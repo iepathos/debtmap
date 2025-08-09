@@ -69,54 +69,27 @@ impl<W: Write> MarkdownWriter<W> {
     }
 
     fn write_summary(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        let debt_score = total_debt_score(&results.technical_debt.items);
-        let debt_threshold = 100; // Default threshold, can be made configurable
+        self.write_summary_header()?;
+        self.write_summary_metrics(results)?;
+        writeln!(self.writer)?;
+        Ok(())
+    }
 
+    fn write_summary_header(&mut self) -> anyhow::Result<()> {
         writeln!(self.writer, "## Executive Summary")?;
         writeln!(self.writer)?;
         writeln!(self.writer, "| Metric | Value | Status |")?;
         writeln!(self.writer, "|--------|-------|--------|")?;
-
-        let summary_rows = vec![
-            (
-                "Files Analyzed",
-                results.complexity.metrics.len().to_string(),
-                "-".to_string(),
-            ),
-            (
-                "Total Functions",
-                results.complexity.summary.total_functions.to_string(),
-                "-".to_string(),
-            ),
-            (
-                "Average Complexity",
-                format!("{:.1}", results.complexity.summary.average_complexity),
-                complexity_status(results.complexity.summary.average_complexity).to_string(),
-            ),
-            (
-                "High Complexity Functions",
-                results.complexity.summary.high_complexity_count.to_string(),
-                high_complexity_status(results.complexity.summary.high_complexity_count)
-                    .to_string(),
-            ),
-            (
-                "Technical Debt Items",
-                results.technical_debt.items.len().to_string(),
-                debt_status(results.technical_debt.items.len()).to_string(),
-            ),
-            (
-                "Total Debt Score",
-                format!("{debt_score} / {debt_threshold}"),
-                debt_score_status(debt_score, debt_threshold).to_string(),
-            ),
-        ];
-
-        for (metric, value, status) in summary_rows {
-            self.write_summary_row(metric, &value, &status)?;
-        }
-
-        writeln!(self.writer)?;
         Ok(())
+    }
+
+    fn write_summary_metrics(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
+        let debt_score = total_debt_score(&results.technical_debt.items);
+        let debt_threshold = 100;
+
+        build_summary_rows(results, debt_score, debt_threshold)
+            .into_iter()
+            .try_for_each(|(metric, value, status)| self.write_summary_row(metric, &value, &status))
     }
 
     fn write_summary_row(&mut self, metric: &str, value: &str, status: &str) -> anyhow::Result<()> {
@@ -135,18 +108,9 @@ impl<W: Write> MarkdownWriter<W> {
     }
 
     fn write_complexity_header(&mut self) -> anyhow::Result<()> {
-        writeln!(self.writer, "## Complexity Analysis")?;
-        writeln!(self.writer)?;
-        writeln!(self.writer, "### Hotspots Requiring Attention")?;
-        writeln!(self.writer)?;
-        writeln!(
-            self.writer,
-            "| File:Line | Function | Cyclomatic | Cognitive | Recommendation |"
-        )?;
-        writeln!(
-            self.writer,
-            "|-----------|----------|------------|-----------|----------------|"
-        )?;
+        complexity_header_lines()
+            .iter()
+            .try_for_each(|line| writeln!(self.writer, "{line}"))?;
         Ok(())
     }
 
@@ -294,12 +258,8 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
 
     println!("{} Complexity Hotspots (top 5):", "⚠️".yellow());
 
-    let mut top_complex: Vec<_> = results.complexity.metrics.iter().collect();
-    top_complex.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
-
-    top_complex
+    get_top_complex_functions(&results.complexity.metrics, 5)
         .iter()
-        .take(5)
         .enumerate()
         .for_each(|(i, func)| {
             println!(
@@ -405,6 +365,56 @@ fn debt_score_status(score: u32, threshold: u32) -> &'static str {
     } else {
         "✅ Good"
     }
+}
+
+fn complexity_header_lines() -> Vec<&'static str> {
+    vec![
+        "## Complexity Analysis",
+        "",
+        "### Hotspots Requiring Attention",
+        "",
+        "| File:Line | Function | Cyclomatic | Cognitive | Recommendation |",
+        "|-----------|----------|------------|-----------|----------------|",
+    ]
+}
+
+fn build_summary_rows(
+    results: &AnalysisResults,
+    debt_score: u32,
+    debt_threshold: u32,
+) -> Vec<(&'static str, String, String)> {
+    vec![
+        (
+            "Files Analyzed",
+            results.complexity.metrics.len().to_string(),
+            "-".to_string(),
+        ),
+        (
+            "Total Functions",
+            results.complexity.summary.total_functions.to_string(),
+            "-".to_string(),
+        ),
+        (
+            "Average Complexity",
+            format!("{:.1}", results.complexity.summary.average_complexity),
+            complexity_status(results.complexity.summary.average_complexity).to_string(),
+        ),
+        (
+            "High Complexity Functions",
+            results.complexity.summary.high_complexity_count.to_string(),
+            high_complexity_status(results.complexity.summary.high_complexity_count).to_string(),
+        ),
+        (
+            "Technical Debt Items",
+            results.technical_debt.items.len().to_string(),
+            debt_status(results.technical_debt.items.len()).to_string(),
+        ),
+        (
+            "Total Debt Score",
+            format!("{debt_score} / {debt_threshold}"),
+            debt_score_status(debt_score, debt_threshold).to_string(),
+        ),
+    ]
 }
 
 fn get_top_complex_functions(metrics: &[FunctionMetrics], count: usize) -> Vec<&FunctionMetrics> {
