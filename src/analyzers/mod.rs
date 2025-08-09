@@ -30,10 +30,14 @@ fn apply_filters(metrics: FileMetrics) -> FileMetrics {
     metrics
 }
 
+type Parser = Box<dyn Fn(&str) -> Result<Ast>>;
+type Transformer = Box<dyn Fn(Ast) -> Ast>;
+type Calculator = Box<dyn Fn(&Ast) -> FileMetrics>;
+
 pub fn compose_analyzers(
-    parsers: Vec<Box<dyn Fn(&str) -> Result<Ast>>>,
-    transformers: Vec<Box<dyn Fn(Ast) -> Ast>>,
-    calculators: Vec<Box<dyn Fn(&Ast) -> FileMetrics>>,
+    parsers: Vec<Parser>,
+    transformers: Vec<Transformer>,
+    calculators: Vec<Calculator>,
 ) -> impl Fn(&str) -> Result<FileMetrics> {
     move |content: &str| {
         let ast = parsers[0](content)?;
@@ -70,5 +74,111 @@ impl Analyzer for NullAnalyzer {
 
     fn language(&self) -> crate::core::Language {
         crate::core::Language::Unknown
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_transform_ast() {
+        let ast = Ast::Unknown;
+        let result = transform_ast(ast);
+        assert!(matches!(result, Ast::Unknown));
+    }
+
+    #[test]
+    fn test_apply_filters() {
+        let metrics = FileMetrics {
+            path: PathBuf::from("test.rs"),
+            language: crate::core::Language::Rust,
+            complexity: crate::core::ComplexityMetrics { functions: vec![] },
+            debt_items: vec![],
+            dependencies: vec![],
+            duplications: vec![],
+        };
+        let result = apply_filters(metrics.clone());
+        assert_eq!(result.path, metrics.path);
+        assert_eq!(result.language, metrics.language);
+    }
+
+    #[test]
+    fn test_get_analyzer_rust() {
+        let analyzer = get_analyzer(crate::core::Language::Rust);
+        assert_eq!(analyzer.language(), crate::core::Language::Rust);
+    }
+
+    #[test]
+    fn test_get_analyzer_python() {
+        let analyzer = get_analyzer(crate::core::Language::Python);
+        assert_eq!(analyzer.language(), crate::core::Language::Python);
+    }
+
+    #[test]
+    fn test_get_analyzer_unknown() {
+        let analyzer = get_analyzer(crate::core::Language::Unknown);
+        assert_eq!(analyzer.language(), crate::core::Language::Unknown);
+    }
+
+    #[test]
+    fn test_null_analyzer_parse() {
+        let analyzer = NullAnalyzer;
+        let result = analyzer.parse("test content", PathBuf::from("test.txt")).unwrap();
+        assert!(matches!(result, Ast::Unknown));
+    }
+
+    #[test]
+    fn test_null_analyzer_analyze() {
+        let analyzer = NullAnalyzer;
+        let ast = Ast::Unknown;
+        let metrics = analyzer.analyze(&ast);
+        assert_eq!(metrics.path, PathBuf::new());
+        assert_eq!(metrics.language, crate::core::Language::Unknown);
+        assert_eq!(metrics.complexity.functions.len(), 0);
+        assert_eq!(metrics.debt_items.len(), 0);
+        assert_eq!(metrics.dependencies.len(), 0);
+        assert_eq!(metrics.duplications.len(), 0);
+    }
+
+    #[test]
+    fn test_null_analyzer_language() {
+        let analyzer = NullAnalyzer;
+        assert_eq!(analyzer.language(), crate::core::Language::Unknown);
+    }
+
+    #[test]
+    fn test_analyze_file() {
+        let analyzer = NullAnalyzer;
+        let content = String::from("test content");
+        let path = PathBuf::from("test.txt");
+        let result = analyze_file(content, path.clone(), &analyzer).unwrap();
+        assert_eq!(result.language, crate::core::Language::Unknown);
+    }
+
+    #[test]
+    fn test_compose_analyzers() {
+        let parsers: Vec<Parser> = vec![
+            Box::new(|_| Ok(Ast::Unknown)),
+        ];
+        let transformers: Vec<Transformer> = vec![
+            Box::new(|ast| ast),
+        ];
+        let calculators: Vec<Calculator> = vec![
+            Box::new(|_| FileMetrics {
+                path: PathBuf::from("test.rs"),
+                language: crate::core::Language::Rust,
+                complexity: crate::core::ComplexityMetrics { functions: vec![] },
+                debt_items: vec![],
+                dependencies: vec![],
+                duplications: vec![],
+            }),
+        ];
+        
+        let analyzer = compose_analyzers(parsers, transformers, calculators);
+        let result = analyzer("test content").unwrap();
+        assert_eq!(result.path, PathBuf::from("test.rs"));
+        assert_eq!(result.language, crate::core::Language::Rust);
     }
 }
