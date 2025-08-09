@@ -247,6 +247,7 @@ mod tests {
 
     #[test]
     fn test_parse_block_suppression() {
+        // debtmap:ignore-start -- Test fixture data
         let content = r#"
 // debtmap:ignore-start
 // TODO: This should be suppressed
@@ -254,6 +255,7 @@ mod tests {
 // debtmap:ignore-end
 // TODO: This should not be suppressed
 "#;
+        // debtmap:ignore-end
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
@@ -267,11 +269,13 @@ mod tests {
 
     #[test]
     fn test_parse_line_suppression() {
+        // debtmap:ignore-start -- Test fixture data
         let content = r#"
 // TODO: Not suppressed
 // TODO: Suppressed // debtmap:ignore
 // FIXME: Also not suppressed
 "#;
+        // debtmap:ignore-end
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
@@ -282,11 +286,13 @@ mod tests {
 
     #[test]
     fn test_parse_next_line_suppression() {
+        // debtmap:ignore-start -- Test fixture data
         let content = r#"
 // debtmap:ignore-next-line
 // TODO: This should be suppressed
 // TODO: This should not be suppressed
 "#;
+        // debtmap:ignore-end
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
@@ -296,12 +302,14 @@ mod tests {
 
     #[test]
     fn test_type_specific_suppression() {
+        // debtmap:ignore-start -- Test fixture data
         let content = r#"
 // debtmap:ignore-start[todo]
 // TODO: Suppressed
 // FIXME: Not suppressed
 // debtmap:ignore-end
 "#;
+        // debtmap:ignore-end
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
@@ -311,11 +319,13 @@ mod tests {
 
     #[test]
     fn test_suppression_with_reason() {
+        // debtmap:ignore-start -- Test fixture data
         let content = r#"
 // debtmap:ignore-start -- Test fixture
 // TODO: Suppressed with reason
 // debtmap:ignore-end
 "#;
+        // debtmap:ignore-end
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
@@ -327,10 +337,12 @@ mod tests {
 
     #[test]
     fn test_unclosed_block_detection() {
+        // debtmap:ignore-start -- Test fixture data
         let content = r#"
 // debtmap:ignore-start
 // TODO: In unclosed block
 "#;
+        // debtmap:ignore-end
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(content, Language::Rust, &file);
 
@@ -340,11 +352,13 @@ mod tests {
 
     #[test]
     fn test_python_comment_syntax() {
+        // debtmap:ignore-start -- Test fixture data
         let content = r#"
 # debtmap:ignore-start
 # TODO: Python TODO
 # debtmap:ignore-end
 "#;
+        // debtmap:ignore-end
         let file = PathBuf::from("test.py");
         let context = parse_suppression_comments(content, Language::Python, &file);
 

@@ -555,11 +555,13 @@ fn test_suppression_block_comments() {
 
 #[test]
 fn test_suppression_line_comments() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 // TODO: Not suppressed
 // TODO: Suppressed // debtmap:ignore
 // FIXME: Also not suppressed
 "#;
+    // debtmap:ignore-end
 
     let path = PathBuf::from("test.rs");
     let items = find_todos_and_fixmes_with_suppression(
@@ -593,12 +595,14 @@ fn test_suppression_next_line() {
 
 #[test]
 fn test_type_specific_suppression() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 // debtmap:ignore-start[todo]
 // TODO: Suppressed
 // FIXME: Not suppressed  
 // debtmap:ignore-end
 "#;
+    // debtmap:ignore-end
 
     let path = PathBuf::from("test.rs");
     let items = find_todos_and_fixmes_with_suppression(
@@ -633,6 +637,7 @@ fn test_suppression_with_reason() {
 
 #[test]
 fn test_python_suppression() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 # debtmap:ignore-start
 # TODO: Python TODO
@@ -640,6 +645,7 @@ fn test_python_suppression() {
 # debtmap:ignore-end
 # TODO: Not suppressed
 "#;
+    // debtmap:ignore-end
 
     let path = PathBuf::from("test.py");
     let items = find_todos_and_fixmes_with_suppression(
@@ -676,11 +682,13 @@ fn test_code_smell_suppression() {
 
 #[test]
 fn test_wildcard_suppression() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 // debtmap:ignore[*]
 // TODO: Suppressed
 // FIXME: Also suppressed
 "#;
+    // debtmap:ignore-end
 
     let path = PathBuf::from("test.rs");
     let suppression = parse_suppression_comments(content, Language::Rust, &path);
