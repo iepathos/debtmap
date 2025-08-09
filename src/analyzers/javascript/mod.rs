@@ -13,10 +13,11 @@ use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tree_sitter::Parser;
 
 pub struct JavaScriptAnalyzer {
-    parser: Parser,
+    parser: Mutex<Parser>,
     language: Language,
     complexity_threshold: u32,
 }
@@ -28,7 +29,7 @@ impl JavaScriptAnalyzer {
             .set_language(&tree_sitter_javascript::LANGUAGE.into())
             .context("Failed to set JavaScript language")?;
         Ok(Self {
-            parser,
+            parser: Mutex::new(parser),
             language: Language::JavaScript,
             complexity_threshold: 10,
         })
@@ -40,16 +41,26 @@ impl JavaScriptAnalyzer {
             .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
             .context("Failed to set TypeScript language")?;
         Ok(Self {
-            parser,
+            parser: Mutex::new(parser),
             language: Language::TypeScript,
             complexity_threshold: 10,
         })
     }
 
-    fn parse_tree(&mut self, content: &str) -> Result<tree_sitter::Tree> {
+    fn parse_tree(&self, content: &str) -> Result<tree_sitter::Tree> {
         self.parser
+            .lock()
+            .unwrap()
             .parse(content, None)
             .context("Failed to parse JavaScript/TypeScript code")
+    }
+
+    fn create_ast(&self, tree: tree_sitter::Tree, source: String, path: PathBuf) -> Ast {
+        match self.language {
+            Language::JavaScript => Ast::JavaScript(JavaScriptAst { tree, source, path }),
+            Language::TypeScript => Ast::TypeScript(TypeScriptAst { tree, source, path }),
+            _ => unreachable!("JavaScriptAnalyzer should only handle JS/TS"),
+        }
     }
 
     fn create_debt_items(
@@ -134,43 +145,12 @@ impl JavaScriptAnalyzer {
 
 impl Analyzer for JavaScriptAnalyzer {
     fn parse(&self, content: &str, path: PathBuf) -> Result<Ast> {
-        let mut analyzer = Self {
-            parser: Parser::new(),
-            language: self.language,
-            complexity_threshold: self.complexity_threshold,
-        };
+        // Parse the content directly using the already configured parser
+        let tree = self.parse_tree(content)?;
 
-        // Set the appropriate language
-        match self.language {
-            Language::JavaScript => {
-                analyzer
-                    .parser
-                    .set_language(&tree_sitter_javascript::LANGUAGE.into())
-                    .context("Failed to set JavaScript language")?;
-            }
-            Language::TypeScript => {
-                analyzer
-                    .parser
-                    .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
-                    .context("Failed to set TypeScript language")?;
-            }
-            _ => unreachable!("JavaScriptAnalyzer should only handle JS/TS"),
-        }
-
-        let tree = analyzer.parse_tree(content)?;
-        match self.language {
-            Language::JavaScript => Ok(Ast::JavaScript(JavaScriptAst {
-                tree,
-                source: content.to_string(),
-                path,
-            })),
-            Language::TypeScript => Ok(Ast::TypeScript(TypeScriptAst {
-                tree,
-                source: content.to_string(),
-                path,
-            })),
-            _ => unreachable!(),
-        }
+        // Create the appropriate AST type based on language
+        let ast = self.create_ast(tree, content.to_string(), path);
+        Ok(ast)
     }
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
