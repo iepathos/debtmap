@@ -1,4 +1,4 @@
-# Eidolon - Justfile
+# Debtmap - Justfile
 # Quick development commands for Rust projects
 
 # Default recipe - show available commands
@@ -71,8 +71,8 @@ test-watch:
 # Run tests with coverage using cargo-tarpaulin
 coverage:
     #!/usr/bin/env bash
-    echo "Building mmm binary for integration tests..."
-    cargo build --bin mmm
+    echo "Building debtmap binary for integration tests..."
+    cargo build --bin debtmap
     echo "Generating code coverage report with cargo-tarpaulin..."
     cargo tarpaulin --skip-clean --engine llvm --out Html --out Json --output-dir target/coverage
     echo "Coverage report generated at target/coverage/tarpaulin-report.html"
@@ -80,8 +80,8 @@ coverage:
 # Run tests with coverage and check threshold
 coverage-check:
     #!/usr/bin/env bash
-    echo "Building mmm binary for integration tests..."
-    cargo build --bin mmm
+    echo "Building debtmap binary for integration tests..."
+    cargo build --bin debtmap
     echo "Checking code coverage threshold..."
     COVERAGE=$(cargo tarpaulin --skip-clean --engine llvm --out Json --output-dir target/coverage --quiet | jq -r '.files | to_entries | map(.value.coverage) | add / length')
     echo "Current coverage: ${COVERAGE}%"
@@ -244,7 +244,7 @@ test-performance:
 
 # Full CI build pipeline (equivalent to scripts/ci-build.sh)
 ci-build:
-    @echo "Building mmm..."
+    @echo "Building debtmap..."
     @echo "Checking code formatting..."
     cargo fmt --all -- --check
     @echo "Running clippy..."
