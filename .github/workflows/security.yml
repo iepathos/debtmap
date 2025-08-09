@@ -1,0 +1,153 @@
+name: Security
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM UTC
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
+    - name: Run security audit
+      run: cargo audit --json > audit-results.json || true
+    
+    - name: Display audit results
+      run: |
+        if [ -f audit-results.json ]; then
+          echo "Security audit results:"
+          cat audit-results.json | jq -r '.vulnerabilities[] | "\(.advisory.id): \(.advisory.title) (\(.advisory.severity))"' || echo "No vulnerabilities found"
+        fi
+    
+    - name: Upload audit results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-audit-results
+        path: audit-results.json
+
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Install cargo-deny
+      run: cargo install cargo-deny
+    
+    - name: Create deny.toml if not exists
+      run: |
+        if [ ! -f deny.toml ]; then
+          cat > deny.toml << 'EOF'
+        [bans]
+        multiple-versions = "warn"
+        wildcards = "deny"
+        
+        [licenses]
+        copyleft = "deny"
+        allow-osi-fsf-free = "neither"
+        default = "deny"
+        allow = [
+            "Apache-2.0",
+            "MIT",
+            "BSD-2-Clause",
+            "BSD-3-Clause",
+            "ISC",
+            "Unicode-DFS-2016",
+        ]
+        
+        [advisories]
+        vulnerability = "deny"
+        unmaintained = "warn"
+        yanked = "warn"
+        notice = "warn"
+        
+        [sources]
+        unknown-registry = "warn"
+        unknown-git = "warn"
+        EOF
+        fi
+    
+    - name: Run cargo deny
+      run: cargo deny check --hide-inclusion-graph
+    
+    - name: Check for unused dependencies
+      run: |
+        cargo install cargo-machete
+        cargo machete --with-metadata || true
+
+  supply-chain:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ubuntu-latest-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Check for suspicious dependencies
+      run: |
+        echo "Checking for suspicious dependencies..."
+        cargo tree --duplicates || true
+        
+        echo "Checking for potential typosquatting..."
+        cargo tree --format "{p}" | grep -E "(reqwest|serde|tokio|clap)" | sort | uniq -c | sort -nr
+    
+    - name: Verify Cargo.lock is up to date
+      run: |
+        cargo generate-lockfile
+        if ! git diff --exit-code Cargo.lock; then
+          echo "Cargo.lock is not up to date!"
+          exit 1
+        fi
+    
+    - name: Check for overly broad feature flags
+      run: |
+        echo "Checking for overly broad feature flags..."
+        grep -n "features.*=.*\[.*\]" Cargo.toml || true
