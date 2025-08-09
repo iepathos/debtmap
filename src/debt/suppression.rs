@@ -199,6 +199,49 @@ fn parse_line(line: &str, line_number: usize, patterns: &SuppressionPatterns) ->
     LineParseResult::None
 }
 
+fn process_parsed_line(
+    result: LineParseResult,
+    context: &mut SuppressionContext,
+    open_blocks: &mut Vec<(usize, Vec<DebtType>, Option<String>)>,
+) {
+    match result {
+        LineParseResult::BlockStart(ln, types, reason) => {
+            open_blocks.push((ln, types, reason));
+        }
+        LineParseResult::BlockEnd(end_line) => {
+            if let Some((start_line, debt_types, reason)) = open_blocks.pop() {
+                context.active_blocks.push(SuppressionBlock {
+                    start_line,
+                    end_line: Some(end_line),
+                    debt_types,
+                    reason,
+                });
+            }
+        }
+        LineParseResult::NextLineSuppression(ln, types, reason) => {
+            context.line_suppressions.insert(
+                ln,
+                SuppressionRule {
+                    debt_types: types,
+                    reason,
+                    applies_to_next_line: true,
+                },
+            );
+        }
+        LineParseResult::LineSuppression(ln, types, reason) => {
+            context.line_suppressions.insert(
+                ln,
+                SuppressionRule {
+                    debt_types: types,
+                    reason,
+                    applies_to_next_line: false,
+                },
+            );
+        }
+        LineParseResult::None => {}
+    }
+}
+
 pub fn parse_suppression_comments(
     content: &str,
     language: Language,
@@ -212,44 +255,10 @@ pub fn parse_suppression_comments(
         .lines()
         .enumerate()
         .map(|(idx, line)| (idx + 1, line))
-        .for_each(
-            |(line_number, line)| match parse_line(line, line_number, &patterns) {
-                LineParseResult::BlockStart(ln, types, reason) => {
-                    open_blocks.push((ln, types, reason));
-                }
-                LineParseResult::BlockEnd(end_line) => {
-                    if let Some((start_line, debt_types, reason)) = open_blocks.pop() {
-                        context.active_blocks.push(SuppressionBlock {
-                            start_line,
-                            end_line: Some(end_line),
-                            debt_types,
-                            reason,
-                        });
-                    }
-                }
-                LineParseResult::NextLineSuppression(ln, types, reason) => {
-                    context.line_suppressions.insert(
-                        ln,
-                        SuppressionRule {
-                            debt_types: types,
-                            reason,
-                            applies_to_next_line: true,
-                        },
-                    );
-                }
-                LineParseResult::LineSuppression(ln, types, reason) => {
-                    context.line_suppressions.insert(
-                        ln,
-                        SuppressionRule {
-                            debt_types: types,
-                            reason,
-                            applies_to_next_line: false,
-                        },
-                    );
-                }
-                LineParseResult::None => {}
-            },
-        );
+        .for_each(|(line_number, line)| {
+            let result = parse_line(line, line_number, &patterns);
+            process_parsed_line(result, &mut context, &mut open_blocks);
+        });
 
     // Record any unclosed blocks
     context.unclosed_blocks = open_blocks
