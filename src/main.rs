@@ -26,47 +26,60 @@ fn main() -> Result<()> {
             threshold_complexity,
             threshold_duplication,
             languages,
-        } => {
-            let languages = parse_languages(languages);
-            let results =
-                analyze_project(path, languages, threshold_complexity, threshold_duplication)?;
-
-            output_results(results, format.into(), output)?;
-        }
-
+        } => handle_analyze(
+            path,
+            format,
+            output,
+            threshold_complexity,
+            threshold_duplication,
+            languages,
+        ),
         Commands::Complexity {
             path,
             format,
             threshold,
-        } => {
-            let results = analyze_complexity_only(path, threshold)?;
-            output_results(results, format.into(), None)?;
-        }
-
+        } => handle_complexity(path, format, threshold),
         Commands::Debt {
             path,
             format,
             min_priority,
-        } => {
-            let results = analyze_debt_only(path, min_priority.map(Into::into))?;
-            output_results(results, format.into(), None)?;
-        }
-
-        Commands::Deps { path, format } => {
-            let results = analyze_dependencies_only(path)?;
-            output_results(results, format.into(), None)?;
-        }
-
-        Commands::Init { force } => {
-            init_config(force)?;
-        }
-
-        Commands::Validate { path, config } => {
-            validate_project(path, config)?;
-        }
+        } => handle_debt(path, format, min_priority),
+        Commands::Deps { path, format } => handle_deps(path, format),
+        Commands::Init { force } => init_config(force),
+        Commands::Validate { path, config } => validate_project(path, config),
     }
+}
 
-    Ok(())
+fn handle_analyze(
+    path: PathBuf,
+    format: cli::OutputFormat,
+    output: Option<PathBuf>,
+    threshold_complexity: u32,
+    threshold_duplication: usize,
+    languages: Option<Vec<String>>,
+) -> Result<()> {
+    let languages = parse_languages(languages);
+    let results = analyze_project(path, languages, threshold_complexity, threshold_duplication)?;
+    output_results(results, format.into(), output)
+}
+
+fn handle_complexity(path: PathBuf, format: cli::OutputFormat, threshold: u32) -> Result<()> {
+    let results = analyze_complexity_only(path, threshold)?;
+    output_results(results, format.into(), None)
+}
+
+fn handle_debt(
+    path: PathBuf,
+    format: cli::OutputFormat,
+    min_priority: Option<cli::Priority>,
+) -> Result<()> {
+    let results = analyze_debt_only(path, min_priority.map(Into::into))?;
+    output_results(results, format.into(), None)
+}
+
+fn handle_deps(path: PathBuf, format: cli::OutputFormat) -> Result<()> {
+    let results = analyze_dependencies_only(path)?;
+    output_results(results, format.into(), None)
 }
 
 fn analyze_project(
@@ -78,61 +91,13 @@ fn analyze_project(
     let files = io::walker::find_project_files(&path, languages.clone())
         .context("Failed to find project files")?;
 
-    let file_metrics: Vec<FileMetrics> = files
-        .par_iter()
-        .filter_map(|path| analyze_single_file(path.as_path()))
-        .collect();
+    let file_metrics = collect_file_metrics(&files);
+    let all_functions = extract_all_functions(&file_metrics);
+    let all_debt_items = extract_all_debt_items(&file_metrics);
+    let duplications = detect_duplications(&files, duplication_threshold);
 
-    let all_functions: Vec<_> = file_metrics
-        .iter()
-        .flat_map(|m| &m.complexity.functions)
-        .cloned()
-        .collect();
-
-    let all_debt_items: Vec<_> = file_metrics
-        .iter()
-        .flat_map(|m| &m.debt_items)
-        .cloned()
-        .collect();
-
-    let files_for_duplication: Vec<(PathBuf, String)> = files
-        .iter()
-        .filter_map(|path| {
-            io::read_file(path)
-                .ok()
-                .map(|content| (path.clone(), content))
-        })
-        .collect();
-
-    let duplications =
-        debt::duplication::detect_duplication(files_for_duplication, duplication_threshold, 0.8);
-
-    let complexity_report = ComplexityReport {
-        metrics: all_functions.clone(),
-        summary: ComplexitySummary {
-            total_functions: all_functions.len(),
-            average_complexity: core::metrics::calculate_average_complexity(&all_functions),
-            max_complexity: core::metrics::find_max_complexity(&all_functions),
-            high_complexity_count: core::metrics::count_high_complexity(
-                &all_functions,
-                complexity_threshold,
-            ),
-        },
-    };
-
-    let debt_by_type = debt::categorize_debt(all_debt_items.clone());
-    let priorities = debt::prioritize_debt(all_debt_items.clone())
-        .into_iter()
-        .map(|item| item.priority)
-        .collect();
-
-    let technical_debt = TechnicalDebtReport {
-        items: all_debt_items,
-        by_type: debt_by_type,
-        priorities,
-        duplications: duplications.clone(),
-    };
-
+    let complexity_report = build_complexity_report(&all_functions, complexity_threshold);
+    let technical_debt = build_technical_debt_report(all_debt_items, duplications.clone());
     let dependencies = create_dependency_report(&file_metrics);
 
     Ok(AnalysisResults {
@@ -143,6 +108,78 @@ fn analyze_project(
         dependencies,
         duplications,
     })
+}
+
+fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
+    files
+        .par_iter()
+        .filter_map(|path| analyze_single_file(path.as_path()))
+        .collect()
+}
+
+fn extract_all_functions(file_metrics: &[FileMetrics]) -> Vec<core::FunctionMetrics> {
+    file_metrics
+        .iter()
+        .flat_map(|m| &m.complexity.functions)
+        .cloned()
+        .collect()
+}
+
+fn extract_all_debt_items(file_metrics: &[FileMetrics]) -> Vec<core::DebtItem> {
+    file_metrics
+        .iter()
+        .flat_map(|m| &m.debt_items)
+        .cloned()
+        .collect()
+}
+
+fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<core::DuplicationBlock> {
+    let files_with_content: Vec<(PathBuf, String)> = files
+        .iter()
+        .filter_map(|path| {
+            io::read_file(path)
+                .ok()
+                .map(|content| (path.clone(), content))
+        })
+        .collect();
+
+    debt::duplication::detect_duplication(files_with_content, threshold, 0.8)
+}
+
+fn build_complexity_report(
+    all_functions: &[core::FunctionMetrics],
+    complexity_threshold: u32,
+) -> ComplexityReport {
+    ComplexityReport {
+        metrics: all_functions.to_vec(),
+        summary: ComplexitySummary {
+            total_functions: all_functions.len(),
+            average_complexity: core::metrics::calculate_average_complexity(all_functions),
+            max_complexity: core::metrics::find_max_complexity(all_functions),
+            high_complexity_count: core::metrics::count_high_complexity(
+                all_functions,
+                complexity_threshold,
+            ),
+        },
+    }
+}
+
+fn build_technical_debt_report(
+    all_debt_items: Vec<core::DebtItem>,
+    duplications: Vec<core::DuplicationBlock>,
+) -> TechnicalDebtReport {
+    let debt_by_type = debt::categorize_debt(all_debt_items.clone());
+    let priorities = debt::prioritize_debt(all_debt_items.clone())
+        .into_iter()
+        .map(|item| item.priority)
+        .collect();
+
+    TechnicalDebtReport {
+        items: all_debt_items,
+        by_type: debt_by_type,
+        priorities,
+        duplications,
+    }
 }
 
 fn analyze_complexity_only(path: PathBuf, threshold: u32) -> Result<AnalysisResults> {
