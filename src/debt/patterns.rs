@@ -1,118 +1,151 @@
 use crate::core::{DebtItem, DebtType, Priority};
 use regex::Regex;
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
-pub fn find_todos_and_fixmes(content: &str, file: &PathBuf) -> Vec<DebtItem> {
-    let mut items = Vec::new();
-
+pub fn find_todos_and_fixmes(content: &str, file: &Path) -> Vec<DebtItem> {
     let todo_regex =
         Regex::new(r"(?i)\b(TODO|FIXME|HACK|XXX|BUG|OPTIMIZE|REFACTOR):\s*(.*)").unwrap();
 
-    for (line_num, line) in content.lines().enumerate() {
-        if let Some(captures) = todo_regex.captures(line) {
-            let marker = captures.get(1).unwrap().as_str().to_uppercase();
-            let message = captures.get(2).unwrap().as_str().trim().to_string();
+    content
+        .lines()
+        .enumerate()
+        .filter_map(|(line_num, line)| {
+            todo_regex.captures(line).map(|captures| {
+                let marker = captures.get(1).unwrap().as_str().to_uppercase();
+                let message = captures.get(2).unwrap().as_str().trim();
 
-            let (debt_type, priority) = match marker.as_str() {
-                "FIXME" | "BUG" => (DebtType::Fixme, Priority::High),
-                "TODO" => (DebtType::Todo, Priority::Medium),
-                "HACK" | "XXX" => (DebtType::CodeSmell, Priority::High),
-                "OPTIMIZE" => (DebtType::CodeSmell, Priority::Low),
-                "REFACTOR" => (DebtType::CodeSmell, Priority::Medium),
-                _ => (DebtType::Todo, Priority::Low),
-            };
+                let (debt_type, priority) = classify_marker(&marker);
 
-            items.push(DebtItem {
-                id: format!("{}-{}-{}", debt_type, file.display(), line_num + 1),
-                debt_type,
-                priority,
-                file: file.clone(),
-                line: line_num + 1,
-                message: format!("{marker}: {message}"),
-                context: Some(line.trim().to_string()),
-            });
-        }
-    }
-
-    items
+                DebtItem {
+                    id: format!("{}-{}-{}", debt_type, file.display(), line_num + 1),
+                    debt_type,
+                    priority,
+                    file: file.to_path_buf(),
+                    line: line_num + 1,
+                    message: format!("{marker}: {message}"),
+                    context: Some(line.trim().to_string()),
+                }
+            })
+        })
+        .collect()
 }
 
-pub fn find_code_smells(content: &str, file: &PathBuf) -> Vec<DebtItem> {
-    let mut items = Vec::new();
-
-    let long_line_threshold = 120;
-    let deep_nesting_threshold = 4;
-
-    for (line_num, line) in content.lines().enumerate() {
-        if line.len() > long_line_threshold {
-            items.push(DebtItem {
-                id: format!("long-line-{}-{}", file.display(), line_num + 1),
-                debt_type: DebtType::CodeSmell,
-                priority: Priority::Low,
-                file: file.clone(),
-                line: line_num + 1,
-                message: format!(
-                    "Line exceeds {} characters ({})",
-                    long_line_threshold,
-                    line.len()
-                ),
-                context: None,
-            });
-        }
-
-        let indent_count = line.chars().take_while(|c| c.is_whitespace()).count() / 4;
-        if indent_count > deep_nesting_threshold {
-            items.push(DebtItem {
-                id: format!("deep-nesting-{}-{}", file.display(), line_num + 1),
-                debt_type: DebtType::CodeSmell,
-                priority: Priority::Medium,
-                file: file.clone(),
-                line: line_num + 1,
-                message: format!("Deep nesting level: {indent_count}"),
-                context: Some(line.trim().to_string()),
-            });
-        }
+fn classify_marker(marker: &str) -> (DebtType, Priority) {
+    match marker {
+        "FIXME" | "BUG" => (DebtType::Fixme, Priority::High),
+        "TODO" => (DebtType::Todo, Priority::Medium),
+        "HACK" | "XXX" => (DebtType::CodeSmell, Priority::High),
+        "OPTIMIZE" => (DebtType::CodeSmell, Priority::Low),
+        "REFACTOR" => (DebtType::CodeSmell, Priority::Medium),
+        _ => (DebtType::Todo, Priority::Low),
     }
-
-    items
 }
 
-pub fn detect_duplicate_strings(content: &str, file: &PathBuf) -> Vec<DebtItem> {
-    let mut items = Vec::new();
+pub fn find_code_smells(content: &str, file: &Path) -> Vec<DebtItem> {
+    const LONG_LINE_THRESHOLD: usize = 120;
+    const DEEP_NESTING_THRESHOLD: usize = 4;
+
+    content
+        .lines()
+        .enumerate()
+        .flat_map(|(line_num, line)| {
+            let line_number = line_num + 1;
+            let file_path = file.to_path_buf();
+
+            [
+                check_line_length(line, line_number, &file_path, LONG_LINE_THRESHOLD),
+                check_nesting_level(line, line_number, &file_path, DEEP_NESTING_THRESHOLD),
+            ]
+            .into_iter()
+            .flatten()
+        })
+        .collect()
+}
+
+fn check_line_length(
+    line: &str,
+    line_number: usize,
+    file_path: &PathBuf,
+    threshold: usize,
+) -> Option<DebtItem> {
+    (line.len() > threshold).then(|| DebtItem {
+        id: format!("long-line-{}-{}", file_path.display(), line_number),
+        debt_type: DebtType::CodeSmell,
+        priority: Priority::Low,
+        file: file_path.clone(),
+        line: line_number,
+        message: format!("Line exceeds {} characters ({})", threshold, line.len()),
+        context: None,
+    })
+}
+
+fn check_nesting_level(
+    line: &str,
+    line_number: usize,
+    file_path: &PathBuf,
+    threshold: usize,
+) -> Option<DebtItem> {
+    let indent_count = line.chars().take_while(|c| c.is_whitespace()).count() / 4;
+
+    (indent_count > threshold).then(|| DebtItem {
+        id: format!("deep-nesting-{}-{}", file_path.display(), line_number),
+        debt_type: DebtType::CodeSmell,
+        priority: Priority::Medium,
+        file: file_path.clone(),
+        line: line_number,
+        message: format!("Deep nesting level: {indent_count}"),
+        context: Some(line.trim().to_string()),
+    })
+}
+
+pub fn detect_duplicate_strings(content: &str, file: &Path) -> Vec<DebtItem> {
     let string_regex = Regex::new(r#"["']([^"']{20,})["']"#).unwrap();
-    let mut string_counts: std::collections::HashMap<String, Vec<usize>> =
-        std::collections::HashMap::new();
 
-    for (line_num, line) in content.lines().enumerate() {
-        for captures in string_regex.captures_iter(line) {
-            let string = captures.get(1).unwrap().as_str().to_string();
-            string_counts.entry(string).or_default().push(line_num + 1);
-        }
+    let string_counts = content
+        .lines()
+        .enumerate()
+        .flat_map(|(line_num, line)| {
+            string_regex
+                .captures_iter(line)
+                .filter_map(|captures| captures.get(1))
+                .map(move |matched| (matched.as_str().to_string(), line_num + 1))
+        })
+        .fold(
+            HashMap::<String, Vec<usize>>::new(),
+            |mut acc, (string, line)| {
+                acc.entry(string).or_default().push(line);
+                acc
+            },
+        );
+
+    string_counts
+        .into_iter()
+        .filter(|(_, lines)| lines.len() > 2)
+        .map(|(string, lines)| create_duplicate_string_item(&string, &lines, file))
+        .collect()
+}
+
+fn create_duplicate_string_item(string: &str, lines: &[usize], file: &Path) -> DebtItem {
+    let truncated_string = if string.len() > 50 {
+        &string[..50]
+    } else {
+        string
+    };
+
+    DebtItem {
+        id: format!("duplicate-string-{}-{}", file.display(), lines[0]),
+        debt_type: DebtType::Duplication,
+        priority: Priority::Low,
+        file: file.to_path_buf(),
+        line: lines[0],
+        message: format!(
+            "String '{}' appears {} times",
+            truncated_string,
+            lines.len()
+        ),
+        context: Some(format!("Lines: {lines:?}")),
     }
-
-    for (string, lines) in string_counts {
-        if lines.len() > 2 {
-            items.push(DebtItem {
-                id: format!("duplicate-string-{}-{}", file.display(), lines[0]),
-                debt_type: DebtType::Duplication,
-                priority: Priority::Low,
-                file: file.clone(),
-                line: lines[0],
-                message: format!(
-                    "String '{}' appears {} times",
-                    if string.len() > 50 {
-                        &string[..50]
-                    } else {
-                        &string
-                    },
-                    lines.len()
-                ),
-                context: Some(format!("Lines: {lines:?}")),
-            });
-        }
-    }
-
-    items
 }
 
 pub fn combine_debt_items(items: Vec<Vec<DebtItem>>) -> Vec<DebtItem> {
@@ -121,9 +154,17 @@ pub fn combine_debt_items(items: Vec<Vec<DebtItem>>) -> Vec<DebtItem> {
 
 pub fn deduplicate_debt_items(items: Vec<DebtItem>) -> Vec<DebtItem> {
     use std::collections::HashSet;
-    let mut seen = HashSet::new();
+
     items
         .into_iter()
-        .filter(|item| seen.insert(item.id.clone()))
-        .collect()
+        .fold(
+            (HashSet::new(), Vec::new()),
+            |(mut seen, mut unique), item| {
+                if seen.insert(item.id.clone()) {
+                    unique.push(item);
+                }
+                (seen, unique)
+            },
+        )
+        .1
 }

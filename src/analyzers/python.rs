@@ -4,9 +4,11 @@ use crate::core::{
     ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
     FunctionMetrics, Language, Priority,
 };
+use crate::debt::patterns::find_todos_and_fixmes;
+use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use anyhow::Result;
 use rustpython_parser::ast;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct PythonAnalyzer {
     complexity_threshold: u32,
@@ -47,8 +49,15 @@ impl Analyzer for PythonAnalyzer {
 }
 
 fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
-    let functions = extract_function_metrics(&ast.module, &ast.path);
-    let debt_items = extract_debt_items(&ast.module, &ast.path, threshold, &functions);
+    let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
+    let functions = extract_function_metrics(&ast.module, &ast.path, &source_content);
+    let debt_items = create_python_debt_items(
+        &ast.module,
+        &ast.path,
+        threshold,
+        &functions,
+        &source_content,
+    );
     let dependencies = extract_dependencies(&ast.module);
 
     FileMetrics {
@@ -61,35 +70,97 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
     }
 }
 
-fn extract_function_metrics(module: &ast::Mod, path: &PathBuf) -> Vec<FunctionMetrics> {
-    let mut functions = Vec::new();
+fn create_python_debt_items(
+    module: &ast::Mod,
+    path: &PathBuf,
+    threshold: u32,
+    functions: &[FunctionMetrics],
+    source_content: &str,
+) -> Vec<DebtItem> {
+    let complexity_items = extract_debt_items(module, path, threshold, functions);
+    let todo_items = find_todos_and_fixmes(source_content, path);
+    let module_smells = analyze_module_smells(path, source_content.lines().count())
+        .into_iter()
+        .map(|smell| smell.to_debt_item());
+    let function_smells = functions
+        .iter()
+        .flat_map(|func| {
+            let param_count = count_python_params(module, &func.name);
+            analyze_function_smells(func, param_count)
+        })
+        .map(|smell| smell.to_debt_item());
 
-    if let ast::Mod::Module(module) = module {
-        for stmt in &module.body {
-            if let ast::Stmt::FunctionDef(func_def) = stmt {
-                let mut metrics = FunctionMetrics::new(func_def.name.to_string(), path.clone(), 0);
+    complexity_items
+        .into_iter()
+        .chain(todo_items)
+        .chain(module_smells)
+        .chain(function_smells)
+        .collect()
+}
 
-                metrics.cyclomatic = calculate_cyclomatic_python(&func_def.body);
-                metrics.cognitive = calculate_cognitive_python(&func_def.body);
-                metrics.nesting = calculate_nesting_python(&func_def.body);
-                metrics.length = func_def.body.len();
+fn extract_function_metrics(
+    module: &ast::Mod,
+    path: &PathBuf,
+    source_content: &str,
+) -> Vec<FunctionMetrics> {
+    let ast::Mod::Module(module) = module else {
+        return Vec::new();
+    };
 
-                functions.push(metrics);
+    let lines: Vec<&str> = source_content.lines().collect();
+
+    module
+        .body
+        .iter()
+        .enumerate()
+        .filter_map(|(stmt_idx, stmt)| match stmt {
+            ast::Stmt::FunctionDef(func_def) => {
+                let line_number =
+                    estimate_line_number(&lines, &func_def.name.to_string(), stmt_idx);
+                Some(FunctionMetrics {
+                    name: func_def.name.to_string(),
+                    file: path.clone(),
+                    line: line_number,
+                    cyclomatic: calculate_cyclomatic_python(&func_def.body),
+                    cognitive: calculate_cognitive_python(&func_def.body),
+                    nesting: calculate_nesting_python(&func_def.body),
+                    length: func_def.body.len(),
+                })
             }
-        }
-    }
+            _ => None,
+        })
+        .collect()
+}
 
-    functions
+fn estimate_line_number(lines: &[&str], func_name: &str, _stmt_idx: usize) -> usize {
+    let def_pattern = format!("def {}", func_name);
+    lines
+        .iter()
+        .enumerate()
+        .find(|(_, line)| line.trim_start().starts_with(&def_pattern))
+        .map(|(idx, _)| idx + 1) // Line numbers are 1-based
+        .unwrap_or(1) // Default to line 1 if not found
+}
+
+fn count_python_params(module: &ast::Mod, func_name: &str) -> usize {
+    let ast::Mod::Module(module) = module else {
+        return 0;
+    };
+
+    module
+        .body
+        .iter()
+        .find_map(|stmt| match stmt {
+            ast::Stmt::FunctionDef(func_def) if func_def.name.to_string() == func_name => {
+                Some(func_def.args.args.len())
+            }
+            _ => None,
+        })
+        .unwrap_or(0)
 }
 
 fn calculate_cyclomatic_python(body: &[ast::Stmt]) -> u32 {
-    let mut complexity = 1;
-
-    for stmt in body {
-        complexity += count_branches_stmt(stmt);
-    }
-
-    complexity
+    1 + body.iter().map(count_branches_stmt).sum::<u32>()
 }
 
 fn count_branches_stmt(stmt: &ast::Stmt) -> u32 {
@@ -110,14 +181,10 @@ fn count_branches_stmt(stmt: &ast::Stmt) -> u32 {
 }
 
 fn calculate_cognitive_python(body: &[ast::Stmt]) -> u32 {
-    let mut cognitive = 0;
     let mut nesting = 0;
-
-    for stmt in body {
-        cognitive += calculate_cognitive_stmt(stmt, &mut nesting);
-    }
-
-    cognitive
+    body.iter()
+        .map(|stmt| calculate_cognitive_stmt(stmt, &mut nesting))
+        .sum()
 }
 
 fn calculate_cognitive_stmt(stmt: &ast::Stmt, nesting: &mut u32) -> u32 {
@@ -157,13 +224,10 @@ fn calculate_cognitive_stmt(stmt: &ast::Stmt, nesting: &mut u32) -> u32 {
 }
 
 fn calculate_nesting_python(body: &[ast::Stmt]) -> u32 {
-    let mut max_nesting = 0;
-
-    for stmt in body {
-        max_nesting = max_nesting.max(calculate_nesting_stmt(stmt, 0));
-    }
-
-    max_nesting
+    body.iter()
+        .map(|stmt| calculate_nesting_stmt(stmt, 0))
+        .max()
+        .unwrap_or(0)
 }
 
 fn calculate_nesting_stmt(stmt: &ast::Stmt, current_depth: u32) -> u32 {
@@ -198,62 +262,67 @@ fn calculate_nesting_stmt(stmt: &ast::Stmt, current_depth: u32) -> u32 {
 
 fn extract_debt_items(
     _module: &ast::Mod,
-    _path: &PathBuf,
+    _path: &Path,
     threshold: u32,
     functions: &[FunctionMetrics],
 ) -> Vec<DebtItem> {
-    let mut items = Vec::new();
+    functions
+        .iter()
+        .filter(|func| func.is_complex(threshold))
+        .map(|func| create_python_complexity_debt_item(func, threshold))
+        .collect()
+}
 
-    for func in functions {
-        if func.is_complex(threshold) {
-            items.push(DebtItem {
-                id: format!("complexity-{}-{}", func.file.display(), func.line),
-                debt_type: DebtType::Complexity,
-                priority: if func.cyclomatic > threshold * 2 {
-                    Priority::High
-                } else {
-                    Priority::Medium
-                },
-                file: func.file.clone(),
-                line: func.line,
-                message: format!(
-                    "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
-                    func.name, func.cyclomatic, func.cognitive
-                ),
-                context: None,
-            });
-        }
+fn create_python_complexity_debt_item(func: &FunctionMetrics, threshold: u32) -> DebtItem {
+    DebtItem {
+        id: format!("complexity-{}-{}", func.file.display(), func.line),
+        debt_type: DebtType::Complexity,
+        priority: if func.cyclomatic > threshold * 2 {
+            Priority::High
+        } else {
+            Priority::Medium
+        },
+        file: func.file.clone(),
+        line: func.line,
+        message: format!(
+            "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
+            func.name, func.cyclomatic, func.cognitive
+        ),
+        context: None,
     }
-
-    items
 }
 
 fn extract_dependencies(module: &ast::Mod) -> Vec<Dependency> {
-    let mut deps = Vec::new();
+    let ast::Mod::Module(module) = module else {
+        return Vec::new();
+    };
 
-    if let ast::Mod::Module(module) = module {
-        for stmt in &module.body {
-            match stmt {
-                ast::Stmt::Import(import) => {
-                    for alias in &import.names {
-                        deps.push(Dependency {
-                            name: alias.name.to_string(),
-                            kind: DependencyKind::Import,
-                        });
-                    }
-                }
-                ast::Stmt::ImportFrom(import_from) => {
-                    if let Some(module) = &import_from.module {
-                        deps.push(Dependency {
-                            name: module.to_string(),
-                            kind: DependencyKind::Module,
-                        });
-                    }
-                }
-                _ => {}
-            }
-        }
+    module
+        .body
+        .iter()
+        .flat_map(extract_stmt_dependencies)
+        .collect()
+}
+
+fn extract_stmt_dependencies(stmt: &ast::Stmt) -> Vec<Dependency> {
+    match stmt {
+        ast::Stmt::Import(import) => import
+            .names
+            .iter()
+            .map(|alias| Dependency {
+                name: alias.name.to_string(),
+                kind: DependencyKind::Import,
+            })
+            .collect(),
+        ast::Stmt::ImportFrom(import_from) => import_from
+            .module
+            .as_ref()
+            .map(|module| Dependency {
+                name: module.to_string(),
+                kind: DependencyKind::Module,
+            })
+            .into_iter()
+            .collect(),
+        _ => Vec::new(),
     }
-
-    deps
 }

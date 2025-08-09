@@ -10,6 +10,14 @@ readme = "README.md"
 keywords = ["code-analysis", "technical-debt", "complexity", "static-analysis"]
 categories = ["development-tools", "command-line-utilities"]
 
+[lib]
+name = "debtmap"
+path = "src/lib.rs"
+
+[[bin]]
+name = "debtmap"
+path = "src/main.rs"
+
 [dependencies]
 # AST Parsing
 syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }

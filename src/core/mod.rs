@@ -1,5 +1,8 @@
 pub mod ast;
+pub mod cache;
+pub mod lazy;
 pub mod metrics;
+pub mod monadic;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -13,6 +16,7 @@ pub struct AnalysisResults {
     pub complexity: ComplexityReport,
     pub technical_debt: TechnicalDebtReport,
     pub dependencies: DependencyReport,
+    pub duplications: Vec<DuplicationBlock>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -63,6 +67,7 @@ pub struct TechnicalDebtReport {
     pub items: Vec<DebtItem>,
     pub by_type: HashMap<DebtType, Vec<DebtItem>>,
     pub priorities: Vec<Priority>,
+    pub duplications: Vec<DuplicationBlock>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]

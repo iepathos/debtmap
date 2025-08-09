@@ -1,5 +1,8 @@
+pub mod circular;
+pub mod coupling;
 pub mod duplication;
 pub mod patterns;
+pub mod smells;
 
 use crate::core::{DebtItem, DebtType, Priority};
 use std::collections::HashMap;

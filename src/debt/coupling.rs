@@ -1,0 +1,272 @@
+use crate::core::{Dependency, DependencyKind, ModuleDependency};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+
+/// Coupling metrics for a module
+#[derive(Debug, Clone)]
+pub struct CouplingMetrics {
+    pub module: String,
+    pub afferent_coupling: usize, // Number of modules that depend on this module
+    pub efferent_coupling: usize, // Number of modules this module depends on
+    pub instability: f64,         // Efferent / (Afferent + Efferent)
+    pub abstractness: f64,        // Ratio of abstract types to total types
+}
+
+impl CouplingMetrics {
+    /// Calculate instability metric (0 = stable, 1 = unstable)
+    pub fn calculate_instability(&mut self) {
+        let total = self.afferent_coupling + self.efferent_coupling;
+        if total > 0 {
+            self.instability = self.efferent_coupling as f64 / total as f64;
+        } else {
+            self.instability = 0.0;
+        }
+    }
+
+    /// Check if module has high coupling
+    pub fn is_highly_coupled(&self, threshold: usize) -> bool {
+        self.efferent_coupling > threshold || self.afferent_coupling > threshold
+    }
+}
+
+/// Calculate coupling metrics for all modules
+pub fn calculate_coupling_metrics(
+    modules: &[ModuleDependency],
+) -> HashMap<String, CouplingMetrics> {
+    let mut metrics_map = HashMap::new();
+
+    for module in modules {
+        let mut metrics = CouplingMetrics {
+            module: module.module.clone(),
+            afferent_coupling: module.dependents.len(),
+            efferent_coupling: module.dependencies.len(),
+            instability: 0.0,
+            abstractness: 0.0, // Would need type analysis to calculate properly
+        };
+
+        metrics.calculate_instability();
+        metrics_map.insert(module.module.clone(), metrics);
+    }
+
+    metrics_map
+}
+
+/// Identify modules with problematic coupling
+pub fn identify_coupling_issues(
+    metrics: &HashMap<String, CouplingMetrics>,
+    coupling_threshold: usize,
+) -> Vec<String> {
+    let mut issues = Vec::new();
+
+    for (module, metric) in metrics {
+        if metric.is_highly_coupled(coupling_threshold) {
+            issues.push(format!(
+                "Module '{}' has high coupling (afferent: {}, efferent: {})",
+                module, metric.afferent_coupling, metric.efferent_coupling
+            ));
+        }
+
+        // Stable Dependencies Principle violation
+        if metric.instability > 0.8 && metric.afferent_coupling > 2 {
+            issues.push(format!(
+                "Module '{}' violates Stable Dependencies Principle (instability: {:.2}, depended on by {} modules)",
+                module, metric.instability, metric.afferent_coupling
+            ));
+        }
+    }
+
+    issues
+}
+
+/// Analyze cohesion within a module (simplified version)
+pub fn analyze_module_cohesion(
+    _module_path: &PathBuf,
+    functions: &[String],
+    shared_data: &[String],
+) -> f64 {
+    if functions.is_empty() || shared_data.is_empty() {
+        return 0.0;
+    }
+
+    // Simplified cohesion: ratio of functions using shared data
+    // In a real implementation, we'd analyze actual data usage
+    let cohesion = shared_data.len() as f64 / functions.len() as f64;
+    cohesion.min(1.0)
+}
+
+/// Detect inappropriate intimacy between modules
+pub fn detect_inappropriate_intimacy(module_deps: &[ModuleDependency]) -> Vec<(String, String)> {
+    let mut intimate_pairs = Vec::new();
+
+    for i in 0..module_deps.len() {
+        for j in i + 1..module_deps.len() {
+            let module_a = &module_deps[i];
+            let module_b = &module_deps[j];
+
+            // Check if modules have bidirectional dependencies
+            let a_depends_on_b = module_a.dependencies.contains(&module_b.module);
+            let b_depends_on_a = module_b.dependencies.contains(&module_a.module);
+
+            if a_depends_on_b && b_depends_on_a {
+                intimate_pairs.push((module_a.module.clone(), module_b.module.clone()));
+            }
+        }
+    }
+
+    intimate_pairs
+}
+
+/// Calculate the distance from the main sequence
+/// D = |A + I - 1| where A is abstractness and I is instability
+pub fn calculate_distance_from_main_sequence(metrics: &CouplingMetrics) -> f64 {
+    (metrics.abstractness + metrics.instability - 1.0).abs()
+}
+
+/// Identify modules in the "zone of pain" (low abstractness, low instability)
+pub fn identify_zone_of_pain(metrics: &HashMap<String, CouplingMetrics>) -> Vec<String> {
+    let mut problematic = Vec::new();
+
+    for (module, metric) in metrics {
+        if metric.abstractness < 0.2 && metric.instability < 0.2 && metric.afferent_coupling > 3 {
+            problematic.push(format!(
+                "Module '{}' is in the zone of pain (rigid and hard to change)",
+                module
+            ));
+        }
+    }
+
+    problematic
+}
+
+/// Identify modules in the "zone of uselessness" (high abstractness, high instability)
+pub fn identify_zone_of_uselessness(metrics: &HashMap<String, CouplingMetrics>) -> Vec<String> {
+    let mut problematic = Vec::new();
+
+    for (module, metric) in metrics {
+        if metric.abstractness > 0.8 && metric.instability > 0.8 {
+            problematic.push(format!(
+                "Module '{}' is in the zone of uselessness (too abstract and unstable)",
+                module
+            ));
+        }
+    }
+
+    problematic
+}
+
+/// Build a module dependency map from file dependencies
+pub fn build_module_dependency_map(
+    file_dependencies: &[(PathBuf, Vec<Dependency>)],
+) -> Vec<ModuleDependency> {
+    let mut module_map: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut reverse_map: HashMap<String, HashSet<String>> = HashMap::new();
+
+    for (file_path, deps) in file_dependencies {
+        let module_name = extract_module_name(file_path);
+
+        let dependencies: HashSet<String> = deps
+            .iter()
+            .filter_map(|dep| {
+                if dep.kind == DependencyKind::Import || dep.kind == DependencyKind::Module {
+                    Some(extract_module_from_import(&dep.name))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        module_map.insert(module_name.clone(), dependencies.clone());
+
+        // Build reverse map for dependents
+        for dep in dependencies {
+            reverse_map
+                .entry(dep)
+                .or_insert_with(HashSet::new)
+                .insert(module_name.clone());
+        }
+    }
+
+    // Convert to ModuleDependency format
+    let mut result = Vec::new();
+    let all_modules: HashSet<String> = module_map
+        .keys()
+        .chain(reverse_map.keys())
+        .cloned()
+        .collect();
+
+    for module in all_modules {
+        let dependencies = module_map
+            .get(&module)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+
+        let dependents = reverse_map
+            .get(&module)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+
+        result.push(ModuleDependency {
+            module,
+            dependencies,
+            dependents,
+        });
+    }
+
+    result
+}
+
+fn extract_module_name(path: &PathBuf) -> String {
+    path.file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+fn extract_module_from_import(import: &str) -> String {
+    import.split("::").next().unwrap_or(import).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_coupling_metrics() {
+        let module = ModuleDependency {
+            module: "test_module".to_string(),
+            dependencies: vec!["dep1".to_string(), "dep2".to_string()],
+            dependents: vec!["dependent1".to_string()],
+        };
+
+        let metrics_map = calculate_coupling_metrics(&[module]);
+        let metrics = metrics_map.get("test_module").unwrap();
+
+        assert_eq!(metrics.efferent_coupling, 2);
+        assert_eq!(metrics.afferent_coupling, 1);
+        assert!((metrics.instability - 0.67).abs() < 0.01); // 2/(1+2) ≈ 0.67
+    }
+
+    #[test]
+    fn test_inappropriate_intimacy() {
+        let modules = vec![
+            ModuleDependency {
+                module: "A".to_string(),
+                dependencies: vec!["B".to_string()],
+                dependents: vec!["B".to_string()],
+            },
+            ModuleDependency {
+                module: "B".to_string(),
+                dependencies: vec!["A".to_string()],
+                dependents: vec!["A".to_string()],
+            },
+        ];
+
+        let intimate = detect_inappropriate_intimacy(&modules);
+        assert_eq!(intimate.len(), 1);
+        assert!(intimate.contains(&("A".to_string(), "B".to_string())));
+    }
+}

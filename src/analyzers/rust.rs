@@ -6,8 +6,9 @@ use crate::core::{
     FunctionMetrics, Language, Priority,
 };
 use crate::debt::patterns::find_todos_and_fixmes;
+use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use syn::{visit::Visit, Item};
 
 pub struct RustAnalyzer {
@@ -19,6 +20,12 @@ impl RustAnalyzer {
         Self {
             complexity_threshold: 10,
         }
+    }
+}
+
+impl Default for RustAnalyzer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -48,10 +55,17 @@ impl Analyzer for RustAnalyzer {
 }
 
 fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
-    let mut visitor = FunctionVisitor::new(ast.path.clone());
+    let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
+    let mut visitor = FunctionVisitor::new(ast.path.clone(), source_content.clone());
     visitor.visit_file(&ast.file);
 
-    let debt_items = extract_debt_items(&ast.file, &ast.path, threshold, &visitor.functions);
+    let debt_items = create_debt_items(
+        &ast.file,
+        &ast.path,
+        threshold,
+        &visitor.functions,
+        &source_content,
+    );
     let dependencies = extract_dependencies(&ast.file);
 
     FileMetrics {
@@ -66,26 +80,63 @@ fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
     }
 }
 
+fn create_debt_items(
+    file: &syn::File,
+    path: &std::path::PathBuf,
+    threshold: u32,
+    functions: &[FunctionMetrics],
+    source_content: &str,
+) -> Vec<DebtItem> {
+    let complexity_items = extract_debt_items(file, path, threshold, functions);
+    let todo_items = find_todos_and_fixmes(source_content, path);
+    let module_smells = analyze_module_smells(path, source_content.lines().count())
+        .into_iter()
+        .map(|smell| smell.to_debt_item())
+        .collect::<Vec<_>>();
+    let function_smells = functions
+        .iter()
+        .flat_map(|func| analyze_function_smells(func, 0))
+        .map(|smell| smell.to_debt_item())
+        .collect::<Vec<_>>();
+
+    [complexity_items, todo_items, module_smells, function_smells]
+        .into_iter()
+        .flatten()
+        .collect()
+}
+
 struct FunctionVisitor {
     functions: Vec<FunctionMetrics>,
     current_file: PathBuf,
+    #[allow(dead_code)]
+    source_content: String,
 }
 
 impl FunctionVisitor {
-    fn new(file: PathBuf) -> Self {
+    fn new(file: PathBuf, source_content: String) -> Self {
         Self {
             functions: Vec::new(),
             current_file: file,
+            source_content,
         }
     }
 
-    fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
-        let mut metrics = FunctionMetrics::new(name, self.current_file.clone(), line);
+    fn get_line_number(&self, _span: syn::__private::Span) -> usize {
+        // For now, return a default line number
+        // Proper line number tracking would require more sophisticated span handling
+        1
+    }
 
-        metrics.cyclomatic = calculate_cyclomatic_syn(&item_fn.block);
-        metrics.cognitive = calculate_cognitive_syn(&item_fn.block);
-        metrics.nesting = calculate_nesting(&item_fn.block);
-        metrics.length = count_lines(&item_fn.block);
+    fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
+        let metrics = FunctionMetrics {
+            name,
+            file: self.current_file.clone(),
+            line,
+            cyclomatic: calculate_cyclomatic_syn(&item_fn.block),
+            cognitive: calculate_cognitive_syn(&item_fn.block),
+            nesting: calculate_nesting(&item_fn.block),
+            length: count_lines(&item_fn.block),
+        };
 
         self.functions.push(metrics);
     }
@@ -94,14 +145,14 @@ impl FunctionVisitor {
 impl<'ast> Visit<'ast> for FunctionVisitor {
     fn visit_item_fn(&mut self, item_fn: &'ast syn::ItemFn) {
         let name = item_fn.sig.ident.to_string();
-        let line = 0;
+        let line = self.get_line_number(item_fn.sig.ident.span());
         self.analyze_function(name, item_fn, line);
         syn::visit::visit_item_fn(self, item_fn);
     }
 
     fn visit_impl_item_fn(&mut self, impl_fn: &'ast syn::ImplItemFn) {
         let name = impl_fn.sig.ident.to_string();
-        let line = 0;
+        let line = self.get_line_number(impl_fn.sig.ident.span());
         let item_fn = syn::ItemFn {
             attrs: impl_fn.attrs.clone(),
             vis: syn::Visibility::Inherited,
@@ -150,55 +201,48 @@ fn count_lines(block: &syn::Block) -> usize {
 }
 
 fn extract_debt_items(
-    file: &syn::File,
-    path: &PathBuf,
+    _file: &syn::File,
+    _path: &Path,
     threshold: u32,
     functions: &[FunctionMetrics],
 ) -> Vec<DebtItem> {
-    let mut items = Vec::new();
+    functions
+        .iter()
+        .filter(|func| func.is_complex(threshold))
+        .map(|func| create_complexity_debt_item(func, threshold))
+        .collect()
+}
 
-    let file_content = quote::quote! { #file }.to_string();
-    items.extend(find_todos_and_fixmes(&file_content, path));
-
-    for func in functions {
-        if func.is_complex(threshold) {
-            items.push(DebtItem {
-                id: format!("complexity-{}-{}", func.file.display(), func.line),
-                debt_type: DebtType::Complexity,
-                priority: if func.cyclomatic > threshold * 2 {
-                    Priority::High
-                } else {
-                    Priority::Medium
-                },
-                file: func.file.clone(),
-                line: func.line,
-                message: format!(
-                    "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
-                    func.name, func.cyclomatic, func.cognitive
-                ),
-                context: None,
-            });
-        }
+fn create_complexity_debt_item(func: &FunctionMetrics, threshold: u32) -> DebtItem {
+    DebtItem {
+        id: format!("complexity-{}-{}", func.file.display(), func.line),
+        debt_type: DebtType::Complexity,
+        priority: if func.cyclomatic > threshold * 2 {
+            Priority::High
+        } else {
+            Priority::Medium
+        },
+        file: func.file.clone(),
+        line: func.line,
+        message: format!(
+            "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
+            func.name, func.cyclomatic, func.cognitive
+        ),
+        context: None,
     }
-
-    items
 }
 
 fn extract_dependencies(file: &syn::File) -> Vec<Dependency> {
-    let mut deps = Vec::new();
-
-    for item in &file.items {
-        if let Item::Use(use_item) = item {
-            if let Some(dep_name) = extract_use_name(&use_item.tree) {
-                deps.push(Dependency {
-                    name: dep_name,
-                    kind: DependencyKind::Import,
-                });
-            }
-        }
-    }
-
-    deps
+    file.items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Use(use_item) => extract_use_name(&use_item.tree).map(|name| Dependency {
+                name,
+                kind: DependencyKind::Import,
+            }),
+            _ => None,
+        })
+        .collect()
 }
 
 fn extract_use_name(tree: &syn::UseTree) -> Option<String> {

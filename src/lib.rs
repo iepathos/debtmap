@@ -1,0 +1,35 @@
+// Export modules for library usage
+pub mod analyzers;
+pub mod cli;
+pub mod complexity;
+pub mod core;
+pub mod debt;
+pub mod io;
+pub mod transformers;
+
+// Re-export commonly used types
+pub use crate::core::{
+    AnalysisResults, CircularDependency, ComplexityMetrics, ComplexityReport, ComplexitySummary,
+    DebtItem, DebtType, Dependency, DependencyKind, DependencyReport, DuplicationBlock,
+    DuplicationLocation, FileMetrics, FunctionMetrics, Language, ModuleDependency, Priority,
+    TechnicalDebtReport,
+};
+
+pub use crate::debt::{
+    circular::{analyze_module_dependencies, DependencyGraph},
+    coupling::{calculate_coupling_metrics, identify_coupling_issues, CouplingMetrics},
+    duplication::detect_duplication,
+    patterns::{detect_duplicate_strings, find_code_smells, find_todos_and_fixmes},
+    smells::{
+        analyze_function_smells, analyze_module_smells, detect_deep_nesting, detect_long_method,
+        detect_long_parameter_list, CodeSmell, SmellType,
+    },
+};
+
+pub use crate::core::metrics::{
+    calculate_average_complexity, count_high_complexity, find_max_complexity,
+};
+
+pub use crate::io::output::{create_writer, OutputFormat, OutputWriter};
+
+pub use crate::analyzers::{analyze_file, get_analyzer, Analyzer};

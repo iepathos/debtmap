@@ -1,10 +1,8 @@
-mod analyzers;
-mod cli;
-mod complexity;
-mod core;
-mod debt;
-mod io;
-mod transformers;
+use debtmap::analyzers;
+use debtmap::cli;
+use debtmap::core;
+use debtmap::debt;
+use debtmap::io;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -13,6 +11,7 @@ use core::{
     AnalysisResults, ComplexityReport, ComplexitySummary, DependencyReport, FileMetrics, Language,
     TechnicalDebtReport,
 };
+use debt::circular::analyze_module_dependencies;
 use rayon::prelude::*;
 use std::path::PathBuf;
 
@@ -79,41 +78,30 @@ fn analyze_project(
     let files = io::walker::find_project_files(&path, languages.clone())
         .context("Failed to find project files")?;
 
-    let file_metrics: Vec<FileMetrics> = files
-        .par_iter()
-        .filter_map(|file_path| {
-            let content = io::read_file(file_path).ok()?;
-            let ext = file_path.extension()?.to_str()?;
-            let language = Language::from_extension(ext);
-
-            if language == Language::Unknown {
-                return None;
-            }
-
-            let analyzer = analyzers::get_analyzer(language);
-            analyzers::analyze_file(content, file_path.clone(), analyzer.as_ref()).ok()
-        })
-        .collect();
+    let file_metrics: Vec<FileMetrics> = files.par_iter().filter_map(analyze_single_file).collect();
 
     let all_functions: Vec<_> = file_metrics
         .iter()
-        .flat_map(|m| m.complexity.functions.clone())
+        .flat_map(|m| &m.complexity.functions)
+        .cloned()
         .collect();
 
     let all_debt_items: Vec<_> = file_metrics
         .iter()
-        .flat_map(|m| m.debt_items.clone())
+        .flat_map(|m| &m.debt_items)
+        .cloned()
         .collect();
 
     let files_for_duplication: Vec<(PathBuf, String)> = files
         .iter()
         .filter_map(|path| {
-            let content = io::read_file(path).ok()?;
-            Some((path.clone(), content))
+            io::read_file(path)
+                .ok()
+                .map(|content| (path.clone(), content))
         })
         .collect();
 
-    let _duplications =
+    let duplications =
         debt::duplication::detect_duplication(files_for_duplication, duplication_threshold, 0.8);
 
     let complexity_report = ComplexityReport {
@@ -139,12 +127,10 @@ fn analyze_project(
         items: all_debt_items,
         by_type: debt_by_type,
         priorities,
+        duplications: duplications.clone(),
     };
 
-    let dependencies = DependencyReport {
-        modules: Vec::new(),
-        circular: Vec::new(),
-    };
+    let dependencies = create_dependency_report(&file_metrics);
 
     Ok(AnalysisResults {
         project_path: path,
@@ -152,30 +138,30 @@ fn analyze_project(
         complexity: complexity_report,
         technical_debt,
         dependencies,
+        duplications,
     })
 }
 
 fn analyze_complexity_only(path: PathBuf, threshold: u32) -> Result<AnalysisResults> {
-    analyze_project(path, vec![Language::Rust, Language::Python], threshold, 50)
+    analyze_project(path, default_languages(), threshold, 50)
 }
 
 fn analyze_debt_only(
     path: PathBuf,
     min_priority: Option<core::Priority>,
 ) -> Result<AnalysisResults> {
-    let mut results = analyze_project(path, vec![Language::Rust, Language::Python], 10, 50)?;
+    let mut results = analyze_project(path, default_languages(), 10, 50)?;
 
     if let Some(priority) = min_priority {
-        let filtered_items =
-            debt::filter_by_priority(results.technical_debt.items.into_iter().collect(), priority);
-        results.technical_debt.items = filtered_items;
+        results.technical_debt.items =
+            debt::filter_by_priority(results.technical_debt.items, priority);
     }
 
     Ok(results)
 }
 
 fn analyze_dependencies_only(path: PathBuf) -> Result<AnalysisResults> {
-    analyze_project(path, vec![Language::Rust, Language::Python], 10, 50)
+    analyze_project(path, default_languages(), 10, 50)
 }
 
 fn output_results(
@@ -262,13 +248,47 @@ fn parse_languages(languages: Option<Vec<String>>) -> Vec<Language> {
         .map(|langs| {
             langs
                 .iter()
-                .map(|l| match l.as_str() {
-                    "rust" => Language::Rust,
-                    "python" => Language::Python,
-                    _ => Language::Unknown,
-                })
-                .filter(|l| *l != Language::Unknown)
+                .filter_map(|lang_str| parse_single_language(lang_str))
                 .collect()
         })
-        .unwrap_or_else(|| vec![Language::Rust, Language::Python])
+        .unwrap_or_else(default_languages)
+}
+
+fn parse_single_language(lang_str: &str) -> Option<Language> {
+    match lang_str {
+        "rust" => Some(Language::Rust),
+        "python" => Some(Language::Python),
+        _ => None,
+    }
+}
+
+fn default_languages() -> Vec<Language> {
+    vec![Language::Rust, Language::Python]
+}
+
+fn analyze_single_file(file_path: &PathBuf) -> Option<FileMetrics> {
+    let content = io::read_file(file_path).ok()?;
+    let ext = file_path.extension()?.to_str()?;
+    let language = Language::from_extension(ext);
+
+    (language != Language::Unknown)
+        .then(|| {
+            let analyzer = analyzers::get_analyzer(language);
+            analyzers::analyze_file(content, file_path.clone(), analyzer.as_ref())
+        })?
+        .ok()
+}
+
+fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {
+    let file_deps: Vec<(std::path::PathBuf, Vec<core::Dependency>)> = file_metrics
+        .iter()
+        .map(|m| (m.path.clone(), m.dependencies.clone()))
+        .collect();
+
+    let dep_graph = analyze_module_dependencies(&file_deps);
+
+    DependencyReport {
+        modules: dep_graph.calculate_coupling_metrics(),
+        circular: dep_graph.detect_circular_dependencies(),
+    }
 }
