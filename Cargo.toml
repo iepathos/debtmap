@@ -2,10 +2,10 @@
 name = "debtmap"
 version = "0.1.0"
 edition = "2021"
-authors = ["Debtmap Contributors"]
+authors = ["Glen Baker <iepathos@gmail.com>"]
 description = "Code complexity and technical debt analyzer"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/debtmap"
+license = "MIT"
+repository = "https://github.com/iepathos/debtmap"
 readme = "README.md"
 keywords = ["code-analysis", "technical-debt", "complexity", "static-analysis"]
 categories = ["development-tools", "command-line-utilities"]
