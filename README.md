@@ -6,12 +6,14 @@ A fast, language-agnostic code complexity and technical debt analyzer written in
 
 ## Features
 
-- **Multi-language support** - Currently supports Rust, Python, and Javascript with extensible architecture for more languages
+- **Multi-language support** - Currently supports Rust, Python, JavaScript, and TypeScript with extensible architecture for more languages
 - **Comprehensive metrics** - Analyzes cyclomatic and cognitive complexity, code duplication, and various code smells
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
 - **Multiple output formats** - JSON, TOML, and human-readable table formats
 - **Configurable thresholds** - Customize complexity and duplication thresholds to match your standards
 - **Incremental analysis** - Smart caching system for analyzing only changed files
+- **Flexible suppression** - Inline comment-based suppression for specific code sections and configuration-based ignore patterns
+- **Test-friendly** - Easily exclude test fixtures and example code from debt analysis
 
 ## Installation
 
@@ -113,6 +115,71 @@ Identifies similar code blocks that could be refactored into shared functions.
 - **Circular dependencies**: Modules that depend on each other
 - **High coupling**: Excessive dependencies between modules
 
+## Suppressing Technical Debt Detection
+
+Debtmap provides two ways to exclude code from technical debt analysis:
+
+### 1. Inline Suppression Comments
+
+You can suppress debt detection for specific code sections using inline comments. This is useful for test fixtures, example code, or intentional technical debt.
+
+#### Suppression Formats
+
+```rust
+// Rust example
+// debtmap:ignore-start -- Optional reason
+// TODO: This will be ignored
+// FIXME: This too
+// debtmap:ignore-end
+
+// Suppress next line only
+// debtmap:ignore-next-line
+// TODO: Just this line is ignored
+
+// Suppress current line
+// TODO: Ignored // debtmap:ignore
+
+// Type-specific suppression
+// debtmap:ignore-start[todo] -- Only suppress TODOs
+// TODO: Ignored
+// FIXME: Not ignored
+// debtmap:ignore-end
+```
+
+```python
+# Python example
+# debtmap:ignore-start
+# TODO: Ignored in Python
+# debtmap:ignore-end
+```
+
+```javascript
+// JavaScript/TypeScript example
+// debtmap:ignore-start -- Test fixture data
+// TODO: Ignored in JS/TS
+// HACK: This too
+// debtmap:ignore-end
+
+/* Block comments also work */
+/* debtmap:ignore-start */
+// TODO: Ignored
+/* debtmap:ignore-end */
+```
+
+#### Suppression Types
+
+- `debtmap:ignore` - Suppress all debt types on current line
+- `debtmap:ignore-next-line` - Suppress all debt types on next line
+- `debtmap:ignore-start` / `debtmap:ignore-end` - Suppress block of code
+- `debtmap:ignore[todo]` - Suppress only TODO markers
+- `debtmap:ignore[fixme]` - Suppress only FIXME markers
+- `debtmap:ignore[hack]` - Suppress only HACK markers
+- `debtmap:ignore[*]` - Suppress all types (wildcard)
+
+### 2. Configuration File Ignores
+
+Use the `.debtmap.toml` configuration file to ignore entire files or directories:
+
 ## Configuration
 
 Create a `.debtmap.toml` file in your project root:
@@ -126,11 +193,14 @@ max_function_lines = 50
 max_nesting_depth = 4
 
 [ignore]
+# Paths to completely ignore during analysis
 paths = ["target/", "node_modules/", "vendor/"]
-patterns = ["*.generated.rs", "*.pb.go"]
+# File patterns to ignore (glob patterns)
+patterns = ["*.generated.rs", "*.pb.go", "*.min.js", "test/fixtures/**"]
 
 [languages]
-enabled = ["rust", "python"]
+# Languages to analyze (rust, python, javascript, typescript)
+enabled = ["rust", "python", "javascript"]
 ```
 
 ## Output Examples
@@ -220,10 +290,10 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Roadmap
 
-- [ ] JavaScript/TypeScript support
+- [x] JavaScript/TypeScript support
+- [x] Inline suppression comments
 - [ ] Go support
 - [ ] Integration with CI/CD pipelines
-- [ ] Web UI for visualization
 - [ ] Historical trend tracking
 - [ ] IDE plugins
 - [ ] Automated refactoring suggestions
@@ -234,6 +304,7 @@ MIT License - see [LICENSE](LICENSE) file for details
 Built with excellent Rust crates including:
 - [syn](https://github.com/dtolnay/syn) for Rust AST parsing
 - [rustpython-parser](https://github.com/RustPython/RustPython) for Python parsing
+- [tree-sitter](https://github.com/tree-sitter/tree-sitter) for JavaScript/TypeScript parsing
 - [rayon](https://github.com/rayon-rs/rayon) for parallel processing
 - [clap](https://github.com/clap-rs/clap) for CLI parsing
 
