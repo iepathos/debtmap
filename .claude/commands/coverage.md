@@ -63,7 +63,6 @@ Please:
 5. Ensure tests follow the project's existing patterns
 6. Add the tests to the appropriate test module or file
 7. Run 'cargo test' to verify the tests pass
-8. Run 'cargo clippy -- -D warnings' to ensure code quality
 
 Focus on testing the most critical functionality first. Aim to add meaningful tests, not just coverage for coverage's sake.
 
@@ -72,8 +71,23 @@ Do NOT run coverage yourself - the script will handle that after you're done.
 EOF
 
 echo "✅ Test implementation complete!"
+echo "🧪 Running tests to ensure everything passes..."
+cargo test
+
+# Check if tests passed
+if [ $? -ne 0 ]; then
+    echo "❌ Tests failed! Please fix the failing tests before committing."
+    exit 1
+fi
+
 echo "📈 Running final coverage check to measure improvement..."
 just coverage
+
+# Check if coverage run succeeded (it runs tests internally)
+if [ $? -ne 0 ]; then
+    echo "❌ Coverage run failed! Tests may be failing."
+    exit 1
+fi
 
 # Extract new coverage percentage
 NEW_COVERAGE=$(cat target/coverage/tarpaulin-report.json | jq -r '
