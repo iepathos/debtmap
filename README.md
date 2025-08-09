@@ -15,6 +15,7 @@ A fast, language-agnostic code complexity and technical debt analyzer written in
 
 - **Multi-language support** - Currently supports Rust, Python, JavaScript, and TypeScript with extensible architecture for more languages
 - **Comprehensive metrics** - Analyzes cyclomatic and cognitive complexity, code duplication, and various code smells
+- **Coverage-based risk analysis** - Integrates with LCOV coverage data to provide risk scoring based on complexity-coverage correlation
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
 - **Multiple output formats** - JSON, TOML, and human-readable table formats
 - **Configurable thresholds** - Customize complexity and duplication thresholds to match your standards
@@ -47,6 +48,13 @@ cargo install debtmap
 # Analyze current directory
 debtmap analyze .
 
+# Analyze with coverage data for risk scoring
+debtmap analyze . --lcov target/coverage/lcov.info
+
+# Generate coverage with cargo tarpaulin (Rust projects)
+cargo tarpaulin --out lcov --output-dir target/coverage
+debtmap analyze . --lcov target/coverage/lcov.info
+
 # Analyze with custom thresholds
 debtmap analyze ./src --threshold-complexity 15 --threshold-duplication 50
 
@@ -74,6 +82,8 @@ debtmap analyze <PATH> [OPTIONS]
 Options:
   -f, --format <FORMAT>              Output format [default: terminal] [possible values: json, markdown, terminal]
   -o, --output <FILE>                Output file (stdout if not specified)
+  --lcov <FILE>                      LCOV coverage file for risk analysis
+  --coverage-file <FILE>             Alias for --lcov (LCOV coverage file)
   --threshold-complexity <N>         Complexity threshold [default: 10]
   --threshold-duplication <N>        Duplication threshold in lines [default: 50]
   --languages <LANGS>                Comma-separated list of languages to analyze
@@ -123,6 +133,64 @@ Debtmap Analysis Report
 ✗ Pass/Fail: FAIL (some metrics exceed thresholds)
 ```
 
+### With Coverage Data
+
+When LCOV coverage data is provided, debtmap adds comprehensive risk analysis:
+
+```
+$ debtmap analyze . --lcov target/coverage/lcov.info
+Debtmap Analysis Report
+=======================
+
+📊 Summary:
+  Files analyzed: 566
+  Total functions: 566
+  Average complexity: 1.5
+  Debt items: 162
+  Total debt score: 1470 (threshold: 100)
+
+⚠️ Complexity Hotspots (top 5):
+  1. ./src/io/output.rs:1 write_risk_insights() - Cyclomatic: 13, Cognitive: 15
+  2. ./src/risk/mod.rs:1 categorize_risk() - Cyclomatic: 13, Cognitive: 13
+  3. ./src/risk/mod.rs:1 estimate_test_effort() - Cyclomatic: 12, Cognitive: 13
+
+📊 Risk Analysis
+================
+
+📈 Analysis Summary
+──────────────────
+Codebase Risk Score: 3.8 (LOW)
+
+Risk Distribution:
+  Critical: 1 functions
+  High: 3 functions  
+  Medium: 11 functions
+  Low: 551 functions
+
+🔥 CRITICAL RISK FUNCTIONS (Complexity > 15, Coverage < 30%)
+─────────────────────────────────────────────────────────────
+1. ./src/risk/lcov.rs::parse_lcov_file
+   Risk Score: 62.0 (CRITICAL)
+   Cyclomatic: 4 | Cognitive: 80 | Coverage: N/A
+   Test Effort: VeryComplex (2-4 test cases)
+
+🎯 TOP 5 TESTING RECOMMENDATIONS (Maximum Risk Reduction)  
+──────────────────────────────────────────────────────────
+Priority | Function | Impact | ROI Score
+---------|----------|--------|-----------
+1 | categorize_risk() | -1% risk | 1.2
+2 | write_recommendations() | -1% risk | 1.1
+3 | estimate_test_effort() | -1% risk | 1.1
+
+💡 ACTIONABLE INSIGHTS
+──────────────────────
+1. Focus testing on the 1 critical risk functions first
+2. Estimated effort to reach safe risk level: 17-25 test cases  
+3. Potential risk reduction from recommended tests: 5%
+
+✗ Pass/Fail: FAIL (some metrics exceed thresholds)
+```
+
 ## Metrics Explained
 
 ### Cyclomatic Complexity
@@ -145,6 +213,29 @@ Identifies similar code blocks that could be refactored into shared functions.
 - **Large files**: Files that have grown too large to maintain easily
 - **Circular dependencies**: Modules that depend on each other
 - **High coupling**: Excessive dependencies between modules
+
+### Risk Analysis (With Coverage Data)
+
+When LCOV coverage data is provided via `--lcov`, debtmap performs sophisticated risk analysis:
+
+#### Risk Scoring
+Functions are scored based on complexity-coverage correlation:
+- **Critical Risk (50+)**: High complexity + low/no coverage
+- **High Risk (25-49)**: Medium-high complexity with poor coverage
+- **Medium Risk (10-24)**: Moderate complexity or coverage gaps
+- **Low Risk (5-9)**: Well-tested or simple functions
+
+#### Testing Recommendations
+- **ROI-based prioritization**: Functions ranked by risk reduction potential
+- **Test effort estimation**: Complexity-based test case recommendations
+- **Actionable insights**: Concrete steps to reduce overall codebase risk
+
+#### Coverage Integration
+Supports LCOV format from popular coverage tools:
+- **Rust**: `cargo tarpaulin --out lcov`
+- **JavaScript/TypeScript**: `jest --coverage --coverageReporters=lcov`
+- **Python**: `pytest --cov --cov-report=lcov`
+- **Go**: `go test -coverprofile=coverage.out && gocover-cobertura < coverage.out > coverage.lcov`
 
 ## Suppressing Technical Debt Detection
 
@@ -329,6 +420,7 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 
 - [x] JavaScript/TypeScript support
 - [x] Inline suppression comments
+- [x] LCOV coverage integration with risk analysis
 - [ ] Go support
 - [ ] Integration with CI/CD pipelines
 - [ ] Historical trend tracking
