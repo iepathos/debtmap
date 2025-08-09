@@ -50,62 +50,63 @@ impl SuppressionContext {
 
     pub fn is_suppressed(&self, line: usize, debt_type: &DebtType) -> bool {
         // Check if line is within any active suppression block
-        for block in &self.active_blocks {
-            if line >= block.start_line {
-                if let Some(end_line) = block.end_line {
-                    if line <= end_line
-                        && (block.debt_types.is_empty() || block.debt_types.contains(debt_type))
-                    {
-                        return true;
-                    }
-                }
-            }
+        let in_block = self.active_blocks.iter().any(|block| {
+            line >= block.start_line
+                && block.end_line.is_some_and(|end| line <= end)
+                && (block.debt_types.is_empty() || block.debt_types.contains(debt_type))
+        });
+
+        if in_block {
+            return true;
         }
 
         // Check line-specific suppressions
-        if let Some(rule) = self.line_suppressions.get(&line) {
-            if rule.debt_types.is_empty() || rule.debt_types.contains(debt_type) {
-                return true;
-            }
+        let line_suppressed = self
+            .line_suppressions
+            .get(&line)
+            .is_some_and(|rule| rule.debt_types.is_empty() || rule.debt_types.contains(debt_type));
+
+        if line_suppressed {
+            return true;
         }
 
         // Check if previous line has a next-line suppression
-        if line > 0 {
-            if let Some(rule) = self.line_suppressions.get(&(line - 1)) {
-                if rule.applies_to_next_line
+        line > 0
+            && self.line_suppressions.get(&(line - 1)).is_some_and(|rule| {
+                rule.applies_to_next_line
                     && (rule.debt_types.is_empty() || rule.debt_types.contains(debt_type))
-                {
-                    return true;
-                }
-            }
-        }
-
-        false
+            })
     }
 
     pub fn get_stats(&self) -> SuppressionStats {
-        let mut total = 0;
-        let mut by_type = HashMap::new();
+        let block_stats = self
+            .active_blocks
+            .iter()
+            .filter(|block| block.end_line.is_some())
+            .flat_map(|block| block.debt_types.iter().copied());
 
-        for block in &self.active_blocks {
-            if block.end_line.is_some() {
-                total += 1;
-                for debt_type in &block.debt_types {
-                    *by_type.entry(*debt_type).or_insert(0) += 1;
-                }
-            }
-        }
+        let line_stats = self
+            .line_suppressions
+            .values()
+            .flat_map(|rule| rule.debt_types.iter().copied());
 
-        for rule in self.line_suppressions.values() {
-            total += 1;
-            for debt_type in &rule.debt_types {
-                *by_type.entry(*debt_type).or_insert(0) += 1;
-            }
+        let all_debt_types: Vec<DebtType> = block_stats.chain(line_stats).collect();
+
+        let total_suppressions = self
+            .active_blocks
+            .iter()
+            .filter(|block| block.end_line.is_some())
+            .count()
+            + self.line_suppressions.len();
+
+        let mut suppressions_by_type = HashMap::new();
+        for debt_type in all_debt_types {
+            *suppressions_by_type.entry(debt_type).or_insert(0) += 1;
         }
 
         SuppressionStats {
-            total_suppressions: total,
-            suppressions_by_type: by_type,
+            total_suppressions,
+            suppressions_by_type,
             unclosed_blocks: self.unclosed_blocks.clone(),
         }
     }
@@ -117,109 +118,143 @@ impl Default for SuppressionContext {
     }
 }
 
+struct SuppressionPatterns {
+    block_start: Regex,
+    block_end: Regex,
+    line: Regex,
+    next_line: Regex,
+}
+
+impl SuppressionPatterns {
+    fn new(language: Language) -> Self {
+        let comment_prefix = get_comment_prefix(language);
+        let escaped_prefix = regex::escape(comment_prefix);
+
+        Self {
+            block_start: Regex::new(&format!(
+                r"(?m)^\s*{escaped_prefix}\s*debtmap:ignore-start(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
+            )).unwrap(),
+            block_end: Regex::new(&format!(
+                r"(?m)^\s*{escaped_prefix}\s*debtmap:ignore-end\s*$"
+            )).unwrap(),
+            line: Regex::new(&format!(
+                r"(?m){escaped_prefix}\s*debtmap:ignore(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
+            )).unwrap(),
+            next_line: Regex::new(&format!(
+                r"(?m)^\s*{escaped_prefix}\s*debtmap:ignore-next-line(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$"
+            )).unwrap(),
+        }
+    }
+}
+
+fn get_comment_prefix(language: Language) -> &'static str {
+    match language {
+        Language::Python => "#",
+        Language::Rust | Language::JavaScript | Language::TypeScript => "//",
+        _ => "//",
+    }
+}
+
+enum LineParseResult {
+    BlockStart(usize, Vec<DebtType>, Option<String>),
+    BlockEnd(usize),
+    NextLineSuppression(usize, Vec<DebtType>, Option<String>),
+    LineSuppression(usize, Vec<DebtType>, Option<String>),
+    None,
+}
+
+fn parse_line(line: &str, line_number: usize, patterns: &SuppressionPatterns) -> LineParseResult {
+    if let Some(captures) = patterns.block_start.captures(line) {
+        return LineParseResult::BlockStart(
+            line_number,
+            parse_debt_types(captures.get(1).map(|m| m.as_str())),
+            captures.get(2).map(|m| m.as_str().to_string()),
+        );
+    }
+
+    if patterns.block_end.is_match(line) {
+        return LineParseResult::BlockEnd(line_number);
+    }
+
+    if let Some(captures) = patterns.next_line.captures(line) {
+        return LineParseResult::NextLineSuppression(
+            line_number,
+            parse_debt_types(captures.get(1).map(|m| m.as_str())),
+            captures.get(2).map(|m| m.as_str().to_string()),
+        );
+    }
+
+    if let Some(captures) = patterns.line.captures(line) {
+        return LineParseResult::LineSuppression(
+            line_number,
+            parse_debt_types(captures.get(1).map(|m| m.as_str())),
+            captures.get(2).map(|m| m.as_str().to_string()),
+        );
+    }
+
+    LineParseResult::None
+}
+
 pub fn parse_suppression_comments(
     content: &str,
     language: Language,
     file: &Path,
 ) -> SuppressionContext {
+    let patterns = SuppressionPatterns::new(language);
     let mut context = SuppressionContext::new();
-
-    // Determine comment prefix based on language
-    let comment_prefix = match language {
-        Language::Python => "#",
-        Language::Rust => "//",
-        Language::JavaScript => "//",
-        Language::TypeScript => "//",
-        _ => "//",
-    };
-
-    // Build regex patterns
-    let block_start_pattern = format!(
-        r"(?m)^\s*{}\s*debtmap:ignore-start(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
-        regex::escape(comment_prefix)
-    );
-    let block_end_pattern = format!(
-        r"(?m)^\s*{}\s*debtmap:ignore-end\s*$",
-        regex::escape(comment_prefix)
-    );
-    let line_pattern = format!(
-        r"(?m){}\s*debtmap:ignore(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
-        regex::escape(comment_prefix)
-    );
-    let next_line_pattern = format!(
-        r"(?m)^\s*{}\s*debtmap:ignore-next-line(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
-        regex::escape(comment_prefix)
-    );
-
-    let block_start_re = Regex::new(&block_start_pattern).unwrap();
-    let block_end_re = Regex::new(&block_end_pattern).unwrap();
-    let line_re = Regex::new(&line_pattern).unwrap();
-    let next_line_re = Regex::new(&next_line_pattern).unwrap();
-
     let mut open_blocks: Vec<(usize, Vec<DebtType>, Option<String>)> = Vec::new();
-    let lines: Vec<&str> = content.lines().collect();
 
-    for (line_num, line) in lines.iter().enumerate() {
-        let line_number = line_num + 1; // 1-indexed
-
-        // Check for block start
-        if let Some(captures) = block_start_re.captures(line) {
-            let debt_types = parse_debt_types(captures.get(1).map(|m| m.as_str()));
-            let reason = captures.get(2).map(|m| m.as_str().to_string());
-            open_blocks.push((line_number, debt_types, reason));
-            continue;
-        }
-
-        // Check for block end
-        if block_end_re.is_match(line) {
-            if let Some((start_line, debt_types, reason)) = open_blocks.pop() {
-                context.active_blocks.push(SuppressionBlock {
-                    start_line,
-                    end_line: Some(line_number),
-                    debt_types,
-                    reason,
-                });
-            }
-            continue;
-        }
-
-        // Check for next-line suppression
-        if let Some(captures) = next_line_re.captures(line) {
-            let debt_types = parse_debt_types(captures.get(1).map(|m| m.as_str()));
-            let reason = captures.get(2).map(|m| m.as_str().to_string());
-            context.line_suppressions.insert(
-                line_number,
-                SuppressionRule {
-                    debt_types,
-                    reason,
-                    applies_to_next_line: true,
-                },
-            );
-            continue;
-        }
-
-        // Check for same-line suppression
-        if let Some(captures) = line_re.captures(line) {
-            let debt_types = parse_debt_types(captures.get(1).map(|m| m.as_str()));
-            let reason = captures.get(2).map(|m| m.as_str().to_string());
-            context.line_suppressions.insert(
-                line_number,
-                SuppressionRule {
-                    debt_types,
-                    reason,
-                    applies_to_next_line: false,
-                },
-            );
-        }
-    }
+    content
+        .lines()
+        .enumerate()
+        .map(|(idx, line)| (idx + 1, line))
+        .for_each(
+            |(line_number, line)| match parse_line(line, line_number, &patterns) {
+                LineParseResult::BlockStart(ln, types, reason) => {
+                    open_blocks.push((ln, types, reason));
+                }
+                LineParseResult::BlockEnd(end_line) => {
+                    if let Some((start_line, debt_types, reason)) = open_blocks.pop() {
+                        context.active_blocks.push(SuppressionBlock {
+                            start_line,
+                            end_line: Some(end_line),
+                            debt_types,
+                            reason,
+                        });
+                    }
+                }
+                LineParseResult::NextLineSuppression(ln, types, reason) => {
+                    context.line_suppressions.insert(
+                        ln,
+                        SuppressionRule {
+                            debt_types: types,
+                            reason,
+                            applies_to_next_line: true,
+                        },
+                    );
+                }
+                LineParseResult::LineSuppression(ln, types, reason) => {
+                    context.line_suppressions.insert(
+                        ln,
+                        SuppressionRule {
+                            debt_types: types,
+                            reason,
+                            applies_to_next_line: false,
+                        },
+                    );
+                }
+                LineParseResult::None => {}
+            },
+        );
 
     // Record any unclosed blocks
-    for (start_line, _, _) in open_blocks {
-        context.unclosed_blocks.push(UnclosedBlock {
+    context.unclosed_blocks = open_blocks
+        .into_iter()
+        .map(|(start_line, _, _)| UnclosedBlock {
             file: file.to_path_buf(),
             start_line,
-        });
-    }
+        })
+        .collect();
 
     context
 }
