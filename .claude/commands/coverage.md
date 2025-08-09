@@ -1,140 +1,74 @@
-#!/usr/bin/env bash
-# Claude command: Automatically improve code coverage
-# This command runs coverage analysis, identifies files with lowest coverage,
-# implements tests for uncovered code, and commits the improvements
+---
+name: coverage
+description: Improve test coverage by adding tests for the least covered file
+---
 
-set -euo pipefail
+# Improve Test Coverage
 
-echo "🔍 Running coverage analysis..."
-just coverage
+Analyze code coverage, identify the file with lowest coverage, and add comprehensive tests to improve coverage.
 
-echo "📊 Analyzing coverage results..."
-# Extract files with lowest coverage from JSON report
-LOWEST_COVERAGE_FILE=$(cat target/coverage/tarpaulin-report.json | jq -r '
-  .files 
-  | to_entries 
-  | map({
-      file: .value.path | join("/") | sub("^//"; ""),
-      coverage: (if .value.coverable > 0 then (.value.covered * 100 / .value.coverable) else 0 end),
-      covered: .value.covered,
-      coverable: .value.coverable,
-      uncovered_lines: [
-        .value.traces[] 
-        | select(.stats.Line == 0) 
-        | .line
-      ]
-    })
-  | map(select(.coverable > 0))
-  | sort_by(.coverage)
-  | first
-')
+## Process
 
-FILE_PATH=$(echo "$LOWEST_COVERAGE_FILE" | jq -r '.file')
-COVERAGE=$(echo "$LOWEST_COVERAGE_FILE" | jq -r '.coverage')
-COVERED=$(echo "$LOWEST_COVERAGE_FILE" | jq -r '.covered')
-COVERABLE=$(echo "$LOWEST_COVERAGE_FILE" | jq -r '.coverable')
-UNCOVERED_LINES=$(echo "$LOWEST_COVERAGE_FILE" | jq -r '.uncovered_lines | @json')
+1. **Run coverage analysis** - Execute `just coverage` to generate coverage report
+2. **Identify target** - Find the file with lowest test coverage from the report
+3. **Analyze uncovered code** - Examine the file to understand what functionality needs testing
+4. **Write tests** - Create comprehensive tests for the uncovered functionality using:
+   - Functional programming patterns where appropriate
+   - Pure functions when possible
+   - Immutability principles
+   - Property-based testing for complex logic
+5. **Verify tests** - Run `cargo test` to ensure all tests pass
+6. **Measure improvement** - Run coverage again to verify improvement
+7. **Commit changes** - Create a clear commit describing the coverage improvement
 
-echo "📁 Targeting file: $FILE_PATH"
-echo "   Current coverage: ${COVERAGE}% (${COVERED}/${COVERABLE} lines)"
+## Important Instructions
 
-# Store initial coverage for comparison
-INITIAL_COVERAGE=$COVERAGE
+**IMPORTANT**: When making ANY commits, do NOT include attribution text like "🤖 Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages. Keep commits clean and focused on the actual changes.
 
-# Use Claude to analyze and improve coverage
-echo "🤖 Analyzing uncovered code and generating tests..."
-cat <<EOF | claude --no-confirm
+## Implementation Steps
 
-You are tasked with improving test coverage for a Rust project. 
+1. First, I'll run the coverage analysis to identify areas needing improvement
+2. Parse the coverage report JSON to find the file with lowest coverage and store initial metrics
+3. Read and analyze that file to understand its functionality
+4. Write comprehensive tests focusing on:
+   - Critical paths and edge cases
+   - Error handling scenarios
+   - Boundary conditions
+   - Integration with other components
+5. Ensure tests follow project patterns and conventions
+6. Run tests to verify they pass
+7. Run coverage again to measure improvement
+8. Calculate the coverage improvement percentage
+9. Commit with the improvement metrics in the message
 
-Target file: $FILE_PATH
-Current coverage: ${COVERAGE}% (${COVERED}/${COVERABLE} lines)
-Uncovered lines: $UNCOVERED_LINES
+## Success Criteria
 
-Please:
-1. Read and analyze the file at $FILE_PATH
-2. Identify the uncovered functionality based on the line numbers
-3. Write idiomatic Rust tests that cover the most important uncovered code
-4. Prefer functional programming approaches where reasonable:
-   - Use pure functions when possible
-   - Favor immutability
-   - Use map/filter/fold over loops
-   - Minimize side effects
-5. Ensure tests follow the project's existing patterns
-6. Add the tests to the appropriate test module or file
-7. Run 'cargo test' to verify the tests pass
+- [ ] Coverage analysis completed
+- [ ] Lowest coverage file identified
+- [ ] Tests written for uncovered functionality
+- [ ] All tests passing
+- [ ] Coverage measurably improved
+- [ ] Changes committed with metrics
 
-Focus on testing the most critical functionality first. Aim to add meaningful tests, not just coverage for coverage's sake.
+## Technical Approach
 
-IMPORTANT: Do NOT run coverage yourself - the script will handle that after you're done.
+When writing tests, I will:
+- Study existing test patterns in the codebase
+- Use the same test utilities and helpers
+- Follow Rust testing best practices
+- Focus on behavior over implementation details
+- Ensure tests are deterministic and isolated
+- Add both unit and integration tests where appropriate
 
-IMPORTANT: Do NOT commit any changes - the script will handle committing after verifying coverage improvements.
+## Commit Message Format
 
-IMPORTANT: You MUST actually write the test code to files. Do not just analyze - implement the tests.
-
-EOF
-
-echo "✅ Test implementation complete!"
-
-# Check if any changes were made
-if [ -z "$(git status --porcelain)" ]; then
-    echo "❌ No changes were made. Claude may not have written any test files."
-    echo "   Please check that the target file has testable code."
-    exit 1
-fi
-
-echo "🧪 Running tests to ensure everything passes..."
-cargo test
-
-# Check if tests passed
-if [ $? -ne 0 ]; then
-    echo "❌ Tests failed! Please fix the failing tests before committing."
-    exit 1
-fi
-
-echo "📈 Running final coverage check to measure improvement..."
-just coverage
-
-# Check if coverage run succeeded (it runs tests internally)
-if [ $? -ne 0 ]; then
-    echo "❌ Coverage run failed! Tests may be failing."
-    exit 1
-fi
-
-# Extract new coverage percentage
-NEW_COVERAGE=$(cat target/coverage/tarpaulin-report.json | jq -r '
-  .files 
-  | to_entries 
-  | map({
-      file: .value.path | join("/") | sub("^//"; ""),
-      coverage: (if .value.coverable > 0 then (.value.covered * 100 / .value.coverable) else 100 end)
-    })
-  | map(select(.file == "'$FILE_PATH'"))
-  | first
-  | .coverage
-')
-
-# Calculate improvement
-IMPROVEMENT=$(echo "$NEW_COVERAGE - $INITIAL_COVERAGE" | bc)
-
-echo "📊 Coverage for $FILE_PATH:"
-echo "   Before: ${INITIAL_COVERAGE}%"
-echo "   After:  ${NEW_COVERAGE}%"
-echo "   Improvement: +${IMPROVEMENT}%"
-
-# Check if coverage actually improved
-if (( $(echo "$IMPROVEMENT <= 0" | bc -l) )); then
-    echo "⚠️  No coverage improvement detected. Skipping commit."
-    exit 1
-fi
-
-# Commit the changes with improvement percentage
-echo "💾 Committing coverage improvements..."
-git add -A
-git commit -m "test: improve coverage for $(basename $FILE_PATH) (+${IMPROVEMENT}%)
+The commit message will follow this format:
+```
+test: improve coverage for [filename] (+X%)
 
 - Added tests for uncovered functionality
-- Coverage improved from ${INITIAL_COVERAGE}% to ${NEW_COVERAGE}%
-- Focus on critical paths and edge cases"
+- Coverage improved from Y% to Z%
+- Focus on critical paths and edge cases
+```
 
-echo "🎉 Coverage improvement committed successfully!"
+Where X is the improvement percentage, Y is the initial coverage, and Z is the final coverage.
