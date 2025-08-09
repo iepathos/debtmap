@@ -7,10 +7,7 @@ external-default-features = "allow"
 allow = []
 deny = []
 skip = [
-    { name = "getrandom" },
-    { name = "regex-automata" },
-    { name = "regex-syntax" },
-    { name = "wasi" },
+    { name = "hashbrown" },
     { name = "windows-sys" },
     { name = "windows-targets" },
     { name = "windows_aarch64_gnullvm" },
@@ -27,17 +24,33 @@ skip-tree = []
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-unmaintained = "all"
+unmaintained = "none"
 yanked = "warn"
-ignore = []
+ignore = [
+    "RUSTSEC-2024-0436",  # paste crate - unmaintained, will need to find alternative
+]
 
 [licenses]
-allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "CC0-1.0", "Unicode-3.0", "MPL-2.0", "0BSD", "BSL-1.0", "LGPL-2.1", "Unlicense", "Zlib", "ISC"]
+allow = [
+    "MIT", 
+    "Apache-2.0", 
+    "CC0-1.0", 
+    "Unicode-3.0", 
+    "MPL-2.0", 
+    "BSL-1.0", 
+    "Unlicense", 
+    "ISC",
+]
 exceptions = [
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "linux-raw-sys" },
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "rustix" },
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "wasi" },
-    { allow = ["Apache-2.0 WITH LLVM-exception"], name = "wit-bindgen-rt" },
+    { allow = ["LGPL-3.0"], name = "malachite" },
+    { allow = ["LGPL-3.0"], name = "malachite-base" },
+    { allow = ["LGPL-3.0"], name = "malachite-bigint" },
+    { allow = ["LGPL-3.0"], name = "malachite-nz" },
+    { allow = ["LGPL-3.0"], name = "malachite-q" },
+    { allow = ["Unicode-DFS-2016"], name = "unicode_names2" },
 ]
 confidence-threshold = 0.8
 
