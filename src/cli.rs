@@ -173,7 +173,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_cli_parsing_init_command() {
         use clap::Parser;
