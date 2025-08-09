@@ -22,6 +22,10 @@ Use debtmap to analyze the repository and identify tech debt, then fix the highe
 6. **Verify** - Run cargo clippy and cargo fmt
 7. **Commit** - Create a clear commit message describing the tech debt fix
 
+## Important Instructions
+
+**IMPORTANT**: When making ANY commits, do NOT include attribution text like "🤖 Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages. Keep commits clean and focused on the actual changes.
+
 ## Steps
 
 ```bash

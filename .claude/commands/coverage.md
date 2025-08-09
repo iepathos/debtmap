@@ -66,7 +66,9 @@ Please:
 
 Focus on testing the most critical functionality first. Aim to add meaningful tests, not just coverage for coverage's sake.
 
-Do NOT run coverage yourself - the script will handle that after you're done.
+IMPORTANT: Do NOT run coverage yourself - the script will handle that after you're done.
+
+IMPORTANT: When making ANY commits, do NOT include attribution text like "🤖 Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages. Keep commits clean and focused on the actual changes.
 
 EOF
 
