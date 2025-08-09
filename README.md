@@ -259,7 +259,7 @@ We welcome contributions! This is an early-stage project, so there's plenty of r
 
 ### Areas for Contribution
 
-- **Language support**: Add analyzers for JavaScript, Go, Java, etc.
+- **Language support**: Add analyzers for Go, Java, etc.
 - **New metrics**: Implement additional complexity or quality metrics
 - **Performance**: Optimize analysis algorithms
 - **Documentation**: Improve docs and add examples
