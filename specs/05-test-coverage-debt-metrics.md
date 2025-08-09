@@ -1,6 +1,6 @@
 ---
 number: 05
-title: Test Coverage Debt Metrics
+title: Complexity-Coverage Risk Analysis
 category: testing
 priority: high
 status: draft
@@ -8,7 +8,7 @@ dependencies: []
 created: 2025-01-09
 ---
 
-# Specification 05: Test Coverage Debt Metrics
+# Specification 05: Complexity-Coverage Risk Analysis
 
 **Category**: testing
 **Priority**: high
@@ -17,205 +17,227 @@ created: 2025-01-09
 
 ## Context
 
-Technical debt analysis is incomplete without considering test coverage as a critical quality metric. Untested or poorly tested code represents significant technical debt that can lead to bugs, maintenance difficulties, and reduced confidence during refactoring. Currently, debtmap identifies code smells, complexity issues, and TODO comments, but lacks integration with test coverage data to provide a holistic view of code quality and debt.
+While test coverage tools are ubiquitous and provide comprehensive coverage metrics, they typically treat all code equally - a 10-line getter function counts the same as a 100-line algorithm with nested conditionals. This misses a critical insight: **complex code needs more thorough testing than simple code**.
 
-Modern development practices emphasize test-driven development and comprehensive test coverage. However, coverage metrics alone don't tell the full story - the quality of tests, coverage of complex code paths, and correlation between complexity and test coverage are equally important for debt assessment.
+Debtmap's unique strength lies in its sophisticated complexity analysis, calculating both cyclomatic and cognitive complexity metrics that reveal which code is genuinely difficult to understand and maintain. By correlating this complexity data with test coverage, debtmap can provide insights that neither coverage tools nor static analyzers offer alone.
 
-This specification aims to integrate test coverage analysis into debtmap's technical debt detection by accepting LCOV coverage reports - a universal format supported across all major languages and testing frameworks. Users will generate LCOV reports using their existing test tooling and provide them to debtmap for analysis, enabling language-agnostic coverage debt detection.
+The real technical debt isn't just "untested code" - it's "untested complex code" that poses the highest risk. A simple untested getter is low risk; an untested function with cyclomatic complexity of 20 is a ticking time bomb. This specification focuses on identifying these high-risk areas by analyzing the correlation between code complexity and test coverage.
 
 ## Objective
 
-Implement LCOV coverage report integration that enables debtmap to parse user-provided LCOV files and combine coverage data with existing complexity and debt analysis to identify high-risk, under-tested code areas and provide prioritized recommendations for improving test coverage where it matters most.
+Implement complexity-coverage correlation analysis that combines debtmap's existing complexity metrics (cyclomatic and cognitive) with LCOV coverage data to identify high-risk code areas, prioritize testing efforts based on actual risk rather than raw coverage percentages, and provide actionable insights about where additional testing will have the greatest impact on reducing technical debt.
 
 ## Requirements
 
 ### Functional Requirements
 
-- **LCOV Parser**: Parse LCOV coverage report format with full support for line, function, and branch coverage data
+- **LCOV Parser**: Parse LCOV coverage report format focusing on function and branch coverage for correlation with complexity metrics
 - **Coverage File Input**: Accept LCOV file path via CLI parameter `--coverage-file` or `--lcov`
-- **Coverage Data Integration**: Map LCOV coverage data to analyzed source files using file paths
-- **Coverage Debt Detection**: Identify untested and under-tested code segments as debt items
-- **Risk-Based Prioritization**: Weight coverage debt by complexity and existing technical debt
-- **Function-Level Coverage**: Extract and report function coverage percentages from LCOV data
-- **Line Coverage Analysis**: Track covered vs uncovered lines with hit counts
-- **Branch Coverage Analysis**: Parse and report branch coverage data (when available in LCOV)
-- **Coverage Thresholds**: Configurable coverage thresholds with debt severity mapping
-- **Multi-Language Support**: Handle LCOV files from any language (Rust, Python, JavaScript, etc.)
-- **Missing Coverage Handling**: Gracefully handle files in analysis that aren't in coverage report
+- **Complexity-Coverage Correlation**: Calculate risk scores by multiplying complexity metrics with coverage gaps
+- **Risk-Based Prioritization**: Rank functions by their complexity-weighted coverage risk, not raw coverage percentages
+- **High-Risk Function Detection**: Identify functions where high complexity meets low coverage (the "danger zone")
+- **Test Effort Estimation**: Estimate testing difficulty based on cyclomatic and cognitive complexity of untested code
+- **Coverage Impact Analysis**: Predict which functions would most reduce risk if tested
+- **Complexity-Adjusted Thresholds**: Dynamic coverage requirements based on code complexity (complex code needs higher coverage)
+- **Risk Heat Maps**: Generate visualizations showing complexity vs coverage correlations
+- **Test ROI Calculation**: Calculate return on investment for testing specific functions based on complexity reduction
+- **Complexity Trend Analysis**: Track how complexity-coverage correlation changes over time
 
 ### Non-Functional Requirements
 
-- **Performance**: Parse LCOV files efficiently without significant slowdown
-- **Scalability**: Handle LCOV files for large codebases (100k+ lines, multi-MB files)
-- **Format Compliance**: Full support for LCOV format specification including all record types
+- **Performance**: Correlation analysis should add minimal overhead to existing complexity calculations
+- **Insight Quality**: Provide actionable, prioritized recommendations rather than raw metrics
+- **Risk Accuracy**: Risk scores should correlate with actual bug density and maintenance costs
 - **Memory Efficiency**: Stream LCOV parsing to minimize memory overhead
-- **Error Tolerance**: Continue analysis even if LCOV file is partially corrupted or incomplete
-- **Extensibility**: Architecture allows future addition of other coverage formats (Cobertura, etc.)
+- **Incremental Analysis**: Support analyzing coverage changes between commits to track risk trends
+- **Language Agnostic**: Work with LCOV from any language while leveraging debtmap's language-specific complexity analysis
 
 ## Acceptance Criteria
 
-- [ ] Successfully parse LCOV coverage reports from all major test frameworks
+- [ ] Successfully parse LCOV coverage reports focusing on function-level coverage
 - [ ] Accept LCOV file via `--coverage-file` or `--lcov` CLI parameter
-- [ ] Parse all LCOV record types: TN, SF, FN, FNDA, FNF, FNH, DA, LF, LH, BRDA, BRF, BRH
-- [ ] Map LCOV source file paths to analyzed files correctly
-- [ ] Identify functions with 0% coverage as high-priority debt items
-- [ ] Identify functions with <50% coverage as medium-priority debt items
-- [ ] Calculate risk scores combining coverage percentage and complexity metrics
-- [ ] Parse branch coverage data from BRDA records when available
-- [ ] Generate coverage debt reports in JSON, Markdown, and terminal formats
-- [ ] Support configurable coverage thresholds via CLI or config file
-- [ ] Track function-level coverage percentages from FN/FNDA records
-- [ ] Handle missing files gracefully (files in analysis but not in LCOV)
-- [ ] Provide coverage improvement recommendations prioritized by complexity
-- [ ] Integrate coverage debt into existing suppression comment system
-- [ ] Support LCOV files generated from: cargo-tarpaulin, pytest-cov, jest, nyc, gcov
-- [ ] Performance remains within 1.5x of baseline analysis speed
-- [ ] Memory usage increases by less than 25% when processing LCOV data
+- [ ] Calculate complexity-weighted risk scores for all functions
+- [ ] Identify "danger zone" functions: complexity > 10 AND coverage < 50%
+- [ ] Rank functions by risk score (complexity * coverage_gap) not raw coverage
+- [ ] Generate test effort estimates based on cognitive complexity of untested code
+- [ ] Provide "test these 5 functions first" recommendations based on risk reduction potential
+- [ ] Show complexity-coverage correlation coefficient for the entire codebase
+- [ ] Support dynamic thresholds: functions with complexity > 15 require 90% coverage, > 10 require 80%, etc.
+- [ ] Generate risk matrix visualization showing function distribution across complexity/coverage quadrants
+- [ ] Calculate potential risk reduction for testing each uncovered function
+- [ ] Identify functions where high complexity is well-tested (good examples)
+- [ ] Detect anti-pattern: high coverage but only on simple code paths
+- [ ] Support LCOV files from: cargo-tarpaulin, pytest-cov, jest, nyc, gcov
+- [ ] Performance remains within 1.2x of baseline complexity analysis
+- [ ] Provide clear ROI metrics: "Testing function X would reduce risk by Y%"
 - [ ] All existing functionality remains unaffected when no LCOV file provided
 
 ## Technical Details
 
 ### Implementation Approach
 
-The LCOV coverage integration will extend the existing debt detection system with coverage-specific analysis:
+The complexity-coverage correlation system will enhance debtmap's existing complexity analysis with risk-based insights:
 
-1. **LCOV Parser Module**: Dedicated parser for LCOV format specification
-2. **Coverage Integration**: Merge parsed LCOV data with existing file analysis
-3. **Risk Calculation**: Combine coverage percentages with complexity metrics
-4. **Debt Classification**: Extend existing debt types with coverage-specific items
-5. **CLI Integration**: Add coverage file parameter to existing analyze command
+1. **LCOV Parser Module**: Minimal parser focusing on function-level coverage data
+2. **Risk Analysis Engine**: Core module that correlates complexity metrics with coverage data
+3. **Priority Algorithm**: Smart ranking based on risk reduction potential, not raw metrics
+4. **Insight Generation**: Produce actionable recommendations, not just data dumps
+5. **Visualization Layer**: Risk matrices and heat maps showing the complexity-coverage landscape
 
 ### Architecture Changes
 
 **New Files**:
-- `src/coverage/mod.rs` - Main coverage analysis module
-- `src/coverage/lcov.rs` - LCOV format parser implementation
-- `src/coverage/integration.rs` - Integration with existing analysis pipeline
-- `src/coverage/risk.rs` - Risk calculation algorithms combining coverage and complexity
-- `src/coverage/metrics.rs` - Coverage-specific metrics and calculations
+- `src/risk/mod.rs` - Main risk analysis module
+- `src/risk/lcov.rs` - Minimal LCOV parser for function coverage
+- `src/risk/correlation.rs` - Complexity-coverage correlation engine
+- `src/risk/priority.rs` - Risk-based prioritization algorithms
+- `src/risk/insights.rs` - Actionable recommendation generation
 
 **Modified Files**:
-- `src/core/mod.rs` - Add coverage-related data structures
-- `src/debt/mod.rs` - Extend debt detection with coverage analysis
-- `src/cli.rs` - Add coverage data input options
-- `src/io/output.rs` - Extend output formats with coverage debt reporting
+- `src/core/mod.rs` - Add risk analysis data structures
+- `src/cli.rs` - Add coverage file input option
+- `src/io/output.rs` - Extend output with risk insights and visualizations
 
 ### Data Structures
 
-**LCOV Data Models**:
+**Risk Analysis Models**:
 ```rust
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LcovReport {
-    pub test_name: Option<String>, // TN record
-    pub source_files: HashMap<PathBuf, SourceFileCoverage>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SourceFileCoverage {
-    pub path: PathBuf, // SF record
-    pub functions: Vec<LcovFunction>, // FN/FNDA records
-    pub lines: HashMap<usize, usize>, // DA records (line_num -> hit_count)
-    pub branches: Vec<LcovBranch>, // BRDA records
-    pub line_coverage: LineSummary, // LF/LH records
-    pub function_coverage: FunctionSummary, // FNF/FNH records
-    pub branch_coverage: Option<BranchSummary>, // BRF/BRH records
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LcovFunction {
-    pub name: String,
-    pub start_line: usize,
-    pub execution_count: usize, // 0 means uncovered
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LcovBranch {
-    pub line: usize,
-    pub block: usize,
-    pub branch: usize,
-    pub taken: Option<usize>, // None = not executed, Some(n) = taken n times
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CoverageDebt {
+pub struct FunctionRisk {
     pub file: PathBuf,
-    pub function_name: Option<String>,
+    pub function_name: String,
     pub line_range: (usize, usize),
+    pub cyclomatic_complexity: u32,
+    pub cognitive_complexity: u32,
     pub coverage_percentage: f64,
-    pub complexity_score: u32,
-    pub risk_score: f64, // coverage_gap * complexity
-    pub priority: Priority,
-    pub recommendation: String,
+    pub risk_score: f64,
+    pub test_effort: TestEffort,
+    pub risk_category: RiskCategory,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum RiskCategory {
+    Critical,     // High complexity (>15), low coverage (<30%)
+    High,         // High complexity (>10), moderate coverage (<60%)
+    Medium,       // Moderate complexity (>5), low coverage (<50%)
+    Low,          // Low complexity or high coverage
+    WellTested,   // High complexity with high coverage (good examples)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TestEffort {
+    pub estimated_difficulty: Difficulty,
+    pub cognitive_load: u32,
+    pub branch_count: u32,
+    pub recommended_test_cases: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Difficulty {
+    Trivial,    // Cognitive < 5
+    Simple,     // Cognitive 5-10
+    Moderate,   // Cognitive 10-20
+    Complex,    // Cognitive 20-40
+    VeryComplex // Cognitive > 40
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RiskInsight {
+    pub top_risks: Vec<FunctionRisk>,
+    pub risk_reduction_opportunities: Vec<TestingRecommendation>,
+    pub codebase_risk_score: f64,
+    pub complexity_coverage_correlation: f64,
+    pub risk_distribution: RiskDistribution,
 }
 ```
 
-**Extended Debt Types**:
+**Risk-Based Classifications**:
 ```rust
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Copy)]
-pub enum DebtType {
-    Todo,
-    Fixme,
-    CodeSmell,
-    Duplication,
-    Complexity,
-    Dependency,
-    Untested,        // 0% coverage
-    Undertested,     // Below threshold coverage
-    UncoveredBranch, // Uncovered conditional branches
-    MissingTest,     // No corresponding test file
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TestingRecommendation {
+    pub function: String,
+    pub current_risk: f64,
+    pub potential_risk_reduction: f64,
+    pub test_effort_estimate: TestEffort,
+    pub rationale: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RiskDistribution {
+    pub critical_count: usize,
+    pub high_count: usize,
+    pub medium_count: usize,
+    pub low_count: usize,
+    pub well_tested_count: usize,
+    pub total_functions: usize,
 }
 ```
 
 ### APIs and Interfaces
 
-**LCOV Parser Interface**:
+**Risk Analysis Interface**:
 ```rust
-pub struct LcovParser;
-
-impl LcovParser {
-    pub fn new() -> Self;
-    pub fn parse_file(&self, path: &Path) -> Result<LcovReport>;
-    pub fn parse_content(&self, content: &str) -> Result<LcovReport>;
+pub struct RiskAnalyzer {
+    complexity_weight: f64,    // Default: 1.0
+    coverage_weight: f64,      // Default: 1.0
+    cognitive_weight: f64,     // Default: 1.5 (cognitive is harder to test)
 }
 
-// CLI Interface
-pub struct CoverageOptions {
-    pub lcov_file: Option<PathBuf>,
-    pub coverage_threshold: f64, // Default: 80.0
-    pub function_threshold: f64, // Default: 70.0
-    pub line_threshold: f64,     // Default: 80.0
+impl RiskAnalyzer {
+    pub fn analyze_function(
+        &self,
+        complexity: &ComplexityMetrics,
+        coverage: f64,
+    ) -> FunctionRisk;
+    
+    pub fn calculate_risk_score(
+        &self,
+        cyclomatic: u32,
+        cognitive: u32,
+        coverage: f64,
+    ) -> f64;
+    
+    pub fn estimate_test_effort(
+        &self,
+        cognitive: u32,
+        cyclomatic: u32,
+    ) -> TestEffort;
 }
 ```
 
-**Risk Calculation**:
+**Risk Calculation Algorithms**:
 ```rust
-pub fn calculate_coverage_risk(
-    coverage_percentage: f64,
-    complexity: u32,
+pub fn calculate_risk_score(
+    cyclomatic: u32,
+    cognitive: u32,
+    coverage: f64,
 ) -> f64 {
-    // Risk = (100 - coverage%) * complexity / 100
-    let coverage_gap = (100.0 - coverage_percentage).max(0.0);
-    (coverage_gap * complexity as f64) / 100.0
+    // Weighted risk formula emphasizing cognitive complexity
+    let coverage_gap = (100.0 - coverage) / 100.0;
+    let complexity_factor = (cyclomatic as f64 + cognitive as f64 * 1.5) / 2.0;
+    coverage_gap * complexity_factor
 }
 
-pub fn classify_coverage_priority(
-    coverage_percentage: f64,
+pub fn calculate_risk_reduction(
+    current_risk: f64,
     complexity: u32,
-) -> Priority;
-```
+    target_coverage: f64,
+) -> f64 {
+    // How much risk would be eliminated by achieving target coverage
+    current_risk * (target_coverage / 100.0)
+}
 
-**Integration Functions**:
-```rust
-pub fn integrate_lcov_with_analysis(
-    file_metrics: FileMetrics,
-    lcov_data: &SourceFileCoverage,
-) -> FileMetrics;
-
-pub fn generate_coverage_debt_items(
-    lcov_coverage: &SourceFileCoverage,
-    complexity: &ComplexityMetrics,
-    thresholds: &CoverageOptions,
-) -> Vec<DebtItem>;
+pub fn prioritize_by_roi(
+    functions: Vec<FunctionRisk>,
+) -> Vec<TestingRecommendation> {
+    // Sort by risk_reduction / test_effort for maximum ROI
+    functions.sort_by(|a, b| {
+        let roi_a = a.risk_score / a.test_effort.cognitive_load as f64;
+        let roi_b = b.risk_score / b.test_effort.cognitive_load as f64;
+        roi_b.partial_cmp(&roi_a).unwrap()
+    });
+    functions.into_iter().take(5).map(to_recommendation).collect()
+}
 ```
 
 ## Dependencies
@@ -282,92 +304,128 @@ pub fn generate_coverage_debt_items(
 
 ## Implementation Notes
 
-### LCOV Format Specification
+### Core Insight: Complexity-Coverage Correlation
 
-LCOV is a simple text-based format with the following record types:
+The key innovation is not measuring coverage (existing tools do that well) but **correlating coverage with complexity** to identify actual risk. This approach recognizes that:
+
+1. **Not all uncovered code is equally risky** - An untested getter is low risk; an untested algorithm with 20 branches is critical
+2. **Testing effort varies by complexity** - A function with cognitive complexity 30 requires more test cases than one with complexity 3
+3. **Coverage targets should be dynamic** - Complex code needs higher coverage than simple code
+4. **ROI matters** - Testing simple code may increase coverage percentage but not reduce actual risk
+
+### LCOV Format (Minimal Parsing)
+
+We only need to parse function-level coverage from LCOV:
 
 ```
-TN:<test name>                    # Optional test name
 SF:<absolute path to source file> # Source file path
 FN:<line>,<function name>         # Function start line and name
-FNDA:<count>,<function name>      # Function execution count
-FNF:<number>                       # Functions found
-FNH:<number>                       # Functions hit
-DA:<line>,<count>[,<checksum>]    # Line execution count
-LF:<number>                        # Lines found
-LH:<number>                        # Lines hit
-BRDA:<line>,<block>,<branch>,<count> # Branch coverage
-BRF:<number>                       # Branches found
-BRH:<number>                       # Branches hit
+FNDA:<count>,<function name>      # Function execution count (0 = untested)
 end_of_record                      # End of source file record
 ```
 
-### Usage Examples by Language
+### Usage Examples
 
 ```bash
-# Rust with cargo-tarpaulin
-cargo tarpaulin --out Lcov --output-dir .
+# Generate LCOV and analyze risk
+cargo tarpaulin --out Lcov
 debtmap analyze . --lcov lcov.info
 
-# Python with pytest-cov
-pytest --cov=src --cov-report=lcov:coverage.lcov
-debtmap analyze . --lcov coverage.lcov
-
-# JavaScript with Jest
-jest --coverage --coverageReporters=lcov
-debtmap analyze . --lcov coverage/lcov.info
-
-# TypeScript with nyc
-nyc --reporter=lcov npm test
-debtmap analyze . --lcov coverage/lcov.info
-
-# Go with go test and gcov2lcov
-go test -coverprofile=coverage.out ./...
-gcov2lcov -infile=coverage.out -outfile=coverage.lcov
-debtmap analyze . --lcov coverage.lcov
+# Output will highlight high-risk functions:
+# CRITICAL RISK: src/parser.rs::parse_expression()
+#   - Cyclomatic Complexity: 25
+#   - Cognitive Complexity: 38
+#   - Coverage: 0%
+#   - Risk Score: 47.5
+#   - Estimated Test Effort: COMPLEX (5-8 test cases needed)
+#   - Recommendation: This function has the highest risk/effort ratio.
+#                    Testing it would reduce codebase risk by 12%.
 ```
 
-### LCOV Parser Implementation Considerations
+### Risk Analysis Examples
 
-- **Path Resolution**: Handle both relative and absolute paths in SF records
-- **Streaming**: Process LCOV files line-by-line to handle large files efficiently
-- **Error Tolerance**: Continue parsing even if some records are malformed
-- **Path Matching**: Match LCOV source paths to analyzed files flexibly
-- **Performance**: Use lazy parsing where possible, cache parsed data
-- **Cross-Platform**: Support both Unix and Windows path separators
-
-### Risk Calculation Algorithm
-
-**Base Risk Score**:
+**Example 1: High Complexity, No Coverage (CRITICAL)**
 ```
-risk = (100 - coverage_percentage) * complexity / 100
+Function: parse_complex_expression
+Cyclomatic: 20, Cognitive: 35, Coverage: 0%
+Risk Score: (20 + 35*1.5)/2 * 1.0 = 36.25
+Priority: CRITICAL - Test immediately
 ```
 
-**Priority Classification**:
-- **Critical**: 0% coverage + complexity > 10
-- **High**: <25% coverage + complexity > 5
-- **Medium**: <50% coverage OR complexity > 15
-- **Low**: All other cases
+**Example 2: Low Complexity, No Coverage (LOW)**
+```
+Function: get_name
+Cyclomatic: 1, Cognitive: 1, Coverage: 0%
+Risk Score: (1 + 1*1.5)/2 * 1.0 = 1.25
+Priority: LOW - Not worth testing individually
+```
 
-### Integration Strategies
+**Example 3: High Complexity, Good Coverage (WELL-TESTED)**
+```
+Function: validate_input
+Cyclomatic: 15, Cognitive: 20, Coverage: 95%
+Risk Score: (15 + 20*1.5)/2 * 0.05 = 1.125
+Priority: WELL-TESTED - Good example for the team
+```
 
-**File Path Matching**:
-- Normalize paths between LCOV and source files
-- Handle different working directory contexts
-- Support both absolute and relative paths
-- Case-insensitive matching on Windows
+### Dynamic Threshold Algorithm
 
-**Coverage Gap Detection**:
-- Files analyzed but not in LCOV report = 0% coverage
-- Functions in analyzed files but not in LCOV = untested
-- Lines in functions but not covered = coverage gaps
+Instead of fixed coverage targets, use complexity-based thresholds:
+
+```
+Required Coverage = min(100, 50 + complexity * 2)
+
+Examples:
+- Complexity 1: 52% coverage required
+- Complexity 10: 70% coverage required
+- Complexity 20: 90% coverage required
+- Complexity 25+: 100% coverage required
+```
+
+### Visualization Concepts
+
+**Risk Matrix (Terminal Output)**:
+```
+Coverage % →
+100 │ ✓✓✓ │ ✓✓✓ │ ✓✓  │ ⚠   │
+ 75 │ ✓✓✓ │ ✓✓  │ ⚠   │ ⚠⚠  │
+ 50 │ ✓✓  │ ⚠   │ ⚠⚠  │ ⚠⚠⚠ │
+ 25 │ ⚠   │ ⚠⚠  │ ⚠⚠⚠ │ 🔥🔥 │
+  0 │ ✓   │ ⚠⚠  │ 🔥  │ 🔥🔥🔥│
+    └─────┴─────┴─────┴─────┘
+      1-5   5-10  10-20  20+
+           Complexity →
+
+✓ = Low Risk  ⚠ = Medium Risk  🔥 = Critical Risk
+```
+
+**Actionable Output Format**:
+```
+=== TOP 5 FUNCTIONS TO TEST FOR MAXIMUM RISK REDUCTION ===
+
+1. process_data() - Would reduce risk by 18%
+   Current Risk: 42.5 (CRITICAL)
+   Complexity: Cyclomatic=18, Cognitive=28
+   Coverage: 0%
+   Test Effort: COMPLEX (6-8 test cases)
+   Why: Highest risk score with manageable test effort
+
+2. validate_input() - Would reduce risk by 12%
+   Current Risk: 28.0 (HIGH)
+   Complexity: Cyclomatic=12, Cognitive=16
+   Coverage: 15%
+   Test Effort: MODERATE (4-5 test cases)
+   Why: Core validation logic with many branches
+
+[...]
+```
 
 ### Performance Optimizations
 
-- **Streaming Parser**: Process LCOV line-by-line without loading entire file
-- **Selective Loading**: Only parse coverage for files being analyzed
-- **Path Indexing**: Build efficient lookup structure for file coverage
-- **Memory Efficiency**: Store only essential coverage data in memory
+- **Function-Only Parsing**: Skip line-level coverage data for faster processing
+- **Lazy Correlation**: Only calculate risk for functions with complexity > threshold
+- **Cached Complexity**: Reuse existing complexity calculations from debtmap
+- **Smart Filtering**: Ignore simple functions (complexity < 3) from risk analysis
 
 ## Migration and Compatibility
 
