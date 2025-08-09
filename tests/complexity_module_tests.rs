@@ -32,7 +32,10 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         nesting: 1,
         length: 10,
     };
-    assert!(calc.is_complex(&metrics), "Should be complex when cyclomatic > threshold");
+    assert!(
+        calc.is_complex(&metrics),
+        "Should be complex when cyclomatic > threshold"
+    );
 }
 
 #[test]
@@ -47,7 +50,10 @@ fn test_complexity_calculator_is_complex_cognitive() {
         nesting: 1,
         length: 10,
     };
-    assert!(calc.is_complex(&metrics), "Should be complex when cognitive > threshold");
+    assert!(
+        calc.is_complex(&metrics),
+        "Should be complex when cognitive > threshold"
+    );
 }
 
 #[test]
@@ -62,7 +68,10 @@ fn test_complexity_calculator_is_complex_both() {
         nesting: 1,
         length: 10,
     };
-    assert!(calc.is_complex(&metrics), "Should be complex when both metrics > threshold");
+    assert!(
+        calc.is_complex(&metrics),
+        "Should be complex when both metrics > threshold"
+    );
 }
 
 #[test]
@@ -77,7 +86,10 @@ fn test_complexity_calculator_is_not_complex() {
         nesting: 1,
         length: 10,
     };
-    assert!(!calc.is_complex(&metrics), "Should not be complex when both metrics <= threshold");
+    assert!(
+        !calc.is_complex(&metrics),
+        "Should not be complex when both metrics <= threshold"
+    );
 }
 
 #[test]
@@ -93,7 +105,10 @@ fn test_complexity_calculator_calculate_score_low() {
         length: 10,
     };
     let score = calc.calculate_score(&metrics);
-    assert_eq!(score, 50, "Score should be 50 when metrics are half of thresholds");
+    assert_eq!(
+        score, 50,
+        "Score should be 50 when metrics are half of thresholds"
+    );
 }
 
 #[test]
@@ -109,7 +124,10 @@ fn test_complexity_calculator_calculate_score_medium() {
         length: 10,
     };
     let score = calc.calculate_score(&metrics);
-    assert_eq!(score, 100, "Score should be 100 when metrics equal thresholds");
+    assert_eq!(
+        score, 100,
+        "Score should be 100 when metrics equal thresholds"
+    );
 }
 
 #[test]
@@ -125,7 +143,10 @@ fn test_complexity_calculator_calculate_score_high() {
         length: 10,
     };
     let score = calc.calculate_score(&metrics);
-    assert_eq!(score, 200, "Score should be 200 when metrics are double thresholds");
+    assert_eq!(
+        score, 200,
+        "Score should be 200 when metrics are double thresholds"
+    );
 }
 
 #[test]
@@ -228,7 +249,7 @@ fn test_average_complexity_odd_count() {
 #[test]
 fn test_complexity_calculator_boundary_values() {
     let calc = ComplexityCalculator::new(1, 1);
-    
+
     let metrics_zero = FunctionMetrics {
         name: "zero".to_string(),
         file: PathBuf::from("test.rs"),
@@ -239,7 +260,7 @@ fn test_complexity_calculator_boundary_values() {
         length: 0,
     };
     assert!(!calc.is_complex(&metrics_zero));
-    
+
     let metrics_one = FunctionMetrics {
         name: "one".to_string(),
         file: PathBuf::from("test.rs"),
@@ -250,7 +271,7 @@ fn test_complexity_calculator_boundary_values() {
         length: 0,
     };
     assert!(!calc.is_complex(&metrics_one));
-    
+
     let metrics_two = FunctionMetrics {
         name: "two".to_string(),
         file: PathBuf::from("test.rs"),
@@ -266,7 +287,7 @@ fn test_complexity_calculator_boundary_values() {
 #[test]
 fn test_complexity_score_proportions() {
     let calc = ComplexityCalculator::new(10, 10);
-    
+
     let metrics_cyclo_only = FunctionMetrics {
         name: "cyclo".to_string(),
         file: PathBuf::from("test.rs"),
@@ -277,8 +298,11 @@ fn test_complexity_score_proportions() {
         length: 0,
     };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
-    assert_eq!(score_cyclo, 50, "Only cyclomatic at threshold should give 50");
-    
+    assert_eq!(
+        score_cyclo, 50,
+        "Only cyclomatic at threshold should give 50"
+    );
+
     let metrics_cognitive_only = FunctionMetrics {
         name: "cognitive".to_string(),
         file: PathBuf::from("test.rs"),
@@ -289,7 +313,10 @@ fn test_complexity_score_proportions() {
         length: 0,
     };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
-    assert_eq!(score_cognitive, 50, "Only cognitive at threshold should give 50");
+    assert_eq!(
+        score_cognitive, 50,
+        "Only cognitive at threshold should give 50"
+    );
 }
 
 #[test]
@@ -298,13 +325,13 @@ fn test_complexity_integration() {
     let branch1 = 5;
     let branch2 = 3;
     let combined = combine_complexity(branch1, branch2);
-    
+
     let all_complexities = vec![branch1, branch2, combined];
     let max = max_complexity(&all_complexities);
-    
+
     assert_eq!(combined, 8);
     assert_eq!(max, 8);
-    
+
     let avg = average_complexity(&all_complexities);
     assert_eq!(avg, 16.0 / 3.0);
 }

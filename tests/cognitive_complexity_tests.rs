@@ -1,4 +1,6 @@
-use debtmap::complexity::cognitive::{calculate_cognitive, calculate_cognitive_penalty, combine_cognitive};
+use debtmap::complexity::cognitive::{
+    calculate_cognitive, calculate_cognitive_penalty, combine_cognitive,
+};
 use syn::{parse_quote, Block};
 
 #[test]
@@ -8,9 +10,12 @@ fn test_calculate_cognitive_simple_block() {
         let y = 10;
         x + y
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 0, "Simple block should have 0 cognitive complexity");
+    assert_eq!(
+        complexity, 0,
+        "Simple block should have 0 cognitive complexity"
+    );
 }
 
 #[test]
@@ -20,9 +25,12 @@ fn test_calculate_cognitive_single_if() {
             println!("positive");
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 1, "Single if statement should have complexity 1");
+    assert_eq!(
+        complexity, 1,
+        "Single if statement should have complexity 1"
+    );
 }
 
 #[test]
@@ -34,9 +42,12 @@ fn test_calculate_cognitive_nested_if() {
             }
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 3, "Nested if should have complexity 3 (1 for outer if + 2 for inner if with nesting)");
+    assert_eq!(
+        complexity, 3,
+        "Nested if should have complexity 3 (1 for outer if + 2 for inner if with nesting)"
+    );
 }
 
 #[test]
@@ -49,9 +60,12 @@ fn test_calculate_cognitive_match_expression() {
             _ => println!("other"),
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 5, "Match with 4 arms should have complexity 5 (1 for match + 4 for arms)");
+    assert_eq!(
+        complexity, 5,
+        "Match with 4 arms should have complexity 5 (1 for match + 4 for arms)"
+    );
 }
 
 #[test]
@@ -68,9 +82,12 @@ fn test_calculate_cognitive_nested_match() {
             None => println!("none"),
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 8, "Nested match should accumulate complexity with nesting penalty");
+    assert_eq!(
+        complexity, 8,
+        "Nested match should accumulate complexity with nesting penalty"
+    );
 }
 
 #[test]
@@ -80,7 +97,7 @@ fn test_calculate_cognitive_while_loop() {
             x += 1;
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
     assert_eq!(complexity, 1, "While loop should have complexity 1");
 }
@@ -92,7 +109,7 @@ fn test_calculate_cognitive_for_loop() {
             println!("{}", i);
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
     assert_eq!(complexity, 1, "For loop should have complexity 1");
 }
@@ -106,9 +123,12 @@ fn test_calculate_cognitive_loop() {
             }
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 3, "Loop with nested if should have complexity 3");
+    assert_eq!(
+        complexity, 3,
+        "Loop with nested if should have complexity 3"
+    );
 }
 
 #[test]
@@ -118,9 +138,12 @@ fn test_calculate_cognitive_logical_operators() {
             println!("both positive");
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 2, "If with logical AND should have complexity 2");
+    assert_eq!(
+        complexity, 2,
+        "If with logical AND should have complexity 2"
+    );
 }
 
 #[test]
@@ -130,9 +153,12 @@ fn test_calculate_cognitive_multiple_logical_operators() {
             println!("complex condition");
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert_eq!(complexity, 3, "If with multiple logical operators should have complexity 3");
+    assert_eq!(
+        complexity, 3,
+        "If with multiple logical operators should have complexity 3"
+    );
 }
 
 #[test]
@@ -141,7 +167,7 @@ fn test_calculate_cognitive_try_expression() {
         let result = operation()?;
         result
     }};
-    
+
     let complexity = calculate_cognitive(&block);
     assert_eq!(complexity, 1, "Try expression should have complexity 1");
 }
@@ -156,7 +182,7 @@ fn test_calculate_cognitive_nested_try() {
             None
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
     assert_eq!(complexity, 3, "Nested try in if should have complexity 3");
 }
@@ -167,7 +193,7 @@ fn test_calculate_cognitive_closure() {
         let add = |x, y| x + y;
         add(1, 2)
     }};
-    
+
     let complexity = calculate_cognitive(&block);
     assert_eq!(complexity, 1, "Closure should have complexity 1");
 }
@@ -181,7 +207,7 @@ fn test_calculate_cognitive_nested_closures() {
         };
         outer(10)
     }};
-    
+
     let complexity = calculate_cognitive(&block);
     assert_eq!(complexity, 2, "Nested closures should have complexity 2");
 }
@@ -202,10 +228,13 @@ fn test_calculate_cognitive_complex_nesting() {
             }
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
     // 1 (if) + 2 (for with nesting 1) + 3 (match with nesting 2) + 2 (2 arms) + 4 (nested if with nesting 3) = 12
-    assert!(complexity >= 10, "Complex nesting should have high complexity");
+    assert!(
+        complexity >= 10,
+        "Complex nesting should have high complexity"
+    );
 }
 
 #[test]
@@ -272,9 +301,12 @@ fn test_calculate_cognitive_else_if_chain() {
             println!("non-positive");
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert!(complexity >= 3, "Else-if chain should have complexity for each branch");
+    assert!(
+        complexity >= 3,
+        "Else-if chain should have complexity for each branch"
+    );
 }
 
 #[test]
@@ -291,7 +323,10 @@ fn test_calculate_cognitive_mixed_control_flow() {
             }
         }
     }};
-    
+
     let complexity = calculate_cognitive(&block);
-    assert!(complexity >= 6, "Mixed control flow should accumulate complexity");
+    assert!(
+        complexity >= 6,
+        "Mixed control flow should accumulate complexity"
+    );
 }
