@@ -49,33 +49,37 @@ impl SuppressionContext {
     }
 
     pub fn is_suppressed(&self, line: usize, debt_type: &DebtType) -> bool {
-        // Check if line is within any active suppression block
-        let in_block = self.active_blocks.iter().any(|block| {
-            line >= block.start_line
-                && block.end_line.is_some_and(|end| line <= end)
-                && (block.debt_types.is_empty() || block.debt_types.contains(debt_type))
-        });
+        self.is_in_suppression_block(line, debt_type)
+            || self.has_line_suppression(line, debt_type)
+            || self.has_next_line_suppression(line, debt_type)
+    }
 
-        if in_block {
-            return true;
-        }
+    fn is_in_suppression_block(&self, line: usize, debt_type: &DebtType) -> bool {
+        self.active_blocks.iter().any(|block| {
+            self.line_within_block(line, block)
+                && self.debt_type_matches(debt_type, &block.debt_types)
+        })
+    }
 
-        // Check line-specific suppressions
-        let line_suppressed = self
-            .line_suppressions
+    fn has_line_suppression(&self, line: usize, debt_type: &DebtType) -> bool {
+        self.line_suppressions
             .get(&line)
-            .is_some_and(|rule| rule.debt_types.is_empty() || rule.debt_types.contains(debt_type));
+            .is_some_and(|rule| self.debt_type_matches(debt_type, &rule.debt_types))
+    }
 
-        if line_suppressed {
-            return true;
-        }
-
-        // Check if previous line has a next-line suppression
+    fn has_next_line_suppression(&self, line: usize, debt_type: &DebtType) -> bool {
         line > 0
             && self.line_suppressions.get(&(line - 1)).is_some_and(|rule| {
-                rule.applies_to_next_line
-                    && (rule.debt_types.is_empty() || rule.debt_types.contains(debt_type))
+                rule.applies_to_next_line && self.debt_type_matches(debt_type, &rule.debt_types)
             })
+    }
+
+    fn line_within_block(&self, line: usize, block: &SuppressionBlock) -> bool {
+        line >= block.start_line && block.end_line.is_some_and(|end| line <= end)
+    }
+
+    fn debt_type_matches(&self, debt_type: &DebtType, allowed_types: &[DebtType]) -> bool {
+        allowed_types.is_empty() || allowed_types.contains(debt_type)
     }
 
     pub fn get_stats(&self) -> SuppressionStats {
