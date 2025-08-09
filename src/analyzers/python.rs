@@ -8,7 +8,7 @@ use crate::debt::patterns::{
     find_code_smells_with_suppression, find_todos_and_fixmes_with_suppression,
 };
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
-use crate::debt::suppression::parse_suppression_comments;
+use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use anyhow::Result;
 use rustpython_parser::ast;
 use std::path::{Path, PathBuf};
@@ -86,45 +86,79 @@ fn create_python_debt_items(
     functions: &[FunctionMetrics],
     source_content: &str,
 ) -> Vec<DebtItem> {
-    // Parse suppression comments
     let suppression_context = parse_suppression_comments(source_content, Language::Python, path);
 
-    let complexity_items = extract_debt_items(module, path, threshold, functions);
-    let todo_items =
-        find_todos_and_fixmes_with_suppression(source_content, path, Some(&suppression_context));
-    let code_smell_items =
-        find_code_smells_with_suppression(source_content, path, Some(&suppression_context));
+    report_unclosed_blocks(&suppression_context);
 
-    let module_smells = analyze_module_smells(path, source_content.lines().count())
+    collect_all_debt_items(
+        module,
+        path,
+        threshold,
+        functions,
+        source_content,
+        &suppression_context,
+    )
+}
+
+fn collect_all_debt_items(
+    module: &ast::Mod,
+    path: &Path,
+    threshold: u32,
+    functions: &[FunctionMetrics],
+    source_content: &str,
+    suppression_context: &SuppressionContext,
+) -> Vec<DebtItem> {
+    [
+        extract_debt_items(module, path, threshold, functions),
+        find_todos_and_fixmes_with_suppression(source_content, path, Some(suppression_context)),
+        find_code_smells_with_suppression(source_content, path, Some(suppression_context)),
+        extract_module_smell_items(path, source_content, suppression_context),
+        extract_function_smell_items(module, functions, suppression_context),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+fn extract_module_smell_items(
+    path: &Path,
+    source_content: &str,
+    suppression_context: &SuppressionContext,
+) -> Vec<DebtItem> {
+    analyze_module_smells(path, source_content.lines().count())
         .into_iter()
         .map(|smell| smell.to_debt_item())
-        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type));
+        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
+        .collect()
+}
 
-    let function_smells = functions
+fn extract_function_smell_items(
+    module: &ast::Mod,
+    functions: &[FunctionMetrics],
+    suppression_context: &SuppressionContext,
+) -> Vec<DebtItem> {
+    functions
         .iter()
         .flat_map(|func| {
             let param_count = count_python_params(module, &func.name);
             analyze_function_smells(func, param_count)
         })
         .map(|smell| smell.to_debt_item())
-        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type));
-
-    // Report unclosed blocks as warnings
-    for unclosed in &suppression_context.unclosed_blocks {
-        eprintln!(
-            "Warning: Unclosed suppression block in {} at line {}",
-            unclosed.file.display(),
-            unclosed.start_line
-        );
-    }
-
-    complexity_items
-        .into_iter()
-        .chain(todo_items)
-        .chain(code_smell_items)
-        .chain(module_smells)
-        .chain(function_smells)
+        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
         .collect()
+}
+
+fn report_unclosed_blocks(suppression_context: &SuppressionContext) {
+    suppression_context
+        .unclosed_blocks
+        .iter()
+        .for_each(|unclosed| {
+            eprintln!(
+                "Warning: Unclosed suppression block in {} at line {}",
+                unclosed.file.display(),
+                unclosed.start_line
+            );
+        });
 }
 
 fn extract_function_metrics(
