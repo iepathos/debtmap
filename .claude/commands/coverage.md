@@ -123,10 +123,6 @@ git commit -m "test: improve coverage for $(basename $FILE_PATH) (+${IMPROVEMENT
 
 - Added tests for uncovered functionality
 - Coverage improved from ${INITIAL_COVERAGE}% to ${NEW_COVERAGE}%
-- Focus on critical paths and edge cases
-
-🤖 Generated with Claude Code (https://claude.ai/code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+- Focus on critical paths and edge cases"
 
 echo "🎉 Coverage improvement committed successfully!"
