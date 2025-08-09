@@ -41,55 +41,53 @@ debtmap analyze .
 # Analyze with custom thresholds
 debtmap analyze ./src --threshold-complexity 15 --threshold-duplication 50
 
-# Check only complexity metrics
-debtmap complexity ./src --threshold 10
-
-# Analyze technical debt patterns
-debtmap debt ./src --min-priority medium
-
 # Output as JSON
 debtmap analyze ./src --format json --output report.json
 
 # Analyze specific languages only
 debtmap analyze . --languages rust,python
+
+# Initialize configuration file
+debtmap init
+
+# Validate project against thresholds
+debtmap validate ./src
 ```
 
 ## Commands
 
 ### `analyze`
-Full analysis including complexity, duplication, and technical debt patterns.
+Comprehensive analysis including complexity metrics, code duplication, technical debt patterns, and dependency analysis.
 
 ```bash
 debtmap analyze <PATH> [OPTIONS]
 
 Options:
-  --format <FORMAT>                 Output format [default: table] [possible values: json, toml, table]
-  --output <FILE>                   Output file (stdout if not specified)
-  --threshold-complexity <N>        Complexity threshold [default: 10]
-  --threshold-duplication <N>       Duplication threshold percentage [default: 30]
-  --languages <LANGS>               Comma-separated list of languages to analyze
+  -f, --format <FORMAT>              Output format [default: terminal] [possible values: json, markdown, terminal]
+  -o, --output <FILE>                Output file (stdout if not specified)
+  --threshold-complexity <N>         Complexity threshold [default: 10]
+  --threshold-duplication <N>        Duplication threshold in lines [default: 50]
+  --languages <LANGS>                Comma-separated list of languages to analyze
 ```
 
-### `complexity`
-Analyze only code complexity metrics.
+### `init`
+Initialize a configuration file for the project.
 
 ```bash
-debtmap complexity <PATH> [OPTIONS]
+debtmap init [OPTIONS]
 
 Options:
-  --format <FORMAT>     Output format [default: table]
-  --threshold <N>       Complexity threshold [default: 10]
+  -f, --force    Force overwrite existing configuration file
 ```
 
-### `debt`
-Identify technical debt patterns and code smells.
+### `validate`
+Validate code against configured thresholds and fail if metrics exceed limits.
 
 ```bash
-debtmap debt <PATH> [OPTIONS]
+debtmap validate <PATH> [OPTIONS]
 
 Options:
-  --format <FORMAT>         Output format [default: table]
-  --min-priority <LEVEL>    Minimum priority level [default: low] [possible values: low, medium, high, critical]
+  -c, --config <FILE>    Configuration file to use [default: .debtmap.toml]
 ```
 
 ## Metrics Explained
@@ -137,13 +135,17 @@ enabled = ["rust", "python"]
 
 ## Output Examples
 
-### Table Format (Default)
+### Terminal Format (Default)
 ```
-File                      | Complexity | Duplication | Issues
---------------------------|------------|-------------|--------
-src/analyzers/rust.rs     | 15         | 12%         | 2
-src/core/metrics.rs       | 8          | 5%          | 0
-src/debt/patterns.rs      | 22         | 18%         | 3
+╭─────────────────────────────────────────────────────────────╮
+│                    Debtmap Analysis Report                  │
+├─────────────────────────────────────────────────────────────┤
+│ File                     │ Complexity │ Debt Items │ Issues │
+├──────────────────────────┼────────────┼────────────┼────────┤
+│ src/analyzers/rust.rs    │ 15         │ 3          │ 2      │
+│ src/core/metrics.rs      │ 8          │ 1          │ 0      │
+│ src/debt/patterns.rs     │ 22         │ 5          │ 3      │
+╰─────────────────────────────────────────────────────────────╯
 ```
 
 ### JSON Format

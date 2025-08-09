@@ -34,17 +34,6 @@ fn main() -> Result<()> {
             threshold_duplication,
             languages,
         ),
-        Commands::Complexity {
-            path,
-            format,
-            threshold,
-        } => handle_complexity(path, format, threshold),
-        Commands::Debt {
-            path,
-            format,
-            min_priority,
-        } => handle_debt(path, format, min_priority),
-        Commands::Deps { path, format } => handle_deps(path, format),
         Commands::Init { force } => init_config(force),
         Commands::Validate { path, config } => validate_project(path, config),
     }
@@ -61,25 +50,6 @@ fn handle_analyze(
     let languages = parse_languages(languages);
     let results = analyze_project(path, languages, threshold_complexity, threshold_duplication)?;
     output_results(results, format.into(), output)
-}
-
-fn handle_complexity(path: PathBuf, format: cli::OutputFormat, threshold: u32) -> Result<()> {
-    let results = analyze_complexity_only(path, threshold)?;
-    output_results(results, format.into(), None)
-}
-
-fn handle_debt(
-    path: PathBuf,
-    format: cli::OutputFormat,
-    min_priority: Option<cli::Priority>,
-) -> Result<()> {
-    let results = analyze_debt_only(path, min_priority.map(Into::into))?;
-    output_results(results, format.into(), None)
-}
-
-fn handle_deps(path: PathBuf, format: cli::OutputFormat) -> Result<()> {
-    let results = analyze_dependencies_only(path)?;
-    output_results(results, format.into(), None)
 }
 
 fn analyze_project(
@@ -180,28 +150,6 @@ fn build_technical_debt_report(
         priorities,
         duplications,
     }
-}
-
-fn analyze_complexity_only(path: PathBuf, threshold: u32) -> Result<AnalysisResults> {
-    analyze_project(path, default_languages(), threshold, 50)
-}
-
-fn analyze_debt_only(
-    path: PathBuf,
-    min_priority: Option<core::Priority>,
-) -> Result<AnalysisResults> {
-    let mut results = analyze_project(path, default_languages(), 10, 50)?;
-
-    if let Some(priority) = min_priority {
-        results.technical_debt.items =
-            debt::filter_by_priority(results.technical_debt.items, priority);
-    }
-
-    Ok(results)
-}
-
-fn analyze_dependencies_only(path: PathBuf) -> Result<AnalysisResults> {
-    analyze_project(path, default_languages(), 10, 50)
 }
 
 fn output_results(

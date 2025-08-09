@@ -38,44 +38,6 @@ pub enum Commands {
         languages: Option<Vec<String>>,
     },
 
-    /// Analyze only complexity metrics
-    Complexity {
-        /// Path to analyze
-        path: PathBuf,
-
-        /// Output format
-        #[arg(short, long, value_enum, default_value = "terminal")]
-        format: OutputFormat,
-
-        /// Complexity threshold
-        #[arg(long, default_value = "10")]
-        threshold: u32,
-    },
-
-    /// Analyze only technical debt
-    Debt {
-        /// Path to analyze
-        path: PathBuf,
-
-        /// Output format
-        #[arg(short, long, value_enum, default_value = "terminal")]
-        format: OutputFormat,
-
-        /// Minimum priority to report
-        #[arg(long, value_enum)]
-        min_priority: Option<Priority>,
-    },
-
-    /// Analyze dependencies
-    Deps {
-        /// Path to analyze
-        path: PathBuf,
-
-        /// Output format
-        #[arg(short, long, value_enum, default_value = "terminal")]
-        format: OutputFormat,
-    },
-
     /// Initialize configuration file
     Init {
         /// Force overwrite existing config
@@ -211,71 +173,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_cli_parsing_complexity_command() {
-        use clap::Parser;
-
-        let args = vec![
-            "debtmap",
-            "complexity",
-            "/test/path",
-            "--format",
-            "markdown",
-            "--threshold",
-            "20",
-        ];
-
-        let cli = Cli::parse_from(args);
-
-        match cli.command {
-            Commands::Complexity {
-                path,
-                format,
-                threshold,
-            } => {
-                assert_eq!(path, PathBuf::from("/test/path"));
-                assert_eq!(format, OutputFormat::Markdown);
-                assert_eq!(threshold, 20);
-            }
-            _ => panic!("Expected Complexity command"),
-        }
-    }
-
-    #[test]
-    fn test_cli_parsing_debt_command() {
-        use clap::Parser;
-
-        let args = vec!["debtmap", "debt", "/test/path", "--min-priority", "high"];
-
-        let cli = Cli::parse_from(args);
-
-        match cli.command {
-            Commands::Debt {
-                path, min_priority, ..
-            } => {
-                assert_eq!(path, PathBuf::from("/test/path"));
-                assert_eq!(min_priority, Some(Priority::High));
-            }
-            _ => panic!("Expected Debt command"),
-        }
-    }
-
-    #[test]
-    fn test_cli_parsing_deps_command() {
-        use clap::Parser;
-
-        let args = vec!["debtmap", "deps", "/test/path", "--format", "terminal"];
-
-        let cli = Cli::parse_from(args);
-
-        match cli.command {
-            Commands::Deps { path, format } => {
-                assert_eq!(path, PathBuf::from("/test/path"));
-                assert_eq!(format, OutputFormat::Terminal);
-            }
-            _ => panic!("Expected Deps command"),
-        }
-    }
 
     #[test]
     fn test_cli_parsing_init_command() {
