@@ -21,75 +21,77 @@ Technical debt analysis is incomplete without considering test coverage as a cri
 
 Modern development practices emphasize test-driven development and comprehensive test coverage. However, coverage metrics alone don't tell the full story - the quality of tests, coverage of complex code paths, and correlation between complexity and test coverage are equally important for debt assessment.
 
-This specification aims to integrate test coverage analysis into debtmap's technical debt detection, providing developers with actionable insights about which untested or under-tested code areas pose the highest maintenance risks.
+This specification aims to integrate test coverage analysis into debtmap's technical debt detection by accepting LCOV coverage reports - a universal format supported across all major languages and testing frameworks. Users will generate LCOV reports using their existing test tooling and provide them to debtmap for analysis, enabling language-agnostic coverage debt detection.
 
 ## Objective
 
-Implement comprehensive test coverage debt metrics that integrate coverage data with existing complexity and debt analysis to identify high-risk, under-tested code areas and provide prioritized recommendations for improving test coverage where it matters most.
+Implement LCOV coverage report integration that enables debtmap to parse user-provided LCOV files and combine coverage data with existing complexity and debt analysis to identify high-risk, under-tested code areas and provide prioritized recommendations for improving test coverage where it matters most.
 
 ## Requirements
 
 ### Functional Requirements
 
-- **Coverage Data Integration**: Parse and integrate test coverage data from multiple formats (lcov, cobertura, jacoco, etc.)
+- **LCOV Parser**: Parse LCOV coverage report format with full support for line, function, and branch coverage data
+- **Coverage File Input**: Accept LCOV file path via CLI parameter `--coverage-file` or `--lcov`
+- **Coverage Data Integration**: Map LCOV coverage data to analyzed source files using file paths
 - **Coverage Debt Detection**: Identify untested and under-tested code segments as debt items
-- **Risk-Based Prioritization**: Weight coverage debt by complexity, code churn, and existing technical debt
-- **Coverage Quality Analysis**: Analyze test quality indicators beyond simple line coverage
-- **Function-Level Coverage**: Track and report coverage at the function/method level
-- **Branch Coverage Analysis**: Identify untested conditional branches and decision points
-- **Integration Coverage**: Detect inter-module dependencies that lack integration test coverage
-- **Coverage Trends**: Support historical coverage tracking to identify degradation patterns
-- **Test File Association**: Link source files to their corresponding test files
+- **Risk-Based Prioritization**: Weight coverage debt by complexity and existing technical debt
+- **Function-Level Coverage**: Extract and report function coverage percentages from LCOV data
+- **Line Coverage Analysis**: Track covered vs uncovered lines with hit counts
+- **Branch Coverage Analysis**: Parse and report branch coverage data (when available in LCOV)
 - **Coverage Thresholds**: Configurable coverage thresholds with debt severity mapping
+- **Multi-Language Support**: Handle LCOV files from any language (Rust, Python, JavaScript, etc.)
+- **Missing Coverage Handling**: Gracefully handle files in analysis that aren't in coverage report
 
 ### Non-Functional Requirements
 
-- **Performance**: Process coverage data efficiently without significant slowdown
-- **Scalability**: Handle coverage data for large codebases (100k+ lines)
-- **Format Support**: Support industry-standard coverage report formats
-- **Memory Efficiency**: Process coverage data with minimal memory overhead
-- **Real-time Analysis**: Integrate with existing incremental analysis capabilities
-- **Extensibility**: Allow addition of new coverage formats and quality metrics
+- **Performance**: Parse LCOV files efficiently without significant slowdown
+- **Scalability**: Handle LCOV files for large codebases (100k+ lines, multi-MB files)
+- **Format Compliance**: Full support for LCOV format specification including all record types
+- **Memory Efficiency**: Stream LCOV parsing to minimize memory overhead
+- **Error Tolerance**: Continue analysis even if LCOV file is partially corrupted or incomplete
+- **Extensibility**: Architecture allows future addition of other coverage formats (Cobertura, etc.)
 
 ## Acceptance Criteria
 
-- [ ] Successfully parse LCOV coverage reports
-- [ ] Successfully parse Cobertura XML coverage reports  
-- [ ] Successfully parse JaCoCo XML coverage reports (for future Java support)
+- [ ] Successfully parse LCOV coverage reports from all major test frameworks
+- [ ] Accept LCOV file via `--coverage-file` or `--lcov` CLI parameter
+- [ ] Parse all LCOV record types: TN, SF, FN, FNDA, FNF, FNH, DA, LF, LH, BRDA, BRF, BRH
+- [ ] Map LCOV source file paths to analyzed files correctly
 - [ ] Identify functions with 0% coverage as high-priority debt items
 - [ ] Identify functions with <50% coverage as medium-priority debt items
-- [ ] Calculate risk scores combining coverage, complexity, and code churn
-- [ ] Detect untested conditional branches in control flow structures
+- [ ] Calculate risk scores combining coverage percentage and complexity metrics
+- [ ] Parse branch coverage data from BRDA records when available
 - [ ] Generate coverage debt reports in JSON, Markdown, and terminal formats
-- [ ] Support configurable coverage thresholds per language
-- [ ] Track function-level coverage percentages with line-level detail
-- [ ] Identify test files associated with source files through naming conventions
-- [ ] Detect missing test files for source modules
-- [ ] Provide coverage improvement recommendations prioritized by impact
-- [ ] Support incremental coverage analysis for changed files only
+- [ ] Support configurable coverage thresholds via CLI or config file
+- [ ] Track function-level coverage percentages from FN/FNDA records
+- [ ] Handle missing files gracefully (files in analysis but not in LCOV)
+- [ ] Provide coverage improvement recommendations prioritized by complexity
 - [ ] Integrate coverage debt into existing suppression comment system
+- [ ] Support LCOV files generated from: cargo-tarpaulin, pytest-cov, jest, nyc, gcov
 - [ ] Performance remains within 1.5x of baseline analysis speed
-- [ ] Memory usage increases by less than 50% when processing coverage data
-- [ ] All existing functionality remains unaffected
+- [ ] Memory usage increases by less than 25% when processing LCOV data
+- [ ] All existing functionality remains unaffected when no LCOV file provided
 
 ## Technical Details
 
 ### Implementation Approach
 
-The test coverage integration will extend the existing debt detection system with coverage-specific analysis:
+The LCOV coverage integration will extend the existing debt detection system with coverage-specific analysis:
 
-1. **Coverage Parser Module**: Dedicated parsers for different coverage formats
-2. **Coverage Integration**: Merge coverage data with existing file analysis
-3. **Risk Calculation**: Combine coverage, complexity, and churn metrics
+1. **LCOV Parser Module**: Dedicated parser for LCOV format specification
+2. **Coverage Integration**: Merge parsed LCOV data with existing file analysis
+3. **Risk Calculation**: Combine coverage percentages with complexity metrics
 4. **Debt Classification**: Extend existing debt types with coverage-specific items
+5. **CLI Integration**: Add coverage file parameter to existing analyze command
 
 ### Architecture Changes
 
 **New Files**:
 - `src/coverage/mod.rs` - Main coverage analysis module
-- `src/coverage/parsers.rs` - Coverage format parsers (LCOV, Cobertura, etc.)
+- `src/coverage/lcov.rs` - LCOV format parser implementation
 - `src/coverage/integration.rs` - Integration with existing analysis pipeline
-- `src/coverage/risk.rs` - Risk calculation algorithms
+- `src/coverage/risk.rs` - Risk calculation algorithms combining coverage and complexity
 - `src/coverage/metrics.rs` - Coverage-specific metrics and calculations
 
 **Modified Files**:
@@ -100,41 +102,48 @@ The test coverage integration will extend the existing debt detection system wit
 
 ### Data Structures
 
-**Coverage Data Models**:
+**LCOV Data Models**:
 ```rust
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CoverageReport {
-    pub format: CoverageFormat,
-    pub files: Vec<FileCoverage>,
-    pub summary: CoverageSummary,
-    pub timestamp: DateTime<Utc>,
+pub struct LcovReport {
+    pub test_name: Option<String>, // TN record
+    pub source_files: HashMap<PathBuf, SourceFileCoverage>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FileCoverage {
-    pub path: PathBuf,
-    pub line_coverage: LineCoverage,
-    pub branch_coverage: BranchCoverage,
-    pub function_coverage: Vec<FunctionCoverage>,
+pub struct SourceFileCoverage {
+    pub path: PathBuf, // SF record
+    pub functions: Vec<LcovFunction>, // FN/FNDA records
+    pub lines: HashMap<usize, usize>, // DA records (line_num -> hit_count)
+    pub branches: Vec<LcovBranch>, // BRDA records
+    pub line_coverage: LineSummary, // LF/LH records
+    pub function_coverage: FunctionSummary, // FNF/FNH records
+    pub branch_coverage: Option<BranchSummary>, // BRF/BRH records
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FunctionCoverage {
+pub struct LcovFunction {
     pub name: String,
+    pub start_line: usize,
+    pub execution_count: usize, // 0 means uncovered
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LcovBranch {
     pub line: usize,
-    pub lines_covered: usize,
-    pub lines_total: usize,
-    pub branches_covered: usize,
-    pub branches_total: usize,
-    pub coverage_percentage: f64,
+    pub block: usize,
+    pub branch: usize,
+    pub taken: Option<usize>, // None = not executed, Some(n) = taken n times
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoverageDebt {
-    pub function_name: String,
+    pub file: PathBuf,
+    pub function_name: Option<String>,
+    pub line_range: (usize, usize),
     pub coverage_percentage: f64,
     pub complexity_score: u32,
-    pub risk_score: f64,
+    pub risk_score: f64, // coverage_gap * complexity
     pub priority: Priority,
     pub recommendation: String,
 }
@@ -159,44 +168,53 @@ pub enum DebtType {
 
 ### APIs and Interfaces
 
-**Coverage Parser Interface**:
+**LCOV Parser Interface**:
 ```rust
-pub trait CoverageParser: Send + Sync {
-    fn format(&self) -> CoverageFormat;
-    fn parse(&self, content: &str) -> Result<CoverageReport>;
-    fn can_parse(&self, content: &str) -> bool;
+pub struct LcovParser;
+
+impl LcovParser {
+    pub fn new() -> Self;
+    pub fn parse_file(&self, path: &Path) -> Result<LcovReport>;
+    pub fn parse_content(&self, content: &str) -> Result<LcovReport>;
 }
 
-pub struct LcovParser;
-pub struct CoberturaParser;
-pub struct JaCoCoParser;
+// CLI Interface
+pub struct CoverageOptions {
+    pub lcov_file: Option<PathBuf>,
+    pub coverage_threshold: f64, // Default: 80.0
+    pub function_threshold: f64, // Default: 70.0
+    pub line_threshold: f64,     // Default: 80.0
+}
 ```
 
 **Risk Calculation**:
 ```rust
 pub fn calculate_coverage_risk(
-    coverage: &FunctionCoverage,
-    complexity: &FunctionMetrics,
-    churn: Option<&ChurnMetrics>,
-) -> f64;
+    coverage_percentage: f64,
+    complexity: u32,
+) -> f64 {
+    // Risk = (100 - coverage%) * complexity / 100
+    let coverage_gap = (100.0 - coverage_percentage).max(0.0);
+    (coverage_gap * complexity as f64) / 100.0
+}
 
-pub fn prioritize_coverage_debt(
-    coverage_debt: Vec<CoverageDebt>,
-    strategy: PrioritizationStrategy,
-) -> Vec<CoverageDebt>;
+pub fn classify_coverage_priority(
+    coverage_percentage: f64,
+    complexity: u32,
+) -> Priority;
 ```
 
 **Integration Functions**:
 ```rust
-pub fn integrate_coverage_with_analysis(
+pub fn integrate_lcov_with_analysis(
     file_metrics: FileMetrics,
-    coverage_data: &FileCoverage,
+    lcov_data: &SourceFileCoverage,
 ) -> FileMetrics;
 
 pub fn generate_coverage_debt_items(
-    coverage: &FileCoverage,
+    lcov_coverage: &SourceFileCoverage,
     complexity: &ComplexityMetrics,
-    thresholds: &CoverageThresholds,
+    thresholds: &CoverageOptions,
 ) -> Vec<DebtItem>;
 ```
 
@@ -264,64 +282,92 @@ pub fn generate_coverage_debt_items(
 
 ## Implementation Notes
 
-### Coverage Format Considerations
+### LCOV Format Specification
 
-**LCOV Format**:
-- Line-based text format commonly used by GNU tools
-- Supports line coverage, branch coverage, and function coverage
-- Generated by gcov, lcov, and many JavaScript testing tools
+LCOV is a simple text-based format with the following record types:
 
-**Cobertura Format**:
-- XML-based format popular in Java and .NET ecosystems
-- Comprehensive branch and line coverage data
-- Supports package/class hierarchies
+```
+TN:<test name>                    # Optional test name
+SF:<absolute path to source file> # Source file path
+FN:<line>,<function name>         # Function start line and name
+FNDA:<count>,<function name>      # Function execution count
+FNF:<number>                       # Functions found
+FNH:<number>                       # Functions hit
+DA:<line>,<count>[,<checksum>]    # Line execution count
+LF:<number>                        # Lines found
+LH:<number>                        # Lines hit
+BRDA:<line>,<block>,<branch>,<count> # Branch coverage
+BRF:<number>                       # Branches found
+BRH:<number>                       # Branches hit
+end_of_record                      # End of source file record
+```
 
-**Format Detection**:
-- Implement automatic format detection based on file content
-- Support multiple formats in single analysis run
-- Graceful handling of malformed or incomplete coverage data
+### Usage Examples by Language
+
+```bash
+# Rust with cargo-tarpaulin
+cargo tarpaulin --out Lcov --output-dir .
+debtmap analyze . --lcov lcov.info
+
+# Python with pytest-cov
+pytest --cov=src --cov-report=lcov:coverage.lcov
+debtmap analyze . --lcov coverage.lcov
+
+# JavaScript with Jest
+jest --coverage --coverageReporters=lcov
+debtmap analyze . --lcov coverage/lcov.info
+
+# TypeScript with nyc
+nyc --reporter=lcov npm test
+debtmap analyze . --lcov coverage/lcov.info
+
+# Go with go test and gcov2lcov
+go test -coverprofile=coverage.out ./...
+gcov2lcov -infile=coverage.out -outfile=coverage.lcov
+debtmap analyze . --lcov coverage.lcov
+```
+
+### LCOV Parser Implementation Considerations
+
+- **Path Resolution**: Handle both relative and absolute paths in SF records
+- **Streaming**: Process LCOV files line-by-line to handle large files efficiently
+- **Error Tolerance**: Continue parsing even if some records are malformed
+- **Path Matching**: Match LCOV source paths to analyzed files flexibly
+- **Performance**: Use lazy parsing where possible, cache parsed data
+- **Cross-Platform**: Support both Unix and Windows path separators
 
 ### Risk Calculation Algorithm
 
 **Base Risk Score**:
 ```
-risk = (1 - coverage_percentage) * complexity_weight * churn_weight
+risk = (100 - coverage_percentage) * complexity / 100
 ```
 
-**Weighting Factors**:
-- **Complexity Weight**: Higher complexity increases risk exponentially
-- **Churn Weight**: Recent changes to uncovered code increase risk
-- **Dependency Weight**: Uncovered code with many dependents is riskier
-- **Critical Path Weight**: Code in critical execution paths has higher risk
+**Priority Classification**:
+- **Critical**: 0% coverage + complexity > 10
+- **High**: <25% coverage + complexity > 5
+- **Medium**: <50% coverage OR complexity > 15
+- **Low**: All other cases
 
 ### Integration Strategies
 
-**Coverage Debt Prioritization**:
-1. **Critical Priority**: 0% coverage + high complexity + recent changes
-2. **High Priority**: <20% coverage + medium complexity + dependencies
-3. **Medium Priority**: <50% coverage + low complexity OR high coverage + high complexity
-4. **Low Priority**: >80% coverage + low complexity + stable code
+**File Path Matching**:
+- Normalize paths between LCOV and source files
+- Handle different working directory contexts
+- Support both absolute and relative paths
+- Case-insensitive matching on Windows
 
-**Test File Detection**:
-- Convention-based detection (test/, tests/, __tests__ directories)
-- Naming pattern matching (*_test.*, *_spec.*, Test*.*)
-- Configuration-based custom patterns
-- Language-specific test file conventions
-
-### Coverage Quality Metrics
-
-Beyond simple line/branch coverage:
-- **Assertion Density**: Number of assertions per test
-- **Test Complexity**: Complexity of test code itself
-- **Mock Usage**: Heavy mocking may indicate fragile tests
-- **Test File Size**: Very large test files may indicate poor organization
+**Coverage Gap Detection**:
+- Files analyzed but not in LCOV report = 0% coverage
+- Functions in analyzed files but not in LCOV = untested
+- Lines in functions but not covered = coverage gaps
 
 ### Performance Optimizations
 
-- **Lazy Loading**: Load coverage data only when needed
-- **Caching**: Cache parsed coverage data between analysis runs
-- **Incremental Updates**: Process only changed files when coverage updates
-- **Memory Streaming**: Stream large coverage files instead of loading entirely
+- **Streaming Parser**: Process LCOV line-by-line without loading entire file
+- **Selective Loading**: Only parse coverage for files being analyzed
+- **Path Indexing**: Build efficient lookup structure for file coverage
+- **Memory Efficiency**: Store only essential coverage data in memory
 
 ## Migration and Compatibility
 
@@ -329,14 +375,13 @@ Beyond simple line/branch coverage:
 - None expected (additive feature)
 
 ### Configuration Changes
-- New CLI options for coverage data input paths
-- Coverage threshold configuration options
-- Coverage format specification options
+- New CLI option: `--lcov <path>` or `--coverage-file <path>`
+- New threshold options: `--coverage-threshold`, `--function-threshold`, `--line-threshold`
 
 ### Integration Requirements
-- Coverage data must be generated by external tools
-- Supported testing frameworks documented per language
-- Clear guidance on generating compatible coverage reports
+- Users must generate LCOV files using their test framework
+- LCOV file must be up-to-date with analyzed code
+- File paths in LCOV must match or be resolvable to source paths
 
 ### Backward Compatibility
 - All existing functionality remains unchanged
