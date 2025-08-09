@@ -75,71 +75,95 @@ impl JavaScriptAnalyzer {
         // Report unclosed blocks
         report_unclosed_blocks(&suppression_context);
 
-        let mut debt_items = Vec::new();
+        // Collect all debt items using functional approach
+        [
+            self.collect_todos_and_fixmes(source, path, &suppression_context),
+            self.collect_code_smells(source, path, &suppression_context),
+            self.collect_function_smells(functions, &suppression_context),
+            self.collect_module_smells(source, path, &suppression_context),
+            self.collect_complexity_issues(functions, path, &suppression_context),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
 
-        // Find TODOs and FIXMEs
-        debt_items.extend(find_todos_and_fixmes_with_suppression(
-            source,
-            path,
-            Some(&suppression_context),
-        ));
+    fn collect_todos_and_fixmes(
+        &self,
+        source: &str,
+        path: &Path,
+        suppression_context: &SuppressionContext,
+    ) -> Vec<DebtItem> {
+        find_todos_and_fixmes_with_suppression(source, path, Some(suppression_context))
+    }
 
-        // Find code smells
-        debt_items.extend(find_code_smells_with_suppression(
-            source,
-            path,
-            Some(&suppression_context),
-        ));
+    fn collect_code_smells(
+        &self,
+        source: &str,
+        path: &Path,
+        suppression_context: &SuppressionContext,
+    ) -> Vec<DebtItem> {
+        find_code_smells_with_suppression(source, path, Some(suppression_context))
+    }
 
-        // Analyze function-level smells
-        for func in functions {
-            let smells = analyze_function_smells(func, 0); // 0 for param count (not available from tree-sitter easily)
-            for smell in smells {
-                let debt_item = smell.to_debt_item();
-                if !suppression_context.is_suppressed(debt_item.line, &debt_item.debt_type) {
-                    debt_items.push(debt_item);
-                }
-            }
-        }
+    fn collect_function_smells(
+        &self,
+        functions: &[FunctionMetrics],
+        suppression_context: &SuppressionContext,
+    ) -> Vec<DebtItem> {
+        functions
+            .iter()
+            .flat_map(|func| analyze_function_smells(func, 0))
+            .map(|smell| smell.to_debt_item())
+            .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
+            .collect()
+    }
 
-        // Analyze module-level smells
+    fn collect_module_smells(
+        &self,
+        source: &str,
+        path: &Path,
+        suppression_context: &SuppressionContext,
+    ) -> Vec<DebtItem> {
         let lines = source.lines().count();
-        let smells = analyze_module_smells(path, lines);
-        for smell in smells {
-            let debt_item = smell.to_debt_item();
-            if !suppression_context.is_suppressed(debt_item.line, &debt_item.debt_type) {
-                debt_items.push(debt_item);
-            }
+        analyze_module_smells(path, lines)
+            .into_iter()
+            .map(|smell| smell.to_debt_item())
+            .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
+            .collect()
+    }
+
+    fn collect_complexity_issues(
+        &self,
+        functions: &[FunctionMetrics],
+        path: &Path,
+        suppression_context: &SuppressionContext,
+    ) -> Vec<DebtItem> {
+        functions
+            .iter()
+            .filter(|func| func.is_complex(self.complexity_threshold))
+            .map(|func| self.create_complexity_debt_item(func, path))
+            .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
+            .collect()
+    }
+
+    fn create_complexity_debt_item(&self, func: &FunctionMetrics, path: &Path) -> DebtItem {
+        DebtItem {
+            id: format!("complexity-{}-{}", path.display(), func.line),
+            debt_type: DebtType::Complexity,
+            priority: if func.cyclomatic > 20 || func.cognitive > 20 {
+                Priority::High
+            } else {
+                Priority::Medium
+            },
+            file: path.to_path_buf(),
+            line: func.line,
+            message: format!(
+                "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
+                func.name, func.cyclomatic, func.cognitive
+            ),
+            context: None,
         }
-
-        // Check for high complexity
-        for func in functions {
-            if func.is_complex(self.complexity_threshold) {
-                let debt_item = DebtItem {
-                    id: format!("complexity-{}-{}", path.display(), func.line),
-                    debt_type: DebtType::Complexity,
-                    priority: if func.cyclomatic > 20 || func.cognitive > 20 {
-                        Priority::High
-                    } else {
-                        Priority::Medium
-                    },
-                    file: path.to_path_buf(),
-                    line: func.line,
-                    message: format!(
-                        "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
-                        func.name, func.cyclomatic, func.cognitive
-                    ),
-                    context: None,
-                };
-
-                // Check if this debt item is suppressed
-                if !suppression_context.is_suppressed(func.line, &debt_item.debt_type) {
-                    debt_items.push(debt_item);
-                }
-            }
-        }
-
-        debt_items
     }
 }
 
