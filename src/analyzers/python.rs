@@ -88,7 +88,7 @@ fn create_python_debt_items(
 ) -> Vec<DebtItem> {
     // Parse suppression comments
     let suppression_context =
-        parse_suppression_comments(source_content, Language::Python, &path.to_path_buf());
+        parse_suppression_comments(source_content, Language::Python, path);
 
     let complexity_items = extract_debt_items(module, path, threshold, functions);
     let todo_items =
@@ -146,7 +146,7 @@ fn extract_function_metrics(
         .filter_map(|(stmt_idx, stmt)| match stmt {
             ast::Stmt::FunctionDef(func_def) => {
                 let line_number =
-                    estimate_line_number(&lines, &func_def.name.to_string(), stmt_idx);
+                    estimate_line_number(&lines, func_def.name.as_ref(), stmt_idx);
                 Some(FunctionMetrics {
                     name: func_def.name.to_string(),
                     file: path.to_path_buf(),
@@ -163,7 +163,7 @@ fn extract_function_metrics(
 }
 
 fn estimate_line_number(lines: &[&str], func_name: &str, _stmt_idx: usize) -> usize {
-    let def_pattern = format!("def {}", func_name);
+    let def_pattern = format!("def {func_name}");
     lines
         .iter()
         .enumerate()

@@ -96,6 +96,12 @@ pub struct TransformationPipeline<T> {
     transformations: Vec<fn(T) -> T>,
 }
 
+impl<T> Default for TransformationPipeline<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> TransformationPipeline<T> {
     /// Create a new transformation pipeline
     pub fn new() -> Self {

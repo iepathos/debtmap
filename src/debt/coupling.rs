@@ -129,8 +129,7 @@ pub fn identify_zone_of_pain(metrics: &HashMap<String, CouplingMetrics>) -> Vec<
     for (module, metric) in metrics {
         if metric.abstractness < 0.2 && metric.instability < 0.2 && metric.afferent_coupling > 3 {
             problematic.push(format!(
-                "Module '{}' is in the zone of pain (rigid and hard to change)",
-                module
+                "Module '{module}' is in the zone of pain (rigid and hard to change)"
             ));
         }
     }
@@ -145,8 +144,7 @@ pub fn identify_zone_of_uselessness(metrics: &HashMap<String, CouplingMetrics>) 
     for (module, metric) in metrics {
         if metric.abstractness > 0.8 && metric.instability > 0.8 {
             problematic.push(format!(
-                "Module '{}' is in the zone of uselessness (too abstract and unstable)",
-                module
+                "Module '{module}' is in the zone of uselessness (too abstract and unstable)"
             ));
         }
     }
@@ -181,7 +179,7 @@ pub fn build_module_dependency_map(
         for dep in dependencies {
             reverse_map
                 .entry(dep)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(module_name.clone());
         }
     }

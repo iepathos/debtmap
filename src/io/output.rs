@@ -106,7 +106,7 @@ impl<W: Write> MarkdownWriter<W> {
     }
 
     fn write_summary_row(&mut self, metric: &str, value: &str, status: &str) -> anyhow::Result<()> {
-        writeln!(self.writer, "| {} | {} | {} |", metric, value, status)?;
+        writeln!(self.writer, "| {metric} | {value} | {status} |")?;
         Ok(())
     }
 
@@ -199,6 +199,12 @@ impl<W: Write> MarkdownWriter<W> {
 }
 
 pub struct TerminalWriter;
+
+impl Default for TerminalWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl TerminalWriter {
     pub fn new() -> Self {

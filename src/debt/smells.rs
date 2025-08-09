@@ -76,7 +76,7 @@ pub fn detect_large_module(path: &Path, line_count: usize) -> Option<CodeSmell> 
             smell_type: SmellType::LargeClass,
             location: path.to_path_buf(),
             line: 1,
-            message: format!("Module has {} lines (threshold: {})", line_count, THRESHOLD),
+            message: format!("Module has {line_count} lines (threshold: {THRESHOLD})"),
             severity: if line_count > THRESHOLD * 2 {
                 Priority::High
             } else {
@@ -182,8 +182,7 @@ pub fn detect_feature_envy(content: &str, path: &Path) -> Vec<CodeSmell> {
                 location: path.to_path_buf(),
                 line: line_num + 1,
                 message: format!(
-                    "Line has {} external method calls vs {} self calls",
-                    other_calls, self_calls
+                    "Line has {other_calls} external method calls vs {self_calls} self calls"
                 ),
                 severity: Priority::Low,
             });

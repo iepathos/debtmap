@@ -213,7 +213,7 @@ mod tests {
         let chained = result
             .map_ok(|x| x * 2)
             .and_then_async(|x| Ok(x + 1))
-            .tap(|x| println!("Value: {}", x));
+            .tap(|x| println!("Value: {x}"));
 
         assert_eq!(chained.unwrap(), 85);
     }
