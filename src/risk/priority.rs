@@ -67,12 +67,11 @@ fn generate_rationale(func: &FunctionRisk) -> String {
         }
         (super::RiskCategory::High, Some(cov)) => {
             format!(
-                "High complexity with only {:.0}% coverage - significant risk reduction potential",
-                cov
+                "High complexity with only {cov:.0}% coverage - significant risk reduction potential"
             )
         }
         (super::RiskCategory::High, None) => {
-            format!("High complexity function - testing would significantly reduce risk")
+            "High complexity function - testing would significantly reduce risk".to_string()
         }
         _ => {
             format!(

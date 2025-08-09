@@ -29,7 +29,7 @@ pub fn format_risk_matrix_terminal() -> String {
     output.push_str("    └─────┴─────┴─────┴─────┘\n");
     output.push_str("      1-5   5-10  10-20  20+\n");
     output.push_str("           Complexity →\n");
-    output.push_str("\n");
+    output.push('\n');
     output.push_str("✓ = Low Risk  ⚠ = Medium Risk  🔥 = Critical Risk\n");
 
     output
@@ -67,7 +67,7 @@ pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
             risk.cyclomatic_complexity,
             risk.cognitive_complexity,
             risk.coverage_percentage
-                .map(|c| format!("{:.0}%", c))
+                .map(|c| format!("{c:.0}%"))
                 .unwrap_or_else(|| "N/A".to_string())
         ));
         output.push_str(&format!(
@@ -120,8 +120,7 @@ pub fn format_actionable_insights(insight: &RiskInsight) -> String {
 
     if critical_count > 0 {
         output.push_str(&format!(
-            "1. Focus testing on the {} critical risk functions first\n",
-            critical_count
+            "1. Focus testing on the {critical_count} critical risk functions first\n"
         ));
     }
 
@@ -157,8 +156,7 @@ pub fn format_actionable_insights(insight: &RiskInsight) -> String {
             .sum();
 
         output.push_str(&format!(
-            "4. Potential risk reduction from recommended tests: {:.0}%\n",
-            total_reduction
+            "4. Potential risk reduction from recommended tests: {total_reduction:.0}%\n"
         ));
     }
 
