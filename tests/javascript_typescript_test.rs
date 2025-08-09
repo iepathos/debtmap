@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 #[test]
 fn test_javascript_file_analysis() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 // TODO: Refactor this function
 function calculateTotal(items) {
@@ -32,6 +33,7 @@ const processOrder = (order) => {
 
 export { calculateTotal, processOrder };
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::JavaScript);
     let result = analyze_file(content.to_string(), PathBuf::from("test.js"), &*analyzer);
@@ -63,6 +65,7 @@ export { calculateTotal, processOrder };
 
 #[test]
 fn test_typescript_file_analysis() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 interface User {
     id: number;
@@ -106,6 +109,7 @@ class UserService {
 
 export { User, UserService, fetchUser };
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::TypeScript);
     let result = analyze_file(content.to_string(), PathBuf::from("test.ts"), &*analyzer);
@@ -122,6 +126,7 @@ export { User, UserService, fetchUser };
 
 #[test]
 fn test_javascript_complexity_metrics() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 function complexFunction(data) {
     if (data.type === 'A') {
@@ -153,6 +158,7 @@ function complexFunction(data) {
     return 'Default';
 }
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::JavaScript);
     let result = analyze_file(content.to_string(), PathBuf::from("complex.js"), &*analyzer);
@@ -170,6 +176,7 @@ function complexFunction(data) {
 
 #[test]
 fn test_jsx_file_detection() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 import React, { useState } from 'react';
 
@@ -202,6 +209,7 @@ function TodoList({ items }) {
 
 export default TodoList;
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::JavaScript);
     let result = analyze_file(
@@ -225,6 +233,7 @@ export default TodoList;
 
 #[test]
 fn test_import_export_dependencies() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 import fs from 'fs';
 import { readFile, writeFile } from 'fs/promises';
@@ -241,6 +250,7 @@ async function loadModule() {
 export { loadModule };
 export default loadModule;
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::JavaScript);
     let result = analyze_file(content.to_string(), PathBuf::from("imports.js"), &*analyzer);
@@ -265,6 +275,7 @@ export default loadModule;
 
 #[test]
 fn test_arrow_function_detection() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 const add = (a, b) => a + b;
 
@@ -291,6 +302,7 @@ class Calculator {
     }
 }
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::JavaScript);
     let result = analyze_file(content.to_string(), PathBuf::from("arrows.js"), &*analyzer);
@@ -304,6 +316,7 @@ class Calculator {
 
 #[test]
 fn test_async_await_analysis() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 async function fetchData(url) {
     try {
@@ -335,6 +348,7 @@ const processData = async (urls) => {
     return results;
 };
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::JavaScript);
     let result = analyze_file(content.to_string(), PathBuf::from("async.js"), &*analyzer);
@@ -354,6 +368,7 @@ const processData = async (urls) => {
 
 #[test]
 fn test_typescript_generics_and_types() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
@@ -388,6 +403,7 @@ class UserRepository implements Repository<User> {
     }
 }
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::TypeScript);
     let result = analyze_file(
@@ -413,6 +429,7 @@ class UserRepository implements Repository<User> {
 
 #[test]
 fn test_suppression_comments_javascript() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
 // debtmap:ignore-next-line [todo]
 // TODO: This should be ignored
@@ -426,6 +443,7 @@ function test() {
     // TODO: This should be detected
 }
 "#;
+    // debtmap:ignore-end
 
     let analyzer = get_analyzer(Language::JavaScript);
     let result = analyze_file(
