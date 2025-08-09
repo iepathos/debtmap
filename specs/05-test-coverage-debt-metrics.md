@@ -25,23 +25,24 @@ The real technical debt isn't just "untested code" - it's "untested complex code
 
 ## Objective
 
-Implement complexity-coverage correlation analysis that combines debtmap's existing complexity metrics (cyclomatic and cognitive) with LCOV coverage data to identify high-risk code areas, prioritize testing efforts based on actual risk rather than raw coverage percentages, and provide actionable insights about where additional testing will have the greatest impact on reducing technical debt.
+Implement **optional** complexity-coverage correlation analysis that, when provided with LCOV coverage data, combines it with debtmap's existing complexity metrics (cyclomatic and cognitive) to identify high-risk code areas, prioritize testing efforts based on actual risk rather than raw coverage percentages, and provide actionable insights about where additional testing will have the greatest impact on reducing technical debt. When no coverage data is provided, debtmap continues to perform all its existing analysis including complexity metrics, code smells, and technical debt detection.
 
 ## Requirements
 
 ### Functional Requirements
 
-- **LCOV Parser**: Parse LCOV coverage report format focusing on function and branch coverage for correlation with complexity metrics
-- **Coverage File Input**: Accept LCOV file path via CLI parameter `--coverage-file` or `--lcov`
-- **Complexity-Coverage Correlation**: Calculate risk scores by multiplying complexity metrics with coverage gaps
-- **Risk-Based Prioritization**: Rank functions by their complexity-weighted coverage risk, not raw coverage percentages
-- **High-Risk Function Detection**: Identify functions where high complexity meets low coverage (the "danger zone")
-- **Test Effort Estimation**: Estimate testing difficulty based on cyclomatic and cognitive complexity of untested code
-- **Coverage Impact Analysis**: Predict which functions would most reduce risk if tested
-- **Complexity-Adjusted Thresholds**: Dynamic coverage requirements based on code complexity (complex code needs higher coverage)
-- **Risk Heat Maps**: Generate visualizations showing complexity vs coverage correlations
-- **Test ROI Calculation**: Calculate return on investment for testing specific functions based on complexity reduction
-- **Complexity Trend Analysis**: Track how complexity-coverage correlation changes over time
+- **Optional LCOV Integration**: Coverage analysis is completely optional - debtmap functions normally without it
+- **Coverage File Input**: Accept optional LCOV file path via CLI parameter `--coverage-file` or `--lcov`
+- **Graceful Degradation**: When no LCOV provided, output complexity metrics and suggest functions that would benefit most from testing based on complexity alone
+- **Complexity-Coverage Correlation**: When LCOV is provided, calculate risk scores by multiplying complexity metrics with coverage gaps
+- **Risk-Based Prioritization**: Rank functions by their complexity-weighted coverage risk when coverage data available
+- **High-Risk Function Detection**: Identify functions where high complexity meets low coverage (requires LCOV)
+- **Test Priority Suggestions**: Even without coverage data, identify complex functions that should be tested first
+- **Coverage Impact Analysis**: When LCOV provided, predict which functions would most reduce risk if tested
+- **Complexity-Based Recommendations**: Without LCOV, recommend testing functions with highest cognitive complexity
+- **Risk Heat Maps**: Generate visualizations when coverage data available
+- **Test ROI Calculation**: Calculate return on investment when both complexity and coverage data exist
+- **Standalone Complexity Analysis**: Full complexity analysis works without any coverage data
 
 ### Non-Functional Requirements
 
@@ -54,23 +55,24 @@ Implement complexity-coverage correlation analysis that combines debtmap's exist
 
 ## Acceptance Criteria
 
-- [ ] Successfully parse LCOV coverage reports focusing on function-level coverage
-- [ ] Accept LCOV file via `--coverage-file` or `--lcov` CLI parameter
-- [ ] Calculate complexity-weighted risk scores for all functions
-- [ ] Identify "danger zone" functions: complexity > 10 AND coverage < 50%
-- [ ] Rank functions by risk score (complexity * coverage_gap) not raw coverage
-- [ ] Generate test effort estimates based on cognitive complexity of untested code
-- [ ] Provide "test these 5 functions first" recommendations based on risk reduction potential
-- [ ] Show complexity-coverage correlation coefficient for the entire codebase
-- [ ] Support dynamic thresholds: functions with complexity > 15 require 90% coverage, > 10 require 80%, etc.
-- [ ] Generate risk matrix visualization showing function distribution across complexity/coverage quadrants
-- [ ] Calculate potential risk reduction for testing each uncovered function
-- [ ] Identify functions where high complexity is well-tested (good examples)
-- [ ] Detect anti-pattern: high coverage but only on simple code paths
+- [ ] Debtmap runs normally without any LCOV file and provides full complexity analysis
+- [ ] Accept optional LCOV file via `--coverage-file` or `--lcov` CLI parameter
+- [ ] When no LCOV provided, identify top 5 complex functions that should be tested first
+- [ ] When LCOV provided, calculate complexity-weighted risk scores for all functions
+- [ ] Identify "danger zone" functions when coverage data available: complexity > 10 AND coverage < 50%
+- [ ] Without LCOV, rank functions by cognitive complexity for testing priority
+- [ ] With LCOV, rank functions by risk score (complexity * coverage_gap) not raw coverage
+- [ ] Generate test effort estimates based on cognitive complexity regardless of coverage data
+- [ ] Provide "test these 5 functions first" recommendations (with or without coverage data)
+- [ ] Show complexity-coverage correlation coefficient when LCOV provided
+- [ ] Support dynamic thresholds when coverage available: functions with complexity > 15 require 90% coverage
+- [ ] Generate risk matrix visualization only when coverage data available
+- [ ] Calculate potential risk reduction only when LCOV provided
+- [ ] Identify well-tested complex functions when coverage data exists
 - [ ] Support LCOV files from: cargo-tarpaulin, pytest-cov, jest, nyc, gcov
-- [ ] Performance remains within 1.2x of baseline complexity analysis
-- [ ] Provide clear ROI metrics: "Testing function X would reduce risk by Y%"
-- [ ] All existing functionality remains unaffected when no LCOV file provided
+- [ ] Performance remains within 1.2x of baseline when LCOV provided
+- [ ] All existing debtmap functionality works identically when no LCOV file provided
+- [ ] Clear messaging when analysis is enhanced with coverage vs complexity-only mode
 
 ## Technical Details
 
@@ -327,11 +329,22 @@ end_of_record                      # End of source file record
 ### Usage Examples
 
 ```bash
-# Generate LCOV and analyze risk
+# Example 1: Without coverage data (default behavior)
+debtmap analyze .
+
+# Output includes complexity-based testing recommendations:
+# === FUNCTIONS THAT NEED TESTING (by complexity) ===
+# 1. src/parser.rs::parse_expression()
+#    - Cyclomatic Complexity: 25
+#    - Cognitive Complexity: 38
+#    - Estimated Test Effort: COMPLEX (5-8 test cases needed)
+#    - Recommendation: High complexity function - prioritize for testing
+
+# Example 2: With LCOV coverage data
 cargo tarpaulin --out Lcov
 debtmap analyze . --lcov lcov.info
 
-# Output will highlight high-risk functions:
+# Enhanced output with coverage correlation:
 # CRITICAL RISK: src/parser.rs::parse_expression()
 #   - Cyclomatic Complexity: 25
 #   - Cognitive Complexity: 38
@@ -430,18 +443,27 @@ Coverage % →
 ## Migration and Compatibility
 
 ### Breaking Changes
-- None expected (additive feature)
+- None - this is a purely additive, optional feature
 
 ### Configuration Changes
-- New CLI option: `--lcov <path>` or `--coverage-file <path>`
-- New threshold options: `--coverage-threshold`, `--function-threshold`, `--line-threshold`
+- New optional CLI parameter: `--lcov <path>` or `--coverage-file <path>`
+- No configuration required when not using coverage analysis
+- Coverage thresholds only apply when LCOV file is provided
 
 ### Integration Requirements
-- Users must generate LCOV files using their test framework
-- LCOV file must be up-to-date with analyzed code
-- File paths in LCOV must match or be resolvable to source paths
+- **Optional**: Users may generate LCOV files if they want enhanced risk analysis
+- When providing LCOV, it should be up-to-date with analyzed code
+- File paths in LCOV should match or be resolvable to source paths
 
 ### Backward Compatibility
-- All existing functionality remains unchanged
-- Coverage analysis is optional and disabled by default
-- Existing configuration files continue to work without modification
+- **100% backward compatible** - debtmap works exactly as before when no LCOV provided
+- All existing workflows continue unchanged
+- Coverage analysis only activates when explicitly requested via CLI parameter
+- Existing configuration files work without any modifications
+- Default behavior remains complexity-only analysis
+
+### Graceful Degradation
+- Missing LCOV file: Continues with complexity-only analysis
+- Malformed LCOV: Warning message, continues with complexity-only analysis  
+- Path mismatch: Analyzes files that can be matched, warns about others
+- Empty LCOV: Treats all functions as having 0% coverage
