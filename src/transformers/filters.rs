@@ -1,4 +1,10 @@
-use crate::core::{DebtType, FileMetrics, Language, Priority};
+use crate::core::{DebtType, FileMetrics, FunctionMetrics, Language, Priority};
+
+fn calculate_total_complexity(functions: &[FunctionMetrics]) -> (u32, u32) {
+    functions.iter().fold((0, 0), |(cyc, cog), f| {
+        (cyc + f.cyclomatic, cog + f.cognitive)
+    })
+}
 
 #[derive(Default)]
 pub struct FilterConfig {
@@ -48,28 +54,40 @@ impl FilterConfig {
 }
 
 pub fn filter_by_min_complexity(metrics: FileMetrics, threshold: u32) -> FileMetrics {
+    let filtered_functions: Vec<_> = metrics
+        .complexity
+        .functions
+        .into_iter()
+        .filter(|f| f.cyclomatic >= threshold || f.cognitive >= threshold)
+        .collect();
+
+    let (cyclomatic, cognitive) = calculate_total_complexity(&filtered_functions);
+
     FileMetrics {
         complexity: crate::core::ComplexityMetrics {
-            functions: metrics
-                .complexity
-                .functions
-                .into_iter()
-                .filter(|f| f.cyclomatic >= threshold || f.cognitive >= threshold)
-                .collect(),
+            functions: filtered_functions,
+            cyclomatic_complexity: cyclomatic,
+            cognitive_complexity: cognitive,
         },
         ..metrics
     }
 }
 
 pub fn filter_by_max_complexity(metrics: FileMetrics, threshold: u32) -> FileMetrics {
+    let filtered_functions: Vec<_> = metrics
+        .complexity
+        .functions
+        .into_iter()
+        .filter(|f| f.cyclomatic <= threshold && f.cognitive <= threshold)
+        .collect();
+
+    let (cyclomatic, cognitive) = calculate_total_complexity(&filtered_functions);
+
     FileMetrics {
         complexity: crate::core::ComplexityMetrics {
-            functions: metrics
-                .complexity
-                .functions
-                .into_iter()
-                .filter(|f| f.cyclomatic <= threshold && f.cognitive <= threshold)
-                .collect(),
+            functions: filtered_functions,
+            cyclomatic_complexity: cyclomatic,
+            cognitive_complexity: cognitive,
         },
         ..metrics
     }
@@ -82,6 +100,8 @@ pub fn filter_by_language(metrics: FileMetrics, languages: Vec<Language>) -> Fil
         FileMetrics {
             complexity: crate::core::ComplexityMetrics {
                 functions: Vec::new(),
+                cyclomatic_complexity: 0,
+                cognitive_complexity: 0,
             },
             debt_items: Vec::new(),
             ..metrics
@@ -103,6 +123,8 @@ pub fn filter_by_file_pattern(metrics: FileMetrics, patterns: Vec<String>) -> Fi
         FileMetrics {
             complexity: crate::core::ComplexityMetrics {
                 functions: Vec::new(),
+                cyclomatic_complexity: 0,
+                cognitive_complexity: 0,
             },
             debt_items: Vec::new(),
             ..metrics
@@ -124,6 +146,8 @@ pub fn exclude_by_pattern(metrics: FileMetrics, patterns: Vec<String>) -> FileMe
         FileMetrics {
             complexity: crate::core::ComplexityMetrics {
                 functions: Vec::new(),
+                cyclomatic_complexity: 0,
+                cognitive_complexity: 0,
             },
             debt_items: Vec::new(),
             ..metrics

@@ -91,7 +91,7 @@ impl Analyzer for NullAnalyzer {
         FileMetrics {
             path: std::path::PathBuf::new(),
             language: crate::core::Language::Unknown,
-            complexity: crate::core::ComplexityMetrics { functions: vec![] },
+            complexity: crate::core::ComplexityMetrics::default(),
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
@@ -120,7 +120,7 @@ mod tests {
         let metrics = FileMetrics {
             path: PathBuf::from("test.rs"),
             language: crate::core::Language::Rust,
-            complexity: crate::core::ComplexityMetrics { functions: vec![] },
+            complexity: crate::core::ComplexityMetrics::default(),
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
@@ -192,7 +192,7 @@ mod tests {
         let calculators: Vec<Calculator> = vec![Box::new(|_| FileMetrics {
             path: PathBuf::from("test.rs"),
             language: crate::core::Language::Rust,
-            complexity: crate::core::ComplexityMetrics { functions: vec![] },
+            complexity: crate::core::ComplexityMetrics::default(),
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],

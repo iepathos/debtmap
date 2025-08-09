@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, and spec 03 implemented
+Progress: 100% of spec 01, spec 02, spec 03, and spec 05 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -29,6 +29,14 @@ Progress: 100% of spec 01, spec 02, and spec 03 implemented
   - Type-specific suppressions (e.g., [todo,fixme])
   - Wildcard suppression with [*]
   - Optional reason documentation with -- reason
+- ✅ Complexity-Coverage Risk Analysis (spec 05):
+  - Optional LCOV coverage file integration via --lcov or --coverage-file
+  - Risk scoring based on complexity-coverage correlation
+  - Critical risk function identification
+  - Test effort estimation based on cognitive complexity
+  - ROI-based testing recommendations
+  - Risk distribution visualization
+  - Works without coverage data - provides complexity-based recommendations
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -46,6 +54,7 @@ The project follows a functional core / imperative shell pattern:
 5. **Flexible Output**: JSON, Markdown, and Terminal formats
 6. **Performance**: Parallel processing for large codebases
 7. **Suppression Support**: Fine-grained control over false positives
+8. **Risk Analysis**: Correlates complexity with test coverage for risk-based testing priorities
 
 ## Project Structure
 ```
@@ -56,6 +65,7 @@ src/
 ├── analyzers/       # Language-specific analyzers
 ├── complexity/      # Complexity calculations
 ├── debt/            # Debt detection
+├── risk/            # Risk analysis and coverage correlation
 ├── transformers/    # Data transformations
 └── io/              # IO operations
 ```

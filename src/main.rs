@@ -3,6 +3,7 @@ use debtmap::cli;
 use debtmap::core;
 use debtmap::debt;
 use debtmap::io;
+use debtmap::risk;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -26,6 +27,7 @@ fn main() -> Result<()> {
             threshold_complexity,
             threshold_duplication,
             languages,
+            coverage_file,
         } => handle_analyze(
             path,
             format,
@@ -33,6 +35,7 @@ fn main() -> Result<()> {
             threshold_complexity,
             threshold_duplication,
             languages,
+            coverage_file,
         ),
         Commands::Init { force } => init_config(force),
         Commands::Validate { path, config } => validate_project(path, config),
@@ -46,10 +49,24 @@ fn handle_analyze(
     threshold_complexity: u32,
     threshold_duplication: usize,
     languages: Option<Vec<String>>,
+    coverage_file: Option<PathBuf>,
 ) -> Result<()> {
     let languages = parse_languages(languages);
-    let results = analyze_project(path, languages, threshold_complexity, threshold_duplication)?;
-    output_results(results, format.into(), output)
+    let results = analyze_project(
+        path.clone(),
+        languages,
+        threshold_complexity,
+        threshold_duplication,
+    )?;
+
+    // Handle risk analysis if coverage file provided
+    let risk_insights = if let Some(lcov_path) = coverage_file {
+        analyze_risk_with_coverage(&results, &lcov_path, &path)?
+    } else {
+        analyze_risk_without_coverage(&results)?
+    };
+
+    output_results_with_risk(results, risk_insights, format.into(), output)
 }
 
 fn analyze_project(
@@ -165,6 +182,95 @@ fn output_results(
     }
 
     Ok(())
+}
+
+fn output_results_with_risk(
+    results: AnalysisResults,
+    risk_insights: Option<risk::RiskInsight>,
+    format: io::output::OutputFormat,
+    output_file: Option<PathBuf>,
+) -> Result<()> {
+    let mut writer = io::output::create_writer(format);
+    writer.write_results(&results)?;
+
+    // Add risk insights if available
+    if let Some(insights) = risk_insights {
+        writer.write_risk_insights(&insights)?;
+    }
+
+    if let Some(path) = output_file {
+        io::write_file(&path, &format!("{results:?}"))?;
+    }
+
+    Ok(())
+}
+
+fn analyze_risk_with_coverage(
+    results: &AnalysisResults,
+    lcov_path: &Path,
+    project_path: &Path,
+) -> Result<Option<risk::RiskInsight>> {
+    use im::Vector;
+
+    // Parse LCOV file
+    let lcov_data = risk::lcov::parse_lcov_file(lcov_path).context("Failed to parse LCOV file")?;
+
+    // Create risk analyzer
+    let analyzer = risk::RiskAnalyzer::default();
+
+    // Analyze each function for risk
+    let mut function_risks = Vector::new();
+
+    for func in &results.complexity.metrics {
+        let complexity_metrics = core::ComplexityMetrics::from_function(func);
+
+        // Try to get coverage for this function
+        let coverage = lcov_data.get_function_coverage(&func.file, &func.name);
+
+        let risk = analyzer.analyze_function(
+            func.file.clone(),
+            func.name.clone(),
+            (func.line, func.line + func.length),
+            &complexity_metrics,
+            coverage,
+        );
+
+        function_risks.push_back(risk);
+    }
+
+    // Generate insights
+    let insights = risk::insights::generate_risk_insights(function_risks, &analyzer);
+
+    Ok(Some(insights))
+}
+
+fn analyze_risk_without_coverage(results: &AnalysisResults) -> Result<Option<risk::RiskInsight>> {
+    use im::Vector;
+
+    // Create risk analyzer
+    let analyzer = risk::RiskAnalyzer::default();
+
+    // Analyze each function for risk based on complexity only
+    let mut function_risks = Vector::new();
+
+    for func in &results.complexity.metrics {
+        let complexity_metrics = core::ComplexityMetrics::from_function(func);
+
+        let risk = analyzer.analyze_function(
+            func.file.clone(),
+            func.name.clone(),
+            (func.line, func.line + func.length),
+            &complexity_metrics,
+            None, // No coverage data
+        );
+
+        function_risks.push_back(risk);
+    }
+
+    // Generate insights
+    let insights = risk::insights::generate_risk_insights(function_risks, &analyzer);
+
+    Ok(Some(insights))
 }
 
 fn init_config(force: bool) -> Result<()> {

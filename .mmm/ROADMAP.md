@@ -28,8 +28,17 @@
   - Multi-language support (Rust, Python)
   - Unclosed block warnings
 
+- [x] **Spec 05**: Complexity-Coverage Risk Analysis
+  - Optional LCOV file integration via --lcov or --coverage-file
+  - Risk scoring combining complexity and coverage
+  - Critical risk function identification
+  - Test effort estimation based on cognitive complexity
+  - ROI-based testing recommendations
+  - Works without coverage data (complexity-only mode)
+  - Dynamic coverage thresholds based on complexity
+
 ## Current Phase: Foundation
-We have completed the initial implementation with core functionality for analyzing Rust and Python code.
+We have completed the initial implementation with core functionality for analyzing Rust and Python code, including risk analysis capabilities.
 
 ## Upcoming Milestones
 

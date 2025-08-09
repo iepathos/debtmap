@@ -106,3 +106,22 @@ Implement inline comment-based suppression using debtmap:ignore syntax similar t
 - ✅ Language-agnostic approach
 - ✅ No external configuration files needed
 - ⚠️ Adds parsing overhead to analysis
+
+---
+
+## ADR-007: Optional Coverage Integration for Risk Analysis
+**Date**: 2025-01-09
+**Status**: Accepted
+
+### Context
+Test coverage alone doesn't indicate risk - a simple untested getter is low risk while an untested complex algorithm is critical. Need to correlate complexity with coverage to identify actual risk.
+
+### Decision
+Implement optional LCOV integration that combines with existing complexity metrics to calculate risk scores, prioritize testing efforts, and provide ROI-based recommendations.
+
+### Consequences
+- ✅ Identifies high-risk untested complex code
+- ✅ Works without coverage data (complexity-only mode)
+- ✅ Provides actionable testing recommendations
+- ✅ Language-agnostic LCOV format support
+- ⚠️ Requires up-to-date coverage data for accuracy
