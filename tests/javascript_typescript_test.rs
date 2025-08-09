@@ -1,7 +1,6 @@
 use debtmap::analyzers::{analyze_file, get_analyzer};
 use debtmap::core::{DebtType, Language};
 use std::path::PathBuf;
-use tempfile::tempdir;
 
 #[test]
 fn test_javascript_file_analysis() {
