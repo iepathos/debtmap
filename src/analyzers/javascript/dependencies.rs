@@ -74,4 +74,3 @@ fn visit_node_for_dependencies(node: Node, source: &str, dependencies: &mut Vec<
         visit_node_for_dependencies(child, source, dependencies);
     }
 }
-

@@ -190,4 +190,3 @@ fn calculate_max_nesting(node: Node, current_depth: u32) -> u32 {
 
     max_depth
 }
-

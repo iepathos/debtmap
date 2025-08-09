@@ -234,4 +234,3 @@ fn report_unclosed_blocks(suppression_context: &SuppressionContext) {
         );
     }
 }
-
