@@ -87,3 +87,22 @@ Use SHA-256 hashing on normalized code chunks.
 - ✅ Very low collision probability
 - ✅ Standard and well-understood
 - ⚠️ Slower than non-cryptographic hashes
+
+---
+
+## ADR-006: Inline Suppression Comments
+**Date**: 2025-08-09
+**Status**: Accepted
+
+### Context
+Need mechanism to suppress false positives in debt detection, especially in test fixtures.
+
+### Decision
+Implement inline comment-based suppression using debtmap:ignore syntax similar to ESLint/Pylint.
+
+### Consequences
+- ✅ Fine-grained control over suppressions
+- ✅ Self-documenting with reason support
+- ✅ Language-agnostic approach
+- ✅ No external configuration files needed
+- ⚠️ Adds parsing overhead to analysis

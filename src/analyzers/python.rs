@@ -4,8 +4,11 @@ use crate::core::{
     ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
     FunctionMetrics, Language, Priority,
 };
-use crate::debt::patterns::find_todos_and_fixmes;
+use crate::debt::patterns::{
+    find_code_smells_with_suppression, find_todos_and_fixmes_with_suppression,
+};
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
+use crate::debt::suppression::parse_suppression_comments;
 use anyhow::Result;
 use rustpython_parser::ast;
 use std::path::{Path, PathBuf};
@@ -19,6 +22,12 @@ impl PythonAnalyzer {
         Self {
             complexity_threshold: 10,
         }
+    }
+}
+
+impl Default for PythonAnalyzer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -72,27 +81,47 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
 
 fn create_python_debt_items(
     module: &ast::Mod,
-    path: &PathBuf,
+    path: &Path,
     threshold: u32,
     functions: &[FunctionMetrics],
     source_content: &str,
 ) -> Vec<DebtItem> {
+    // Parse suppression comments
+    let suppression_context = parse_suppression_comments(source_content, Language::Python, &path.to_path_buf());
+
     let complexity_items = extract_debt_items(module, path, threshold, functions);
-    let todo_items = find_todos_and_fixmes(source_content, path);
+    let todo_items =
+        find_todos_and_fixmes_with_suppression(source_content, path, Some(&suppression_context));
+    let code_smell_items =
+        find_code_smells_with_suppression(source_content, path, Some(&suppression_context));
+
     let module_smells = analyze_module_smells(path, source_content.lines().count())
         .into_iter()
-        .map(|smell| smell.to_debt_item());
+        .map(|smell| smell.to_debt_item())
+        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type));
+
     let function_smells = functions
         .iter()
         .flat_map(|func| {
             let param_count = count_python_params(module, &func.name);
             analyze_function_smells(func, param_count)
         })
-        .map(|smell| smell.to_debt_item());
+        .map(|smell| smell.to_debt_item())
+        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type));
+
+    // Report unclosed blocks as warnings
+    for unclosed in &suppression_context.unclosed_blocks {
+        eprintln!(
+            "Warning: Unclosed suppression block in {} at line {}",
+            unclosed.file.display(),
+            unclosed.start_line
+        );
+    }
 
     complexity_items
         .into_iter()
         .chain(todo_items)
+        .chain(code_smell_items)
         .chain(module_smells)
         .chain(function_smells)
         .collect()
@@ -100,7 +129,7 @@ fn create_python_debt_items(
 
 fn extract_function_metrics(
     module: &ast::Mod,
-    path: &PathBuf,
+    path: &Path,
     source_content: &str,
 ) -> Vec<FunctionMetrics> {
     let ast::Mod::Module(module) = module else {
@@ -119,7 +148,7 @@ fn extract_function_metrics(
                     estimate_line_number(&lines, &func_def.name.to_string(), stmt_idx);
                 Some(FunctionMetrics {
                     name: func_def.name.to_string(),
-                    file: path.clone(),
+                    file: path.to_path_buf(),
                     line: line_number,
                     cyclomatic: calculate_cyclomatic_python(&func_def.body),
                     cognitive: calculate_cognitive_python(&func_def.body),

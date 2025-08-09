@@ -33,6 +33,10 @@ Complexity metric calculations:
 Technical debt detection:
 - `patterns.rs`: Pattern matching for TODOs, FIXMEs
 - `duplication.rs`: Content hashing for duplicate detection
+- `suppression.rs`: Inline comment suppression parsing and checking
+- `smells.rs`: Code smell detection patterns
+- `coupling.rs`: Module coupling analysis
+- `circular.rs`: Circular dependency detection
 
 ### Transformers (`src/transformers/`)
 Functional data transformations:

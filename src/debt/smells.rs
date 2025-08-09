@@ -1,5 +1,5 @@
 use crate::core::{DebtItem, DebtType, FunctionMetrics, Priority};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Represents different types of code smells
 #[derive(Debug, Clone, PartialEq)]
@@ -68,13 +68,13 @@ pub fn detect_long_parameter_list(func: &FunctionMetrics, param_count: usize) ->
 }
 
 /// Detect large classes/modules based on line count
-pub fn detect_large_module(path: &PathBuf, line_count: usize) -> Option<CodeSmell> {
+pub fn detect_large_module(path: &Path, line_count: usize) -> Option<CodeSmell> {
     const THRESHOLD: usize = 300;
 
     if line_count > THRESHOLD {
         Some(CodeSmell {
             smell_type: SmellType::LargeClass,
-            location: path.clone(),
+            location: path.to_path_buf(),
             line: 1,
             message: format!("Module has {} lines (threshold: {})", line_count, THRESHOLD),
             severity: if line_count > THRESHOLD * 2 {
@@ -156,7 +156,7 @@ pub fn analyze_function_smells(func: &FunctionMetrics, param_count: usize) -> Ve
 }
 
 /// Analyze a file for module-level code smells
-pub fn analyze_module_smells(path: &PathBuf, line_count: usize) -> Vec<CodeSmell> {
+pub fn analyze_module_smells(path: &Path, line_count: usize) -> Vec<CodeSmell> {
     let mut smells = Vec::new();
 
     if let Some(smell) = detect_large_module(path, line_count) {
@@ -168,7 +168,7 @@ pub fn analyze_module_smells(path: &PathBuf, line_count: usize) -> Vec<CodeSmell
 
 /// Detect feature envy - methods that use other class data more than their own
 /// This is a simplified version that looks for method calls on other objects
-pub fn detect_feature_envy(content: &str, path: &PathBuf) -> Vec<CodeSmell> {
+pub fn detect_feature_envy(content: &str, path: &Path) -> Vec<CodeSmell> {
     let mut smells = Vec::new();
 
     // Simple heuristic: count method calls on other objects vs self
@@ -179,7 +179,7 @@ pub fn detect_feature_envy(content: &str, path: &PathBuf) -> Vec<CodeSmell> {
         if other_calls > 3 && other_calls > self_calls * 2 {
             smells.push(CodeSmell {
                 smell_type: SmellType::FeatureEnvy,
-                location: path.clone(),
+                location: path.to_path_buf(),
                 line: line_num + 1,
                 message: format!(
                     "Line has {} external method calls vs {} self calls",

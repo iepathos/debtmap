@@ -3,6 +3,7 @@ pub mod coupling;
 pub mod duplication;
 pub mod patterns;
 pub mod smells;
+pub mod suppression;
 
 use crate::core::{DebtItem, DebtType, Priority};
 use std::collections::HashMap;

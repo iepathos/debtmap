@@ -18,6 +18,16 @@
   - Caching for incremental analysis
   - Comprehensive test suite
 
+- [x] **Spec 03**: Inline suppression comments
+  - Block suppression with debtmap:ignore-start/end
+  - Line-specific suppression with debtmap:ignore
+  - Next-line suppression with debtmap:ignore-next-line
+  - Type-specific suppression (e.g., [todo,fixme])
+  - Wildcard suppression with [*]
+  - Optional reason documentation
+  - Multi-language support (Rust, Python)
+  - Unclosed block warnings
+
 ## Current Phase: Foundation
 We have completed the initial implementation with core functionality for analyzing Rust and Python code.
 

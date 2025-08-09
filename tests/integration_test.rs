@@ -6,6 +6,7 @@ use tempfile::TempDir;
 
 #[test]
 fn test_todo_fixme_detection() {
+    // debtmap:ignore-start -- Test fixture data
     let content = r#"
     // TODO: Implement this feature
     // FIXME: This is broken
@@ -15,6 +16,7 @@ fn test_todo_fixme_detection() {
     // OPTIMIZE: Can be improved
     // REFACTOR: Needs cleanup
     "#;
+    // debtmap:ignore-end
 
     let path = PathBuf::from("test.rs");
     let items = find_todos_and_fixmes(content, &path);
@@ -329,7 +331,7 @@ fn test_output_json_format() {
                 priority: Priority::Medium,
                 file: PathBuf::from("test.rs"),
                 line: 5,
-                message: "TODO: Implement feature".to_string(),
+                message: "TODO: Implement feature".to_string(), // debtmap:ignore -- Test fixture
                 context: None,
             }],
             by_type: {
@@ -528,4 +530,162 @@ fn test_code_smell_to_debt_item() {
     assert_eq!(debt_item.priority, Priority::High);
     assert_eq!(debt_item.line, 100);
     assert_eq!(debt_item.message, "Method is too long");
+}
+
+#[test]
+fn test_suppression_block_comments() {
+    let content = r#"
+// debtmap:ignore-start
+// TODO: This should be suppressed
+// FIXME: This too
+// debtmap:ignore-end
+// TODO: This should not be suppressed
+"#;
+
+    let path = PathBuf::from("test.rs");
+    let items = find_todos_and_fixmes_with_suppression(
+        content,
+        &path,
+        Some(&parse_suppression_comments(content, Language::Rust, &path)),
+    );
+
+    assert_eq!(items.len(), 1, "Should only find one non-suppressed TODO");
+    assert!(items[0].message.contains("This should not be suppressed"));
+}
+
+#[test]
+fn test_suppression_line_comments() {
+    let content = r#"
+// TODO: Not suppressed
+// TODO: Suppressed // debtmap:ignore
+// FIXME: Also not suppressed
+"#;
+
+    let path = PathBuf::from("test.rs");
+    let items = find_todos_and_fixmes_with_suppression(
+        content,
+        &path,
+        Some(&parse_suppression_comments(content, Language::Rust, &path)),
+    );
+
+    assert_eq!(items.len(), 2, "Should find two non-suppressed items");
+    assert!(!items.iter().any(|i| i.message.contains("Suppressed")));
+}
+
+#[test]
+fn test_suppression_next_line() {
+    let content = r#"
+// debtmap:ignore-next-line
+// TODO: This should be suppressed
+// TODO: This should not be suppressed
+"#;
+
+    let path = PathBuf::from("test.rs");
+    let items = find_todos_and_fixmes_with_suppression(
+        content,
+        &path,
+        Some(&parse_suppression_comments(content, Language::Rust, &path)),
+    );
+
+    assert_eq!(items.len(), 1, "Should only find one non-suppressed TODO");
+    assert!(items[0].message.contains("This should not be suppressed"));
+}
+
+#[test]
+fn test_type_specific_suppression() {
+    let content = r#"
+// debtmap:ignore-start[todo]
+// TODO: Suppressed
+// FIXME: Not suppressed  
+// debtmap:ignore-end
+"#;
+
+    let path = PathBuf::from("test.rs");
+    let items = find_todos_and_fixmes_with_suppression(
+        content,
+        &path,
+        Some(&parse_suppression_comments(content, Language::Rust, &path)),
+    );
+
+    assert_eq!(items.len(), 1, "Should only find FIXME");
+    assert!(items[0].debt_type == DebtType::Fixme);
+}
+
+#[test]
+fn test_suppression_with_reason() {
+    let content = r#"
+// debtmap:ignore-start -- Test fixture data
+// TODO: Test TODO
+// FIXME: Test FIXME
+// debtmap:ignore-end
+"#;
+
+    let path = PathBuf::from("test.rs");
+    let suppression = parse_suppression_comments(content, Language::Rust, &path);
+    let items = find_todos_and_fixmes_with_suppression(content, &path, Some(&suppression));
+
+    assert_eq!(items.len(), 0, "All items should be suppressed");
+    assert_eq!(
+        suppression.active_blocks[0].reason,
+        Some("Test fixture data".to_string())
+    );
+}
+
+#[test]
+fn test_python_suppression() {
+    let content = r#"
+# debtmap:ignore-start
+# TODO: Python TODO
+# FIXME: Python FIXME
+# debtmap:ignore-end
+# TODO: Not suppressed
+"#;
+
+    let path = PathBuf::from("test.py");
+    let items = find_todos_and_fixmes_with_suppression(
+        content,
+        &path,
+        Some(&parse_suppression_comments(
+            content,
+            Language::Python,
+            &path,
+        )),
+    );
+
+    assert_eq!(items.len(), 1, "Should only find one non-suppressed TODO");
+    assert!(items[0].message.contains("Not suppressed"));
+}
+
+#[test]
+fn test_code_smell_suppression() {
+    let content = r#"
+// debtmap:ignore-next-line[codesmell]
+                                                                                                    // This is a very long line that would normally trigger a code smell
+// This is a normal line
+"#;
+
+    let path = PathBuf::from("test.rs");
+    let items = find_code_smells_with_suppression(
+        content,
+        &path,
+        Some(&parse_suppression_comments(content, Language::Rust, &path)),
+    );
+
+    assert_eq!(items.len(), 0, "Long line should be suppressed");
+}
+
+#[test]
+fn test_wildcard_suppression() {
+    let content = r#"
+// debtmap:ignore[*]
+// TODO: Suppressed
+// FIXME: Also suppressed
+"#;
+
+    let path = PathBuf::from("test.rs");
+    let suppression = parse_suppression_comments(content, Language::Rust, &path);
+
+    assert!(suppression.is_suppressed(2, &DebtType::Todo));
+    assert!(suppression.is_suppressed(2, &DebtType::Fixme));
+    assert!(suppression.is_suppressed(2, &DebtType::CodeSmell));
 }

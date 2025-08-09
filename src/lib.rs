@@ -19,11 +19,15 @@ pub use crate::debt::{
     circular::{analyze_module_dependencies, DependencyGraph},
     coupling::{calculate_coupling_metrics, identify_coupling_issues, CouplingMetrics},
     duplication::detect_duplication,
-    patterns::{detect_duplicate_strings, find_code_smells, find_todos_and_fixmes},
+    patterns::{
+        detect_duplicate_strings, find_code_smells, find_code_smells_with_suppression,
+        find_todos_and_fixmes, find_todos_and_fixmes_with_suppression,
+    },
     smells::{
         analyze_function_smells, analyze_module_smells, detect_deep_nesting, detect_long_method,
         detect_long_parameter_list, CodeSmell, SmellType,
     },
+    suppression::{parse_suppression_comments, SuppressionContext, SuppressionStats},
 };
 
 pub use crate::core::metrics::{

@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01 and spec 02 implemented
+Progress: 100% of spec 01, spec 02, and spec 03 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -21,7 +21,14 @@ Progress: 100% of spec 01 and spec 02 implemented
 - ✅ Lazy evaluation pipelines
 - ✅ Monadic error handling patterns
 - ✅ Incremental analysis with caching support
-- ✅ Comprehensive test suite with 19+ integration tests
+- ✅ Comprehensive test suite with 27+ integration tests
+- ✅ Inline suppression comments for false positive control:
+  - Block suppressions with debtmap:ignore-start/end
+  - Line-specific suppressions with debtmap:ignore
+  - Next-line suppressions with debtmap:ignore-next-line
+  - Type-specific suppressions (e.g., [todo,fixme])
+  - Wildcard suppression with [*]
+  - Optional reason documentation with -- reason
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -38,6 +45,7 @@ The project follows a functional core / imperative shell pattern:
 4. **Multi-language**: Supports Rust and Python analysis
 5. **Flexible Output**: JSON, Markdown, and Terminal formats
 6. **Performance**: Parallel processing for large codebases
+7. **Suppression Support**: Fine-grained control over false positives
 
 ## Project Structure
 ```
