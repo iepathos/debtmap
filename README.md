@@ -321,6 +321,10 @@ just --list
 
 MIT License - see [LICENSE](LICENSE) file for details
 
+### Dependency Licensing Note
+
+Debtmap includes Python parsing functionality via `rustpython-parser`, which depends on `malachite` (LGPL-3.0 licensed) for arbitrary-precision arithmetic. This LGPL dependency is used only for Python AST parsing and does not affect the MIT licensing of debtmap itself. For use cases requiring strict MIT-only dependencies, Python support can be disabled or replaced with an alternative parser.
+
 ## Roadmap
 
 - [x] JavaScript/TypeScript support
