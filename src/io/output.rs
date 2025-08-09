@@ -77,46 +77,44 @@ impl<W: Write> MarkdownWriter<W> {
         writeln!(self.writer, "| Metric | Value | Status |")?;
         writeln!(self.writer, "|--------|-------|--------|")?;
 
-        self.write_summary_row(
-            "Files Analyzed",
-            &results.complexity.metrics.len().to_string(),
-            "-",
-        )?;
-        self.write_summary_row(
-            "Total Functions",
-            &results.complexity.summary.total_functions.to_string(),
-            "-",
-        )?;
-        self.write_summary_row(
-            "Average Complexity",
-            &format!("{:.1}", results.complexity.summary.average_complexity),
-            complexity_status(results.complexity.summary.average_complexity),
-        )?;
-        self.write_summary_row(
-            "High Complexity Functions",
-            &results.complexity.summary.high_complexity_count.to_string(),
-            if results.complexity.summary.high_complexity_count > 10 {
-                "⚠️ Warning"
-            } else {
-                "✅ Good"
-            },
-        )?;
-        self.write_summary_row(
-            "Technical Debt Items",
-            &results.technical_debt.items.len().to_string(),
-            debt_status(results.technical_debt.items.len()),
-        )?;
-        self.write_summary_row(
-            "Total Debt Score",
-            &format!("{debt_score} / {debt_threshold}"),
-            if debt_score > debt_threshold {
-                "❌ Exceeds threshold"
-            } else if debt_score > debt_threshold / 2 {
-                "⚠️ Medium"
-            } else {
-                "✅ Good"
-            },
-        )?;
+        let summary_rows = vec![
+            (
+                "Files Analyzed",
+                results.complexity.metrics.len().to_string(),
+                "-".to_string(),
+            ),
+            (
+                "Total Functions",
+                results.complexity.summary.total_functions.to_string(),
+                "-".to_string(),
+            ),
+            (
+                "Average Complexity",
+                format!("{:.1}", results.complexity.summary.average_complexity),
+                complexity_status(results.complexity.summary.average_complexity).to_string(),
+            ),
+            (
+                "High Complexity Functions",
+                results.complexity.summary.high_complexity_count.to_string(),
+                high_complexity_status(results.complexity.summary.high_complexity_count)
+                    .to_string(),
+            ),
+            (
+                "Technical Debt Items",
+                results.technical_debt.items.len().to_string(),
+                debt_status(results.technical_debt.items.len()).to_string(),
+            ),
+            (
+                "Total Debt Score",
+                format!("{debt_score} / {debt_threshold}"),
+                debt_score_status(debt_score, debt_threshold).to_string(),
+            ),
+        ];
+
+        for (metric, value, status) in summary_rows {
+            self.write_summary_row(metric, &value, &status)?;
+        }
+
         writeln!(self.writer)?;
         Ok(())
     }
@@ -245,6 +243,15 @@ fn print_header() {
     println!();
 }
 
+fn format_debt_score(score: u32, threshold: u32) -> String {
+    let colored_score = match score {
+        s if s > threshold => s.to_string().red(),
+        s if s > threshold / 2 => s.to_string().yellow(),
+        s => s.to_string().green(),
+    };
+    format!("{colored_score} (threshold: {threshold})")
+}
+
 fn print_summary(results: &AnalysisResults) {
     let debt_score = total_debt_score(&results.technical_debt.items);
     let debt_threshold = 100; // Default threshold, can be made configurable
@@ -260,29 +267,10 @@ fn print_summary(results: &AnalysisResults) {
         results.complexity.summary.average_complexity
     );
     println!("  Debt items: {}", results.technical_debt.items.len());
-
-    // Add debt score with color coding
-    let score_display = if debt_score > debt_threshold {
-        format!(
-            "{} (threshold: {})",
-            debt_score.to_string().red(),
-            debt_threshold
-        )
-    } else if debt_score > debt_threshold / 2 {
-        format!(
-            "{} (threshold: {})",
-            debt_score.to_string().yellow(),
-            debt_threshold
-        )
-    } else {
-        format!(
-            "{} (threshold: {})",
-            debt_score.to_string().green(),
-            debt_threshold
-        )
-    };
-    println!("  Total debt score: {score_display}");
-
+    println!(
+        "  Total debt score: {}",
+        format_debt_score(debt_score, debt_threshold)
+    );
     println!();
 }
 
@@ -385,6 +373,24 @@ fn debt_status(count: usize) -> &'static str {
         x if x < 20 => "✅ Low",
         x if x < 50 => "⚠️ Medium",
         _ => "❌ High",
+    }
+}
+
+fn high_complexity_status(count: usize) -> &'static str {
+    if count > 10 {
+        "⚠️ Warning"
+    } else {
+        "✅ Good"
+    }
+}
+
+fn debt_score_status(score: u32, threshold: u32) -> &'static str {
+    if score > threshold {
+        "❌ Exceeds threshold"
+    } else if score > threshold / 2 {
+        "⚠️ Medium"
+    } else {
+        "✅ Good"
     }
 }
 
