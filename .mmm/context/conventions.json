@@ -1,0 +1,54 @@
+{
+  "naming_patterns": {
+    "file_naming": "SnakeCase",
+    "function_naming": "SnakeCase",
+    "variable_naming": "SnakeCase",
+    "type_naming": "PascalCase",
+    "constant_naming": "ScreamingSnakeCase"
+  },
+  "code_patterns": {
+    "error_handling": {
+      "name": "Result-based error handling",
+      "description": "Uses Result<T, E> for error handling",
+      "examples": [
+        "Result<String, Error>"
+      ],
+      "frequency": 35
+    },
+    "logging": {
+      "name": "Logging pattern",
+      "description": "Uses logging for debugging and monitoring",
+      "examples": [
+        "println!",
+        "log::info!"
+      ],
+      "frequency": 6
+    },
+    "builder": {
+      "name": "Builder pattern",
+      "description": "Uses builder pattern for object construction",
+      "examples": [
+        "RequestBuilder::new()"
+      ],
+      "frequency": 2
+    }
+  },
+  "test_patterns": {
+    "test_file_pattern": "tests/",
+    "test_function_prefix": "test_",
+    "test_module_pattern": "#[cfg(test)]",
+    "assertion_style": "assert_eq!"
+  },
+  "project_idioms": [
+    {
+      "name": "Option matching",
+      "pattern": "match option { Some(x) => ..., None => ... }",
+      "usage_count": 0
+    },
+    {
+      "name": "Result propagation",
+      "pattern": "function()?",
+      "usage_count": 0
+    }
+  ]
+}

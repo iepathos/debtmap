@@ -1,0 +1,309 @@
+{
+  "test_coverage": 11.7343645,
+  "type_coverage": 126.10169,
+  "lint_warnings": 21,
+  "code_duplication": 0.0,
+  "doc_coverage": 16.27907,
+  "benchmark_results": {},
+  "memory_usage": {
+    "estimated_stack": 2097152,
+    "estimated_heap": 7340032
+  },
+  "compile_time": {
+    "secs": 51,
+    "nanos": 696739666
+  },
+  "binary_size": 5829232,
+  "max_nesting_depth": 9,
+  "total_lines": 4696,
+  "complexity_summary": {
+    "by_file": {
+      "src/main.rs": {
+        "avg_cyclomatic": 2.2307692,
+        "max_cyclomatic": 7,
+        "avg_cognitive": 9.076923,
+        "max_cognitive": 28,
+        "functions_count": 13,
+        "high_complexity_count": 0
+      },
+      "src/analyzers/rust.rs": {
+        "avg_cyclomatic": 1.7,
+        "max_cyclomatic": 4,
+        "avg_cognitive": 6.7,
+        "max_cognitive": 18,
+        "functions_count": 10,
+        "high_complexity_count": 0
+      },
+      "src/complexity/cyclomatic.rs": {
+        "avg_cyclomatic": 1.0,
+        "max_cyclomatic": 1,
+        "avg_cognitive": 2.0,
+        "max_cognitive": 2,
+        "functions_count": 4,
+        "high_complexity_count": 0
+      },
+      "src/debt/coupling.rs": {
+        "avg_cyclomatic": 2.9166667,
+        "max_cyclomatic": 6,
+        "avg_cognitive": 15.416667,
+        "max_cognitive": 55,
+        "functions_count": 12,
+        "high_complexity_count": 0
+      },
+      "src/core/monadic.rs": {
+        "avg_cyclomatic": 1.0,
+        "max_cyclomatic": 1,
+        "avg_cognitive": 5.0,
+        "max_cognitive": 12,
+        "functions_count": 8,
+        "high_complexity_count": 0
+      },
+      "src/debt/mod.rs": {
+        "avg_cyclomatic": 2.4285715,
+        "max_cyclomatic": 11,
+        "avg_cognitive": 6.285714,
+        "max_cognitive": 16,
+        "functions_count": 7,
+        "high_complexity_count": 1
+      },
+      "src/debt/duplication.rs": {
+        "avg_cyclomatic": 2.1111112,
+        "max_cyclomatic": 3,
+        "avg_cognitive": 12.888889,
+        "max_cognitive": 26,
+        "functions_count": 9,
+        "high_complexity_count": 0
+      },
+      "src/core/lazy.rs": {
+        "avg_cyclomatic": 1.0,
+        "max_cyclomatic": 1,
+        "avg_cognitive": 6.5,
+        "max_cognitive": 7,
+        "functions_count": 2,
+        "high_complexity_count": 0
+      },
+      "src/complexity/cognitive.rs": {
+        "avg_cyclomatic": 2.25,
+        "max_cyclomatic": 6,
+        "avg_cognitive": 3.75,
+        "max_cognitive": 9,
+        "functions_count": 4,
+        "high_complexity_count": 0
+      },
+      "src/io/walker.rs": {
+        "avg_cyclomatic": 1.0,
+        "max_cyclomatic": 1,
+        "avg_cognitive": 2.0,
+        "max_cognitive": 2,
+        "functions_count": 3,
+        "high_complexity_count": 0
+      },
+      "src/io/mod.rs": {
+        "avg_cyclomatic": 1.6,
+        "max_cyclomatic": 2,
+        "avg_cognitive": 3.6,
+        "max_cognitive": 8,
+        "functions_count": 5,
+        "high_complexity_count": 0
+      },
+      "src/cli.rs": {
+        "avg_cyclomatic": 1.0,
+        "max_cyclomatic": 1,
+        "avg_cognitive": 2.0,
+        "max_cognitive": 2,
+        "functions_count": 1,
+        "high_complexity_count": 0
+      },
+      "src/core/ast.rs": {
+        "avg_cyclomatic": 1.5,
+        "max_cyclomatic": 2,
+        "avg_cognitive": 6.5,
+        "max_cognitive": 11,
+        "functions_count": 2,
+        "high_complexity_count": 0
+      },
+      "src/debt/circular.rs": {
+        "avg_cyclomatic": 1.0,
+        "max_cyclomatic": 1,
+        "avg_cognitive": 7.0,
+        "max_cognitive": 24,
+        "functions_count": 7,
+        "high_complexity_count": 0
+      },
+      "src/debt/smells.rs": {
+        "avg_cyclomatic": 3.5,
+        "max_cyclomatic": 6,
+        "avg_cognitive": 25.25,
+        "max_cognitive": 51,
+        "functions_count": 8,
+        "high_complexity_count": 0
+      },
+      "src/analyzers/mod.rs": {
+        "avg_cyclomatic": 1.6,
+        "max_cyclomatic": 4,
+        "avg_cognitive": 5.6,
+        "max_cognitive": 11,
+        "functions_count": 5,
+        "high_complexity_count": 0
+      },
+      "src/debt/suppression.rs": {
+        "avg_cyclomatic": 3.0,
+        "max_cyclomatic": 11,
+        "avg_cognitive": 14.6,
+        "max_cognitive": 109,
+        "functions_count": 10,
+        "high_complexity_count": 2
+      },
+      "src/debt/patterns.rs": {
+        "avg_cyclomatic": 2.090909,
+        "max_cyclomatic": 7,
+        "avg_cognitive": 14.272727,
+        "max_cognitive": 48,
+        "functions_count": 11,
+        "high_complexity_count": 0
+      },
+      "src/analyzers/python.rs": {
+        "avg_cyclomatic": 3.1333334,
+        "max_cyclomatic": 9,
+        "avg_cognitive": 16.0,
+        "max_cognitive": 57,
+        "functions_count": 15,
+        "high_complexity_count": 0
+      },
+      "src/transformers/mod.rs": {
+        "avg_cyclomatic": 1.125,
+        "max_cyclomatic": 2,
+        "avg_cognitive": 5.625,
+        "max_cognitive": 17,
+        "functions_count": 8,
+        "high_complexity_count": 0
+      },
+      "src/core/cache.rs": {
+        "avg_cyclomatic": 1.25,
+        "max_cyclomatic": 2,
+        "avg_cognitive": 2.25,
+        "max_cognitive": 3,
+        "functions_count": 4,
+        "high_complexity_count": 0
+      },
+      "src/core/metrics.rs": {
+        "avg_cyclomatic": 2.0,
+        "max_cyclomatic": 5,
+        "avg_cognitive": 5.4444447,
+        "max_cognitive": 10,
+        "functions_count": 9,
+        "high_complexity_count": 0
+      },
+      "src/transformers/filters.rs": {
+        "avg_cyclomatic": 1.625,
+        "max_cyclomatic": 2,
+        "avg_cognitive": 9.5,
+        "max_cognitive": 20,
+        "functions_count": 8,
+        "high_complexity_count": 0
+      },
+      "src/io/output.rs": {
+        "avg_cyclomatic": 4.0,
+        "max_cyclomatic": 4,
+        "avg_cognitive": 7.0,
+        "max_cognitive": 7,
+        "functions_count": 4,
+        "high_complexity_count": 0
+      },
+      "src/complexity/mod.rs": {
+        "avg_cyclomatic": 1.3333334,
+        "max_cyclomatic": 2,
+        "avg_cognitive": 4.0,
+        "max_cognitive": 8,
+        "functions_count": 3,
+        "high_complexity_count": 0
+      }
+    },
+    "total_functions": 172,
+    "filtered_functions": 161
+  },
+  "complexity_hotspots": [
+    {
+      "file": "src/debt/suppression.rs",
+      "function": "parse_suppression_comments",
+      "cyclomatic": 11,
+      "cognitive": 109
+    },
+    {
+      "file": "src/debt/suppression.rs",
+      "function": "parse_debt_types",
+      "cyclomatic": 11,
+      "cognitive": 21
+    },
+    {
+      "file": "src/debt/mod.rs",
+      "function": "calculate_debt_score",
+      "cyclomatic": 11,
+      "cognitive": 16
+    },
+    {
+      "file": "src/analyzers/python.rs",
+      "function": "calculate_cognitive_stmt",
+      "cyclomatic": 9,
+      "cognitive": 57
+    },
+    {
+      "file": "src/analyzers/python.rs",
+      "function": "calculate_nesting_stmt",
+      "cyclomatic": 9,
+      "cognitive": 57
+    },
+    {
+      "file": "src/analyzers/python.rs",
+      "function": "count_branches_stmt",
+      "cyclomatic": 8,
+      "cognitive": 23
+    },
+    {
+      "file": "src/debt/patterns.rs",
+      "function": "classify_marker",
+      "cyclomatic": 7,
+      "cognitive": 10
+    },
+    {
+      "file": "src/main.rs",
+      "function": "main",
+      "cyclomatic": 7,
+      "cognitive": 28
+    },
+    {
+      "file": "src/debt/smells.rs",
+      "function": "detect_data_clumps",
+      "cyclomatic": 6,
+      "cognitive": 51
+    },
+    {
+      "file": "src/complexity/cognitive.rs",
+      "function": "calculate_cognitive_penalty",
+      "cyclomatic": 6,
+      "cognitive": 9
+    },
+    {
+      "file": "src/debt/coupling.rs",
+      "function": "build_module_dependency_map",
+      "cyclomatic": 6,
+      "cognitive": 55
+    }
+  ],
+  "bugs_fixed": 0,
+  "features_added": 0,
+  "improvement_velocity": 0.0,
+  "health_score": {
+    "overall": 41.57150487899781,
+    "components": {
+      "test_coverage": 11.73436450958252,
+      "code_quality": 70.0,
+      "documentation": 16.279069900512695,
+      "maintainability": 48.12594280242919,
+      "type_safety": 126.10169219970703
+    },
+    "timestamp": "2025-08-09T10:15:40.725951Z"
+  },
+  "timestamp": "2025-08-09T10:14:49.027872Z",
+  "iteration_id": "analysis-1754734489"
+}

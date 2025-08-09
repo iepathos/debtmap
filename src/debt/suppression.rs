@@ -338,10 +338,9 @@ mod tests {
     #[test]
     fn test_unclosed_block_detection() {
         // Test content with intentionally unclosed block for testing
-        let content = format!("{}{}{}",
-            "// debtmap:",
-            "ignore-start\n",
-            "// TODO: In unclosed block\n"
+        let content = format!(
+            "{}{}{}",
+            "// debtmap:", "ignore-start\n", "// TODO: In unclosed block\n"
         );
         let file = PathBuf::from("test.rs");
         let context = parse_suppression_comments(&content, Language::Rust, &file);

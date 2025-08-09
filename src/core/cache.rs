@@ -182,6 +182,12 @@ pub struct IncrementalAnalysis {
     pub changed_files: im::HashSet<PathBuf>,
 }
 
+impl Default for IncrementalAnalysis {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IncrementalAnalysis {
     /// Create new incremental analysis state
     pub fn new() -> Self {
@@ -286,7 +292,7 @@ mod tests {
     #[test]
     fn test_cache_stats() {
         let temp_dir = TempDir::new().unwrap();
-        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+        let cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
 
         assert_eq!(cache.stats().entries, 0);
         assert_eq!(cache.stats().hits, 0);

@@ -8,6 +8,12 @@ pub struct DependencyGraph {
     modules: Vec<String>,
 }
 
+impl Default for DependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DependencyGraph {
     /// Create a new empty dependency graph
     pub fn new() -> Self {

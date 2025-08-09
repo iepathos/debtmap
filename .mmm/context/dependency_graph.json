@@ -1,0 +1,220 @@
+{
+  "nodes": {
+    "src/analyzers/rust.rs": {
+      "module_type": "Library",
+      "import_count": 9,
+      "export_count": 2,
+      "coupling_score": 0
+    },
+    "src/main.rs": {
+      "module_type": "Binary",
+      "import_count": 12,
+      "coupling_score": 0
+    },
+    "src/core/cache.rs": {
+      "module_type": "Library",
+      "import_count": 10,
+      "export_count": 16,
+      "coupling_score": 0
+    },
+    "src/complexity/cyclomatic.rs": {
+      "module_type": "Library",
+      "import_count": 1,
+      "export_count": 3,
+      "coupling_score": 0
+    },
+    "src/analyzers/mod.rs": {
+      "module_type": "Library",
+      "import_count": 2,
+      "export_count": 4,
+      "coupling_score": 0
+    },
+    "src/transformers/mod.rs": {
+      "module_type": "Library",
+      "import_count": 1,
+      "export_count": 9,
+      "coupling_score": 0
+    },
+    "src/core/monadic.rs": {
+      "module_type": "Library",
+      "import_count": 5,
+      "export_count": 11,
+      "coupling_score": 0
+    },
+    "src/debt/suppression.rs": {
+      "module_type": "Library",
+      "import_count": 7,
+      "export_count": 9,
+      "coupling_score": 0
+    },
+    "src/analyzers/python.rs": {
+      "module_type": "Library",
+      "import_count": 8,
+      "export_count": 2,
+      "coupling_score": 0
+    },
+    "src/debt/duplication.rs": {
+      "module_type": "Library",
+      "import_count": 4,
+      "export_count": 3,
+      "coupling_score": 0
+    },
+    "src/debt/mod.rs": {
+      "module_type": "Library",
+      "import_count": 4,
+      "export_count": 7,
+      "coupling_score": 0
+    },
+    "src/core/ast.rs": {
+      "module_type": "Library",
+      "import_count": 1,
+      "export_count": 11,
+      "coupling_score": 0
+    },
+    "src/lib.rs": {
+      "module_type": "Library",
+      "export_count": 30,
+      "coupling_score": 0
+    },
+    "src/core/mod.rs": {
+      "module_type": "Library",
+      "import_count": 4,
+      "export_count": 21,
+      "coupling_score": 0
+    },
+    "src/io/walker.rs": {
+      "module_type": "Library",
+      "import_count": 4,
+      "export_count": 8,
+      "coupling_score": 0
+    },
+    "src/debt/coupling.rs": {
+      "module_type": "Library",
+      "import_count": 5,
+      "export_count": 11,
+      "coupling_score": 0
+    },
+    "src/transformers/filters.rs": {
+      "module_type": "Library",
+      "import_count": 1,
+      "export_count": 10,
+      "coupling_score": 0
+    },
+    "src/io/mod.rs": {
+      "module_type": "Library",
+      "import_count": 3,
+      "export_count": 5,
+      "coupling_score": 0
+    },
+    "src/core/metrics.rs": {
+      "module_type": "Library",
+      "import_count": 3,
+      "export_count": 9,
+      "coupling_score": 0
+    },
+    "src/complexity/mod.rs": {
+      "module_type": "Library",
+      "import_count": 1,
+      "export_count": 7,
+      "coupling_score": 0
+    },
+    "src/core/lazy.rs": {
+      "module_type": "Library",
+      "import_count": 3,
+      "export_count": 21,
+      "coupling_score": 0
+    },
+    "src/complexity/cognitive.rs": {
+      "module_type": "Library",
+      "import_count": 1,
+      "export_count": 3,
+      "coupling_score": 0
+    },
+    "src/debt/circular.rs": {
+      "module_type": "Library",
+      "import_count": 4,
+      "export_count": 13,
+      "coupling_score": 0
+    },
+    "src/debt/patterns.rs": {
+      "module_type": "Library",
+      "import_count": 6,
+      "export_count": 7,
+      "coupling_score": 0
+    },
+    "src/cli.rs": {
+      "module_type": "Library",
+      "import_count": 2,
+      "export_count": 5,
+      "coupling_score": 0
+    },
+    "src/io/output.rs": {
+      "module_type": "Library",
+      "import_count": 4,
+      "export_count": 9,
+      "coupling_score": 0
+    },
+    "src/debt/smells.rs": {
+      "module_type": "Library",
+      "import_count": 2,
+      "export_count": 11,
+      "coupling_score": 0
+    }
+  },
+  "edges": [],
+  "cycles": [],
+  "layers": [
+    {
+      "name": "root",
+      "level": 0,
+      "modules": [
+        "Cargo.toml"
+      ]
+    },
+    {
+      "name": "top-level",
+      "level": 1,
+      "modules": [
+        "src/lib.rs",
+        "src/main.rs",
+        "tests/integration_test.rs",
+        "src/cli.rs"
+      ]
+    },
+    {
+      "name": "module",
+      "level": 2,
+      "modules": [
+        "src/core/mod.rs",
+        "src/io/walker.rs",
+        "src/debt/duplication.rs",
+        "src/io/mod.rs",
+        "src/debt/circular.rs",
+        "src/debt/suppression.rs",
+        "src/debt/coupling.rs",
+        "src/transformers/filters.rs",
+        "src/analyzers/python.rs",
+        "src/debt/patterns.rs",
+        "src/debt/mod.rs",
+        "src/core/metrics.rs",
+        "src/analyzers/mod.rs",
+        "src/core/monadic.rs",
+        "src/core/ast.rs",
+        "src/core/lazy.rs",
+        "src/analyzers/rust.rs",
+        "src/complexity/cognitive.rs",
+        "src/complexity/mod.rs",
+        "src/io/output.rs",
+        "src/debt/smells.rs",
+        "src/core/cache.rs",
+        "src/complexity/cyclomatic.rs",
+        "src/transformers/mod.rs"
+      ]
+    }
+  ],
+  "coupling_analysis": {
+    "high_coupling_modules": [],
+    "avg_coupling": 0.0,
+    "max_coupling": 0
+  }
+}
