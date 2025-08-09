@@ -45,26 +45,34 @@ impl<W: Write> MarkdownWriter<W> {
 
 impl<W: Write> OutputWriter for MarkdownWriter<W> {
     fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        self.write_header(results)?;
-        self.write_summary(results)?;
-        self.write_complexity_analysis(results)?;
-        self.write_technical_debt(results)?;
-        self.write_recommendations()?;
-        Ok(())
+        let writers: Vec<fn(&mut Self, &AnalysisResults) -> anyhow::Result<()>> = vec![
+            |w, r| w.write_header(r),
+            |w, r| w.write_summary(r),
+            |w, r| w.write_complexity_analysis(r),
+            |w, r| w.write_technical_debt(r),
+            |w, _| w.write_recommendations(),
+        ];
+
+        writers.iter().try_for_each(|writer| writer(self, results))
     }
 }
 
 impl<W: Write> MarkdownWriter<W> {
     fn write_header(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        writeln!(self.writer, "# Debtmap Analysis Report")?;
-        writeln!(self.writer)?;
-        writeln!(
-            self.writer,
-            "Generated: {}",
-            results.timestamp.format("%Y-%m-%d %H:%M:%S UTC")
-        )?;
-        writeln!(self.writer, "Version: 0.1.0")?;
-        writeln!(self.writer)?;
+        let header_lines = [
+            "# Debtmap Analysis Report".to_string(),
+            String::new(),
+            format!(
+                "Generated: {}",
+                results.timestamp.format("%Y-%m-%d %H:%M:%S UTC")
+            ),
+            "Version: 0.1.0".to_string(),
+            String::new(),
+        ];
+
+        header_lines
+            .iter()
+            .try_for_each(|line| writeln!(self.writer, "{line}"))?;
         Ok(())
     }
 
@@ -205,11 +213,15 @@ impl TerminalWriter {
 
 impl OutputWriter for TerminalWriter {
     fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        print_header();
-        print_summary(results);
-        print_complexity_hotspots(results);
-        print_technical_debt(results);
-        print_pass_fail_status(results);
+        let printers: Vec<fn(&AnalysisResults)> = vec![
+            |_| print_header(),
+            print_summary,
+            print_complexity_hotspots,
+            print_technical_debt,
+            print_pass_fail_status,
+        ];
+
+        printers.iter().for_each(|printer| printer(results));
         Ok(())
     }
 }
@@ -334,19 +346,25 @@ fn is_passing(results: &AnalysisResults) -> bool {
 }
 
 fn complexity_status(avg: f64) -> &'static str {
-    match avg {
-        x if x < 5.0 => "✅ Good",
-        x if x < 10.0 => "⚠️ Medium",
-        _ => "❌ High",
-    }
+    static THRESHOLDS: &[(f64, &str)] =
+        &[(5.0, "✅ Good"), (10.0, "⚠️ Medium"), (f64::MAX, "❌ High")];
+
+    THRESHOLDS
+        .iter()
+        .find(|(threshold, _)| avg < *threshold)
+        .map(|(_, status)| *status)
+        .unwrap_or("❌ High")
 }
 
 fn debt_status(count: usize) -> &'static str {
-    match count {
-        x if x < 20 => "✅ Low",
-        x if x < 50 => "⚠️ Medium",
-        _ => "❌ High",
-    }
+    static THRESHOLDS: &[(usize, &str)] =
+        &[(20, "✅ Low"), (50, "⚠️ Medium"), (usize::MAX, "❌ High")];
+
+    THRESHOLDS
+        .iter()
+        .find(|(threshold, _)| count < *threshold)
+        .map(|(_, status)| *status)
+        .unwrap_or("❌ High")
 }
 
 fn high_complexity_status(count: usize) -> &'static str {

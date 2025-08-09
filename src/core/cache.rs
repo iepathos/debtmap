@@ -7,6 +7,12 @@ use std::path::{Path, PathBuf};
 
 use crate::core::FileMetrics;
 
+/// File information for caching
+struct FileInfo {
+    hash: String,
+    modified: DateTime<Utc>,
+}
+
 /// Cache entry for analysis results
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CacheEntry {
@@ -43,34 +49,56 @@ impl AnalysisCache {
     where
         F: FnOnce() -> Result<FileMetrics>,
     {
+        let file_info = self.get_file_info(path)?;
+
+        self.try_cache_hit(&file_info)
+            .or_else(|| self.compute_and_cache(file_info, compute))
+            .unwrap_or_else(|| Err(anyhow::anyhow!("Failed to get or compute metrics")))
+    }
+
+    /// Get file information needed for caching
+    fn get_file_info(&self, path: &Path) -> Result<FileInfo> {
         let content = std::fs::read_to_string(path)?;
         let hash = Self::calculate_hash(&content);
         let metadata = std::fs::metadata(path)?;
-        let modified: DateTime<Utc> = DateTime::from(metadata.modified()?);
+        let modified = DateTime::from(metadata.modified()?);
 
-        // Check cache
-        if let Some(entry) = self.index.get(&hash) {
-            if entry.timestamp >= modified {
+        Ok(FileInfo { hash, modified })
+    }
+
+    /// Try to get a cache hit
+    fn try_cache_hit(&mut self, file_info: &FileInfo) -> Option<Result<FileMetrics>> {
+        self.index
+            .get(&file_info.hash)
+            .filter(|entry| entry.timestamp >= file_info.modified)
+            .map(|entry| {
                 self.hits += 1;
-                return Ok(entry.metrics.clone());
-            }
-        }
+                Ok(entry.metrics.clone())
+            })
+    }
 
-        // Cache miss - compute new metrics
+    /// Compute new metrics and update cache
+    fn compute_and_cache<F>(
+        &mut self,
+        file_info: FileInfo,
+        compute: F,
+    ) -> Option<Result<FileMetrics>>
+    where
+        F: FnOnce() -> Result<FileMetrics>,
+    {
         self.misses += 1;
-        let metrics = compute()?;
 
-        // Update cache
-        let entry = CacheEntry {
-            file_hash: hash.clone(),
-            timestamp: Utc::now(),
-            metrics: metrics.clone(),
-        };
+        Some(compute().and_then(|metrics| {
+            let entry = CacheEntry {
+                file_hash: file_info.hash.clone(),
+                timestamp: Utc::now(),
+                metrics: metrics.clone(),
+            };
 
-        self.index = self.index.update(hash, entry);
-        self.save_index()?;
-
-        Ok(metrics)
+            self.index = self.index.update(file_info.hash, entry);
+            self.save_index()?;
+            Ok(metrics)
+        }))
     }
 
     /// Calculate SHA-256 hash of content

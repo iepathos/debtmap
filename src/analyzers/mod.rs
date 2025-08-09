@@ -50,17 +50,24 @@ pub fn compose_analyzers(
 pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
     use crate::core::Language;
 
-    match language {
-        Language::Rust => Box::new(rust::RustAnalyzer::new()),
-        Language::Python => Box::new(python::PythonAnalyzer::new()),
-        Language::JavaScript => {
+    type AnalyzerFactory = fn() -> Box<dyn Analyzer>;
+
+    static ANALYZER_MAP: &[(Language, AnalyzerFactory)] = &[
+        (Language::Rust, || Box::new(rust::RustAnalyzer::new())),
+        (Language::Python, || Box::new(python::PythonAnalyzer::new())),
+        (Language::JavaScript, || {
             create_js_analyzer(javascript::JavaScriptAnalyzer::new_javascript, "JavaScript")
-        }
-        Language::TypeScript => {
+        }),
+        (Language::TypeScript, || {
             create_js_analyzer(javascript::JavaScriptAnalyzer::new_typescript, "TypeScript")
-        }
-        _ => Box::new(NullAnalyzer),
-    }
+        }),
+    ];
+
+    ANALYZER_MAP
+        .iter()
+        .find(|(lang, _)| *lang == language)
+        .map(|(_, factory)| factory())
+        .unwrap_or_else(|| Box::new(NullAnalyzer))
 }
 
 fn create_js_analyzer<F>(factory: F, lang_name: &str) -> Box<dyn Analyzer>
