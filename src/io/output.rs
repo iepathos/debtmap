@@ -1,4 +1,5 @@
 use crate::core::{AnalysisResults, FunctionMetrics, Priority};
+use crate::debt::total_debt_score;
 use colored::*;
 use serde_json;
 use std::io::Write;
@@ -68,6 +69,9 @@ impl<W: Write> MarkdownWriter<W> {
     }
 
     fn write_summary(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
+        let debt_score = total_debt_score(&results.technical_debt.items);
+        let debt_threshold = 100; // Default threshold, can be made configurable
+
         writeln!(self.writer, "## Executive Summary")?;
         writeln!(self.writer)?;
         writeln!(self.writer, "| Metric | Value | Status |")?;
@@ -101,6 +105,17 @@ impl<W: Write> MarkdownWriter<W> {
             "Technical Debt Items",
             &results.technical_debt.items.len().to_string(),
             debt_status(results.technical_debt.items.len()),
+        )?;
+        self.write_summary_row(
+            "Total Debt Score",
+            &format!("{debt_score} / {debt_threshold}"),
+            if debt_score > debt_threshold {
+                "❌ Exceeds threshold"
+            } else if debt_score > debt_threshold / 2 {
+                "⚠️ Medium"
+            } else {
+                "✅ Good"
+            },
         )?;
         writeln!(self.writer)?;
         Ok(())
@@ -231,6 +246,9 @@ fn print_header() {
 }
 
 fn print_summary(results: &AnalysisResults) {
+    let debt_score = total_debt_score(&results.technical_debt.items);
+    let debt_threshold = 100; // Default threshold, can be made configurable
+
     println!("{} Summary:", "📊".bold());
     println!("  Files analyzed: {}", results.complexity.metrics.len());
     println!(
@@ -242,6 +260,29 @@ fn print_summary(results: &AnalysisResults) {
         results.complexity.summary.average_complexity
     );
     println!("  Debt items: {}", results.technical_debt.items.len());
+
+    // Add debt score with color coding
+    let score_display = if debt_score > debt_threshold {
+        format!(
+            "{} (threshold: {})",
+            debt_score.to_string().red(),
+            debt_threshold
+        )
+    } else if debt_score > debt_threshold / 2 {
+        format!(
+            "{} (threshold: {})",
+            debt_score.to_string().yellow(),
+            debt_threshold
+        )
+    } else {
+        format!(
+            "{} (threshold: {})",
+            debt_score.to_string().green(),
+            debt_threshold
+        )
+    };
+    println!("  Total debt score: {score_display}");
+
     println!();
 }
 
@@ -323,8 +364,12 @@ fn print_pass_fail_status(results: &AnalysisResults) {
 }
 
 fn is_passing(results: &AnalysisResults) -> bool {
+    let debt_score = total_debt_score(&results.technical_debt.items);
+    let debt_threshold = 100; // Default threshold, can be made configurable
+
     results.complexity.summary.average_complexity < 10.0
         && results.complexity.summary.high_complexity_count < 10
+        && debt_score <= debt_threshold
 }
 
 fn complexity_status(avg: f64) -> &'static str {
