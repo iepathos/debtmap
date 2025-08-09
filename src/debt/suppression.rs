@@ -1,4 +1,5 @@
 use crate::core::{DebtType, Language};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -221,6 +222,19 @@ pub fn parse_suppression_comments(
     context
 }
 
+static DEBT_TYPE_MAP: Lazy<HashMap<&'static str, DebtType>> = Lazy::new(|| {
+    let mut map = HashMap::new();
+    map.insert("todo", DebtType::Todo);
+    map.insert("fixme", DebtType::Fixme);
+    map.insert("smell", DebtType::CodeSmell);
+    map.insert("codesmell", DebtType::CodeSmell);
+    map.insert("duplication", DebtType::Duplication);
+    map.insert("duplicate", DebtType::Duplication);
+    map.insert("complexity", DebtType::Complexity);
+    map.insert("dependency", DebtType::Dependency);
+    map
+});
+
 fn parse_debt_types(types_str: Option<&str>) -> Vec<DebtType> {
     // Early return for special cases
     let Some(types) = types_str else {
@@ -239,15 +253,7 @@ fn parse_debt_types(types_str: Option<&str>) -> Vec<DebtType> {
 }
 
 fn parse_single_debt_type(type_str: &str) -> Option<DebtType> {
-    match type_str.to_lowercase().as_str() {
-        "todo" => Some(DebtType::Todo),
-        "fixme" => Some(DebtType::Fixme),
-        "smell" | "codesmell" => Some(DebtType::CodeSmell),
-        "duplication" | "duplicate" => Some(DebtType::Duplication),
-        "complexity" => Some(DebtType::Complexity),
-        "dependency" => Some(DebtType::Dependency),
-        _ => None,
-    }
+    DEBT_TYPE_MAP.get(type_str.to_lowercase().as_str()).copied()
 }
 
 #[cfg(test)]
