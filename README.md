@@ -6,7 +6,7 @@ A fast, language-agnostic code complexity and technical debt analyzer written in
 
 ## Features
 
-- **Multi-language support** - Currently supports Rust and Python with extensible architecture for more languages
+- **Multi-language support** - Currently supports Rust, Python, and Javascript with extensible architecture for more languages
 - **Comprehensive metrics** - Analyzes cyclomatic and cognitive complexity, code duplication, and various code smells
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
 - **Multiple output formats** - JSON, TOML, and human-readable table formats
