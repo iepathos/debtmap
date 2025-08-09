@@ -44,7 +44,7 @@ impl Analyzer for RustAnalyzer {
             _ => FileMetrics {
                 path: PathBuf::new(),
                 language: Language::Rust,
-                complexity: ComplexityMetrics { functions: vec![] },
+                complexity: ComplexityMetrics::default(),
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
@@ -71,11 +71,18 @@ fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
     );
     let dependencies = extract_dependencies(&ast.file);
 
+    let functions = visitor.functions;
+    let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
+        (cyc + f.cyclomatic, cog + f.cognitive)
+    });
+
     FileMetrics {
         path: ast.path.clone(),
         language: Language::Rust,
         complexity: ComplexityMetrics {
-            functions: visitor.functions,
+            functions,
+            cyclomatic_complexity: cyclomatic,
+            cognitive_complexity: cognitive,
         },
         debt_items,
         dependencies,
