@@ -92,6 +92,30 @@ Options:
   -c, --config <FILE>    Configuration file to use [default: .debtmap.toml]
 ```
 
+## Example Output
+
+```
+$ debtmap analyze .
+Debtmap Analysis Report
+=======================
+
+📊 Summary:
+  Files analyzed: 512
+  Total functions: 512
+  Average complexity: 1.6
+  Debt items: 160
+  Total debt score: 1440 (threshold: 100)
+
+⚠️ Complexity Hotspots (top 5):
+  1. ./src/analyzers/javascript/complexity.rs:1 get_complexity_calculator() - Cyclomatic: 8, Cognitive: 8
+  2. ./src/core/mod.rs:1 fmt() - Cyclomatic: 7, Cognitive: 7
+  3. ./src/complexity/cyclomatic.rs:1 visit_expr() - Cyclomatic: 7, Cognitive: 7
+  4. ./src/debt/patterns.rs:1 classify_marker() - Cyclomatic: 7, Cognitive: 7
+  5. ./src/debt/mod.rs:1 type_weight() - Cyclomatic: 7, Cognitive: 7
+
+✗ Pass/Fail: FAIL (some metrics exceed thresholds)
+```
+
 ## Metrics Explained
 
 ### Cyclomatic Complexity
@@ -267,21 +291,23 @@ We welcome contributions! This is an early-stage project, so there's plenty of r
 
 ### Development
 
+This project uses [Just](https://github.com/casey/just) for task automation. Run `just` to see available commands.
+
 ```bash
-# Run tests
-cargo test
+# Common development tasks
+just test        # Run all tests
+just fmt         # Format code
+just lint        # Run clippy linter
+just check       # Quick syntax check
+just dev         # Run in development mode
+just watch       # Run with hot reloading
 
-# Run with verbose output
-RUST_LOG=debug cargo run -- analyze ./src
+# CI and quality checks
+just ci          # Run all CI checks locally
+just coverage    # Generate test coverage report
 
-# Benchmark
-cargo bench
-
-# Format code
-cargo fmt
-
-# Run lints
-cargo clippy
+# See all available commands
+just --list
 ```
 
 ## License
@@ -297,7 +323,6 @@ MIT License - see [LICENSE](LICENSE) file for details
 - [ ] Historical trend tracking
 - [ ] IDE plugins
 - [ ] Automated refactoring suggestions
-- [ ] Machine learning-based debt prediction
 
 ## Acknowledgments
 
