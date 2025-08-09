@@ -38,6 +38,9 @@ UNCOVERED_LINES=$(echo "$LOWEST_COVERAGE_FILE" | jq -r '.uncovered_lines | @json
 echo "📁 Targeting file: $FILE_PATH"
 echo "   Current coverage: ${COVERAGE}% (${COVERED}/${COVERABLE} lines)"
 
+# Store initial coverage for comparison
+INITIAL_COVERAGE=$COVERAGE
+
 # Use Claude to analyze and improve coverage
 echo "🤖 Analyzing uncovered code and generating tests..."
 cat <<EOF | claude --no-confirm
@@ -61,14 +64,15 @@ Please:
 6. Add the tests to the appropriate test module or file
 7. Run 'cargo test' to verify the tests pass
 8. Run 'cargo clippy -- -D warnings' to ensure code quality
-9. Verify coverage improved with 'just coverage'
 
 Focus on testing the most critical functionality first. Aim to add meaningful tests, not just coverage for coverage's sake.
 
+Do NOT run coverage yourself - the script will handle that after you're done.
+
 EOF
 
-echo "✅ Coverage improvement complete!"
-echo "📈 Running final coverage check..."
+echo "✅ Test implementation complete!"
+echo "📈 Running final coverage check to measure improvement..."
 just coverage
 
 # Extract new coverage percentage
@@ -84,15 +88,27 @@ NEW_COVERAGE=$(cat target/coverage/tarpaulin-report.json | jq -r '
   | .coverage
 ')
 
-echo "📊 Coverage for $FILE_PATH improved from ${COVERAGE}% to ${NEW_COVERAGE}%"
+# Calculate improvement
+IMPROVEMENT=$(echo "$NEW_COVERAGE - $INITIAL_COVERAGE" | bc)
 
-# Commit the changes
+echo "📊 Coverage for $FILE_PATH:"
+echo "   Before: ${INITIAL_COVERAGE}%"
+echo "   After:  ${NEW_COVERAGE}%"
+echo "   Improvement: +${IMPROVEMENT}%"
+
+# Check if coverage actually improved
+if (( $(echo "$IMPROVEMENT <= 0" | bc -l) )); then
+    echo "⚠️  No coverage improvement detected. Skipping commit."
+    exit 1
+fi
+
+# Commit the changes with improvement percentage
 echo "💾 Committing coverage improvements..."
 git add -A
-git commit -m "test: improve coverage for $(basename $FILE_PATH)
+git commit -m "test: improve coverage for $(basename $FILE_PATH) (+${IMPROVEMENT}%)
 
 - Added tests for uncovered functionality
-- Coverage improved from ${COVERAGE}% to ${NEW_COVERAGE}%
+- Coverage improved from ${INITIAL_COVERAGE}% to ${NEW_COVERAGE}%
 - Focus on critical paths and edge cases
 
 🤖 Generated with Claude Code (https://claude.ai/code)
