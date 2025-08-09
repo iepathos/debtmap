@@ -8,16 +8,23 @@ pub fn extract_dependencies(node: Node, source: &str) -> Vec<Dependency> {
 }
 
 fn visit_node_for_dependencies(node: Node, source: &str, dependencies: &mut Vec<Dependency>) {
-    match node.kind() {
-        "import_statement" => extract_import_statement(&node, source, dependencies),
-        "call_expression" => extract_call_expression(&node, source, dependencies),
-        "import" => extract_dynamic_import(&node, source, dependencies),
-        _ => {}
+    type ExtractorFn = fn(&Node, &str, &mut Vec<Dependency>);
+
+    static NODE_EXTRACTORS: &[(&str, ExtractorFn)] = &[
+        ("import_statement", extract_import_statement),
+        ("call_expression", extract_call_expression),
+        ("import", extract_dynamic_import),
+    ];
+
+    if let Some((_, extractor)) = NODE_EXTRACTORS
+        .iter()
+        .find(|(kind, _)| *kind == node.kind())
+    {
+        extractor(&node, source, dependencies);
     }
 
-    for child in node.children(&mut node.walk()) {
-        visit_node_for_dependencies(child, source, dependencies);
-    }
+    node.children(&mut node.walk())
+        .for_each(|child| visit_node_for_dependencies(child, source, dependencies));
 }
 
 fn extract_import_statement(node: &Node, source: &str, dependencies: &mut Vec<Dependency>) {

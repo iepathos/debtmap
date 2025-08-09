@@ -14,20 +14,46 @@ struct CognitiveVisitor {
     nesting_level: u32,
 }
 
-impl<'ast> Visit<'ast> for CognitiveVisitor {
-    fn visit_expr(&mut self, expr: &'ast Expr) {
-        let (base_complexity, extra_complexity, increases_nesting) = match expr {
+struct ExprMetrics {
+    base_complexity: u32,
+    extra_complexity: u32,
+    increases_nesting: bool,
+}
+
+impl CognitiveVisitor {
+    fn calculate_expr_metrics(&self, expr: &Expr) -> ExprMetrics {
+        match expr {
             Expr::If(_) | Expr::While(_) | Expr::ForLoop(_) | Expr::Loop(_) | Expr::Try(_) => {
-                (1 + self.nesting_level, 0, true)
+                ExprMetrics {
+                    base_complexity: 1 + self.nesting_level,
+                    extra_complexity: 0,
+                    increases_nesting: true,
+                }
             }
-            Expr::Match(expr_match) => (1 + self.nesting_level, expr_match.arms.len() as u32, true),
-            Expr::Binary(binary) if is_logical_operator(&binary.op) => (1, 0, false),
-            Expr::Closure(_) => (1, 0, false),
-            _ => (0, 0, false),
-        };
+            Expr::Match(expr_match) => ExprMetrics {
+                base_complexity: 1 + self.nesting_level,
+                extra_complexity: expr_match.arms.len() as u32,
+                increases_nesting: true,
+            },
+            Expr::Binary(binary) if is_logical_operator(&binary.op) => ExprMetrics {
+                base_complexity: 1,
+                extra_complexity: 0,
+                increases_nesting: false,
+            },
+            Expr::Closure(_) => ExprMetrics {
+                base_complexity: 1,
+                extra_complexity: 0,
+                increases_nesting: false,
+            },
+            _ => ExprMetrics {
+                base_complexity: 0,
+                extra_complexity: 0,
+                increases_nesting: false,
+            },
+        }
+    }
 
-        self.complexity += base_complexity + extra_complexity;
-
+    fn visit_with_nesting(&mut self, expr: &Expr, increases_nesting: bool) {
         if increases_nesting {
             self.nesting_level += 1;
             syn::visit::visit_expr(self, expr);
@@ -38,18 +64,31 @@ impl<'ast> Visit<'ast> for CognitiveVisitor {
     }
 }
 
+impl<'ast> Visit<'ast> for CognitiveVisitor {
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        let metrics = self.calculate_expr_metrics(expr);
+        self.complexity += metrics.base_complexity + metrics.extra_complexity;
+
+        self.visit_with_nesting(expr, metrics.increases_nesting);
+    }
+
+    fn visit_block(&mut self, block: &'ast Block) {
+        syn::visit::visit_block(self, block);
+    }
+}
+
 fn is_logical_operator(op: &syn::BinOp) -> bool {
     matches!(op, syn::BinOp::And(_) | syn::BinOp::Or(_))
 }
 
 pub fn calculate_cognitive_penalty(nesting: u32) -> u32 {
-    match nesting {
-        0 => 0,
-        1 => 1,
-        2 => 2,
-        3 => 4,
-        _ => 8,
-    }
+    static PENALTY_TABLE: &[(u32, u32)] = &[(0, 0), (1, 1), (2, 2), (3, 4)];
+
+    PENALTY_TABLE
+        .iter()
+        .find(|(level, _)| *level == nesting)
+        .map(|(_, penalty)| *penalty)
+        .unwrap_or(8)
 }
 
 pub fn combine_cognitive(complexities: Vec<u32>) -> u32 {

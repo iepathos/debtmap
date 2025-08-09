@@ -78,13 +78,33 @@ impl Ast {
     }
 
     pub fn extract_nodes(&self) -> Vec<AstNode> {
-        match self {
-            Ast::Rust(_) => self.extract_rust_nodes(),
-            Ast::Python(_) => self.extract_python_nodes(),
-            Ast::JavaScript(_) => self.extract_javascript_nodes(),
-            Ast::TypeScript(_) => self.extract_typescript_nodes(),
-            Ast::Unknown => vec![],
-        }
+        type ExtractorFn = fn(&Ast) -> Vec<AstNode>;
+        type MatcherFn = fn(&Ast) -> bool;
+
+        static EXTRACTORS: &[(MatcherFn, ExtractorFn)] = &[
+            (
+                |ast| matches!(ast, Ast::Rust(_)),
+                |ast| ast.extract_rust_nodes(),
+            ),
+            (
+                |ast| matches!(ast, Ast::Python(_)),
+                |ast| ast.extract_python_nodes(),
+            ),
+            (
+                |ast| matches!(ast, Ast::JavaScript(_)),
+                |ast| ast.extract_javascript_nodes(),
+            ),
+            (
+                |ast| matches!(ast, Ast::TypeScript(_)),
+                |ast| ast.extract_typescript_nodes(),
+            ),
+        ];
+
+        EXTRACTORS
+            .iter()
+            .find(|(matcher, _)| matcher(self))
+            .map(|(_, extractor)| extractor(self))
+            .unwrap_or_default()
     }
 
     fn extract_rust_nodes(&self) -> Vec<AstNode> {
