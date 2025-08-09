@@ -129,6 +129,12 @@ impl<W: Write> MarkdownWriter<W> {
             return Ok(());
         }
 
+        self.write_complexity_header()?;
+        self.write_complexity_table(results)?;
+        Ok(())
+    }
+
+    fn write_complexity_header(&mut self) -> anyhow::Result<()> {
         writeln!(self.writer, "## Complexity Analysis")?;
         writeln!(self.writer)?;
         writeln!(self.writer, "### Hotspots Requiring Attention")?;
@@ -141,23 +147,30 @@ impl<W: Write> MarkdownWriter<W> {
             self.writer,
             "|-----------|----------|------------|-----------|----------------|"
         )?;
+        Ok(())
+    }
 
-        let mut top_complex: Vec<_> = results.complexity.metrics.iter().collect();
-        top_complex.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+    fn write_complexity_table(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
+        let top_complex = get_top_complex_functions(&results.complexity.metrics, 5);
 
-        for func in top_complex.iter().take(5) {
-            writeln!(
-                self.writer,
-                "| {}:{} | {} | {} | {} | {} |",
-                func.file.display(),
-                func.line,
-                func.name,
-                func.cyclomatic,
-                func.cognitive,
-                get_recommendation(func)
-            )?;
+        for func in top_complex {
+            self.write_complexity_row(func)?;
         }
         writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_complexity_row(&mut self, func: &FunctionMetrics) -> anyhow::Result<()> {
+        writeln!(
+            self.writer,
+            "| {}:{} | {} | {} | {} | {} |",
+            func.file.display(),
+            func.line,
+            func.name,
+            func.cyclomatic,
+            func.cognitive,
+            get_recommendation(func)
+        )?;
         Ok(())
     }
 
@@ -392,6 +405,12 @@ fn debt_score_status(score: u32, threshold: u32) -> &'static str {
     } else {
         "✅ Good"
     }
+}
+
+fn get_top_complex_functions(metrics: &[FunctionMetrics], count: usize) -> Vec<&FunctionMetrics> {
+    let mut sorted_metrics: Vec<_> = metrics.iter().collect();
+    sorted_metrics.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+    sorted_metrics.into_iter().take(count).collect()
 }
 
 fn get_recommendation(func: &FunctionMetrics) -> &'static str {

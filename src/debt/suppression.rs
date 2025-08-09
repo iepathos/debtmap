@@ -222,21 +222,31 @@ pub fn parse_suppression_comments(
 }
 
 fn parse_debt_types(types_str: Option<&str>) -> Vec<DebtType> {
-    match types_str {
-        Some("*") => vec![], // Empty vector means all types
-        Some(types) => types
-            .split(',')
-            .filter_map(|t| match t.trim().to_lowercase().as_str() {
-                "todo" => Some(DebtType::Todo),
-                "fixme" => Some(DebtType::Fixme),
-                "smell" | "codesmell" => Some(DebtType::CodeSmell),
-                "duplication" | "duplicate" => Some(DebtType::Duplication),
-                "complexity" => Some(DebtType::Complexity),
-                "dependency" => Some(DebtType::Dependency),
-                _ => None,
-            })
-            .collect(),
-        None => vec![], // No types specified means all types
+    // Early return for special cases
+    let Some(types) = types_str else {
+        return vec![]; // No types specified means all types
+    };
+
+    if types == "*" {
+        return vec![]; // Empty vector means all types
+    }
+
+    // Use a static mapping for type conversion
+    types
+        .split(',')
+        .filter_map(|t| parse_single_debt_type(t.trim()))
+        .collect()
+}
+
+fn parse_single_debt_type(type_str: &str) -> Option<DebtType> {
+    match type_str.to_lowercase().as_str() {
+        "todo" => Some(DebtType::Todo),
+        "fixme" => Some(DebtType::Fixme),
+        "smell" | "codesmell" => Some(DebtType::CodeSmell),
+        "duplication" | "duplicate" => Some(DebtType::Duplication),
+        "complexity" => Some(DebtType::Complexity),
+        "dependency" => Some(DebtType::Dependency),
+        _ => None,
     }
 }
 
