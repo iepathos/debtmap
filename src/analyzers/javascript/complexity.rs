@@ -3,33 +3,32 @@ use std::path::Path;
 use tree_sitter::Node;
 
 pub fn extract_functions(node: Node, source: &str, path: &Path) -> Vec<FunctionMetrics> {
-    let mut functions = Vec::new();
-    visit_node_for_functions(node, source, path, &mut functions);
-    functions
+    collect_functions_from_node(node, source, path)
 }
 
-fn visit_node_for_functions(
-    node: Node,
-    source: &str,
-    path: &Path,
-    functions: &mut Vec<FunctionMetrics>,
-) {
-    match node.kind() {
-        "function_declaration"
-        | "function_expression"
-        | "arrow_function"
-        | "method_definition"
-        | "generator_function_declaration" => {
-            if let Some(metrics) = analyze_function(node, source, path) {
-                functions.push(metrics);
-            }
+fn collect_functions_from_node(node: Node, source: &str, path: &Path) -> Vec<FunctionMetrics> {
+    const FUNCTION_NODES: &[&str] = &[
+        "function_declaration",
+        "function_expression",
+        "arrow_function",
+        "method_definition",
+        "generator_function_declaration",
+    ];
+
+    let mut functions = Vec::new();
+
+    if FUNCTION_NODES.contains(&node.kind()) {
+        if let Some(metrics) = analyze_function(node, source, path) {
+            functions.push(metrics);
         }
-        _ => {}
     }
 
-    for child in node.children(&mut node.walk()) {
-        visit_node_for_functions(child, source, path, functions);
-    }
+    functions.extend(
+        node.children(&mut node.walk())
+            .flat_map(|child| collect_functions_from_node(child, source, path)),
+    );
+
+    functions
 }
 
 fn analyze_function(node: Node, source: &str, path: &Path) -> Option<FunctionMetrics> {
@@ -73,52 +72,54 @@ fn get_arrow_function_name(node: Node, source: &str) -> Option<String> {
 }
 
 pub fn calculate_cyclomatic_complexity(node: Node, source: &str) -> u32 {
-    let mut complexity = 1; // Base complexity
-    visit_node_for_complexity(node, source, &mut complexity);
-    complexity
+    1 + calculate_complexity_sum(node, source)
 }
 
-fn visit_node_for_complexity(node: Node, source: &str, complexity: &mut u32) {
-    *complexity += node_complexity_increment(node, source);
-
-    node.children(&mut node.walk())
-        .for_each(|child| visit_node_for_complexity(child, source, complexity));
+fn calculate_complexity_sum(node: Node, source: &str) -> u32 {
+    node_complexity_increment(node, source)
+        + node
+            .children(&mut node.walk())
+            .map(|child| calculate_complexity_sum(child, source))
+            .sum::<u32>()
 }
 
 fn node_complexity_increment(node: Node, source: &str) -> u32 {
-    match node.kind() {
-        // Control flow statements
-        "if_statement" | "ternary_expression" | "switch_case" | "case_statement"
-        | "while_statement" | "do_statement" | "for_statement" | "for_in_statement"
-        | "for_of_statement" | "catch_clause" | "optional_chain" => 1,
+    const CONTROL_FLOW_NODES: &[&str] = &[
+        "if_statement",
+        "ternary_expression",
+        "switch_case",
+        "case_statement",
+        "while_statement",
+        "do_statement",
+        "for_statement",
+        "for_in_statement",
+        "for_of_statement",
+        "catch_clause",
+        "optional_chain",
+    ];
 
-        // Logical operators create branches
-        "binary_expression" => node
-            .utf8_text(source.as_bytes())
-            .ok()
-            .filter(|text| text.contains("&&") || text.contains("||"))
-            .map(|_| 1)
-            .unwrap_or(0),
-
-        _ => 0,
+    if CONTROL_FLOW_NODES.contains(&node.kind()) {
+        1
+    } else if node.kind() == "binary_expression" {
+        is_logical_operator(node, source) as u32
+    } else {
+        0
     }
 }
 
+fn is_logical_operator(node: Node, source: &str) -> bool {
+    node.utf8_text(source.as_bytes())
+        .ok()
+        .map(|text| text.contains("&&") || text.contains("||"))
+        .unwrap_or(false)
+}
+
 pub fn calculate_cognitive_complexity(node: Node, source: &str, nesting_level: u32) -> u32 {
-    use NodeComplexityHandler as Handler;
-
-    let handler = match node.kind() {
-        "if_statement" => Handler::IfStatement,
-        "switch_statement" => Handler::SwitchStatement,
-        "while_statement" | "do_statement" | "for_statement" | "for_in_statement"
-        | "for_of_statement" => Handler::LoopStatement,
-        "catch_clause" => Handler::CatchClause,
-        "ternary_expression" => Handler::TernaryExpression,
-        "binary_expression" => Handler::BinaryExpression,
-        _ => Handler::Default,
-    };
-
-    handler.calculate_complexity(node, source, nesting_level)
+    NodeComplexityHandler::from_node_kind(node.kind()).calculate_complexity(
+        node,
+        source,
+        nesting_level,
+    )
 }
 
 enum NodeComplexityHandler {
@@ -132,34 +133,78 @@ enum NodeComplexityHandler {
 }
 
 impl NodeComplexityHandler {
+    fn from_node_kind(kind: &str) -> Self {
+        const LOOP_STATEMENTS: &[&str] = &[
+            "while_statement",
+            "do_statement",
+            "for_statement",
+            "for_in_statement",
+            "for_of_statement",
+        ];
+
+        if kind == "if_statement" {
+            Self::IfStatement
+        } else if kind == "switch_statement" {
+            Self::SwitchStatement
+        } else if LOOP_STATEMENTS.contains(&kind) {
+            Self::LoopStatement
+        } else if kind == "catch_clause" {
+            Self::CatchClause
+        } else if kind == "ternary_expression" {
+            Self::TernaryExpression
+        } else if kind == "binary_expression" {
+            Self::BinaryExpression
+        } else {
+            Self::Default
+        }
+    }
+
     fn calculate_complexity(self, node: Node, source: &str, nesting_level: u32) -> u32 {
+        let (base, nesting_inc, _include_else) = self.get_complexity_params();
+
         match self {
             Self::IfStatement => {
-                self.structural_complexity(node, source, nesting_level, 1)
+                base + nesting_level
+                    + self.sum_child_complexity(node, source, nesting_level + nesting_inc)
                     + self.count_else_clauses(node)
             }
-            Self::SwitchStatement => self.structural_complexity(node, source, nesting_level, 0),
-            Self::LoopStatement => self.structural_complexity(node, source, nesting_level, 1),
-            Self::CatchClause => self.structural_complexity(node, source, nesting_level, 0),
             Self::TernaryExpression => {
-                1 + nesting_level + self.sum_child_complexity(node, source, nesting_level)
+                base + nesting_level + self.sum_child_complexity(node, source, nesting_level)
             }
             Self::BinaryExpression => {
                 self.logical_operator_complexity(node, source)
                     + self.sum_child_complexity(node, source, nesting_level)
             }
             Self::Default => self.sum_child_complexity(node, source, nesting_level),
+            _ => {
+                base + nesting_level
+                    + self.sum_child_complexity(node, source, nesting_level + nesting_inc)
+            }
         }
     }
 
-    fn structural_complexity(
-        &self,
-        node: Node,
-        source: &str,
-        nesting_level: u32,
-        base_increment: u32,
-    ) -> u32 {
-        base_increment + nesting_level + self.sum_child_complexity(node, source, nesting_level + 1)
+    fn get_complexity_params(&self) -> (u32, u32, bool) {
+        use NodeComplexityHandler::*;
+        const PARAMS: [(u32, u32, bool); 7] = [
+            (1, 1, true),  // IfStatement
+            (0, 1, false), // SwitchStatement
+            (1, 1, false), // LoopStatement
+            (0, 1, false), // CatchClause
+            (1, 0, false), // TernaryExpression
+            (0, 0, false), // BinaryExpression
+            (0, 0, false), // Default
+        ];
+
+        let index = match self {
+            IfStatement => 0,
+            SwitchStatement => 1,
+            LoopStatement => 2,
+            CatchClause => 3,
+            TernaryExpression => 4,
+            BinaryExpression => 5,
+            Default => 6,
+        };
+        PARAMS[index]
     }
 
     fn sum_child_complexity(&self, node: Node, source: &str, nesting_level: u32) -> u32 {
@@ -175,11 +220,7 @@ impl NodeComplexityHandler {
     }
 
     fn logical_operator_complexity(&self, node: Node, source: &str) -> u32 {
-        node.utf8_text(source.as_bytes())
-            .ok()
-            .filter(|text| text.contains("&&") || text.contains("||"))
-            .map(|_| 1)
-            .unwrap_or(0)
+        is_logical_operator(node, source) as u32
     }
 }
 
