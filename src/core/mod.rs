@@ -93,14 +93,15 @@ pub enum DebtType {
 
 impl std::fmt::Display for DebtType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DebtType::Todo => write!(f, "TODO"),
-            DebtType::Fixme => write!(f, "FIXME"),
-            DebtType::CodeSmell => write!(f, "Code Smell"),
-            DebtType::Duplication => write!(f, "Duplication"),
-            DebtType::Complexity => write!(f, "Complexity"),
-            DebtType::Dependency => write!(f, "Dependency"),
-        }
+        let display_str = match self {
+            DebtType::Todo => "TODO",
+            DebtType::Fixme => "FIXME",
+            DebtType::CodeSmell => "Code Smell",
+            DebtType::Duplication => "Duplication",
+            DebtType::Complexity => "Complexity",
+            DebtType::Dependency => "Dependency",
+        };
+        write!(f, "{display_str}")
     }
 }
 
@@ -114,12 +115,13 @@ pub enum Priority {
 
 impl std::fmt::Display for Priority {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Priority::Low => write!(f, "Low"),
-            Priority::Medium => write!(f, "Medium"),
-            Priority::High => write!(f, "High"),
-            Priority::Critical => write!(f, "Critical"),
-        }
+        let display_str = match self {
+            Priority::Low => "Low",
+            Priority::Medium => "Medium",
+            Priority::High => "High",
+            Priority::Critical => "Critical",
+        };
+        write!(f, "{display_str}")
     }
 }
 
@@ -206,12 +208,13 @@ impl Language {
 
 impl std::fmt::Display for Language {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Language::Rust => write!(f, "Rust"),
-            Language::Python => write!(f, "Python"),
-            Language::JavaScript => write!(f, "JavaScript"),
-            Language::TypeScript => write!(f, "TypeScript"),
-            Language::Unknown => write!(f, "Unknown"),
-        }
+        let display_str = match self {
+            Language::Rust => "Rust",
+            Language::Python => "Python",
+            Language::JavaScript => "JavaScript",
+            Language::TypeScript => "TypeScript",
+            Language::Unknown => "Unknown",
+        };
+        write!(f, "{display_str}")
     }
 }
