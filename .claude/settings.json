@@ -1,0 +1,89 @@
+{
+    "hooks": {
+      "Notification": [
+        {
+          "matcher": "",
+          "hooks": [
+            {
+              "type": "command",
+              "command": ".claude/hooks/notification awaiting_input"
+            }
+          ]
+        }
+      ]
+    },
+    "permissions": {
+      "allow": [
+        "Bash(cargo build:*)",
+        "Bash(cargo test:*)",
+        "Bash(cargo run:*)",
+        "Bash(cargo check:*)",
+        "Bash(cargo clippy:*)",
+        "Bash(cargo fmt:*)",
+        "Bash(cargo doc:*)",
+        "Bash(cargo clean:*)",
+        "Bash(cargo update:*)",
+        "Bash(cargo install:*)",
+        "Bash(cargo bench:*)",
+        "Bash(cargo tarpaulin:*)",
+        "Bash(rustc:*)",
+        "Bash(rustfmt:*)",
+        "Bash(rm:*)",
+        "Bash(curl:*)",
+        "Bash(kill:*)",
+        "Bash(ls:*)",
+        "Bash(mkdir:*)",
+        "Bash(rg:*)",
+        "Bash(grep:*)",
+        "Bash(git checkout:*)",
+        "Bash(cp:*)",
+        "mcp__ide__getDiagnostics",
+        "Bash(find:*)",
+        "Bash(git worktree:*)",
+        "Bash(git branch:*)",
+        "Bash(mv:*)",
+        "Bash(git add:*)",
+        "Bash(git status:*)",
+        "Bash(git diff:*)",
+        "Bash(git log:*)",
+        "Bash(git push:*)",
+        "Bash(git pull:*)",
+        "Bash(make:*)",
+        "Bash(ps:*)",
+        "Bash(cat:*)",
+        "Bash(head:*)",
+        "Bash(tail:*)",
+        "Bash(echo:*)",
+        "Bash(pwd:*)",
+        "Bash(which:*)",
+        "Bash(wc:*)",
+        "Bash(sort:*)",
+        "Bash(uniq:*)",
+        "*",
+        "WebFetch(domain:docs.anthropic.com)",
+        "WebFetch(domain:docs.rs)",
+        "WebFetch(domain:crates.io)",
+        "WebFetch(domain:rust-lang.org)",
+        "WebFetch(domain:github.com)",
+        "Bash(timeout:*)",
+        "Bash(git commit:*)",
+        "Bash(cargo add:*)",
+        "Bash(cargo remove:*)",
+        "Bash(cargo tree:*)",
+        "Bash(just:*)",
+        "Bash(sed:*)",
+        "Bash(test:*)",
+        "Bash(xargs:*)",
+        "Bash(/dev/null)",
+        "Bash(touch:*)",
+        "Bash(time:*)",
+        "Bash(jq:*)",
+        "Bash(cargo deny check:*)",
+        "WebFetch(domain:rust-lang.github.io)",
+        "Bash(cargo expand:*)",
+        "Bash(RUST_BACKTRACE=1 cargo:*)",
+        "Bash(RUST_LOG=info cargo:*)"
+      ],
+      "deny": []
+    }
+  }

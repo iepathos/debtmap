@@ -1,0 +1,90 @@
+.metadata/
+
+# Rust build artifacts
+/target/
+/Cargo.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files
+*.bak
+*.backup
+
+# Archive files
+*.tar.gz
+*.zip
+*.rar
+
+# Documentation build artifacts
+docs/_build/
+docs/build/
+book/
+
+# Test artifacts
+*.profraw
+*.profdata
+test_workspaces_*/
+
+# Benchmarking
+criterion/
+
+# Coverage reports
+tarpaulin-report.html
+lcov.info
+coverage/
+
+# Rust-specific
+**/*.rs.bk
+*.pdb
+
+# Flamegraph outputs
+flamegraph.svg
+perf.data*
+
+# Node modules (for web frontends)
+node_modules/
+
+# Python virtual environments (for tooling)
+venv/
+env/
+.venv/
+.env/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Local development files
+local/
+dev/
+
+# MMM session state files
+.mmm/session_state.json
+.mmm/state.json.corrupted.*

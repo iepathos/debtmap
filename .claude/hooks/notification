@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Claude Code Notification Hook for macOS
+# This script provides text-to-speech notifications for Claude Code events
+
+# Configuration
+# Array of interesting voices to randomly choose from
+VOICES=(
+    "Zarvox"      # Alien robot
+    "Whisper"     # Whispering
+    #"Bad News"    # Deep dramatic
+    #"Good News"   # Upbeat cheerful
+    #"Jester"      # Playful silly
+    "Superstar"   # Theatrical
+    "Ralph"       # Silly character
+    "Junior"      # Young kid
+    "Fred"        # Character voice
+    #"Albert"      # Character voice
+    "Grandpa"     # Grandpa voice
+    "Grandma"     # Grandma voice
+    "Rocko"       # Rock-and-roll
+    "Sandy"       # Beach personality
+)
+
+# Array of funny messages to randomly choose from
+MESSAGES=(
+    # Tool-related messages
+    # "Hold onto your terminals, I'm going full hacker mode!"
+    "Time to read some spicy code. Yum yum!"
+    "Watch me work my magic fingers on this code!"
+    "Beep boop, creating digital masterpieces!"
+    # "Grep grep hooray! I'm hunting for treasure!"
+    "Spawning my minion agents! Mwahahaha!"
+    "Making a list and checking it twice!"
+    # "Activating super secret tools. Very mysterious!"
+    "Boom! Command executed like a boss!"
+    "My eyes! The code was too beautiful!"
+    "And that's how you refactor with style!"
+    # "File written! It's alive! IT'S ALIVE!"
+    "Found it! I'm basically a code detective now."
+    "My minions have returned victorious!"
+    # General attention messages
+    # "Hey! Hey you! I need your human wisdom over here!"
+    "Ta-da! Another masterpiece completed! You're welcome!"
+    "Oopsie daisy! Something went kaboom! But I can fix it!"
+    "Brain blast activated! Neurons firing at maximum capacity!"
+    "Eureka! My genius brain has solved everything!"
+    "Planning complete! Time to build something amazing!"
+    "Something magical is happening! Very exciting!"
+    # "Excuse me human! I need your attention for a second!"
+    "Hello? Are you still there? I'm getting lonely!"
+    "I need your eyeballs on the screen please!"
+    # "Attention human: Important AI business happening!"
+    "Knock knock! Who's there? It's me, Claude!"
+    "Permission slip time! I need your signature!"
+    "Red alert! Just kidding, but I do need you!"
+)
+
+RATE="180"        # Speaking rate (words per minute)
+
+# Function to speak notification with random voice and message
+speak_notification() {
+    local message="${1:-}"
+    # If no message provided, use random one from array
+    if [ -z "$message" ]; then
+        message="${MESSAGES[$RANDOM % ${#MESSAGES[@]}]}"
+    fi
+    # Get random voice from array
+    local random_voice="${VOICES[$RANDOM % ${#VOICES[@]}]}"
+    # echo "$random_voice"
+    say -v "$random_voice" -r "$RATE" "$message" &
+}
+
+# Any notification triggers random voice + random message
+speak_notification
+
+# Exit successfully
+exit 0
