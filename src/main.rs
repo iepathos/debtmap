@@ -295,15 +295,22 @@ fn parse_languages(languages: Option<Vec<String>>) -> Vec<Language> {
 }
 
 fn parse_single_language(lang_str: &str) -> Option<Language> {
-    match lang_str {
-        "rust" => Some(Language::Rust),
-        "python" => Some(Language::Python),
+    match lang_str.to_lowercase().as_str() {
+        "rust" | "rs" => Some(Language::Rust),
+        "python" | "py" => Some(Language::Python),
+        "javascript" | "js" => Some(Language::JavaScript),
+        "typescript" | "ts" => Some(Language::TypeScript),
         _ => None,
     }
 }
 
 fn default_languages() -> Vec<Language> {
-    vec![Language::Rust, Language::Python]
+    vec![
+        Language::Rust,
+        Language::Python,
+        Language::JavaScript,
+        Language::TypeScript,
+    ]
 }
 
 fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {

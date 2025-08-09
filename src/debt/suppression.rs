@@ -128,6 +128,8 @@ pub fn parse_suppression_comments(
     let comment_prefix = match language {
         Language::Python => "#",
         Language::Rust => "//",
+        Language::JavaScript => "//",
+        Language::TypeScript => "//",
         _ => "//",
     };
 
