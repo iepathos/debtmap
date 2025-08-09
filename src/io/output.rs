@@ -1,5 +1,6 @@
 use crate::core::{AnalysisResults, FunctionMetrics, Priority};
 use crate::debt::total_debt_score;
+use crate::risk::RiskInsight;
 use colored::*;
 use serde_json;
 use std::io::Write;
@@ -13,6 +14,7 @@ pub enum OutputFormat {
 
 pub trait OutputWriter {
     fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()>;
+    fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()>;
 }
 
 pub struct JsonWriter<W: Write> {
@@ -28,6 +30,12 @@ impl<W: Write> JsonWriter<W> {
 impl<W: Write> OutputWriter for JsonWriter<W> {
     fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
         let json = serde_json::to_string_pretty(results)?;
+        self.writer.write_all(json.as_bytes())?;
+        Ok(())
+    }
+
+    fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
+        let json = serde_json::to_string_pretty(insights)?;
         self.writer.write_all(json.as_bytes())?;
         Ok(())
     }
@@ -54,6 +62,58 @@ impl<W: Write> OutputWriter for MarkdownWriter<W> {
         ];
 
         writers.iter().try_for_each(|writer| writer(self, results))
+    }
+
+    fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
+        writeln!(self.writer, "## Risk Analysis")?;
+        writeln!(self.writer)?;
+
+        // Write risk summary
+        writeln!(self.writer, "### Risk Summary")?;
+        writeln!(
+            self.writer,
+            "- Codebase Risk Score: {:.1}",
+            insights.codebase_risk_score
+        )?;
+        if let Some(correlation) = insights.complexity_coverage_correlation {
+            writeln!(
+                self.writer,
+                "- Complexity-Coverage Correlation: {:.2}",
+                correlation
+            )?;
+        }
+        writeln!(self.writer)?;
+
+        // Write risk distribution
+        writeln!(self.writer, "### Risk Distribution")?;
+        writeln!(
+            self.writer,
+            "- Critical: {}",
+            insights.risk_distribution.critical_count
+        )?;
+        writeln!(
+            self.writer,
+            "- High: {}",
+            insights.risk_distribution.high_count
+        )?;
+        writeln!(
+            self.writer,
+            "- Medium: {}",
+            insights.risk_distribution.medium_count
+        )?;
+        writeln!(
+            self.writer,
+            "- Low: {}",
+            insights.risk_distribution.low_count
+        )?;
+        writeln!(
+            self.writer,
+            "- Well Tested: {}",
+            insights.risk_distribution.well_tested_count
+        )?;
+        writeln!(self.writer)?;
+
+        Ok(())
     }
 }
 
@@ -222,6 +282,92 @@ impl OutputWriter for TerminalWriter {
         ];
 
         printers.iter().for_each(|printer| printer(results));
+        Ok(())
+    }
+
+    fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
+        use crate::risk::insights::{
+            format_actionable_insights, format_critical_risks, format_recommendations,
+            format_risk_matrix_terminal,
+        };
+
+        // Print risk header
+        println!();
+        println!("{}", "📊 Risk Analysis".bold().cyan());
+        println!("{}", "================".cyan());
+        println!();
+
+        // Print risk summary
+        println!("📈 Analysis Summary");
+        println!("──────────────────");
+        println!(
+            "Codebase Risk Score: {:.1} ({})",
+            insights.codebase_risk_score,
+            if insights.codebase_risk_score < 30.0 {
+                "LOW".green()
+            } else if insights.codebase_risk_score < 60.0 {
+                "MEDIUM".yellow()
+            } else {
+                "HIGH".red()
+            }
+        );
+
+        if let Some(correlation) = insights.complexity_coverage_correlation {
+            println!("Complexity-Coverage Correlation: {:.2}", correlation);
+        }
+        println!();
+
+        // Print risk distribution
+        println!("Risk Distribution:");
+        println!(
+            "  Critical: {} functions",
+            insights.risk_distribution.critical_count.to_string().red()
+        );
+        println!(
+            "  High: {} functions",
+            insights.risk_distribution.high_count.to_string().yellow()
+        );
+        println!(
+            "  Medium: {} functions",
+            insights.risk_distribution.medium_count
+        );
+        println!(
+            "  Low: {} functions",
+            insights.risk_distribution.low_count.to_string().green()
+        );
+        println!(
+            "  Well Tested: {} functions",
+            insights
+                .risk_distribution
+                .well_tested_count
+                .to_string()
+                .cyan()
+        );
+        println!();
+
+        // Print critical risks
+        let critical_risks_output = format_critical_risks(&insights.top_risks);
+        if !critical_risks_output.is_empty() {
+            print!("{}", critical_risks_output);
+        }
+
+        // Print recommendations
+        let recommendations_output = format_recommendations(&insights.risk_reduction_opportunities);
+        if !recommendations_output.is_empty() {
+            print!("{}", recommendations_output);
+        }
+
+        // Print risk matrix
+        if insights.complexity_coverage_correlation.is_some() {
+            print!("{}", format_risk_matrix_terminal());
+        }
+
+        // Print actionable insights
+        let insights_output = format_actionable_insights(insights);
+        if !insights_output.is_empty() {
+            print!("{}", insights_output);
+        }
+
         Ok(())
     }
 }

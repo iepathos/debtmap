@@ -187,10 +187,18 @@ impl Analyzer for JavaScriptAnalyzer {
                 let debt_items =
                     self.create_debt_items(&js_ast.tree, &js_ast.source, &js_ast.path, &functions);
 
+                let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
+                    (cyc + f.cyclomatic, cog + f.cognitive)
+                });
+
                 FileMetrics {
                     path: js_ast.path.clone(),
                     language: Language::JavaScript,
-                    complexity: ComplexityMetrics { functions },
+                    complexity: ComplexityMetrics {
+                        functions,
+                        cyclomatic_complexity: cyclomatic,
+                        cognitive_complexity: cognitive,
+                    },
                     debt_items,
                     dependencies,
                     duplications: vec![],
@@ -204,10 +212,18 @@ impl Analyzer for JavaScriptAnalyzer {
                 let debt_items =
                     self.create_debt_items(&ts_ast.tree, &ts_ast.source, &ts_ast.path, &functions);
 
+                let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
+                    (cyc + f.cyclomatic, cog + f.cognitive)
+                });
+
                 FileMetrics {
                     path: ts_ast.path.clone(),
                     language: Language::TypeScript,
-                    complexity: ComplexityMetrics { functions },
+                    complexity: ComplexityMetrics {
+                        functions,
+                        cyclomatic_complexity: cyclomatic,
+                        cognitive_complexity: cognitive,
+                    },
                     debt_items,
                     dependencies,
                     duplications: vec![],
@@ -216,7 +232,7 @@ impl Analyzer for JavaScriptAnalyzer {
             _ => FileMetrics {
                 path: PathBuf::new(),
                 language: self.language,
-                complexity: ComplexityMetrics { functions: vec![] },
+                complexity: ComplexityMetrics::default(),
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],

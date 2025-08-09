@@ -184,6 +184,28 @@ pub struct FileMetrics {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ComplexityMetrics {
     pub functions: Vec<FunctionMetrics>,
+    pub cyclomatic_complexity: u32,
+    pub cognitive_complexity: u32,
+}
+
+impl Default for ComplexityMetrics {
+    fn default() -> Self {
+        Self {
+            functions: Vec::new(),
+            cyclomatic_complexity: 0,
+            cognitive_complexity: 0,
+        }
+    }
+}
+
+impl ComplexityMetrics {
+    pub fn from_function(func: &FunctionMetrics) -> Self {
+        Self {
+            functions: vec![func.clone()],
+            cyclomatic_complexity: func.cyclomatic,
+            cognitive_complexity: func.cognitive,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
