@@ -87,7 +87,8 @@ fn create_python_debt_items(
     source_content: &str,
 ) -> Vec<DebtItem> {
     // Parse suppression comments
-    let suppression_context = parse_suppression_comments(source_content, Language::Python, &path.to_path_buf());
+    let suppression_context =
+        parse_suppression_comments(source_content, Language::Python, &path.to_path_buf());
 
     let complexity_items = extract_debt_items(module, path, threshold, functions);
     let todo_items =

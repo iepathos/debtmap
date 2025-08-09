@@ -43,6 +43,17 @@ impl<W: Write> MarkdownWriter<W> {
 
 impl<W: Write> OutputWriter for MarkdownWriter<W> {
     fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
+        self.write_header(results)?;
+        self.write_summary(results)?;
+        self.write_complexity_analysis(results)?;
+        self.write_technical_debt(results)?;
+        self.write_recommendations()?;
+        Ok(())
+    }
+}
+
+impl<W: Write> MarkdownWriter<W> {
+    fn write_header(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
         writeln!(self.writer, "# Debtmap Analysis Report")?;
         writeln!(self.writer)?;
         writeln!(
@@ -52,109 +63,126 @@ impl<W: Write> OutputWriter for MarkdownWriter<W> {
         )?;
         writeln!(self.writer, "Version: 0.1.0")?;
         writeln!(self.writer)?;
+        Ok(())
+    }
 
+    fn write_summary(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
         writeln!(self.writer, "## Executive Summary")?;
         writeln!(self.writer)?;
         writeln!(self.writer, "| Metric | Value | Status |")?;
         writeln!(self.writer, "|--------|-------|--------|")?;
-        writeln!(
-            self.writer,
-            "| Files Analyzed | {} | - |",
-            results.complexity.metrics.len()
+
+        self.write_summary_row(
+            "Files Analyzed",
+            &results.complexity.metrics.len().to_string(),
+            "-",
         )?;
-        writeln!(
-            self.writer,
-            "| Total Functions | {} | - |",
-            results.complexity.summary.total_functions
+        self.write_summary_row(
+            "Total Functions",
+            &results.complexity.summary.total_functions.to_string(),
+            "-",
         )?;
-        writeln!(
-            self.writer,
-            "| Average Complexity | {:.1} | {} |",
-            results.complexity.summary.average_complexity,
-            complexity_status(results.complexity.summary.average_complexity)
+        self.write_summary_row(
+            "Average Complexity",
+            &format!("{:.1}", results.complexity.summary.average_complexity),
+            complexity_status(results.complexity.summary.average_complexity),
         )?;
-        writeln!(
-            self.writer,
-            "| High Complexity Functions | {} | {} |",
-            results.complexity.summary.high_complexity_count,
+        self.write_summary_row(
+            "High Complexity Functions",
+            &results.complexity.summary.high_complexity_count.to_string(),
             if results.complexity.summary.high_complexity_count > 10 {
                 "⚠️ Warning"
             } else {
                 "✅ Good"
-            }
+            },
+        )?;
+        self.write_summary_row(
+            "Technical Debt Items",
+            &results.technical_debt.items.len().to_string(),
+            debt_status(results.technical_debt.items.len()),
+        )?;
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_summary_row(&mut self, metric: &str, value: &str, status: &str) -> anyhow::Result<()> {
+        writeln!(self.writer, "| {} | {} | {} |", metric, value, status)?;
+        Ok(())
+    }
+
+    fn write_complexity_analysis(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
+        if results.complexity.metrics.is_empty() {
+            return Ok(());
+        }
+
+        writeln!(self.writer, "## Complexity Analysis")?;
+        writeln!(self.writer)?;
+        writeln!(self.writer, "### Hotspots Requiring Attention")?;
+        writeln!(self.writer)?;
+        writeln!(
+            self.writer,
+            "| File:Line | Function | Cyclomatic | Cognitive | Recommendation |"
         )?;
         writeln!(
             self.writer,
-            "| Technical Debt Items | {} | {} |",
-            results.technical_debt.items.len(),
-            debt_status(results.technical_debt.items.len())
+            "|-----------|----------|------------|-----------|----------------|"
         )?;
+
+        let mut top_complex: Vec<_> = results.complexity.metrics.iter().collect();
+        top_complex.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+
+        for func in top_complex.iter().take(5) {
+            writeln!(
+                self.writer,
+                "| {}:{} | {} | {} | {} | {} |",
+                func.file.display(),
+                func.line,
+                func.name,
+                func.cyclomatic,
+                func.cognitive,
+                get_recommendation(func)
+            )?;
+        }
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_technical_debt(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
+        if results.technical_debt.items.is_empty() {
+            return Ok(());
+        }
+
+        writeln!(self.writer, "## Technical Debt")?;
         writeln!(self.writer)?;
 
-        if !results.complexity.metrics.is_empty() {
-            writeln!(self.writer, "## Complexity Analysis")?;
-            writeln!(self.writer)?;
-            writeln!(self.writer, "### Hotspots Requiring Attention")?;
-            writeln!(self.writer)?;
+        let high_priority: Vec<_> = results
+            .technical_debt
+            .items
+            .iter()
+            .filter(|item| matches!(item.priority, Priority::High | Priority::Critical))
+            .collect();
+
+        if !high_priority.is_empty() {
             writeln!(
                 self.writer,
-                "| File:Line | Function | Cyclomatic | Cognitive | Recommendation |"
+                "### High Priority ({} items)",
+                high_priority.len()
             )?;
-            writeln!(
-                self.writer,
-                "|-----------|----------|------------|-----------|----------------|"
-            )?;
-
-            let mut top_complex: Vec<_> = results.complexity.metrics.iter().collect();
-            top_complex.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
-
-            for func in top_complex.iter().take(5) {
+            for item in high_priority.iter().take(10) {
                 writeln!(
                     self.writer,
-                    "| {}:{} | {} | {} | {} | {} |",
-                    func.file.display(),
-                    func.line,
-                    func.name,
-                    func.cyclomatic,
-                    func.cognitive,
-                    get_recommendation(func)
+                    "- [ ] `{}:{}` - {}",
+                    item.file.display(),
+                    item.line,
+                    item.message
                 )?;
             }
             writeln!(self.writer)?;
         }
+        Ok(())
+    }
 
-        if !results.technical_debt.items.is_empty() {
-            writeln!(self.writer, "## Technical Debt")?;
-            writeln!(self.writer)?;
-
-            let high_priority: Vec<_> = results
-                .technical_debt
-                .items
-                .iter()
-                .filter(|item| {
-                    item.priority == Priority::High || item.priority == Priority::Critical
-                })
-                .collect();
-
-            if !high_priority.is_empty() {
-                writeln!(
-                    self.writer,
-                    "### High Priority ({} items)",
-                    high_priority.len()
-                )?;
-                for item in high_priority.iter().take(10) {
-                    writeln!(
-                        self.writer,
-                        "- [ ] `{}:{}` - {}",
-                        item.file.display(),
-                        item.line,
-                        item.message
-                    )?;
-                }
-                writeln!(self.writer)?;
-            }
-        }
-
+    fn write_recommendations(&mut self) -> anyhow::Result<()> {
         writeln!(self.writer, "## Recommendations")?;
         writeln!(self.writer)?;
         writeln!(self.writer, "1. **Immediate Action**: Address high-priority debt items and refactor top complexity hotspots")?;
@@ -166,7 +194,6 @@ impl<W: Write> OutputWriter for MarkdownWriter<W> {
             self.writer,
             "3. **Long Term**: Establish complexity budget and monitor trends over time"
         )?;
-
         Ok(())
     }
 }
@@ -181,88 +208,116 @@ impl TerminalWriter {
 
 impl OutputWriter for TerminalWriter {
     fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        println!("{}", "Debtmap Analysis Report".bold().blue());
-        println!("{}", "=======================".blue());
-        println!();
-
-        println!("{} Summary:", "📊".bold());
-        println!("  Files analyzed: {}", results.complexity.metrics.len());
-        println!(
-            "  Total functions: {}",
-            results.complexity.summary.total_functions
-        );
-        println!(
-            "  Average complexity: {:.1}",
-            results.complexity.summary.average_complexity
-        );
-        println!("  Debt items: {}", results.technical_debt.items.len());
-        println!();
-
-        if results.complexity.summary.high_complexity_count > 0 {
-            println!("{} Complexity Hotspots (top 5):", "⚠️".yellow());
-
-            let mut top_complex: Vec<_> = results.complexity.metrics.iter().collect();
-            top_complex.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
-
-            for (i, func) in top_complex.iter().take(5).enumerate() {
-                println!(
-                    "  {}. {}:{} {}() - Cyclomatic: {}, Cognitive: {}",
-                    i + 1,
-                    func.file.display(),
-                    func.line,
-                    func.name.yellow(),
-                    func.cyclomatic.to_string().red(),
-                    func.cognitive.to_string().red()
-                );
-            }
-            println!();
-        }
-
-        let high_priority: Vec<_> = results
-            .technical_debt
-            .items
-            .iter()
-            .filter(|item| item.priority == Priority::High || item.priority == Priority::Critical)
-            .collect();
-
-        if !high_priority.is_empty() {
-            println!(
-                "{} Technical Debt ({} items):",
-                "🔧".bold(),
-                results.technical_debt.items.len()
-            );
-            println!("  {} ({}):", "High Priority".red(), high_priority.len());
-
-            for item in high_priority.iter().take(5) {
-                println!(
-                    "    - {}:{} - {}",
-                    item.file.display(),
-                    item.line,
-                    item.message
-                );
-            }
-            println!();
-        }
-
-        let pass = results.complexity.summary.average_complexity < 10.0
-            && results.complexity.summary.high_complexity_count < 10;
-
-        if pass {
-            println!(
-                "{} Pass/Fail: {} (all metrics within thresholds)",
-                "✓".green(),
-                "PASS".green().bold()
-            );
-        } else {
-            println!(
-                "{} Pass/Fail: {} (some metrics exceed thresholds)",
-                "✗".red(),
-                "FAIL".red().bold()
-            );
-        }
-
+        print_header();
+        print_summary(results);
+        print_complexity_hotspots(results);
+        print_technical_debt(results);
+        print_pass_fail_status(results);
         Ok(())
     }
+}
+
+fn print_header() {
+    println!("{}", "Debtmap Analysis Report".bold().blue());
+    println!("{}", "=======================".blue());
+    println!();
+}
+
+fn print_summary(results: &AnalysisResults) {
+    println!("{} Summary:", "📊".bold());
+    println!("  Files analyzed: {}", results.complexity.metrics.len());
+    println!(
+        "  Total functions: {}",
+        results.complexity.summary.total_functions
+    );
+    println!(
+        "  Average complexity: {:.1}",
+        results.complexity.summary.average_complexity
+    );
+    println!("  Debt items: {}", results.technical_debt.items.len());
+    println!();
+}
+
+fn print_complexity_hotspots(results: &AnalysisResults) {
+    if results.complexity.summary.high_complexity_count == 0 {
+        return;
+    }
+
+    println!("{} Complexity Hotspots (top 5):", "⚠️".yellow());
+
+    let mut top_complex: Vec<_> = results.complexity.metrics.iter().collect();
+    top_complex.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
+
+    top_complex
+        .iter()
+        .take(5)
+        .enumerate()
+        .for_each(|(i, func)| {
+            println!(
+                "  {}. {}:{} {}() - Cyclomatic: {}, Cognitive: {}",
+                i + 1,
+                func.file.display(),
+                func.line,
+                func.name.yellow(),
+                func.cyclomatic.to_string().red(),
+                func.cognitive.to_string().red()
+            );
+        });
+    println!();
+}
+
+fn print_technical_debt(results: &AnalysisResults) {
+    let high_priority: Vec<_> = results
+        .technical_debt
+        .items
+        .iter()
+        .filter(|item| matches!(item.priority, Priority::High | Priority::Critical))
+        .collect();
+
+    if high_priority.is_empty() {
+        return;
+    }
+
+    println!(
+        "{} Technical Debt ({} items):",
+        "🔧".bold(),
+        results.technical_debt.items.len()
+    );
+    println!("  {} ({}):", "High Priority".red(), high_priority.len());
+
+    high_priority.iter().take(5).for_each(|item| {
+        println!(
+            "    - {}:{} - {}",
+            item.file.display(),
+            item.line,
+            item.message
+        );
+    });
+    println!();
+}
+
+fn print_pass_fail_status(results: &AnalysisResults) {
+    let pass = is_passing(results);
+    let (symbol, status, message) = if pass {
+        (
+            "✓".green(),
+            "PASS".green().bold(),
+            "all metrics within thresholds",
+        )
+    } else {
+        (
+            "✗".red(),
+            "FAIL".red().bold(),
+            "some metrics exceed thresholds",
+        )
+    };
+
+    println!("{symbol} Pass/Fail: {status} ({message})");
+}
+
+fn is_passing(results: &AnalysisResults) -> bool {
+    results.complexity.summary.average_complexity < 10.0
+        && results.complexity.summary.high_complexity_count < 10
 }
 
 fn complexity_status(avg: f64) -> &'static str {
