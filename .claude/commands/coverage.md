@@ -68,11 +68,21 @@ Focus on testing the most critical functionality first. Aim to add meaningful te
 
 IMPORTANT: Do NOT run coverage yourself - the script will handle that after you're done.
 
-IMPORTANT: When making ANY commits, do NOT include attribution text like "🤖 Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages. Keep commits clean and focused on the actual changes.
+IMPORTANT: Do NOT commit any changes - the script will handle committing after verifying coverage improvements.
+
+IMPORTANT: You MUST actually write the test code to files. Do not just analyze - implement the tests.
 
 EOF
 
 echo "✅ Test implementation complete!"
+
+# Check if any changes were made
+if [ -z "$(git status --porcelain)" ]; then
+    echo "❌ No changes were made. Claude may not have written any test files."
+    echo "   Please check that the target file has testable code."
+    exit 1
+fi
+
 echo "🧪 Running tests to ensure everything passes..."
 cargo test
 
