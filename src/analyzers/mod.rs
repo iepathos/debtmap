@@ -125,7 +125,9 @@ mod tests {
     #[test]
     fn test_null_analyzer_parse() {
         let analyzer = NullAnalyzer;
-        let result = analyzer.parse("test content", PathBuf::from("test.txt")).unwrap();
+        let result = analyzer
+            .parse("test content", PathBuf::from("test.txt"))
+            .unwrap();
         assert!(matches!(result, Ast::Unknown));
     }
 
@@ -159,23 +161,17 @@ mod tests {
 
     #[test]
     fn test_compose_analyzers() {
-        let parsers: Vec<Parser> = vec![
-            Box::new(|_| Ok(Ast::Unknown)),
-        ];
-        let transformers: Vec<Transformer> = vec![
-            Box::new(|ast| ast),
-        ];
-        let calculators: Vec<Calculator> = vec![
-            Box::new(|_| FileMetrics {
-                path: PathBuf::from("test.rs"),
-                language: crate::core::Language::Rust,
-                complexity: crate::core::ComplexityMetrics { functions: vec![] },
-                debt_items: vec![],
-                dependencies: vec![],
-                duplications: vec![],
-            }),
-        ];
-        
+        let parsers: Vec<Parser> = vec![Box::new(|_| Ok(Ast::Unknown))];
+        let transformers: Vec<Transformer> = vec![Box::new(|ast| ast)];
+        let calculators: Vec<Calculator> = vec![Box::new(|_| FileMetrics {
+            path: PathBuf::from("test.rs"),
+            language: crate::core::Language::Rust,
+            complexity: crate::core::ComplexityMetrics { functions: vec![] },
+            debt_items: vec![],
+            dependencies: vec![],
+            duplications: vec![],
+        })];
+
         let analyzer = compose_analyzers(parsers, transformers, calculators);
         let result = analyzer("test content").unwrap();
         assert_eq!(result.path, PathBuf::from("test.rs"));

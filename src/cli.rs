@@ -133,3 +133,221 @@ impl From<OutputFormat> for crate::io::output::OutputFormat {
 pub fn parse_args() -> Cli {
     Cli::parse()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_priority_conversion() {
+        // Test conversion from CLI Priority to core Priority
+        assert_eq!(
+            crate::core::Priority::from(Priority::Low),
+            crate::core::Priority::Low
+        );
+        assert_eq!(
+            crate::core::Priority::from(Priority::Medium),
+            crate::core::Priority::Medium
+        );
+        assert_eq!(
+            crate::core::Priority::from(Priority::High),
+            crate::core::Priority::High
+        );
+        assert_eq!(
+            crate::core::Priority::from(Priority::Critical),
+            crate::core::Priority::Critical
+        );
+    }
+
+    #[test]
+    fn test_output_format_conversion() {
+        // Test conversion from CLI OutputFormat to io::output::OutputFormat
+        assert_eq!(
+            crate::io::output::OutputFormat::from(OutputFormat::Json),
+            crate::io::output::OutputFormat::Json
+        );
+        assert_eq!(
+            crate::io::output::OutputFormat::from(OutputFormat::Markdown),
+            crate::io::output::OutputFormat::Markdown
+        );
+        assert_eq!(
+            crate::io::output::OutputFormat::from(OutputFormat::Terminal),
+            crate::io::output::OutputFormat::Terminal
+        );
+    }
+
+    #[test]
+    fn test_cli_parsing_analyze_command() {
+        use clap::Parser;
+
+        let args = vec![
+            "debtmap",
+            "analyze",
+            "/test/path",
+            "--format",
+            "json",
+            "--threshold-complexity",
+            "15",
+            "--threshold-duplication",
+            "100",
+        ];
+
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Analyze {
+                path,
+                format,
+                threshold_complexity,
+                threshold_duplication,
+                ..
+            } => {
+                assert_eq!(path, PathBuf::from("/test/path"));
+                assert_eq!(format, OutputFormat::Json);
+                assert_eq!(threshold_complexity, 15);
+                assert_eq!(threshold_duplication, 100);
+            }
+            _ => panic!("Expected Analyze command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parsing_complexity_command() {
+        use clap::Parser;
+
+        let args = vec![
+            "debtmap",
+            "complexity",
+            "/test/path",
+            "--format",
+            "markdown",
+            "--threshold",
+            "20",
+        ];
+
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Complexity {
+                path,
+                format,
+                threshold,
+            } => {
+                assert_eq!(path, PathBuf::from("/test/path"));
+                assert_eq!(format, OutputFormat::Markdown);
+                assert_eq!(threshold, 20);
+            }
+            _ => panic!("Expected Complexity command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parsing_debt_command() {
+        use clap::Parser;
+
+        let args = vec!["debtmap", "debt", "/test/path", "--min-priority", "high"];
+
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Debt {
+                path, min_priority, ..
+            } => {
+                assert_eq!(path, PathBuf::from("/test/path"));
+                assert_eq!(min_priority, Some(Priority::High));
+            }
+            _ => panic!("Expected Debt command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parsing_deps_command() {
+        use clap::Parser;
+
+        let args = vec!["debtmap", "deps", "/test/path", "--format", "terminal"];
+
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Deps { path, format } => {
+                assert_eq!(path, PathBuf::from("/test/path"));
+                assert_eq!(format, OutputFormat::Terminal);
+            }
+            _ => panic!("Expected Deps command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parsing_init_command() {
+        use clap::Parser;
+
+        let args = vec!["debtmap", "init", "--force"];
+
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Init { force } => {
+                assert!(force);
+            }
+            _ => panic!("Expected Init command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parsing_validate_command() {
+        use clap::Parser;
+
+        let args = vec![
+            "debtmap",
+            "validate",
+            "/test/path",
+            "--config",
+            "/config/path",
+        ];
+
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Validate { path, config } => {
+                assert_eq!(path, PathBuf::from("/test/path"));
+                assert_eq!(config, Some(PathBuf::from("/config/path")));
+            }
+            _ => panic!("Expected Validate command"),
+        }
+    }
+
+    #[test]
+    fn test_priority_ordering() {
+        // Test that Priority enum ordering is correct
+        assert!(Priority::Low < Priority::Medium);
+        assert!(Priority::Medium < Priority::High);
+        assert!(Priority::High < Priority::Critical);
+    }
+
+    #[test]
+    fn test_output_format_equality() {
+        // Test OutputFormat equality
+        assert_eq!(OutputFormat::Json, OutputFormat::Json);
+        assert_ne!(OutputFormat::Json, OutputFormat::Markdown);
+        assert_ne!(OutputFormat::Terminal, OutputFormat::Json);
+    }
+
+    #[test]
+    fn test_parse_args_wrapper() {
+        // Since parse_args() calls Cli::parse() which requires actual CLI args,
+        // we'll test it indirectly through the Cli structure
+        use clap::Parser;
+
+        // Verify that the parse_args function would work with valid arguments
+        let test_args = vec!["debtmap", "analyze", "."];
+        let cli = Cli::parse_from(test_args);
+
+        // Verify the CLI was parsed correctly
+        match cli.command {
+            Commands::Analyze { .. } => {
+                // Success - the structure was created properly
+            }
+            _ => panic!("Expected Analyze command from test args"),
+        }
+    }
+}

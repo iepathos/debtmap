@@ -13,7 +13,7 @@ use core::{
 };
 use debt::circular::analyze_module_dependencies;
 use rayon::prelude::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() -> Result<()> {
     let cli = cli::parse_args();
@@ -78,7 +78,10 @@ fn analyze_project(
     let files = io::walker::find_project_files(&path, languages.clone())
         .context("Failed to find project files")?;
 
-    let file_metrics: Vec<FileMetrics> = files.par_iter().filter_map(analyze_single_file).collect();
+    let file_metrics: Vec<FileMetrics> = files
+        .par_iter()
+        .filter_map(|path| analyze_single_file(path.as_path()))
+        .collect();
 
     let all_functions: Vec<_> = file_metrics
         .iter()
@@ -266,7 +269,7 @@ fn default_languages() -> Vec<Language> {
     vec![Language::Rust, Language::Python]
 }
 
-fn analyze_single_file(file_path: &PathBuf) -> Option<FileMetrics> {
+fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {
     let content = io::read_file(file_path).ok()?;
     let ext = file_path.extension()?.to_str()?;
     let language = Language::from_extension(ext);
@@ -274,7 +277,7 @@ fn analyze_single_file(file_path: &PathBuf) -> Option<FileMetrics> {
     (language != Language::Unknown)
         .then(|| {
             let analyzer = analyzers::get_analyzer(language);
-            analyzers::analyze_file(content, file_path.clone(), analyzer.as_ref())
+            analyzers::analyze_file(content, file_path.to_path_buf(), analyzer.as_ref())
         })?
         .ok()
 }

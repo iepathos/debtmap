@@ -3,6 +3,7 @@ use colored::*;
 use serde_json;
 use std::io::Write;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum OutputFormat {
     Json,
     Markdown,

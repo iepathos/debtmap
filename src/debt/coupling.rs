@@ -1,6 +1,6 @@
 use crate::core::{Dependency, DependencyKind, ModuleDependency};
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Coupling metrics for a module
 #[derive(Debug, Clone)]
@@ -80,7 +80,7 @@ pub fn identify_coupling_issues(
 
 /// Analyze cohesion within a module (simplified version)
 pub fn analyze_module_cohesion(
-    _module_path: &PathBuf,
+    _module_path: &Path,
     functions: &[String],
     shared_data: &[String],
 ) -> f64 {
@@ -217,7 +217,7 @@ pub fn build_module_dependency_map(
     result
 }
 
-fn extract_module_name(path: &PathBuf) -> String {
+fn extract_module_name(path: &Path) -> String {
     path.file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("unknown")

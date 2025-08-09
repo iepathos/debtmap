@@ -85,7 +85,7 @@ fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
 
 fn create_debt_items(
     file: &syn::File,
-    path: &std::path::PathBuf,
+    path: &std::path::Path,
     threshold: u32,
     functions: &[FunctionMetrics],
     source_content: &str,
