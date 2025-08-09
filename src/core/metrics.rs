@@ -19,8 +19,15 @@ pub fn count_high_complexity(metrics: &[FunctionMetrics], threshold: u32) -> usi
 }
 
 pub fn combine_metrics(left: ComplexityMetrics, right: ComplexityMetrics) -> ComplexityMetrics {
+    let functions = [left.functions, right.functions].concat();
+    let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
+        (cyc + f.cyclomatic, cog + f.cognitive)
+    });
+
     ComplexityMetrics {
-        functions: [left.functions, right.functions].concat(),
+        functions,
+        cyclomatic_complexity: cyclomatic,
+        cognitive_complexity: cognitive,
     }
 }
 
@@ -28,8 +35,15 @@ pub fn filter_metrics<F>(metrics: ComplexityMetrics, predicate: F) -> Complexity
 where
     F: Fn(&FunctionMetrics) -> bool,
 {
+    let functions: Vec<_> = metrics.functions.into_iter().filter(predicate).collect();
+    let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
+        (cyc + f.cyclomatic, cog + f.cognitive)
+    });
+
     ComplexityMetrics {
-        functions: metrics.functions.into_iter().filter(predicate).collect(),
+        functions,
+        cyclomatic_complexity: cyclomatic,
+        cognitive_complexity: cognitive,
     }
 }
 

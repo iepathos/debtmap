@@ -43,10 +43,18 @@ Functional data transformations:
 - `mod.rs`: Transformation composition
 - `filters.rs`: Configurable filter predicates
 
+### Risk (`src/risk/`)
+Risk analysis and coverage correlation:
+- `mod.rs`: Risk types and analyzer
+- `lcov.rs`: LCOV coverage file parsing
+- `correlation.rs`: Complexity-coverage correlation analysis
+- `priority.rs`: ROI-based test prioritization
+- `insights.rs`: Risk insight generation and formatting
+
 ### IO (`src/io/`)
 Side-effectful operations:
 - `walker.rs`: File system traversal
-- `output.rs`: Result formatting and writing
+- `output.rs`: Result formatting and writing (includes risk insights)
 
 ## Data Flow
 ```

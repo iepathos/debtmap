@@ -5,6 +5,7 @@ pub mod complexity;
 pub mod core;
 pub mod debt;
 pub mod io;
+pub mod risk;
 pub mod transformers;
 
 // Re-export commonly used types
@@ -37,3 +38,8 @@ pub use crate::core::metrics::{
 pub use crate::io::output::{create_writer, OutputFormat, OutputWriter};
 
 pub use crate::analyzers::{analyze_file, get_analyzer, Analyzer};
+
+pub use crate::risk::{
+    insights::generate_risk_insights, lcov::parse_lcov_file, FunctionRisk, RiskAnalyzer,
+    RiskCategory, RiskInsight, TestingRecommendation,
+};

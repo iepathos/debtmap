@@ -36,6 +36,10 @@ pub enum Commands {
         /// Languages to analyze
         #[arg(long, value_delimiter = ',')]
         languages: Option<Vec<String>>,
+
+        /// Optional LCOV coverage file for risk analysis
+        #[arg(long = "coverage-file", alias = "lcov")]
+        coverage_file: Option<PathBuf>,
     },
 
     /// Initialize configuration file
