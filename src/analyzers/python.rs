@@ -193,17 +193,9 @@ fn calculate_cyclomatic_python(body: &[ast::Stmt]) -> u32 {
 
 fn count_branches_stmt(stmt: &ast::Stmt) -> u32 {
     match stmt {
-        ast::Stmt::If(_) => 1,
-        ast::Stmt::While(_) => 1,
-        ast::Stmt::For(_) => 1,
+        ast::Stmt::If(_) | ast::Stmt::While(_) | ast::Stmt::For(_) => 1,
         ast::Stmt::Try(try_stmt) => try_stmt.handlers.len() as u32,
-        ast::Stmt::With(with_stmt) => {
-            let mut count = 0;
-            for stmt in &with_stmt.body {
-                count += count_branches_stmt(stmt);
-            }
-            count
-        }
+        ast::Stmt::With(with_stmt) => with_stmt.body.iter().map(count_branches_stmt).sum(),
         _ => 0,
     }
 }
@@ -216,39 +208,20 @@ fn calculate_cognitive_python(body: &[ast::Stmt]) -> u32 {
 }
 
 fn calculate_cognitive_stmt(stmt: &ast::Stmt, nesting: &mut u32) -> u32 {
-    match stmt {
-        ast::Stmt::If(if_stmt) => {
-            let mut cognitive = 1 + *nesting;
-            *nesting += 1;
-            for s in &if_stmt.body {
-                cognitive += calculate_cognitive_stmt(s, nesting);
-            }
-            for s in &if_stmt.orelse {
-                cognitive += calculate_cognitive_stmt(s, nesting);
-            }
-            *nesting -= 1;
-            cognitive
-        }
-        ast::Stmt::While(while_stmt) => {
-            let mut cognitive = 1 + *nesting;
-            *nesting += 1;
-            for s in &while_stmt.body {
-                cognitive += calculate_cognitive_stmt(s, nesting);
-            }
-            *nesting -= 1;
-            cognitive
-        }
-        ast::Stmt::For(for_stmt) => {
-            let mut cognitive = 1 + *nesting;
-            *nesting += 1;
-            for s in &for_stmt.body {
-                cognitive += calculate_cognitive_stmt(s, nesting);
-            }
-            *nesting -= 1;
-            cognitive
-        }
-        _ => 0,
+    let bodies = extract_stmt_bodies(stmt);
+    if bodies.is_empty() {
+        return 0;
     }
+
+    let base_cognitive = 1 + *nesting;
+    *nesting += 1;
+    let body_cognitive = bodies
+        .into_iter()
+        .flatten()
+        .map(|s| calculate_cognitive_stmt(s, nesting))
+        .sum::<u32>();
+    *nesting -= 1;
+    base_cognitive + body_cognitive
 }
 
 fn calculate_nesting_python(body: &[ast::Stmt]) -> u32 {
@@ -259,32 +232,26 @@ fn calculate_nesting_python(body: &[ast::Stmt]) -> u32 {
 }
 
 fn calculate_nesting_stmt(stmt: &ast::Stmt, current_depth: u32) -> u32 {
+    let bodies = extract_stmt_bodies(stmt);
+    if bodies.is_empty() {
+        return current_depth;
+    }
+
+    let next_depth = current_depth + 1;
+    bodies
+        .into_iter()
+        .flatten()
+        .map(|s| calculate_nesting_stmt(s, next_depth))
+        .max()
+        .unwrap_or(next_depth)
+}
+
+fn extract_stmt_bodies(stmt: &ast::Stmt) -> Vec<&[ast::Stmt]> {
     match stmt {
-        ast::Stmt::If(if_stmt) => {
-            let mut max = current_depth + 1;
-            for s in &if_stmt.body {
-                max = max.max(calculate_nesting_stmt(s, current_depth + 1));
-            }
-            for s in &if_stmt.orelse {
-                max = max.max(calculate_nesting_stmt(s, current_depth + 1));
-            }
-            max
-        }
-        ast::Stmt::While(while_stmt) => {
-            let mut max = current_depth + 1;
-            for s in &while_stmt.body {
-                max = max.max(calculate_nesting_stmt(s, current_depth + 1));
-            }
-            max
-        }
-        ast::Stmt::For(for_stmt) => {
-            let mut max = current_depth + 1;
-            for s in &for_stmt.body {
-                max = max.max(calculate_nesting_stmt(s, current_depth + 1));
-            }
-            max
-        }
-        _ => current_depth,
+        ast::Stmt::If(if_stmt) => vec![&if_stmt.body[..], &if_stmt.orelse[..]],
+        ast::Stmt::While(while_stmt) => vec![&while_stmt.body[..]],
+        ast::Stmt::For(for_stmt) => vec![&for_stmt.body[..]],
+        _ => vec![],
     }
 }
 

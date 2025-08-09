@@ -46,23 +46,27 @@ pub fn group_by_file(items: Vec<DebtItem>) -> std::collections::HashMap<PathBuf,
 }
 
 pub fn calculate_debt_score(item: &DebtItem) -> u32 {
-    let priority_score = match item.priority {
+    priority_weight(&item.priority) * type_weight(&item.debt_type)
+}
+
+fn priority_weight(priority: &Priority) -> u32 {
+    match priority {
         Priority::Low => 1,
         Priority::Medium => 3,
         Priority::High => 5,
         Priority::Critical => 10,
-    };
+    }
+}
 
-    let type_score = match item.debt_type {
+fn type_weight(debt_type: &DebtType) -> u32 {
+    match debt_type {
         DebtType::Todo => 1,
         DebtType::Fixme => 2,
         DebtType::CodeSmell => 3,
         DebtType::Duplication => 4,
         DebtType::Complexity => 5,
         DebtType::Dependency => 3,
-    };
-
-    priority_score * type_score
+    }
 }
 
 pub fn total_debt_score(items: &[DebtItem]) -> u32 {
