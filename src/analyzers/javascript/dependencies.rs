@@ -9,68 +9,70 @@ pub fn extract_dependencies(node: Node, source: &str) -> Vec<Dependency> {
 
 fn visit_node_for_dependencies(node: Node, source: &str, dependencies: &mut Vec<Dependency>) {
     match node.kind() {
-        // ES6 imports
-        "import_statement" => {
-            if let Some(source_node) = node.child_by_field_name("source") {
-                if let Ok(module_name) = source_node.utf8_text(source.as_bytes()) {
-                    dependencies.push(Dependency {
-                        name: module_name
-                            .trim_matches(|c| c == '"' || c == '\'' || c == '`')
-                            .to_string(),
-                        kind: DependencyKind::Import,
-                    });
-                }
-            }
-        }
-        // CommonJS require
-        "call_expression" => {
-            if let Some(function_node) = node.child_by_field_name("function") {
-                if let Ok(func_name) = function_node.utf8_text(source.as_bytes()) {
-                    if func_name == "require" {
-                        if let Some(args_node) = node.child_by_field_name("arguments") {
-                            for child in args_node.children(&mut args_node.walk()) {
-                                if child.kind() == "string" {
-                                    if let Ok(module_name) = child.utf8_text(source.as_bytes()) {
-                                        dependencies.push(Dependency {
-                                            name: module_name
-                                                .trim_matches(|c| c == '"' || c == '\'' || c == '`')
-                                                .to_string(),
-                                            kind: DependencyKind::Import,
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // Dynamic imports
-        "import" => {
-            // Handle dynamic import() expressions
-            if let Some(parent) = node.parent() {
-                if parent.kind() == "call_expression" {
-                    if let Some(args_node) = parent.child_by_field_name("arguments") {
-                        for child in args_node.children(&mut args_node.walk()) {
-                            if child.kind() == "string" {
-                                if let Ok(module_name) = child.utf8_text(source.as_bytes()) {
-                                    dependencies.push(Dependency {
-                                        name: module_name
-                                            .trim_matches(|c| c == '"' || c == '\'' || c == '`')
-                                            .to_string(),
-                                        kind: DependencyKind::Import,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        "import_statement" => extract_import_statement(&node, source, dependencies),
+        "call_expression" => extract_call_expression(&node, source, dependencies),
+        "import" => extract_dynamic_import(&node, source, dependencies),
         _ => {}
     }
 
     for child in node.children(&mut node.walk()) {
         visit_node_for_dependencies(child, source, dependencies);
     }
+}
+
+fn extract_import_statement(node: &Node, source: &str, dependencies: &mut Vec<Dependency>) {
+    if let Some(module_name) = node
+        .child_by_field_name("source")
+        .and_then(|source_node| source_node.utf8_text(source.as_bytes()).ok())
+    {
+        dependencies.push(Dependency {
+            name: clean_module_name(module_name),
+            kind: DependencyKind::Import,
+        });
+    }
+}
+
+fn extract_call_expression(node: &Node, source: &str, dependencies: &mut Vec<Dependency>) {
+    let is_require = node
+        .child_by_field_name("function")
+        .and_then(|func| func.utf8_text(source.as_bytes()).ok())
+        .map(|name| name == "require")
+        .unwrap_or(false);
+
+    if !is_require {
+        return;
+    }
+
+    if let Some(args) = node.child_by_field_name("arguments") {
+        extract_string_arguments(&args, source, dependencies);
+    }
+}
+
+fn extract_dynamic_import(node: &Node, source: &str, dependencies: &mut Vec<Dependency>) {
+    if let Some(args) = node
+        .parent()
+        .filter(|parent| parent.kind() == "call_expression")
+        .and_then(|parent| parent.child_by_field_name("arguments"))
+    {
+        extract_string_arguments(&args, source, dependencies);
+    }
+}
+
+fn extract_string_arguments(args_node: &Node, source: &str, dependencies: &mut Vec<Dependency>) {
+    args_node
+        .children(&mut args_node.walk())
+        .filter(|child| child.kind() == "string")
+        .filter_map(|child| child.utf8_text(source.as_bytes()).ok())
+        .for_each(|module_name| {
+            dependencies.push(Dependency {
+                name: clean_module_name(module_name),
+                kind: DependencyKind::Import,
+            })
+        });
+}
+
+fn clean_module_name(module_name: &str) -> String {
+    module_name
+        .trim_matches(|c| c == '"' || c == '\'' || c == '`')
+        .to_string()
 }
