@@ -1,6 +1,7 @@
 use crate::core::{ast::Ast, FileMetrics};
 use anyhow::Result;
 
+pub mod javascript;
 pub mod python;
 pub mod rust;
 
@@ -50,6 +51,20 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
     match language {
         crate::core::Language::Rust => Box::new(rust::RustAnalyzer::new()),
         crate::core::Language::Python => Box::new(python::PythonAnalyzer::new()),
+        crate::core::Language::JavaScript => Box::new(
+            javascript::JavaScriptAnalyzer::new_javascript().unwrap_or_else(|_| {
+                eprintln!("Failed to initialize JavaScript analyzer");
+                javascript::JavaScriptAnalyzer::new_javascript()
+                    .expect("JavaScript analyzer initialization failed")
+            }),
+        ),
+        crate::core::Language::TypeScript => Box::new(
+            javascript::JavaScriptAnalyzer::new_typescript().unwrap_or_else(|_| {
+                eprintln!("Failed to initialize TypeScript analyzer");
+                javascript::JavaScriptAnalyzer::new_typescript()
+                    .expect("TypeScript analyzer initialization failed")
+            }),
+        ),
         _ => Box::new(NullAnalyzer),
     }
 }

@@ -13,7 +13,12 @@ impl FileWalker {
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
-            languages: vec![Language::Rust, Language::Python],
+            languages: vec![
+                Language::Rust,
+                Language::Python,
+                Language::JavaScript,
+                Language::TypeScript,
+            ],
             ignore_patterns: vec![],
         }
     }
@@ -74,9 +79,22 @@ impl FileWalker {
 }
 
 pub fn find_project_files(root: &Path, languages: Vec<Language>) -> Result<Vec<PathBuf>> {
-    FileWalker::new(root.to_path_buf())
-        .with_languages(languages)
-        .walk()
+    if root.is_file() {
+        // Handle single file case
+        if let Some(ext) = root.extension() {
+            let ext_str = ext.to_string_lossy();
+            let lang = Language::from_extension(&ext_str);
+            if languages.contains(&lang) || languages.is_empty() {
+                return Ok(vec![root.to_path_buf()]);
+            }
+        }
+        Ok(vec![])
+    } else {
+        // Handle directory case
+        FileWalker::new(root.to_path_buf())
+            .with_languages(languages)
+            .walk()
+    }
 }
 
 pub fn count_lines(path: &Path) -> Result<usize> {

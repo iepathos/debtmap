@@ -187,6 +187,8 @@ pub enum DependencyKind {
 pub enum Language {
     Rust,
     Python,
+    JavaScript,
+    TypeScript,
     Unknown,
 }
 
@@ -195,6 +197,8 @@ impl Language {
         match ext {
             "rs" => Language::Rust,
             "py" => Language::Python,
+            "js" | "jsx" | "mjs" | "cjs" => Language::JavaScript,
+            "ts" | "tsx" | "mts" | "cts" => Language::TypeScript,
             _ => Language::Unknown,
         }
     }
@@ -205,6 +209,8 @@ impl std::fmt::Display for Language {
         match self {
             Language::Rust => write!(f, "Rust"),
             Language::Python => write!(f, "Python"),
+            Language::JavaScript => write!(f, "JavaScript"),
+            Language::TypeScript => write!(f, "TypeScript"),
             Language::Unknown => write!(f, "Unknown"),
         }
     }

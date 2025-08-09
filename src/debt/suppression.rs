@@ -128,12 +128,14 @@ pub fn parse_suppression_comments(
     let comment_prefix = match language {
         Language::Python => "#",
         Language::Rust => "//",
+        Language::JavaScript => "//",
+        Language::TypeScript => "//",
         _ => "//",
     };
 
     // Build regex patterns
     let block_start_pattern = format!(
-        r"(?m)^\s*{}\s*debtmap:ignore-start(?:\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
+        r"(?m)^\s*{}\s*debtmap:ignore-start(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
         regex::escape(comment_prefix)
     );
     let block_end_pattern = format!(
@@ -141,11 +143,11 @@ pub fn parse_suppression_comments(
         regex::escape(comment_prefix)
     );
     let line_pattern = format!(
-        r"(?m){}\s*debtmap:ignore(?:\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
+        r"(?m){}\s*debtmap:ignore(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
         regex::escape(comment_prefix)
     );
     let next_line_pattern = format!(
-        r"(?m)^\s*{}\s*debtmap:ignore-next-line(?:\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
+        r"(?m)^\s*{}\s*debtmap:ignore-next-line(?:\s*\[([\w,*]+)\])?(?:\s*--\s*(.*))?$",
         regex::escape(comment_prefix)
     );
 
