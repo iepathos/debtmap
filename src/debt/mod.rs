@@ -59,14 +59,20 @@ fn priority_weight(priority: &Priority) -> u32 {
 }
 
 fn type_weight(debt_type: &DebtType) -> u32 {
-    match debt_type {
-        DebtType::Todo => 1,
-        DebtType::Fixme => 2,
-        DebtType::CodeSmell => 3,
-        DebtType::Duplication => 4,
-        DebtType::Complexity => 5,
-        DebtType::Dependency => 3,
-    }
+    const WEIGHTS: &[(DebtType, u32)] = &[
+        (DebtType::Todo, 1),
+        (DebtType::Fixme, 2),
+        (DebtType::CodeSmell, 3),
+        (DebtType::Duplication, 4),
+        (DebtType::Complexity, 5),
+        (DebtType::Dependency, 3),
+    ];
+
+    WEIGHTS
+        .iter()
+        .find(|(dt, _)| dt == debt_type)
+        .map(|(_, weight)| *weight)
+        .unwrap_or(1)
 }
 
 pub fn total_debt_score(items: &[DebtItem]) -> u32 {

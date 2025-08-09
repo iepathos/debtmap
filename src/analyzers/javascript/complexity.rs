@@ -126,9 +126,49 @@ struct ComplexityParams {
 }
 
 type ComplexityCalculator = fn(Node, &str, u32) -> u32;
+type ComplexityPredicate = fn(&str) -> bool;
+type ComplexityMapping = (ComplexityPredicate, ComplexityCalculator);
 
 // Pure function to get complexity calculator based on node kind
 fn get_complexity_calculator(kind: &str) -> ComplexityCalculator {
+    COMPLEXITY_CALCULATORS
+        .iter()
+        .find_map(|(pattern, calculator)| pattern(kind).then_some(*calculator))
+        .unwrap_or(calculate_default_complexity)
+}
+
+// Complexity calculator mappings using pure functions
+const COMPLEXITY_CALCULATORS: &[ComplexityMapping] = &[
+    (is_if_statement, calculate_if_complexity),
+    (is_switch_statement, calculate_switch_complexity),
+    (is_catch_clause, calculate_catch_complexity),
+    (is_ternary_expression, calculate_ternary_complexity),
+    (is_binary_expression, calculate_binary_complexity),
+    (is_loop_statement, calculate_loop_complexity),
+];
+
+// Pure predicate functions for pattern matching
+fn is_if_statement(kind: &str) -> bool {
+    kind == "if_statement"
+}
+
+fn is_switch_statement(kind: &str) -> bool {
+    kind == "switch_statement"
+}
+
+fn is_catch_clause(kind: &str) -> bool {
+    kind == "catch_clause"
+}
+
+fn is_ternary_expression(kind: &str) -> bool {
+    kind == "ternary_expression"
+}
+
+fn is_binary_expression(kind: &str) -> bool {
+    kind == "binary_expression"
+}
+
+fn is_loop_statement(kind: &str) -> bool {
     const LOOP_STATEMENTS: &[&str] = &[
         "while_statement",
         "do_statement",
@@ -136,16 +176,7 @@ fn get_complexity_calculator(kind: &str) -> ComplexityCalculator {
         "for_in_statement",
         "for_of_statement",
     ];
-
-    match kind {
-        "if_statement" => calculate_if_complexity,
-        "switch_statement" => calculate_switch_complexity,
-        "catch_clause" => calculate_catch_complexity,
-        "ternary_expression" => calculate_ternary_complexity,
-        "binary_expression" => calculate_binary_complexity,
-        _ if LOOP_STATEMENTS.contains(&kind) => calculate_loop_complexity,
-        _ => calculate_default_complexity,
-    }
+    LOOP_STATEMENTS.contains(&kind)
 }
 
 // Pure complexity calculation functions

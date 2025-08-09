@@ -10,22 +10,18 @@ struct CyclomaticVisitor {
     complexity: u32,
 }
 
+fn calculate_expr_complexity(expr: &Expr) -> u32 {
+    match expr {
+        Expr::If(_) | Expr::While(_) | Expr::ForLoop(_) | Expr::Loop(_) | Expr::Try(_) => 1,
+        Expr::Match(expr_match) => expr_match.arms.len() as u32,
+        Expr::Binary(binary) if is_logical_operator(&binary.op) => 1,
+        _ => 0,
+    }
+}
+
 impl<'ast> Visit<'ast> for CyclomaticVisitor {
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        match expr {
-            Expr::If(_) => self.complexity += 1,
-            Expr::Match(expr_match) => {
-                self.complexity += expr_match.arms.len() as u32;
-            }
-            Expr::While(_) | Expr::ForLoop(_) | Expr::Loop(_) => {
-                self.complexity += 1;
-            }
-            Expr::Binary(binary) if is_logical_operator(&binary.op) => {
-                self.complexity += 1;
-            }
-            Expr::Try(_) => self.complexity += 1,
-            _ => {}
-        }
+        self.complexity += calculate_expr_complexity(expr);
         syn::visit::visit_expr(self, expr);
     }
 

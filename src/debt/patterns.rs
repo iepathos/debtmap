@@ -49,14 +49,21 @@ pub fn find_todos_and_fixmes_with_suppression(
 }
 
 fn classify_marker(marker: &str) -> (DebtType, Priority) {
-    match marker {
-        "FIXME" | "BUG" => (DebtType::Fixme, Priority::High),
-        "TODO" => (DebtType::Todo, Priority::Medium),
-        "HACK" | "XXX" => (DebtType::CodeSmell, Priority::High),
-        "OPTIMIZE" => (DebtType::CodeSmell, Priority::Low),
-        "REFACTOR" => (DebtType::CodeSmell, Priority::Medium),
-        _ => (DebtType::Todo, Priority::Low),
-    }
+    const MARKER_CLASSIFICATIONS: &[(&str, DebtType, Priority)] = &[
+        ("FIXME", DebtType::Fixme, Priority::High),
+        ("BUG", DebtType::Fixme, Priority::High),
+        ("TODO", DebtType::Todo, Priority::Medium),
+        ("HACK", DebtType::CodeSmell, Priority::High),
+        ("XXX", DebtType::CodeSmell, Priority::High),
+        ("OPTIMIZE", DebtType::CodeSmell, Priority::Low),
+        ("REFACTOR", DebtType::CodeSmell, Priority::Medium),
+    ];
+
+    MARKER_CLASSIFICATIONS
+        .iter()
+        .find(|(m, _, _)| *m == marker)
+        .map(|(_, dt, p)| (*dt, *p))
+        .unwrap_or((DebtType::Todo, Priority::Low))
 }
 
 pub fn find_code_smells(content: &str, file: &Path) -> Vec<DebtItem> {

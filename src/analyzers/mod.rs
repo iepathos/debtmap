@@ -48,25 +48,36 @@ pub fn compose_analyzers(
 }
 
 pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
-    match language {
-        crate::core::Language::Rust => Box::new(rust::RustAnalyzer::new()),
-        crate::core::Language::Python => Box::new(python::PythonAnalyzer::new()),
-        crate::core::Language::JavaScript => Box::new(
-            javascript::JavaScriptAnalyzer::new_javascript().unwrap_or_else(|_| {
-                eprintln!("Failed to initialize JavaScript analyzer");
-                javascript::JavaScriptAnalyzer::new_javascript()
-                    .expect("JavaScript analyzer initialization failed")
-            }),
-        ),
-        crate::core::Language::TypeScript => Box::new(
-            javascript::JavaScriptAnalyzer::new_typescript().unwrap_or_else(|_| {
-                eprintln!("Failed to initialize TypeScript analyzer");
-                javascript::JavaScriptAnalyzer::new_typescript()
-                    .expect("TypeScript analyzer initialization failed")
-            }),
-        ),
-        _ => Box::new(NullAnalyzer),
-    }
+    use crate::core::Language;
+
+    type AnalyzerFactory = fn() -> Box<dyn Analyzer>;
+
+    static ANALYZER_MAP: &[(Language, AnalyzerFactory)] = &[
+        (Language::Rust, || Box::new(rust::RustAnalyzer::new())),
+        (Language::Python, || Box::new(python::PythonAnalyzer::new())),
+        (Language::JavaScript, || {
+            create_js_analyzer(javascript::JavaScriptAnalyzer::new_javascript, "JavaScript")
+        }),
+        (Language::TypeScript, || {
+            create_js_analyzer(javascript::JavaScriptAnalyzer::new_typescript, "TypeScript")
+        }),
+    ];
+
+    ANALYZER_MAP
+        .iter()
+        .find(|(lang, _)| *lang == language)
+        .map(|(_, factory)| factory())
+        .unwrap_or_else(|| Box::new(NullAnalyzer))
+}
+
+fn create_js_analyzer<F>(factory: F, lang_name: &str) -> Box<dyn Analyzer>
+where
+    F: Fn() -> Result<javascript::JavaScriptAnalyzer>,
+{
+    Box::new(factory().unwrap_or_else(|_| {
+        eprintln!("Failed to initialize {lang_name} analyzer");
+        factory().unwrap_or_else(|_| panic!("{lang_name} analyzer initialization failed"))
+    }))
 }
 
 struct NullAnalyzer;
