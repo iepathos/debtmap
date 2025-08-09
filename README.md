@@ -1,5 +1,11 @@
 # debtmap
 
+
+[![CI](https://github.com/iepathos/debtmap/actions/workflows/ci.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/ci.yml)
+[![Security](https://github.com/iepathos/debtmap/actions/workflows/security.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/security.yml)
+[![Release](https://github.com/iepathos/debtmap/actions/workflows/release.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/release.yml)
+
+
 > 🚧 **Early Prototype** - This project is under active development and APIs may change
 
 A fast, language-agnostic code complexity and technical debt analyzer written in Rust. Debtmap helps identify areas of technical debt in your codebase by analyzing complexity, duplication, and code quality patterns.
