@@ -78,8 +78,7 @@ impl<W: Write> OutputWriter for MarkdownWriter<W> {
         if let Some(correlation) = insights.complexity_coverage_correlation {
             writeln!(
                 self.writer,
-                "- Complexity-Coverage Correlation: {:.2}",
-                correlation
+                "- Complexity-Coverage Correlation: {correlation:.2}"
             )?;
         }
         writeln!(self.writer)?;
@@ -313,7 +312,7 @@ impl OutputWriter for TerminalWriter {
         );
 
         if let Some(correlation) = insights.complexity_coverage_correlation {
-            println!("Complexity-Coverage Correlation: {:.2}", correlation);
+            println!("Complexity-Coverage Correlation: {correlation:.2}");
         }
         println!();
 
@@ -348,13 +347,13 @@ impl OutputWriter for TerminalWriter {
         // Print critical risks
         let critical_risks_output = format_critical_risks(&insights.top_risks);
         if !critical_risks_output.is_empty() {
-            print!("{}", critical_risks_output);
+            print!("{critical_risks_output}");
         }
 
         // Print recommendations
         let recommendations_output = format_recommendations(&insights.risk_reduction_opportunities);
         if !recommendations_output.is_empty() {
-            print!("{}", recommendations_output);
+            print!("{recommendations_output}");
         }
 
         // Print risk matrix
@@ -365,7 +364,7 @@ impl OutputWriter for TerminalWriter {
         // Print actionable insights
         let insights_output = format_actionable_insights(insights);
         if !insights_output.is_empty() {
-            print!("{}", insights_output);
+            print!("{insights_output}");
         }
 
         Ok(())
