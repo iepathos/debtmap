@@ -169,20 +169,6 @@ fn build_technical_debt_report(
     }
 }
 
-fn output_results(
-    results: AnalysisResults,
-    format: io::output::OutputFormat,
-    output_file: Option<PathBuf>,
-) -> Result<()> {
-    let mut writer = io::output::create_writer(format);
-    writer.write_results(&results)?;
-
-    if let Some(path) = output_file {
-        io::write_file(&path, &format!("{results:?}"))?;
-    }
-
-    Ok(())
-}
 
 fn output_results_with_risk(
     results: AnalysisResults,
@@ -208,7 +194,7 @@ fn output_results_with_risk(
 fn analyze_risk_with_coverage(
     results: &AnalysisResults,
     lcov_path: &Path,
-    project_path: &Path,
+    _project_path: &Path,
 ) -> Result<Option<risk::RiskInsight>> {
     use im::Vector;
 
