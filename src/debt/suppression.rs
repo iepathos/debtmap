@@ -337,17 +337,17 @@ mod tests {
 
     #[test]
     fn test_unclosed_block_detection() {
-        // debtmap:ignore-start -- Test fixture data
-        let content = r#"
-// debtmap:ignore-start
-// TODO: In unclosed block
-"#;
-        // debtmap:ignore-end
+        // Test content with intentionally unclosed block for testing
+        let content = format!("{}{}{}",
+            "// debtmap:",
+            "ignore-start\n",
+            "// TODO: In unclosed block\n"
+        );
         let file = PathBuf::from("test.rs");
-        let context = parse_suppression_comments(content, Language::Rust, &file);
+        let context = parse_suppression_comments(&content, Language::Rust, &file);
 
         assert_eq!(context.unclosed_blocks.len(), 1);
-        assert_eq!(context.unclosed_blocks[0].start_line, 2);
+        assert_eq!(context.unclosed_blocks[0].start_line, 1);
     }
 
     #[test]
