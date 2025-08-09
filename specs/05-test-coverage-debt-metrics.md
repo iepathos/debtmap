@@ -467,3 +467,145 @@ Coverage % →
 - Malformed LCOV: Warning message, continues with complexity-only analysis  
 - Path mismatch: Analyzes files that can be matched, warns about others
 - Empty LCOV: Treats all functions as having 0% coverage
+
+## Example Output
+
+### Terminal Output with Coverage Analysis
+
+```
+╔════════════════════════════════════════════════════════════════════╗
+║                     DEBTMAP ANALYSIS REPORT                        ║
+║                  Enhanced with Coverage Analysis                   ║
+╚════════════════════════════════════════════════════════════════════╝
+
+📊 Analysis Summary
+──────────────────
+Files Analyzed: 47
+Total Functions: 312
+Coverage Data: ✓ LCOV (lcov.info)
+Overall Coverage: 67.3%
+Codebase Risk Score: 42.8 (MEDIUM-HIGH)
+
+🔥 CRITICAL RISK FUNCTIONS (Complexity > 15, Coverage < 30%)
+─────────────────────────────────────────────────────────────
+1. src/parser/expression.rs::parse_complex_expression
+   Risk Score: 47.5 (CRITICAL)
+   Cyclomatic: 25 | Cognitive: 38 | Coverage: 0%
+   Test Effort: COMPLEX (6-8 test cases)
+   💡 Testing this would reduce codebase risk by 12%
+
+2. src/analyzer/javascript.rs::analyze_function_complexity
+   Risk Score: 36.2 (CRITICAL)
+   Cyclomatic: 18 | Cognitive: 28 | Coverage: 12%
+   Test Effort: COMPLEX (5-7 test cases)
+   💡 Core analysis logic with many untested branches
+
+⚠️  HIGH RISK FUNCTIONS (Complexity > 10, Coverage < 60%)
+──────────────────────────────────────────────────────────
+3. src/io/output.rs::format_markdown_report
+   Risk Score: 18.4 (HIGH)
+   Cyclomatic: 12 | Cognitive: 16 | Coverage: 35%
+   Test Effort: MODERATE (3-4 test cases)
+
+✅ WELL-TESTED COMPLEX FUNCTIONS (Good Examples)
+────────────────────────────────────────────────
+• src/analyzer/metrics.rs::calculate_cognitive_complexity
+  Complexity: 15 | Coverage: 100% | Risk: 0.0 (NONE)
+
+📈 RISK DISTRIBUTION MATRIX
+────────────────────────────
+Coverage % →
+100 │ ✓✓✓ │ ✓✓✓ │ ✓✓  │ ⚠   │
+ 75 │ ✓✓✓ │ ✓✓  │ ⚠   │ ⚠⚠  │
+ 50 │ ✓✓  │ ⚠   │ ⚠⚠  │ 🔥🔥 │
+ 25 │ ⚠   │ ⚠⚠  │ 🔥  │ 🔥🔥 │
+  0 │ ✓   │ ⚠⚠  │ 🔥  │ 🔥🔥🔥│
+    └─────┴─────┴─────┴─────┘
+      1-5   5-10  10-20  20+
+           Complexity →
+
+🎯 TOP 5 TESTING RECOMMENDATIONS (Maximum Risk Reduction)
+──────────────────────────────────────────────────────────
+Priority | Function | Impact | ROI Score
+---------|----------|--------|----------
+1 | parse_complex_expression() | -12% risk | 8.2
+  └─ Why: Highest risk with manageable test effort
+  
+2 | resolve_circular_deps() | -8% risk | 7.1
+  └─ Why: Critical path algorithm, moderate effort
+
+💡 ACTIONABLE INSIGHTS
+──────────────────────
+1. Focus testing on the 8 critical risk functions first
+2. Current testing effort misallocated - too much on simple getters/setters
+3. Estimated effort to reach safe risk level: 40-50 test cases
+4. Potential risk reduction from recommended tests: 36%
+```
+
+### JSON Output Structure
+
+```json
+{
+  "summary": {
+    "files_analyzed": 47,
+    "total_functions": 312,
+    "coverage_source": "lcov.info",
+    "overall_coverage": 67.3,
+    "codebase_risk_score": 42.8,
+    "risk_level": "MEDIUM-HIGH",
+    "complexity_coverage_correlation": -0.42
+  },
+  "critical_risks": [
+    {
+      "file": "src/parser/expression.rs",
+      "function": "parse_complex_expression",
+      "line_range": [145, 298],
+      "complexity": {
+        "cyclomatic": 25,
+        "cognitive": 38
+      },
+      "coverage": {
+        "percentage": 0
+      },
+      "risk": {
+        "score": 47.5,
+        "category": "CRITICAL",
+        "reduction_potential": 12.0
+      },
+      "test_effort": {
+        "difficulty": "COMPLEX",
+        "estimated_cases": [6, 8]
+      },
+      "recommendation": "Testing this would reduce codebase risk by 12%"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": 1,
+      "function": "parse_complex_expression",
+      "impact": {
+        "risk_reduction": 12.0,
+        "roi_score": 8.2
+      },
+      "rationale": "Highest risk with manageable test effort"
+    }
+  ],
+  "risk_distribution": {
+    "critical": 8,
+    "high": 23,
+    "medium": 45,
+    "low": 198,
+    "well_tested": 38
+  }
+}
+```
+
+### Key Output Features
+
+1. **Risk-Based Prioritization**: Functions ranked by `complexity × coverage_gap`, not raw coverage
+2. **Actionable Recommendations**: Specific functions with ROI scores and effort estimates
+3. **Visual Risk Matrix**: Shows distribution across complexity/coverage quadrants
+4. **Impact Quantification**: "Testing function X reduces risk by Y%"
+5. **Anti-Pattern Detection**: Identifies over-tested simple code and under-tested complex code
+6. **Test Effort Estimation**: Based on cognitive complexity for planning
+7. **Correlation Insights**: Shows if complex code tends to be less tested
