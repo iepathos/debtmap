@@ -169,7 +169,6 @@ fn build_technical_debt_report(
     }
 }
 
-
 fn output_results_with_risk(
     results: AnalysisResults,
     risk_insights: Option<risk::RiskInsight>,

@@ -40,16 +40,38 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
 
+    - name: Install cargo-tarpaulin
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin
+        else
+          echo "cargo-tarpaulin already installed"
+        fi
+
     - name: Build debtmap
       run: cargo build --release
+
+    - name: Generate coverage data
+      run: cargo tarpaulin --out lcov --output-dir target/coverage --timeout 120
+
+    - name: Run debtmap analysis with coverage
+      run: |
+        if [ -f "target/coverage/lcov.info" ]; then
+          ./target/release/debtmap analyze . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
+        else
+          echo "Warning: LCOV file not found, running analysis without coverage data"
+          ./target/release/debtmap analyze . --format json --output debtmap-report.json
+        fi
 
     - name: Run debtmap validation
       run: ./target/release/debtmap validate .
       
-    - name: Upload debtmap report
-      if: failure()
+    - name: Upload debtmap report and coverage
+      if: always()
       uses: actions/upload-artifact@v3
       with:
-        name: debtmap-report
-        path: debtmap-report.json
+        name: debtmap-analysis-artifacts
+        path: |
+          debtmap-report.json
+          target/coverage/lcov.info
         retention-days: 7
