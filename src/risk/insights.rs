@@ -15,26 +15,6 @@ pub fn generate_risk_insights(
     insights
 }
 
-pub fn format_risk_matrix_terminal() -> String {
-    let mut output = String::new();
-
-    output.push_str("📈 RISK DISTRIBUTION MATRIX\n");
-    output.push_str("────────────────────────────\n");
-    output.push_str("Coverage % →\n");
-    output.push_str("100 │ ✓✓✓ │ ✓✓✓ │ ✓✓  │ ⚠   │\n");
-    output.push_str(" 75 │ ✓✓✓ │ ✓✓  │ ⚠   │ ⚠⚠  │\n");
-    output.push_str(" 50 │ ✓✓  │ ⚠   │ ⚠⚠  │ 🔥🔥 │\n");
-    output.push_str(" 25 │ ⚠   │ ⚠⚠  │ 🔥  │ 🔥🔥 │\n");
-    output.push_str("  0 │ ✓   │ ⚠⚠  │ 🔥  │ 🔥🔥🔥│\n");
-    output.push_str("    └─────┴─────┴─────┴─────┘\n");
-    output.push_str("      1-5   5-10  10-20  20+\n");
-    output.push_str("           Complexity →\n");
-    output.push('\n');
-    output.push_str("✓ = Low Risk  ⚠ = Medium Risk  🔥 = Critical Risk\n");
-
-    output
-}
-
 pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
     let mut output = String::new();
 

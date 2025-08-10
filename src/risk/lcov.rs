@@ -174,12 +174,45 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
 
 impl LcovData {
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
-        self.functions.get(file).and_then(|funcs| {
-            funcs
-                .iter()
-                .find(|f| f.name == function_name || f.name.contains(function_name))
-                .map(|f| f.coverage_percentage)
-        })
+        // Try multiple path variations to handle relative vs absolute paths
+        let paths_to_try = vec![
+            file.to_path_buf(),
+            // Convert relative path to absolute by prepending current dir
+            std::env::current_dir()
+                .ok()?
+                .join(file.strip_prefix("./").unwrap_or(file)),
+            // Try with src/ prefix
+            std::env::current_dir()
+                .ok()?
+                .join("src")
+                .join(file.strip_prefix("./src/").unwrap_or(file)),
+        ];
+
+        for path in paths_to_try {
+            if let Some(funcs) = self.functions.get(&path) {
+                // First try exact match
+                if let Some(func) = funcs.iter().find(|f| f.name == function_name) {
+                    return Some(func.coverage_percentage);
+                }
+
+                // If no exact match, try partial match for qualified names (e.g., "Struct::method")
+                if let Some(func) = funcs
+                    .iter()
+                    .find(|f| f.name.ends_with(&format!("::{function_name}")))
+                {
+                    return Some(func.coverage_percentage);
+                }
+
+                // Fallback: contains match only if function_name is reasonably specific
+                if function_name.len() > 3 {
+                    if let Some(func) = funcs.iter().find(|f| f.name.contains(function_name)) {
+                        return Some(func.coverage_percentage);
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     pub fn get_file_coverage(&self, file: &Path) -> Option<f64> {
