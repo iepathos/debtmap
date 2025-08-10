@@ -174,45 +174,54 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
 
 impl LcovData {
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
-        // Try multiple path variations to handle relative vs absolute paths
-        let paths_to_try = vec![
-            file.to_path_buf(),
-            // Convert relative path to absolute by prepending current dir
-            std::env::current_dir()
-                .ok()?
-                .join(file.strip_prefix("./").unwrap_or(file)),
-            // Try with src/ prefix
-            std::env::current_dir()
-                .ok()?
-                .join("src")
-                .join(file.strip_prefix("./src/").unwrap_or(file)),
-        ];
+        self.generate_path_variations(file)
+            .into_iter()
+            .filter_map(|path| self.functions.get(&path))
+            .find_map(|funcs| self.find_matching_function(funcs, function_name))
+            .map(|func| func.coverage_percentage)
+    }
 
-        for path in paths_to_try {
-            if let Some(funcs) = self.functions.get(&path) {
-                // First try exact match
-                if let Some(func) = funcs.iter().find(|f| f.name == function_name) {
-                    return Some(func.coverage_percentage);
-                }
+    // Extract path generation logic to a pure function
+    fn generate_path_variations(&self, file: &Path) -> Vec<PathBuf> {
+        let current_dir = std::env::current_dir().ok();
 
-                // If no exact match, try partial match for qualified names (e.g., "Struct::method")
-                if let Some(func) = funcs
+        vec![
+            Some(file.to_path_buf()),
+            current_dir
+                .as_ref()
+                .map(|dir| dir.join(file.strip_prefix("./").unwrap_or(file))),
+            current_dir.as_ref().map(|dir| {
+                dir.join("src")
+                    .join(file.strip_prefix("./src/").unwrap_or(file))
+            }),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
+    // Extract function matching logic to a pure function
+    fn find_matching_function<'a>(
+        &self,
+        funcs: &'a [FunctionCoverage],
+        function_name: &str,
+    ) -> Option<&'a FunctionCoverage> {
+        // Chain matchers in order of preference
+        funcs
+            .iter()
+            .find(|f| f.name == function_name)
+            .or_else(|| {
+                funcs
                     .iter()
                     .find(|f| f.name.ends_with(&format!("::{function_name}")))
-                {
-                    return Some(func.coverage_percentage);
-                }
-
-                // Fallback: contains match only if function_name is reasonably specific
+            })
+            .or_else(|| {
                 if function_name.len() > 3 {
-                    if let Some(func) = funcs.iter().find(|f| f.name.contains(function_name)) {
-                        return Some(func.coverage_percentage);
-                    }
+                    funcs.iter().find(|f| f.name.contains(function_name))
+                } else {
+                    None
                 }
-            }
-        }
-
-        None
+            })
     }
 
     pub fn get_file_coverage(&self, file: &Path) -> Option<f64> {
