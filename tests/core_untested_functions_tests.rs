@@ -489,4 +489,3 @@ mod test_traverse_results {
         assert_eq!(users[2].name, "User3");
     }
 }
-
