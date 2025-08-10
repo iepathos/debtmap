@@ -1,3 +1,4 @@
+pub mod context;
 pub mod correlation;
 pub mod insights;
 pub mod lcov;
@@ -77,12 +78,14 @@ pub struct RiskDistribution {
     pub total_functions: usize,
 }
 
+use self::context::{AnalysisTarget, ContextAggregator, ContextualRisk};
 use self::strategy::{EnhancedRiskStrategy, LegacyRiskStrategy, RiskCalculator, RiskContext};
 
 pub struct RiskAnalyzer {
     strategy: Box<dyn RiskCalculator>,
     debt_score: Option<f64>,
     debt_threshold: Option<f64>,
+    context_aggregator: Option<ContextAggregator>,
 }
 
 impl Clone for RiskAnalyzer {
@@ -91,6 +94,7 @@ impl Clone for RiskAnalyzer {
             strategy: self.strategy.box_clone(),
             debt_score: self.debt_score,
             debt_threshold: self.debt_threshold,
+            context_aggregator: None, // Don't clone aggregator, recreate if needed
         }
     }
 }
@@ -101,6 +105,7 @@ impl Default for RiskAnalyzer {
             strategy: Box::new(EnhancedRiskStrategy::default()),
             debt_score: None,
             debt_threshold: None,
+            context_aggregator: None,
         }
     }
 }
@@ -111,12 +116,18 @@ impl RiskAnalyzer {
             strategy: Box::new(LegacyRiskStrategy::default()),
             debt_score: None,
             debt_threshold: None,
+            context_aggregator: None,
         }
     }
 
     pub fn with_debt_context(mut self, debt_score: f64, debt_threshold: f64) -> Self {
         self.debt_score = Some(debt_score);
         self.debt_threshold = Some(debt_threshold);
+        self
+    }
+
+    pub fn with_context_aggregator(mut self, aggregator: ContextAggregator) -> Self {
+        self.context_aggregator = Some(aggregator);
         self
     }
 
@@ -139,6 +150,40 @@ impl RiskAnalyzer {
         };
 
         self.strategy.calculate(&context)
+    }
+
+    pub fn analyze_function_with_context(
+        &mut self,
+        file: PathBuf,
+        function_name: String,
+        line_range: (usize, usize),
+        complexity: &ComplexityMetrics,
+        coverage: Option<f64>,
+        root_path: PathBuf,
+    ) -> (FunctionRisk, Option<ContextualRisk>) {
+        let base_risk = self.analyze_function(
+            file.clone(),
+            function_name.clone(),
+            line_range,
+            complexity,
+            coverage,
+        );
+
+        let contextual_risk = if let Some(ref mut aggregator) = self.context_aggregator {
+            let target = AnalysisTarget {
+                root_path,
+                file_path: file,
+                function_name,
+                line_range,
+            };
+
+            let context_map = aggregator.analyze(&target);
+            Some(ContextualRisk::new(base_risk.risk_score, &context_map))
+        } else {
+            None
+        };
+
+        (base_risk, contextual_risk)
     }
 
     pub fn calculate_risk_score(

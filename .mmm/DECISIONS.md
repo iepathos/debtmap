@@ -185,3 +185,28 @@ Rewrote complexity calculation to properly count all control flow: if statements
 - ✅ All functions including closures properly counted
 - ✅ Better risk assessment based on true complexity
 - ⚠️ Breaking change in complexity values from previous versions
+
+---
+
+## ADR-011: Context-Aware Risk Analysis
+**Date**: 2025-08-10
+**Status**: Accepted
+
+### Context
+Risk analysis previously treated all code paths equally, missing critical context about actual code usage, dependency relationships, historical stability, and business impact. This led to misaligned priorities where rarely-used complex code received the same risk score as critical path functions.
+
+### Decision
+Implement a pluggable context provider system that enriches risk analysis with multiple context sources:
+- Critical path analysis from entry points (main, API handlers, CLI commands)
+- Dependency risk propagation through module graph
+- Git history for change frequency and bug density
+- Extensible architecture for future providers (runtime metrics, business context)
+
+### Consequences
+- ✅ Risk scores better reflect real-world impact
+- ✅ Critical paths receive appropriate priority
+- ✅ Historical instability factors into risk
+- ✅ Extensible for future context sources
+- ✅ Optional and backward compatible (via --context flag)
+- ⚠️ Additional processing time for context gathering
+- ⚠️ Requires git repository for full functionality

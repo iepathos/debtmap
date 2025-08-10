@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, and spec 09 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, and spec 11 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -50,6 +50,13 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, and spec
   - Match expressions use n-1 formula for arms
   - Nested functions and closures are properly counted
   - Realistic average complexity values (3-8 range typical)
+- ✅ Context-Aware Risk Analysis (spec 11):
+  - Critical path identification from entry points
+  - Dependency risk propagation through module graph
+  - Git history integration for change frequency and bug density
+  - Pluggable context provider architecture
+  - Weighted risk calculation with context contributions
+  - Optional via --context CLI flag
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -68,6 +75,7 @@ The project follows a functional core / imperative shell pattern:
 6. **Performance**: Parallel processing for large codebases
 7. **Suppression Support**: Fine-grained control over false positives
 8. **Risk Analysis**: Correlates complexity with test coverage for risk-based testing priorities
+9. **Context-Aware Risk**: Considers critical paths, dependencies, and historical data
 
 ## Project Structure
 ```
@@ -87,7 +95,6 @@ src/
 
 ### Near-term Enhancements
 - Spec 10: Add modern pattern detection (async/await, callbacks, functional)
-- Spec 11: Implement context-aware risk assessment
 - Spec 12: Improve ROI calculations
 - Spec 13: Add risk categorization system
 

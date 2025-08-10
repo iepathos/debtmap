@@ -44,6 +44,18 @@ pub enum Commands {
         /// Use legacy risk calculation formula (for backwards compatibility)
         #[arg(long = "legacy-risk")]
         legacy_risk: bool,
+
+        /// Enable context-aware risk analysis
+        #[arg(long = "context", alias = "enable-context")]
+        enable_context: bool,
+
+        /// Context providers to use (critical_path, dependency, git_history)
+        #[arg(long = "context-providers", value_delimiter = ',')]
+        context_providers: Option<Vec<String>>,
+
+        /// Disable specific context providers
+        #[arg(long = "disable-context", value_delimiter = ',')]
+        disable_context: Option<Vec<String>>,
     },
 
     /// Initialize configuration file
