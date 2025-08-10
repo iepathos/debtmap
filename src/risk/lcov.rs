@@ -27,40 +27,52 @@ enum LcovLine {
     Other,
 }
 
+// Helper function to parse comma-separated data
+fn parse_comma_data<T>(data: &str) -> Option<(T, String)>
+where
+    T: std::str::FromStr,
+{
+    data.split_once(',')
+        .and_then(|(first, second)| first.parse::<T>().ok().map(|val| (val, second.to_string())))
+}
+
+// Parse source file line
+fn parse_source_file(line: &str) -> Option<LcovLine> {
+    line.strip_prefix("SF:")
+        .map(|path| LcovLine::SourceFile(PathBuf::from(path)))
+}
+
+// Parse function definition line
+fn parse_function(line: &str) -> Option<LcovLine> {
+    line.strip_prefix("FN:")
+        .and_then(parse_comma_data::<usize>)
+        .map(|(line_num, name)| LcovLine::Function {
+            line: line_num,
+            name,
+        })
+}
+
+// Parse function data line
+fn parse_function_data(line: &str) -> Option<LcovLine> {
+    line.strip_prefix("FNDA:")
+        .and_then(parse_comma_data::<u64>)
+        .map(|(count, name)| LcovLine::FunctionData { count, name })
+}
+
 fn parse_lcov_line(line: &str) -> LcovLine {
     let line = line.trim();
 
-    if let Some(path) = line.strip_prefix("SF:") {
-        return LcovLine::SourceFile(PathBuf::from(path));
-    }
-
-    if let Some(fn_data) = line.strip_prefix("FN:") {
-        if let Some((line_str, name)) = fn_data.split_once(',') {
-            if let Ok(line_num) = line_str.parse::<usize>() {
-                return LcovLine::Function {
-                    line: line_num,
-                    name: name.to_string(),
-                };
+    parse_source_file(line)
+        .or_else(|| parse_function(line))
+        .or_else(|| parse_function_data(line))
+        .or_else(|| {
+            if line == "end_of_record" {
+                Some(LcovLine::EndOfRecord)
+            } else {
+                None
             }
-        }
-    }
-
-    if let Some(fnda_data) = line.strip_prefix("FNDA:") {
-        if let Some((count_str, name)) = fnda_data.split_once(',') {
-            if let Ok(count) = count_str.parse::<u64>() {
-                return LcovLine::FunctionData {
-                    count,
-                    name: name.to_string(),
-                };
-            }
-        }
-    }
-
-    if line == "end_of_record" {
-        return LcovLine::EndOfRecord;
-    }
-
-    LcovLine::Other
+        })
+        .unwrap_or(LcovLine::Other)
 }
 
 // State for processing a single file's records
@@ -106,39 +118,56 @@ impl FileRecord {
     }
 }
 
-pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
+// Process a single parsed line and update the record state
+fn process_lcov_line(line_type: LcovLine, current_record: &mut FileRecord, data: &mut LcovData) {
+    match line_type {
+        LcovLine::SourceFile(path) => {
+            *current_record = FileRecord::new(path);
+        }
+        LcovLine::Function { line, name } => {
+            current_record.add_function(line, name);
+        }
+        LcovLine::FunctionData { count, name } => {
+            current_record.add_function_data(count, name);
+        }
+        LcovLine::EndOfRecord => {
+            finalize_record(current_record, data);
+        }
+        LcovLine::Other => {}
+    }
+}
+
+// Finalize the current record and add it to the data
+fn finalize_record(current_record: &mut FileRecord, data: &mut LcovData) {
+    if let Some(file_path) = current_record.path.take() {
+        let functions = current_record.to_function_coverage();
+        if !functions.is_empty() {
+            data.functions.insert(file_path, functions);
+        }
+    }
+    *current_record = FileRecord::default();
+}
+
+// Read and parse lines from the LCOV file
+fn read_lcov_lines(path: &Path) -> Result<Vec<String>> {
     let file = File::open(path)
         .with_context(|| format!("Failed to open LCOV file: {}", path.display()))?;
     let reader = BufReader::new(file);
+    reader
+        .lines()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
+}
 
+pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
+    let lines = read_lcov_lines(path)?;
     let mut data = LcovData::default();
     let mut current_record = FileRecord::default();
 
-    for line in reader.lines() {
-        let line = line?;
-
-        match parse_lcov_line(&line) {
-            LcovLine::SourceFile(path) => {
-                current_record = FileRecord::new(path);
-            }
-            LcovLine::Function { line, name } => {
-                current_record.add_function(line, name);
-            }
-            LcovLine::FunctionData { count, name } => {
-                current_record.add_function_data(count, name);
-            }
-            LcovLine::EndOfRecord => {
-                if let Some(file_path) = current_record.path.take() {
-                    let functions = current_record.to_function_coverage();
-                    if !functions.is_empty() {
-                        data.functions.insert(file_path, functions);
-                    }
-                }
-                current_record = FileRecord::default();
-            }
-            LcovLine::Other => {}
-        }
-    }
+    lines
+        .iter()
+        .map(|line| parse_lcov_line(line))
+        .for_each(|line_type| process_lcov_line(line_type, &mut current_record, &mut data));
 
     Ok(data)
 }
