@@ -141,7 +141,7 @@ impl EnhancedRiskStrategy {
 
         let coverage_component = match context.coverage {
             Some(cov) => (100.0 - cov) / 100.0 * self.weights.coverage,
-            None => self.weights.coverage,
+            None => 0.0, // Don't add coverage weight when coverage is unknown
         };
 
         (complexity_component + coverage_component) * 5.0
@@ -165,7 +165,7 @@ impl EnhancedRiskStrategy {
 
     fn calculate_coverage_penalty(&self, coverage: Option<f64>) -> f64 {
         match coverage {
-            None => self.weights.untested_penalty,
+            None => 1.0, // No penalty when coverage is unknown (not untested, just unknown)
             Some(c) if c < 20.0 => 3.0,
             Some(c) if c < 40.0 => 2.0,
             Some(c) if c < 60.0 => 1.5,
@@ -225,6 +225,18 @@ impl EnhancedRiskStrategy {
             }
         }
 
+        // When coverage is unknown, also consider complexity for categorization
+        if coverage.is_none() {
+            // Use complexity-based categorization when coverage is unknown
+            return match avg_complexity {
+                c if c > 15 => RiskCategory::Critical,
+                c if c > 10 => RiskCategory::High,
+                c if c > 5 => RiskCategory::Medium,
+                _ => RiskCategory::Low,
+            };
+        }
+
+        // When coverage is known, use risk score based categorization
         match risk_score {
             r if r >= 8.0 => RiskCategory::Critical,
             r if r >= 6.0 => RiskCategory::High,
@@ -404,10 +416,14 @@ mod tests {
 
         let risk = strategy.calculate(&context);
 
+        // With no coverage, risk score is based on complexity only
+        // No penalty is applied, so risk score should be moderate
         assert!(
-            risk.risk_score > 5.0,
-            "High complexity with no coverage should have high risk"
+            risk.risk_score > 1.0,
+            "High complexity should still have some risk even without coverage data (got {})",
+            risk.risk_score
         );
+        // Average complexity (20+25)/2 = 22.5, which is > 15, so Critical
         assert_eq!(risk.risk_category, RiskCategory::Critical);
     }
 
@@ -457,7 +473,7 @@ mod tests {
     fn test_coverage_penalty_calculations() {
         let strategy = EnhancedRiskStrategy::default();
 
-        assert_eq!(strategy.calculate_coverage_penalty(None), 2.0);
+        assert_eq!(strategy.calculate_coverage_penalty(None), 1.0);
         assert_eq!(strategy.calculate_coverage_penalty(Some(10.0)), 3.0);
         assert_eq!(strategy.calculate_coverage_penalty(Some(30.0)), 2.0);
         assert_eq!(strategy.calculate_coverage_penalty(Some(50.0)), 1.5);

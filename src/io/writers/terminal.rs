@@ -141,12 +141,14 @@ fn print_summary(results: &AnalysisResults) {
     let debt_score = total_debt_score(&results.technical_debt.items);
     let debt_threshold = 100;
 
+    // Count unique files from function metrics
+    let unique_files: std::collections::HashSet<_> =
+        results.complexity.metrics.iter().map(|m| &m.file).collect();
+    let file_count = unique_files.len();
+
     println!("📊 {} Summary", "CODEBASE".bold());
     println!("───────────────────────────────────────────");
-    println!(
-        "  Files analyzed:      {}",
-        results.complexity.metrics.len()
-    );
+    println!("  Files analyzed:      {file_count}");
     println!(
         "  Total functions:     {}",
         results.complexity.summary.total_functions
