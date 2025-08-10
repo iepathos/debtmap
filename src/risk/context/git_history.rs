@@ -343,12 +343,12 @@ mod tests {
 
         // Configure git user for commits
         Command::new("git")
-            .args(&["config", "user.email", "test@example.com"])
+            .args(["config", "user.email", "test@example.com"])
             .current_dir(&repo_path)
             .output()?;
 
         Command::new("git")
-            .args(&["config", "user.name", "Test User"])
+            .args(["config", "user.name", "Test User"])
             .current_dir(&repo_path)
             .output()?;
 
@@ -360,7 +360,7 @@ mod tests {
         std::fs::write(&file_path, content)?;
 
         Command::new("git")
-            .args(&["add", file_name])
+            .args(["add", file_name])
             .current_dir(repo_path)
             .output()?;
 
@@ -369,7 +369,7 @@ mod tests {
 
     fn commit_with_message(repo_path: &Path, message: &str) -> Result<()> {
         Command::new("git")
-            .args(&["commit", "-m", message])
+            .args(["commit", "-m", message])
             .current_dir(repo_path)
             .output()?;
 
@@ -397,7 +397,7 @@ mod tests {
         // Make a bug fix commit
         std::fs::write(&file_path, "fn main() { println!(\"fixed\"); }")?;
         Command::new("git")
-            .args(&["add", "test.rs"])
+            .args(["add", "test.rs"])
             .current_dir(&repo_path)
             .output()?;
         commit_with_message(&repo_path, "fix: resolve printing issue")?;

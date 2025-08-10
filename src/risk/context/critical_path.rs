@@ -140,9 +140,9 @@ impl CriticalPathAnalyzer {
             && (name.starts_with("cmd_")
                 || name.starts_with("command_")
                 || name.ends_with("_command"))
-            {
-                return Some(EntryType::CliCommand);
-            }
+        {
+            return Some(EntryType::CliCommand);
+        }
 
         // API endpoint detection
         if (path_str.contains("api") || path_str.contains("handler") || path_str.contains("route"))
@@ -152,15 +152,16 @@ impl CriticalPathAnalyzer {
                 || name.starts_with("post_")
                 || name.starts_with("put_")
                 || name.starts_with("delete_"))
-            {
-                return Some(EntryType::ApiEndpoint);
-            }
+        {
+            return Some(EntryType::ApiEndpoint);
+        }
 
         // Web handler detection
         if (path_str.contains("web") || path_str.contains("http"))
-            && (name.contains("route") || name.contains("handler")) {
-                return Some(EntryType::WebHandler);
-            }
+            && (name.contains("route") || name.contains("handler"))
+        {
+            return Some(EntryType::WebHandler);
+        }
 
         // Event handler detection
         if name.starts_with("on_") || name.ends_with("_listener") || name.contains("event") {
