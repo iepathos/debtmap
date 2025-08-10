@@ -42,7 +42,7 @@ fn test_debt_type_display_all_variants() {
     ];
 
     for (debt_type, expected) in types {
-        assert_eq!(format!("{}", debt_type), expected);
+        assert_eq!(format!("{debt_type}"), expected);
     }
 }
 
@@ -76,7 +76,7 @@ fn test_priority_display_all_variants() {
     ];
 
     for (priority, expected) in priorities {
-        assert_eq!(format!("{}", priority), expected);
+        assert_eq!(format!("{priority}"), expected);
     }
 }
 
@@ -116,7 +116,7 @@ fn test_language_display_all_variants() {
     ];
 
     for (language, expected) in languages {
-        assert_eq!(format!("{}", language), expected);
+        assert_eq!(format!("{language}"), expected);
     }
 }
 

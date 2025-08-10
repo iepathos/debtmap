@@ -342,7 +342,7 @@ mod test_applicative_apply {
     fn test_apply_simple_transformation() {
         let app = Applicative::new(vec![1, 2, 3, 4, 5]);
         let result = app.apply(|x| x * 2);
-        
+
         let values = result.unwrap();
         assert_eq!(values, vec![2, 4, 6, 8, 10]);
     }
@@ -351,7 +351,7 @@ mod test_applicative_apply {
     fn test_apply_empty_values() {
         let app: Applicative<i32> = Applicative::new(vec![]);
         let result = app.apply(|x| x + 1);
-        
+
         let values = result.unwrap();
         assert!(values.is_empty());
     }
@@ -360,7 +360,7 @@ mod test_applicative_apply {
     fn test_apply_string_transformation() {
         let app = Applicative::new(vec!["hello", "world", "rust"]);
         let result = app.apply(|s| s.to_uppercase());
-        
+
         let values = result.unwrap();
         assert_eq!(values, vec!["HELLO", "WORLD", "RUST"]);
     }
@@ -374,12 +374,18 @@ mod test_applicative_apply {
         }
 
         let app = Applicative::new(vec![
-            Person { name: "Alice".to_string(), age: 30 },
-            Person { name: "Bob".to_string(), age: 25 },
+            Person {
+                name: "Alice".to_string(),
+                age: 30,
+            },
+            Person {
+                name: "Bob".to_string(),
+                age: 25,
+            },
         ]);
-        
+
         let result = app.apply(|p| p.age + 5);
-        
+
         let values = result.unwrap();
         assert_eq!(values, vec![35, 30]);
     }
@@ -389,7 +395,7 @@ mod test_applicative_apply {
         let app = Applicative::new(vec![1, 2, 3]);
         let intermediate = app.apply(|x| x * x);
         let result = intermediate.apply(|x| x + 1);
-        
+
         let values = result.unwrap();
         assert_eq!(values, vec![2, 5, 10]);
     }
@@ -398,10 +404,10 @@ mod test_applicative_apply {
     fn test_apply_closure_with_captures() {
         let multiplier = 3;
         let offset = 10;
-        
+
         let app = Applicative::new(vec![1, 2, 3, 4]);
         let result = app.apply(|x| x * multiplier + offset);
-        
+
         let values = result.unwrap();
         assert_eq!(values, vec![13, 16, 19, 22]);
     }
@@ -410,7 +416,7 @@ mod test_applicative_apply {
     fn test_apply_preserves_order() {
         let app = Applicative::new(vec![5, 3, 8, 1, 9]);
         let result = app.apply(|x| x * 10);
-        
+
         let values = result.unwrap();
         assert_eq!(values, vec![50, 30, 80, 10, 90]);
     }
@@ -419,7 +425,7 @@ mod test_applicative_apply {
     fn test_apply_with_option_transformation() {
         let app = Applicative::new(vec![Some(1), None, Some(3), None, Some(5)]);
         let result = app.apply(|opt| opt.map(|x| x * 2));
-        
+
         let values = result.unwrap();
         assert_eq!(values, vec![Some(2), None, Some(6), None, Some(10)]);
     }

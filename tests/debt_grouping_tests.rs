@@ -231,12 +231,12 @@ fn test_filter_by_type_all_types() {
         .iter()
         .enumerate()
         .map(|(i, dt)| DebtItem {
-            id: format!("{}", i),
+            id: format!("{i}"),
             debt_type: *dt,
             priority: Priority::Medium,
             file: PathBuf::from("file.rs"),
             line: i * 10,
-            message: format!("Item {}", i),
+            message: format!("Item {i}"),
             context: None,
         })
         .collect();
