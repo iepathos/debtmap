@@ -77,6 +77,15 @@ coverage:
     cargo tarpaulin --skip-clean --engine llvm --out Html --out Json --output-dir target/coverage
     echo "Coverage report generated at target/coverage/tarpaulin-report.html"
 
+# Run tests with coverage (lcov format)
+coverage-lcov:
+    #!/usr/bin/env bash
+    echo "Building debtmap binary for integration tests..."
+    cargo build --bin debtmap
+    echo "Generating code coverage report with cargo-tarpaulin (lcov format)..."
+    cargo tarpaulin --skip-clean --engine llvm --out Lcov --output-dir target/coverage
+    echo "Coverage report generated at target/coverage/lcov.info"
+
 # Run tests with coverage and check threshold
 coverage-check:
     #!/usr/bin/env bash
@@ -95,6 +104,17 @@ coverage-check:
 # Open coverage report in browser
 coverage-open: coverage
     open target/coverage/tarpaulin-report.html
+
+# Analyze the current repository with debtmap using coverage data
+analyze-self:
+    #!/usr/bin/env bash
+    echo "Building debtmap in release mode..."
+    cargo build --release --bin debtmap
+    echo "Generating code coverage (lcov format)..."
+    cargo tarpaulin --skip-clean --engine llvm --out Lcov --output-dir target/coverage
+    echo "Analyzing current repository with debtmap..."
+    ./target/release/debtmap --lcov target/coverage/lcov.info
+    echo "Analysis complete!"
 
 # Run property-based tests only (if using proptest)
 test-prop:
