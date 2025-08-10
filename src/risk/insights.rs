@@ -64,6 +64,29 @@ pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
     output
 }
 
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for word in text.split_whitespace() {
+        if current_line.is_empty() {
+            current_line = word.to_string();
+        } else if current_line.len() + 1 + word.len() <= width {
+            current_line.push(' ');
+            current_line.push_str(word);
+        } else {
+            lines.push(current_line);
+            current_line = word.to_string();
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines
+}
+
 pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -> String {
     let mut output = String::new();
 
@@ -72,17 +95,8 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     }
 
     output.push_str("🎯 TOP 5 TESTING RECOMMENDATIONS\n");
-    output.push_str(
-        "────────────────────────────────────────────────────────────────────────────────\n",
-    );
     output.push_str("Ordered by ROI (Risk Reduction / Test Effort)\n");
     output.push('\n');
-    output.push_str(
-        "Priority | Function                       | Location                      | ROI\n",
-    );
-    output.push_str(
-        "---------|--------------------------------|-------------------------------|------\n",
-    );
 
     for (i, rec) in recommendations.iter().take(5).enumerate() {
         let roi_score = rec.roi.unwrap_or(0.1);
@@ -90,12 +104,6 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
             "<1".to_string()
         } else {
             format!("{:.0}", rec.potential_risk_reduction)
-        };
-
-        let function_display = if rec.function.len() > 30 {
-            format!("{}...()", &rec.function[..27])
-        } else {
-            format!("{}()", rec.function)
         };
 
         let roi_display = if roi_score >= 10.0 {
@@ -108,40 +116,87 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
         let file_str = rec.file.to_string_lossy();
         let location_display = format!("{}:{}", file_str, rec.line);
 
+        // Determine risk level string
+        let risk_level = if rec.current_risk >= 8.0 {
+            "HIGH"
+        } else if rec.current_risk >= 5.0 {
+            "MEDIUM"
+        } else {
+            "LOW"
+        };
+
+        // Format complexity based on test effort
+        let complexity_desc = match rec.test_effort_estimate.estimated_difficulty {
+            super::Difficulty::Trivial => "trivial",
+            super::Difficulty::Simple => "simple",
+            super::Difficulty::Moderate => "moderate",
+            super::Difficulty::Complex => "complex",
+            super::Difficulty::VeryComplex => "very complex",
+        };
+
+        let complexity_str = format!(
+            "branches={}, cognitive={}",
+            rec.test_effort_estimate.branch_count, rec.test_effort_estimate.cognitive_load
+        );
+
+        // Format dependency info
+        let deps_info = format!(
+            "{} upstream, {} downstream",
+            rec.dependencies.len(),
+            rec.dependents.len()
+        );
+
+        // Create the top border with proper spacing
+        let header = format!("#{}", i + 1);
+        let roi_label = format!("ROI: {roi_display}");
+        let dash_count = 82 - header.len() - roi_label.len() - 8; // Account for "┌─ " + " ─┐" + spaces
+
         output.push_str(&format!(
-            "{:<8} | {:<30} | {:<30} | {:>5}\n",
-            format!("#{}", i + 1),
-            function_display,
-            location_display,
-            roi_display
+            "┌─ {} {} {} ─┐\n",
+            header,
+            "─".repeat(dash_count),
+            roi_label
         ));
 
-        // Format dependency information and risk info on the next line
-        let deps_display = format!("→{}←{}", rec.dependencies.len(), rec.dependents.len());
-        output.push_str(&format!(
-            "         │ Risk: {:.1} | Impact: -{}% | Deps: {}\n",
-            rec.current_risk, risk_reduction, deps_display
-        ));
-        output.push_str(&format!("         └─ {}", rec.rationale));
+        // Function and location line - pad to 78 chars (82 - 4 for "│ " and " │")
+        let func_loc = format!("{}() @ {}", rec.function, location_display);
+        output.push_str(&format!("│ {func_loc:<78} │\n"));
 
-        // Add dependency details if present
+        // Divider - exactly 82 chars total
+        output.push_str(
+            "├────────────────────────────────────────────────────────────────────────────────┤\n",
+        );
+
+        // Risk line
+        let risk_line = format!(
+            "Risk: {} ({:.1})  Impact: -{}%  Complexity: {} ({})",
+            risk_level, rec.current_risk, risk_reduction, complexity_desc, complexity_str
+        );
+        output.push_str(&format!("│ {risk_line:<78} │\n"));
+
+        // Dependencies line
+        let deps_line = format!("Dependencies: {deps_info}");
+        output.push_str(&format!("│ {deps_line:<78} │\n"));
+
+        // Rationale lines (wrapped)
+        let rationale_lines = wrap_text(&rec.rationale, 78);
+        for line in rationale_lines {
+            output.push_str(&format!("│ {line:<78} │\n"));
+        }
+
+        // Add used by info if present
         if !rec.dependents.is_empty() {
-            output.push_str(&format!(
-                "\n            ← Used by: {}",
-                rec.dependents.join(", ")
-            ));
-            if rec.dependents.len() >= 3 {
-                output.push_str(" (high cascade impact)");
+            let used_by = format!("Used by: {}", rec.dependents.join(", "));
+            let used_by_lines = wrap_text(&used_by, 78);
+            for line in used_by_lines {
+                output.push_str(&format!("│ {line:<78} │\n"));
             }
         }
-        if !rec.dependencies.is_empty() {
-            output.push_str(&format!(
-                "\n            → Depends on: {}",
-                rec.dependencies.join(", ")
-            ));
-        }
 
-        output.push_str("\n\n");
+        output.push_str(
+            "└────────────────────────────────────────────────────────────────────────────────┘\n",
+        );
+        output.push('\n');
     }
 
     output
