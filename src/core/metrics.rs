@@ -95,6 +95,7 @@ mod tests {
             cognitive,
             nesting: 0,
             length: 10,
+            is_test: false,
         }
     }
 

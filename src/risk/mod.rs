@@ -64,6 +64,7 @@ pub struct RiskInsight {
 pub struct TestingRecommendation {
     pub function: String,
     pub file: PathBuf,
+    pub line: usize,
     pub current_risk: f64,
     pub potential_risk_reduction: f64,
     pub test_effort_estimate: TestEffort,
@@ -150,6 +151,7 @@ impl RiskAnalyzer {
         self.strategy.calculate(&context)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn analyze_function_with_context(
         &mut self,
         file: PathBuf,

@@ -321,6 +321,7 @@ mod tests {
                     cognitive: 1,
                     nesting: 0,
                     length: 10,
+                    is_test: false,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,

@@ -20,6 +20,7 @@ fn create_test_target(
         id: id.to_string(),
         path: PathBuf::from(format!("src/{id}.rs")),
         function: Some(format!("{id}_fn")),
+        line: 1,
         module_type: ModuleType::Core,
         current_coverage: coverage,
         current_risk: 8.0, // Increased to ensure non-zero risk

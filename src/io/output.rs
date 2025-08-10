@@ -154,6 +154,7 @@ mod tests {
             cognitive: 7,
             nesting: 2,
             length: 25,
+            is_test: false,
         }];
 
         AnalysisResults {

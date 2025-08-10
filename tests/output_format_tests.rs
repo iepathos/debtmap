@@ -17,6 +17,7 @@ fn test_output_json_format() {
                 cognitive: 7,
                 nesting: 2,
                 length: 25,
+            is_test: false,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
