@@ -1,9 +1,7 @@
-use crate::core::{AnalysisResults, FunctionMetrics, Priority};
-use crate::debt::total_debt_score;
+use crate::core::{AnalysisResults, FunctionMetrics};
+use crate::io::writers::{JsonWriter, MarkdownWriter, TerminalWriter};
 use crate::risk::RiskInsight;
-use colored::*;
-use serde_json;
-use std::io::Write;
+use std::io;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -17,531 +15,59 @@ pub trait OutputWriter {
     fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()>;
 }
 
-pub struct JsonWriter<W: Write> {
-    writer: W,
-}
-
-impl<W: Write> JsonWriter<W> {
-    pub fn new(writer: W) -> Self {
-        Self { writer }
+pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
+    match format {
+        OutputFormat::Json => Box::new(JsonWriter::new(io::stdout())),
+        OutputFormat::Markdown => Box::new(MarkdownWriter::new(io::stdout())),
+        OutputFormat::Terminal => Box::new(TerminalWriter::new()),
     }
 }
 
-impl<W: Write> OutputWriter for JsonWriter<W> {
-    fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        let json = serde_json::to_string_pretty(results)?;
-        self.writer.write_all(json.as_bytes())?;
-        Ok(())
-    }
-
-    fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
-        let json = serde_json::to_string_pretty(insights)?;
-        self.writer.write_all(json.as_bytes())?;
-        Ok(())
+// Helper functions shared by multiple writers
+pub fn complexity_status(avg: f64) -> &'static str {
+    match avg {
+        a if a > 15.0 => "❌ High",
+        a if a > 10.0 => "⚠️ Medium",
+        a if a > 5.0 => "🔶 Moderate",
+        _ => "✅ Low",
     }
 }
 
-pub struct MarkdownWriter<W: Write> {
-    writer: W,
-}
-
-impl<W: Write> MarkdownWriter<W> {
-    pub fn new(writer: W) -> Self {
-        Self { writer }
+pub fn debt_status(count: usize) -> &'static str {
+    match count {
+        c if c > 50 => "❌ High",
+        c if c > 20 => "⚠️ Medium",
+        c if c > 10 => "🔶 Moderate",
+        _ => "✅ Low",
     }
 }
 
-impl<W: Write> OutputWriter for MarkdownWriter<W> {
-    fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        let writers: Vec<fn(&mut Self, &AnalysisResults) -> anyhow::Result<()>> = vec![
-            |w, r| w.write_header(r),
-            |w, r| w.write_summary(r),
-            |w, r| w.write_complexity_analysis(r),
-            |w, r| w.write_technical_debt(r),
-            |w, _| w.write_recommendations(),
-        ];
-
-        writers.iter().try_for_each(|writer| writer(self, results))
-    }
-
-    fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
-        writeln!(self.writer, "## Risk Analysis")?;
-        writeln!(self.writer)?;
-
-        // Write risk summary
-        writeln!(self.writer, "### Risk Summary")?;
-        writeln!(
-            self.writer,
-            "- Codebase Risk Score: {:.1}",
-            insights.codebase_risk_score
-        )?;
-        if let Some(correlation) = insights.complexity_coverage_correlation {
-            writeln!(
-                self.writer,
-                "- Complexity-Coverage Correlation: {correlation:.2}"
-            )?;
-        }
-        writeln!(self.writer)?;
-
-        // Write risk distribution
-        writeln!(self.writer, "### Risk Distribution")?;
-        writeln!(
-            self.writer,
-            "- Critical: {}",
-            insights.risk_distribution.critical_count
-        )?;
-        writeln!(
-            self.writer,
-            "- High: {}",
-            insights.risk_distribution.high_count
-        )?;
-        writeln!(
-            self.writer,
-            "- Medium: {}",
-            insights.risk_distribution.medium_count
-        )?;
-        writeln!(
-            self.writer,
-            "- Low: {}",
-            insights.risk_distribution.low_count
-        )?;
-        writeln!(
-            self.writer,
-            "- Well Tested: {}",
-            insights.risk_distribution.well_tested_count
-        )?;
-        writeln!(self.writer)?;
-
-        Ok(())
+pub fn high_complexity_status(count: usize) -> &'static str {
+    match count {
+        0 => "✅ Good",
+        1..=5 => "🔶 Fair",
+        _ => "❌ Poor",
     }
 }
 
-impl<W: Write> MarkdownWriter<W> {
-    fn write_header(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        let header_lines = [
-            "# Debtmap Analysis Report".to_string(),
-            String::new(),
-            format!(
-                "Generated: {}",
-                results.timestamp.format("%Y-%m-%d %H:%M:%S UTC")
-            ),
-            "Version: 0.1.0".to_string(),
-            String::new(),
-        ];
-
-        header_lines
-            .iter()
-            .try_for_each(|line| writeln!(self.writer, "{line}"))?;
-        Ok(())
-    }
-
-    fn write_summary(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        self.write_summary_header()?;
-        self.write_summary_metrics(results)?;
-        writeln!(self.writer)?;
-        Ok(())
-    }
-
-    fn write_summary_header(&mut self) -> anyhow::Result<()> {
-        writeln!(self.writer, "## Executive Summary")?;
-        writeln!(self.writer)?;
-        writeln!(self.writer, "| Metric | Value | Status |")?;
-        writeln!(self.writer, "|--------|-------|--------|")?;
-        Ok(())
-    }
-
-    fn write_summary_metrics(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        let debt_score = total_debt_score(&results.technical_debt.items);
-        let debt_threshold = 100;
-
-        build_summary_rows(results, debt_score, debt_threshold)
-            .into_iter()
-            .try_for_each(|(metric, value, status)| self.write_summary_row(metric, &value, &status))
-    }
-
-    fn write_summary_row(&mut self, metric: &str, value: &str, status: &str) -> anyhow::Result<()> {
-        writeln!(self.writer, "| {metric} | {value} | {status} |")?;
-        Ok(())
-    }
-
-    fn write_complexity_analysis(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        if results.complexity.metrics.is_empty() {
-            return Ok(());
-        }
-
-        self.write_complexity_header()?;
-        self.write_complexity_table(results)?;
-        Ok(())
-    }
-
-    fn write_complexity_header(&mut self) -> anyhow::Result<()> {
-        complexity_header_lines()
-            .iter()
-            .try_for_each(|line| writeln!(self.writer, "{line}"))?;
-        Ok(())
-    }
-
-    fn write_complexity_table(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        let top_complex = get_top_complex_functions(&results.complexity.metrics, 5);
-
-        for func in top_complex {
-            self.write_complexity_row(func)?;
-        }
-        writeln!(self.writer)?;
-        Ok(())
-    }
-
-    fn write_complexity_row(&mut self, func: &FunctionMetrics) -> anyhow::Result<()> {
-        writeln!(
-            self.writer,
-            "| {}:{} | {} | {} | {} | {} |",
-            func.file.display(),
-            func.line,
-            func.name,
-            func.cyclomatic,
-            func.cognitive,
-            get_recommendation(func)
-        )?;
-        Ok(())
-    }
-
-    fn write_technical_debt(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        if results.technical_debt.items.is_empty() {
-            return Ok(());
-        }
-
-        writeln!(self.writer, "## Technical Debt")?;
-        writeln!(self.writer)?;
-
-        let high_priority: Vec<_> = results
-            .technical_debt
-            .items
-            .iter()
-            .filter(|item| matches!(item.priority, Priority::High | Priority::Critical))
-            .collect();
-
-        if !high_priority.is_empty() {
-            writeln!(
-                self.writer,
-                "### High Priority ({} items)",
-                high_priority.len()
-            )?;
-            for item in high_priority.iter().take(10) {
-                writeln!(
-                    self.writer,
-                    "- [ ] `{}:{}` - {}",
-                    item.file.display(),
-                    item.line,
-                    item.message
-                )?;
-            }
-            writeln!(self.writer)?;
-        }
-        Ok(())
-    }
-
-    fn write_recommendations(&mut self) -> anyhow::Result<()> {
-        writeln!(self.writer, "## Recommendations")?;
-        writeln!(self.writer)?;
-        writeln!(self.writer, "1. **Immediate Action**: Address high-priority debt items and refactor top complexity hotspots")?;
-        writeln!(
-            self.writer,
-            "2. **Short Term**: Reduce code duplication by extracting common functionality"
-        )?;
-        writeln!(
-            self.writer,
-            "3. **Long Term**: Establish complexity budget and monitor trends over time"
-        )?;
-        Ok(())
+pub fn debt_score_status(score: u32, threshold: u32) -> &'static str {
+    match score {
+        s if s > threshold => "❌ High",
+        s if s > threshold / 2 => "⚠️ Medium",
+        _ => "✅ Good",
     }
 }
 
-pub struct TerminalWriter;
-
-impl Default for TerminalWriter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TerminalWriter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl OutputWriter for TerminalWriter {
-    fn write_results(&mut self, results: &AnalysisResults) -> anyhow::Result<()> {
-        let printers: Vec<fn(&AnalysisResults)> = vec![
-            |_| print_header(),
-            print_summary,
-            print_complexity_hotspots,
-            print_technical_debt,
-            print_pass_fail_status,
-        ];
-
-        printers.iter().for_each(|printer| printer(results));
-        Ok(())
-    }
-
-    fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
-        use crate::risk::insights::{
-            format_actionable_insights, format_critical_risks, format_recommendations,
-            format_risk_matrix_terminal,
-        };
-
-        // Print risk header
-        println!();
-        println!("{}", "📊 Risk Analysis".bold().cyan());
-        println!("{}", "================".cyan());
-        println!();
-
-        // Print risk summary
-        println!("📈 Analysis Summary");
-        println!("──────────────────");
-        println!(
-            "Codebase Risk Score: {:.1} ({})",
-            insights.codebase_risk_score,
-            if insights.codebase_risk_score < 30.0 {
-                "LOW".green()
-            } else if insights.codebase_risk_score < 60.0 {
-                "MEDIUM".yellow()
-            } else {
-                "HIGH".red()
-            }
-        );
-
-        if let Some(correlation) = insights.complexity_coverage_correlation {
-            println!("Complexity-Coverage Correlation: {correlation:.2}");
-        }
-        println!();
-
-        // Print risk distribution
-        println!("Risk Distribution:");
-        println!(
-            "  Critical: {} functions",
-            insights.risk_distribution.critical_count.to_string().red()
-        );
-        println!(
-            "  High: {} functions",
-            insights.risk_distribution.high_count.to_string().yellow()
-        );
-        println!(
-            "  Medium: {} functions",
-            insights.risk_distribution.medium_count
-        );
-        println!(
-            "  Low: {} functions",
-            insights.risk_distribution.low_count.to_string().green()
-        );
-        println!(
-            "  Well Tested: {} functions",
-            insights
-                .risk_distribution
-                .well_tested_count
-                .to_string()
-                .cyan()
-        );
-        println!();
-
-        // Print critical risks
-        let critical_risks_output = format_critical_risks(&insights.top_risks);
-        if !critical_risks_output.is_empty() {
-            print!("{critical_risks_output}");
-        }
-
-        // Print recommendations
-        let recommendations_output = format_recommendations(&insights.risk_reduction_opportunities);
-        if !recommendations_output.is_empty() {
-            print!("{recommendations_output}");
-        }
-
-        // Print risk matrix
-        if insights.complexity_coverage_correlation.is_some() {
-            print!("{}", format_risk_matrix_terminal());
-        }
-
-        // Print actionable insights
-        let insights_output = format_actionable_insights(insights);
-        if !insights_output.is_empty() {
-            print!("{insights_output}");
-        }
-
-        Ok(())
-    }
-}
-
-fn print_header() {
-    println!("{}", "Debtmap Analysis Report".bold().blue());
-    println!("{}", "=======================".blue());
-    println!();
-}
-
-fn format_debt_score(score: u32, threshold: u32) -> String {
-    let colored_score = match score {
-        s if s > threshold => s.to_string().red(),
-        s if s > threshold / 2 => s.to_string().yellow(),
-        s => s.to_string().green(),
-    };
-    format!("{colored_score} (threshold: {threshold})")
-}
-
-fn print_summary(results: &AnalysisResults) {
-    let debt_score = total_debt_score(&results.technical_debt.items);
-    let debt_threshold = 100; // Default threshold, can be made configurable
-
-    println!("{} Summary:", "📊".bold());
-    println!("  Files analyzed: {}", results.complexity.metrics.len());
-    println!(
-        "  Total functions: {}",
-        results.complexity.summary.total_functions
-    );
-    println!(
-        "  Average complexity: {:.1}",
-        results.complexity.summary.average_complexity
-    );
-    println!("  Debt items: {}", results.technical_debt.items.len());
-    println!(
-        "  Total debt score: {}",
-        format_debt_score(debt_score, debt_threshold)
-    );
-    println!();
-}
-
-fn print_complexity_hotspots(results: &AnalysisResults) {
-    if results.complexity.summary.high_complexity_count == 0 {
-        return;
-    }
-
-    println!("{} Complexity Hotspots (top 5):", "⚠️".yellow());
-
-    get_top_complex_functions(&results.complexity.metrics, 5)
-        .iter()
-        .enumerate()
-        .for_each(|(i, func)| {
-            println!(
-                "  {}. {}:{} {}() - Cyclomatic: {}, Cognitive: {}",
-                i + 1,
-                func.file.display(),
-                func.line,
-                func.name.yellow(),
-                func.cyclomatic.to_string().red(),
-                func.cognitive.to_string().red()
-            );
-        });
-    println!();
-}
-
-fn print_technical_debt(results: &AnalysisResults) {
-    let high_priority: Vec<_> = results
-        .technical_debt
-        .items
-        .iter()
-        .filter(|item| matches!(item.priority, Priority::High | Priority::Critical))
-        .collect();
-
-    if high_priority.is_empty() {
-        return;
-    }
-
-    println!(
-        "{} Technical Debt ({} items):",
-        "🔧".bold(),
-        results.technical_debt.items.len()
-    );
-    println!("  {} ({}):", "High Priority".red(), high_priority.len());
-
-    high_priority.iter().take(5).for_each(|item| {
-        println!(
-            "    - {}:{} - {}",
-            item.file.display(),
-            item.line,
-            item.message
-        );
-    });
-    println!();
-}
-
-fn print_pass_fail_status(results: &AnalysisResults) {
-    let pass = is_passing(results);
-    let (symbol, status, message) = if pass {
-        (
-            "✓".green(),
-            "PASS".green().bold(),
-            "all metrics within thresholds",
-        )
-    } else {
-        (
-            "✗".red(),
-            "FAIL".red().bold(),
-            "some metrics exceed thresholds",
-        )
-    };
-
-    println!("{symbol} Pass/Fail: {status} ({message})");
-}
-
-fn is_passing(results: &AnalysisResults) -> bool {
-    let debt_score = total_debt_score(&results.technical_debt.items);
-    let debt_threshold = 100; // Default threshold, can be made configurable
-
-    results.complexity.summary.average_complexity < 10.0
-        && results.complexity.summary.high_complexity_count < 10
-        && debt_score <= debt_threshold
-}
-
-fn complexity_status(avg: f64) -> &'static str {
-    static THRESHOLDS: &[(f64, &str)] =
-        &[(5.0, "✅ Good"), (10.0, "⚠️ Medium"), (f64::MAX, "❌ High")];
-
-    THRESHOLDS
-        .iter()
-        .find(|(threshold, _)| avg < *threshold)
-        .map(|(_, status)| *status)
-        .unwrap_or("❌ High")
-}
-
-fn debt_status(count: usize) -> &'static str {
-    static THRESHOLDS: &[(usize, &str)] =
-        &[(20, "✅ Low"), (50, "⚠️ Medium"), (usize::MAX, "❌ High")];
-
-    THRESHOLDS
-        .iter()
-        .find(|(threshold, _)| count < *threshold)
-        .map(|(_, status)| *status)
-        .unwrap_or("❌ High")
-}
-
-fn high_complexity_status(count: usize) -> &'static str {
-    if count > 10 {
-        "⚠️ Warning"
-    } else {
-        "✅ Good"
-    }
-}
-
-fn debt_score_status(score: u32, threshold: u32) -> &'static str {
-    if score > threshold {
-        "❌ Exceeds threshold"
-    } else if score > threshold / 2 {
-        "⚠️ Medium"
-    } else {
-        "✅ Good"
-    }
-}
-
-fn complexity_header_lines() -> Vec<&'static str> {
+pub fn complexity_header_lines() -> Vec<&'static str> {
     vec![
         "## Complexity Analysis",
         "",
-        "### Hotspots Requiring Attention",
-        "",
-        "| File:Line | Function | Cyclomatic | Cognitive | Recommendation |",
-        "|-----------|----------|------------|-----------|----------------|",
+        "| Location | Function | Cyclomatic | Cognitive | Recommendation |",
+        "|----------|----------|------------|-----------|----------------|",
     ]
 }
 
-fn build_summary_rows(
+pub fn build_summary_rows(
     results: &AnalysisResults,
     debt_score: u32,
     debt_threshold: u32,
@@ -580,24 +106,102 @@ fn build_summary_rows(
     ]
 }
 
-fn get_top_complex_functions(metrics: &[FunctionMetrics], count: usize) -> Vec<&FunctionMetrics> {
-    let mut sorted_metrics: Vec<_> = metrics.iter().collect();
-    sorted_metrics.sort_by(|a, b| b.cyclomatic.cmp(&a.cyclomatic));
-    sorted_metrics.into_iter().take(count).collect()
+pub fn get_top_complex_functions(
+    metrics: &[FunctionMetrics],
+    count: usize,
+) -> Vec<&FunctionMetrics> {
+    let mut sorted = metrics.iter().collect::<Vec<_>>();
+    sorted.sort_by_key(|m| std::cmp::Reverse(m.cyclomatic.max(m.cognitive)));
+    sorted.into_iter().take(count).collect()
 }
 
-fn get_recommendation(func: &FunctionMetrics) -> &'static str {
-    match func.cyclomatic {
-        x if x > 20 => "Refactor: Split into smaller functions",
-        x if x > 10 => "Review: Consider extracting complex logic",
-        _ => "Monitor: Keep watching for increases",
+pub fn get_recommendation(func: &FunctionMetrics) -> &'static str {
+    match func.cyclomatic.max(func.cognitive) {
+        c if c > 20 => "Urgent refactoring needed",
+        c if c > 15 => "Refactor recommended",
+        c if c > 10 => "Consider simplifying",
+        _ => "Acceptable",
     }
 }
 
-pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
-    match format {
-        OutputFormat::Json => Box::new(JsonWriter::new(std::io::stdout())),
-        OutputFormat::Markdown => Box::new(MarkdownWriter::new(std::io::stdout())),
-        OutputFormat::Terminal => Box::new(TerminalWriter::new()),
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{
+        AnalysisResults, ComplexityReport, ComplexitySummary, DebtItem, DebtType, DependencyReport,
+        FunctionMetrics, Priority, TechnicalDebtReport,
+    };
+    use chrono::Utc;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    fn create_test_results() -> AnalysisResults {
+        let mut items = Vec::new();
+        items.push(DebtItem {
+            id: "test-1".to_string(),
+            debt_type: DebtType::Todo,
+            priority: Priority::Medium,
+            file: PathBuf::from("test.rs"),
+            line: 5,
+            message: "TODO: Implement feature".to_string(),
+            context: None,
+        });
+
+        let metrics = vec![FunctionMetrics {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 7,
+            nesting: 2,
+            length: 25,
+        }];
+
+        AnalysisResults {
+            project_path: PathBuf::from("/test/project"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: metrics.clone(),
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 5.0,
+                    max_complexity: 5,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items,
+                by_type: HashMap::new(),
+                priorities: vec![Priority::Medium],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        }
+    }
+
+    #[test]
+    fn test_output_json_format() {
+        let results = create_test_results();
+        let mut buffer = Vec::new();
+        let mut writer = crate::io::writers::JsonWriter::new(&mut buffer);
+        writer.write_results(&results).unwrap();
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(output.contains("test_func"));
+        assert!(output.contains("TODO: Implement feature"));
+    }
+
+    #[test]
+    fn test_output_markdown_format() {
+        let results = create_test_results();
+        let mut buffer = Vec::new();
+        let mut writer = crate::io::writers::MarkdownWriter::new(&mut buffer);
+        writer.write_results(&results).unwrap();
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(output.contains("# Debtmap Analysis Report"));
+        assert!(output.contains("Executive Summary"));
     }
 }
