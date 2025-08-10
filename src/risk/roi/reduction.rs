@@ -67,7 +67,7 @@ impl AdvancedRiskReductionModel {
             _ => 0.70,
         };
 
-        (base_confidence * coverage_confidence * delta_confidence).max(0.5)
+        (base_confidence * coverage_confidence * delta_confidence).max(0.5_f64)
     }
 }
 
@@ -105,7 +105,7 @@ impl RiskReductionModel for AdvancedRiskReductionModel {
         } else {
             // High coverage - diminishing returns
             let remaining_gap = 100.0 - target.current_coverage;
-            let coverage_ratio = coverage_delta / remaining_gap.max(1.0);
+            let coverage_ratio = coverage_delta / remaining_gap.max(1.0_f64);
             coverage_ratio * 15.0 // Max 15% additional reduction for well-tested code
         };
 
