@@ -1,4 +1,5 @@
 use crate::analyzers::Analyzer;
+use quote::ToTokens;
 use crate::complexity::{
     cognitive::calculate_cognitive_with_patterns, cyclomatic::calculate_cyclomatic,
 };
@@ -194,6 +195,13 @@ impl FunctionVisitor {
     }
 
     fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
+        // Check if this is a test function
+        let is_test = item_fn.attrs.iter().any(|attr| {
+            attr.path().is_ident("test") || 
+            (attr.path().is_ident("cfg") && 
+             attr.meta.to_token_stream().to_string().contains("test"))
+        });
+        
         let metrics = FunctionMetrics {
             name,
             file: self.current_file.clone(),
@@ -202,6 +210,7 @@ impl FunctionVisitor {
             cognitive: calculate_cognitive_syn(&item_fn.block),
             nesting: calculate_nesting(&item_fn.block),
             length: count_lines(&item_fn.block),
+            is_test,
         };
 
         self.functions.push(metrics);
@@ -257,6 +266,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                 cognitive: calculate_cognitive_syn(&block),
                 nesting: calculate_nesting(&block),
                 length: count_lines(&block),
+                is_test: false, // Closures are not test functions
             };
 
             self.functions.push(metrics);

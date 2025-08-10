@@ -7,14 +7,15 @@ max_file_length = 500
 max_function_length = 50
 
 [languages]
-enabled = ["rust", "python"]
+enabled = ["rust"]
 
 [ignore]
 patterns = [
     "target/**",
     "venv/**",
     "node_modules/**",
-    "*.min.js"
+    "*.min.js",
+    "benches/**"
 ]
 
 [output]

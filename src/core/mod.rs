@@ -42,6 +42,7 @@ pub struct FunctionMetrics {
     pub cognitive: u32,
     pub nesting: u32,
     pub length: usize,
+    pub is_test: bool,
 }
 
 impl FunctionMetrics {
@@ -54,6 +55,7 @@ impl FunctionMetrics {
             cognitive: 0,
             nesting: 0,
             length: 0,
+            is_test: false,
         }
     }
 

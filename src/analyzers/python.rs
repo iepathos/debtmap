@@ -208,6 +208,7 @@ fn extract_functions_from_stmts(
                     cognitive: calculate_cognitive_python(&func_def.body),
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
+                    is_test: func_def.name.starts_with("test_"),
                 });
 
                 // Recursively look for nested functions
@@ -230,6 +231,7 @@ fn extract_functions_from_stmts(
                     cognitive: calculate_cognitive_python(&func_def.body),
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
+                    is_test: func_def.name.starts_with("test_"),
                 });
 
                 // Recursively look for nested functions
