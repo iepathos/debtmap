@@ -67,6 +67,7 @@ pub struct TestingRecommendation {
     pub potential_risk_reduction: f64,
     pub test_effort_estimate: TestEffort,
     pub rationale: String,
+    pub roi: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
