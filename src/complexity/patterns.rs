@@ -53,6 +53,12 @@ pub struct PatternDetector {
     ternary_depth: u32,
 }
 
+impl Default for PatternDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PatternDetector {
     pub fn new() -> Self {
         Self {
@@ -168,15 +174,13 @@ impl<'ast> Visit<'ast> for PatternDetector {
                 self.patterns.async_await_count += 1;
             }
 
-            // Closure/callback detection
+            // Closure detection - only count async closures for patterns
+            // Regular closures are already handled in cognitive complexity
             Expr::Closure(closure) => {
                 self.closure_depth += 1;
-                if self.closure_depth > 1 {
-                    self.patterns.callback_depth =
-                        self.patterns.callback_depth.max(self.closure_depth);
-                }
 
-                // Check if closure is async
+                // Only count async closures in patterns (they add extra complexity)
+                // Regular closures are already counted in cognitive complexity
                 if closure.asyncness.is_some() {
                     self.patterns.async_await_count += 1;
                 }
@@ -209,7 +213,13 @@ impl<'ast> Visit<'ast> for PatternDetector {
             }
 
             // Ternary/conditional expression detection
-            Expr::If(if_expr) if if_expr.then_branch.stmts.len() == 1 => {
+            // Only count as ternary if it's an if-expression with else branch
+            // and single expressions (not statements) in both branches
+            Expr::If(if_expr)
+                if if_expr.else_branch.is_some()
+                    && if_expr.then_branch.stmts.len() == 1
+                    && matches!(&if_expr.then_branch.stmts[0], syn::Stmt::Expr(_, None)) =>
+            {
                 self.ternary_depth += 1;
                 if self.ternary_depth > 1 {
                     self.patterns.nested_ternaries += 1;
@@ -218,9 +228,9 @@ impl<'ast> Visit<'ast> for PatternDetector {
                 self.ternary_depth -= 1;
             }
 
-            // Try block (error handling)
+            // Try expressions are already counted in cognitive complexity,
+            // so we don't add them to patterns to avoid double-counting
             Expr::Try(_) => {
-                self.patterns.error_handling_blocks += 1;
                 syn::visit::visit_expr(self, expr);
             }
 
@@ -267,7 +277,7 @@ mod tests {
         patterns.callback_depth = 1;
         patterns.method_chain_length = 6;
 
-        assert_eq!(patterns.total_complexity(), 2 * 2 + 1 * 3 + 6 / 3);
+        assert_eq!(patterns.total_complexity(), 2 * 2 + 3 + 6 / 3);
     }
 
     #[test]
