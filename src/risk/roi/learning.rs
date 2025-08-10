@@ -155,7 +155,7 @@ impl ROILearningSystem {
 
         let avg_adjustment = total_ratio / outcomes.len() as f64;
 
-        avg_adjustment.max(0.5).min(2.0)
+        avg_adjustment.clamp(0.5, 2.0)
     }
 
     fn update_adjustment_factors(&mut self, outcome: &ROIOutcome) {
@@ -180,7 +180,7 @@ impl ROILearningSystem {
         self.adjustment_factors
             .entry(key)
             .and_modify(|factor| {
-                *factor = (*factor * 0.7 + effort_ratio * 0.3).max(0.5).min(2.0);
+                *factor = (*factor * 0.7 + effort_ratio * 0.3).clamp(0.5, 2.0);
             })
             .or_insert(effort_ratio);
     }

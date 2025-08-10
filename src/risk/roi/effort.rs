@@ -88,7 +88,14 @@ impl AdvancedEffortModel {
         let cognitive_factor = (target.complexity.cognitive_complexity as f64 / 7.0).max(1.0);
         let case_hours = min_cases * self.base_rates.per_test_case;
 
-        case_hours * cognitive_factor
+        // Apply complexity factors based on cyclomatic and cognitive complexity
+        let complexity_multiplier = self.complexity_factors.cyclomatic_base
+            + (target.complexity.cognitive_complexity as f64
+                * self.complexity_factors.cognitive_weight)
+            + ((target.complexity.cyclomatic_complexity as f64 / 10.0)
+                * self.complexity_factors.nesting_penalty);
+
+        case_hours * cognitive_factor * complexity_multiplier.max(1.0)
     }
 
     fn estimate_setup_effort(&self, target: &TestTarget) -> f64 {
@@ -101,13 +108,18 @@ impl AdvancedEffortModel {
             _ => 0.5,
         };
 
-        match dependency_count {
+        // Factor in per-dependency effort
+        let dependency_effort = dependency_count as f64 * self.base_rates.per_dependency;
+
+        let base_effort = match dependency_count {
             0 => 0.0,
             1..=3 => 0.5 * module_factor,
             4..=7 => 1.0 * module_factor,
             8..=12 => 1.5 * module_factor,
             _ => 2.0 * module_factor,
-        }
+        };
+
+        base_effort + dependency_effort
     }
 
     fn estimate_mocking_effort(&self, target: &TestTarget) -> f64 {
@@ -152,7 +164,14 @@ impl AdvancedEffortModel {
             _ => 2.5,
         };
 
-        cognitive_hours * size_factor
+        // Apply cognitive penalty for complex code
+        let cognitive_penalty = if cognitive > 30 {
+            self.base_rates.cognitive_penalty * ((cognitive - 30) as f64 / 10.0)
+        } else {
+            0.0
+        };
+
+        cognitive_hours * size_factor + cognitive_penalty
     }
 
     fn estimate_test_cases(&self, target: &TestTarget) -> usize {

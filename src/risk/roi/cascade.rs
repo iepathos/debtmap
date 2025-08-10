@@ -84,6 +84,7 @@ impl CascadeCalculator {
         impact
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn propagate_impact(
         &self,
         node_id: String,
