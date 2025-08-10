@@ -69,21 +69,35 @@ impl ROICalculator {
         let cascade_impact = self.cascade_calculator.calculate(target, context);
         let confidence = self.calculate_confidence(target, &effort, &direct_impact);
 
-        let total_impact = direct_impact.percentage
-            + cascade_impact.total_risk_reduction * self.config.cascade_weight;
+        // Apply module type bonus to impact
+        let module_multiplier = self.get_module_type_multiplier(target);
+
+        // Calculate total impact with module bonus and cascade effects
+        let total_impact = (direct_impact.percentage * module_multiplier)
+            + (cascade_impact.total_risk_reduction * self.config.cascade_weight);
+
         let adjusted_effort = self.adjust_effort_with_learning(effort.hours, target);
 
-        // Scale ROI to meaningful range (0.1 to 10.0)
-        // High impact (>30%) with low effort (<2h) = ROI ~5-10
-        // Moderate impact (10-30%) with moderate effort (2-5h) = ROI ~1-5
-        // Low impact (<10%) or high effort (>5h) = ROI ~0.1-1
+        // Enhanced ROI formula with dependency awareness
+        // Include dependency count as a factor
+        let dependency_factor = 1.0 + (target.dependents.len() as f64 * 0.1).min(1.0);
+
         let raw_roi = if adjusted_effort > 0.0 {
-            total_impact / adjusted_effort
+            (total_impact * dependency_factor) / adjusted_effort
         } else {
-            total_impact
+            total_impact * dependency_factor
         };
 
-        let value = (raw_roi * confidence).clamp(0.1, 10.0);
+        // Apply diminishing returns for very high ROI values
+        let scaled_roi = if raw_roi > 20.0 {
+            10.0 + (raw_roi - 20.0).ln()
+        } else if raw_roi > 10.0 {
+            5.0 + (raw_roi - 10.0) * 0.5
+        } else {
+            raw_roi
+        };
+
+        let value = (scaled_roi * confidence).clamp(0.1, 10.0);
 
         ROI {
             value,
@@ -143,6 +157,18 @@ impl ROICalculator {
         }
     }
 
+    fn get_module_type_multiplier(&self, target: &TestTarget) -> f64 {
+        use super::priority::ModuleType;
+        match target.module_type {
+            ModuleType::EntryPoint => 2.0, // Highest multiplier for entry points
+            ModuleType::Core => 1.5,       // High multiplier for core modules
+            ModuleType::Api => 1.2,        // Moderate multiplier for API modules
+            ModuleType::Model => 1.1,      // Slight bonus for data models
+            ModuleType::IO => 1.0,         // Standard for I/O modules
+            _ => 1.0,                      // No bonus for utilities and unknown
+        }
+    }
+
     fn generate_breakdown(
         &self,
         target: &TestTarget,
@@ -167,10 +193,20 @@ impl ROICalculator {
             name: "Cascade Impact".to_string(),
             value: cascade.total_risk_reduction,
             weight: self.config.cascade_weight,
-            explanation: format!(
-                "Affects {} dependent modules",
-                cascade.affected_modules.len()
-            ),
+            explanation: if cascade.affected_modules.is_empty() && !target.dependents.is_empty() {
+                format!(
+                    "Potentially affects {} dependent modules",
+                    target.dependents.len()
+                )
+            } else if !cascade.affected_modules.is_empty() {
+                format!(
+                    "Affects {} dependent modules (depth: {})",
+                    cascade.affected_modules.len(),
+                    cascade.propagation_depth
+                )
+            } else {
+                "No cascade impact detected".to_string()
+            },
         });
 
         components.push(ROIComponent {
@@ -183,11 +219,16 @@ impl ROICalculator {
             ),
         });
 
+        let module_multiplier = self.get_module_type_multiplier(target);
+        let dependency_factor = 1.0 + (target.dependents.len() as f64 * 0.1).min(1.0);
+
         let formula = format!(
-            "ROI = (Direct[{:.1}%] + Cascade[{:.1}%] * {:.1}) / Effort[{:.1}h]",
+            "ROI = ((Direct[{:.1}%] * {:.1}) + (Cascade[{:.1}%] * {:.1})) * DependencyFactor[{:.1}] / Effort[{:.1}h]",
             direct.percentage,
+            module_multiplier,
             cascade.total_risk_reduction,
             self.config.cascade_weight,
+            dependency_factor,
             effort.hours
         );
 
@@ -219,7 +260,9 @@ impl ROICalculator {
         );
 
         let impact_str = if !target.dependents.is_empty() {
-            format!(" affecting {} modules", target.dependents.len())
+            format!(" affecting {} dependent modules", target.dependents.len())
+        } else if !target.dependencies.is_empty() {
+            format!(" with {} dependencies", target.dependencies.len())
         } else {
             String::new()
         };
