@@ -35,7 +35,6 @@ impl OutputWriter for TerminalWriter {
     fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
         use crate::risk::insights::{
             format_actionable_insights, format_critical_risks, format_recommendations,
-            format_risk_matrix_terminal,
         };
 
         // Print risk header
@@ -103,11 +102,6 @@ impl OutputWriter for TerminalWriter {
         let recommendations_output = format_recommendations(&insights.risk_reduction_opportunities);
         if !recommendations_output.is_empty() {
             print!("{recommendations_output}");
-        }
-
-        // Print risk matrix
-        if insights.complexity_coverage_correlation.is_some() {
-            print!("{}", format_risk_matrix_terminal());
         }
 
         // Print actionable insights
