@@ -177,6 +177,7 @@ struct FunctionVisitor {
     current_file: PathBuf,
     #[allow(dead_code)]
     source_content: String,
+    in_test_module: bool,
 }
 
 impl FunctionVisitor {
@@ -185,22 +186,24 @@ impl FunctionVisitor {
             functions: Vec::new(),
             current_file: file,
             source_content,
+            in_test_module: false,
         }
     }
 
-    fn get_line_number(&self, _span: syn::__private::Span) -> usize {
-        // Line number tracking requires proc-macro2 "span-locations" feature
-        // For now, we'll use a simple incrementing counter based on function position
-        self.functions.len() + 1
+    fn get_line_number(&self, span: syn::__private::Span) -> usize {
+        // Use proc-macro2's span-locations feature to get actual line numbers
+        span.start().line
     }
 
     fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
-        // Check if this is a test function
-        let is_test = item_fn.attrs.iter().any(|attr| {
+        // Check if this is a test function (either has #[test] attribute or is in a test module)
+        let has_test_attribute = item_fn.attrs.iter().any(|attr| {
             attr.path().is_ident("test")
                 || (attr.path().is_ident("cfg")
                     && attr.meta.to_token_stream().to_string().contains("test"))
         });
+
+        let is_test = has_test_attribute || self.in_test_module;
 
         let metrics = FunctionMetrics {
             name,
@@ -218,6 +221,24 @@ impl FunctionVisitor {
 }
 
 impl<'ast> Visit<'ast> for FunctionVisitor {
+    fn visit_item_mod(&mut self, item_mod: &'ast syn::ItemMod) {
+        // Check if this is a test module (has #[cfg(test)] attribute)
+        let is_test_mod = item_mod.attrs.iter().any(|attr| {
+            attr.path().is_ident("cfg") && attr.meta.to_token_stream().to_string().contains("test")
+        });
+
+        let was_in_test_module = self.in_test_module;
+        if is_test_mod {
+            self.in_test_module = true;
+        }
+
+        // Continue visiting the module content
+        syn::visit::visit_item_mod(self, item_mod);
+
+        // Restore the previous state when leaving the module
+        self.in_test_module = was_in_test_module;
+    }
+
     fn visit_item_fn(&mut self, item_fn: &'ast syn::ItemFn) {
         let name = item_fn.sig.ident.to_string();
         let line = self.get_line_number(item_fn.sig.ident.span());
@@ -277,7 +298,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     cognitive,
                     nesting,
                     length,
-                    is_test: false, // Closures are not test functions
+                    is_test: self.in_test_module, // Closures in test modules are test-related
                 };
 
                 self.functions.push(metrics);
