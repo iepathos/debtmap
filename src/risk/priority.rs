@@ -1,6 +1,4 @@
-use super::{
-    Difficulty, FunctionRisk, RiskAnalyzer, TestEffort, TestingRecommendation,
-};
+use super::{Difficulty, FunctionRisk, RiskAnalyzer, TestEffort, TestingRecommendation};
 use crate::core::ComplexityMetrics;
 use im::{HashMap, Vector};
 use std::path::{Path, PathBuf};
@@ -432,26 +430,7 @@ pub struct ROI {
 
 // =============== Effort Estimator ===============
 
-pub struct EffortEstimator {
-    complexity_weights: ComplexityWeights,
-}
-
-#[derive(Clone, Debug)]
-struct ComplexityWeights {
-    cyclomatic_weight: f64,
-    cognitive_weight: f64,
-    line_weight: f64,
-}
-
-impl Default for ComplexityWeights {
-    fn default() -> Self {
-        Self {
-            cyclomatic_weight: 1.0,
-            cognitive_weight: 1.5,
-            line_weight: 0.01,
-        }
-    }
-}
+pub struct EffortEstimator;
 
 impl Default for EffortEstimator {
     fn default() -> Self {
@@ -461,9 +440,7 @@ impl Default for EffortEstimator {
 
 impl EffortEstimator {
     pub fn new() -> Self {
-        Self {
-            complexity_weights: ComplexityWeights::default(),
-        }
+        Self
     }
 
     pub fn estimate(&self, target: &TestTarget) -> f64 {
@@ -569,10 +546,7 @@ pub fn prioritize_by_roi(
     analyzer: &RiskAnalyzer,
 ) -> Vector<TestingRecommendation> {
     // Convert FunctionRisk to TestTarget
-    let targets: Vec<TestTarget> = functions
-        .iter()
-        .map(function_risk_to_target)
-        .collect();
+    let targets: Vec<TestTarget> = functions.iter().map(function_risk_to_target).collect();
 
     // Run through prioritization pipeline
     let pipeline = PrioritizationPipeline::new();

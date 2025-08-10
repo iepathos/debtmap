@@ -17,6 +17,17 @@ use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process;
 
+struct AnalyzeConfig {
+    path: PathBuf,
+    format: cli::OutputFormat,
+    output: Option<PathBuf>,
+    threshold_complexity: u32,
+    threshold_duplication: usize,
+    languages: Option<Vec<String>>,
+    coverage_file: Option<PathBuf>,
+    legacy_risk: bool,
+}
+
 fn main() -> Result<()> {
     let cli = cli::parse_args();
 
@@ -30,16 +41,19 @@ fn main() -> Result<()> {
             languages,
             coverage_file,
             legacy_risk,
-        } => handle_analyze(
-            path,
-            format,
-            output,
-            threshold_complexity,
-            threshold_duplication,
-            languages,
-            coverage_file,
-            legacy_risk,
-        ),
+        } => {
+            let config = AnalyzeConfig {
+                path,
+                format,
+                output,
+                threshold_complexity,
+                threshold_duplication,
+                languages,
+                coverage_file,
+                legacy_risk,
+            };
+            handle_analyze(config)
+        }
         Commands::Init { force } => init_config(force),
         Commands::Validate { path, config } => validate_project(path, config),
     };
@@ -54,36 +68,32 @@ fn main() -> Result<()> {
     }
 }
 
-fn handle_analyze(
-    path: PathBuf,
-    format: cli::OutputFormat,
-    output: Option<PathBuf>,
-    threshold_complexity: u32,
-    threshold_duplication: usize,
-    languages: Option<Vec<String>>,
-    coverage_file: Option<PathBuf>,
-    legacy_risk: bool,
-) -> Result<()> {
-    let languages = parse_languages(languages);
+fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
+    let languages = parse_languages(config.languages);
     let results = analyze_project(
-        path.clone(),
+        config.path.clone(),
         languages,
-        threshold_complexity,
-        threshold_duplication,
+        config.threshold_complexity,
+        config.threshold_duplication,
     )?;
 
     // Handle risk analysis if coverage file provided
-    let risk_insights = if let Some(lcov_path) = coverage_file {
-        analyze_risk_with_coverage(&results, &lcov_path, &path, legacy_risk)?
+    let risk_insights = if let Some(lcov_path) = config.coverage_file {
+        analyze_risk_with_coverage(&results, &lcov_path, &config.path, config.legacy_risk)?
     } else {
-        analyze_risk_without_coverage(&results, legacy_risk)?
+        analyze_risk_without_coverage(&results, config.legacy_risk)?
     };
 
     // Output results
-    output_results_with_risk(results.clone(), risk_insights, format.into(), output)?;
+    output_results_with_risk(
+        results.clone(),
+        risk_insights,
+        config.format.into(),
+        config.output,
+    )?;
 
     // Check if analysis passed
-    if !is_analysis_passing(&results, threshold_complexity) {
+    if !is_analysis_passing(&results, config.threshold_complexity) {
         process::exit(1);
     }
 
