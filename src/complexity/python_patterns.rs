@@ -37,6 +37,12 @@ pub struct PythonPatternDetector {
     function_depth: u32,
 }
 
+impl Default for PythonPatternDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PythonPatternDetector {
     pub fn new() -> Self {
         Self {
@@ -102,7 +108,7 @@ impl PythonPatternDetector {
 
                 // Check for metaclass usage
                 for keyword in &class.keywords {
-                    if keyword.arg.as_ref().map_or(false, |arg| arg == "metaclass") {
+                    if keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass") {
                         self.patterns.metaclass_usage += 1;
                     }
                 }
@@ -275,6 +281,6 @@ mod tests {
         patterns.decorator_count = 3;
         patterns.generator_count = 1;
 
-        assert_eq!(patterns.total_complexity(), 2 * 2 + 3 + 1 * 2);
+        assert_eq!(patterns.total_complexity(), 2 * 2 + 3 + 2);
     }
 }
