@@ -22,10 +22,11 @@ Run debtmap to analyze the current tech debt:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info
 ```
-- **Important**: Save the output and note:
-  - "Total debt score" value
-  - "Overall coverage" percentage (if available)
-- If LCOV file is missing, run without the `--lcov` flag
+- **CRITICAL - RECORD ALL INITIAL VALUES**: You MUST save and note:
+  - "Total debt score" value (initial baseline)
+  - "Overall coverage" percentage (initial baseline - REQUIRED if lcov is available)
+  - Total function count (initial baseline)
+- If LCOV file is missing, run without the `--lcov` flag but note "Coverage: not measured"
 
 ### Step 3: Identify Priority
 From the debtmap output, identify the top priority issue:
@@ -96,12 +97,15 @@ Run debtmap again to measure improvement:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info
 ```
-- Note the new values:
-  - "Total debt score"
-  - "Overall coverage" percentage (if tests were added)
-- Calculate changes:
+- **CRITICAL**: Record ALL of these values:
+  - "Total debt score" (final value)
+  - "Overall coverage" percentage (final value)
+  - Total function count (final value)
+- Calculate and document ALL changes:
   - Debt score change: initial score - final score
-  - Coverage change: final coverage - initial coverage (if applicable)
+  - Coverage percentage change: final coverage% - initial coverage%
+  - Function count change: final count - initial count
+- **REQUIRED**: If coverage was measured, you MUST include the coverage change in the commit message
 - Document specific improvements achieved
 
 ### Step 9: Commit Changes
@@ -112,10 +116,14 @@ Create a descriptive commit message:
 test: add comprehensive tests for [module/function name]
 
 - Added [number] test cases covering [specific scenarios]
-- Coverage improvement: +[X.XX]% (from [initial]% to [final]%)
-- Debt score reduction: -[amount] (from [initial] to [final])
+- Coverage change: +[X.XX]% (from [initial]% to [final]%)
+- Debt score change: [+/-amount] (from [initial] to [final])
+- Function count change: +[number] (from [initial] to [final])
 
 Tech debt category: Testing coverage (ROI optimization)
+
+IMPORTANT: You MUST include the actual coverage percentage change if coverage was measured.
+Even if coverage didn't increase (e.g., when adding test functions), state: "Coverage: unchanged at X.XX%"
 ```
 
 **For complexity reduction:**
@@ -132,6 +140,14 @@ Tech debt category: Complexity reduction
 ## Important Instructions
 
 **IMPORTANT**: When making ANY commits, do NOT include attribution text like "🤖 Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages. Keep commits clean and focused on the actual changes.
+
+**MANDATORY COMMIT MESSAGE REQUIREMENTS**:
+Every commit MUST include these metrics if they were measured:
+1. Coverage change: ALWAYS include if lcov was used (e.g., "+2.5% (from 48.2% to 50.7%)" or "unchanged at 52.3%")
+2. Debt score change: ALWAYS include (e.g., "-150 (from 3735 to 3585)")  
+3. Function count change: Include if it changed (e.g., "+23 (from 1228 to 1251)")
+
+If coverage wasn't measured, explicitly state: "Coverage: not measured (no lcov data)"
 
 ## Success Criteria
 
