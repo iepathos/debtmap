@@ -49,7 +49,15 @@ Risk analysis and coverage correlation:
 - `strategy.rs`: Risk calculation strategies (Enhanced and Legacy)
 - `lcov.rs`: LCOV coverage file parsing
 - `correlation.rs`: Complexity-coverage correlation analysis
-- `priority.rs`: ROI-based test prioritization
+- `priority.rs`: Advanced multi-stage test prioritization pipeline
+  - PrioritizationPipeline: Orchestrates prioritization stages
+  - ZeroCoverageStage: Boosts untested modules
+  - CriticalPathStage: Scores module criticality
+  - ComplexityRiskStage: Factors in complexity risks
+  - DependencyImpactStage: Analyzes dependency impacts
+  - EffortOptimizationStage: Optimizes for ROI
+  - ROICalculator: Dynamic ROI calculation with cascade effects
+  - EffortEstimator: Realistic effort estimation
 - `insights.rs`: Risk insight generation and formatting
 
 ### IO (`src/io/`)

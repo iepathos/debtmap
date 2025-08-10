@@ -85,6 +85,16 @@ pub struct RiskAnalyzer {
     debt_threshold: Option<f64>,
 }
 
+impl Clone for RiskAnalyzer {
+    fn clone(&self) -> Self {
+        Self {
+            strategy: self.strategy.box_clone(),
+            debt_score: self.debt_score,
+            debt_threshold: self.debt_threshold,
+        }
+    }
+}
+
 impl Default for RiskAnalyzer {
     fn default() -> Self {
         Self {
