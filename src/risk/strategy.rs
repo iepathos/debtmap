@@ -79,7 +79,12 @@ impl RiskCalculator for EnhancedRiskStrategy {
     fn calculate(&self, context: &RiskContext) -> FunctionRisk {
         let risk_score = self.calculate_risk_score(context);
         let test_effort = self.estimate_test_effort(&context.complexity);
-        let risk_category = self.categorize_risk(&context.complexity, context.coverage, risk_score, context.is_test);
+        let risk_category = self.categorize_risk(
+            &context.complexity,
+            context.coverage,
+            risk_score,
+            context.is_test,
+        );
 
         FunctionRisk {
             file: context.file.clone(),
@@ -98,10 +103,10 @@ impl RiskCalculator for EnhancedRiskStrategy {
     fn calculate_risk_score(&self, context: &RiskContext) -> f64 {
         let base_risk = self.calculate_base_risk(context);
         let debt_factor = self.calculate_debt_factor(context.debt_score, context.debt_threshold);
-        
+
         // Don't apply coverage penalty to test functions - they don't need test coverage
         let coverage_penalty = if context.is_test {
-            1.0  // No penalty for test functions
+            1.0 // No penalty for test functions
         } else {
             self.calculate_coverage_penalty(context.coverage)
         };
@@ -132,7 +137,7 @@ impl EnhancedRiskStrategy {
 
         // For test functions, don't include coverage in risk calculation
         let coverage_component = if context.is_test {
-            0.0  // Test functions don't need test coverage
+            0.0 // Test functions don't need test coverage
         } else {
             match context.coverage {
                 Some(cov) => (100.0 - cov) / 100.0 * self.weights.coverage,
@@ -219,10 +224,10 @@ impl EnhancedRiskStrategy {
         // For test functions, categorize based on complexity only (not coverage)
         if is_test {
             return match avg_complexity {
-                c if c > 20 => RiskCategory::High,      // Very complex test
-                c if c > 10 => RiskCategory::Medium,    // Complex test
-                c if c > 5 => RiskCategory::Low,        // Moderately complex test
-                _ => RiskCategory::Low,                 // Simple test
+                c if c > 20 => RiskCategory::High,   // Very complex test
+                c if c > 10 => RiskCategory::Medium, // Complex test
+                c if c > 5 => RiskCategory::Low,     // Moderately complex test
+                _ => RiskCategory::Low,              // Simple test
             };
         }
 
