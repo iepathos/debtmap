@@ -136,8 +136,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn create_test_results() -> AnalysisResults {
-        let mut items = Vec::new();
-        items.push(DebtItem {
+        let items = vec![DebtItem {
             id: "test-1".to_string(),
             debt_type: DebtType::Todo,
             priority: Priority::Medium,
@@ -145,7 +144,7 @@ mod tests {
             line: 5,
             message: "TODO: Implement feature".to_string(),
             context: None,
-        });
+        }];
 
         let metrics = vec![FunctionMetrics {
             name: "test_func".to_string(),
