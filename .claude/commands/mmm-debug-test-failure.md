@@ -6,7 +6,7 @@ Fix failing tests by analyzing test output and applying targeted fixes.
 
 ## Variables
 
---spec: Path to spec file that generated the tests
+--spec: Optional path to spec file that generated code that introduced regression.
 --output: Test failure output from cargo test
 
 ## Execute
