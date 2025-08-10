@@ -326,99 +326,79 @@ impl CriticalityScorer {
     }
 }
 
-// =============== ROI Calculator ===============
+// =============== ROI Calculator (Legacy) ===============
+// This is kept for backward compatibility but delegates to the new advanced ROI system
+
+pub use super::roi::{
+    ROIBreakdown, ROICalculator as AdvancedROICalculator, ROIComponent, ROIConfig,
+    ROI as AdvancedROI,
+};
 
 pub struct ROICalculator {
+    advanced_calculator: AdvancedROICalculator,
     risk_analyzer: RiskAnalyzer,
 }
 
 impl ROICalculator {
     pub fn new(risk_analyzer: RiskAnalyzer) -> Self {
-        Self { risk_analyzer }
+        let advanced_calculator = AdvancedROICalculator::new(risk_analyzer.clone());
+        Self {
+            advanced_calculator,
+            risk_analyzer,
+        }
     }
 
-    pub fn calculate(&self, target: &TestTarget, target_coverage: f64) -> ROI {
-        let risk_reduction = self.calculate_risk_reduction(target, target_coverage);
-        let effort = EffortEstimator::new().estimate(target);
-        let cascade_impact = self.calculate_cascade_effect(target);
+    pub fn calculate(&self, target: &TestTarget, _target_coverage: f64) -> ROI {
+        // Create context for advanced calculator
+        let context = self.create_context(target);
 
-        let value = if effort > 0.0 {
-            (risk_reduction + cascade_impact) / effort
-        } else {
-            risk_reduction + cascade_impact
-        };
+        // Use advanced calculator
+        let advanced_roi = self.advanced_calculator.calculate(target, &context);
 
+        // Convert to legacy ROI format for compatibility
         ROI {
-            value,
-            risk_reduction,
-            effort,
-            cascade_impact,
-            explanation: self.generate_explanation(target, risk_reduction, effort),
+            value: advanced_roi.value,
+            risk_reduction: advanced_roi.direct_impact.percentage,
+            effort: advanced_roi.effort.hours,
+            cascade_impact: advanced_roi.cascade_impact.total_risk_reduction,
+            explanation: advanced_roi.breakdown.explanation,
         }
     }
 
-    fn calculate_risk_reduction(&self, target: &TestTarget, target_coverage: f64) -> f64 {
-        let current_risk = target.current_risk;
+    fn create_context(&self, target: &TestTarget) -> super::roi::Context {
+        // Build dependency graph from target information
+        let mut nodes = im::HashMap::new();
+        let mut edges = im::Vector::new();
 
-        // Project new risk with target coverage
-        let projected_risk = self.risk_analyzer.calculate_risk_score(
-            target.complexity.cyclomatic_complexity,
-            target.complexity.cognitive_complexity,
-            Some(target_coverage),
+        // Add current target as a node
+        nodes.insert(
+            target.id.clone(),
+            super::roi::DependencyNode {
+                id: target.id.clone(),
+                path: target.path.clone(),
+                risk: target.current_risk,
+                complexity: target.complexity.clone(),
+            },
         );
 
-        // Calculate percentage reduction
-        if current_risk > 0.0 {
-            ((current_risk - projected_risk) / current_risk * 100.0).max(0.0)
-        } else {
-            0.0
+        // Add dependents as edges
+        for dependent in &target.dependents {
+            edges.push_back(super::roi::DependencyEdge {
+                from: target.id.clone(),
+                to: dependent.clone(),
+                weight: 0.8, // Default weight
+            });
         }
-    }
 
-    fn calculate_cascade_effect(&self, target: &TestTarget) -> f64 {
-        // Each dependent gets indirect benefit
-        let dependent_count = target.dependents.len() as f64;
-        let base_impact = dependent_count * 0.5; // 0.5% per dependent
-
-        // Zero coverage has higher cascade effect
-        let coverage_multiplier = if target.current_coverage == 0.0 {
-            2.0
-        } else {
-            1.0
-        };
-
-        base_impact * coverage_multiplier
-    }
-
-    fn generate_explanation(
-        &self,
-        target: &TestTarget,
-        risk_reduction: f64,
-        effort: f64,
-    ) -> String {
-        let coverage_str = if target.current_coverage == 0.0 {
-            "completely untested".to_string()
-        } else {
-            format!("{:.0}% covered", target.current_coverage)
-        };
-
-        let complexity_str = format!(
-            "complexity {}/{}",
-            target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity
-        );
-
-        let impact_str = if !target.dependents.is_empty() {
-            format!(" affecting {} modules", target.dependents.len())
-        } else {
-            String::new()
-        };
-
-        format!(
-            "Currently {coverage_str} with {complexity_str}{impact_str} - testing would reduce risk by {risk_reduction:.1}% with effort {effort:.0}"
-        )
+        super::roi::Context {
+            dependency_graph: super::roi::DependencyGraph { nodes, edges },
+            critical_paths: vec![],
+            historical_data: None,
+        }
     }
 }
 
+// Legacy ROI struct for backward compatibility
 #[derive(Clone, Debug)]
 pub struct ROI {
     pub value: f64,
