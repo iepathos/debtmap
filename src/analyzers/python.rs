@@ -148,6 +148,7 @@ fn extract_function_smell_items(
 ) -> Vec<DebtItem> {
     functions
         .iter()
+        .filter(|func| !func.is_test)
         .flat_map(|func| {
             let param_count = count_python_params(module, &func.name);
             analyze_function_smells(func, param_count)
@@ -409,7 +410,7 @@ fn extract_debt_items(
 ) -> Vec<DebtItem> {
     functions
         .iter()
-        .filter(|func| func.is_complex(threshold))
+        .filter(|func| !func.is_test && func.is_complex(threshold))
         .map(|func| create_python_complexity_debt_item(func, threshold))
         .collect()
 }
