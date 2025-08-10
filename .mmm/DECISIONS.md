@@ -145,3 +145,24 @@ Implement enhanced risk formula with strategy pattern, increasing coverage weigh
 - ✅ Legacy mode for backwards compatibility
 - ✅ More actionable risk insights
 - ⚠️ Breaking change in risk score values without --legacy-risk flag
+
+---
+
+## ADR-009: Multi-Stage Testing Prioritization Pipeline
+**Date**: 2025-08-10
+**Status**: Accepted
+
+### Context
+Previous testing prioritization produced suboptimal recommendations with uniform ROI values (all 1.1), prioritized low-complexity functions over untested critical modules, and showed unrealistic risk reduction estimates.
+
+### Decision
+Implement a multi-stage prioritization pipeline with specialized stages for zero-coverage detection, criticality scoring, complexity risk analysis, dependency impact, and effort optimization. Use dynamic ROI calculation with cascade effects and realistic effort estimation.
+
+### Consequences
+- ✅ Zero-coverage modules always prioritized first
+- ✅ Entry points and core modules properly weighted
+- ✅ Realistic ROI values with meaningful variation
+- ✅ Accurate risk reduction estimates (1-20% range)
+- ✅ Clear rationale for each recommendation
+- ✅ Extensible pipeline architecture
+- ⚠️ More complex implementation than simple sorting
