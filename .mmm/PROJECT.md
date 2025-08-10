@@ -78,6 +78,21 @@ src/
 ```
 
 ## Next Steps
+
+### Immediate Priority (Spec 09)
+- Fix critical complexity calculation bugs:
+  - Cyclomatic complexity not counting branches correctly
+  - Cognitive complexity nesting miscalculations
+  - Function counting issues (601 files = 601 functions bug)
+  - Unrealistic average complexity (should be 3-8, not 1.5)
+
+### Near-term Enhancements
+- Spec 10: Add modern pattern detection (async/await, callbacks, functional)
+- Spec 11: Implement context-aware risk assessment
+- Spec 12: Improve ROI calculations
+- Spec 13: Add risk categorization system
+
+### Long-term Goals
 - Add more language support via tree-sitter
 - Implement incremental analysis caching
 - Add historical trend tracking

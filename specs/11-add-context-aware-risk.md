@@ -1,5 +1,5 @@
 ---
-number: 10
+number: 11
 title: Add Context-Aware Risk Analysis
 category: optimization
 priority: high
@@ -8,7 +8,7 @@ dependencies: [07, 08]
 created: 2025-01-10
 ---
 
-# Specification 10: Add Context-Aware Risk Analysis
+# Specification 11: Add Context-Aware Risk Analysis
 
 **Category**: optimization
 **Priority**: high
