@@ -54,17 +54,14 @@ jobs:
     - name: Generate coverage data
       run: cargo tarpaulin --out lcov --output-dir target/coverage --timeout 120
 
-    - name: Run debtmap analysis with coverage
+    - name: Run debtmap validation with coverage
       run: |
         if [ -f "target/coverage/lcov.info" ]; then
-          ./target/release/debtmap analyze . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
+          ./target/release/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
         else
-          echo "Warning: LCOV file not found, running analysis without coverage data"
-          ./target/release/debtmap analyze . --format json --output debtmap-report.json
+          echo "Warning: LCOV file not found, running validation without coverage data"
+          ./target/release/debtmap validate . --format json --output debtmap-report.json
         fi
-
-    - name: Run debtmap validation
-      run: ./target/release/debtmap validate .
       
     - name: Upload debtmap report and coverage
       if: always()

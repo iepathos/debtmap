@@ -69,6 +69,30 @@ pub enum Commands {
         /// Configuration file
         #[arg(short, long)]
         config: Option<PathBuf>,
+
+        /// Optional LCOV coverage file for risk analysis
+        #[arg(long = "coverage-file", alias = "lcov")]
+        coverage_file: Option<PathBuf>,
+
+        /// Output format
+        #[arg(short, long, value_enum)]
+        format: Option<OutputFormat>,
+
+        /// Output file (defaults to stdout)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Enable context-aware risk analysis
+        #[arg(long = "context", alias = "enable-context")]
+        enable_context: bool,
+
+        /// Context providers to use (critical_path, dependency, git_history)
+        #[arg(long = "context-providers", value_delimiter = ',')]
+        context_providers: Option<Vec<String>>,
+
+        /// Disable specific context providers
+        #[arg(long = "disable-context", value_delimiter = ',')]
+        disable_context: Option<Vec<String>>,
     },
 }
 
@@ -220,7 +244,7 @@ mod tests {
         let cli = Cli::parse_from(args);
 
         match cli.command {
-            Commands::Validate { path, config } => {
+            Commands::Validate { path, config, .. } => {
                 assert_eq!(path, PathBuf::from("/test/path"));
                 assert_eq!(config, Some(PathBuf::from("/config/path")));
             }
