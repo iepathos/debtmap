@@ -230,7 +230,7 @@ impl PythonPatternDetector {
             ast::Expr::Call(call) => {
                 if let Some(ref func_name) = self.current_function_name {
                     if let ast::Expr::Name(name) = &*call.func {
-                        if name.id.to_string() == *func_name {
+                        if name.id == *func_name {
                             self.patterns.recursive_calls += 1;
                         }
                     }
@@ -276,10 +276,12 @@ mod tests {
 
     #[test]
     fn test_python_pattern_complexity_total() {
-        let mut patterns = PythonPatternComplexity::default();
-        patterns.async_await_count = 2;
-        patterns.decorator_count = 3;
-        patterns.generator_count = 1;
+        let patterns = PythonPatternComplexity {
+            async_await_count: 2,
+            decorator_count: 3,
+            generator_count: 1,
+            ..Default::default()
+        };
 
         assert_eq!(patterns.total_complexity(), 2 * 2 + 3 + 2);
     }
