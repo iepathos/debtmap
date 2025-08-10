@@ -68,6 +68,8 @@ pub struct TestingRecommendation {
     pub test_effort_estimate: TestEffort,
     pub rationale: String,
     pub roi: Option<f64>,
+    pub dependencies: Vec<String>,
+    pub dependents: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

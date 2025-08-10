@@ -568,6 +568,8 @@ pub fn prioritize_by_roi(
             test_effort_estimate: complexity_to_test_effort(&target.complexity),
             rationale: generate_enhanced_rationale_v2(&target, &roi),
             roi: Some(roi.value),
+            dependencies: target.dependencies.clone(),
+            dependents: target.dependents.clone(),
         };
 
         recommendations.push_back(recommendation);
@@ -787,12 +789,18 @@ fn complexity_to_test_effort(complexity: &ComplexityMetrics) -> TestEffort {
     }
 }
 
-fn generate_enhanced_rationale_v2(target: &TestTarget, roi: &crate::risk::roi::ROI) -> String {
-    let module_str = format!("{:?}", target.module_type).to_lowercase();
+fn generate_enhanced_rationale_v2(target: &TestTarget, _roi: &crate::risk::roi::ROI) -> String {
     let coverage_str = if target.current_coverage == 0.0 {
-        "NO test coverage"
+        "NO test coverage".to_string()
     } else {
-        "incomplete coverage"
+        format!("{:.0}% coverage", target.current_coverage)
+    };
+
+    let complexity_desc = match target.complexity.cognitive_complexity {
+        0..=7 => "Simple",
+        8..=15 => "Moderate",
+        16..=30 => "Complex",
+        _ => "Very complex",
     };
 
     let complexity_str = format!(
@@ -800,34 +808,45 @@ fn generate_enhanced_rationale_v2(target: &TestTarget, roi: &crate::risk::roi::R
         target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity
     );
 
-    format!(
-        "{} {} with {} - {} code ({}). ROI: {:.1}x with {:.1}% risk reduction",
-        match target.module_type {
-            ModuleType::EntryPoint => "Critical entry point",
-            ModuleType::Core => "Core module",
-            ModuleType::Api => "API module",
-            ModuleType::IO => "I/O module",
-            ModuleType::Model => "Data model",
-            ModuleType::Utility => "Utility module",
-            ModuleType::Test => "Test module",
-            _ => &module_str,
-        },
-        if target.current_coverage == 0.0 {
-            "completely untested"
-        } else {
-            coverage_str
-        },
-        coverage_str,
-        match target.complexity.cognitive_complexity {
-            0..=7 => "simple",
-            8..=15 => "moderate",
-            16..=30 => "complex",
-            _ => "very complex",
-        },
-        complexity_str,
-        roi.value,
-        roi.direct_impact.percentage
-    )
+    let effort_desc = match (
+        target.complexity.cyclomatic_complexity,
+        target.complexity.cognitive_complexity,
+    ) {
+        (1..=3, 1..=7) => " - easy win",
+        (1..=5, 1..=10) => " - quick test",
+        (6..=10, _) => " - moderate effort",
+        _ => " - requires effort",
+    };
+
+    let roi_desc = if target.dependents.len() >= 3 && target.complexity.cognitive_complexity <= 10 {
+        " - maximum ROI"
+    } else if target.module_type == ModuleType::EntryPoint {
+        " - critical path"
+    } else {
+        ""
+    };
+
+    let module_desc = match target.module_type {
+        ModuleType::EntryPoint => "Critical entry point completely untested",
+        ModuleType::Core => "Core module completely untested",
+        ModuleType::Api => "API module completely untested",
+        ModuleType::IO => "I/O module completely untested",
+        ModuleType::Model => "Data model completely untested",
+        ModuleType::Utility => "Utility module completely untested",
+        ModuleType::Test => "Test module untested",
+        _ => "Module completely untested",
+    };
+
+    if target.current_coverage == 0.0 {
+        format!(
+            "{module_desc} with NO test coverage\n            {complexity_desc} code ({complexity_str}){effort_desc}{roi_desc}"
+        )
+    } else {
+        format!(
+            "{} with {coverage_str}\n            {complexity_desc} code ({complexity_str}){effort_desc}{roi_desc}",
+            module_desc.replace("completely untested", "")
+        )
+    }
 }
 
 fn _generate_enhanced_rationale(target: &TestTarget, roi: &ROI) -> String {
