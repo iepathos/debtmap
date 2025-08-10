@@ -1,5 +1,6 @@
 pub mod output;
 pub mod walker;
+pub mod writers;
 
 use anyhow::Result;
 use std::fs;
