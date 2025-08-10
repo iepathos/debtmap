@@ -580,16 +580,22 @@ fn validate_project(config: ValidateConfig) -> Result<()> {
         );
 
         if let Some(insights) = risk_insights {
-            println!("\n  Overall codebase risk score: {:.1}", insights.codebase_risk_score);
-            
+            println!(
+                "\n  Overall codebase risk score: {:.1}",
+                insights.codebase_risk_score
+            );
+
             if !insights.top_risks.is_empty() {
                 println!("\n  Critical risk functions (high complexity + low/no coverage):");
                 for func in insights.top_risks.iter().take(5) {
-                    let coverage_str = func.coverage_percentage
+                    let coverage_str = func
+                        .coverage_percentage
                         .map(|c| format!("{:.0}%", c * 100.0))
                         .unwrap_or_else(|| "0%".to_string());
-                    println!("    - {} (risk: {:.1}, coverage: {})", 
-                        func.function_name, func.risk_score, coverage_str);
+                    println!(
+                        "    - {} (risk: {:.1}, coverage: {})",
+                        func.function_name, func.risk_score, coverage_str
+                    );
                 }
             }
         }
