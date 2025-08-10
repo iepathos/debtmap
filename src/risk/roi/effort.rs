@@ -69,6 +69,12 @@ impl Default for ComplexityFactors {
     }
 }
 
+impl Default for AdvancedEffortModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AdvancedEffortModel {
     pub fn new() -> Self {
         Self {
