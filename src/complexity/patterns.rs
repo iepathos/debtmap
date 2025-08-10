@@ -144,6 +144,79 @@ impl PatternDetector {
             }
         }
     }
+
+    fn handle_await_expr(&mut self) {
+        self.patterns.async_await_count += 1;
+    }
+
+    fn handle_closure_expr(&mut self, closure: &syn::ExprClosure) {
+        self.closure_depth += 1;
+        if closure.asyncness.is_some() {
+            self.patterns.async_await_count += 1;
+        }
+        syn::visit::visit_expr_closure(self, closure);
+        self.closure_depth -= 1;
+    }
+
+    fn handle_method_call_expr(&mut self, expr: &Expr) {
+        let chain_length = self.detect_method_chain(expr);
+        if chain_length > 2 {
+            self.patterns.method_chain_length = self.patterns.method_chain_length.max(chain_length);
+        }
+
+        self.detect_functional_composition(expr);
+        self.check_recursive_method_call(expr);
+        syn::visit::visit_expr(self, expr);
+    }
+
+    fn check_recursive_method_call(&mut self, expr: &Expr) {
+        if let Some(ref func_name) = self.current_function_name {
+            if let Expr::MethodCall(method) = expr {
+                if method.method == func_name {
+                    self.patterns.recursive_calls += 1;
+                }
+            }
+        }
+    }
+
+    fn handle_if_expr(&mut self, if_expr: &syn::ExprIf) {
+        let is_ternary = if_expr.else_branch.is_some()
+            && if_expr.then_branch.stmts.len() == 1
+            && matches!(&if_expr.then_branch.stmts[0], syn::Stmt::Expr(_, None));
+
+        if is_ternary {
+            self.ternary_depth += 1;
+            if self.ternary_depth > 1 {
+                self.patterns.nested_ternaries += 1;
+            }
+            syn::visit::visit_expr_if(self, if_expr);
+            self.ternary_depth -= 1;
+        } else {
+            syn::visit::visit_expr_if(self, if_expr);
+        }
+    }
+
+    fn handle_unsafe_expr(&mut self, expr: &Expr) {
+        self.patterns.unsafe_blocks += 1;
+        syn::visit::visit_expr(self, expr);
+    }
+
+    fn handle_call_expr(&mut self, call: &syn::ExprCall) {
+        self.check_recursive_function_call(call);
+        syn::visit::visit_expr_call(self, call);
+    }
+
+    fn check_recursive_function_call(&mut self, call: &syn::ExprCall) {
+        if let Some(ref func_name) = self.current_function_name {
+            if let Expr::Path(path) = &*call.func {
+                if let Some(segment) = path.path.segments.last() {
+                    if segment.ident == func_name {
+                        self.patterns.recursive_calls += 1;
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for PatternDetector {
@@ -169,91 +242,13 @@ impl<'ast> Visit<'ast> for PatternDetector {
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
         match expr {
-            // Async/await detection
-            Expr::Await(_) => {
-                self.patterns.async_await_count += 1;
-            }
-
-            // Closure detection - only count async closures for patterns
-            // Regular closures are already handled in cognitive complexity
-            Expr::Closure(closure) => {
-                self.closure_depth += 1;
-
-                // Only count async closures in patterns (they add extra complexity)
-                // Regular closures are already counted in cognitive complexity
-                if closure.asyncness.is_some() {
-                    self.patterns.async_await_count += 1;
-                }
-
-                syn::visit::visit_expr_closure(self, closure);
-                self.closure_depth -= 1;
-            }
-
-            // Method chain detection
-            Expr::MethodCall(_) => {
-                let chain_length = self.detect_method_chain(expr);
-                if chain_length > 2 {
-                    self.patterns.method_chain_length =
-                        self.patterns.method_chain_length.max(chain_length);
-                }
-
-                // Functional composition detection
-                self.detect_functional_composition(expr);
-
-                // Check for recursive calls
-                if let Some(ref func_name) = self.current_function_name {
-                    if let Expr::MethodCall(method) = expr {
-                        if method.method == func_name {
-                            self.patterns.recursive_calls += 1;
-                        }
-                    }
-                }
-
-                syn::visit::visit_expr(self, expr);
-            }
-
-            // Ternary/conditional expression detection
-            // Only count as ternary if it's an if-expression with else branch
-            // and single expressions (not statements) in both branches
-            Expr::If(if_expr)
-                if if_expr.else_branch.is_some()
-                    && if_expr.then_branch.stmts.len() == 1
-                    && matches!(&if_expr.then_branch.stmts[0], syn::Stmt::Expr(_, None)) =>
-            {
-                self.ternary_depth += 1;
-                if self.ternary_depth > 1 {
-                    self.patterns.nested_ternaries += 1;
-                }
-                syn::visit::visit_expr_if(self, if_expr);
-                self.ternary_depth -= 1;
-            }
-
-            // Try expressions are already counted in cognitive complexity,
-            // so we don't add them to patterns to avoid double-counting
-            Expr::Try(_) => {
-                syn::visit::visit_expr(self, expr);
-            }
-
-            // Unsafe block detection
-            Expr::Unsafe(_) => {
-                self.patterns.unsafe_blocks += 1;
-                syn::visit::visit_expr(self, expr);
-            }
-
-            // Recursive call detection for direct function calls
-            Expr::Call(call) => {
-                if let Some(ref func_name) = self.current_function_name {
-                    if let Expr::Path(path) = &*call.func {
-                        if let Some(segment) = path.path.segments.last() {
-                            if segment.ident == func_name {
-                                self.patterns.recursive_calls += 1;
-                            }
-                        }
-                    }
-                }
-                syn::visit::visit_expr(self, expr);
-            }
-
+            Expr::Await(_) => self.handle_await_expr(),
+            Expr::Closure(closure) => self.handle_closure_expr(closure),
+            Expr::MethodCall(_) => self.handle_method_call_expr(expr),
+            Expr::If(if_expr) => self.handle_if_expr(if_expr),
+            Expr::Try(_) => syn::visit::visit_expr(self, expr),
+            Expr::Unsafe(_) => self.handle_unsafe_expr(expr),
+            Expr::Call(call) => self.handle_call_expr(call),
             _ => syn::visit::visit_expr(self, expr),
         }
     }
