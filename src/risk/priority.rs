@@ -70,6 +70,137 @@ pub enum ModuleType {
     Unknown,    // Default/unknown
 }
 
+// =============== Helper Structures for Complexity Reduction ===============
+
+/// Module type detector with functional pattern matching
+struct ModuleTypeDetector;
+
+impl ModuleTypeDetector {
+    /// Check if the file is an entry point
+    fn is_entry_point(file_name: &str) -> bool {
+        matches!(file_name, "main.rs" | "lib.rs")
+    }
+
+    /// Determine module type based on path patterns
+    fn from_path_patterns(path_str: &str) -> ModuleType {
+        const PATTERNS: &[(&[&str], ModuleType)] = &[
+            (&["test"], ModuleType::Test),
+            (&["core"], ModuleType::Core),
+            (&["api", "handler"], ModuleType::Api),
+            (&["model"], ModuleType::Model),
+            (&["io", "output"], ModuleType::IO),
+            (&["util", "helper"], ModuleType::Utility),
+        ];
+
+        PATTERNS
+            .iter()
+            .find(|(keywords, _)| keywords.iter().any(|k| path_str.contains(k)))
+            .map(|(_, module_type)| module_type.clone())
+            .unwrap_or(ModuleType::Unknown)
+    }
+}
+
+/// Functional rationale builder for test recommendations
+struct RationaleBuilder;
+
+impl RationaleBuilder {
+    fn coverage_description(coverage: f64) -> String {
+        match coverage {
+            0.0 => "NO test coverage".to_string(),
+            c => format!("{c:.0}% coverage"),
+        }
+    }
+
+    fn complexity_level(cognitive: u32) -> &'static str {
+        match cognitive {
+            0..=7 => "Simple",
+            8..=15 => "Moderate",
+            16..=30 => "Complex",
+            _ => "Very complex",
+        }
+    }
+
+    fn effort_description(cyclomatic: u32, cognitive: u32) -> &'static str {
+        match (cyclomatic, cognitive) {
+            (1..=3, 1..=7) => " - easy win",
+            (1..=5, 1..=10) => " - quick test",
+            (6..=10, _) => " - moderate effort",
+            _ => " - requires effort",
+        }
+    }
+
+    fn roi_description(target: &TestTarget) -> &'static str {
+        match (
+            target.dependents.len(),
+            target.complexity.cognitive_complexity,
+            &target.module_type,
+        ) {
+            (3.., 0..=10, _) => " - maximum ROI",
+            (_, _, ModuleType::EntryPoint) => " - critical path",
+            _ => "",
+        }
+    }
+
+    fn module_description(module_type: &ModuleType, has_coverage: bool) -> String {
+        let base = match module_type {
+            ModuleType::EntryPoint => "Critical entry point",
+            ModuleType::Core => "Core module",
+            ModuleType::Api => "API module",
+            ModuleType::IO => "I/O module",
+            ModuleType::Model => "Data model",
+            ModuleType::Utility => "Utility module",
+            ModuleType::Test => "Test module",
+            ModuleType::Unknown => "Module",
+        };
+
+        if has_coverage {
+            base.to_string()
+        } else {
+            format!("{base} completely untested")
+        }
+    }
+}
+
+// Pure function helpers for complexity reduction
+#[allow(dead_code)]
+fn describe_coverage_status(target: &TestTarget) -> &'static str {
+    match (target.current_coverage, &target.module_type) {
+        (0.0, ModuleType::EntryPoint) => "Critical entry point with NO test coverage",
+        (0.0, ModuleType::Core) => "Core module completely untested",
+        (0.0, ModuleType::Api) => "API handler with zero coverage",
+        (0.0, ModuleType::IO) => "I/O module without any tests",
+        (0.0, _) => "Module has no test coverage",
+        (c, _) if c < 30.0 => "Poorly tested",
+        (c, _) if c < 60.0 => "Moderately tested",
+        _ => "Well tested",
+    }
+}
+
+#[allow(dead_code)]
+fn describe_complexity(metrics: &ComplexityMetrics) -> &'static str {
+    use std::cmp::max;
+    let max_complexity = max(
+        metrics.cyclomatic_complexity / 2,
+        metrics.cognitive_complexity / 4,
+    );
+
+    match max_complexity {
+        0..=2 => "simple",
+        3..=5 => "moderately complex",
+        6..=10 => "highly complex",
+        _ => "extremely complex",
+    }
+}
+
+#[allow(dead_code)]
+fn describe_impact(dependents: &[String]) -> String {
+    match dependents.len() {
+        0 => String::new(),
+        1..=5 => format!(" - affects {} other modules", dependents.len()),
+        n => format!(" - critical dependency for {n} modules"),
+    }
+}
+
 // =============== Prioritization Stages ===============
 
 pub struct ZeroCoverageStage {
@@ -605,30 +736,14 @@ fn function_risk_to_target(risk: &FunctionRisk) -> TestTarget {
 }
 
 fn determine_module_type(path: &Path) -> ModuleType {
-    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-    match file_name {
-        "main.rs" => ModuleType::EntryPoint,
-        "lib.rs" => ModuleType::EntryPoint,
-        _ => {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .filter(|name| ModuleTypeDetector::is_entry_point(name))
+        .map(|_| ModuleType::EntryPoint)
+        .unwrap_or_else(|| {
             let path_str = path.to_string_lossy().to_lowercase();
-            if path_str.contains("test") {
-                ModuleType::Test
-            } else if path_str.contains("core") {
-                ModuleType::Core
-            } else if path_str.contains("api") || path_str.contains("handler") {
-                ModuleType::Api
-            } else if path_str.contains("model") {
-                ModuleType::Model
-            } else if path_str.contains("io") || path_str.contains("output") {
-                ModuleType::IO
-            } else if path_str.contains("util") || path_str.contains("helper") {
-                ModuleType::Utility
-            } else {
-                ModuleType::Unknown
-            }
-        }
-    }
+            ModuleTypeDetector::from_path_patterns(&path_str)
+        })
 }
 
 /// Build a dependency graph from TestTarget data
@@ -790,102 +905,30 @@ fn complexity_to_test_effort(complexity: &ComplexityMetrics) -> TestEffort {
 }
 
 fn generate_enhanced_rationale_v2(target: &TestTarget, _roi: &crate::risk::roi::ROI) -> String {
-    let coverage_str = if target.current_coverage == 0.0 {
-        "NO test coverage".to_string()
-    } else {
-        format!("{:.0}% coverage", target.current_coverage)
-    };
-
-    let complexity_desc = match target.complexity.cognitive_complexity {
-        0..=7 => "Simple",
-        8..=15 => "Moderate",
-        16..=30 => "Complex",
-        _ => "Very complex",
-    };
-
+    let coverage_str = RationaleBuilder::coverage_description(target.current_coverage);
+    let complexity_desc =
+        RationaleBuilder::complexity_level(target.complexity.cognitive_complexity);
     let complexity_str = format!(
         "cyclo={}, cognitive={}",
         target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity
     );
-
-    let effort_desc = match (
+    let effort_desc = RationaleBuilder::effort_description(
         target.complexity.cyclomatic_complexity,
         target.complexity.cognitive_complexity,
-    ) {
-        (1..=3, 1..=7) => " - easy win",
-        (1..=5, 1..=10) => " - quick test",
-        (6..=10, _) => " - moderate effort",
-        _ => " - requires effort",
-    };
+    );
+    let roi_desc = RationaleBuilder::roi_description(target);
+    let module_desc =
+        RationaleBuilder::module_description(&target.module_type, target.current_coverage > 0.0);
 
-    let roi_desc = if target.dependents.len() >= 3 && target.complexity.cognitive_complexity <= 10 {
-        " - maximum ROI"
-    } else if target.module_type == ModuleType::EntryPoint {
-        " - critical path"
-    } else {
-        ""
-    };
-
-    let module_desc = match target.module_type {
-        ModuleType::EntryPoint => "Critical entry point completely untested",
-        ModuleType::Core => "Core module completely untested",
-        ModuleType::Api => "API module completely untested",
-        ModuleType::IO => "I/O module completely untested",
-        ModuleType::Model => "Data model completely untested",
-        ModuleType::Utility => "Utility module completely untested",
-        ModuleType::Test => "Test module untested",
-        _ => "Module completely untested",
-    };
-
-    if target.current_coverage == 0.0 {
-        format!(
-            "{module_desc} with NO test coverage\n            {complexity_desc} code ({complexity_str}){effort_desc}{roi_desc}"
-        )
-    } else {
-        format!(
-            "{} with {coverage_str}\n            {complexity_desc} code ({complexity_str}){effort_desc}{roi_desc}",
-            module_desc.replace("completely untested", "")
-        )
-    }
+    format!(
+        "{module_desc} with {coverage_str}\n            {complexity_desc} code ({complexity_str}){effort_desc}{roi_desc}"
+    )
 }
 
 fn _generate_enhanced_rationale(target: &TestTarget, roi: &ROI) -> String {
-    let coverage_status = if target.current_coverage == 0.0 {
-        match target.module_type {
-            ModuleType::EntryPoint => "Critical entry point with NO test coverage",
-            ModuleType::Core => "Core module completely untested",
-            ModuleType::Api => "API handler with zero coverage",
-            ModuleType::IO => "I/O module without any tests",
-            _ => "Module has no test coverage",
-        }
-    } else if target.current_coverage < 30.0 {
-        "Poorly tested"
-    } else if target.current_coverage < 60.0 {
-        "Moderately tested"
-    } else {
-        "Well tested"
-    };
-
-    let complexity_desc = match (
-        target.complexity.cyclomatic_complexity,
-        target.complexity.cognitive_complexity,
-    ) {
-        (c, g) if c > 20 || g > 40 => "extremely complex",
-        (c, g) if c > 10 || g > 20 => "highly complex",
-        (c, g) if c > 5 || g > 10 => "moderately complex",
-        _ => "simple",
-    };
-
-    let impact_desc = if target.dependents.len() > 5 {
-        format!(
-            " - critical dependency for {} modules",
-            target.dependents.len()
-        )
-    } else if !target.dependents.is_empty() {
-        format!(" - affects {} other modules", target.dependents.len())
-    } else {
-        String::new()
-    };
+    let coverage_status = describe_coverage_status(target);
+    let complexity_desc = describe_complexity(&target.complexity);
+    let impact_desc = describe_impact(&target.dependents);
 
     format!(
         "{} - {} code (cyclo={}, cognitive={}){}. ROI: {:.1}x with {:.1}% risk reduction",
