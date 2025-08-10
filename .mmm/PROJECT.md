@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, and spec 08 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, and spec 09 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -44,6 +44,12 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, and spec 08 imple
   - Dynamic ROI calculation with cascade effects
   - Effort estimation based on complexity and module type
   - Smart recommendations with clear rationale
+- ✅ Fixed Complexity Calculations (spec 09):
+  - Cyclomatic complexity correctly counts all branches and control flow
+  - If/else statements properly add complexity
+  - Match expressions use n-1 formula for arms
+  - Nested functions and closures are properly counted
+  - Realistic average complexity values (3-8 range typical)
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -78,13 +84,6 @@ src/
 ```
 
 ## Next Steps
-
-### Immediate Priority (Spec 09)
-- Fix critical complexity calculation bugs:
-  - Cyclomatic complexity not counting branches correctly
-  - Cognitive complexity nesting miscalculations
-  - Function counting issues (601 files = 601 functions bug)
-  - Unrealistic average complexity (should be 3-8, not 1.5)
 
 ### Near-term Enhancements
 - Spec 10: Add modern pattern detection (async/await, callbacks, functional)

@@ -179,15 +179,27 @@ fn extract_function_metrics(
     };
 
     let lines: Vec<&str> = source_content.lines().collect();
+    let mut functions = Vec::new();
 
-    module
-        .body
-        .iter()
-        .enumerate()
-        .filter_map(|(stmt_idx, stmt)| match stmt {
+    // Recursively extract functions from the module
+    extract_functions_from_stmts(&module.body, path, &lines, &mut functions, 0);
+
+    functions
+}
+
+fn extract_functions_from_stmts(
+    stmts: &[ast::Stmt],
+    path: &Path,
+    lines: &[&str],
+    functions: &mut Vec<FunctionMetrics>,
+    stmt_offset: usize,
+) {
+    for (idx, stmt) in stmts.iter().enumerate() {
+        match stmt {
             ast::Stmt::FunctionDef(func_def) => {
-                let line_number = estimate_line_number(&lines, func_def.name.as_ref(), stmt_idx);
-                Some(FunctionMetrics {
+                let line_number =
+                    estimate_line_number(lines, func_def.name.as_ref(), stmt_offset + idx);
+                functions.push(FunctionMetrics {
                     name: func_def.name.to_string(),
                     file: path.to_path_buf(),
                     line: line_number,
@@ -195,11 +207,52 @@ fn extract_function_metrics(
                     cognitive: calculate_cognitive_python(&func_def.body),
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
-                })
+                });
+
+                // Recursively look for nested functions
+                extract_functions_from_stmts(
+                    &func_def.body,
+                    path,
+                    lines,
+                    functions,
+                    stmt_offset + idx,
+                );
             }
-            _ => None,
-        })
-        .collect()
+            ast::Stmt::AsyncFunctionDef(func_def) => {
+                let line_number =
+                    estimate_line_number(lines, func_def.name.as_ref(), stmt_offset + idx);
+                functions.push(FunctionMetrics {
+                    name: format!("async {}", func_def.name),
+                    file: path.to_path_buf(),
+                    line: line_number,
+                    cyclomatic: calculate_cyclomatic_python(&func_def.body),
+                    cognitive: calculate_cognitive_python(&func_def.body),
+                    nesting: calculate_nesting_python(&func_def.body),
+                    length: func_def.body.len(),
+                });
+
+                // Recursively look for nested functions
+                extract_functions_from_stmts(
+                    &func_def.body,
+                    path,
+                    lines,
+                    functions,
+                    stmt_offset + idx,
+                );
+            }
+            ast::Stmt::ClassDef(class_def) => {
+                // Look for methods in classes
+                extract_functions_from_stmts(
+                    &class_def.body,
+                    path,
+                    lines,
+                    functions,
+                    stmt_offset + idx,
+                );
+            }
+            _ => {}
+        }
+    }
 }
 
 fn estimate_line_number(lines: &[&str], func_name: &str, _stmt_idx: usize) -> usize {
@@ -235,9 +288,27 @@ fn calculate_cyclomatic_python(body: &[ast::Stmt]) -> u32 {
 
 fn count_branches_stmt(stmt: &ast::Stmt) -> u32 {
     match stmt {
-        ast::Stmt::If(_) | ast::Stmt::While(_) | ast::Stmt::For(_) => 1,
-        ast::Stmt::Try(try_stmt) => try_stmt.handlers.len() as u32,
+        ast::Stmt::If(if_stmt) => {
+            let mut count = 1;
+            if !if_stmt.orelse.is_empty() {
+                count += if_stmt.orelse.iter().map(count_branches_stmt).sum::<u32>();
+                if !matches!(if_stmt.orelse.first(), Some(ast::Stmt::If(_))) {
+                    count += 1;
+                }
+            }
+            count + if_stmt.body.iter().map(count_branches_stmt).sum::<u32>()
+        }
+        ast::Stmt::While(while_stmt) => {
+            1 + while_stmt.body.iter().map(count_branches_stmt).sum::<u32>()
+        }
+        ast::Stmt::For(for_stmt) => 1 + for_stmt.body.iter().map(count_branches_stmt).sum::<u32>(),
+        ast::Stmt::Try(try_stmt) => {
+            let handler_count = try_stmt.handlers.len() as u32;
+            let body_count: u32 = try_stmt.body.iter().map(count_branches_stmt).sum();
+            handler_count + body_count
+        }
         ast::Stmt::With(with_stmt) => with_stmt.body.iter().map(count_branches_stmt).sum(),
+        ast::Stmt::Match(match_stmt) => match_stmt.cases.len().saturating_sub(1) as u32,
         _ => 0,
     }
 }

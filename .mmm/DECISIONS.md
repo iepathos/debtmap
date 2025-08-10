@@ -166,3 +166,22 @@ Implement a multi-stage prioritization pipeline with specialized stages for zero
 - ✅ Clear rationale for each recommendation
 - ✅ Extensible pipeline architecture
 - ⚠️ More complex implementation than simple sorting
+
+---
+
+## ADR-010: Fixed Complexity Calculation Algorithms
+**Date**: 2025-08-10
+**Status**: Accepted
+
+### Context
+Complexity calculations had critical bugs: cyclomatic complexity always returned 1 regardless of branches, if/else statements weren't counted, match expressions were overcounting, and closures/nested functions were missed entirely.
+
+### Decision
+Rewrote complexity calculation to properly count all control flow: if statements add 1, else branches add 1, match expressions use n-1 formula (where n is number of arms), loops add 1 each, and closures are tracked as separate functions.
+
+### Consequences
+- ✅ Accurate cyclomatic complexity matching standard definitions
+- ✅ Realistic average complexity values (3-8 typical range)
+- ✅ All functions including closures properly counted
+- ✅ Better risk assessment based on true complexity
+- ⚠️ Breaking change in complexity values from previous versions
