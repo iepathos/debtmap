@@ -1,6 +1,5 @@
 use debtmap::core::ast::{
-    combine_asts, filter_ast, Ast, AstNode, JavaScriptAst, NodeKind, RustAst,
-    TypeScriptAst,
+    combine_asts, filter_ast, Ast, AstNode, JavaScriptAst, NodeKind, RustAst, TypeScriptAst,
 };
 use std::path::PathBuf;
 
@@ -20,10 +19,12 @@ fn create_test_python_ast() -> Ast {
 
 fn create_test_javascript_ast() -> Ast {
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
+    parser
+        .set_language(&tree_sitter_javascript::LANGUAGE.into())
+        .unwrap();
     let source = "function test() {}";
     let tree = parser.parse(source, None).unwrap();
-    
+
     Ast::JavaScript(JavaScriptAst {
         tree,
         source: source.to_string(),
@@ -33,10 +34,12 @@ fn create_test_javascript_ast() -> Ast {
 
 fn create_test_typescript_ast() -> Ast {
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()).unwrap();
+    parser
+        .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
+        .unwrap();
     let source = "function test(): void {}";
     let tree = parser.parse(source, None).unwrap();
-    
+
     Ast::TypeScript(TypeScriptAst {
         tree,
         source: source.to_string(),
@@ -48,10 +51,10 @@ fn create_test_typescript_ast() -> Ast {
 fn test_extract_rust_nodes() {
     let ast = create_test_rust_ast();
     let nodes = ast.extract_nodes();
-    
+
     // Currently returns empty vec as per implementation
     assert_eq!(nodes.len(), 0);
-    
+
     // Test that it's called for Rust AST
     match &ast {
         Ast::Rust(_) => {
@@ -67,10 +70,10 @@ fn test_extract_rust_nodes() {
 fn test_extract_python_nodes() {
     let ast = create_test_python_ast();
     let nodes = ast.extract_nodes();
-    
+
     // Currently returns empty vec as per implementation
     assert_eq!(nodes.len(), 0);
-    
+
     // Test that Unknown AST returns empty nodes
     match &ast {
         Ast::Unknown => {
@@ -85,10 +88,10 @@ fn test_extract_python_nodes() {
 fn test_extract_javascript_nodes() {
     let ast = create_test_javascript_ast();
     let nodes = ast.extract_nodes();
-    
+
     // Currently returns empty vec as per implementation
     assert_eq!(nodes.len(), 0);
-    
+
     // Test that it's called for JavaScript AST
     match &ast {
         Ast::JavaScript(_) => {
@@ -104,10 +107,10 @@ fn test_extract_javascript_nodes() {
 fn test_extract_typescript_nodes() {
     let ast = create_test_typescript_ast();
     let nodes = ast.extract_nodes();
-    
+
     // Currently returns empty vec as per implementation
     assert_eq!(nodes.len(), 0);
-    
+
     // Test that it's called for TypeScript AST
     match &ast {
         Ast::TypeScript(_) => {
@@ -123,7 +126,7 @@ fn test_extract_typescript_nodes() {
 fn test_extract_nodes_unknown_ast() {
     let ast = Ast::Unknown;
     let nodes = ast.extract_nodes();
-    
+
     // Unknown AST should return empty vec
     assert_eq!(nodes.len(), 0);
 }
@@ -131,12 +134,9 @@ fn test_extract_nodes_unknown_ast() {
 #[test]
 fn test_ast_transform() {
     let ast = create_test_rust_ast();
-    
-    let transformed = ast.transform(|a| match a {
-        Ast::Rust(rust_ast) => Ast::Rust(rust_ast),
-        other => other,
-    });
-    
+
+    let transformed = ast.transform(|a| a);
+
     // Should preserve the AST type
     assert!(matches!(transformed, Ast::Rust(_)));
 }
@@ -144,7 +144,7 @@ fn test_ast_transform() {
 #[test]
 fn test_map_functions_empty() {
     let ast = create_test_rust_ast();
-    
+
     let functions: Vec<String> = ast.map_functions(|node| {
         if matches!(node.kind, NodeKind::Function | NodeKind::Method) {
             node.name.clone()
@@ -152,7 +152,7 @@ fn test_map_functions_empty() {
             None
         }
     });
-    
+
     // Since extract_nodes returns empty, this should be empty
     assert_eq!(functions.len(), 0);
 }
@@ -161,10 +161,9 @@ fn test_map_functions_empty() {
 fn test_map_functions_with_mock_nodes() {
     // Create a mock function to test the filtering logic
     let _ast = create_test_rust_ast();
-    
+
     // Create mock nodes for testing
-    let mock_nodes = vec![
-        AstNode {
+    let mock_nodes = [AstNode {
             kind: NodeKind::Function,
             name: Some("test_func".to_string()),
             line: 10,
@@ -181,16 +180,15 @@ fn test_map_functions_with_mock_nodes() {
             name: Some("test_method".to_string()),
             line: 30,
             children: vec![],
-        },
-    ];
-    
+        }];
+
     // Filter only functions and methods
     let functions: Vec<String> = mock_nodes
         .iter()
         .filter(|n| matches!(n.kind, NodeKind::Function | NodeKind::Method))
         .filter_map(|n| n.name.clone())
         .collect();
-    
+
     assert_eq!(functions.len(), 2);
     assert!(functions.contains(&"test_func".to_string()));
     assert!(functions.contains(&"test_method".to_string()));
@@ -200,7 +198,7 @@ fn test_map_functions_with_mock_nodes() {
 fn test_count_branches_empty() {
     let ast = create_test_rust_ast();
     let count = ast.count_branches();
-    
+
     // Since extract_nodes returns empty, this should be 0
     assert_eq!(count, 0);
 }
@@ -240,7 +238,7 @@ fn test_count_branches_with_mock_nodes() {
             children: vec![],
         },
     ];
-    
+
     // Count branch nodes
     let branch_count = mock_nodes
         .iter()
@@ -251,7 +249,7 @@ fn test_count_branches_with_mock_nodes() {
             )
         })
         .count();
-    
+
     assert_eq!(branch_count, 4);
 }
 
@@ -260,10 +258,10 @@ fn test_combine_asts() {
     let ast1 = create_test_rust_ast();
     let ast2 = create_test_python_ast();
     let ast3 = create_test_javascript_ast();
-    
+
     let asts = vec![ast1, ast2, ast3];
     let combined = combine_asts(asts.clone());
-    
+
     // combine_asts just returns the input vector
     assert_eq!(combined.len(), 3);
 }
@@ -271,9 +269,9 @@ fn test_combine_asts() {
 #[test]
 fn test_filter_ast_matching() {
     let ast = create_test_rust_ast();
-    
+
     let filtered = filter_ast(ast, |a| matches!(a, Ast::Rust(_)));
-    
+
     assert!(filtered.is_some());
     assert!(matches!(filtered.unwrap(), Ast::Rust(_)));
 }
@@ -281,18 +279,18 @@ fn test_filter_ast_matching() {
 #[test]
 fn test_filter_ast_not_matching() {
     let ast = create_test_rust_ast();
-    
+
     let filtered = filter_ast(ast, |a| matches!(a, Ast::Python(_)));
-    
+
     assert!(filtered.is_none());
 }
 
 #[test]
 fn test_filter_ast_with_unknown() {
     let ast = Ast::Unknown;
-    
+
     let filtered = filter_ast(ast, |a| matches!(a, Ast::Unknown));
-    
+
     assert!(filtered.is_some());
     assert!(matches!(filtered.unwrap(), Ast::Unknown));
 }
@@ -311,16 +309,14 @@ fn test_ast_node_structure() {
         kind: NodeKind::Function,
         name: Some("test_function".to_string()),
         line: 42,
-        children: vec![
-            AstNode {
-                kind: NodeKind::If,
-                name: None,
-                line: 43,
-                children: vec![],
-            },
-        ],
+        children: vec![AstNode {
+            kind: NodeKind::If,
+            name: None,
+            line: 43,
+            children: vec![],
+        }],
     };
-    
+
     assert_eq!(node.kind, NodeKind::Function);
     assert_eq!(node.name, Some("test_function".to_string()));
     assert_eq!(node.line, 42);
