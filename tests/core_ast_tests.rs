@@ -60,7 +60,6 @@ fn test_extract_rust_nodes() {
         Ast::Rust(_) => {
             // This branch should be taken
             // Note: extract_rust_nodes is private, so we test via extract_nodes
-            assert!(true);
         }
         _ => panic!("Expected Rust AST"),
     }
@@ -78,7 +77,6 @@ fn test_extract_python_nodes() {
     match &ast {
         Ast::Unknown => {
             // This branch should be taken
-            assert!(true);
         }
         _ => panic!("Expected Unknown AST"),
     }
@@ -97,7 +95,6 @@ fn test_extract_javascript_nodes() {
         Ast::JavaScript(_) => {
             // This branch should be taken
             // Note: extract_javascript_nodes is private, so we test via extract_nodes
-            assert!(true);
         }
         _ => panic!("Expected JavaScript AST"),
     }
@@ -116,7 +113,6 @@ fn test_extract_typescript_nodes() {
         Ast::TypeScript(_) => {
             // This branch should be taken
             // Note: extract_typescript_nodes is private, so we test via extract_nodes
-            assert!(true);
         }
         _ => panic!("Expected TypeScript AST"),
     }
