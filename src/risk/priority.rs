@@ -536,11 +536,23 @@ pub fn prioritize_by_roi(
     // Sort by priority score
     prioritized.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
 
+    // Use the new ROI calculator
+    let roi_calc = crate::risk::roi::ROICalculator::new(analyzer.clone());
+
+    // Create a context for ROI calculation
+    let context = crate::risk::roi::Context {
+        dependency_graph: crate::risk::roi::DependencyGraph {
+            nodes: im::HashMap::new(),
+            edges: im::Vector::new(),
+        },
+        critical_paths: Vec::new(),
+        historical_data: None,
+    };
+
     // Generate recommendations for top targets
     let mut recommendations = Vector::new();
     for target in prioritized.into_iter().take(10) {
-        let roi_calc = ROICalculator::new(analyzer.clone());
-        let roi = roi_calc.calculate(&target, 90.0);
+        let roi = roi_calc.calculate(&target, &context);
 
         let recommendation = TestingRecommendation {
             function: target
@@ -549,9 +561,10 @@ pub fn prioritize_by_roi(
                 .unwrap_or_else(|| target.path.to_string_lossy().to_string()),
             file: target.path.clone(),
             current_risk: target.current_risk,
-            potential_risk_reduction: roi.risk_reduction,
+            potential_risk_reduction: roi.direct_impact.percentage,
             test_effort_estimate: complexity_to_test_effort(&target.complexity),
-            rationale: generate_enhanced_rationale(&target, &roi),
+            rationale: generate_enhanced_rationale_v2(&target, &roi),
+            roi: Some(roi.value),
         };
 
         recommendations.push_back(recommendation);
@@ -630,7 +643,50 @@ fn complexity_to_test_effort(complexity: &ComplexityMetrics) -> TestEffort {
     }
 }
 
-fn generate_enhanced_rationale(target: &TestTarget, roi: &ROI) -> String {
+fn generate_enhanced_rationale_v2(target: &TestTarget, roi: &crate::risk::roi::ROI) -> String {
+    let module_str = format!("{:?}", target.module_type).to_lowercase();
+    let coverage_str = if target.current_coverage == 0.0 {
+        "NO test coverage"
+    } else {
+        "incomplete coverage"
+    };
+
+    let complexity_str = format!(
+        "cyclo={}, cognitive={}",
+        target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity
+    );
+
+    format!(
+        "{} {} with {} - {} code ({}). ROI: {:.1}x with {:.1}% risk reduction",
+        match target.module_type {
+            ModuleType::EntryPoint => "Critical entry point",
+            ModuleType::Core => "Core module",
+            ModuleType::Api => "API module",
+            ModuleType::IO => "I/O module",
+            ModuleType::Model => "Data model",
+            ModuleType::Utility => "Utility module",
+            ModuleType::Test => "Test module",
+            _ => &module_str,
+        },
+        if target.current_coverage == 0.0 {
+            "completely untested"
+        } else {
+            coverage_str
+        },
+        coverage_str,
+        match target.complexity.cognitive_complexity {
+            0..=7 => "simple",
+            8..=15 => "moderate",
+            16..=30 => "complex",
+            _ => "very complex",
+        },
+        complexity_str,
+        roi.value,
+        roi.direct_impact.percentage
+    )
+}
+
+fn _generate_enhanced_rationale(target: &TestTarget, roi: &ROI) -> String {
     let coverage_status = if target.current_coverage == 0.0 {
         match target.module_type {
             ModuleType::EntryPoint => "Critical entry point with NO test coverage",

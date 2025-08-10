@@ -97,7 +97,7 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     output.push_str("---------|--------------------------------|-------------|------\n");
 
     for (i, rec) in recommendations.iter().take(5).enumerate() {
-        let roi_score = rec.current_risk / (rec.test_effort_estimate.cognitive_load as f64 + 1.0);
+        let roi_score = rec.roi.unwrap_or(0.1);
         let risk_reduction = if rec.potential_risk_reduction < 0.5 {
             "<1".to_string()
         } else {

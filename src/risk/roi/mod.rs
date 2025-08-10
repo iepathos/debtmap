@@ -73,11 +73,17 @@ impl ROICalculator {
             + cascade_impact.total_risk_reduction * self.config.cascade_weight;
         let adjusted_effort = self.adjust_effort_with_learning(effort.hours, target);
 
-        let value = if adjusted_effort > 0.0 {
-            (total_impact / adjusted_effort) * confidence
+        // Scale ROI to meaningful range (0.1 to 10.0)
+        // High impact (>30%) with low effort (<2h) = ROI ~5-10
+        // Moderate impact (10-30%) with moderate effort (2-5h) = ROI ~1-5
+        // Low impact (<10%) or high effort (>5h) = ROI ~0.1-1
+        let raw_roi = if adjusted_effort > 0.0 {
+            total_impact / adjusted_effort
         } else {
-            total_impact * confidence
+            total_impact
         };
+
+        let value = (raw_roi * confidence).clamp(0.1, 10.0);
 
         ROI {
             value,

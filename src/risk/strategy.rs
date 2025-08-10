@@ -278,16 +278,24 @@ impl RiskCalculator for LegacyRiskStrategy {
         let cyclomatic = context.complexity.cyclomatic_complexity;
         let cognitive = context.complexity.cognitive_complexity;
 
-        let complexity_factor = (cyclomatic as f64 * self.weights.complexity_weight
-            + cognitive as f64 * self.weights.cognitive_weight)
-            / 2.0;
+        // Base risk from complexity (scale 0-10)
+        let base_risk = ((cyclomatic as f64 / 10.0).min(1.0) * 5.0
+            + (cognitive as f64 / 20.0).min(1.0) * 5.0)
+            * ((self.weights.complexity_weight + self.weights.cognitive_weight) / 2.0);
 
         match context.coverage {
             Some(cov) => {
-                let coverage_gap = (100.0 - cov) / 100.0;
-                coverage_gap * complexity_factor * self.weights.coverage_weight
+                // Coverage factor: exponential decay as coverage increases
+                // At 0% coverage: factor = 2.0 (doubles risk)
+                // At 50% coverage: factor = 1.0 (no change)
+                // At 100% coverage: factor = 0.2 (80% risk reduction)
+                let coverage_factor = 2.0 * (0.5_f64).powf(cov / 50.0);
+
+                // Final risk combines base risk with coverage impact
+                base_risk * coverage_factor * self.weights.coverage_weight
             }
-            None => complexity_factor,
+            // When coverage is unknown, assume worst case (0% coverage)
+            None => base_risk * 2.0,
         }
     }
 

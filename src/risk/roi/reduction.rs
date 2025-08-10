@@ -14,12 +14,14 @@ pub struct RiskReduction {
 }
 
 pub struct AdvancedRiskReductionModel {
-    risk_analyzer: RiskAnalyzer,
+    _risk_analyzer: RiskAnalyzer,
 }
 
 impl AdvancedRiskReductionModel {
     pub fn new(risk_analyzer: RiskAnalyzer) -> Self {
-        Self { risk_analyzer }
+        Self {
+            _risk_analyzer: risk_analyzer,
+        }
     }
 
     fn project_coverage_increase(&self, target: &TestTarget) -> f64 {
@@ -40,45 +42,6 @@ impl AdvancedRiskReductionModel {
             };
             remaining * achievable
         }
-    }
-
-    fn test_effectiveness(&self, coverage_delta: f64) -> f64 {
-        let normalized_delta = coverage_delta / 100.0;
-
-        match normalized_delta {
-            d if d <= 0.2 => d * 2.0,
-            d if d <= 0.5 => 0.4 + (d - 0.2) * 1.333,
-            d if d <= 0.8 => 0.8 + (d - 0.5) * 0.667,
-            d => 1.0 + (d - 0.8) * 0.5,
-        }
-    }
-
-    fn risk_reduction_multiplier(&self, target: &TestTarget) -> f64 {
-        let coverage_factor = if target.current_coverage == 0.0 {
-            2.0
-        } else if target.current_coverage < 20.0 {
-            1.5
-        } else if target.current_coverage < 50.0 {
-            1.2
-        } else {
-            1.0
-        };
-
-        let complexity_factor = match target.complexity.cyclomatic_complexity {
-            0..=5 => 0.8,
-            6..=10 => 1.0,
-            11..=20 => 1.2,
-            21..=40 => 1.5,
-            _ => 2.0,
-        };
-
-        let debt_factor = if target.debt_items > 0 {
-            1.0 + (target.debt_items as f64 * 0.05).min(0.5)
-        } else {
-            1.0
-        };
-
-        coverage_factor * complexity_factor * debt_factor
     }
 
     fn calculate_confidence(&self, target: &TestTarget, coverage_delta: f64) -> f64 {
@@ -112,28 +75,53 @@ impl RiskReductionModel for AdvancedRiskReductionModel {
     fn calculate(&self, target: &TestTarget) -> RiskReduction {
         let current_risk = target.current_risk;
         let coverage_delta = self.project_coverage_increase(target);
-        let new_coverage = (target.current_coverage + coverage_delta).min(100.0);
+        let _new_coverage = (target.current_coverage + coverage_delta).min(100.0);
 
-        let projected_risk = self.risk_analyzer.calculate_risk_score(
-            target.complexity.cyclomatic_complexity,
-            target.complexity.cognitive_complexity,
-            Some(new_coverage),
-        );
-
-        let effectiveness = self.test_effectiveness(coverage_delta);
-        let multiplier = self.risk_reduction_multiplier(target);
-
-        let risk_reduction = (current_risk - projected_risk).max(0.0);
-        let adjusted_reduction = risk_reduction * effectiveness * multiplier;
-
-        let percentage = if current_risk > 0.0 {
-            (adjusted_reduction / current_risk * 100.0).min(95.0)
+        // Calculate risk reduction directly based on coverage improvement
+        // For untested code (0% coverage), testing can reduce risk by 50-80%
+        // For partially tested code, diminishing returns apply
+        let base_reduction_percentage = if target.current_coverage == 0.0 {
+            // First tests on untested code have highest impact
+            match coverage_delta {
+                d if d >= 60.0 => 60.0, // High coverage achieved
+                d if d >= 40.0 => 50.0, // Moderate coverage achieved
+                d if d >= 20.0 => 40.0, // Basic coverage achieved
+                _ => 30.0,              // Minimal coverage
+            }
+        } else if target.current_coverage < 20.0 {
+            // Low coverage - still high returns
+            match coverage_delta {
+                d if d >= 40.0 => 45.0,
+                d if d >= 20.0 => 35.0,
+                _ => 25.0,
+            }
+        } else if target.current_coverage < 50.0 {
+            // Moderate coverage - moderate returns
+            match coverage_delta {
+                d if d >= 30.0 => 25.0,
+                d if d >= 15.0 => 20.0,
+                _ => 15.0,
+            }
         } else {
-            0.0
+            // High coverage - diminishing returns
+            let remaining_gap = 100.0 - target.current_coverage;
+            let coverage_ratio = coverage_delta / remaining_gap.max(1.0);
+            coverage_ratio * 15.0 // Max 15% additional reduction for well-tested code
         };
 
+        // Apply complexity multiplier - more complex code benefits more from testing
+        let complexity_multiplier = match target.complexity.cyclomatic_complexity {
+            0..=5 => 0.9,   // Simple code - less benefit
+            6..=10 => 1.0,  // Moderate complexity - normal benefit
+            11..=20 => 1.2, // Complex code - more benefit
+            _ => 1.4,       // Very complex - highest benefit
+        };
+
+        let percentage = (base_reduction_percentage * complexity_multiplier).min(85.0);
+        let absolute = current_risk * (percentage / 100.0);
+
         RiskReduction {
-            absolute: adjusted_reduction,
+            absolute,
             percentage,
             coverage_increase: coverage_delta,
             confidence: self.calculate_confidence(target, coverage_delta),
