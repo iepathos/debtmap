@@ -536,16 +536,19 @@ pub fn prioritize_by_roi(
     // Sort by priority score
     prioritized.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
 
+    // Build dependency graph from TestTarget data
+    let dependency_graph = build_dependency_graph(&prioritized);
+
+    // Identify critical paths (entry points and core modules)
+    let critical_paths = identify_critical_paths(&prioritized);
+
     // Use the new ROI calculator
     let roi_calc = crate::risk::roi::ROICalculator::new(analyzer.clone());
 
-    // Create a context for ROI calculation
+    // Create a context for ROI calculation with populated dependency information
     let context = crate::risk::roi::Context {
-        dependency_graph: crate::risk::roi::DependencyGraph {
-            nodes: im::HashMap::new(),
-            edges: im::Vector::new(),
-        },
-        critical_paths: Vec::new(),
+        dependency_graph,
+        critical_paths,
         historical_data: None,
     };
 
@@ -576,6 +579,9 @@ pub fn prioritize_by_roi(
 fn function_risk_to_target(risk: &FunctionRisk) -> TestTarget {
     let module_type = determine_module_type(&risk.file);
 
+    // Infer dependencies based on module structure
+    let (dependencies, dependents) = infer_module_relationships(&risk.file, &module_type);
+
     TestTarget {
         id: format!("{}:{}", risk.file.display(), risk.function_name),
         path: risk.file.clone(),
@@ -588,8 +594,8 @@ fn function_risk_to_target(risk: &FunctionRisk) -> TestTarget {
             cyclomatic_complexity: risk.cyclomatic_complexity,
             cognitive_complexity: risk.cognitive_complexity,
         },
-        dependencies: vec![],
-        dependents: vec![],
+        dependencies,
+        dependents,
         lines: (risk.line_range.1 - risk.line_range.0) + 1,
         priority_score: 0.0,
         debt_items: 0, // Would need to be populated from debt analysis
@@ -621,6 +627,144 @@ fn determine_module_type(path: &Path) -> ModuleType {
             }
         }
     }
+}
+
+/// Build a dependency graph from TestTarget data
+fn build_dependency_graph(targets: &[TestTarget]) -> crate::risk::roi::DependencyGraph {
+    let mut nodes = im::HashMap::new();
+    let mut edges = im::Vector::new();
+
+    // Create nodes for each target
+    for target in targets {
+        let node = crate::risk::roi::DependencyNode {
+            id: target.id.clone(),
+            path: target.path.clone(),
+            risk: target.current_risk,
+            complexity: target.complexity.clone(),
+        };
+        nodes.insert(target.id.clone(), node);
+    }
+
+    // Create edges based on dependents
+    for target in targets {
+        for dependent in &target.dependents {
+            edges.push_back(crate::risk::roi::DependencyEdge {
+                from: target.id.clone(),
+                to: dependent.clone(),
+                weight: calculate_edge_weight(target),
+            });
+        }
+    }
+
+    crate::risk::roi::DependencyGraph { nodes, edges }
+}
+
+/// Calculate edge weight based on module criticality
+fn calculate_edge_weight(target: &TestTarget) -> f64 {
+    match target.module_type {
+        ModuleType::EntryPoint => 2.0, // Highest weight for entry points
+        ModuleType::Core => 1.5,       // High weight for core modules
+        ModuleType::Api => 1.2,        // Moderate weight for API modules
+        ModuleType::Model => 1.1,      // Slight weight for data models
+        ModuleType::IO => 1.0,         // Standard weight for I/O
+        _ => 0.8,                      // Lower weight for utilities and unknown
+    }
+}
+
+/// Identify critical paths based on module types
+fn identify_critical_paths(targets: &[TestTarget]) -> Vec<PathBuf> {
+    targets
+        .iter()
+        .filter(|t| matches!(t.module_type, ModuleType::EntryPoint | ModuleType::Core))
+        .map(|t| t.path.clone())
+        .collect()
+}
+
+/// Infer module relationships based on file structure and module type
+fn infer_module_relationships(path: &Path, module_type: &ModuleType) -> (Vec<String>, Vec<String>) {
+    let mut dependencies = Vec::new();
+    let mut dependents = Vec::new();
+
+    let path_str = path.to_string_lossy();
+
+    // Infer dependencies based on module type and common patterns
+    match module_type {
+        ModuleType::EntryPoint => {
+            // Entry points typically depend on core and API modules
+            dependencies.push("core".to_string());
+            dependencies.push("cli".to_string());
+            dependencies.push("io".to_string());
+            // Entry points are rarely depended upon
+        }
+        ModuleType::Core => {
+            // Core modules may depend on models and utilities
+            dependencies.push("models".to_string());
+            dependencies.push("utils".to_string());
+            // Core modules are heavily depended upon
+            dependents.push("main".to_string());
+            dependents.push("api".to_string());
+            dependents.push("transformers".to_string());
+        }
+        ModuleType::Api => {
+            // API modules depend on core and models
+            dependencies.push("core".to_string());
+            dependencies.push("models".to_string());
+            // API modules are used by entry points and handlers
+            dependents.push("main".to_string());
+            dependents.push("handlers".to_string());
+        }
+        ModuleType::Model => {
+            // Models have few dependencies
+            dependencies.push("utils".to_string());
+            // Models are widely used
+            dependents.push("core".to_string());
+            dependents.push("api".to_string());
+            dependents.push("io".to_string());
+        }
+        ModuleType::IO => {
+            // I/O modules depend on models and utilities
+            dependencies.push("models".to_string());
+            dependencies.push("utils".to_string());
+            // I/O modules are used by core and entry points
+            dependents.push("main".to_string());
+            dependents.push("core".to_string());
+        }
+        ModuleType::Utility => {
+            // Utilities have minimal dependencies
+            // Utilities are widely used
+            dependents.push("core".to_string());
+            dependents.push("models".to_string());
+            dependents.push("io".to_string());
+            dependents.push("api".to_string());
+        }
+        _ => {}
+    }
+
+    // Add path-based relationships
+    if path_str.contains("risk") {
+        dependencies.push("core".to_string());
+        dependents.push("io::output".to_string());
+    }
+    if path_str.contains("analyzers") {
+        dependencies.push("core::ast".to_string());
+        dependents.push("main".to_string());
+    }
+    if path_str.contains("complexity") {
+        dependencies.push("core::metrics".to_string());
+        dependents.push("risk".to_string());
+    }
+    if path_str.contains("debt") {
+        dependencies.push("core".to_string());
+        dependents.push("main".to_string());
+    }
+
+    // Ensure unique entries
+    dependencies.sort();
+    dependencies.dedup();
+    dependents.sort();
+    dependents.dedup();
+
+    (dependencies, dependents)
 }
 
 fn complexity_to_test_effort(complexity: &ComplexityMetrics) -> TestEffort {

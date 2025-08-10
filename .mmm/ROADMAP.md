@@ -71,6 +71,13 @@ We have completed the initial implementation with core functionality for analyzi
   - Pluggable context provider architecture
   - Weighted risk calculation with context
 
+- [x] **Spec 14**: Dependency-Aware ROI Calculation
+  - Dynamic dependency graph construction from module relationships
+  - Module type-based impact multipliers
+  - Cascade effect calculation with exponential decay
+  - Dependency factor for ROI enhancement
+  - Meaningful ROI variation based on code criticality
+
 ## Pending Specs
 
 ### Enhancements
@@ -80,8 +87,7 @@ We have completed the initial implementation with core functionality for analyzi
   - Recognize functional composition patterns
   - Account for error handling complexity
 
-
-- [ ] **Spec 12**: Improve ROI Calculation
+- [ ] **Spec 12**: Improve ROI Calculation (Completed as part of Spec 14)
   - Enhanced return on investment calculations
 
 - [ ] **Spec 13**: Add Risk Categories
