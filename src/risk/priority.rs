@@ -1,46 +1,25 @@
+pub mod module_detection;
+pub mod pipeline;
+pub mod recommendations;
+pub mod scoring;
+pub mod stages;
+
+pub use module_detection::{determine_module_type, infer_module_relationships, ModuleType};
+pub use pipeline::{PrioritizationPipeline, PrioritizationStage};
+pub use recommendations::{
+    generate_enhanced_rationale_v2, ComplexityLevel, ImpactAnalysis, TestApproach,
+    TestEffortDetails, TestRecommendation,
+};
+pub use scoring::{CriticalityScorer, EffortEstimator};
+pub use stages::{
+    ComplexityRiskStage, CriticalPathStage, DependencyImpactStage, EffortOptimizationStage,
+    ZeroCoverageStage,
+};
+
 use super::{Difficulty, FunctionRisk, RiskAnalyzer, TestEffort, TestingRecommendation};
 use crate::core::ComplexityMetrics;
-use im::{HashMap, Vector};
-use std::path::{Path, PathBuf};
-
-// =============== Prioritization Pipeline ===============
-
-pub trait PrioritizationStage {
-    fn process(&self, targets: Vec<TestTarget>) -> Vec<TestTarget>;
-    fn name(&self) -> &str;
-}
-
-pub struct PrioritizationPipeline {
-    stages: Vec<Box<dyn PrioritizationStage>>,
-}
-
-impl Default for PrioritizationPipeline {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PrioritizationPipeline {
-    pub fn new() -> Self {
-        Self {
-            stages: vec![
-                Box::new(ZeroCoverageStage::new()),
-                Box::new(CriticalPathStage::new()),
-                Box::new(ComplexityRiskStage::new()),
-                Box::new(DependencyImpactStage::new()),
-                Box::new(EffortOptimizationStage::new()),
-            ],
-        }
-    }
-
-    pub fn process(&self, targets: Vec<TestTarget>) -> Vec<TestTarget> {
-        self.stages
-            .iter()
-            .fold(targets, |acc, stage| stage.process(acc))
-    }
-}
-
-// =============== Test Target ===============
+use im::Vector;
+use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
 pub struct TestTarget {
@@ -57,408 +36,6 @@ pub struct TestTarget {
     pub priority_score: f64,
     pub debt_items: usize,
 }
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ModuleType {
-    EntryPoint, // main.rs, lib.rs
-    Core,       // Core business logic
-    Api,        // API/service layer
-    Model,      // Data models
-    IO,         // Input/output modules
-    Utility,    // Helper utilities
-    Test,       // Test modules
-    Unknown,    // Default/unknown
-}
-
-// =============== Helper Structures for Complexity Reduction ===============
-
-/// Module type detector with functional pattern matching
-struct ModuleTypeDetector;
-
-impl ModuleTypeDetector {
-    /// Check if the file is an entry point
-    fn is_entry_point(file_name: &str) -> bool {
-        matches!(file_name, "main.rs" | "lib.rs")
-    }
-
-    /// Determine module type based on path patterns
-    fn from_path_patterns(path_str: &str) -> ModuleType {
-        const PATTERNS: &[(&[&str], ModuleType)] = &[
-            (&["test"], ModuleType::Test),
-            (&["core"], ModuleType::Core),
-            (&["api", "handler"], ModuleType::Api),
-            (&["model"], ModuleType::Model),
-            (&["io", "output"], ModuleType::IO),
-            (&["util", "helper"], ModuleType::Utility),
-        ];
-
-        PATTERNS
-            .iter()
-            .find(|(keywords, _)| keywords.iter().any(|k| path_str.contains(k)))
-            .map(|(_, module_type)| module_type.clone())
-            .unwrap_or(ModuleType::Unknown)
-    }
-}
-
-/// Functional rationale builder for test recommendations
-struct RationaleBuilder;
-
-impl RationaleBuilder {
-    fn coverage_description(coverage: f64) -> String {
-        match coverage {
-            0.0 => "NO test coverage".to_string(),
-            c => format!("{c:.0}% coverage"),
-        }
-    }
-
-    fn complexity_level(cognitive: u32) -> &'static str {
-        match cognitive {
-            0..=7 => "Simple",
-            8..=15 => "Moderate",
-            16..=30 => "Complex",
-            _ => "Very complex",
-        }
-    }
-
-    fn effort_description(cyclomatic: u32, cognitive: u32) -> &'static str {
-        match (cyclomatic, cognitive) {
-            (1..=3, 1..=7) => " - easy win",
-            (1..=5, 1..=10) => " - quick test",
-            (6..=10, _) => " - moderate effort",
-            _ => " - requires effort",
-        }
-    }
-
-    fn roi_description(target: &TestTarget) -> &'static str {
-        match (
-            target.dependents.len(),
-            target.complexity.cognitive_complexity,
-            &target.module_type,
-        ) {
-            (3.., 0..=10, _) => " - maximum ROI",
-            (_, _, ModuleType::EntryPoint) => " - critical path",
-            _ => "",
-        }
-    }
-
-    fn module_description(module_type: &ModuleType, has_coverage: bool) -> String {
-        let base = match module_type {
-            ModuleType::EntryPoint => "Critical entry point",
-            ModuleType::Core => "Core module",
-            ModuleType::Api => "API module",
-            ModuleType::IO => "I/O module",
-            ModuleType::Model => "Data model",
-            ModuleType::Utility => "Utility module",
-            ModuleType::Test => "Test module",
-            ModuleType::Unknown => "Module",
-        };
-
-        if has_coverage {
-            base.to_string()
-        } else {
-            format!("{base} completely untested")
-        }
-    }
-}
-
-// Pure function helpers for complexity reduction
-#[allow(dead_code)]
-fn describe_coverage_status(target: &TestTarget) -> &'static str {
-    match (target.current_coverage, &target.module_type) {
-        (0.0, ModuleType::EntryPoint) => "Critical entry point with NO test coverage",
-        (0.0, ModuleType::Core) => "Core module completely untested",
-        (0.0, ModuleType::Api) => "API handler with zero coverage",
-        (0.0, ModuleType::IO) => "I/O module without any tests",
-        (0.0, _) => "Module has no test coverage",
-        (c, _) if c < 30.0 => "Poorly tested",
-        (c, _) if c < 60.0 => "Moderately tested",
-        _ => "Well tested",
-    }
-}
-
-#[allow(dead_code)]
-fn describe_complexity(metrics: &ComplexityMetrics) -> &'static str {
-    use std::cmp::max;
-    let max_complexity = max(
-        metrics.cyclomatic_complexity / 2,
-        metrics.cognitive_complexity / 4,
-    );
-
-    match max_complexity {
-        0..=2 => "simple",
-        3..=5 => "moderately complex",
-        6..=10 => "highly complex",
-        _ => "extremely complex",
-    }
-}
-
-#[allow(dead_code)]
-fn describe_impact(dependents: &[String]) -> String {
-    match dependents.len() {
-        0 => String::new(),
-        1..=5 => format!(" - affects {} other modules", dependents.len()),
-        n => format!(" - critical dependency for {n} modules"),
-    }
-}
-
-// =============== Prioritization Stages ===============
-
-pub struct ZeroCoverageStage {
-    boost_factor: f64,
-}
-
-impl Default for ZeroCoverageStage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ZeroCoverageStage {
-    pub fn new() -> Self {
-        Self {
-            boost_factor: 100.0,
-        }
-    }
-}
-
-impl PrioritizationStage for ZeroCoverageStage {
-    fn process(&self, mut targets: Vec<TestTarget>) -> Vec<TestTarget> {
-        for target in &mut targets {
-            if target.current_coverage == 0.0 {
-                // Heavily boost zero-coverage items, scaled by criticality
-                let criticality_factor = match target.module_type {
-                    ModuleType::EntryPoint => 10.0,
-                    ModuleType::Core => 8.0,
-                    ModuleType::Api => 6.0,
-                    ModuleType::Model => 4.0,
-                    ModuleType::IO => 3.0,
-                    ModuleType::Utility => 2.0,
-                    _ => 1.0,
-                };
-
-                // Factor in size of untested code
-                let size_factor = (target.lines as f64).ln().max(1.0);
-
-                target.priority_score += self.boost_factor * criticality_factor * size_factor;
-            }
-        }
-        targets
-    }
-
-    fn name(&self) -> &str {
-        "ZeroCoverageStage"
-    }
-}
-
-pub struct CriticalPathStage {
-    scorer: CriticalityScorer,
-}
-
-impl Default for CriticalPathStage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CriticalPathStage {
-    pub fn new() -> Self {
-        Self {
-            scorer: CriticalityScorer::new(),
-        }
-    }
-}
-
-impl PrioritizationStage for CriticalPathStage {
-    fn process(&self, mut targets: Vec<TestTarget>) -> Vec<TestTarget> {
-        for target in &mut targets {
-            let criticality = self.scorer.score(target);
-            target.priority_score += criticality * 10.0;
-        }
-        targets
-    }
-
-    fn name(&self) -> &str {
-        "CriticalPathStage"
-    }
-}
-
-pub struct ComplexityRiskStage;
-
-impl Default for ComplexityRiskStage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ComplexityRiskStage {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PrioritizationStage for ComplexityRiskStage {
-    fn process(&self, mut targets: Vec<TestTarget>) -> Vec<TestTarget> {
-        for target in &mut targets {
-            // Complexity contribution to priority
-            let complexity_score = (target.complexity.cyclomatic_complexity as f64
-                + target.complexity.cognitive_complexity as f64)
-                / 2.0;
-
-            // Scale by current risk
-            target.priority_score += complexity_score * target.current_risk / 10.0;
-        }
-        targets
-    }
-
-    fn name(&self) -> &str {
-        "ComplexityRiskStage"
-    }
-}
-
-pub struct DependencyImpactStage;
-
-impl Default for DependencyImpactStage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DependencyImpactStage {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PrioritizationStage for DependencyImpactStage {
-    fn process(&self, mut targets: Vec<TestTarget>) -> Vec<TestTarget> {
-        for target in &mut targets {
-            // More dependents = higher impact when fixed
-            let impact_factor = (target.dependents.len() as f64).sqrt();
-            target.priority_score += impact_factor * 5.0;
-        }
-        targets
-    }
-
-    fn name(&self) -> &str {
-        "DependencyImpactStage"
-    }
-}
-
-pub struct EffortOptimizationStage;
-
-impl Default for EffortOptimizationStage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EffortOptimizationStage {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl PrioritizationStage for EffortOptimizationStage {
-    fn process(&self, mut targets: Vec<TestTarget>) -> Vec<TestTarget> {
-        for target in &mut targets {
-            // Adjust priority by estimated effort (favor quick wins)
-            let effort = EffortEstimator::new().estimate(target);
-            if effort > 0.0 {
-                // Divide by effort to get ROI-like score
-                target.priority_score /= effort.sqrt();
-            }
-        }
-        targets
-    }
-
-    fn name(&self) -> &str {
-        "EffortOptimizationStage"
-    }
-}
-
-// =============== Criticality Scorer ===============
-
-pub struct CriticalityScorer {
-    patterns: HashMap<String, f64>,
-}
-
-impl Default for CriticalityScorer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CriticalityScorer {
-    pub fn new() -> Self {
-        let mut patterns = HashMap::new();
-        patterns.insert("main".to_string(), 10.0);
-        patterns.insert("lib".to_string(), 10.0);
-        patterns.insert("core".to_string(), 8.0);
-        patterns.insert("api".to_string(), 7.0);
-        patterns.insert("service".to_string(), 6.0);
-        patterns.insert("model".to_string(), 5.0);
-        patterns.insert("handler".to_string(), 6.0);
-        patterns.insert("controller".to_string(), 6.0);
-        patterns.insert("repository".to_string(), 5.0);
-        patterns.insert("util".to_string(), 3.0);
-        patterns.insert("helper".to_string(), 3.0);
-        patterns.insert("test".to_string(), 1.0);
-
-        Self { patterns }
-    }
-
-    pub fn score(&self, target: &TestTarget) -> f64 {
-        let base_score = self.pattern_match_score(&target.path);
-        let dependency_factor = self.dependency_score(target);
-        let size_factor = (target.lines as f64).ln() / 10.0;
-        let debt_factor = 1.0 + (target.debt_items as f64 * 0.1);
-
-        (base_score * dependency_factor * size_factor * debt_factor).min(10.0)
-    }
-
-    fn pattern_match_score(&self, path: &Path) -> f64 {
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-        // Check exact matches first
-        match file_name {
-            "main.rs" | "lib.rs" => return 10.0,
-            _ => {}
-        }
-
-        // Check pattern matches
-        let file_lower = file_name.to_lowercase();
-        for (pattern, score) in self.patterns.iter() {
-            if file_lower.contains(pattern) {
-                return *score;
-            }
-        }
-
-        // Check path components for module type hints
-        let path_str = path.to_string_lossy().to_lowercase();
-        for (pattern, score) in self.patterns.iter() {
-            if path_str.contains(pattern) {
-                return *score * 0.8; // Slightly lower score for path matches
-            }
-        }
-
-        4.0 // Default score
-    }
-
-    fn dependency_score(&self, target: &TestTarget) -> f64 {
-        let dependent_count = target.dependents.len() as f64;
-        let dependency_count = target.dependencies.len() as f64;
-
-        // More dependents = more critical
-        // More dependencies = potentially more complex
-        let dependent_factor = (1.0 + dependent_count / 10.0).min(2.0);
-        let dependency_factor = (1.0 + dependency_count / 20.0).min(1.5);
-
-        dependent_factor * dependency_factor
-    }
-}
-
-// =============== ROI Calculator (Legacy) ===============
-// This is kept for backward compatibility but delegates to the new advanced ROI system
 
 pub use super::roi::{
     ROIBreakdown, ROICalculator as AdvancedROICalculator, ROIComponent, ROIConfig,
@@ -481,13 +58,9 @@ impl ROICalculator {
     }
 
     pub fn calculate(&self, target: &TestTarget, _target_coverage: f64) -> ROI {
-        // Create context for advanced calculator
         let context = self.create_context(target);
-
-        // Use advanced calculator
         let advanced_roi = self.advanced_calculator.calculate(target, &context);
 
-        // Convert to legacy ROI format for compatibility
         ROI {
             value: advanced_roi.value,
             risk_reduction: advanced_roi.direct_impact.percentage,
@@ -498,11 +71,9 @@ impl ROICalculator {
     }
 
     fn create_context(&self, target: &TestTarget) -> super::roi::Context {
-        // Build dependency graph from target information
         let mut nodes = im::HashMap::new();
         let mut edges = im::Vector::new();
 
-        // Add current target as a node
         nodes.insert(
             target.id.clone(),
             super::roi::DependencyNode {
@@ -513,12 +84,11 @@ impl ROICalculator {
             },
         );
 
-        // Add dependents as edges
         for dependent in &target.dependents {
             edges.push_back(super::roi::DependencyEdge {
                 from: target.id.clone(),
                 to: dependent.clone(),
-                weight: 0.8, // Default weight
+                weight: 0.8,
             });
         }
 
@@ -530,7 +100,6 @@ impl ROICalculator {
     }
 }
 
-// Legacy ROI struct for backward compatibility
 #[derive(Clone, Debug)]
 pub struct ROI {
     pub value: f64,
@@ -540,150 +109,25 @@ pub struct ROI {
     pub explanation: String,
 }
 
-// =============== Effort Estimator ===============
-
-pub struct EffortEstimator;
-
-impl Default for EffortEstimator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EffortEstimator {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub fn estimate(&self, target: &TestTarget) -> f64 {
-        let base_effort = self.complexity_to_test_cases(&target.complexity);
-        let setup_effort = self.estimate_setup_complexity(target);
-        let mock_effort = self.estimate_mocking_needs(target);
-
-        base_effort + setup_effort + mock_effort
-    }
-
-    fn complexity_to_test_cases(&self, complexity: &ComplexityMetrics) -> f64 {
-        // McCabe's formula: minimum test cases = cyclomatic complexity + 1
-        let min_cases = complexity.cyclomatic_complexity as f64 + 1.0;
-
-        // Adjust for cognitive complexity
-        let cognitive_factor = (complexity.cognitive_complexity as f64 / 10.0).max(1.0);
-
-        min_cases * cognitive_factor
-    }
-
-    fn estimate_setup_complexity(&self, target: &TestTarget) -> f64 {
-        // Entry points and IO modules need more setup
-        match target.module_type {
-            ModuleType::EntryPoint => 5.0,
-            ModuleType::IO => 3.0,
-            ModuleType::Api => 2.0,
-            ModuleType::Core => 1.0,
-            _ => 0.5,
-        }
-    }
-
-    fn estimate_mocking_needs(&self, target: &TestTarget) -> f64 {
-        // More dependencies = more mocking needed
-        let dep_count = target.dependencies.len() as f64;
-        dep_count * 0.5
-    }
-
-    pub fn explain(&self, target: &TestTarget) -> String {
-        let base = self.complexity_to_test_cases(&target.complexity);
-        let setup = self.estimate_setup_complexity(target);
-        let mocking = self.estimate_mocking_needs(target);
-
-        format!(
-            "Estimated effort: {:.0} (base: {:.0}, setup: {:.0}, mocking: {:.0})",
-            base + setup + mocking,
-            base,
-            setup,
-            mocking
-        )
-    }
-}
-
-// =============== Testing Recommendations ===============
-
-#[derive(Clone, Debug)]
-pub struct TestRecommendation {
-    pub target: TestTarget,
-    pub priority: f64,
-    pub roi: ROI,
-    pub effort: TestEffortDetails,
-    pub impact: ImpactAnalysis,
-    pub rationale: String,
-    pub suggested_approach: TestApproach,
-}
-
-#[derive(Clone, Debug)]
-pub struct TestEffortDetails {
-    pub estimated_cases: usize,
-    pub estimated_hours: f64,
-    pub complexity_level: ComplexityLevel,
-    pub setup_requirements: Vec<String>,
-}
-
-#[derive(Clone, Debug)]
-pub enum ComplexityLevel {
-    Trivial,
-    Simple,
-    Moderate,
-    Complex,
-    VeryComplex,
-}
-
-#[derive(Clone, Debug)]
-pub enum TestApproach {
-    UnitTest,
-    IntegrationTest,
-    ModuleTest,
-    EndToEndTest,
-}
-
-#[derive(Clone, Debug)]
-pub struct ImpactAnalysis {
-    pub direct_risk_reduction: f64,
-    pub cascade_effect: f64,
-    pub affected_modules: Vec<String>,
-    pub coverage_improvement: f64,
-}
-
-// =============== Main Entry Functions ===============
-
 pub fn prioritize_by_roi(
     functions: &Vector<FunctionRisk>,
     analyzer: &RiskAnalyzer,
 ) -> Vector<TestingRecommendation> {
-    // Convert FunctionRisk to TestTarget
     let targets: Vec<TestTarget> = functions.iter().map(function_risk_to_target).collect();
-
-    // Run through prioritization pipeline
     let pipeline = PrioritizationPipeline::new();
     let mut prioritized = pipeline.process(targets);
-
-    // Sort by priority score
     prioritized.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
 
-    // Build dependency graph from TestTarget data
     let dependency_graph = build_dependency_graph(&prioritized);
-
-    // Identify critical paths (entry points and core modules)
     let critical_paths = identify_critical_paths(&prioritized);
-
-    // Use the new ROI calculator
     let roi_calc = crate::risk::roi::ROICalculator::new(analyzer.clone());
 
-    // Create a context for ROI calculation with populated dependency information
     let context = crate::risk::roi::Context {
         dependency_graph,
         critical_paths,
         historical_data: None,
     };
 
-    // Generate recommendations for top targets
     let mut recommendations = Vector::new();
     for target in prioritized.into_iter().take(10) {
         let roi = roi_calc.calculate(&target, &context);
@@ -702,7 +146,6 @@ pub fn prioritize_by_roi(
             dependencies: target.dependencies.clone(),
             dependents: target.dependents.clone(),
         };
-
         recommendations.push_back(recommendation);
     }
 
@@ -711,12 +154,10 @@ pub fn prioritize_by_roi(
 
 fn function_risk_to_target(risk: &FunctionRisk) -> TestTarget {
     let module_type = determine_module_type(&risk.file);
-
-    // Infer dependencies based on module structure
     let (dependencies, dependents) = infer_module_relationships(&risk.file, &module_type);
 
     TestTarget {
-        id: format!("{}:{}", risk.file.display(), risk.function_name),
+        id: format!("{}::{}", risk.file.display(), risk.function_name),
         path: risk.file.clone(),
         function: Some(risk.function_name.clone()),
         module_type,
@@ -729,46 +170,33 @@ fn function_risk_to_target(risk: &FunctionRisk) -> TestTarget {
         },
         dependencies,
         dependents,
-        lines: (risk.line_range.1 - risk.line_range.0) + 1,
+        lines: 100,
         priority_score: 0.0,
-        debt_items: 0, // Would need to be populated from debt analysis
+        debt_items: 0,
     }
 }
 
-fn determine_module_type(path: &Path) -> ModuleType {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .filter(|name| ModuleTypeDetector::is_entry_point(name))
-        .map(|_| ModuleType::EntryPoint)
-        .unwrap_or_else(|| {
-            let path_str = path.to_string_lossy().to_lowercase();
-            ModuleTypeDetector::from_path_patterns(&path_str)
-        })
-}
-
-/// Build a dependency graph from TestTarget data
 fn build_dependency_graph(targets: &[TestTarget]) -> crate::risk::roi::DependencyGraph {
     let mut nodes = im::HashMap::new();
     let mut edges = im::Vector::new();
 
-    // Create nodes for each target
     for target in targets {
-        let node = crate::risk::roi::DependencyNode {
-            id: target.id.clone(),
-            path: target.path.clone(),
-            risk: target.current_risk,
-            complexity: target.complexity.clone(),
-        };
-        nodes.insert(target.id.clone(), node);
-    }
+        nodes.insert(
+            target.id.clone(),
+            crate::risk::roi::DependencyNode {
+                id: target.id.clone(),
+                path: target.path.clone(),
+                risk: target.current_risk,
+                complexity: target.complexity.clone(),
+            },
+        );
 
-    // Create edges based on dependents
-    for target in targets {
+        let edge_weight = calculate_edge_weight(target);
         for dependent in &target.dependents {
             edges.push_back(crate::risk::roi::DependencyEdge {
                 from: target.id.clone(),
                 to: dependent.clone(),
-                weight: calculate_edge_weight(target),
+                weight: edge_weight,
             });
         }
     }
@@ -776,19 +204,18 @@ fn build_dependency_graph(targets: &[TestTarget]) -> crate::risk::roi::Dependenc
     crate::risk::roi::DependencyGraph { nodes, edges }
 }
 
-/// Calculate edge weight based on module criticality
 fn calculate_edge_weight(target: &TestTarget) -> f64 {
-    match target.module_type {
-        ModuleType::EntryPoint => 2.0, // Highest weight for entry points
-        ModuleType::Core => 1.5,       // High weight for core modules
-        ModuleType::Api => 1.2,        // Moderate weight for API modules
-        ModuleType::Model => 1.1,      // Slight weight for data models
-        ModuleType::IO => 1.0,         // Standard weight for I/O
-        _ => 0.8,                      // Lower weight for utilities and unknown
-    }
+    let base_weight = match target.module_type {
+        ModuleType::EntryPoint | ModuleType::Core => 1.0,
+        ModuleType::Api | ModuleType::Model => 0.8,
+        ModuleType::IO => 0.6,
+        _ => 0.4,
+    };
+
+    let risk_factor = (target.current_risk / 10.0).min(1.5);
+    base_weight * risk_factor
 }
 
-/// Identify critical paths based on module types
 fn identify_critical_paths(targets: &[TestTarget]) -> Vec<PathBuf> {
     targets
         .iter()
@@ -797,103 +224,16 @@ fn identify_critical_paths(targets: &[TestTarget]) -> Vec<PathBuf> {
         .collect()
 }
 
-/// Infer module relationships based on file structure and module type
-fn infer_module_relationships(path: &Path, module_type: &ModuleType) -> (Vec<String>, Vec<String>) {
-    let mut dependencies = Vec::new();
-    let mut dependents = Vec::new();
-
-    let path_str = path.to_string_lossy();
-
-    // Infer dependencies based on module type and common patterns
-    match module_type {
-        ModuleType::EntryPoint => {
-            // Entry points typically depend on core and API modules
-            dependencies.push("core".to_string());
-            dependencies.push("cli".to_string());
-            dependencies.push("io".to_string());
-            // Entry points are rarely depended upon
-        }
-        ModuleType::Core => {
-            // Core modules may depend on models and utilities
-            dependencies.push("models".to_string());
-            dependencies.push("utils".to_string());
-            // Core modules are heavily depended upon
-            dependents.push("main".to_string());
-            dependents.push("api".to_string());
-            dependents.push("transformers".to_string());
-        }
-        ModuleType::Api => {
-            // API modules depend on core and models
-            dependencies.push("core".to_string());
-            dependencies.push("models".to_string());
-            // API modules are used by entry points and handlers
-            dependents.push("main".to_string());
-            dependents.push("handlers".to_string());
-        }
-        ModuleType::Model => {
-            // Models have few dependencies
-            dependencies.push("utils".to_string());
-            // Models are widely used
-            dependents.push("core".to_string());
-            dependents.push("api".to_string());
-            dependents.push("io".to_string());
-        }
-        ModuleType::IO => {
-            // I/O modules depend on models and utilities
-            dependencies.push("models".to_string());
-            dependencies.push("utils".to_string());
-            // I/O modules are used by core and entry points
-            dependents.push("main".to_string());
-            dependents.push("core".to_string());
-        }
-        ModuleType::Utility => {
-            // Utilities have minimal dependencies
-            // Utilities are widely used
-            dependents.push("core".to_string());
-            dependents.push("models".to_string());
-            dependents.push("io".to_string());
-            dependents.push("api".to_string());
-        }
-        _ => {}
-    }
-
-    // Add path-based relationships
-    if path_str.contains("risk") {
-        dependencies.push("core".to_string());
-        dependents.push("io::output".to_string());
-    }
-    if path_str.contains("analyzers") {
-        dependencies.push("core::ast".to_string());
-        dependents.push("main".to_string());
-    }
-    if path_str.contains("complexity") {
-        dependencies.push("core::metrics".to_string());
-        dependents.push("risk".to_string());
-    }
-    if path_str.contains("debt") {
-        dependencies.push("core".to_string());
-        dependents.push("main".to_string());
-    }
-
-    // Ensure unique entries
-    dependencies.sort();
-    dependencies.dedup();
-    dependents.sort();
-    dependents.dedup();
-
-    (dependencies, dependents)
-}
-
 fn complexity_to_test_effort(complexity: &ComplexityMetrics) -> TestEffort {
-    let cognitive = complexity.cognitive_complexity;
     let cyclomatic = complexity.cyclomatic_complexity;
+    let cognitive = complexity.cognitive_complexity;
+    let combined = cyclomatic + cognitive / 2;
 
-    let difficulty = match cognitive {
-        0..=4 => Difficulty::Trivial,
-        5..=9 => Difficulty::Simple,
-        10..=19 => Difficulty::Moderate,
-        20..=39 => Difficulty::Complex,
-        _ => Difficulty::VeryComplex,
+    let difficulty = match combined {
+        0..=5 => Difficulty::Trivial,
+        6..=10 => Difficulty::Simple,
+        11..=20 => Difficulty::Moderate,
+        _ => Difficulty::Complex,
     };
 
     TestEffort {
@@ -903,46 +243,6 @@ fn complexity_to_test_effort(complexity: &ComplexityMetrics) -> TestEffort {
         recommended_test_cases: cyclomatic + 1,
     }
 }
-
-fn generate_enhanced_rationale_v2(target: &TestTarget, _roi: &crate::risk::roi::ROI) -> String {
-    let coverage_str = RationaleBuilder::coverage_description(target.current_coverage);
-    let complexity_desc =
-        RationaleBuilder::complexity_level(target.complexity.cognitive_complexity);
-    let complexity_str = format!(
-        "cyclo={}, cognitive={}",
-        target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity
-    );
-    let effort_desc = RationaleBuilder::effort_description(
-        target.complexity.cyclomatic_complexity,
-        target.complexity.cognitive_complexity,
-    );
-    let roi_desc = RationaleBuilder::roi_description(target);
-    let module_desc =
-        RationaleBuilder::module_description(&target.module_type, target.current_coverage > 0.0);
-
-    format!(
-        "{module_desc} with {coverage_str}\n            {complexity_desc} code ({complexity_str}){effort_desc}{roi_desc}"
-    )
-}
-
-fn _generate_enhanced_rationale(target: &TestTarget, roi: &ROI) -> String {
-    let coverage_status = describe_coverage_status(target);
-    let complexity_desc = describe_complexity(&target.complexity);
-    let impact_desc = describe_impact(&target.dependents);
-
-    format!(
-        "{} - {} code (cyclo={}, cognitive={}){}. ROI: {:.1}x with {:.1}% risk reduction",
-        coverage_status,
-        complexity_desc,
-        target.complexity.cyclomatic_complexity,
-        target.complexity.cognitive_complexity,
-        impact_desc,
-        roi.value,
-        roi.risk_reduction
-    )
-}
-
-// =============== Utility Functions ===============
 
 pub fn identify_untested_complex_functions(
     functions: &Vector<FunctionRisk>,
@@ -980,8 +280,6 @@ pub fn identify_well_tested_complex_functions(
 }
 
 pub fn calculate_dynamic_coverage_threshold(complexity: u32) -> f64 {
-    // Dynamic threshold: more complex code needs higher coverage
-    // Base: 50% + 2% per complexity point, max 100%
     let threshold = 50.0 + (complexity as f64 * 2.0);
     threshold.min(100.0)
 }
@@ -1016,7 +314,7 @@ mod tests {
         let mut targets = vec![target.clone()];
         targets = stage.process(targets);
 
-        assert!(targets[0].priority_score > 1000.0); // Should be heavily boosted
+        assert!(targets[0].priority_score > 1000.0);
     }
 
     #[test]
@@ -1056,7 +354,7 @@ mod tests {
         let main_score = scorer.score(&main_target);
         let util_score = scorer.score(&util_target);
 
-        assert!(main_score > util_score); // Entry points should score higher
+        assert!(main_score > util_score);
     }
 
     #[test]
@@ -1105,8 +403,8 @@ mod tests {
         let simple_effort = estimator.estimate(&simple_target);
 
         assert!(complex_effort > simple_effort);
-        assert!(complex_effort > 20.0); // Should be significant for complex code
-        assert!(simple_effort < 10.0); // Should be low for simple code
+        assert!(complex_effort > 20.0);
+        assert!(simple_effort < 10.0);
     }
 
     #[test]
