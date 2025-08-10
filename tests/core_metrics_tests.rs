@@ -212,7 +212,7 @@ fn test_complexity_metrics_from_function() {
         cognitive: 8,
         nesting: 2,
         length: 30,
-            is_test: false,
+        is_test: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -243,7 +243,7 @@ fn test_complexity_metrics_from_function_zero_values() {
         cognitive: 0,
         nesting: 0,
         length: 1,
-            is_test: false,
+        is_test: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -266,7 +266,7 @@ fn test_complexity_metrics_from_function_high_values() {
         cognitive: 75,
         nesting: 10,
         length: 500,
-            is_test: false,
+        is_test: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -292,7 +292,7 @@ fn test_complexity_metrics_from_function_preserves_path() {
         cognitive: 4,
         nesting: 1,
         length: 15,
-            is_test: false,
+        is_test: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);

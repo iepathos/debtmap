@@ -62,7 +62,7 @@ fn test_function_is_complex() {
         cognitive: 8,
         nesting: 2,
         length: 30,
-            is_test: false,
+        is_test: false,
     };
 
     assert!(
