@@ -163,7 +163,8 @@ fn test_map_functions_with_mock_nodes() {
     let _ast = create_test_rust_ast();
 
     // Create mock nodes for testing
-    let mock_nodes = [AstNode {
+    let mock_nodes = [
+        AstNode {
             kind: NodeKind::Function,
             name: Some("test_func".to_string()),
             line: 10,
@@ -180,7 +181,8 @@ fn test_map_functions_with_mock_nodes() {
             name: Some("test_method".to_string()),
             line: 30,
             children: vec![],
-        }];
+        },
+    ];
 
     // Filter only functions and methods
     let functions: Vec<String> = mock_nodes
