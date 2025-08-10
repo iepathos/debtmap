@@ -3,7 +3,7 @@ use debtmap::core::{
     cache::{AnalysisCache, IncrementalAnalysis},
     lazy::TransformationPipeline,
     metrics::combine_metrics,
-    monadic::{traverse_results, Applicative},
+    monadic::{lift_result, traverse_results, Applicative, OptionExt, ResultExt},
     ComplexityMetrics, FileMetrics, FunctionMetrics, Language,
 };
 use std::path::PathBuf;
@@ -487,5 +487,483 @@ mod test_traverse_results {
         assert_eq!(users[0].name, "User1");
         assert_eq!(users[1].name, "User2");
         assert_eq!(users[2].name, "User3");
+    }
+}
+
+// Tests for or_else_with() in ResultExt
+mod test_or_else_with {
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_or_else_with_ok_value() {
+        let result: Result<i32> = Ok(42);
+        let fallback = result.or_else_with(|| Ok(100));
+
+        assert!(fallback.is_ok());
+        assert_eq!(fallback.unwrap(), 42); // Original value is preserved
+    }
+
+    #[test]
+    fn test_or_else_with_error_fallback_success() {
+        let result: Result<i32> = Err(anyhow!("Initial error"));
+        let fallback = result.or_else_with(|| Ok(100));
+
+        assert!(fallback.is_ok());
+        assert_eq!(fallback.unwrap(), 100); // Fallback value is used
+    }
+
+    #[test]
+    fn test_or_else_with_error_fallback_error() {
+        let result: Result<i32> = Err(anyhow!("Initial error"));
+        let fallback = result.or_else_with(|| Err(anyhow!("Fallback error")));
+
+        assert!(fallback.is_err());
+        assert!(fallback.unwrap_err().to_string().contains("Fallback error"));
+    }
+
+    #[test]
+    fn test_or_else_with_complex_type() {
+        #[derive(Debug, PartialEq)]
+        struct Data {
+            value: String,
+            count: u32,
+        }
+
+        let result: Result<Data> = Err(anyhow!("Failed to load"));
+        let fallback = result.or_else_with(|| {
+            Ok(Data {
+                value: "default".to_string(),
+                count: 0,
+            })
+        });
+
+        assert!(fallback.is_ok());
+        let data = fallback.unwrap();
+        assert_eq!(data.value, "default");
+        assert_eq!(data.count, 0);
+    }
+
+    #[test]
+    fn test_or_else_with_chain() {
+        let result: Result<i32> = Err(anyhow!("Error 1"));
+
+        let fallback = result
+            .or_else_with(|| Err(anyhow!("Error 2")))
+            .or_else_with(|| Ok(42));
+
+        assert!(fallback.is_ok());
+        assert_eq!(fallback.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_or_else_with_side_effects() {
+        let mut counter = 0;
+
+        let result: Result<i32> = Err(anyhow!("Error"));
+        let fallback = result.or_else_with(|| {
+            counter += 1;
+            Ok(counter * 10)
+        });
+
+        assert!(fallback.is_ok());
+        assert_eq!(fallback.unwrap(), 10);
+        assert_eq!(counter, 1);
+    }
+
+    #[test]
+    fn test_or_else_with_no_execution_on_ok() {
+        let mut counter = 0;
+
+        let result: Result<i32> = Ok(42);
+        let fallback = result.or_else_with(|| {
+            counter += 1; // This should not execute
+            Ok(100)
+        });
+
+        assert!(fallback.is_ok());
+        assert_eq!(fallback.unwrap(), 42);
+        assert_eq!(counter, 0); // Counter unchanged
+    }
+
+    #[test]
+    fn test_or_else_with_async_like_pattern() {
+        fn fetch_primary() -> Result<String> {
+            Err(anyhow!("Primary failed"))
+        }
+
+        fn fetch_backup() -> Result<String> {
+            Ok("backup data".to_string())
+        }
+
+        let result = fetch_primary().or_else_with(fetch_backup);
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "backup data");
+    }
+}
+
+// Tests for or_else_some() in OptionExt
+mod test_or_else_some {
+    use super::*;
+
+    #[test]
+    fn test_or_else_some_with_some_value() {
+        let value: Option<i32> = Some(42);
+        let fallback = value.or_else_some(|| Some(100));
+
+        assert!(fallback.is_some());
+        assert_eq!(fallback.unwrap(), 42); // Original value preserved
+    }
+
+    #[test]
+    fn test_or_else_some_with_none_fallback_some() {
+        let value: Option<i32> = None;
+        let fallback = value.or_else_some(|| Some(100));
+
+        assert!(fallback.is_some());
+        assert_eq!(fallback.unwrap(), 100); // Fallback value used
+    }
+
+    #[test]
+    fn test_or_else_some_with_none_fallback_none() {
+        let value: Option<i32> = None;
+        let fallback = value.or_else_some(|| None);
+
+        assert!(fallback.is_none());
+    }
+
+    #[test]
+    fn test_or_else_some_with_complex_type() {
+        #[derive(Debug, PartialEq)]
+        struct Config {
+            setting: String,
+            enabled: bool,
+        }
+
+        let value: Option<Config> = None;
+        let fallback = value.or_else_some(|| {
+            Some(Config {
+                setting: "default".to_string(),
+                enabled: true,
+            })
+        });
+
+        assert!(fallback.is_some());
+        let config = fallback.unwrap();
+        assert_eq!(config.setting, "default");
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn test_or_else_some_chain() {
+        let value: Option<i32> = None;
+
+        let result = value.or_else_some(|| None).or_else_some(|| Some(42));
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_or_else_some_lazy_evaluation() {
+        let mut counter = 0;
+
+        let value: Option<i32> = None;
+        let fallback = value.or_else_some(|| {
+            counter += 1;
+            Some(counter * 10)
+        });
+
+        assert!(fallback.is_some());
+        assert_eq!(fallback.unwrap(), 10);
+        assert_eq!(counter, 1);
+    }
+
+    #[test]
+    fn test_or_else_some_no_execution_on_some() {
+        let mut counter = 0;
+
+        let value: Option<i32> = Some(42);
+        let fallback = value.or_else_some(|| {
+            counter += 1; // Should not execute
+            Some(100)
+        });
+
+        assert!(fallback.is_some());
+        assert_eq!(fallback.unwrap(), 42);
+        assert_eq!(counter, 0); // Counter unchanged
+    }
+
+    #[test]
+    fn test_or_else_some_practical_use_case() {
+        fn get_env_var() -> Option<String> {
+            None // Simulate missing env var
+        }
+
+        fn get_default_config() -> Option<String> {
+            Some("default_value".to_string())
+        }
+
+        let config = get_env_var().or_else_some(get_default_config);
+
+        assert!(config.is_some());
+        assert_eq!(config.unwrap(), "default_value");
+    }
+
+    #[test]
+    fn test_or_else_some_with_filter() {
+        let value: Option<i32> = None;
+
+        let result = value.or_else_some(|| Some(10)).filter_some(|&x| x > 5);
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 10);
+    }
+
+    #[test]
+    fn test_or_else_some_edge_case_nested_options() {
+        let value: Option<Option<i32>> = None;
+        let fallback = value.or_else_some(|| Some(Some(42)));
+
+        assert!(fallback.is_some());
+        assert_eq!(fallback.unwrap().unwrap(), 42);
+    }
+}
+
+// Tests for lift_result()
+mod test_lift_result {
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_lift_result_basic() {
+        let add_one = |x: i32| x + 1;
+        let lifted = lift_result(add_one);
+
+        let result = lifted(41);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_lift_result_string_transformation() {
+        let uppercase = |s: String| s.to_uppercase();
+        let lifted = lift_result(uppercase);
+
+        let result = lifted("hello".to_string());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "HELLO");
+    }
+
+    #[test]
+    fn test_lift_result_complex_type() {
+        #[derive(Debug, PartialEq)]
+        struct Point {
+            x: i32,
+            y: i32,
+        }
+
+        let double_point = |p: Point| Point {
+            x: p.x * 2,
+            y: p.y * 2,
+        };
+
+        let lifted = lift_result(double_point);
+
+        let result = lifted(Point { x: 3, y: 4 });
+        assert!(result.is_ok());
+
+        let doubled = result.unwrap();
+        assert_eq!(doubled.x, 6);
+        assert_eq!(doubled.y, 8);
+    }
+
+    #[test]
+    fn test_lift_result_composition() {
+        let add_one = |x: i32| x + 1;
+        let double = |x: i32| x * 2;
+
+        let lifted_add = lift_result(add_one);
+        let lifted_double = lift_result(double);
+
+        let result = lifted_add(5).and_then(lifted_double);
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 12); // (5 + 1) * 2
+    }
+
+    #[test]
+    fn test_lift_result_with_chain() {
+        let square = |x: i32| x * x;
+        let lifted = lift_result(square);
+
+        let result: Result<i32> = Ok(3).and_then(lifted).and_then(lift_result(|x| x + 1));
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 10); // 3^2 + 1
+    }
+
+    #[test]
+    fn test_lift_result_pure_function_guarantee() {
+        let pure_fn = |x: i32| x * 2;
+        let lifted = lift_result(pure_fn);
+
+        // Call multiple times with same input
+        let result1 = lifted(21);
+        let result2 = lifted(21);
+
+        assert!(result1.is_ok());
+        assert!(result2.is_ok());
+        assert_eq!(result1.unwrap(), 42);
+        assert_eq!(result2.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_lift_result_with_vec_map() {
+        let double = |x: i32| x * 2;
+        let lifted = lift_result(double);
+
+        let values = vec![1, 2, 3];
+        let results: Result<Vec<i32>> = values.into_iter().map(lifted).collect();
+
+        assert!(results.is_ok());
+        assert_eq!(results.unwrap(), vec![2, 4, 6]);
+    }
+
+    #[test]
+    fn test_lift_result_practical_parsing() {
+        fn parse_and_double(s: &str) -> Result<i32> {
+            let parsed: Result<i32> = s.parse().map_err(|e| anyhow!("{}", e));
+            parsed.and_then(lift_result(|x| x * 2))
+        }
+
+        let result = parse_and_double("21");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_lift_result_tuple_transformation() {
+        let swap = |(a, b): (i32, String)| (b, a);
+        let lifted = lift_result(swap);
+
+        let result = lifted((42, "answer".to_string()));
+        assert!(result.is_ok());
+
+        let swapped = result.unwrap();
+        assert_eq!(swapped.0, "answer");
+        assert_eq!(swapped.1, 42);
+    }
+
+    #[test]
+    fn test_lift_result_closure_capture() {
+        let multiplier = 10;
+        let multiply = |x: i32| x * multiplier;
+        let lifted = lift_result(multiply);
+
+        let result = lifted(5);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 50);
+    }
+}
+
+// Tests for default() in TransformationPipeline
+mod test_transformation_pipeline_default {
+    use super::*;
+
+    #[test]
+    fn test_default_creates_empty_pipeline() {
+        let pipeline: TransformationPipeline<i32> = Default::default();
+
+        // Apply to a value - should return unchanged
+        let result = pipeline.apply(42);
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn test_default_apply_all_empty() {
+        let pipeline: TransformationPipeline<i32> = Default::default();
+
+        let values = vec![1, 2, 3, 4, 5];
+        let results = pipeline.apply_all(values.clone());
+
+        assert_eq!(results, values); // Values unchanged
+    }
+
+    #[test]
+    fn test_default_then_add_transformations() {
+        let pipeline: TransformationPipeline<i32> = Default::default();
+        let pipeline = pipeline
+            .add_transformation(|x| x + 1)
+            .add_transformation(|x| x * 2);
+
+        let result = pipeline.apply(10);
+        assert_eq!(result, 22); // (10 + 1) * 2
+    }
+
+    #[test]
+    fn test_default_type_inference() {
+        // Test that Default can infer the type properly
+        let pipeline = TransformationPipeline::default();
+        let pipeline = pipeline.add_transformation(|x: String| x.to_uppercase());
+
+        let result = pipeline.apply("hello".to_string());
+        assert_eq!(result, "HELLO");
+    }
+
+    #[test]
+    fn test_default_multiple_instances() {
+        let pipeline1: TransformationPipeline<i32> = Default::default();
+        let pipeline2: TransformationPipeline<i32> = Default::default();
+
+        // Both should behave identically
+        assert_eq!(pipeline1.apply(100), pipeline2.apply(100));
+    }
+
+    #[test]
+    fn test_default_with_complex_type() {
+        #[derive(Debug, PartialEq, Clone)]
+        struct Data {
+            value: i32,
+        }
+
+        let pipeline: TransformationPipeline<Data> = Default::default();
+        let data = Data { value: 42 };
+
+        let result = pipeline.apply(data.clone());
+        assert_eq!(result, data);
+    }
+
+    #[test]
+    fn test_default_chain_behavior() {
+        let base_pipeline: TransformationPipeline<i32> = Default::default();
+
+        // Create different pipelines from the same default
+        let pipeline1 = base_pipeline.add_transformation(|x| x + 10);
+        let pipeline2 = TransformationPipeline::default().add_transformation(|x| x * 2);
+
+        assert_eq!(pipeline1.apply(5), 15);
+        assert_eq!(pipeline2.apply(5), 10);
+    }
+
+    #[test]
+    fn test_default_practical_use_case() {
+        // Simulating a data processing pipeline
+        fn create_processing_pipeline(needs_normalization: bool) -> TransformationPipeline<f64> {
+            let mut pipeline = TransformationPipeline::default();
+
+            if needs_normalization {
+                pipeline = pipeline.add_transformation(|x| x / 100.0);
+            }
+
+            pipeline.add_transformation(|x| x * 2.0)
+        }
+
+        let pipeline_with_norm = create_processing_pipeline(true);
+        let pipeline_without_norm = create_processing_pipeline(false);
+
+        assert_eq!(pipeline_with_norm.apply(100.0), 2.0); // (100/100) * 2
+        assert_eq!(pipeline_without_norm.apply(100.0), 200.0); // 100 * 2
     }
 }
