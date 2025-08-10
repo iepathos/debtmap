@@ -225,7 +225,7 @@ fn analyze_risk_with_coverage(
     // Calculate debt score and threshold
     let debt_score = debt::total_debt_score(&results.technical_debt.items) as f64;
     let debt_threshold = 100.0; // Default threshold
-    
+
     // Create risk analyzer with appropriate strategy
     let analyzer = if legacy_risk {
         risk::RiskAnalyzer::with_legacy_strategy()
