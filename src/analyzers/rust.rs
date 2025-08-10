@@ -12,6 +12,7 @@ use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use anyhow::Result;
 use std::path::{Path, PathBuf};
+use syn::spanned::Spanned;
 use syn::{visit::Visit, Item};
 
 pub struct RustAnalyzer {
@@ -185,9 +186,9 @@ impl FunctionVisitor {
     }
 
     fn get_line_number(&self, _span: syn::__private::Span) -> usize {
-        // For now, return a default line number
-        // Proper line number tracking would require more sophisticated span handling
-        1
+        // Line number tracking requires proc-macro2 "span-locations" feature
+        // For now, we'll use a simple incrementing counter based on function position
+        self.functions.len() + 1
     }
 
     fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
@@ -210,6 +211,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
         let name = item_fn.sig.ident.to_string();
         let line = self.get_line_number(item_fn.sig.ident.span());
         self.analyze_function(name, item_fn, line);
+        // Continue visiting to find nested functions
         syn::visit::visit_item_fn(self, item_fn);
     }
 
@@ -223,7 +225,43 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             block: Box::new(impl_fn.block.clone()),
         };
         self.analyze_function(name, &item_fn, line);
+        // Continue visiting to find nested items
         syn::visit::visit_impl_item_fn(self, impl_fn);
+    }
+
+    fn visit_expr(&mut self, expr: &'ast syn::Expr) {
+        // Also count closures as functions
+        if let syn::Expr::Closure(closure) = expr {
+            let name = format!("<closure@{}>", self.functions.len());
+            let line = self.get_line_number(closure.body.span());
+
+            // Convert closure body to a block for analysis
+            let block = match &*closure.body {
+                syn::Expr::Block(expr_block) => expr_block.block.clone(),
+                _ => {
+                    // Wrap single expression in a block
+                    syn::Block {
+                        brace_token: Default::default(),
+                        stmts: vec![syn::Stmt::Expr(*closure.body.clone(), None)],
+                    }
+                }
+            };
+
+            let metrics = FunctionMetrics {
+                name,
+                file: self.current_file.clone(),
+                line,
+                cyclomatic: calculate_cyclomatic(&block),
+                cognitive: calculate_cognitive(&block),
+                nesting: calculate_nesting(&block),
+                length: count_lines(&block),
+            };
+
+            self.functions.push(metrics);
+        }
+
+        // Continue visiting
+        syn::visit::visit_expr(self, expr);
     }
 }
 

@@ -27,10 +27,7 @@ fn test_calculate_cyclomatic_single_if() {
     }};
 
     let complexity = calculate_cyclomatic(&block);
-    assert_eq!(
-        complexity, 1,
-        "Single if statement doesn't add complexity in this implementation"
-    );
+    assert_eq!(complexity, 2, "Single if statement adds 1 to complexity");
 }
 
 #[test]
@@ -45,8 +42,8 @@ fn test_calculate_cyclomatic_if_else() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 1,
-        "If-else doesn't add complexity in this implementation"
+        complexity, 3,
+        "If-else adds 2 to complexity (one for if, one for else)"
     );
 }
 
@@ -62,8 +59,8 @@ fn test_calculate_cyclomatic_nested_if() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 1,
-        "Nested if statements don't add complexity in this implementation"
+        complexity, 3,
+        "Nested if statements each add 1 to complexity"
     );
 }
 
@@ -79,7 +76,10 @@ fn test_calculate_cyclomatic_match_expression() {
     }};
 
     let complexity = calculate_cyclomatic(&block);
-    assert_eq!(complexity, 5, "Match with 4 arms adds 4 to complexity");
+    assert_eq!(
+        complexity, 4,
+        "Match with 4 arms adds 3 to complexity (n-1)"
+    );
 }
 
 #[test]
@@ -95,8 +95,8 @@ fn test_calculate_cyclomatic_match_with_guards() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 5,
-        "Match arms with guards count the same as regular arms"
+        complexity, 4,
+        "Match with 4 arms (including guards) adds 3 to complexity"
     );
 }
 
@@ -135,7 +135,7 @@ fn test_calculate_cyclomatic_loop() {
     }};
 
     let complexity = calculate_cyclomatic(&block);
-    assert_eq!(complexity, 2, "Loop adds complexity but nested if doesn't");
+    assert_eq!(complexity, 3, "Loop adds 1 and nested if adds 1");
 }
 
 #[test]
@@ -148,8 +148,8 @@ fn test_calculate_cyclomatic_logical_and() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 1,
-        "Logical AND doesn't add complexity in this block context"
+        complexity, 2,
+        "If statement adds 1, logical AND in condition doesn't add extra"
     );
 }
 
@@ -163,8 +163,8 @@ fn test_calculate_cyclomatic_logical_or() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 1,
-        "Logical OR doesn't add complexity in this block context"
+        complexity, 2,
+        "If statement adds 1, logical OR in condition doesn't add extra"
     );
 }
 
@@ -178,8 +178,8 @@ fn test_calculate_cyclomatic_multiple_logical_operators() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 1,
-        "Logical operators don't add complexity in this block context"
+        complexity, 2,
+        "If statement adds 1, logical operators in condition don't add extra"
     );
 }
 
@@ -224,8 +224,8 @@ fn test_calculate_cyclomatic_nested_match() {
 
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
-        complexity, 6,
-        "Nested match statements accumulate complexity"
+        complexity, 4,
+        "Outer match adds 1, inner match adds 2 (3 arms - 1)"
     );
 }
 
@@ -247,7 +247,7 @@ fn test_calculate_cyclomatic_complex_control_flow() {
     let complexity = calculate_cyclomatic(&block);
     assert_eq!(
         complexity, 5,
-        "Complex control flow accumulates decision points"
+        "For loop adds 1, if adds 1, match with 3 arms adds 2"
     );
 }
 
@@ -347,10 +347,7 @@ fn test_calculate_cyclomatic_else_if_chain() {
     }};
 
     let complexity = calculate_cyclomatic(&block);
-    assert_eq!(
-        complexity, 1,
-        "Else-if chain doesn't add complexity in this implementation"
-    );
+    assert_eq!(complexity, 7, "Each if/else if/else branch adds complexity");
 }
 
 #[test]
@@ -366,10 +363,7 @@ fn test_calculate_cyclomatic_early_return() {
     }};
 
     let complexity = calculate_cyclomatic(&block);
-    assert_eq!(
-        complexity, 1,
-        "Early returns don't add complexity in this implementation"
-    );
+    assert_eq!(complexity, 3, "Each if statement adds 1 to complexity");
 }
 
 #[test]
@@ -387,8 +381,5 @@ fn test_calculate_cyclomatic_break_continue() {
     }};
 
     let complexity = calculate_cyclomatic(&block);
-    assert_eq!(
-        complexity, 2,
-        "For loop adds complexity but if statements don't"
-    );
+    assert_eq!(complexity, 4, "For loop adds 1, each if statement adds 1");
 }

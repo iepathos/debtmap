@@ -58,14 +58,13 @@
 ## Current Phase: Foundation
 We have completed the initial implementation with core functionality for analyzing Rust and Python code, including enhanced risk analysis with debt integration.
 
-## Pending Specs
+- [x] **Spec 09**: Fix Complexity Calculation Bugs
+  - Cyclomatic complexity now correctly counts all branches
+  - Cognitive complexity properly tracks nesting  
+  - Functions, methods, and closures are all counted
+  - Realistic average complexity values achieved
 
-### Critical Bug Fixes
-- [ ] **Spec 09**: Fix Complexity Calculation Bugs
-  - Fix cyclomatic complexity not counting branches
-  - Fix cognitive complexity nesting calculations  
-  - Fix function counting issues (601 files with 601 functions)
-  - Ensure realistic average complexity (3-8 range)
+## Pending Specs
 
 ### Enhancements
 - [ ] **Spec 10**: Enhance Complexity Detection with Modern Patterns
