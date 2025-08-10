@@ -58,6 +58,31 @@
 ## Current Phase: Foundation
 We have completed the initial implementation with core functionality for analyzing Rust and Python code, including enhanced risk analysis with debt integration.
 
+## Pending Specs
+
+### Critical Bug Fixes
+- [ ] **Spec 09**: Fix Complexity Calculation Bugs
+  - Fix cyclomatic complexity not counting branches
+  - Fix cognitive complexity nesting calculations  
+  - Fix function counting issues (601 files with 601 functions)
+  - Ensure realistic average complexity (3-8 range)
+
+### Enhancements
+- [ ] **Spec 10**: Enhance Complexity Detection with Modern Patterns
+  - Detect async/await patterns
+  - Identify callback chains and promises
+  - Recognize functional composition patterns
+  - Account for error handling complexity
+
+- [ ] **Spec 11**: Add Context-Aware Risk
+  - Context-based risk assessment enhancements
+
+- [ ] **Spec 12**: Improve ROI Calculation
+  - Enhanced return on investment calculations
+
+- [ ] **Spec 13**: Add Risk Categories
+  - Categorized risk assessment system
+
 ## Upcoming Milestones
 
 ### Phase 1: Language Expansion (Q1 2025)

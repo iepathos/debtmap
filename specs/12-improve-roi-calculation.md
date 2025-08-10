@@ -1,5 +1,5 @@
 ---
-number: 11
+number: 12
 title: Improve ROI Calculation for Testing Investment
 category: optimization
 priority: high
@@ -8,7 +8,7 @@ dependencies: [07, 08, 09, 10]
 created: 2025-01-10
 ---
 
-# Specification 11: Improve ROI Calculation for Testing Investment
+# Specification 12: Improve ROI Calculation for Testing Investment
 
 **Category**: optimization
 **Priority**: high

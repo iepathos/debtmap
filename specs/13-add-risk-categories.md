@@ -1,5 +1,5 @@
 ---
-number: 12
+number: 13
 title: Add Comprehensive Risk Categories
 category: foundation
 priority: high
@@ -8,7 +8,7 @@ dependencies: [07, 10]
 created: 2025-01-10
 ---
 
-# Specification 12: Add Comprehensive Risk Categories
+# Specification 13: Add Comprehensive Risk Categories
 
 **Category**: foundation
 **Priority**: high
