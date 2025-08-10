@@ -49,37 +49,36 @@ impl SuppressionContext {
     }
 
     pub fn is_suppressed(&self, line: usize, debt_type: &DebtType) -> bool {
-        self.is_in_suppression_block(line, debt_type)
-            || self.has_line_suppression(line, debt_type)
-            || self.has_next_line_suppression(line, debt_type)
+        // Check all suppression sources using lazy evaluation
+        [
+            self.is_in_suppression_block(line, debt_type),
+            self.has_line_suppression(line, debt_type),
+            self.has_next_line_suppression(line, debt_type),
+        ]
+        .into_iter()
+        .any(|suppressed| suppressed)
     }
 
     fn is_in_suppression_block(&self, line: usize, debt_type: &DebtType) -> bool {
-        self.active_blocks.iter().any(|block| {
-            self.line_within_block(line, block)
-                && self.debt_type_matches(debt_type, &block.debt_types)
-        })
+        self.active_blocks
+            .iter()
+            .filter(|block| line_within_block(line, block))
+            .any(|block| debt_type_matches(debt_type, &block.debt_types))
     }
 
     fn has_line_suppression(&self, line: usize, debt_type: &DebtType) -> bool {
         self.line_suppressions
             .get(&line)
-            .is_some_and(|rule| self.debt_type_matches(debt_type, &rule.debt_types))
+            .is_some_and(|rule| debt_type_matches(debt_type, &rule.debt_types))
     }
 
     fn has_next_line_suppression(&self, line: usize, debt_type: &DebtType) -> bool {
-        line > 0
-            && self.line_suppressions.get(&(line - 1)).is_some_and(|rule| {
-                rule.applies_to_next_line && self.debt_type_matches(debt_type, &rule.debt_types)
+        (line > 0)
+            .then(|| self.line_suppressions.get(&(line - 1)))
+            .flatten()
+            .is_some_and(|rule| {
+                rule.applies_to_next_line && debt_type_matches(debt_type, &rule.debt_types)
             })
-    }
-
-    fn line_within_block(&self, line: usize, block: &SuppressionBlock) -> bool {
-        line >= block.start_line && block.end_line.is_some_and(|end| line <= end)
-    }
-
-    fn debt_type_matches(&self, debt_type: &DebtType, allowed_types: &[DebtType]) -> bool {
-        allowed_types.is_empty() || allowed_types.contains(debt_type)
     }
 
     pub fn get_stats(&self) -> SuppressionStats {
@@ -120,6 +119,15 @@ impl Default for SuppressionContext {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// Helper functions extracted as pure functions for better testability
+fn line_within_block(line: usize, block: &SuppressionBlock) -> bool {
+    line >= block.start_line && block.end_line.is_some_and(|end| line <= end)
+}
+
+fn debt_type_matches(debt_type: &DebtType, allowed_types: &[DebtType]) -> bool {
+    allowed_types.is_empty() || allowed_types.contains(debt_type)
 }
 
 struct SuppressionPatterns {
@@ -168,35 +176,65 @@ enum LineParseResult {
 }
 
 fn parse_line(line: &str, line_number: usize, patterns: &SuppressionPatterns) -> LineParseResult {
-    if let Some(captures) = patterns.block_start.captures(line) {
-        return LineParseResult::BlockStart(
+    // Try each pattern in order and return the first match
+    try_parse_block_start(line, line_number, patterns)
+        .or_else(|| try_parse_block_end(line, line_number, patterns))
+        .or_else(|| try_parse_next_line(line, line_number, patterns))
+        .or_else(|| try_parse_line_suppression(line, line_number, patterns))
+        .unwrap_or(LineParseResult::None)
+}
+
+fn try_parse_block_start(
+    line: &str,
+    line_number: usize,
+    patterns: &SuppressionPatterns,
+) -> Option<LineParseResult> {
+    patterns.block_start.captures(line).map(|captures| {
+        LineParseResult::BlockStart(
             line_number,
             parse_debt_types(captures.get(1).map(|m| m.as_str())),
             captures.get(2).map(|m| m.as_str().to_string()),
-        );
-    }
+        )
+    })
+}
 
-    if patterns.block_end.is_match(line) {
-        return LineParseResult::BlockEnd(line_number);
-    }
+fn try_parse_block_end(
+    line: &str,
+    line_number: usize,
+    patterns: &SuppressionPatterns,
+) -> Option<LineParseResult> {
+    patterns
+        .block_end
+        .is_match(line)
+        .then_some(LineParseResult::BlockEnd(line_number))
+}
 
-    if let Some(captures) = patterns.next_line.captures(line) {
-        return LineParseResult::NextLineSuppression(
+fn try_parse_next_line(
+    line: &str,
+    line_number: usize,
+    patterns: &SuppressionPatterns,
+) -> Option<LineParseResult> {
+    patterns.next_line.captures(line).map(|captures| {
+        LineParseResult::NextLineSuppression(
             line_number,
             parse_debt_types(captures.get(1).map(|m| m.as_str())),
             captures.get(2).map(|m| m.as_str().to_string()),
-        );
-    }
+        )
+    })
+}
 
-    if let Some(captures) = patterns.line.captures(line) {
-        return LineParseResult::LineSuppression(
+fn try_parse_line_suppression(
+    line: &str,
+    line_number: usize,
+    patterns: &SuppressionPatterns,
+) -> Option<LineParseResult> {
+    patterns.line.captures(line).map(|captures| {
+        LineParseResult::LineSuppression(
             line_number,
             parse_debt_types(captures.get(1).map(|m| m.as_str())),
             captures.get(2).map(|m| m.as_str().to_string()),
-        );
-    }
-
-    LineParseResult::None
+        )
+    })
 }
 
 fn process_parsed_line(
@@ -204,42 +242,51 @@ fn process_parsed_line(
     context: &mut SuppressionContext,
     open_blocks: &mut Vec<(usize, Vec<DebtType>, Option<String>)>,
 ) {
+    use LineParseResult::*;
+
     match result {
-        LineParseResult::BlockStart(ln, types, reason) => {
-            open_blocks.push((ln, types, reason));
+        BlockStart(ln, types, reason) => open_blocks.push((ln, types, reason)),
+        BlockEnd(end_line) => handle_block_end(context, open_blocks, end_line),
+        NextLineSuppression(ln, types, reason) => {
+            add_line_suppression(context, ln, types, reason, true)
         }
-        LineParseResult::BlockEnd(end_line) => {
-            if let Some((start_line, debt_types, reason)) = open_blocks.pop() {
-                context.active_blocks.push(SuppressionBlock {
-                    start_line,
-                    end_line: Some(end_line),
-                    debt_types,
-                    reason,
-                });
-            }
+        LineSuppression(ln, types, reason) => {
+            add_line_suppression(context, ln, types, reason, false)
         }
-        LineParseResult::NextLineSuppression(ln, types, reason) => {
-            context.line_suppressions.insert(
-                ln,
-                SuppressionRule {
-                    debt_types: types,
-                    reason,
-                    applies_to_next_line: true,
-                },
-            );
-        }
-        LineParseResult::LineSuppression(ln, types, reason) => {
-            context.line_suppressions.insert(
-                ln,
-                SuppressionRule {
-                    debt_types: types,
-                    reason,
-                    applies_to_next_line: false,
-                },
-            );
-        }
-        LineParseResult::None => {}
+        None => {}
     }
+}
+
+fn handle_block_end(
+    context: &mut SuppressionContext,
+    open_blocks: &mut Vec<(usize, Vec<DebtType>, Option<String>)>,
+    end_line: usize,
+) {
+    if let Some((start_line, debt_types, reason)) = open_blocks.pop() {
+        context.active_blocks.push(SuppressionBlock {
+            start_line,
+            end_line: Some(end_line),
+            debt_types,
+            reason,
+        });
+    }
+}
+
+fn add_line_suppression(
+    context: &mut SuppressionContext,
+    line: usize,
+    debt_types: Vec<DebtType>,
+    reason: Option<String>,
+    applies_to_next_line: bool,
+) {
+    context.line_suppressions.insert(
+        line,
+        SuppressionRule {
+            debt_types,
+            reason,
+            applies_to_next_line,
+        },
+    );
 }
 
 pub fn parse_suppression_comments(
