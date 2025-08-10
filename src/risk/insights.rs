@@ -34,9 +34,10 @@ pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
 
     for (i, risk) in critical_risks.iter().enumerate() {
         output.push_str(&format!(
-            "{}. {}::{}\n",
+            "{}. {}:{}::{}\n",
             i + 1,
             risk.file.display(),
+            risk.line_range.0,
             risk.function_name
         ));
         output.push_str(&format!(
@@ -103,13 +104,9 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
             format!("{roi_score:.1}")
         };
 
-        // Format file path - show relative path and truncate if too long
+        // Format file path with line number
         let file_str = rec.file.to_string_lossy();
-        let location_display = if file_str.len() > 30 {
-            format!("...{}", &file_str[file_str.len() - 27..])
-        } else {
-            file_str.to_string()
-        };
+        let location_display = format!("{}:{}", file_str, rec.line);
 
         output.push_str(&format!(
             "{:<8} | {:<30} | {:<30} | {:>5}\n",

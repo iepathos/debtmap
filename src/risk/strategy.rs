@@ -439,7 +439,7 @@ mod tests {
                 cyclomatic_complexity: 10,
                 cognitive_complexity: 10,
             };
-            let category = strategy.categorize_risk(&complexity, Some(50.0), score);
+            let category = strategy.categorize_risk(&complexity, Some(50.0), score, false);
             assert_eq!(
                 category, expected_category,
                 "Score {score} should map to {expected_category:?}"

@@ -233,6 +233,7 @@ mod tests {
             id: "module_a".to_string(),
             path: PathBuf::from("src/module_a.rs"),
             function: Some("test_fn".to_string()),
+            line: 1,
             module_type: super::super::super::priority::ModuleType::Core,
             current_coverage: 0.0,
             current_risk: 8.0,
