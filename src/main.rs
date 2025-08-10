@@ -15,11 +15,12 @@ use core::{
 use debt::circular::analyze_module_dependencies;
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+use std::process;
 
 fn main() -> Result<()> {
     let cli = cli::parse_args();
 
-    match cli.command {
+    let result = match cli.command {
         Commands::Analyze {
             path,
             format,
@@ -39,6 +40,15 @@ fn main() -> Result<()> {
         ),
         Commands::Init { force } => init_config(force),
         Commands::Validate { path, config } => validate_project(path, config),
+    };
+
+    // Exit with appropriate code based on result
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            eprintln!("Error: {e}");
+            process::exit(1);
+        }
     }
 }
 
@@ -66,7 +76,15 @@ fn handle_analyze(
         analyze_risk_without_coverage(&results)?
     };
 
-    output_results_with_risk(results, risk_insights, format.into(), output)
+    // Output results
+    output_results_with_risk(results.clone(), risk_insights, format.into(), output)?;
+
+    // Check if analysis passed
+    if !is_analysis_passing(&results, threshold_complexity) {
+        process::exit(1);
+    }
+
+    Ok(())
 }
 
 fn analyze_project(
@@ -363,6 +381,15 @@ fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {
             analyzers::analyze_file(content, file_path.to_path_buf(), analyzer.as_ref())
         })?
         .ok()
+}
+
+fn is_analysis_passing(results: &AnalysisResults, _complexity_threshold: u32) -> bool {
+    let debt_score = debt::total_debt_score(&results.technical_debt.items);
+    let debt_threshold = 100;
+
+    results.complexity.summary.average_complexity <= 10.0
+        && results.complexity.summary.high_complexity_count <= 5
+        && debt_score <= debt_threshold
 }
 
 fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {

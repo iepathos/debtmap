@@ -40,13 +40,14 @@ impl OutputWriter for TerminalWriter {
 
         // Print risk header
         println!();
-        println!("{}", "📊 Risk Analysis".bold().cyan());
-        println!("{}", "================".cyan());
+        println!("{}", "═══════════════════════════════════════════".cyan());
+        println!("{}", "           RISK ANALYSIS REPORT".bold().cyan());
+        println!("{}", "═══════════════════════════════════════════".cyan());
         println!();
 
         // Print risk summary
-        println!("📈 Analysis Summary");
-        println!("──────────────────");
+        println!("📈 {} Summary", "RISK".bold());
+        println!("───────────────────────────────────────────");
         println!(
             "Codebase Risk Score: {:.1} ({})",
             insights.codebase_risk_score,
@@ -120,8 +121,10 @@ impl OutputWriter for TerminalWriter {
 }
 
 fn print_header() {
-    println!("{}", "Debtmap Analysis Report".bold().blue());
-    println!("{}", "=======================".blue());
+    println!();
+    println!("{}", "═══════════════════════════════════════════".blue());
+    println!("{}", "           DEBTMAP ANALYSIS REPORT".bold().blue());
+    println!("{}", "═══════════════════════════════════════════".blue());
     println!();
 }
 
@@ -138,19 +141,26 @@ fn print_summary(results: &AnalysisResults) {
     let debt_score = total_debt_score(&results.technical_debt.items);
     let debt_threshold = 100;
 
-    println!("📊 Summary:");
-    println!("  Files analyzed: {}", results.complexity.metrics.len());
+    println!("📊 {} Summary", "CODEBASE".bold());
+    println!("───────────────────────────────────────────");
     println!(
-        "  Total functions: {}",
+        "  Files analyzed:      {}",
+        results.complexity.metrics.len()
+    );
+    println!(
+        "  Total functions:     {}",
         results.complexity.summary.total_functions
     );
     println!(
-        "  Average complexity: {:.1}",
+        "  Average complexity:  {:.1}",
         results.complexity.summary.average_complexity
     );
-    println!("  Debt items: {}", results.technical_debt.items.len());
     println!(
-        "  Total debt score: {}",
+        "  Debt items:          {}",
+        results.technical_debt.items.len()
+    );
+    println!(
+        "  Total debt score:    {}",
         format_debt_score(debt_score, debt_threshold)
     );
     println!();
@@ -161,7 +171,8 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
         return;
     }
 
-    println!("⚠️ Complexity Hotspots (top 5):");
+    println!("⚠️  {} (Top 5)", "COMPLEXITY HOTSPOTS".bold());
+    println!("───────────────────────────────────────────");
     let top_complex = get_top_complex_functions(&results.complexity.metrics, 5);
 
     for (i, func) in top_complex.iter().enumerate() {
@@ -190,9 +201,11 @@ fn print_technical_debt(results: &AnalysisResults) {
     }
 
     println!(
-        "🔧 Technical Debt ({} items):",
+        "🔧 {} ({} items)",
+        "TECHNICAL DEBT".bold(),
         results.technical_debt.items.len()
     );
+    println!("───────────────────────────────────────────");
 
     let high_priority: Vec<_> = results
         .technical_debt

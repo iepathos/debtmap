@@ -89,21 +89,46 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
         return output;
     }
 
-    output.push_str("🎯 TOP 5 TESTING RECOMMENDATIONS (Maximum Risk Reduction)\n");
+    output.push_str("🎯 TOP 5 TESTING RECOMMENDATIONS\n");
     output.push_str("──────────────────────────────────────────────────────────\n");
-    output.push_str("Priority | Function | Impact | ROI Score\n");
-    output.push_str("---------|----------|--------|-----------\n");
+    output.push_str("Ordered by ROI (Risk Reduction / Test Effort)\n");
+    output.push('\n');
+    output.push_str("Priority | Function                        | Risk Impact | ROI\n");
+    output.push_str("---------|--------------------------------|-------------|------\n");
 
     for (i, rec) in recommendations.iter().enumerate() {
         let roi_score = rec.current_risk / (rec.test_effort_estimate.cognitive_load as f64 + 1.0);
+        let risk_reduction = if rec.potential_risk_reduction < 0.5 {
+            "<1".to_string()
+        } else {
+            format!("{:.0}", rec.potential_risk_reduction)
+        };
+
+        let function_display = if rec.function.len() > 30 {
+            format!("{}...()", &rec.function[..27])
+        } else {
+            format!("{}()", rec.function)
+        };
+
+        let roi_display = if roi_score >= 10.0 {
+            format!("{roi_score:.0}")
+        } else {
+            format!("{roi_score:.1}")
+        };
+
         output.push_str(&format!(
-            "{} | {}() | -{:.0}% risk | {:.1}\n",
-            i + 1,
-            rec.function,
-            rec.potential_risk_reduction,
-            roi_score
+            "{:<8} | {:<30} | {:>11} | {:>5}\n",
+            format!("#{}", i + 1),
+            function_display,
+            format!("-{}%", risk_reduction),
+            roi_display
         ));
-        output.push_str(&format!("  └─ Why: {}\n\n", rec.rationale));
+        output.push_str(&format!(
+            "         └─ {}
+",
+            rec.rationale
+        ));
+        output.push('\n');
     }
 
     output
@@ -120,15 +145,21 @@ pub fn format_actionable_insights(insight: &RiskInsight) -> String {
 
     if critical_count > 0 {
         output.push_str(&format!(
-            "1. Focus testing on the {critical_count} critical risk functions first\n"
+            "• Focus testing on the {} critical risk function{} first\n",
+            critical_count,
+            if critical_count == 1 { "" } else { "s" }
         ));
     }
 
     if let Some(correlation) = insight.complexity_coverage_correlation {
         if correlation < -0.3 {
-            output.push_str("2. Good news: Complex code tends to be better tested\n");
+            output.push_str(&format!(
+                "• ✅ Good news: Complex code tends to be better tested (correlation: {correlation:.2})\n"
+            ));
         } else if correlation > 0.3 {
-            output.push_str("2. Warning: Complex code tends to have less coverage\n");
+            output.push_str(&format!(
+                "• ⚠️  Warning: Complex code lacks coverage (correlation: {correlation:.2})\n"
+            ));
         }
     }
 
@@ -141,11 +172,13 @@ pub fn format_actionable_insights(insight: &RiskInsight) -> String {
             .map(|r| r.test_effort.recommended_test_cases)
             .sum();
 
-        output.push_str(&format!(
-            "3. Estimated effort to reach safe risk level: {}-{} test cases\n",
-            estimated_effort,
-            estimated_effort + (estimated_effort / 2)
-        ));
+        if estimated_effort > 0 {
+            output.push_str(&format!(
+                "• Estimated test effort for safe risk level: {}-{} test cases\n",
+                estimated_effort,
+                estimated_effort + (estimated_effort / 2)
+            ));
+        }
     }
 
     if !insight.risk_reduction_opportunities.is_empty() {
@@ -155,9 +188,11 @@ pub fn format_actionable_insights(insight: &RiskInsight) -> String {
             .map(|r| r.potential_risk_reduction)
             .sum();
 
-        output.push_str(&format!(
-            "4. Potential risk reduction from recommended tests: {total_reduction:.0}%\n"
-        ));
+        if total_reduction >= 1.0 {
+            output.push_str(&format!(
+                "• Potential risk reduction from top 5 recommendations: {total_reduction:.0}%\n"
+            ));
+        }
     }
 
     output
