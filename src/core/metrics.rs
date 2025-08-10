@@ -80,3 +80,122 @@ pub fn calculate_length_penalty(length: usize) -> u32 {
         _ => 3,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::FunctionMetrics;
+
+    fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic,
+            cognitive,
+            nesting: 0,
+            length: 10,
+        }
+    }
+
+    #[test]
+    fn test_filter_metrics_keeps_matching_functions() {
+        let metrics = ComplexityMetrics {
+            functions: vec![
+                create_test_function("simple", 1, 1),
+                create_test_function("complex", 10, 15),
+                create_test_function("medium", 5, 7),
+            ],
+            cyclomatic_complexity: 16,
+            cognitive_complexity: 23,
+        };
+
+        let filtered = filter_metrics(metrics, |f| f.cyclomatic > 4);
+
+        assert_eq!(filtered.functions.len(), 2);
+        assert_eq!(filtered.functions[0].name, "complex");
+        assert_eq!(filtered.functions[1].name, "medium");
+        assert_eq!(filtered.cyclomatic_complexity, 15);
+        assert_eq!(filtered.cognitive_complexity, 22);
+    }
+
+    #[test]
+    fn test_filter_metrics_empty_result() {
+        let metrics = ComplexityMetrics {
+            functions: vec![
+                create_test_function("simple1", 1, 1),
+                create_test_function("simple2", 2, 2),
+            ],
+            cyclomatic_complexity: 3,
+            cognitive_complexity: 3,
+        };
+
+        let filtered = filter_metrics(metrics, |f| f.cyclomatic > 10);
+
+        assert_eq!(filtered.functions.len(), 0);
+        assert_eq!(filtered.cyclomatic_complexity, 0);
+        assert_eq!(filtered.cognitive_complexity, 0);
+    }
+
+    #[test]
+    fn test_filter_metrics_all_match() {
+        let metrics = ComplexityMetrics {
+            functions: vec![
+                create_test_function("func1", 10, 12),
+                create_test_function("func2", 15, 18),
+            ],
+            cyclomatic_complexity: 25,
+            cognitive_complexity: 30,
+        };
+
+        let filtered = filter_metrics(metrics.clone(), |_| true);
+
+        assert_eq!(filtered.functions.len(), 2);
+        assert_eq!(filtered.cyclomatic_complexity, 25);
+        assert_eq!(filtered.cognitive_complexity, 30);
+    }
+
+    #[test]
+    fn test_filter_metrics_by_cognitive_complexity() {
+        let metrics = ComplexityMetrics {
+            functions: vec![
+                create_test_function("low_cognitive", 5, 3),
+                create_test_function("high_cognitive", 3, 20),
+                create_test_function("medium_cognitive", 4, 10),
+            ],
+            cyclomatic_complexity: 12,
+            cognitive_complexity: 33,
+        };
+
+        let filtered = filter_metrics(metrics, |f| f.cognitive > 9);
+
+        assert_eq!(filtered.functions.len(), 2);
+        assert!(filtered
+            .functions
+            .iter()
+            .any(|f| f.name == "high_cognitive"));
+        assert!(filtered
+            .functions
+            .iter()
+            .any(|f| f.name == "medium_cognitive"));
+    }
+
+    #[test]
+    fn test_filter_metrics_complex_predicate() {
+        let metrics = ComplexityMetrics {
+            functions: vec![
+                create_test_function("func1", 5, 10),
+                create_test_function("func2", 10, 5),
+                create_test_function("func3", 8, 8),
+            ],
+            cyclomatic_complexity: 23,
+            cognitive_complexity: 23,
+        };
+
+        let filtered = filter_metrics(metrics, |f| f.cyclomatic > 7 && f.cognitive < 9);
+
+        assert_eq!(filtered.functions.len(), 2);
+        assert!(filtered.functions.iter().any(|f| f.name == "func2"));
+        assert!(filtered.functions.iter().any(|f| f.name == "func3"));
+    }
+}
