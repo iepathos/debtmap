@@ -198,3 +198,100 @@ fn test_calculate_length_penalty() {
     assert_eq!(calculate_length_penalty(100), 2);
     assert_eq!(calculate_length_penalty(101), 3);
 }
+
+#[test]
+fn test_complexity_metrics_from_function() {
+    use debtmap::core::ComplexityMetrics;
+    
+    // Test with a simple function
+    let func = FunctionMetrics {
+        name: "test_func".to_string(),
+        file: PathBuf::from("test.rs"),
+        line: 42,
+        cyclomatic: 5,
+        cognitive: 8,
+        nesting: 2,
+        length: 30,
+    };
+    
+    let metrics = ComplexityMetrics::from_function(&func);
+    
+    // Should contain exactly one function
+    assert_eq!(metrics.functions.len(), 1);
+    assert_eq!(metrics.functions[0].name, "test_func");
+    assert_eq!(metrics.functions[0].cyclomatic, 5);
+    assert_eq!(metrics.functions[0].cognitive, 8);
+    assert_eq!(metrics.functions[0].nesting, 2);
+    assert_eq!(metrics.functions[0].length, 30);
+    
+    // Overall metrics should match the single function
+    assert_eq!(metrics.cyclomatic_complexity, 5);
+    assert_eq!(metrics.cognitive_complexity, 8);
+}
+
+#[test]
+fn test_complexity_metrics_from_function_zero_values() {
+    use debtmap::core::ComplexityMetrics;
+    
+    // Test with zero complexity values
+    let func = FunctionMetrics {
+        name: "simple_func".to_string(),
+        file: PathBuf::from("simple.rs"),
+        line: 1,
+        cyclomatic: 0,
+        cognitive: 0,
+        nesting: 0,
+        length: 1,
+    };
+    
+    let metrics = ComplexityMetrics::from_function(&func);
+    
+    assert_eq!(metrics.functions.len(), 1);
+    assert_eq!(metrics.cyclomatic_complexity, 0);
+    assert_eq!(metrics.cognitive_complexity, 0);
+}
+
+#[test]
+fn test_complexity_metrics_from_function_high_values() {
+    use debtmap::core::ComplexityMetrics;
+    
+    // Test with high complexity values
+    let func = FunctionMetrics {
+        name: "complex_func".to_string(),
+        file: PathBuf::from("complex.rs"),
+        line: 100,
+        cyclomatic: 50,
+        cognitive: 75,
+        nesting: 10,
+        length: 500,
+    };
+    
+    let metrics = ComplexityMetrics::from_function(&func);
+    
+    assert_eq!(metrics.functions.len(), 1);
+    assert_eq!(metrics.cyclomatic_complexity, 50);
+    assert_eq!(metrics.cognitive_complexity, 75);
+    assert_eq!(metrics.functions[0].line, 100);
+    assert_eq!(metrics.functions[0].length, 500);
+}
+
+#[test]
+fn test_complexity_metrics_from_function_preserves_path() {
+    use debtmap::core::ComplexityMetrics;
+    
+    // Test that file path is preserved correctly
+    let complex_path = PathBuf::from("/src/deeply/nested/module/impl.rs");
+    let func = FunctionMetrics {
+        name: "nested_func".to_string(),
+        file: complex_path.clone(),
+        line: 200,
+        cyclomatic: 3,
+        cognitive: 4,
+        nesting: 1,
+        length: 15,
+    };
+    
+    let metrics = ComplexityMetrics::from_function(&func);
+    
+    assert_eq!(metrics.functions[0].file, complex_path);
+}
