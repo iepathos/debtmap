@@ -1,3 +1,4 @@
+use super::patterns::{analyze_patterns, PatternComplexity};
 use syn::{visit::Visit, Block, Expr};
 
 pub fn calculate_cognitive(block: &Block) -> u32 {
@@ -6,7 +7,22 @@ pub fn calculate_cognitive(block: &Block) -> u32 {
         nesting_level: 0,
     };
     visitor.visit_block(block);
-    visitor.complexity
+
+    // Add pattern-based complexity
+    let patterns = analyze_patterns(block);
+    visitor.complexity + patterns.total_complexity()
+}
+
+pub fn calculate_cognitive_with_patterns(block: &Block) -> (u32, PatternComplexity) {
+    let mut visitor = CognitiveVisitor {
+        complexity: 0,
+        nesting_level: 0,
+    };
+    visitor.visit_block(block);
+
+    let patterns = analyze_patterns(block);
+    let total = visitor.complexity + patterns.total_complexity();
+    (total, patterns)
 }
 
 struct CognitiveVisitor {
@@ -40,10 +56,24 @@ impl CognitiveVisitor {
                 extra_complexity: 0,
                 increases_nesting: false,
             },
-            Expr::Closure(_) => ExprMetrics {
+            Expr::Closure(closure) => {
+                // Closures add more complexity if they're async or nested
+                let base = if closure.asyncness.is_some() { 2 } else { 1 };
+                ExprMetrics {
+                    base_complexity: base + self.nesting_level.min(1),
+                    extra_complexity: 0,
+                    increases_nesting: false,
+                }
+            }
+            Expr::Await(_) => ExprMetrics {
                 base_complexity: 1,
                 extra_complexity: 0,
                 increases_nesting: false,
+            },
+            Expr::Unsafe(_) => ExprMetrics {
+                base_complexity: 2,
+                extra_complexity: 0,
+                increases_nesting: true,
             },
             _ => ExprMetrics {
                 base_complexity: 0,

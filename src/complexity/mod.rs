@@ -1,5 +1,7 @@
 pub mod cognitive;
 pub mod cyclomatic;
+pub mod patterns;
+pub mod python_patterns;
 
 use crate::core::FunctionMetrics;
 
