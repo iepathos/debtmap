@@ -42,7 +42,7 @@ impl Default for CascadeCalculator {
 impl CascadeCalculator {
     pub fn new() -> Self {
         Self {
-            propagation_decay: 0.7,
+            propagation_decay: 0.7, // 70% impact at each level
             min_strength: 0.1,
             max_depth: 3,
         }
@@ -165,11 +165,16 @@ impl CascadeCalculator {
     }
 
     fn calculate_risk_reduction(&self, source_risk: f64, target_risk: f64, strength: f64) -> f64 {
-        let base_reduction = (source_risk * 0.1).min(1.0);
+        // Base reduction is proportional to source risk
+        let base_reduction = (source_risk * 0.15).min(2.0);
 
-        let risk_factor = (target_risk / 10.0).min(1.0);
+        // Target risk factor - higher risk targets benefit more
+        let risk_factor = (target_risk / 10.0).clamp(0.1, 1.5);
 
-        base_reduction * risk_factor * strength
+        // Apply diminishing returns for cascade depth (via strength)
+        let diminished_strength = strength.powf(0.8); // Slight dampening
+
+        base_reduction * risk_factor * diminished_strength
     }
 }
 

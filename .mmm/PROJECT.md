@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, and spec 11 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, and spec 14 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -57,6 +57,14 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Pluggable context provider architecture
   - Weighted risk calculation with context contributions
   - Optional via --context CLI flag
+- ✅ Dependency-Aware ROI Calculation (spec 14):
+  - Builds dependency graph from module relationships
+  - Cascade impact based on actual dependent modules
+  - Module type bonuses (EntryPoint: 2x, Core: 1.5x, Api: 1.2x)
+  - Dependency factor increases ROI for highly-depended code
+  - Exponential decay for cascade propagation (70% per level)
+  - Diminishing returns model for realistic risk reduction
+  - Enhanced ROI formula with meaningful variation (0.1 to 10.0 range)
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -76,6 +84,7 @@ The project follows a functional core / imperative shell pattern:
 7. **Suppression Support**: Fine-grained control over false positives
 8. **Risk Analysis**: Correlates complexity with test coverage for risk-based testing priorities
 9. **Context-Aware Risk**: Considers critical paths, dependencies, and historical data
+10. **Smart ROI Prioritization**: Dependency-aware testing recommendations with cascade effects
 
 ## Project Structure
 ```
