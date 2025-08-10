@@ -1,5 +1,5 @@
 use super::{
-    Difficulty, FunctionRisk, RiskAnalyzer, RiskCategory, TestEffort, TestingRecommendation,
+    Difficulty, FunctionRisk, RiskAnalyzer, TestEffort, TestingRecommendation,
 };
 use crate::core::ComplexityMetrics;
 use im::{HashMap, Vector};
@@ -14,6 +14,12 @@ pub trait PrioritizationStage {
 
 pub struct PrioritizationPipeline {
     stages: Vec<Box<dyn PrioritizationStage>>,
+}
+
+impl Default for PrioritizationPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PrioritizationPipeline {
@@ -72,6 +78,12 @@ pub struct ZeroCoverageStage {
     boost_factor: f64,
 }
 
+impl Default for ZeroCoverageStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ZeroCoverageStage {
     pub fn new() -> Self {
         Self {
@@ -113,6 +125,12 @@ pub struct CriticalPathStage {
     scorer: CriticalityScorer,
 }
 
+impl Default for CriticalPathStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CriticalPathStage {
     pub fn new() -> Self {
         Self {
@@ -136,6 +154,12 @@ impl PrioritizationStage for CriticalPathStage {
 }
 
 pub struct ComplexityRiskStage;
+
+impl Default for ComplexityRiskStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ComplexityRiskStage {
     pub fn new() -> Self {
@@ -164,6 +188,12 @@ impl PrioritizationStage for ComplexityRiskStage {
 
 pub struct DependencyImpactStage;
 
+impl Default for DependencyImpactStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DependencyImpactStage {
     pub fn new() -> Self {
         Self
@@ -187,6 +217,12 @@ impl PrioritizationStage for DependencyImpactStage {
 
 pub struct EffortOptimizationStage;
 
+impl Default for EffortOptimizationStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EffortOptimizationStage {
     pub fn new() -> Self {
         Self
@@ -200,7 +236,7 @@ impl PrioritizationStage for EffortOptimizationStage {
             let effort = EffortEstimator::new().estimate(target);
             if effort > 0.0 {
                 // Divide by effort to get ROI-like score
-                target.priority_score = target.priority_score / effort.sqrt();
+                target.priority_score /= effort.sqrt();
             }
         }
         targets
@@ -215,6 +251,12 @@ impl PrioritizationStage for EffortOptimizationStage {
 
 pub struct CriticalityScorer {
     patterns: HashMap<String, f64>,
+}
+
+impl Default for CriticalityScorer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CriticalityScorer {
@@ -367,15 +409,14 @@ impl ROICalculator {
             target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity
         );
 
-        let impact_str = if target.dependents.len() > 0 {
+        let impact_str = if !target.dependents.is_empty() {
             format!(" affecting {} modules", target.dependents.len())
         } else {
             String::new()
         };
 
         format!(
-            "Currently {} with {}{} - testing would reduce risk by {:.1}% with effort {:.0}",
-            coverage_str, complexity_str, impact_str, risk_reduction, effort
+            "Currently {coverage_str} with {complexity_str}{impact_str} - testing would reduce risk by {risk_reduction:.1}% with effort {effort:.0}"
         )
     }
 }
@@ -409,6 +450,12 @@ impl Default for ComplexityWeights {
             cognitive_weight: 1.5,
             line_weight: 0.01,
         }
+    }
+}
+
+impl Default for EffortEstimator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -524,7 +571,7 @@ pub fn prioritize_by_roi(
     // Convert FunctionRisk to TestTarget
     let targets: Vec<TestTarget> = functions
         .iter()
-        .map(|f| function_risk_to_target(f))
+        .map(function_risk_to_target)
         .collect();
 
     // Run through prioritization pipeline
@@ -660,7 +707,7 @@ fn generate_enhanced_rationale(target: &TestTarget, roi: &ROI) -> String {
             " - critical dependency for {} modules",
             target.dependents.len()
         )
-    } else if target.dependents.len() > 0 {
+    } else if !target.dependents.is_empty() {
         format!(" - affects {} other modules", target.dependents.len())
     } else {
         String::new()
