@@ -1,5 +1,4 @@
 use crate::analyzers::Analyzer;
-use quote::ToTokens;
 use crate::complexity::{
     cognitive::calculate_cognitive_with_patterns, cyclomatic::calculate_cyclomatic,
 };
@@ -14,6 +13,7 @@ use crate::debt::patterns::{
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use anyhow::Result;
+use quote::ToTokens;
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::{visit::Visit, Item};
@@ -197,11 +197,11 @@ impl FunctionVisitor {
     fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
         // Check if this is a test function
         let is_test = item_fn.attrs.iter().any(|attr| {
-            attr.path().is_ident("test") || 
-            (attr.path().is_ident("cfg") && 
-             attr.meta.to_token_stream().to_string().contains("test"))
+            attr.path().is_ident("test")
+                || (attr.path().is_ident("cfg")
+                    && attr.meta.to_token_stream().to_string().contains("test"))
         });
-        
+
         let metrics = FunctionMetrics {
             name,
             file: self.current_file.clone(),

@@ -71,11 +71,17 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     }
 
     output.push_str("🎯 TOP 5 TESTING RECOMMENDATIONS\n");
-    output.push_str("────────────────────────────────────────────────────────────────────────────────\n");
+    output.push_str(
+        "────────────────────────────────────────────────────────────────────────────────\n",
+    );
     output.push_str("Ordered by ROI (Risk Reduction / Test Effort)\n");
     output.push('\n');
-    output.push_str("Priority | Function                       | Location                      | ROI\n");
-    output.push_str("---------|--------------------------------|-------------------------------|------\n");
+    output.push_str(
+        "Priority | Function                       | Location                      | ROI\n",
+    );
+    output.push_str(
+        "---------|--------------------------------|-------------------------------|------\n",
+    );
 
     for (i, rec) in recommendations.iter().take(5).enumerate() {
         let roi_score = rec.roi.unwrap_or(0.1);
@@ -112,14 +118,12 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
             location_display,
             roi_display
         ));
-        
+
         // Format dependency information and risk info on the next line
         let deps_display = format!("→{}←{}", rec.dependencies.len(), rec.dependents.len());
         output.push_str(&format!(
             "         │ Risk: {:.1} | Impact: -{}% | Deps: {}\n",
-            rec.current_risk,
-            risk_reduction,
-            deps_display
+            rec.current_risk, risk_reduction, deps_display
         ));
         output.push_str(&format!("         └─ {}", rec.rationale));
 
