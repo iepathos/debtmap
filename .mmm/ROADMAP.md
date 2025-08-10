@@ -42,7 +42,6 @@
   - Added exponential penalty for low coverage
   - Integrated technical debt into risk calculation
   - Strategy pattern for risk calculation
-  - Legacy risk mode for backwards compatibility via --legacy-risk
   - Risk scores now use full 0-10 range effectively
   - Enhanced test recommendations with debt context
 

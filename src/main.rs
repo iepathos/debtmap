@@ -25,7 +25,6 @@ struct AnalyzeConfig {
     threshold_duplication: usize,
     languages: Option<Vec<String>>,
     coverage_file: Option<PathBuf>,
-    legacy_risk: bool,
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
@@ -43,7 +42,6 @@ fn main() -> Result<()> {
             threshold_duplication,
             languages,
             coverage_file,
-            legacy_risk,
             enable_context,
             context_providers,
             disable_context,
@@ -56,7 +54,6 @@ fn main() -> Result<()> {
                 threshold_duplication,
                 languages,
                 coverage_file,
-                legacy_risk,
                 enable_context,
                 context_providers,
                 disable_context,
@@ -92,7 +89,6 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             &results,
             &lcov_path,
             &config.path,
-            config.legacy_risk,
             config.enable_context,
             config.context_providers,
             config.disable_context,
@@ -100,7 +96,6 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     } else {
         analyze_risk_without_coverage(
             &results,
-            config.legacy_risk,
             config.enable_context,
             config.context_providers,
             config.disable_context,
@@ -311,7 +306,6 @@ fn analyze_risk_with_coverage(
     results: &AnalysisResults,
     lcov_path: &Path,
     project_path: &Path,
-    legacy_risk: bool,
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
@@ -325,12 +319,8 @@ fn analyze_risk_with_coverage(
     let debt_score = debt::total_debt_score(&results.technical_debt.items) as f64;
     let debt_threshold = 100.0; // Default threshold
 
-    // Create risk analyzer with appropriate strategy
-    let mut analyzer = if legacy_risk {
-        risk::RiskAnalyzer::with_legacy_strategy()
-    } else {
-        risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold)
-    };
+    // Create risk analyzer
+    let mut analyzer = risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold);
 
     // Add context aggregator if enabled
     if let Some(aggregator) = build_context_aggregator(
@@ -370,7 +360,6 @@ fn analyze_risk_with_coverage(
 
 fn analyze_risk_without_coverage(
     results: &AnalysisResults,
-    legacy_risk: bool,
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
@@ -382,12 +371,8 @@ fn analyze_risk_without_coverage(
     let debt_score = debt::total_debt_score(&results.technical_debt.items) as f64;
     let debt_threshold = 100.0; // Default threshold
 
-    // Create risk analyzer with appropriate strategy
-    let mut analyzer = if legacy_risk {
-        risk::RiskAnalyzer::with_legacy_strategy()
-    } else {
-        risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold)
-    };
+    // Create risk analyzer
+    let mut analyzer = risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold);
 
     // Add context aggregator if enabled
     if let Some(aggregator) = build_context_aggregator(

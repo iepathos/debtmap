@@ -142,9 +142,7 @@ Implement enhanced risk formula with strategy pattern, increasing coverage weigh
 - ✅ Risk scores properly reflect coverage gaps and debt
 - ✅ Full 0-10 risk scale utilization
 - ✅ Strategy pattern enables multiple risk formulas
-- ✅ Legacy mode for backwards compatibility
 - ✅ More actionable risk insights
-- ⚠️ Breaking change in risk score values without --legacy-risk flag
 
 ---
 
