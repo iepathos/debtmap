@@ -241,11 +241,8 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     }
 
     fn visit_expr(&mut self, expr: &'ast syn::Expr) {
-        // Also count closures as functions
+        // Also count closures as functions, but only if they're non-trivial
         if let syn::Expr::Closure(closure) = expr {
-            let name = format!("<closure@{}>", self.functions.len());
-            let line = self.get_line_number(closure.body.span());
-
             // Convert closure body to a block for analysis
             let block = match &*closure.body {
                 syn::Expr::Block(expr_block) => expr_block.block.clone(),
@@ -258,18 +255,33 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                 }
             };
 
-            let metrics = FunctionMetrics {
-                name,
-                file: self.current_file.clone(),
-                line,
-                cyclomatic: calculate_cyclomatic(&block),
-                cognitive: calculate_cognitive_syn(&block),
-                nesting: calculate_nesting(&block),
-                length: count_lines(&block),
-                is_test: false, // Closures are not test functions
-            };
+            // Calculate metrics first to determine if closure is trivial
+            let cyclomatic = calculate_cyclomatic(&block);
+            let cognitive = calculate_cognitive_syn(&block);
+            let nesting = calculate_nesting(&block);
+            let length = count_lines(&block);
 
-            self.functions.push(metrics);
+            // Only track substantial closures:
+            // - Cognitive complexity > 1 (has some logic)
+            // - OR length > 1 (multi-line)
+            // - OR cyclomatic > 1 (has branches)
+            if cognitive > 1 || length > 1 || cyclomatic > 1 {
+                let name = format!("<closure@{}>", self.functions.len());
+                let line = self.get_line_number(closure.body.span());
+
+                let metrics = FunctionMetrics {
+                    name,
+                    file: self.current_file.clone(),
+                    line,
+                    cyclomatic,
+                    cognitive,
+                    nesting,
+                    length,
+                    is_test: false, // Closures are not test functions
+                };
+
+                self.functions.push(metrics);
+            }
         }
 
         // Continue visiting
