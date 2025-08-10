@@ -125,3 +125,23 @@ Implement optional LCOV integration that combines with existing complexity metri
 - ✅ Provides actionable testing recommendations
 - ✅ Language-agnostic LCOV format support
 - ⚠️ Requires up-to-date coverage data for accuracy
+
+---
+
+## ADR-008: Recalibrated Risk Formula with Debt Integration
+**Date**: 2025-08-10
+**Status**: Accepted
+
+### Context
+Initial risk formula underweighted coverage gaps and didn't account for technical debt accumulation. A codebase with 37% coverage and debt 12.9x over threshold still showed "LOW" risk.
+
+### Decision
+Implement enhanced risk formula with strategy pattern, increasing coverage weight to 0.5, adding exponential penalties for low coverage, and integrating debt scores as multiplicative factors.
+
+### Consequences
+- ✅ Risk scores properly reflect coverage gaps and debt
+- ✅ Full 0-10 risk scale utilization
+- ✅ Strategy pattern enables multiple risk formulas
+- ✅ Legacy mode for backwards compatibility
+- ✅ More actionable risk insights
+- ⚠️ Breaking change in risk score values without --legacy-risk flag
