@@ -187,50 +187,40 @@ impl RiskAnalyzer {
     ) -> RiskCategory {
         let avg_complexity = (cyclomatic + cognitive) / 2;
 
-        // Define risk rules as data
-        struct RiskRule {
-            min_complexity: u32,
-            max_coverage: Option<f64>,
-            category: RiskCategory,
-        }
+        // Check for well-tested case first
+        Self::check_well_tested(avg_complexity, coverage)
+            .or_else(|| Self::match_risk_rule(avg_complexity, coverage))
+            .unwrap_or(RiskCategory::Low)
+    }
 
-        let rules = [
-            RiskRule {
-                min_complexity: 15,
-                max_coverage: Some(30.0),
-                category: RiskCategory::Critical,
-            },
-            RiskRule {
-                min_complexity: 10,
-                max_coverage: Some(60.0),
-                category: RiskCategory::High,
-            },
-            RiskRule {
-                min_complexity: 5,
-                max_coverage: Some(50.0),
-                category: RiskCategory::Medium,
-            },
+    fn check_well_tested(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
+        coverage
+            .filter(|&cov| avg_complexity > 10 && cov > 80.0)
+            .map(|_| RiskCategory::WellTested)
+    }
+
+    fn match_risk_rule(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
+        const RISK_RULES: [(u32, Option<f64>, RiskCategory); 3] = [
+            (15, Some(30.0), RiskCategory::Critical),
+            (10, Some(60.0), RiskCategory::High),
+            (5, Some(50.0), RiskCategory::Medium),
         ];
 
-        // Check for well-tested case first
-        if let Some(cov) = coverage {
-            if avg_complexity > 10 && cov > 80.0 {
-                return RiskCategory::WellTested;
-            }
-        }
+        RISK_RULES
+            .iter()
+            .find(|(min_complexity, max_coverage, _)| {
+                avg_complexity > *min_complexity
+                    && Self::coverage_exceeds_threshold(coverage, *max_coverage)
+            })
+            .map(|(_, _, category)| category.clone())
+    }
 
-        // Apply risk rules
-        for rule in &rules {
-            if avg_complexity > rule.min_complexity {
-                match (coverage, rule.max_coverage) {
-                    (Some(cov), Some(max_cov)) if cov < max_cov => return rule.category.clone(),
-                    (None, _) => return rule.category.clone(),
-                    _ => continue,
-                }
-            }
+    fn coverage_exceeds_threshold(coverage: Option<f64>, threshold: Option<f64>) -> bool {
+        match (coverage, threshold) {
+            (Some(cov), Some(max_cov)) => cov < max_cov,
+            (None, _) => true,
+            _ => false,
         }
-
-        RiskCategory::Low
     }
 
     pub fn calculate_risk_reduction(
