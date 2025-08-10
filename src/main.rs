@@ -30,6 +30,18 @@ struct AnalyzeConfig {
     disable_context: Option<Vec<String>>,
 }
 
+struct ValidateConfig {
+    path: PathBuf,
+    #[allow(dead_code)] // TODO: Use config file for thresholds
+    config: Option<PathBuf>,
+    coverage_file: Option<PathBuf>,
+    format: Option<cli::OutputFormat>,
+    output: Option<PathBuf>,
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
+}
+
 fn main() -> Result<()> {
     let cli = cli::parse_args();
 
@@ -61,7 +73,28 @@ fn main() -> Result<()> {
             handle_analyze(config)
         }
         Commands::Init { force } => init_config(force),
-        Commands::Validate { path, config } => validate_project(path, config),
+        Commands::Validate {
+            path,
+            config,
+            coverage_file,
+            format,
+            output,
+            enable_context,
+            context_providers,
+            disable_context,
+        } => {
+            let config = ValidateConfig {
+                path,
+                config,
+                coverage_file,
+                format,
+                output,
+                enable_context,
+                context_providers,
+                disable_context,
+            };
+            validate_project(config)
+        }
     };
 
     // Exit with appropriate code based on result
@@ -443,15 +476,93 @@ default_format = "terminal"
     Ok(())
 }
 
-fn validate_project(path: PathBuf, _config: Option<PathBuf>) -> Result<()> {
-    let results = analyze_project(path, vec![Language::Rust, Language::Python], 10, 50)?;
+fn validate_with_risk(results: &AnalysisResults, insights: &risk::RiskInsight) -> bool {
+    // Calculate risk-adjusted thresholds
+    let risk_threshold = 7.0; // Functions with risk > 7.0 are considered high risk
 
-    let pass = results.complexity.summary.average_complexity < 10.0
-        && results.complexity.summary.high_complexity_count < 10
-        && results.technical_debt.items.len() < 100;
+    // Check high-risk functions
+    let high_risk_count = insights
+        .top_risks
+        .iter()
+        .filter(|f| f.risk_score > risk_threshold)
+        .count();
+
+    // Check overall codebase risk
+    let codebase_risk_pass = insights.codebase_risk_score < 7.0;
+
+    // Pass if:
+    // - Average complexity is reasonable
+    // - Not too many high-risk functions
+    // - Overall codebase risk is acceptable
+    // - Technical debt is manageable
+    results.complexity.summary.average_complexity < 10.0
+        && high_risk_count < 5
+        && codebase_risk_pass
+        && results.technical_debt.items.len() < 150 // Slightly higher threshold with coverage
+}
+
+fn validate_project(config: ValidateConfig) -> Result<()> {
+    // Use default thresholds for now (TODO: read from config)
+    let complexity_threshold = 10;
+    let duplication_threshold = 50;
+
+    // Analyze the project
+    let results = analyze_project(
+        config.path.clone(),
+        vec![Language::Rust, Language::Python],
+        complexity_threshold,
+        duplication_threshold,
+    )?;
+
+    // Handle risk analysis if coverage file provided
+    let risk_insights = if let Some(lcov_path) = config.coverage_file.clone() {
+        analyze_risk_with_coverage(
+            &results,
+            &lcov_path,
+            &config.path,
+            config.enable_context,
+            config.context_providers.clone(),
+            config.disable_context.clone(),
+        )?
+    } else if config.enable_context {
+        analyze_risk_without_coverage(
+            &results,
+            config.enable_context,
+            config.context_providers.clone(),
+            config.disable_context.clone(),
+            &config.path,
+        )?
+    } else {
+        None
+    };
+
+    // If format and/or output are specified, generate report
+    if config.format.is_some() || config.output.is_some() {
+        let output_format = config.format.unwrap_or(cli::OutputFormat::Terminal);
+        output_results_with_risk(
+            results.clone(),
+            risk_insights.clone(),
+            output_format.into(),
+            config.output.clone(),
+        )?;
+    }
+
+    // Apply validation with coverage-aware risk if available
+    let pass = if let Some(ref insights) = risk_insights {
+        // With coverage: use risk-adjusted validation
+        validate_with_risk(&results, insights)
+    } else {
+        // Without coverage: use basic validation
+        results.complexity.summary.average_complexity < 10.0
+            && results.complexity.summary.high_complexity_count < 10
+            && results.technical_debt.items.len() < 100
+    };
 
     if pass {
         println!("✅ Validation PASSED - All metrics within thresholds");
+        if config.coverage_file.is_some() {
+            println!("  Coverage analysis was applied to risk calculations");
+        }
         Ok(())
     } else {
         println!("❌ Validation FAILED - Some metrics exceed thresholds");
@@ -467,6 +578,28 @@ fn validate_project(path: PathBuf, _config: Option<PathBuf>) -> Result<()> {
             "  Technical debt items: {}",
             results.technical_debt.items.len()
         );
+
+        if let Some(insights) = risk_insights {
+            println!(
+                "\n  Overall codebase risk score: {:.1}",
+                insights.codebase_risk_score
+            );
+
+            if !insights.top_risks.is_empty() {
+                println!("\n  Critical risk functions (high complexity + low/no coverage):");
+                for func in insights.top_risks.iter().take(5) {
+                    let coverage_str = func
+                        .coverage_percentage
+                        .map(|c| format!("{:.0}%", c * 100.0))
+                        .unwrap_or_else(|| "0%".to_string());
+                    println!(
+                        "    - {} (risk: {:.1}, coverage: {})",
+                        func.function_name, func.risk_score, coverage_str
+                    );
+                }
+            }
+        }
+
         anyhow::bail!("Validation failed");
     }
 }
