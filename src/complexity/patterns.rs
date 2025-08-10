@@ -203,7 +203,7 @@ impl<'ast> Visit<'ast> for PatternDetector {
                 // Check for recursive calls
                 if let Some(ref func_name) = self.current_function_name {
                     if let Expr::MethodCall(method) = expr {
-                        if method.method.to_string() == *func_name {
+                        if method.method == func_name {
                             self.patterns.recursive_calls += 1;
                         }
                     }
@@ -245,7 +245,7 @@ impl<'ast> Visit<'ast> for PatternDetector {
                 if let Some(ref func_name) = self.current_function_name {
                     if let Expr::Path(path) = &*call.func {
                         if let Some(segment) = path.path.segments.last() {
-                            if segment.ident.to_string() == *func_name {
+                            if segment.ident == func_name {
                                 self.patterns.recursive_calls += 1;
                             }
                         }
@@ -272,23 +272,29 @@ mod tests {
 
     #[test]
     fn test_pattern_complexity_total() {
-        let mut patterns = PatternComplexity::default();
-        patterns.async_await_count = 2;
-        patterns.callback_depth = 1;
-        patterns.method_chain_length = 6;
+        let patterns = PatternComplexity {
+            async_await_count: 2,
+            callback_depth: 1,
+            method_chain_length: 6,
+            ..Default::default()
+        };
 
         assert_eq!(patterns.total_complexity(), 2 * 2 + 3 + 6 / 3);
     }
 
     #[test]
     fn test_pattern_merge() {
-        let mut p1 = PatternComplexity::default();
-        p1.async_await_count = 1;
-        p1.callback_depth = 2;
+        let mut p1 = PatternComplexity {
+            async_await_count: 1,
+            callback_depth: 2,
+            ..Default::default()
+        };
 
-        let mut p2 = PatternComplexity::default();
-        p2.async_await_count = 2;
-        p2.callback_depth = 3;
+        let p2 = PatternComplexity {
+            async_await_count: 2,
+            callback_depth: 3,
+            ..Default::default()
+        };
 
         p1.merge(&p2);
         assert_eq!(p1.async_await_count, 3);
