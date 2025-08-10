@@ -144,30 +144,39 @@ impl RiskAnalyzer {
     }
 
     pub fn estimate_test_effort(&self, cognitive: u32, cyclomatic: u32) -> TestEffort {
-        let difficulty = match cognitive {
-            0..=4 => Difficulty::Trivial,
-            5..=10 => Difficulty::Simple,
-            11..=20 => Difficulty::Moderate,
-            21..=40 => Difficulty::Complex,
-            _ => Difficulty::VeryComplex,
-        };
-
-        // Estimate test cases based on branches
-        let recommended_test_cases = match cyclomatic {
-            0..=3 => 1,
-            4..=7 => 2,
-            8..=10 => 3,
-            11..=15 => 5,
-            16..=20 => 7,
-            _ => 10,
-        };
-
         TestEffort {
-            estimated_difficulty: difficulty,
+            estimated_difficulty: Self::classify_difficulty(cognitive),
             cognitive_load: cognitive,
             branch_count: cyclomatic,
-            recommended_test_cases,
+            recommended_test_cases: Self::calculate_test_cases(cyclomatic),
         }
+    }
+
+    fn classify_difficulty(cognitive: u32) -> Difficulty {
+        const THRESHOLDS: [(u32, Difficulty); 5] = [
+            (4, Difficulty::Trivial),
+            (10, Difficulty::Simple),
+            (20, Difficulty::Moderate),
+            (40, Difficulty::Complex),
+            (u32::MAX, Difficulty::VeryComplex),
+        ];
+
+        THRESHOLDS
+            .iter()
+            .find(|(threshold, _)| cognitive <= *threshold)
+            .map(|(_, difficulty)| difficulty.clone())
+            .unwrap_or(Difficulty::VeryComplex)
+    }
+
+    fn calculate_test_cases(cyclomatic: u32) -> u32 {
+        const MAPPINGS: [(u32, u32); 6] =
+            [(3, 1), (7, 2), (10, 3), (15, 5), (20, 7), (u32::MAX, 10)];
+
+        MAPPINGS
+            .iter()
+            .find(|(threshold, _)| cyclomatic <= *threshold)
+            .map(|(_, cases)| *cases)
+            .unwrap_or(10)
     }
 
     fn categorize_risk(
@@ -178,15 +187,39 @@ impl RiskAnalyzer {
     ) -> RiskCategory {
         let avg_complexity = (cyclomatic + cognitive) / 2;
 
-        match coverage {
-            Some(cov) if avg_complexity > 15 && cov < 30.0 => RiskCategory::Critical,
-            Some(cov) if avg_complexity > 10 && cov < 60.0 => RiskCategory::High,
-            Some(cov) if avg_complexity > 5 && cov < 50.0 => RiskCategory::Medium,
-            Some(cov) if avg_complexity > 10 && cov > 80.0 => RiskCategory::WellTested,
-            None if avg_complexity > 15 => RiskCategory::Critical,
-            None if avg_complexity > 10 => RiskCategory::High,
-            None if avg_complexity > 5 => RiskCategory::Medium,
-            _ => RiskCategory::Low,
+        // Check for well-tested case first
+        Self::check_well_tested(avg_complexity, coverage)
+            .or_else(|| Self::match_risk_rule(avg_complexity, coverage))
+            .unwrap_or(RiskCategory::Low)
+    }
+
+    fn check_well_tested(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
+        coverage
+            .filter(|&cov| avg_complexity > 10 && cov > 80.0)
+            .map(|_| RiskCategory::WellTested)
+    }
+
+    fn match_risk_rule(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
+        const RISK_RULES: [(u32, Option<f64>, RiskCategory); 3] = [
+            (15, Some(30.0), RiskCategory::Critical),
+            (10, Some(60.0), RiskCategory::High),
+            (5, Some(50.0), RiskCategory::Medium),
+        ];
+
+        RISK_RULES
+            .iter()
+            .find(|(min_complexity, max_coverage, _)| {
+                avg_complexity > *min_complexity
+                    && Self::coverage_exceeds_threshold(coverage, *max_coverage)
+            })
+            .map(|(_, _, category)| category.clone())
+    }
+
+    fn coverage_exceeds_threshold(coverage: Option<f64>, threshold: Option<f64>) -> bool {
+        match (coverage, threshold) {
+            (Some(cov), Some(max_cov)) => cov < max_cov,
+            (None, _) => true,
+            _ => false,
         }
     }
 

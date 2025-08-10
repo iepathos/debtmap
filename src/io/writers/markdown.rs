@@ -1,10 +1,10 @@
-use crate::core::{AnalysisResults, FunctionMetrics, Priority};
+use crate::core::{AnalysisResults, DebtItem, FunctionMetrics, Priority};
 use crate::debt::total_debt_score;
 use crate::io::output::{
     build_summary_rows, complexity_header_lines, get_recommendation, get_top_complex_functions,
     OutputWriter,
 };
-use crate::risk::RiskInsight;
+use crate::risk::{RiskDistribution, RiskInsight};
 use std::io::Write;
 
 pub struct MarkdownWriter<W: Write> {
@@ -31,53 +31,9 @@ impl<W: Write> OutputWriter for MarkdownWriter<W> {
     }
 
     fn write_risk_insights(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
-        writeln!(self.writer, "## Risk Analysis")?;
-        writeln!(self.writer)?;
-
-        // Write risk summary
-        writeln!(self.writer, "### Risk Summary")?;
-        writeln!(
-            self.writer,
-            "- Codebase Risk Score: {:.1}",
-            insights.codebase_risk_score
-        )?;
-        if let Some(correlation) = insights.complexity_coverage_correlation {
-            writeln!(
-                self.writer,
-                "- Complexity-Coverage Correlation: {correlation:.2}"
-            )?;
-        }
-        writeln!(self.writer)?;
-
-        // Write risk distribution
-        writeln!(self.writer, "### Risk Distribution")?;
-        writeln!(
-            self.writer,
-            "- Critical: {}",
-            insights.risk_distribution.critical_count
-        )?;
-        writeln!(
-            self.writer,
-            "- High: {}",
-            insights.risk_distribution.high_count
-        )?;
-        writeln!(
-            self.writer,
-            "- Medium: {}",
-            insights.risk_distribution.medium_count
-        )?;
-        writeln!(
-            self.writer,
-            "- Low: {}",
-            insights.risk_distribution.low_count
-        )?;
-        writeln!(
-            self.writer,
-            "- Well Tested: {}",
-            insights.risk_distribution.well_tested_count
-        )?;
-        writeln!(self.writer)?;
-
+        self.write_risk_header()?;
+        self.write_risk_summary(insights)?;
+        self.write_risk_distribution(&insights.risk_distribution)?;
         Ok(())
     }
 }
@@ -176,48 +132,115 @@ impl<W: Write> MarkdownWriter<W> {
             return Ok(());
         }
 
+        self.write_technical_debt_header()?;
+        self.write_high_priority_items(&results.technical_debt.items)?;
+        Ok(())
+    }
+
+    fn write_technical_debt_header(&mut self) -> anyhow::Result<()> {
         writeln!(self.writer, "## Technical Debt")?;
         writeln!(self.writer)?;
+        Ok(())
+    }
 
-        let high_priority: Vec<_> = results
-            .technical_debt
-            .items
-            .iter()
-            .filter(|item| matches!(item.priority, Priority::High | Priority::Critical))
-            .collect();
+    fn write_risk_header(&mut self) -> anyhow::Result<()> {
+        writeln!(self.writer, "## Risk Analysis")?;
+        writeln!(self.writer)?;
+        Ok(())
+    }
 
-        if !high_priority.is_empty() {
+    fn write_risk_summary(&mut self, insights: &RiskInsight) -> anyhow::Result<()> {
+        writeln!(self.writer, "### Risk Summary")?;
+        writeln!(
+            self.writer,
+            "- Codebase Risk Score: {:.1}",
+            insights.codebase_risk_score
+        )?;
+
+        if let Some(correlation) = insights.complexity_coverage_correlation {
             writeln!(
                 self.writer,
-                "### High Priority ({} items)",
-                high_priority.len()
+                "- Complexity-Coverage Correlation: {correlation:.2}"
             )?;
-            for item in high_priority.iter().take(10) {
-                writeln!(
-                    self.writer,
-                    "- [ ] `{}:{}` - {}",
-                    item.file.display(),
-                    item.line,
-                    item.message
-                )?;
-            }
-            writeln!(self.writer)?;
         }
+
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_risk_distribution(&mut self, distribution: &RiskDistribution) -> anyhow::Result<()> {
+        writeln!(self.writer, "### Risk Distribution")?;
+
+        let distribution_items = [
+            ("Critical", distribution.critical_count),
+            ("High", distribution.high_count),
+            ("Medium", distribution.medium_count),
+            ("Low", distribution.low_count),
+            ("Well Tested", distribution.well_tested_count),
+        ];
+
+        distribution_items
+            .iter()
+            .try_for_each(|(label, count)| writeln!(self.writer, "- {label}: {count}"))?;
+
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_high_priority_items(&mut self, items: &[DebtItem]) -> anyhow::Result<()> {
+        let high_priority: Vec<_> = items
+            .iter()
+            .filter(|item| self.is_high_priority(item))
+            .collect();
+
+        if high_priority.is_empty() {
+            return Ok(());
+        }
+
+        writeln!(
+            self.writer,
+            "### High Priority ({} items)",
+            high_priority.len()
+        )?;
+
+        high_priority
+            .iter()
+            .take(10)
+            .try_for_each(|item| self.write_debt_item(item))?;
+
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn is_high_priority(&self, item: &DebtItem) -> bool {
+        matches!(item.priority, Priority::High | Priority::Critical)
+    }
+
+    fn write_debt_item(&mut self, item: &DebtItem) -> anyhow::Result<()> {
+        writeln!(
+            self.writer,
+            "- [ ] `{}:{}` - {}",
+            item.file.display(),
+            item.line,
+            item.message
+        )?;
         Ok(())
     }
 
     fn write_recommendations(&mut self) -> anyhow::Result<()> {
         writeln!(self.writer, "## Recommendations")?;
         writeln!(self.writer)?;
-        writeln!(self.writer, "1. **Immediate Action**: Address high-priority debt items and refactor top complexity hotspots")?;
-        writeln!(
-            self.writer,
-            "2. **Short Term**: Reduce code duplication by extracting common functionality"
-        )?;
-        writeln!(
-            self.writer,
-            "3. **Long Term**: Establish complexity budget and monitor trends over time"
-        )?;
+
+        let recommendations = [
+            "1. **Immediate Action**: Address high-priority debt items and refactor top complexity hotspots",
+            "2. **Short Term**: Reduce code duplication by extracting common functionality",
+            "3. **Long Term**: Establish complexity budget and monitor trends over time",
+        ];
+
+        recommendations
+            .iter()
+            .try_for_each(|rec| writeln!(self.writer, "{rec}"))?;
+
         Ok(())
     }
 }
