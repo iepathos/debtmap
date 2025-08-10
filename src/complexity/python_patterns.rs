@@ -60,206 +60,165 @@ impl PythonPatternDetector {
     }
 
     fn analyze_stmt(&mut self, stmt: &ast::Stmt) {
+        use ast::Stmt::*;
         match stmt {
-            // Async function detection
-            ast::Stmt::AsyncFunctionDef(func) => {
-                self.patterns.async_await_count += 1;
-                self.patterns.decorator_count += func.decorator_list.len() as u32;
-
-                // Check for nested functions
-                if self.function_depth > 0 {
-                    self.patterns.nested_functions += 1;
-                }
-
-                let old_name = self.current_function_name.clone();
-                let old_depth = self.function_depth;
-                self.current_function_name = Some(func.name.to_string());
-                self.function_depth += 1;
-
-                self.analyze_body(&func.body);
-
-                self.current_function_name = old_name;
-                self.function_depth = old_depth;
-            }
-
-            // Regular function with decorators
-            ast::Stmt::FunctionDef(func) => {
-                self.patterns.decorator_count += func.decorator_list.len() as u32;
-
-                // Check for nested functions
-                if self.function_depth > 0 {
-                    self.patterns.nested_functions += 1;
-                }
-
-                let old_name = self.current_function_name.clone();
-                let old_depth = self.function_depth;
-                self.current_function_name = Some(func.name.to_string());
-                self.function_depth += 1;
-
-                self.analyze_body(&func.body);
-
-                self.current_function_name = old_name;
-                self.function_depth = old_depth;
-            }
-
-            // Class definition (check for metaclass)
-            ast::Stmt::ClassDef(class) => {
-                self.patterns.decorator_count += class.decorator_list.len() as u32;
-
-                // Check for metaclass usage
-                for keyword in &class.keywords {
-                    if keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass") {
-                        self.patterns.metaclass_usage += 1;
-                    }
-                }
-
-                self.analyze_body(&class.body);
-            }
-
-            // Try/except/finally blocks
-            ast::Stmt::Try(try_stmt) => {
-                self.patterns.try_except_finally += 1;
-                self.analyze_body(&try_stmt.body);
-                for handler in &try_stmt.handlers {
-                    let ast::ExceptHandler::ExceptHandler(h) = handler;
-                    self.analyze_body(&h.body);
-                }
-                self.analyze_body(&try_stmt.orelse);
-                self.analyze_body(&try_stmt.finalbody);
-            }
-
-            // With statements (context managers)
-            ast::Stmt::With(with_stmt) => {
-                self.patterns.with_statements += 1;
-                self.analyze_body(&with_stmt.body);
-            }
-
-            ast::Stmt::AsyncWith(with_stmt) => {
-                self.patterns.with_statements += 1;
-                self.patterns.async_await_count += 1;
-                self.analyze_body(&with_stmt.body);
-            }
-
-            // For loops (check for async)
-            ast::Stmt::AsyncFor(for_stmt) => {
-                self.patterns.async_await_count += 1;
-                self.analyze_expr(&for_stmt.iter);
-                self.analyze_body(&for_stmt.body);
-            }
-
-            ast::Stmt::For(for_stmt) => {
-                self.analyze_expr(&for_stmt.iter);
-                self.analyze_body(&for_stmt.body);
-            }
-
-            // Expression statements
-            ast::Stmt::Expr(expr) => {
-                self.analyze_expr(&expr.value);
-            }
-
-            // Other statements that might contain expressions
-            ast::Stmt::Return(ret) => {
-                if let Some(value) = &ret.value {
-                    self.analyze_expr(value);
-                }
-            }
-
-            ast::Stmt::Assign(assign) => {
-                self.analyze_expr(&assign.value);
-            }
-
-            ast::Stmt::AugAssign(aug) => {
-                self.analyze_expr(&aug.value);
-            }
-
-            ast::Stmt::If(if_stmt) => {
-                self.analyze_expr(&if_stmt.test);
-                self.analyze_body(&if_stmt.body);
-                self.analyze_body(&if_stmt.orelse);
-            }
-
-            ast::Stmt::While(while_stmt) => {
-                self.analyze_expr(&while_stmt.test);
-                self.analyze_body(&while_stmt.body);
-            }
-
+            AsyncFunctionDef(func) => self.handle_async_function(func),
+            FunctionDef(func) => self.handle_function(func),
+            ClassDef(class) => self.handle_class(class),
+            Try(try_stmt) => self.handle_try(try_stmt),
+            With(with_stmt) => self.handle_with(with_stmt),
+            AsyncWith(with_stmt) => self.handle_async_with(with_stmt),
+            AsyncFor(for_stmt) => self.handle_async_for(for_stmt),
+            For(for_stmt) => self.handle_for(for_stmt),
+            Expr(expr) => self.analyze_expr(&expr.value),
+            Return(ret) => ret
+                .value
+                .as_ref()
+                .map(|v| self.analyze_expr(v))
+                .unwrap_or(()),
+            Assign(assign) => self.analyze_expr(&assign.value),
+            AugAssign(aug) => self.analyze_expr(&aug.value),
+            If(if_stmt) => self.handle_if(if_stmt),
+            While(while_stmt) => self.handle_while(while_stmt),
             _ => {}
         }
     }
 
+    fn handle_async_function(&mut self, func: &ast::StmtAsyncFunctionDef) {
+        self.patterns.async_await_count += 1;
+        self.patterns.decorator_count += func.decorator_list.len() as u32;
+        self.analyze_function_body(&func.name, &func.body);
+    }
+
+    fn handle_function(&mut self, func: &ast::StmtFunctionDef) {
+        self.patterns.decorator_count += func.decorator_list.len() as u32;
+        self.analyze_function_body(&func.name, &func.body);
+    }
+
+    fn analyze_function_body(&mut self, name: &ast::Identifier, body: &[ast::Stmt]) {
+        if self.function_depth > 0 {
+            self.patterns.nested_functions += 1;
+        }
+        let old_name = self.current_function_name.clone();
+        let old_depth = self.function_depth;
+        self.current_function_name = Some(name.to_string());
+        self.function_depth += 1;
+        self.analyze_body(body);
+        self.current_function_name = old_name;
+        self.function_depth = old_depth;
+    }
+
+    fn handle_class(&mut self, class: &ast::StmtClassDef) {
+        self.patterns.decorator_count += class.decorator_list.len() as u32;
+        for keyword in &class.keywords {
+            if keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass") {
+                self.patterns.metaclass_usage += 1;
+            }
+        }
+        self.analyze_body(&class.body);
+    }
+
+    fn handle_try(&mut self, try_stmt: &ast::StmtTry) {
+        self.patterns.try_except_finally += 1;
+        self.analyze_body(&try_stmt.body);
+        for handler in &try_stmt.handlers {
+            let ast::ExceptHandler::ExceptHandler(h) = handler;
+            self.analyze_body(&h.body);
+        }
+        self.analyze_body(&try_stmt.orelse);
+        self.analyze_body(&try_stmt.finalbody);
+    }
+
+    fn handle_with(&mut self, with_stmt: &ast::StmtWith) {
+        self.patterns.with_statements += 1;
+        self.analyze_body(&with_stmt.body);
+    }
+
+    fn handle_async_with(&mut self, with_stmt: &ast::StmtAsyncWith) {
+        self.patterns.with_statements += 1;
+        self.patterns.async_await_count += 1;
+        self.analyze_body(&with_stmt.body);
+    }
+
+    fn handle_async_for(&mut self, for_stmt: &ast::StmtAsyncFor) {
+        self.patterns.async_await_count += 1;
+        self.analyze_expr(&for_stmt.iter);
+        self.analyze_body(&for_stmt.body);
+    }
+
+    fn handle_for(&mut self, for_stmt: &ast::StmtFor) {
+        self.analyze_expr(&for_stmt.iter);
+        self.analyze_body(&for_stmt.body);
+    }
+
+    fn handle_if(&mut self, if_stmt: &ast::StmtIf) {
+        self.analyze_expr(&if_stmt.test);
+        self.analyze_body(&if_stmt.body);
+        self.analyze_body(&if_stmt.orelse);
+    }
+
+    fn handle_while(&mut self, while_stmt: &ast::StmtWhile) {
+        self.analyze_expr(&while_stmt.test);
+        self.analyze_body(&while_stmt.body);
+    }
+
     fn analyze_expr(&mut self, expr: &ast::Expr) {
+        use ast::Expr::*;
         match expr {
-            // Lambda expressions
-            ast::Expr::Lambda(_) => {
-                self.patterns.lambda_count += 1;
-            }
-
-            // Generator expressions
-            ast::Expr::GeneratorExp(_) => {
-                self.patterns.generator_count += 1;
-                self.comprehension_depth += 1;
-                // Note: Would need to recursively analyze comprehension here
-                self.comprehension_depth -= 1;
-            }
-
-            // List/Set/Dict comprehensions
-            ast::Expr::ListComp(_) | ast::Expr::SetComp(_) | ast::Expr::DictComp(_) => {
-                self.comprehension_depth += 1;
-                if self.comprehension_depth > 1 {
-                    // Nested comprehension adds significant complexity
-                    self.patterns.comprehension_depth = self
-                        .patterns
-                        .comprehension_depth
-                        .max(self.comprehension_depth);
-                }
-                // Note: Would need to recursively analyze comprehension here
-                self.comprehension_depth -= 1;
-            }
-
-            // Await expressions
-            ast::Expr::Await(_) => {
-                self.patterns.async_await_count += 1;
-            }
-
-            // Yield/YieldFrom (generators)
-            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
-                self.patterns.generator_count += 1;
-            }
-
-            // Function calls (check for recursion)
-            ast::Expr::Call(call) => {
-                if let Some(ref func_name) = self.current_function_name {
-                    if let ast::Expr::Name(name) = &*call.func {
-                        if name.id == *func_name {
-                            self.patterns.recursive_calls += 1;
-                        }
-                    }
-                }
-
-                // Recursively analyze arguments
-                for arg in &call.args {
-                    self.analyze_expr(arg);
-                }
-            }
-
-            // Other expressions that might contain nested expressions
-            ast::Expr::BinOp(binop) => {
-                self.analyze_expr(&binop.left);
-                self.analyze_expr(&binop.right);
-            }
-
-            ast::Expr::UnaryOp(unary) => {
-                self.analyze_expr(&unary.operand);
-            }
-
-            ast::Expr::IfExp(if_exp) => {
-                self.analyze_expr(&if_exp.test);
-                self.analyze_expr(&if_exp.body);
-                self.analyze_expr(&if_exp.orelse);
-            }
-
+            Lambda(_) => self.patterns.lambda_count += 1,
+            GeneratorExp(_) => self.handle_generator(),
+            ListComp(_) | SetComp(_) | DictComp(_) => self.handle_comprehension(),
+            Await(_) => self.patterns.async_await_count += 1,
+            Yield(_) | YieldFrom(_) => self.patterns.generator_count += 1,
+            Call(call) => self.handle_call(call),
+            BinOp(binop) => self.handle_binop(binop),
+            UnaryOp(unary) => self.analyze_expr(&unary.operand),
+            IfExp(if_exp) => self.handle_if_exp(if_exp),
             _ => {}
         }
+    }
+
+    fn handle_generator(&mut self) {
+        self.patterns.generator_count += 1;
+        self.comprehension_depth += 1;
+        // Note: Would need to recursively analyze comprehension here
+        self.comprehension_depth -= 1;
+    }
+
+    fn handle_comprehension(&mut self) {
+        self.comprehension_depth += 1;
+        if self.comprehension_depth > 1 {
+            self.patterns.comprehension_depth = self
+                .patterns
+                .comprehension_depth
+                .max(self.comprehension_depth);
+        }
+        // Note: Would need to recursively analyze comprehension here
+        self.comprehension_depth -= 1;
+    }
+
+    fn handle_call(&mut self, call: &ast::ExprCall) {
+        if let Some(ref func_name) = self.current_function_name {
+            if let ast::Expr::Name(name) = &*call.func {
+                if name.id == *func_name {
+                    self.patterns.recursive_calls += 1;
+                }
+            }
+        }
+        for arg in &call.args {
+            self.analyze_expr(arg);
+        }
+    }
+
+    fn handle_binop(&mut self, binop: &ast::ExprBinOp) {
+        self.analyze_expr(&binop.left);
+        self.analyze_expr(&binop.right);
+    }
+
+    fn handle_if_exp(&mut self, if_exp: &ast::ExprIfExp) {
+        self.analyze_expr(&if_exp.test);
+        self.analyze_expr(&if_exp.body);
+        self.analyze_expr(&if_exp.orelse);
     }
 }
 
