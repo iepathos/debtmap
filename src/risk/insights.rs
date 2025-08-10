@@ -93,7 +93,7 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     output.push_str("──────────────────────────────────────────────────────────\n");
     output.push_str("Ordered by ROI (Risk Reduction / Test Effort)\n");
     output.push('\n');
-    output.push_str("Priority | Function                        | Risk Impact | ROI\n");
+    output.push_str("Priority | Function                       | Risk Impact | ROI\n");
     output.push_str("---------|--------------------------------|-------------|------\n");
 
     for (i, rec) in recommendations.iter().enumerate() {
