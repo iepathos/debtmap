@@ -1,0 +1,28 @@
+# Tarpaulin Configuration
+# Excludes test files from coverage analysis
+
+[default]
+# Exclude test files and directories from coverage
+exclude-files = [
+    "tests/*",
+    "*_test.rs",
+    "*_tests.rs",
+    "*/tests/*",
+    "*/test/*",
+    "benches/*",
+    "*/bench/*",
+    "*/benchmark/*"
+]
+
+# Build options
+skip-clean = true
+engine = "Llvm"
+
+# Timeout for tests
+timeout = "2m"
+
+# Follow child processes
+follow-exec = false
+
+# Don't count lines with only closing braces
+avoid-cfg-tarpaulin = true

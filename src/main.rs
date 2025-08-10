@@ -380,6 +380,7 @@ fn analyze_risk_with_coverage(
             (func.line, func.line + func.length),
             &complexity_metrics,
             coverage,
+            func.is_test,
         );
 
         function_risks.push_back(risk);
@@ -429,6 +430,7 @@ fn analyze_risk_without_coverage(
             (func.line, func.line + func.length),
             &complexity_metrics,
             None, // No coverage data
+            func.is_test,
         );
 
         function_risks.push_back(risk);

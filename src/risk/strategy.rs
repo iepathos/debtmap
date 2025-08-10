@@ -51,6 +51,7 @@ pub struct RiskContext {
     pub coverage: Option<f64>,
     pub debt_score: Option<f64>,
     pub debt_threshold: Option<f64>,
+    pub is_test: bool,
 }
 
 pub trait RiskCalculator: Send + Sync {
@@ -78,7 +79,7 @@ impl RiskCalculator for EnhancedRiskStrategy {
     fn calculate(&self, context: &RiskContext) -> FunctionRisk {
         let risk_score = self.calculate_risk_score(context);
         let test_effort = self.estimate_test_effort(&context.complexity);
-        let risk_category = self.categorize_risk(&context.complexity, context.coverage, risk_score);
+        let risk_category = self.categorize_risk(&context.complexity, context.coverage, risk_score, context.is_test);
 
         FunctionRisk {
             file: context.file.clone(),
@@ -90,13 +91,20 @@ impl RiskCalculator for EnhancedRiskStrategy {
             risk_score,
             test_effort,
             risk_category,
+            is_test_function: context.is_test,
         }
     }
 
     fn calculate_risk_score(&self, context: &RiskContext) -> f64 {
         let base_risk = self.calculate_base_risk(context);
         let debt_factor = self.calculate_debt_factor(context.debt_score, context.debt_threshold);
-        let coverage_penalty = self.calculate_coverage_penalty(context.coverage);
+        
+        // Don't apply coverage penalty to test functions - they don't need test coverage
+        let coverage_penalty = if context.is_test {
+            1.0  // No penalty for test functions
+        } else {
+            self.calculate_coverage_penalty(context.coverage)
+        };
 
         let final_risk = base_risk * debt_factor * coverage_penalty;
         final_risk.min(10.0)
@@ -122,9 +130,14 @@ impl EnhancedRiskStrategy {
         let complexity_component =
             (cyclomatic * self.weights.complexity + cognitive * self.weights.cognitive) / 50.0;
 
-        let coverage_component = match context.coverage {
-            Some(cov) => (100.0 - cov) / 100.0 * self.weights.coverage,
-            None => 0.0, // Don't add coverage weight when coverage is unknown
+        // For test functions, don't include coverage in risk calculation
+        let coverage_component = if context.is_test {
+            0.0  // Test functions don't need test coverage
+        } else {
+            match context.coverage {
+                Some(cov) => (100.0 - cov) / 100.0 * self.weights.coverage,
+                None => 0.0, // Don't add coverage weight when coverage is unknown
+            }
         };
 
         (complexity_component + coverage_component) * 5.0
@@ -198,9 +211,20 @@ impl EnhancedRiskStrategy {
         complexity: &ComplexityMetrics,
         coverage: Option<f64>,
         risk_score: f64,
+        is_test: bool,
     ) -> RiskCategory {
         let avg_complexity =
             (complexity.cyclomatic_complexity + complexity.cognitive_complexity) / 2;
+
+        // For test functions, categorize based on complexity only (not coverage)
+        if is_test {
+            return match avg_complexity {
+                c if c > 20 => RiskCategory::High,      // Very complex test
+                c if c > 10 => RiskCategory::Medium,    // Complex test
+                c if c > 5 => RiskCategory::Low,        // Moderately complex test
+                _ => RiskCategory::Low,                 // Simple test
+            };
+        }
 
         if let Some(cov) = coverage {
             if avg_complexity > 10 && cov > 80.0 {
@@ -253,6 +277,7 @@ mod tests {
             coverage,
             debt_score,
             debt_threshold: Some(100.0),
+            is_test: false,
         }
     }
 

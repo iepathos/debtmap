@@ -74,7 +74,7 @@ coverage:
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
     echo "Generating code coverage report with cargo-tarpaulin..."
-    cargo tarpaulin --skip-clean --engine llvm --out Html --out Json --output-dir target/coverage
+    cargo tarpaulin --config .tarpaulin.toml --out Html --out Json --output-dir target/coverage
     echo "Coverage report generated at target/coverage/tarpaulin-report.html"
 
 # Run tests with coverage (lcov format)
@@ -83,7 +83,7 @@ coverage-lcov:
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
     echo "Generating code coverage report with cargo-tarpaulin (lcov format)..."
-    cargo tarpaulin --skip-clean --engine llvm --out Lcov --output-dir target/coverage
+    cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage
     echo "Coverage report generated at target/coverage/lcov.info"
 
 # Run tests with coverage and check threshold
@@ -92,7 +92,7 @@ coverage-check:
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
     echo "Checking code coverage threshold..."
-    COVERAGE=$(cargo tarpaulin --skip-clean --engine llvm --out Json --output-dir target/coverage --quiet | jq -r '.files | to_entries | map(.value.coverage) | add / length')
+    COVERAGE=$(cargo tarpaulin --config .tarpaulin.toml --out Json --output-dir target/coverage --quiet | jq -r '.files | to_entries | map(.value.coverage) | add / length')
     echo "Current coverage: ${COVERAGE}%"
     if (( $(echo "$COVERAGE < 80" | bc -l) )); then
         echo "⚠️  Coverage is below 80%: $COVERAGE%"
@@ -111,7 +111,7 @@ analyze-self:
     echo "Building debtmap in release mode..."
     cargo build --release --bin debtmap
     echo "Generating code coverage (lcov format)..."
-    cargo tarpaulin --skip-clean --engine llvm --out Lcov --output-dir target/coverage
+    cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage
     echo "Analyzing current repository with debtmap..."
     ./target/release/debtmap analyze . --lcov target/coverage/lcov.info
     echo "Analysis complete!"

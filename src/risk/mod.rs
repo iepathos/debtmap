@@ -22,6 +22,7 @@ pub struct FunctionRisk {
     pub risk_score: f64,
     pub test_effort: TestEffort,
     pub risk_category: RiskCategory,
+    pub is_test_function: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -133,6 +134,7 @@ impl RiskAnalyzer {
         line_range: (usize, usize),
         complexity: &ComplexityMetrics,
         coverage: Option<f64>,
+        is_test: bool,
     ) -> FunctionRisk {
         let context = RiskContext {
             file,
@@ -142,6 +144,7 @@ impl RiskAnalyzer {
             coverage,
             debt_score: self.debt_score,
             debt_threshold: self.debt_threshold,
+            is_test,
         };
 
         self.strategy.calculate(&context)
@@ -154,6 +157,7 @@ impl RiskAnalyzer {
         line_range: (usize, usize),
         complexity: &ComplexityMetrics,
         coverage: Option<f64>,
+        is_test: bool,
         root_path: PathBuf,
     ) -> (FunctionRisk, Option<ContextualRisk>) {
         let base_risk = self.analyze_function(
@@ -162,6 +166,7 @@ impl RiskAnalyzer {
             line_range,
             complexity,
             coverage,
+            is_test,
         );
 
         let contextual_risk = if let Some(ref mut aggregator) = self.context_aggregator {
@@ -199,6 +204,7 @@ impl RiskAnalyzer {
             coverage,
             debt_score: self.debt_score,
             debt_threshold: self.debt_threshold,
+            is_test: false,
         };
 
         self.strategy.calculate_risk_score(&context)

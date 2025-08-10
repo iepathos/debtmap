@@ -18,9 +18,10 @@ pub fn generate_risk_insights(
 pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
     let mut output = String::new();
 
+    // Filter out test functions from critical risks display
     let critical_risks: Vec<&FunctionRisk> = risks
         .iter()
-        .filter(|r| matches!(r.risk_category, RiskCategory::Critical))
+        .filter(|r| !r.is_test_function && matches!(r.risk_category, RiskCategory::Critical))
         .take(5)
         .collect();
 
@@ -70,11 +71,11 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     }
 
     output.push_str("🎯 TOP 5 TESTING RECOMMENDATIONS\n");
-    output.push_str("──────────────────────────────────────────────────────────\n");
+    output.push_str("────────────────────────────────────────────────────────────────────────────────\n");
     output.push_str("Ordered by ROI (Risk Reduction / Test Effort)\n");
     output.push('\n');
-    output.push_str("Priority | Function                       | Deps | Impact | ROI\n");
-    output.push_str("---------|--------------------------------|------|--------|------\n");
+    output.push_str("Priority | Function                       | Location                      | ROI\n");
+    output.push_str("---------|--------------------------------|-------------------------------|------\n");
 
     for (i, rec) in recommendations.iter().take(5).enumerate() {
         let roi_score = rec.roi.unwrap_or(0.1);
@@ -96,16 +97,29 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
             format!("{roi_score:.1}")
         };
 
-        // Format dependency information as →X←Y
-        let deps_display = format!("→{}←{}", rec.dependencies.len(), rec.dependents.len());
+        // Format file path - show relative path and truncate if too long
+        let file_str = rec.file.to_string_lossy();
+        let location_display = if file_str.len() > 30 {
+            format!("...{}", &file_str[file_str.len() - 27..])
+        } else {
+            file_str.to_string()
+        };
 
         output.push_str(&format!(
-            "{:<8} | {:<30} | {:^6} | {:>7} | {:>5}\n",
+            "{:<8} | {:<30} | {:<30} | {:>5}\n",
             format!("#{}", i + 1),
             function_display,
-            deps_display,
-            format!("-{}%", risk_reduction),
+            location_display,
             roi_display
+        ));
+        
+        // Format dependency information and risk info on the next line
+        let deps_display = format!("→{}←{}", rec.dependencies.len(), rec.dependents.len());
+        output.push_str(&format!(
+            "         │ Risk: {:.1} | Impact: -{}% | Deps: {}\n",
+            rec.current_risk,
+            risk_reduction,
+            deps_display
         ));
         output.push_str(&format!("         └─ {}", rec.rationale));
 

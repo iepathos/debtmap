@@ -113,7 +113,13 @@ pub fn prioritize_by_roi(
     functions: &Vector<FunctionRisk>,
     analyzer: &RiskAnalyzer,
 ) -> Vector<TestingRecommendation> {
-    let targets: Vec<TestTarget> = functions.iter().map(function_risk_to_target).collect();
+    // Filter out test functions before generating recommendations
+    // We check against the function metrics to see if it's marked as a test
+    let targets: Vec<TestTarget> = functions
+        .iter()
+        .filter(|f| !f.is_test_function)
+        .map(function_risk_to_target)
+        .collect();
     let pipeline = PrioritizationPipeline::new();
     let mut prioritized = pipeline.process(targets);
     prioritized.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
