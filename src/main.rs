@@ -26,6 +26,9 @@ struct AnalyzeConfig {
     languages: Option<Vec<String>>,
     coverage_file: Option<PathBuf>,
     legacy_risk: bool,
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
 }
 
 fn main() -> Result<()> {
@@ -41,6 +44,9 @@ fn main() -> Result<()> {
             languages,
             coverage_file,
             legacy_risk,
+            enable_context,
+            context_providers,
+            disable_context,
         } => {
             let config = AnalyzeConfig {
                 path,
@@ -51,6 +57,9 @@ fn main() -> Result<()> {
                 languages,
                 coverage_file,
                 legacy_risk,
+                enable_context,
+                context_providers,
+                disable_context,
             };
             handle_analyze(config)
         }
@@ -79,9 +88,24 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
 
     // Handle risk analysis if coverage file provided
     let risk_insights = if let Some(lcov_path) = config.coverage_file {
-        analyze_risk_with_coverage(&results, &lcov_path, &config.path, config.legacy_risk)?
+        analyze_risk_with_coverage(
+            &results,
+            &lcov_path,
+            &config.path,
+            config.legacy_risk,
+            config.enable_context,
+            config.context_providers,
+            config.disable_context,
+        )?
     } else {
-        analyze_risk_without_coverage(&results, config.legacy_risk)?
+        analyze_risk_without_coverage(
+            &results,
+            config.legacy_risk,
+            config.enable_context,
+            config.context_providers,
+            config.disable_context,
+            &config.path,
+        )?
     };
 
     // Output results
@@ -221,11 +245,76 @@ fn output_results_with_risk(
     Ok(())
 }
 
+fn build_context_aggregator(
+    project_path: &Path,
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
+) -> Option<risk::context::ContextAggregator> {
+    if !enable_context {
+        return None;
+    }
+
+    let mut aggregator = risk::context::ContextAggregator::new();
+
+    // Determine which providers to enable
+    let enabled_providers = if let Some(providers) = context_providers {
+        providers
+    } else {
+        // Default providers
+        vec![
+            "critical_path".to_string(),
+            "dependency".to_string(),
+            "git_history".to_string(),
+        ]
+    };
+
+    let disabled = disable_context.unwrap_or_default();
+
+    for provider_name in enabled_providers {
+        if disabled.contains(&provider_name) {
+            continue;
+        }
+
+        match provider_name.as_str() {
+            "critical_path" => {
+                // For now, create a simple critical path analyzer
+                // In a real implementation, we'd build this from the AST
+                let analyzer = risk::context::critical_path::CriticalPathAnalyzer::new();
+                let provider = risk::context::critical_path::CriticalPathProvider::new(analyzer);
+                aggregator = aggregator.with_provider(Box::new(provider));
+            }
+            "dependency" => {
+                // Create dependency graph from analysis results
+                let graph = risk::context::dependency::DependencyGraph::new();
+                let provider = risk::context::dependency::DependencyRiskProvider::new(graph);
+                aggregator = aggregator.with_provider(Box::new(provider));
+            }
+            "git_history" => {
+                // Try to create git history provider
+                if let Ok(provider) =
+                    risk::context::git_history::GitHistoryProvider::new(project_path.to_path_buf())
+                {
+                    aggregator = aggregator.with_provider(Box::new(provider));
+                }
+            }
+            _ => {
+                eprintln!("Warning: Unknown context provider: {provider_name}");
+            }
+        }
+    }
+
+    Some(aggregator)
+}
+
 fn analyze_risk_with_coverage(
     results: &AnalysisResults,
     lcov_path: &Path,
-    _project_path: &Path,
+    project_path: &Path,
     legacy_risk: bool,
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
 ) -> Result<Option<risk::RiskInsight>> {
     use im::Vector;
 
@@ -237,11 +326,21 @@ fn analyze_risk_with_coverage(
     let debt_threshold = 100.0; // Default threshold
 
     // Create risk analyzer with appropriate strategy
-    let analyzer = if legacy_risk {
+    let mut analyzer = if legacy_risk {
         risk::RiskAnalyzer::with_legacy_strategy()
     } else {
         risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold)
     };
+
+    // Add context aggregator if enabled
+    if let Some(aggregator) = build_context_aggregator(
+        project_path,
+        enable_context,
+        context_providers,
+        disable_context,
+    ) {
+        analyzer = analyzer.with_context_aggregator(aggregator);
+    }
 
     // Analyze each function for risk
     let mut function_risks = Vector::new();
@@ -272,6 +371,10 @@ fn analyze_risk_with_coverage(
 fn analyze_risk_without_coverage(
     results: &AnalysisResults,
     legacy_risk: bool,
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
+    project_path: &Path,
 ) -> Result<Option<risk::RiskInsight>> {
     use im::Vector;
 
@@ -280,11 +383,21 @@ fn analyze_risk_without_coverage(
     let debt_threshold = 100.0; // Default threshold
 
     // Create risk analyzer with appropriate strategy
-    let analyzer = if legacy_risk {
+    let mut analyzer = if legacy_risk {
         risk::RiskAnalyzer::with_legacy_strategy()
     } else {
         risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold)
     };
+
+    // Add context aggregator if enabled
+    if let Some(aggregator) = build_context_aggregator(
+        project_path,
+        enable_context,
+        context_providers,
+        disable_context,
+    ) {
+        analyzer = analyzer.with_context_aggregator(aggregator);
+    }
 
     // Analyze each function for risk based on complexity only
     let mut function_risks = Vector::new();
