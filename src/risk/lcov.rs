@@ -180,36 +180,41 @@ impl LcovData {
             .find_map(|funcs| self.find_matching_function(funcs, function_name))
             .map(|func| func.coverage_percentage)
     }
-    
+
     // Extract path generation logic to a pure function
     fn generate_path_variations(&self, file: &Path) -> Vec<PathBuf> {
         let current_dir = std::env::current_dir().ok();
-        
+
         vec![
             Some(file.to_path_buf()),
-            current_dir.as_ref().map(|dir| 
-                dir.join(file.strip_prefix("./").unwrap_or(file))
-            ),
-            current_dir.as_ref().map(|dir| 
-                dir.join("src").join(file.strip_prefix("./src/").unwrap_or(file))
-            ),
+            current_dir
+                .as_ref()
+                .map(|dir| dir.join(file.strip_prefix("./").unwrap_or(file))),
+            current_dir.as_ref().map(|dir| {
+                dir.join("src")
+                    .join(file.strip_prefix("./src/").unwrap_or(file))
+            }),
         ]
         .into_iter()
         .flatten()
         .collect()
     }
-    
+
     // Extract function matching logic to a pure function
     fn find_matching_function<'a>(
-        &self, 
-        funcs: &'a [FunctionCoverage], 
-        function_name: &str
+        &self,
+        funcs: &'a [FunctionCoverage],
+        function_name: &str,
     ) -> Option<&'a FunctionCoverage> {
         // Chain matchers in order of preference
-        funcs.iter()
+        funcs
+            .iter()
             .find(|f| f.name == function_name)
-            .or_else(|| funcs.iter()
-                .find(|f| f.name.ends_with(&format!("::{function_name}"))))
+            .or_else(|| {
+                funcs
+                    .iter()
+                    .find(|f| f.name.ends_with(&format!("::{function_name}")))
+            })
             .or_else(|| {
                 if function_name.len() > 3 {
                     funcs.iter().find(|f| f.name.contains(function_name))
