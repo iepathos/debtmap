@@ -377,8 +377,8 @@ mod tests {
 
         for i in 0..5 {
             graph.add_module(Module {
-                name: format!("module_{}", i),
-                path: PathBuf::from(format!("src/mod{}", i)),
+                name: format!("module_{i}"),
+                path: PathBuf::from(format!("src/mod{i}")),
                 intrinsic_risk: 3.0,
                 functions: vector![format!("func_{}", i)],
             });
@@ -387,7 +387,7 @@ mod tests {
         // Create a chain: 4 -> 3 -> 2 -> 1 -> 0
         // (module i depends on module i+1)
         for i in 0..4 {
-            graph.add_dependency(format!("module_{}", i + 1), format!("module_{}", i), 0.5);
+            graph.add_dependency(format!("module_{}", i + 1), format!("module_{i}"), 0.5);
         }
 
         let calculator = DependencyRiskCalculator::new(graph);
