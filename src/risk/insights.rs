@@ -93,8 +93,8 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     output.push_str("──────────────────────────────────────────────────────────\n");
     output.push_str("Ordered by ROI (Risk Reduction / Test Effort)\n");
     output.push('\n');
-    output.push_str("Priority | Function                       | Risk Impact | ROI\n");
-    output.push_str("---------|--------------------------------|-------------|------\n");
+    output.push_str("Priority | Function                       | Deps | Impact | ROI\n");
+    output.push_str("---------|--------------------------------|------|--------|------\n");
 
     for (i, rec) in recommendations.iter().take(5).enumerate() {
         let roi_score = rec.roi.unwrap_or(0.1);
@@ -116,19 +116,37 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
             format!("{roi_score:.1}")
         };
 
+        // Format dependency information as →X←Y
+        let deps_display = format!("→{}←{}", rec.dependencies.len(), rec.dependents.len());
+
         output.push_str(&format!(
-            "{:<8} | {:<30} | {:>11} | {:>5}\n",
+            "{:<8} | {:<30} | {:^6} | {:>7} | {:>5}\n",
             format!("#{}", i + 1),
             function_display,
+            deps_display,
             format!("-{}%", risk_reduction),
             roi_display
         ));
-        output.push_str(&format!(
-            "         └─ {}
-",
-            rec.rationale
-        ));
-        output.push('\n');
+        output.push_str(&format!("         └─ {}", rec.rationale));
+
+        // Add dependency details if present
+        if !rec.dependents.is_empty() {
+            output.push_str(&format!(
+                "\n            ← Used by: {}",
+                rec.dependents.join(", ")
+            ));
+            if rec.dependents.len() >= 3 {
+                output.push_str(" (high cascade impact)");
+            }
+        }
+        if !rec.dependencies.is_empty() {
+            output.push_str(&format!(
+                "\n            → Depends on: {}",
+                rec.dependencies.join(", ")
+            ));
+        }
+
+        output.push_str("\n\n");
     }
 
     output
