@@ -1,4 +1,5 @@
 use crate::analyzers::Analyzer;
+use crate::complexity::python_patterns::analyze_python_patterns;
 use crate::core::{
     ast::{Ast, PythonAst},
     ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
@@ -315,9 +316,14 @@ fn count_branches_stmt(stmt: &ast::Stmt) -> u32 {
 
 fn calculate_cognitive_python(body: &[ast::Stmt]) -> u32 {
     let mut nesting = 0;
-    body.iter()
+    let base_cognitive: u32 = body
+        .iter()
         .map(|stmt| calculate_cognitive_stmt(stmt, &mut nesting))
-        .sum()
+        .sum();
+
+    // Add pattern-based complexity
+    let patterns = analyze_python_patterns(body);
+    base_cognitive + patterns.total_complexity()
 }
 
 fn calculate_cognitive_stmt(stmt: &ast::Stmt, nesting: &mut u32) -> u32 {

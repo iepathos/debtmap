@@ -1,5 +1,7 @@
 use crate::analyzers::Analyzer;
-use crate::complexity::{cognitive::calculate_cognitive, cyclomatic::calculate_cyclomatic};
+use crate::complexity::{
+    cognitive::calculate_cognitive_with_patterns, cyclomatic::calculate_cyclomatic,
+};
 use crate::core::{
     ast::{Ast, RustAst},
     ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
@@ -252,7 +254,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                 file: self.current_file.clone(),
                 line,
                 cyclomatic: calculate_cyclomatic(&block),
-                cognitive: calculate_cognitive(&block),
+                cognitive: calculate_cognitive_syn(&block),
                 nesting: calculate_nesting(&block),
                 length: count_lines(&block),
             };
@@ -270,7 +272,9 @@ fn calculate_cyclomatic_syn(block: &syn::Block) -> u32 {
 }
 
 fn calculate_cognitive_syn(block: &syn::Block) -> u32 {
-    calculate_cognitive(block)
+    // Use the enhanced version that includes pattern detection
+    let (total, _patterns) = calculate_cognitive_with_patterns(block);
+    total
 }
 
 fn calculate_nesting(block: &syn::Block) -> u32 {
