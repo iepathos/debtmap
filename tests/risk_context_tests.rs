@@ -1,8 +1,8 @@
+use anyhow::Result;
 use debtmap::risk::context::{
     AnalysisTarget, Context, ContextAggregator, ContextDetails, ContextMap, ContextProvider,
     ContextualRisk, Impact, Priority,
 };
-use anyhow::Result;
 use std::path::PathBuf;
 
 struct MockProvider {
@@ -20,7 +20,7 @@ impl ContextProvider for MockProvider {
         if self.should_fail {
             anyhow::bail!("Mock provider failure")
         }
-        
+
         Ok(Context {
             provider: self.name.clone(),
             weight: self.weight,
@@ -51,10 +51,10 @@ fn test_context_aggregator_default() {
         function_name: "test_fn".to_string(),
         line_range: (1, 10),
     };
-    
+
     let mut aggregator = aggregator;
     let context_map = aggregator.analyze(&target);
-    
+
     // Default aggregator has no providers, so context map should be empty
     assert_eq!(context_map.total_contribution(), 0.0);
 }
@@ -68,10 +68,10 @@ fn test_context_aggregator_new() {
         function_name: "test_fn".to_string(),
         line_range: (1, 10),
     };
-    
+
     let mut aggregator = aggregator;
     let context_map = aggregator.analyze(&target);
-    
+
     // New aggregator has no providers, so context map should be empty
     assert_eq!(context_map.total_contribution(), 0.0);
 }
@@ -83,18 +83,18 @@ fn test_context_aggregator_with_provider() {
         weight: 1.0,
         should_fail: false,
     });
-    
+
     let mut aggregator = ContextAggregator::new().with_provider(provider);
-    
+
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),
         file_path: PathBuf::from("/test/file.rs"),
         function_name: "test_fn".to_string(),
         line_range: (1, 10),
     };
-    
+
     let context_map = aggregator.analyze(&target);
-    
+
     // Should have one context from the provider
     assert!(context_map.get("test_provider").is_some());
     assert_eq!(context_map.total_contribution(), 0.5); // contribution * weight = 0.5 * 1.0
@@ -107,18 +107,18 @@ fn test_context_aggregator_with_failing_provider() {
         weight: 1.0,
         should_fail: true,
     });
-    
+
     let mut aggregator = ContextAggregator::new().with_provider(provider);
-    
+
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),
         file_path: PathBuf::from("/test/file.rs"),
         function_name: "test_fn".to_string(),
         line_range: (1, 10),
     };
-    
+
     let context_map = aggregator.analyze(&target);
-    
+
     // Failing provider should not add context
     assert!(context_map.get("failing_provider").is_none());
     assert_eq!(context_map.total_contribution(), 0.0);
@@ -131,23 +131,26 @@ fn test_context_aggregator_cache() {
         weight: 1.0,
         should_fail: false,
     });
-    
+
     let mut aggregator = ContextAggregator::new().with_provider(provider);
-    
+
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),
         file_path: PathBuf::from("/test/file.rs"),
         function_name: "test_fn".to_string(),
         line_range: (1, 10),
     };
-    
+
     // First call
     let context_map1 = aggregator.analyze(&target);
     // Second call should use cache
     let context_map2 = aggregator.analyze(&target);
-    
+
     // Both should be identical
-    assert_eq!(context_map1.total_contribution(), context_map2.total_contribution());
+    assert_eq!(
+        context_map1.total_contribution(),
+        context_map2.total_contribution()
+    );
 }
 
 #[test]
@@ -157,21 +160,21 @@ fn test_context_aggregator_clear_cache() {
         weight: 1.0,
         should_fail: false,
     });
-    
+
     let mut aggregator = ContextAggregator::new().with_provider(provider);
-    
+
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),
         file_path: PathBuf::from("/test/file.rs"),
         function_name: "test_fn".to_string(),
         line_range: (1, 10),
     };
-    
+
     let _ = aggregator.analyze(&target);
     aggregator.clear_cache();
     // After clearing cache, should recompute
     let context_map = aggregator.analyze(&target);
-    
+
     assert!(context_map.get("cache_clear_provider").is_some());
 }
 
@@ -192,7 +195,7 @@ fn test_context_map_new() {
 #[test]
 fn test_context_map_add_and_get() {
     let mut context_map = ContextMap::new();
-    
+
     let context = Context {
         provider: "test".to_string(),
         weight: 2.0,
@@ -204,9 +207,9 @@ fn test_context_map_add_and_get() {
             author_count: 3,
         },
     };
-    
+
     context_map.add("test".to_string(), context.clone());
-    
+
     assert!(context_map.get("test").is_some());
     assert_eq!(context_map.get("test").unwrap().provider, "test");
     assert_eq!(context_map.total_contribution(), 1.0); // 0.5 * 2.0
@@ -215,7 +218,7 @@ fn test_context_map_add_and_get() {
 #[test]
 fn test_context_map_total_contribution() {
     let mut context_map = ContextMap::new();
-    
+
     context_map.add(
         "provider1".to_string(),
         Context {
@@ -229,7 +232,7 @@ fn test_context_map_total_contribution() {
             },
         },
     );
-    
+
     context_map.add(
         "provider2".to_string(),
         Context {
@@ -244,7 +247,7 @@ fn test_context_map_total_contribution() {
             },
         },
     );
-    
+
     // Total = (0.5 * 1.0) + (0.3 * 2.0) = 0.5 + 0.6 = 1.1
     assert_eq!(context_map.total_contribution(), 1.1);
 }
@@ -252,7 +255,7 @@ fn test_context_map_total_contribution() {
 #[test]
 fn test_context_map_iter() {
     let mut context_map = ContextMap::new();
-    
+
     context_map.add(
         "provider1".to_string(),
         Context {
@@ -266,7 +269,7 @@ fn test_context_map_iter() {
             },
         },
     );
-    
+
     let items: Vec<_> = context_map.iter().collect();
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].0, "provider1");
@@ -275,7 +278,7 @@ fn test_context_map_iter() {
 #[test]
 fn test_contextual_risk_new() {
     let mut context_map = ContextMap::new();
-    
+
     context_map.add(
         "test".to_string(),
         Context {
@@ -289,9 +292,9 @@ fn test_contextual_risk_new() {
             },
         },
     );
-    
+
     let risk = ContextualRisk::new(5.0, &context_map);
-    
+
     assert_eq!(risk.base_risk, 5.0);
     // contextual_risk = 5.0 * (1.0 + 0.2) = 6.0
     assert_eq!(risk.contextual_risk, 6.0);
@@ -303,7 +306,7 @@ fn test_contextual_risk_new() {
 #[test]
 fn test_contextual_risk_capped_at_10() {
     let mut context_map = ContextMap::new();
-    
+
     context_map.add(
         "high_impact".to_string(),
         Context {
@@ -317,9 +320,9 @@ fn test_contextual_risk_capped_at_10() {
             },
         },
     );
-    
+
     let risk = ContextualRisk::new(8.0, &context_map);
-    
+
     assert_eq!(risk.base_risk, 8.0);
     // Would be 8.0 * (1.0 + 4.0) = 40.0, but capped at 10.0
     assert_eq!(risk.contextual_risk, 10.0);
