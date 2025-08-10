@@ -210,3 +210,29 @@ Implement a pluggable context provider system that enriches risk analysis with m
 - ✅ Optional and backward compatible (via --context flag)
 - ⚠️ Additional processing time for context gathering
 - ⚠️ Requires git repository for full functionality
+
+---
+
+## ADR-012: Dependency-Aware ROI Calculation
+**Date**: 2025-08-10
+**Status**: Accepted
+
+### Context
+The ROI calculation was producing uniform results (all 10.0) for functions with similar complexity, failing to account for the cascade effects of testing highly-depended-upon code. Functions used by many modules have higher impact when tested.
+
+### Decision
+Implement dependency-aware ROI calculation that:
+- Builds dependency graphs from module relationships
+- Applies module type multipliers (EntryPoint: 2x, Core: 1.5x, Api: 1.2x)
+- Calculates cascade impact with exponential decay (70% per level)
+- Adds dependency factor based on dependent count
+- Uses diminishing returns model for realistic ROI scaling
+
+### Consequences
+- ✅ ROI values show meaningful variation (not all 10.0)
+- ✅ Highly-depended modules correctly prioritized
+- ✅ Entry points and core modules receive appropriate bonuses
+- ✅ Cascade effects properly calculated and displayed
+- ✅ More intuitive testing recommendations
+- ⚠️ Dependency inference may not capture all relationships
+- ⚠️ Additional computation for graph construction
