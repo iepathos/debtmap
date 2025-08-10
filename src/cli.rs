@@ -38,11 +38,11 @@ pub enum Commands {
         languages: Option<Vec<String>>,
 
         /// Optional LCOV coverage file for risk analysis
-        #[arg(long = "coverage-file", alias = "lcov")]
+        #[arg(long = "coverage-file", visible_alias = "lcov")]
         coverage_file: Option<PathBuf>,
 
         /// Enable context-aware risk analysis
-        #[arg(long = "context", alias = "enable-context")]
+        #[arg(long = "context", visible_alias = "enable-context")]
         enable_context: bool,
 
         /// Context providers to use (critical_path, dependency, git_history)
@@ -71,7 +71,7 @@ pub enum Commands {
         config: Option<PathBuf>,
 
         /// Optional LCOV coverage file for risk analysis
-        #[arg(long = "coverage-file", alias = "lcov")]
+        #[arg(long = "coverage-file", visible_alias = "lcov")]
         coverage_file: Option<PathBuf>,
 
         /// Output format
@@ -83,7 +83,7 @@ pub enum Commands {
         output: Option<PathBuf>,
 
         /// Enable context-aware risk analysis
-        #[arg(long = "context", alias = "enable-context")]
+        #[arg(long = "context", visible_alias = "enable-context")]
         enable_context: bool,
 
         /// Context providers to use (critical_path, dependency, git_history)
