@@ -83,7 +83,7 @@ pub struct RiskDistribution {
 }
 
 use self::context::{AnalysisTarget, ContextAggregator, ContextualRisk};
-use self::strategy::{EnhancedRiskStrategy, LegacyRiskStrategy, RiskCalculator, RiskContext};
+use self::strategy::{EnhancedRiskStrategy, RiskCalculator, RiskContext};
 
 pub struct RiskAnalyzer {
     strategy: Box<dyn RiskCalculator>,
@@ -115,15 +115,6 @@ impl Default for RiskAnalyzer {
 }
 
 impl RiskAnalyzer {
-    pub fn with_legacy_strategy() -> Self {
-        Self {
-            strategy: Box::new(LegacyRiskStrategy::default()),
-            debt_score: None,
-            debt_threshold: None,
-            context_aggregator: None,
-        }
-    }
-
     pub fn with_debt_context(mut self, debt_score: f64, debt_threshold: f64) -> Self {
         self.debt_score = Some(debt_score);
         self.debt_threshold = Some(debt_threshold);

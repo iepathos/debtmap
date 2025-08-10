@@ -27,23 +27,6 @@ impl Default for RiskWeights {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LegacyRiskWeights {
-    pub complexity_weight: f64,
-    pub coverage_weight: f64,
-    pub cognitive_weight: f64,
-}
-
-impl Default for LegacyRiskWeights {
-    fn default() -> Self {
-        Self {
-            complexity_weight: 1.0,
-            coverage_weight: 1.0,
-            cognitive_weight: 1.5,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RiskComponents {
     pub base: f64,
     pub debt_factor: f64,
@@ -246,150 +229,6 @@ impl EnhancedRiskStrategy {
     }
 }
 
-#[derive(Clone, Default)]
-pub struct LegacyRiskStrategy {
-    pub weights: LegacyRiskWeights,
-}
-
-impl RiskCalculator for LegacyRiskStrategy {
-    fn box_clone(&self) -> Box<dyn RiskCalculator> {
-        Box::new(self.clone())
-    }
-
-    fn calculate(&self, context: &RiskContext) -> FunctionRisk {
-        let risk_score = self.calculate_risk_score(context);
-        let test_effort = self.estimate_test_effort(&context.complexity);
-        let risk_category = self.categorize_risk(&context.complexity, context.coverage);
-
-        FunctionRisk {
-            file: context.file.clone(),
-            function_name: context.function_name.clone(),
-            line_range: context.line_range,
-            cyclomatic_complexity: context.complexity.cyclomatic_complexity,
-            cognitive_complexity: context.complexity.cognitive_complexity,
-            coverage_percentage: context.coverage,
-            risk_score,
-            test_effort,
-            risk_category,
-        }
-    }
-
-    fn calculate_risk_score(&self, context: &RiskContext) -> f64 {
-        let cyclomatic = context.complexity.cyclomatic_complexity;
-        let cognitive = context.complexity.cognitive_complexity;
-
-        // Base risk from complexity (scale 0-10)
-        let base_risk = ((cyclomatic as f64 / 10.0).min(1.0) * 5.0
-            + (cognitive as f64 / 20.0).min(1.0) * 5.0)
-            * ((self.weights.complexity_weight + self.weights.cognitive_weight) / 2.0);
-
-        match context.coverage {
-            Some(cov) => {
-                // Coverage factor: exponential decay as coverage increases
-                // At 0% coverage: factor = 2.0 (doubles risk)
-                // At 50% coverage: factor = 1.0 (no change)
-                // At 100% coverage: factor = 0.2 (80% risk reduction)
-                let coverage_factor = 2.0 * (0.5_f64).powf(cov / 50.0);
-
-                // Final risk combines base risk with coverage impact
-                base_risk * coverage_factor * self.weights.coverage_weight
-            }
-            // When coverage is unknown, assume worst case (0% coverage)
-            None => base_risk * 2.0,
-        }
-    }
-
-    fn calculate_risk_reduction(
-        &self,
-        current_risk: f64,
-        _complexity: u32,
-        target_coverage: f64,
-    ) -> f64 {
-        current_risk * (target_coverage / 100.0)
-    }
-}
-
-impl LegacyRiskStrategy {
-    fn estimate_test_effort(&self, complexity: &ComplexityMetrics) -> TestEffort {
-        TestEffort {
-            estimated_difficulty: Self::classify_difficulty(complexity.cognitive_complexity),
-            cognitive_load: complexity.cognitive_complexity,
-            branch_count: complexity.cyclomatic_complexity,
-            recommended_test_cases: Self::calculate_test_cases(complexity.cyclomatic_complexity),
-        }
-    }
-
-    fn classify_difficulty(cognitive: u32) -> Difficulty {
-        const THRESHOLDS: [(u32, Difficulty); 5] = [
-            (4, Difficulty::Trivial),
-            (10, Difficulty::Simple),
-            (20, Difficulty::Moderate),
-            (40, Difficulty::Complex),
-            (u32::MAX, Difficulty::VeryComplex),
-        ];
-
-        THRESHOLDS
-            .iter()
-            .find(|(threshold, _)| cognitive <= *threshold)
-            .map(|(_, difficulty)| difficulty.clone())
-            .unwrap_or(Difficulty::VeryComplex)
-    }
-
-    fn calculate_test_cases(cyclomatic: u32) -> u32 {
-        const MAPPINGS: [(u32, u32); 6] =
-            [(3, 1), (7, 2), (10, 3), (15, 5), (20, 7), (u32::MAX, 10)];
-
-        MAPPINGS
-            .iter()
-            .find(|(threshold, _)| cyclomatic <= *threshold)
-            .map(|(_, cases)| *cases)
-            .unwrap_or(10)
-    }
-
-    fn categorize_risk(
-        &self,
-        complexity: &ComplexityMetrics,
-        coverage: Option<f64>,
-    ) -> RiskCategory {
-        let avg_complexity =
-            (complexity.cyclomatic_complexity + complexity.cognitive_complexity) / 2;
-
-        Self::check_well_tested(avg_complexity, coverage)
-            .or_else(|| Self::match_risk_rule(avg_complexity, coverage))
-            .unwrap_or(RiskCategory::Low)
-    }
-
-    fn check_well_tested(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
-        coverage
-            .filter(|&cov| avg_complexity > 10 && cov > 80.0)
-            .map(|_| RiskCategory::WellTested)
-    }
-
-    fn match_risk_rule(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
-        const RISK_RULES: [(u32, Option<f64>, RiskCategory); 3] = [
-            (15, Some(30.0), RiskCategory::Critical),
-            (10, Some(60.0), RiskCategory::High),
-            (5, Some(50.0), RiskCategory::Medium),
-        ];
-
-        RISK_RULES
-            .iter()
-            .find(|(min_complexity, max_coverage, _)| {
-                avg_complexity > *min_complexity
-                    && Self::coverage_exceeds_threshold(coverage, *max_coverage)
-            })
-            .map(|(_, _, category)| category.clone())
-    }
-
-    fn coverage_exceeds_threshold(coverage: Option<f64>, threshold: Option<f64>) -> bool {
-        match (coverage, threshold) {
-            (Some(cov), Some(max_cov)) => cov < max_cov,
-            (None, _) => true,
-            _ => false,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -513,18 +352,6 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_strategy_compatibility() {
-        let strategy = LegacyRiskStrategy::default();
-        let context = create_test_context(15, 20, Some(40.0), None);
-
-        let risk = strategy.calculate(&context);
-
-        // Legacy strategy doesn't consider debt
-        assert!(risk.risk_score > 0.0);
-        assert_eq!(risk.risk_category, RiskCategory::High);
-    }
-
-    #[test]
     fn test_risk_score_max_cap() {
         let strategy = EnhancedRiskStrategy::default();
         // Extreme values to test max cap
@@ -538,16 +365,13 @@ mod tests {
     #[test]
     fn test_risk_reduction_calculation() {
         let enhanced = EnhancedRiskStrategy::default();
-        let legacy = LegacyRiskStrategy::default();
 
         let enhanced_reduction = enhanced.calculate_risk_reduction(8.0, 20, 80.0);
-        let legacy_reduction = legacy.calculate_risk_reduction(8.0, 20, 80.0);
 
         assert!(
             enhanced_reduction < 8.0,
             "Enhanced should show significant reduction"
         );
-        assert_eq!(legacy_reduction, 6.4, "Legacy should be simple percentage");
     }
 
     #[test]

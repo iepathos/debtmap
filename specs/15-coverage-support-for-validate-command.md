@@ -391,15 +391,52 @@ impl StreamingLcovParser {
 ### Migration Path
 1. **Phase 1**: Add coverage support to validate command
 2. **Phase 2**: Update documentation and examples
-3. **Phase 3**: Encourage adoption in CI/CD pipelines
+3. **Phase 3**: Update CI/CD workflows to use validate with coverage
 4. **Phase 4**: Add coverage-specific thresholds
-5. **Phase 5**: Deprecate coverage-unaware validation (future)
+5. **Phase 5**: Deprecate separate analyze step in workflows
 
 ### Backward Compatibility
 - All existing validate commands continue to work unchanged
 - Coverage is optional and off by default if not specified
 - Existing threshold configurations remain valid
 - Exit codes maintain same semantics
+
+### GitHub Workflow Updates
+
+The project's `.github/workflows/debtmap.yml` should be updated to simplify the workflow by removing the separate `analyze` step:
+
+**Current workflow** (before changes):
+```yaml
+- name: Run debtmap analysis with coverage
+  run: |
+    if [ -f "target/coverage/lcov.info" ]; then
+      ./target/release/debtmap analyze . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
+    else
+      echo "Warning: LCOV file not found, running analysis without coverage data"
+      ./target/release/debtmap analyze . --format json --output debtmap-report.json
+    fi
+
+- name: Run debtmap validation
+  run: ./target/release/debtmap validate .
+```
+
+**Updated workflow** (after implementation):
+```yaml
+- name: Run debtmap validation with coverage
+  run: |
+    if [ -f "target/coverage/lcov.info" ]; then
+      ./target/release/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
+    else
+      echo "Warning: LCOV file not found, running validation without coverage data"
+      ./target/release/debtmap validate . --format json --output debtmap-report.json
+    fi
+```
+
+This simplification:
+- Removes the redundant `analyze` step
+- Uses `validate` for both threshold checking and report generation
+- Maintains the same coverage-aware behavior
+- Produces the same JSON output for artifact upload
 
 ### CI/CD Integration Examples
 

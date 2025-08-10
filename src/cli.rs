@@ -41,10 +41,6 @@ pub enum Commands {
         #[arg(long = "coverage-file", alias = "lcov")]
         coverage_file: Option<PathBuf>,
 
-        /// Use legacy risk calculation formula (for backwards compatibility)
-        #[arg(long = "legacy-risk")]
-        legacy_risk: bool,
-
         /// Enable context-aware risk analysis
         #[arg(long = "context", alias = "enable-context")]
         enable_context: bool,
