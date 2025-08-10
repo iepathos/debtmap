@@ -37,6 +37,7 @@ Extend the `debtmap validate` command to accept and utilize LCOV coverage data i
 ### Functional Requirements
 
 - **Coverage File Support**: Accept LCOV coverage files via `--lcov` or `--coverage-file` flags
+- **Report Generation**: Accept `--format` and `--output` flags to generate analysis reports
 - **Consistent Analysis**: Use the same coverage analysis pipeline as `analyze` command
 - **Threshold Integration**: Apply thresholds to coverage-adjusted risk scores
 - **Risk Recalculation**: Recalculate debt scores using coverage data when available
@@ -46,6 +47,7 @@ Extend the `debtmap validate` command to accept and utilize LCOV coverage data i
 - **Coverage Metrics**: Include coverage metrics in validation output
 - **Threshold Types**: Support coverage-specific thresholds (e.g., minimum coverage)
 - **Exit Codes**: Maintain existing exit code behavior with coverage-aware validation
+- **Unified Command**: Replace separate analyze/validate workflow with single command
 
 ### Non-Functional Requirements
 
@@ -58,6 +60,7 @@ Extend the `debtmap validate` command to accept and utilize LCOV coverage data i
 ## Acceptance Criteria
 
 - [ ] `validate` command accepts `--lcov` and `--coverage-file` flags
+- [ ] `validate` command accepts `--format` and `--output` flags for report generation
 - [ ] Coverage data is parsed and applied to risk calculations
 - [ ] Risk scores with coverage match those from `analyze` command
 - [ ] Thresholds are applied to coverage-adjusted scores
@@ -71,6 +74,8 @@ Extend the `debtmap validate` command to accept and utilize LCOV coverage data i
 - [ ] Documentation updated with coverage usage examples
 - [ ] Integration tests cover all coverage scenarios
 - [ ] Exit codes correctly reflect coverage-aware validation results
+- [ ] `.github/workflows/debtmap.yml` updated to use single validate command
+- [ ] JSON output from validate matches previous analyze output format
 
 ## Technical Details
 
@@ -108,6 +113,14 @@ pub struct ValidateArgs {
     /// LCOV coverage file for risk analysis
     #[arg(long, alias = "coverage-file", value_name = "FILE")]
     pub lcov: Option<PathBuf>,
+    
+    /// Output format (json, markdown, terminal)
+    #[arg(long, value_name = "FORMAT")]
+    pub format: Option<OutputFormat>,
+    
+    /// Output file path (stdout if not specified)
+    #[arg(long, value_name = "FILE")]
+    pub output: Option<PathBuf>,
     
     /// Minimum coverage percentage threshold
     #[arg(long, value_name = "PERCENTAGE")]
