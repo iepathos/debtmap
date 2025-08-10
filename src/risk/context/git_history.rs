@@ -293,37 +293,96 @@ impl ContextProvider for GitHistoryProvider {
     }
 
     fn explain(&self, context: &Context) -> String {
-        if let ContextDetails::Historical {
+        match &context.details {
+            ContextDetails::Historical {
+                change_frequency,
+                bug_density,
+                age_days,
+                author_count,
+            } => self.explain_historical_context(
+                *change_frequency,
+                *bug_density,
+                (*age_days).into(),
+                *author_count,
+            ),
+            _ => "No historical information".to_string(),
+        }
+    }
+}
+
+impl GitHistoryProvider {
+    fn explain_historical_context(
+        &self,
+        change_frequency: f64,
+        bug_density: f64,
+        age_days: u64,
+        author_count: usize,
+    ) -> String {
+        let stability_status =
+            self.determine_stability_status(change_frequency, bug_density, age_days);
+        self.format_stability_message(
+            stability_status,
             change_frequency,
             bug_density,
             age_days,
             author_count,
-        } = &context.details
-        {
-            if *change_frequency > 5.0 && *bug_density > 0.3 {
-                format!(
-                    "Highly unstable: {:.1} changes/month, {:.0}% bug fixes",
-                    change_frequency,
-                    bug_density * 100.0
-                )
-            } else if *change_frequency > 2.0 {
-                format!(
-                    "Frequently changed: {change_frequency:.1} changes/month by {author_count} authors"
-                )
-            } else if *bug_density > 0.2 {
-                format!(
-                    "Bug-prone: {:.0}% of commits are bug fixes",
-                    bug_density * 100.0
-                )
-            } else if *age_days > 365 {
-                format!("Mature and stable: {age_days} days old")
-            } else {
-                format!("Relatively stable: {change_frequency:.1} changes/month")
-            }
+        )
+    }
+
+    fn determine_stability_status(
+        &self,
+        change_frequency: f64,
+        bug_density: f64,
+        age_days: u64,
+    ) -> StabilityStatus {
+        if change_frequency > 5.0 && bug_density > 0.3 {
+            StabilityStatus::HighlyUnstable
+        } else if change_frequency > 2.0 {
+            StabilityStatus::FrequentlyChanged
+        } else if bug_density > 0.2 {
+            StabilityStatus::BugProne
+        } else if age_days > 365 {
+            StabilityStatus::MatureStable
         } else {
-            "No historical information".to_string()
+            StabilityStatus::RelativelyStable
         }
     }
+
+    fn format_stability_message(
+        &self,
+        status: StabilityStatus,
+        change_frequency: f64,
+        bug_density: f64,
+        age_days: u64,
+        author_count: usize,
+    ) -> String {
+        match status {
+            StabilityStatus::HighlyUnstable => format!(
+                "Highly unstable: {:.1} changes/month, {:.0}% bug fixes",
+                change_frequency,
+                bug_density * 100.0
+            ),
+            StabilityStatus::FrequentlyChanged => format!(
+                "Frequently changed: {change_frequency:.1} changes/month by {author_count} authors"
+            ),
+            StabilityStatus::BugProne => format!(
+                "Bug-prone: {:.0}% of commits are bug fixes",
+                bug_density * 100.0
+            ),
+            StabilityStatus::MatureStable => format!("Mature and stable: {age_days} days old"),
+            StabilityStatus::RelativelyStable => {
+                format!("Relatively stable: {change_frequency:.1} changes/month")
+            }
+        }
+    }
+}
+
+enum StabilityStatus {
+    HighlyUnstable,
+    FrequentlyChanged,
+    BugProne,
+    MatureStable,
+    RelativelyStable,
 }
 
 #[cfg(test)]
