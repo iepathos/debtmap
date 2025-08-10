@@ -59,6 +59,11 @@ Risk analysis and coverage correlation:
   - ROICalculator: Dynamic ROI calculation with cascade effects
   - EffortEstimator: Realistic effort estimation
 - `insights.rs`: Risk insight generation and formatting
+- `context/`: Context-aware risk analysis
+  - `mod.rs`: Context provider trait and aggregator
+  - `critical_path.rs`: Critical path analysis from entry points
+  - `dependency.rs`: Dependency risk propagation
+  - `git_history.rs`: Git history and change frequency analysis
 
 ### IO (`src/io/`)
 Side-effectful operations:

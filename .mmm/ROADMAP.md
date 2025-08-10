@@ -64,6 +64,13 @@ We have completed the initial implementation with core functionality for analyzi
   - Functions, methods, and closures are all counted
   - Realistic average complexity values achieved
 
+- [x] **Spec 11**: Context-Aware Risk Analysis
+  - Critical path identification from entry points
+  - Dependency risk propagation through module graph
+  - Git history integration for change frequency
+  - Pluggable context provider architecture
+  - Weighted risk calculation with context
+
 ## Pending Specs
 
 ### Enhancements
@@ -73,8 +80,6 @@ We have completed the initial implementation with core functionality for analyzi
   - Recognize functional composition patterns
   - Account for error handling complexity
 
-- [ ] **Spec 11**: Add Context-Aware Risk
-  - Context-based risk assessment enhancements
 
 - [ ] **Spec 12**: Improve ROI Calculation
   - Enhanced return on investment calculations
