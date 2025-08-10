@@ -3,6 +3,7 @@ pub mod correlation;
 pub mod insights;
 pub mod lcov;
 pub mod priority;
+pub mod roi;
 pub mod strategy;
 
 use crate::core::ComplexityMetrics;
