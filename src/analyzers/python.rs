@@ -308,10 +308,7 @@ fn count_branches_stmt(stmt: &ast::Stmt) -> u32 {
             handler_count + body_count
         }
         ast::Stmt::With(with_stmt) => with_stmt.body.iter().map(count_branches_stmt).sum(),
-        ast::Stmt::Match(match_stmt) => {
-            
-            match_stmt.cases.len().saturating_sub(1) as u32
-        }
+        ast::Stmt::Match(match_stmt) => match_stmt.cases.len().saturating_sub(1) as u32,
         _ => 0,
     }
 }
