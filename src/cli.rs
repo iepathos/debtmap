@@ -40,6 +40,10 @@ pub enum Commands {
         /// Optional LCOV coverage file for risk analysis
         #[arg(long = "coverage-file", alias = "lcov")]
         coverage_file: Option<PathBuf>,
+
+        /// Use legacy risk calculation formula (for backwards compatibility)
+        #[arg(long = "legacy-risk")]
+        legacy_risk: bool,
     },
 
     /// Initialize configuration file

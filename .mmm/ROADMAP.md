@@ -37,8 +37,17 @@
   - Works without coverage data (complexity-only mode)
   - Dynamic coverage thresholds based on complexity
 
+- [x] **Spec 07**: Recalibrated Risk Formula
+  - Increased coverage weight from 0.3 to 0.5
+  - Added exponential penalty for low coverage
+  - Integrated technical debt into risk calculation
+  - Strategy pattern for risk calculation
+  - Legacy risk mode for backwards compatibility via --legacy-risk
+  - Risk scores now use full 0-10 range effectively
+  - Enhanced test recommendations with debt context
+
 ## Current Phase: Foundation
-We have completed the initial implementation with core functionality for analyzing Rust and Python code, including risk analysis capabilities.
+We have completed the initial implementation with core functionality for analyzing Rust and Python code, including enhanced risk analysis with debt integration.
 
 ## Upcoming Milestones
 

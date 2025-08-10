@@ -2,6 +2,7 @@ pub mod correlation;
 pub mod insights;
 pub mod lcov;
 pub mod priority;
+pub mod strategy;
 
 use crate::core::ComplexityMetrics;
 use im::Vector;
@@ -21,7 +22,7 @@ pub struct FunctionRisk {
     pub risk_category: RiskCategory,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum RiskCategory {
     Critical,   // High complexity (>15), low coverage (<30%)
     High,       // High complexity (>10), moderate coverage (<60%)
@@ -38,7 +39,7 @@ pub struct TestEffort {
     pub recommended_test_cases: u32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Difficulty {
     Trivial,     // Cognitive < 5
     Simple,      // Cognitive 5-10
@@ -76,23 +77,39 @@ pub struct RiskDistribution {
     pub total_functions: usize,
 }
 
+use self::strategy::{EnhancedRiskStrategy, LegacyRiskStrategy, RiskCalculator, RiskContext};
+
 pub struct RiskAnalyzer {
-    pub complexity_weight: f64, // Default: 1.0
-    pub coverage_weight: f64,   // Default: 1.0
-    pub cognitive_weight: f64,  // Default: 1.5 (cognitive is harder to test)
+    strategy: Box<dyn RiskCalculator>,
+    debt_score: Option<f64>,
+    debt_threshold: Option<f64>,
 }
 
 impl Default for RiskAnalyzer {
     fn default() -> Self {
         Self {
-            complexity_weight: 1.0,
-            coverage_weight: 1.0,
-            cognitive_weight: 1.5,
+            strategy: Box::new(EnhancedRiskStrategy::default()),
+            debt_score: None,
+            debt_threshold: None,
         }
     }
 }
 
 impl RiskAnalyzer {
+    pub fn with_legacy_strategy() -> Self {
+        Self {
+            strategy: Box::new(LegacyRiskStrategy::default()),
+            debt_score: None,
+            debt_threshold: None,
+        }
+    }
+
+    pub fn with_debt_context(mut self, debt_score: f64, debt_threshold: f64) -> Self {
+        self.debt_score = Some(debt_score);
+        self.debt_threshold = Some(debt_threshold);
+        self
+    }
+
     pub fn analyze_function(
         &self,
         file: PathBuf,
@@ -101,24 +118,17 @@ impl RiskAnalyzer {
         complexity: &ComplexityMetrics,
         coverage: Option<f64>,
     ) -> FunctionRisk {
-        let cyclomatic = complexity.cyclomatic_complexity;
-        let cognitive = complexity.cognitive_complexity;
-
-        let risk_score = self.calculate_risk_score(cyclomatic, cognitive, coverage);
-        let test_effort = self.estimate_test_effort(cognitive, cyclomatic);
-        let risk_category = self.categorize_risk(cyclomatic, cognitive, coverage);
-
-        FunctionRisk {
+        let context = RiskContext {
             file,
             function_name,
             line_range,
-            cyclomatic_complexity: cyclomatic,
-            cognitive_complexity: cognitive,
-            coverage_percentage: coverage,
-            risk_score,
-            test_effort,
-            risk_category,
-        }
+            complexity: complexity.clone(),
+            coverage,
+            debt_score: self.debt_score,
+            debt_threshold: self.debt_threshold,
+        };
+
+        self.strategy.calculate(&context)
     }
 
     pub fn calculate_risk_score(
@@ -127,109 +137,30 @@ impl RiskAnalyzer {
         cognitive: u32,
         coverage: Option<f64>,
     ) -> f64 {
-        let complexity_factor = (cyclomatic as f64 * self.complexity_weight
-            + cognitive as f64 * self.cognitive_weight)
-            / 2.0;
+        let context = RiskContext {
+            file: PathBuf::new(),
+            function_name: String::new(),
+            line_range: (0, 0),
+            complexity: ComplexityMetrics {
+                functions: vec![],
+                cyclomatic_complexity: cyclomatic,
+                cognitive_complexity: cognitive,
+            },
+            coverage,
+            debt_score: self.debt_score,
+            debt_threshold: self.debt_threshold,
+        };
 
-        match coverage {
-            Some(cov) => {
-                let coverage_gap = (100.0 - cov) / 100.0;
-                coverage_gap * complexity_factor * self.coverage_weight
-            }
-            None => {
-                // When no coverage data, use complexity as proxy for risk
-                complexity_factor
-            }
-        }
-    }
-
-    pub fn estimate_test_effort(&self, cognitive: u32, cyclomatic: u32) -> TestEffort {
-        TestEffort {
-            estimated_difficulty: Self::classify_difficulty(cognitive),
-            cognitive_load: cognitive,
-            branch_count: cyclomatic,
-            recommended_test_cases: Self::calculate_test_cases(cyclomatic),
-        }
-    }
-
-    fn classify_difficulty(cognitive: u32) -> Difficulty {
-        const THRESHOLDS: [(u32, Difficulty); 5] = [
-            (4, Difficulty::Trivial),
-            (10, Difficulty::Simple),
-            (20, Difficulty::Moderate),
-            (40, Difficulty::Complex),
-            (u32::MAX, Difficulty::VeryComplex),
-        ];
-
-        THRESHOLDS
-            .iter()
-            .find(|(threshold, _)| cognitive <= *threshold)
-            .map(|(_, difficulty)| difficulty.clone())
-            .unwrap_or(Difficulty::VeryComplex)
-    }
-
-    fn calculate_test_cases(cyclomatic: u32) -> u32 {
-        const MAPPINGS: [(u32, u32); 6] =
-            [(3, 1), (7, 2), (10, 3), (15, 5), (20, 7), (u32::MAX, 10)];
-
-        MAPPINGS
-            .iter()
-            .find(|(threshold, _)| cyclomatic <= *threshold)
-            .map(|(_, cases)| *cases)
-            .unwrap_or(10)
-    }
-
-    fn categorize_risk(
-        &self,
-        cyclomatic: u32,
-        cognitive: u32,
-        coverage: Option<f64>,
-    ) -> RiskCategory {
-        let avg_complexity = (cyclomatic + cognitive) / 2;
-
-        // Check for well-tested case first
-        Self::check_well_tested(avg_complexity, coverage)
-            .or_else(|| Self::match_risk_rule(avg_complexity, coverage))
-            .unwrap_or(RiskCategory::Low)
-    }
-
-    fn check_well_tested(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
-        coverage
-            .filter(|&cov| avg_complexity > 10 && cov > 80.0)
-            .map(|_| RiskCategory::WellTested)
-    }
-
-    fn match_risk_rule(avg_complexity: u32, coverage: Option<f64>) -> Option<RiskCategory> {
-        const RISK_RULES: [(u32, Option<f64>, RiskCategory); 3] = [
-            (15, Some(30.0), RiskCategory::Critical),
-            (10, Some(60.0), RiskCategory::High),
-            (5, Some(50.0), RiskCategory::Medium),
-        ];
-
-        RISK_RULES
-            .iter()
-            .find(|(min_complexity, max_coverage, _)| {
-                avg_complexity > *min_complexity
-                    && Self::coverage_exceeds_threshold(coverage, *max_coverage)
-            })
-            .map(|(_, _, category)| category.clone())
-    }
-
-    fn coverage_exceeds_threshold(coverage: Option<f64>, threshold: Option<f64>) -> bool {
-        match (coverage, threshold) {
-            (Some(cov), Some(max_cov)) => cov < max_cov,
-            (None, _) => true,
-            _ => false,
-        }
+        self.strategy.calculate_risk_score(&context)
     }
 
     pub fn calculate_risk_reduction(
         &self,
         current_risk: f64,
-        _complexity: u32,
+        complexity: u32,
         target_coverage: f64,
     ) -> f64 {
-        // How much risk would be eliminated by achieving target coverage
-        current_risk * (target_coverage / 100.0)
+        self.strategy
+            .calculate_risk_reduction(current_risk, complexity, target_coverage)
     }
 }

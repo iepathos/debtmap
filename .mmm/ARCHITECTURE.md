@@ -45,7 +45,8 @@ Functional data transformations:
 
 ### Risk (`src/risk/`)
 Risk analysis and coverage correlation:
-- `mod.rs`: Risk types and analyzer
+- `mod.rs`: Risk types and analyzer with strategy pattern
+- `strategy.rs`: Risk calculation strategies (Enhanced and Legacy)
 - `lcov.rs`: LCOV coverage file parsing
 - `correlation.rs`: Complexity-coverage correlation analysis
 - `priority.rs`: ROI-based test prioritization

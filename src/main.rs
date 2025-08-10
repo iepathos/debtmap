@@ -29,6 +29,7 @@ fn main() -> Result<()> {
             threshold_duplication,
             languages,
             coverage_file,
+            legacy_risk,
         } => handle_analyze(
             path,
             format,
@@ -37,6 +38,7 @@ fn main() -> Result<()> {
             threshold_duplication,
             languages,
             coverage_file,
+            legacy_risk,
         ),
         Commands::Init { force } => init_config(force),
         Commands::Validate { path, config } => validate_project(path, config),
@@ -60,6 +62,7 @@ fn handle_analyze(
     threshold_duplication: usize,
     languages: Option<Vec<String>>,
     coverage_file: Option<PathBuf>,
+    legacy_risk: bool,
 ) -> Result<()> {
     let languages = parse_languages(languages);
     let results = analyze_project(
@@ -71,9 +74,9 @@ fn handle_analyze(
 
     // Handle risk analysis if coverage file provided
     let risk_insights = if let Some(lcov_path) = coverage_file {
-        analyze_risk_with_coverage(&results, &lcov_path, &path)?
+        analyze_risk_with_coverage(&results, &lcov_path, &path, legacy_risk)?
     } else {
-        analyze_risk_without_coverage(&results)?
+        analyze_risk_without_coverage(&results, legacy_risk)?
     };
 
     // Output results
@@ -212,14 +215,23 @@ fn analyze_risk_with_coverage(
     results: &AnalysisResults,
     lcov_path: &Path,
     _project_path: &Path,
+    legacy_risk: bool,
 ) -> Result<Option<risk::RiskInsight>> {
     use im::Vector;
 
     // Parse LCOV file
     let lcov_data = risk::lcov::parse_lcov_file(lcov_path).context("Failed to parse LCOV file")?;
 
-    // Create risk analyzer
-    let analyzer = risk::RiskAnalyzer::default();
+    // Calculate debt score and threshold
+    let debt_score = debt::total_debt_score(&results.technical_debt.items) as f64;
+    let debt_threshold = 100.0; // Default threshold
+
+    // Create risk analyzer with appropriate strategy
+    let analyzer = if legacy_risk {
+        risk::RiskAnalyzer::with_legacy_strategy()
+    } else {
+        risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold)
+    };
 
     // Analyze each function for risk
     let mut function_risks = Vector::new();
@@ -247,11 +259,22 @@ fn analyze_risk_with_coverage(
     Ok(Some(insights))
 }
 
-fn analyze_risk_without_coverage(results: &AnalysisResults) -> Result<Option<risk::RiskInsight>> {
+fn analyze_risk_without_coverage(
+    results: &AnalysisResults,
+    legacy_risk: bool,
+) -> Result<Option<risk::RiskInsight>> {
     use im::Vector;
 
-    // Create risk analyzer
-    let analyzer = risk::RiskAnalyzer::default();
+    // Calculate debt score and threshold
+    let debt_score = debt::total_debt_score(&results.technical_debt.items) as f64;
+    let debt_threshold = 100.0; // Default threshold
+
+    // Create risk analyzer with appropriate strategy
+    let analyzer = if legacy_risk {
+        risk::RiskAnalyzer::with_legacy_strategy()
+    } else {
+        risk::RiskAnalyzer::default().with_debt_context(debt_score, debt_threshold)
+    };
 
     // Analyze each function for risk based on complexity only
     let mut function_risks = Vector::new();
