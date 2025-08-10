@@ -408,6 +408,65 @@ just coverage    # Generate test coverage report
 just --list
 ```
 
+### Automated Technical Debt Reduction
+
+We use [mmm (Memento Mori)](https://github.com/iepathos/mmm) for automated technical debt reduction through AI-driven workflows. This allows us to continuously improve code quality without manual intervention.
+
+#### Quick Start
+
+```bash
+# Run automated debt reduction (5 iterations)
+mmm cook workflows/debtmap.yml -wn 5
+```
+
+This command:
+- Creates an isolated git worktree for safe experimentation
+- Runs up to 5 iterations of automated improvements
+- Each iteration identifies and fixes the highest-risk technical debt
+- Validates all changes with tests and linting
+- Commits improvements with detailed metrics
+
+#### What Gets Fixed
+
+The workflow automatically addresses:
+- High complexity functions (cyclomatic complexity > 10)
+- Untested complex code (low coverage on risky functions)
+- Code duplication (repeated blocks > 50 lines)
+- Deep nesting and long functions
+- Code style inconsistencies
+
+#### Documentation
+
+For detailed information on our development process:
+- [MMM Workflow Guide](docs/MMM_WORKFLOW.md) - Using mmm for automated debt reduction
+- [Claude Workflow Guide](docs/CLAUDE_WORKFLOW.md) - Manual debt reduction with Claude Code
+
+#### Example Session
+
+```bash
+$ mmm cook workflows/debtmap.yml -wn 3
+ℹ️  Created worktree at: /Users/glen/.mmm/worktrees/debtmap/session-abc123
+🔄 Starting iteration 1/3
+✅ Fixed: Reduced complexity in parse_lcov_file from 80 to 45
+🔄 Starting iteration 2/3
+✅ Fixed: Eliminated 120 lines of duplication in test utilities
+🔄 Starting iteration 3/3
+✅ Fixed: Improved test coverage for risk module from 45% to 78%
+ℹ️  Total debt score reduced by 35%
+```
+
+After the workflow completes, review and merge the improvements:
+
+```bash
+# Review changes
+pushd ~/.mmm/worktrees/debtmap/session-*
+  git log --oneline
+popd
+
+# If satisfied, merge to main
+mmm worktree merge session-abc123
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details
