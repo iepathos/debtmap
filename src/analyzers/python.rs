@@ -288,30 +288,55 @@ fn calculate_cyclomatic_python(body: &[ast::Stmt]) -> u32 {
 }
 
 fn count_branches_stmt(stmt: &ast::Stmt) -> u32 {
+    use ast::Stmt::*;
+
     match stmt {
-        ast::Stmt::If(if_stmt) => {
-            let mut count = 1;
-            if !if_stmt.orelse.is_empty() {
-                count += if_stmt.orelse.iter().map(count_branches_stmt).sum::<u32>();
-                if !matches!(if_stmt.orelse.first(), Some(ast::Stmt::If(_))) {
-                    count += 1;
-                }
-            }
-            count + if_stmt.body.iter().map(count_branches_stmt).sum::<u32>()
-        }
-        ast::Stmt::While(while_stmt) => {
-            1 + while_stmt.body.iter().map(count_branches_stmt).sum::<u32>()
-        }
-        ast::Stmt::For(for_stmt) => 1 + for_stmt.body.iter().map(count_branches_stmt).sum::<u32>(),
-        ast::Stmt::Try(try_stmt) => {
-            let handler_count = try_stmt.handlers.len() as u32;
-            let body_count: u32 = try_stmt.body.iter().map(count_branches_stmt).sum();
-            handler_count + body_count
-        }
-        ast::Stmt::With(with_stmt) => with_stmt.body.iter().map(count_branches_stmt).sum(),
-        ast::Stmt::Match(match_stmt) => match_stmt.cases.len().saturating_sub(1) as u32,
+        If(if_stmt) => count_if_branches(if_stmt),
+        While(while_stmt) => count_loop_branches(&while_stmt.body),
+        For(for_stmt) => count_loop_branches(&for_stmt.body),
+        Try(try_stmt) => count_try_branches(try_stmt),
+        With(with_stmt) => count_body_branches(&with_stmt.body),
+        Match(match_stmt) => count_match_branches(match_stmt),
         _ => 0,
     }
+}
+
+fn count_if_branches(if_stmt: &ast::StmtIf) -> u32 {
+    let base_count = 1;
+    let body_count = count_body_branches(&if_stmt.body);
+    let else_count = count_else_branches(&if_stmt.orelse);
+
+    base_count + body_count + else_count
+}
+
+fn count_else_branches(orelse: &[ast::Stmt]) -> u32 {
+    if orelse.is_empty() {
+        return 0;
+    }
+
+    let is_elif = matches!(orelse.first(), Some(ast::Stmt::If(_)));
+    let else_branch_count = if is_elif { 0 } else { 1 };
+    let nested_count = count_body_branches(orelse);
+
+    else_branch_count + nested_count
+}
+
+fn count_loop_branches(body: &[ast::Stmt]) -> u32 {
+    1 + count_body_branches(body)
+}
+
+fn count_try_branches(try_stmt: &ast::StmtTry) -> u32 {
+    let handler_count = try_stmt.handlers.len() as u32;
+    let body_count = count_body_branches(&try_stmt.body);
+    handler_count + body_count
+}
+
+fn count_body_branches(body: &[ast::Stmt]) -> u32 {
+    body.iter().map(count_branches_stmt).sum()
+}
+
+fn count_match_branches(match_stmt: &ast::StmtMatch) -> u32 {
+    match_stmt.cases.len().saturating_sub(1) as u32
 }
 
 fn calculate_cognitive_python(body: &[ast::Stmt]) -> u32 {

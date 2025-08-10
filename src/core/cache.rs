@@ -304,7 +304,32 @@ fn metrics_equal(a: &FileMetrics, b: &FileMetrics) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::{ComplexityMetrics, FunctionMetrics, Language};
+    use std::fs;
     use tempfile::TempDir;
+
+    fn create_test_metrics() -> FileMetrics {
+        FileMetrics {
+            path: PathBuf::from("test.rs"),
+            language: Language::Rust,
+            complexity: ComplexityMetrics {
+                functions: vec![FunctionMetrics {
+                    name: "test_func".to_string(),
+                    file: PathBuf::from("test.rs"),
+                    line: 1,
+                    cyclomatic: 1,
+                    cognitive: 1,
+                    nesting: 0,
+                    length: 10,
+                }],
+                cyclomatic_complexity: 1,
+                cognitive_complexity: 1,
+            },
+            debt_items: vec![],
+            dependencies: vec![],
+            duplications: vec![],
+        }
+    }
 
     #[test]
     fn test_cache_hash() {
@@ -336,5 +361,218 @@ mod tests {
 
         assert!(inc.changed_files.contains(&PathBuf::from("file1.rs")));
         assert!(inc.changed_files.contains(&PathBuf::from("file2.rs")));
+    }
+
+    #[test]
+    fn test_try_cache_hit_with_valid_entry() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let file_info = FileInfo {
+            hash: "test_hash".to_string(),
+            modified: Utc::now() - chrono::Duration::hours(1),
+        };
+
+        let entry = CacheEntry {
+            file_hash: "test_hash".to_string(),
+            timestamp: Utc::now(),
+            metrics: create_test_metrics(),
+        };
+
+        cache.index = cache.index.update("test_hash".to_string(), entry);
+
+        let result = cache.try_cache_hit(&file_info);
+        assert!(result.is_some());
+        assert_eq!(cache.hits, 1);
+    }
+
+    #[test]
+    fn test_try_cache_hit_with_outdated_entry() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let file_info = FileInfo {
+            hash: "test_hash".to_string(),
+            modified: Utc::now(),
+        };
+
+        let entry = CacheEntry {
+            file_hash: "test_hash".to_string(),
+            timestamp: Utc::now() - chrono::Duration::hours(2),
+            metrics: create_test_metrics(),
+        };
+
+        cache.index = cache.index.update("test_hash".to_string(), entry);
+
+        let result = cache.try_cache_hit(&file_info);
+        assert!(result.is_none());
+        assert_eq!(cache.hits, 0);
+    }
+
+    #[test]
+    fn test_try_cache_hit_with_missing_entry() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let file_info = FileInfo {
+            hash: "nonexistent_hash".to_string(),
+            modified: Utc::now(),
+        };
+
+        let result = cache.try_cache_hit(&file_info);
+        assert!(result.is_none());
+        assert_eq!(cache.hits, 0);
+    }
+
+    #[test]
+    fn test_compute_and_cache_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let file_info = FileInfo {
+            hash: "new_hash".to_string(),
+            modified: Utc::now(),
+        };
+
+        let compute = || Ok(create_test_metrics());
+        let result = cache.compute_and_cache(file_info, compute);
+
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+        assert_eq!(cache.misses, 1);
+        assert!(cache.index.contains_key("new_hash"));
+    }
+
+    #[test]
+    fn test_compute_and_cache_failure() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let file_info = FileInfo {
+            hash: "error_hash".to_string(),
+            modified: Utc::now(),
+        };
+
+        let compute = || Err(anyhow::anyhow!("Computation failed"));
+        let result = cache.compute_and_cache(file_info, compute);
+
+        assert!(result.is_some());
+        assert!(result.unwrap().is_err());
+        assert_eq!(cache.misses, 1);
+        assert!(!cache.index.contains_key("error_hash"));
+    }
+
+    #[test]
+    fn test_get_or_compute_with_cache_hit() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.rs");
+        fs::write(&test_file, "fn main() {}").unwrap();
+
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        // First call - should compute and cache
+        let compute = || Ok(create_test_metrics());
+        let result1 = cache.get_or_compute(&test_file, compute);
+        assert!(result1.is_ok());
+        assert_eq!(cache.misses, 1);
+        assert_eq!(cache.hits, 0);
+
+        // Second call - should hit cache
+        let compute2 = || Ok(create_test_metrics());
+        let result2 = cache.get_or_compute(&test_file, compute2);
+        assert!(result2.is_ok());
+        assert_eq!(cache.misses, 1);
+        assert_eq!(cache.hits, 1);
+    }
+
+    #[test]
+    fn test_clear_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let entry = CacheEntry {
+            file_hash: "test_hash".to_string(),
+            timestamp: Utc::now(),
+            metrics: create_test_metrics(),
+        };
+
+        cache.index = cache.index.update("test_hash".to_string(), entry);
+        cache.hits = 5;
+        cache.misses = 3;
+
+        assert_eq!(cache.index.len(), 1);
+
+        cache.clear().unwrap();
+
+        assert_eq!(cache.index.len(), 0);
+        assert_eq!(cache.hits, 0);
+        assert_eq!(cache.misses, 0);
+    }
+
+    #[test]
+    fn test_prune_old_entries() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+
+        let old_entry = CacheEntry {
+            file_hash: "old_hash".to_string(),
+            timestamp: Utc::now() - chrono::Duration::days(10),
+            metrics: create_test_metrics(),
+        };
+
+        let recent_entry = CacheEntry {
+            file_hash: "recent_hash".to_string(),
+            timestamp: Utc::now() - chrono::Duration::days(1),
+            metrics: create_test_metrics(),
+        };
+
+        cache.index = cache.index.update("old_hash".to_string(), old_entry);
+        cache.index = cache.index.update("recent_hash".to_string(), recent_entry);
+
+        assert_eq!(cache.index.len(), 2);
+
+        cache.prune(5).unwrap();
+
+        assert_eq!(cache.index.len(), 1);
+        assert!(cache.index.contains_key("recent_hash"));
+        assert!(!cache.index.contains_key("old_hash"));
+    }
+
+    #[test]
+    fn test_cache_stats_display() {
+        let stats = CacheStats {
+            entries: 10,
+            hits: 7,
+            misses: 3,
+            hit_rate: 0.7,
+        };
+
+        let display = format!("{stats}");
+        assert!(display.contains("10 entries"));
+        assert!(display.contains("7 hits"));
+        assert!(display.contains("3 misses"));
+        assert!(display.contains("70.0% hit rate"));
+    }
+
+    #[test]
+    fn test_incremental_analysis_diff() {
+        let mut inc = IncrementalAnalysis::new();
+
+        let metrics1 = create_test_metrics();
+        let mut metrics2 = create_test_metrics();
+        metrics2.path = PathBuf::from("file2.rs");
+
+        inc.previous_state = inc
+            .previous_state
+            .update(PathBuf::from("file1.rs"), metrics1.clone());
+        inc.current_state = inc
+            .current_state
+            .update(PathBuf::from("file2.rs"), metrics2);
+
+        let diff = inc.calculate_diff();
+
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.removed.len(), 1);
+        assert_eq!(diff.modified.len(), 0);
     }
 }

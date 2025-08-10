@@ -182,6 +182,92 @@ mod tests {
     }
 
     #[test]
+    fn test_lazy_pipeline_take() {
+        let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let result: Vec<i32> = LazyPipeline::new(numbers.into_iter()).take(3).collect();
+
+        assert_eq!(result, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_lazy_pipeline_skip() {
+        let numbers = vec![1, 2, 3, 4, 5];
+        let result: Vec<i32> = LazyPipeline::new(numbers.into_iter()).skip(2).collect();
+
+        assert_eq!(result, vec![3, 4, 5]);
+    }
+
+    #[test]
+    fn test_lazy_pipeline_flat_map() {
+        let numbers = vec![1, 2, 3];
+        let result: Vec<i32> = LazyPipeline::new(numbers.into_iter())
+            .flat_map(|x| vec![x, x * 2])
+            .collect();
+
+        assert_eq!(result, vec![1, 2, 2, 4, 3, 6]);
+    }
+
+    #[test]
+    fn test_lazy_pipeline_fold() {
+        let numbers = vec![1, 2, 3, 4, 5];
+        let sum = LazyPipeline::new(numbers.into_iter()).fold(0, |acc, x| acc + x);
+
+        assert_eq!(sum, 15);
+    }
+
+    #[test]
+    fn test_lazy_pipeline_any() {
+        let numbers = vec![1, 2, 3, 4, 5];
+        let has_three = LazyPipeline::new(numbers.into_iter()).any(|x| x == 3);
+
+        assert!(has_three);
+    }
+
+    #[test]
+    fn test_lazy_pipeline_all() {
+        let numbers = vec![2, 4, 6, 8];
+        let all_even = LazyPipeline::new(numbers.into_iter()).all(|x| x % 2 == 0);
+
+        assert!(all_even);
+    }
+
+    #[test]
+    fn test_lazy_pipeline_count() {
+        let numbers = vec![1, 2, 3, 4, 5];
+        let count = LazyPipeline::new(numbers.into_iter())
+            .filter(|&x| x > 2)
+            .count();
+
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_transformation_pipeline() {
+        let pipeline = TransformationPipeline::new()
+            .add_transformation(|x| x + 1)
+            .add_transformation(|x| x * 2);
+
+        let result = pipeline.apply(5);
+        assert_eq!(result, 12); // (5 + 1) * 2
+    }
+
+    #[test]
+    fn test_transformation_pipeline_apply_all() {
+        let pipeline = TransformationPipeline::new().add_transformation(|x| x + 10);
+
+        let values = vec![1, 2, 3];
+        let results = pipeline.apply_all(values);
+        assert_eq!(results, vec![11, 12, 13]);
+    }
+
+    #[test]
+    fn test_transformation_pipeline_empty() {
+        let pipeline = TransformationPipeline::<i32>::new();
+        let result = pipeline.apply(42);
+        assert_eq!(result, 42); // No transformations, returns input
+    }
+
+    #[test]
     fn test_lazy_value() {
         let mut lazy = Lazy::new(|| {
             println!("Computing expensive value");
@@ -191,5 +277,26 @@ mod tests {
         assert!(!lazy.is_evaluated());
         assert_eq!(*lazy.force(), 42);
         assert!(lazy.is_evaluated());
+    }
+
+    #[test]
+    fn test_lazy_value_multiple_force() {
+        let mut lazy = Lazy::new(|| 100);
+
+        assert_eq!(*lazy.force(), 100);
+        assert_eq!(*lazy.force(), 100); // Should return cached value
+        assert!(lazy.is_evaluated());
+    }
+
+    #[test]
+    fn test_lazy_pipeline_complex_chain() {
+        let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let result: Vec<i32> = LazyPipeline::new(numbers.into_iter())
+            .filter(|&x| x % 2 == 0)
+            .map(|x| x * x)
+            .take(3)
+            .collect();
+
+        assert_eq!(result, vec![4, 16, 36]);
     }
 }
