@@ -555,8 +555,7 @@ mod tests {
             let category = strategy.categorize_risk(&complexity, Some(50.0), score);
             assert_eq!(
                 category, expected_category,
-                "Score {} should map to {:?}",
-                score, expected_category
+                "Score {score} should map to {expected_category:?}"
             );
         }
     }
