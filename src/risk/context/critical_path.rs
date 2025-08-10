@@ -130,52 +130,59 @@ impl CriticalPathAnalyzer {
     fn classify_entry_point(name: &str, path: &Path) -> Option<EntryType> {
         let path_str = path.to_string_lossy();
 
-        // Main function detection
-        if name == "main" {
-            return Some(EntryType::Main);
-        }
+        type ClassifierFn = fn(&str, &str) -> bool;
+        let classifiers: [(ClassifierFn, EntryType); 6] = [
+            (is_main_function, EntryType::Main),
+            (is_cli_command, EntryType::CliCommand),
+            (is_api_endpoint, EntryType::ApiEndpoint),
+            (is_web_handler, EntryType::WebHandler),
+            (is_event_handler, EntryType::EventHandler),
+            (is_test_entry, EntryType::TestEntry),
+        ];
 
-        // CLI command detection
-        if (path_str.contains("cli") || path_str.contains("command"))
-            && (name.starts_with("cmd_")
-                || name.starts_with("command_")
-                || name.ends_with("_command"))
-        {
-            return Some(EntryType::CliCommand);
-        }
-
-        // API endpoint detection
-        if (path_str.contains("api") || path_str.contains("handler") || path_str.contains("route"))
-            && (name.starts_with("handle_")
-                || name.ends_with("_handler")
-                || name.starts_with("get_")
-                || name.starts_with("post_")
-                || name.starts_with("put_")
-                || name.starts_with("delete_"))
-        {
-            return Some(EntryType::ApiEndpoint);
-        }
-
-        // Web handler detection
-        if (path_str.contains("web") || path_str.contains("http"))
-            && (name.contains("route") || name.contains("handler"))
-        {
-            return Some(EntryType::WebHandler);
-        }
-
-        // Event handler detection
-        if name.starts_with("on_") || name.ends_with("_listener") || name.contains("event") {
-            return Some(EntryType::EventHandler);
-        }
-
-        // Test entry detection
-        if path_str.contains("test") || name.starts_with("test_") || name.contains("test") {
-            return Some(EntryType::TestEntry);
-        }
-
-        None
+        classifiers
+            .into_iter()
+            .find_map(|(classifier, entry_type)| classifier(name, &path_str).then_some(entry_type))
     }
+}
 
+fn is_main_function(name: &str, _path: &str) -> bool {
+    name == "main"
+}
+
+fn is_cli_command(name: &str, path: &str) -> bool {
+    let has_cli_path = path.contains("cli") || path.contains("command");
+    let has_cli_name =
+        name.starts_with("cmd_") || name.starts_with("command_") || name.ends_with("_command");
+    has_cli_path && has_cli_name
+}
+
+fn is_api_endpoint(name: &str, path: &str) -> bool {
+    let has_api_path = path.contains("api") || path.contains("handler") || path.contains("route");
+    let has_api_name = name.starts_with("handle_")
+        || name.ends_with("_handler")
+        || name.starts_with("get_")
+        || name.starts_with("post_")
+        || name.starts_with("put_")
+        || name.starts_with("delete_");
+    has_api_path && has_api_name
+}
+
+fn is_web_handler(name: &str, path: &str) -> bool {
+    let has_web_path = path.contains("web") || path.contains("http");
+    let has_handler_name = name.contains("route") || name.contains("handler");
+    has_web_path && has_handler_name
+}
+
+fn is_event_handler(name: &str, _path: &str) -> bool {
+    name.starts_with("on_") || name.ends_with("_listener") || name.contains("event")
+}
+
+fn is_test_entry(name: &str, path: &str) -> bool {
+    path.contains("test") || name.starts_with("test_") || name.contains("test")
+}
+
+impl CriticalPathAnalyzer {
     /// Analyze critical paths from all entry points
     pub fn analyze_paths(&self) -> Vector<CriticalPath> {
         let mut paths = Vector::new();
