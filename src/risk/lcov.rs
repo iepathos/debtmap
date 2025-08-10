@@ -17,69 +17,126 @@ pub struct LcovData {
     pub functions: HashMap<PathBuf, Vec<FunctionCoverage>>,
 }
 
+// Pure function to parse a line and return its type
+#[derive(Debug, Clone)]
+enum LcovLine {
+    SourceFile(PathBuf),
+    Function { line: usize, name: String },
+    FunctionData { count: u64, name: String },
+    EndOfRecord,
+    Other,
+}
+
+fn parse_lcov_line(line: &str) -> LcovLine {
+    let line = line.trim();
+
+    if let Some(path) = line.strip_prefix("SF:") {
+        return LcovLine::SourceFile(PathBuf::from(path));
+    }
+
+    if let Some(fn_data) = line.strip_prefix("FN:") {
+        if let Some((line_str, name)) = fn_data.split_once(',') {
+            if let Ok(line_num) = line_str.parse::<usize>() {
+                return LcovLine::Function {
+                    line: line_num,
+                    name: name.to_string(),
+                };
+            }
+        }
+    }
+
+    if let Some(fnda_data) = line.strip_prefix("FNDA:") {
+        if let Some((count_str, name)) = fnda_data.split_once(',') {
+            if let Ok(count) = count_str.parse::<u64>() {
+                return LcovLine::FunctionData {
+                    count,
+                    name: name.to_string(),
+                };
+            }
+        }
+    }
+
+    if line == "end_of_record" {
+        return LcovLine::EndOfRecord;
+    }
+
+    LcovLine::Other
+}
+
+// State for processing a single file's records
+#[derive(Debug, Default)]
+struct FileRecord {
+    path: Option<PathBuf>,
+    function_lines: HashMap<String, usize>,
+    function_hits: HashMap<String, u64>,
+}
+
+impl FileRecord {
+    fn new(path: PathBuf) -> Self {
+        Self {
+            path: Some(path),
+            function_lines: HashMap::new(),
+            function_hits: HashMap::new(),
+        }
+    }
+
+    fn add_function(&mut self, line: usize, name: String) {
+        self.function_lines.insert(name, line);
+    }
+
+    fn add_function_data(&mut self, count: u64, name: String) {
+        self.function_hits.insert(name, count);
+    }
+
+    fn to_function_coverage(&self) -> Vec<FunctionCoverage> {
+        self.function_lines
+            .iter()
+            .map(|(name, &start_line)| {
+                let execution_count = self.function_hits.get(name).copied().unwrap_or(0);
+                let coverage_percentage = if execution_count > 0 { 100.0 } else { 0.0 };
+
+                FunctionCoverage {
+                    name: name.clone(),
+                    start_line,
+                    execution_count,
+                    coverage_percentage,
+                }
+            })
+            .collect()
+    }
+}
+
 pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
     let file = File::open(path)
         .with_context(|| format!("Failed to open LCOV file: {}", path.display()))?;
     let reader = BufReader::new(file);
 
     let mut data = LcovData::default();
-    let mut current_file: Option<PathBuf> = None;
-    let mut function_lines: HashMap<String, usize> = HashMap::new();
-    let mut function_hits: HashMap<String, u64> = HashMap::new();
+    let mut current_record = FileRecord::default();
 
     for line in reader.lines() {
         let line = line?;
-        let line = line.trim();
 
-        if line.starts_with("SF:") {
-            // Source file
-            let path = line.strip_prefix("SF:").unwrap();
-            current_file = Some(PathBuf::from(path));
-            function_lines.clear();
-            function_hits.clear();
-        } else if line.starts_with("FN:") {
-            // Function definition
-            if let Some(fn_data) = line.strip_prefix("FN:") {
-                if let Some((line_str, name)) = fn_data.split_once(',') {
-                    if let Ok(line_num) = line_str.parse::<usize>() {
-                        function_lines.insert(name.to_string(), line_num);
+        match parse_lcov_line(&line) {
+            LcovLine::SourceFile(path) => {
+                current_record = FileRecord::new(path);
+            }
+            LcovLine::Function { line, name } => {
+                current_record.add_function(line, name);
+            }
+            LcovLine::FunctionData { count, name } => {
+                current_record.add_function_data(count, name);
+            }
+            LcovLine::EndOfRecord => {
+                if let Some(file_path) = current_record.path.take() {
+                    let functions = current_record.to_function_coverage();
+                    if !functions.is_empty() {
+                        data.functions.insert(file_path, functions);
                     }
                 }
+                current_record = FileRecord::default();
             }
-        } else if line.starts_with("FNDA:") {
-            // Function hit data
-            if let Some(fnda_data) = line.strip_prefix("FNDA:") {
-                if let Some((count_str, name)) = fnda_data.split_once(',') {
-                    if let Ok(count) = count_str.parse::<u64>() {
-                        function_hits.insert(name.to_string(), count);
-                    }
-                }
-            }
-        } else if line == "end_of_record" {
-            // End of current file's data
-            if let Some(ref file_path) = current_file {
-                let mut functions = Vec::new();
-
-                for (name, start_line) in &function_lines {
-                    let execution_count = function_hits.get(name).copied().unwrap_or(0);
-                    let coverage_percentage = if execution_count > 0 { 100.0 } else { 0.0 };
-
-                    functions.push(FunctionCoverage {
-                        name: name.clone(),
-                        start_line: *start_line,
-                        execution_count,
-                        coverage_percentage,
-                    });
-                }
-
-                if !functions.is_empty() {
-                    data.functions.insert(file_path.clone(), functions);
-                }
-            }
-
-            current_file = None;
-            function_lines.clear();
-            function_hits.clear();
+            LcovLine::Other => {}
         }
     }
 
