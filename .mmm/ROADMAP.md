@@ -46,6 +46,15 @@
   - Risk scores now use full 0-10 range effectively
   - Enhanced test recommendations with debt context
 
+- [x] **Spec 08**: Fix Testing Prioritization Algorithm
+  - Multi-stage prioritization pipeline for better recommendations
+  - Zero-coverage modules always prioritized first
+  - Module criticality scoring (entry points, core, API, etc.)
+  - Dynamic ROI calculation with realistic risk reduction
+  - Effort estimation based on complexity and module type
+  - Cascade impact analysis for dependencies
+  - Clear rationale for each recommendation
+
 ## Current Phase: Foundation
 We have completed the initial implementation with core functionality for analyzing Rust and Python code, including enhanced risk analysis with debt integration.
 

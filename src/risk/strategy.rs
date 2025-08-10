@@ -71,6 +71,7 @@ pub struct RiskContext {
 }
 
 pub trait RiskCalculator: Send + Sync {
+    fn box_clone(&self) -> Box<dyn RiskCalculator>;
     fn calculate(&self, context: &RiskContext) -> FunctionRisk;
     fn calculate_risk_score(&self, context: &RiskContext) -> f64;
     fn calculate_risk_reduction(
@@ -81,12 +82,16 @@ pub trait RiskCalculator: Send + Sync {
     ) -> f64;
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct EnhancedRiskStrategy {
     pub weights: RiskWeights,
 }
 
 impl RiskCalculator for EnhancedRiskStrategy {
+    fn box_clone(&self) -> Box<dyn RiskCalculator> {
+        Box::new(self.clone())
+    }
+
     fn calculate(&self, context: &RiskContext) -> FunctionRisk {
         let risk_score = self.calculate_risk_score(context);
         let test_effort = self.estimate_test_effort(&context.complexity);
@@ -229,12 +234,16 @@ impl EnhancedRiskStrategy {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct LegacyRiskStrategy {
     pub weights: LegacyRiskWeights,
 }
 
 impl RiskCalculator for LegacyRiskStrategy {
+    fn box_clone(&self) -> Box<dyn RiskCalculator> {
+        Box::new(self.clone())
+    }
+
     fn calculate(&self, context: &RiskContext) -> FunctionRisk {
         let risk_score = self.calculate_risk_score(context);
         let test_effort = self.estimate_test_effort(&context.complexity);
