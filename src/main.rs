@@ -514,94 +514,140 @@ fn validate_project(config: ValidateConfig) -> Result<()> {
         duplication_threshold,
     )?;
 
-    // Handle risk analysis if coverage file provided
-    let risk_insights = if let Some(lcov_path) = config.coverage_file.clone() {
-        analyze_risk_with_coverage(
-            &results,
-            &lcov_path,
-            &config.path,
-            config.enable_context,
-            config.context_providers.clone(),
-            config.disable_context.clone(),
-        )?
-    } else if config.enable_context {
-        analyze_risk_without_coverage(
-            &results,
-            config.enable_context,
-            config.context_providers.clone(),
-            config.disable_context.clone(),
-            &config.path,
-        )?
-    } else {
-        None
-    };
+    // Handle risk analysis
+    let risk_insights = get_risk_insights(&config, &results)?;
 
-    // If format and/or output are specified, generate report
-    if config.format.is_some() || config.output.is_some() {
-        let output_format = config.format.unwrap_or(cli::OutputFormat::Terminal);
-        output_results_with_risk(
-            results.clone(),
-            risk_insights.clone(),
-            output_format.into(),
-            config.output.clone(),
-        )?;
+    // Generate report if requested
+    generate_report_if_requested(&config, &results, &risk_insights)?;
+
+    // Validate and report results
+    validate_and_report(&config, &results, &risk_insights)
+}
+
+fn get_risk_insights(
+    config: &ValidateConfig,
+    results: &AnalysisResults,
+) -> Result<Option<risk::RiskInsight>> {
+    match (&config.coverage_file, config.enable_context) {
+        (Some(lcov_path), _) => analyze_risk_with_coverage(
+            results,
+            lcov_path,
+            &config.path,
+            config.enable_context,
+            config.context_providers.clone(),
+            config.disable_context.clone(),
+        ),
+        (None, true) => analyze_risk_without_coverage(
+            results,
+            config.enable_context,
+            config.context_providers.clone(),
+            config.disable_context.clone(),
+            &config.path,
+        ),
+        _ => Ok(None),
     }
+}
 
-    // Apply validation with coverage-aware risk if available
-    let pass = if let Some(ref insights) = risk_insights {
-        // With coverage: use risk-adjusted validation
-        validate_with_risk(&results, insights)
-    } else {
-        // Without coverage: use basic validation
-        results.complexity.summary.average_complexity < 10.0
-            && results.complexity.summary.high_complexity_count < 10
-            && results.technical_debt.items.len() < 100
-    };
+fn generate_report_if_requested(
+    config: &ValidateConfig,
+    results: &AnalysisResults,
+    risk_insights: &Option<risk::RiskInsight>,
+) -> Result<()> {
+    config
+        .format
+        .or(config.output.as_ref().map(|_| cli::OutputFormat::Terminal))
+        .map(|format| {
+            output_results_with_risk(
+                results.clone(),
+                risk_insights.clone(),
+                format.into(),
+                config.output.clone(),
+            )
+        })
+        .unwrap_or(Ok(()))
+}
+
+fn validate_and_report(
+    config: &ValidateConfig,
+    results: &AnalysisResults,
+    risk_insights: &Option<risk::RiskInsight>,
+) -> Result<()> {
+    let pass = risk_insights
+        .as_ref()
+        .map(|insights| validate_with_risk(results, insights))
+        .unwrap_or_else(|| validate_basic(results));
 
     if pass {
-        println!("✅ Validation PASSED - All metrics within thresholds");
-        if config.coverage_file.is_some() {
-            println!("  Coverage analysis was applied to risk calculations");
-        }
+        print_validation_success(config.coverage_file.is_some());
         Ok(())
     } else {
-        println!("❌ Validation FAILED - Some metrics exceed thresholds");
-        println!(
-            "  Average complexity: {:.1}",
-            results.complexity.summary.average_complexity
-        );
-        println!(
-            "  High complexity functions: {}",
-            results.complexity.summary.high_complexity_count
-        );
-        println!(
-            "  Technical debt items: {}",
-            results.technical_debt.items.len()
-        );
-
-        if let Some(insights) = risk_insights {
-            println!(
-                "\n  Overall codebase risk score: {:.1}",
-                insights.codebase_risk_score
-            );
-
-            if !insights.top_risks.is_empty() {
-                println!("\n  Critical risk functions (high complexity + low/no coverage):");
-                for func in insights.top_risks.iter().take(5) {
-                    let coverage_str = func
-                        .coverage_percentage
-                        .map(|c| format!("{:.0}%", c * 100.0))
-                        .unwrap_or_else(|| "0%".to_string());
-                    println!(
-                        "    - {} (risk: {:.1}, coverage: {})",
-                        func.function_name, func.risk_score, coverage_str
-                    );
-                }
-            }
-        }
-
-        anyhow::bail!("Validation failed");
+        print_validation_failure(results, risk_insights);
+        anyhow::bail!("Validation failed")
     }
+}
+
+fn validate_basic(results: &AnalysisResults) -> bool {
+    results.complexity.summary.average_complexity < 10.0
+        && results.complexity.summary.high_complexity_count < 10
+        && results.technical_debt.items.len() < 100
+}
+
+fn print_validation_success(has_coverage: bool) {
+    println!("✅ Validation PASSED - All metrics within thresholds");
+    if has_coverage {
+        println!("  Coverage analysis was applied to risk calculations");
+    }
+}
+
+fn print_validation_failure(results: &AnalysisResults, risk_insights: &Option<risk::RiskInsight>) {
+    println!("❌ Validation FAILED - Some metrics exceed thresholds");
+    print_basic_metrics(results);
+
+    if let Some(insights) = risk_insights {
+        print_risk_metrics(insights);
+    }
+}
+
+fn print_basic_metrics(results: &AnalysisResults) {
+    println!(
+        "  Average complexity: {:.1}",
+        results.complexity.summary.average_complexity
+    );
+    println!(
+        "  High complexity functions: {}",
+        results.complexity.summary.high_complexity_count
+    );
+    println!(
+        "  Technical debt items: {}",
+        results.technical_debt.items.len()
+    );
+}
+
+fn print_risk_metrics(insights: &risk::RiskInsight) {
+    println!(
+        "\n  Overall codebase risk score: {:.1}",
+        insights.codebase_risk_score
+    );
+
+    if !insights.top_risks.is_empty() {
+        println!("\n  Critical risk functions (high complexity + low/no coverage):");
+        insights
+            .top_risks
+            .iter()
+            .take(5)
+            .for_each(print_risk_function);
+    }
+}
+
+fn print_risk_function(func: &risk::FunctionRisk) {
+    let coverage_str = func
+        .coverage_percentage
+        .map(|c| format!("{:.0}%", c * 100.0))
+        .unwrap_or_else(|| "0%".to_string());
+    println!(
+        "    - {} (risk: {:.1}, coverage: {})",
+        func.function_name, func.risk_score, coverage_str
+    );
 }
 
 fn parse_languages(languages: Option<Vec<String>>) -> Vec<Language> {
