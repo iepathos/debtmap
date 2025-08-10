@@ -336,6 +336,7 @@ pub use super::roi::{
 
 pub struct ROICalculator {
     advanced_calculator: AdvancedROICalculator,
+    #[allow(dead_code)]
     risk_analyzer: RiskAnalyzer,
 }
 
