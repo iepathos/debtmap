@@ -9,18 +9,22 @@
 
 > 🚧 **Early Prototype** - This project is under active development and APIs may change
 
-A fast, language-agnostic code complexity and technical debt analyzer written in Rust. Debtmap uniquely combines complexity analysis with test coverage data to identify truly risky code and provides ROI-driven recommendations for where to focus testing efforts.
+A fast, language-agnostic code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven ROI calculations for both.
 
 ## Why Debtmap?
 
 ### 🎯 What Makes Debtmap Different
 
-Unlike traditional static analysis tools that simply flag complex code, debtmap answers the critical question: **"What should I test first to reduce the most risk?"**
+Unlike traditional static analysis tools that simply flag complex code, debtmap answers two critical questions:
+1. **"What should I refactor to reduce cognitive burden?"** - Identifies overly complex code that slows down development
+2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
 
 **Unique Capabilities:**
+- **Cognitive Complexity Analysis**: Goes beyond cyclomatic complexity to measure how hard code is to understand, identifying functions that need refactoring to reduce mental load
 - **Coverage-Risk Correlation**: The only tool that combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
-- **ROI-Driven Prioritization**: Calculates actual return on investment for testing efforts, showing which functions will reduce the most risk per test case written
-- **Quantified Impact**: Provides concrete metrics like "testing this function will reduce codebase risk by 5%" rather than vague severity scores
+- **ROI-Driven Prioritization**: Calculates actual return on investment for both refactoring and testing efforts, showing which changes will have the most impact
+- **Actionable Refactoring Guidance**: Provides specific recommendations like "extract nested conditions" or "split this 80-line function" rather than just flagging issues
+- **Quantified Impact**: Provides concrete metrics like "refactoring this will reduce complexity by 60%" or "testing this will reduce risk by 5%"
 - **Language-Agnostic Coverage Integration**: Works with any tool that generates LCOV format (Jest, pytest, cargo-tarpaulin, etc.)
 
 **Performance:**
@@ -141,12 +145,27 @@ Debtmap Analysis Report
   Debt items: 160
   Total debt score: 1440 (threshold: 100)
 
-⚠️ Complexity Hotspots (top 5):
-  1. ./src/analyzers/javascript/complexity.rs:1 get_complexity_calculator() - Cyclomatic: 8, Cognitive: 8
-  2. ./src/core/mod.rs:1 fmt() - Cyclomatic: 7, Cognitive: 7
-  3. ./src/complexity/cyclomatic.rs:1 visit_expr() - Cyclomatic: 7, Cognitive: 7
-  4. ./src/debt/patterns.rs:1 classify_marker() - Cyclomatic: 7, Cognitive: 7
-  5. ./src/debt/mod.rs:1 type_weight() - Cyclomatic: 7, Cognitive: 7
+🔨 Top Refactoring Opportunities (High Cognitive Complexity):
+  1. ./src/risk/lcov.rs parse_lcov_file() - Cognitive: 80 (Cyclomatic: 4)
+     💡 Recommendation: Extract parsing logic into separate functions
+     Impact: Reduce complexity by 65%, improve readability
+  
+  2. ./src/io/output.rs write_risk_insights() - Cognitive: 15 (Cyclomatic: 13)
+     💡 Recommendation: Split into smaller formatting functions
+     Impact: Reduce complexity by 40%, easier testing
+  
+  3. ./src/risk/mod.rs categorize_risk() - Cognitive: 13 (Cyclomatic: 13)
+     💡 Recommendation: Use pattern matching or lookup table
+     Impact: Reduce complexity by 50%, clearer logic flow
+
+⚠️ Testing Priorities (High Risk, Low Coverage):
+  1. ./src/analyzers/javascript/complexity.rs get_complexity_calculator() - Risk: Critical
+     Coverage: 0% | Complexity: 8 | ROI: 8.5
+     Effort: 2-3 test cases (~1.5 hours)
+  
+  2. ./src/core/mod.rs fmt() - Risk: High
+     Coverage: 15% | Complexity: 7 | ROI: 6.2
+     Effort: 2 test cases (~1 hour)
 
 ✗ Pass/Fail: FAIL (some metrics exceed thresholds)
 ```
