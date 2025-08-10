@@ -1,5 +1,5 @@
 ---
-name: fix-tech-debt
+name: debtmap
 description: Analyze tech debt with debtmap, fix the top priority item, test, and commit
 ---
 
