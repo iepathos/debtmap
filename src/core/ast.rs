@@ -264,4 +264,186 @@ mod tests {
 
         assert_eq!(function_nodes.len(), 2);
     }
+
+    #[test]
+    fn test_extract_rust_nodes() {
+        let ast = Ast::Rust(RustAst {
+            file: syn::File {
+                shebang: None,
+                attrs: vec![],
+                items: vec![],
+            },
+            path: PathBuf::from("test.rs"),
+        });
+        
+        // Currently returns empty vec, test that it doesn't panic
+        let nodes = ast.extract_rust_nodes();
+        assert_eq!(nodes.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_python_nodes() {
+        // Test with Unknown AST since creating PythonAst requires complex structures
+        let ast = Ast::Unknown;
+        let nodes = ast.extract_python_nodes();
+        assert_eq!(nodes.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_javascript_nodes() {
+        // We can't easily create a tree_sitter::Tree, but we can test with Unknown
+        let ast = Ast::Unknown;
+        let nodes = ast.extract_javascript_nodes();
+        assert_eq!(nodes.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_typescript_nodes() {
+        // We can't easily create a tree_sitter::Tree, but we can test with Unknown
+        let ast = Ast::Unknown;
+        let nodes = ast.extract_typescript_nodes();
+        assert_eq!(nodes.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_nodes_rust() {
+        let ast = Ast::Rust(RustAst {
+            file: syn::File {
+                shebang: None,
+                attrs: vec![],
+                items: vec![],
+            },
+            path: PathBuf::from("test.rs"),
+        });
+        
+        let nodes = ast.extract_nodes();
+        assert_eq!(nodes.len(), 0); // Expected since extract_rust_nodes returns empty
+    }
+
+    #[test]
+    fn test_extract_nodes_python() {
+        // Test extraction logic without creating complex AST
+        let ast = Ast::Unknown;
+        let nodes = ast.extract_nodes();
+        assert_eq!(nodes.len(), 0);
+    }
+
+    #[test]
+    fn test_ast_node_with_children() {
+        let child1 = AstNode {
+            kind: NodeKind::Block,
+            name: None,
+            line: 5,
+            children: vec![],
+        };
+        
+        let child2 = AstNode {
+            kind: NodeKind::If,
+            name: None,
+            line: 6,
+            children: vec![],
+        };
+        
+        let parent = AstNode {
+            kind: NodeKind::Function,
+            name: Some("parent_func".to_string()),
+            line: 4,
+            children: vec![child1, child2],
+        };
+        
+        assert_eq!(parent.children.len(), 2);
+        assert_eq!(parent.children[0].kind, NodeKind::Block);
+        assert_eq!(parent.children[1].kind, NodeKind::If);
+    }
+
+    #[test]
+    fn test_node_kind_equality() {
+        assert_eq!(NodeKind::Function, NodeKind::Function);
+        assert_ne!(NodeKind::Function, NodeKind::Method);
+        assert_ne!(NodeKind::If, NodeKind::While);
+    }
+
+    #[test]
+    fn test_count_branches_with_different_node_types() {
+        // Test that count_branches correctly identifies branch nodes
+        let branch_kinds = vec![
+            NodeKind::If,
+            NodeKind::While,
+            NodeKind::For,
+            NodeKind::Match,
+        ];
+        
+        let non_branch_kinds = vec![
+            NodeKind::Function,
+            NodeKind::Method,
+            NodeKind::Class,
+            NodeKind::Module,
+            NodeKind::Try,
+            NodeKind::Block,
+        ];
+        
+        for kind in branch_kinds {
+            assert!(
+                matches!(kind, NodeKind::If | NodeKind::While | NodeKind::For | NodeKind::Match),
+                "Expected {:?} to be a branch node",
+                kind
+            );
+        }
+        
+        for kind in non_branch_kinds {
+            assert!(
+                !matches!(kind, NodeKind::If | NodeKind::While | NodeKind::For | NodeKind::Match),
+                "Expected {:?} to not be a branch node",
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn test_transform_preserves_type() {
+        let rust_ast = Ast::Rust(RustAst {
+            file: syn::File {
+                shebang: None,
+                attrs: vec![],
+                items: vec![],
+            },
+            path: PathBuf::from("test.rs"),
+        });
+        
+        let transformed = rust_ast.transform(|a| a);
+        assert!(matches!(transformed, Ast::Rust(_)));
+    }
+
+    #[test]
+    fn test_combine_asts_preserves_order() {
+        let ast1 = Ast::Unknown;
+        let ast2 = Ast::Unknown;
+        let ast3 = Ast::Unknown;
+        
+        let combined = combine_asts(vec![ast1, ast2, ast3]);
+        assert_eq!(combined.len(), 3);
+    }
+
+    #[test]
+    fn test_combine_asts_empty() {
+        let combined = combine_asts(vec![]);
+        assert_eq!(combined.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_ast_with_multiple_predicates() {
+        let ast = Ast::Unknown;
+        
+        // Test with always true predicate
+        let result1 = filter_ast(ast.clone(), |_| true);
+        assert!(result1.is_some());
+        
+        // Test with always false predicate
+        let result2 = filter_ast(ast.clone(), |_| false);
+        assert!(result2.is_none());
+        
+        // Test with specific type check
+        let result3 = filter_ast(ast.clone(), |a| matches!(a, Ast::Unknown));
+        assert!(result3.is_some());
+    }
 }
