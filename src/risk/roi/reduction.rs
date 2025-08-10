@@ -67,58 +67,80 @@ impl AdvancedRiskReductionModel {
             _ => 0.70,
         };
 
-        (base_confidence * coverage_confidence * delta_confidence).max(0.5)
+        (base_confidence * coverage_confidence * delta_confidence).max(0.5_f64)
+    }
+}
+
+impl AdvancedRiskReductionModel {
+    // Pure function to calculate base reduction for untested code
+    fn reduction_for_untested(coverage_delta: f64) -> f64 {
+        match coverage_delta {
+            d if d >= 60.0 => 60.0,
+            d if d >= 40.0 => 50.0,
+            d if d >= 20.0 => 40.0,
+            _ => 30.0,
+        }
+    }
+
+    // Pure function to calculate base reduction for low coverage code
+    fn reduction_for_low_coverage(coverage_delta: f64) -> f64 {
+        match coverage_delta {
+            d if d >= 40.0 => 45.0,
+            d if d >= 20.0 => 35.0,
+            _ => 25.0,
+        }
+    }
+
+    // Pure function to calculate base reduction for moderate coverage code
+    fn reduction_for_moderate_coverage(coverage_delta: f64) -> f64 {
+        match coverage_delta {
+            d if d >= 30.0 => 25.0,
+            d if d >= 15.0 => 20.0,
+            _ => 15.0,
+        }
+    }
+
+    // Pure function to calculate base reduction for high coverage code
+    fn reduction_for_high_coverage(current_coverage: f64, coverage_delta: f64) -> f64 {
+        let remaining_gap = 100.0 - current_coverage;
+        let coverage_ratio = coverage_delta / remaining_gap.max(1.0);
+        coverage_ratio * 15.0
+    }
+
+    // Pure function to get base reduction percentage
+    fn get_base_reduction_percentage(current_coverage: f64, coverage_delta: f64) -> f64 {
+        match current_coverage {
+            0.0 => Self::reduction_for_untested(coverage_delta),
+            c if c < 20.0 => Self::reduction_for_low_coverage(coverage_delta),
+            c if c < 50.0 => Self::reduction_for_moderate_coverage(coverage_delta),
+            c => Self::reduction_for_high_coverage(c, coverage_delta),
+        }
+    }
+
+    // Pure function to get complexity multiplier
+    fn get_complexity_multiplier(cyclomatic_complexity: u32) -> f64 {
+        match cyclomatic_complexity {
+            0..=5 => 0.9,
+            6..=10 => 1.0,
+            11..=20 => 1.2,
+            _ => 1.4,
+        }
     }
 }
 
 impl RiskReductionModel for AdvancedRiskReductionModel {
     fn calculate(&self, target: &TestTarget) -> RiskReduction {
-        let current_risk = target.current_risk;
         let coverage_delta = self.project_coverage_increase(target);
-        let _new_coverage = (target.current_coverage + coverage_delta).min(100.0);
 
-        // Calculate risk reduction directly based on coverage improvement
-        // For untested code (0% coverage), testing can reduce risk by 50-80%
-        // For partially tested code, diminishing returns apply
-        let base_reduction_percentage = if target.current_coverage == 0.0 {
-            // First tests on untested code have highest impact
-            match coverage_delta {
-                d if d >= 60.0 => 60.0, // High coverage achieved
-                d if d >= 40.0 => 50.0, // Moderate coverage achieved
-                d if d >= 20.0 => 40.0, // Basic coverage achieved
-                _ => 30.0,              // Minimal coverage
-            }
-        } else if target.current_coverage < 20.0 {
-            // Low coverage - still high returns
-            match coverage_delta {
-                d if d >= 40.0 => 45.0,
-                d if d >= 20.0 => 35.0,
-                _ => 25.0,
-            }
-        } else if target.current_coverage < 50.0 {
-            // Moderate coverage - moderate returns
-            match coverage_delta {
-                d if d >= 30.0 => 25.0,
-                d if d >= 15.0 => 20.0,
-                _ => 15.0,
-            }
-        } else {
-            // High coverage - diminishing returns
-            let remaining_gap = 100.0 - target.current_coverage;
-            let coverage_ratio = coverage_delta / remaining_gap.max(1.0);
-            coverage_ratio * 15.0 // Max 15% additional reduction for well-tested code
-        };
+        // Use functional composition to calculate the reduction
+        let base_reduction_percentage =
+            Self::get_base_reduction_percentage(target.current_coverage, coverage_delta);
 
-        // Apply complexity multiplier - more complex code benefits more from testing
-        let complexity_multiplier = match target.complexity.cyclomatic_complexity {
-            0..=5 => 0.9,   // Simple code - less benefit
-            6..=10 => 1.0,  // Moderate complexity - normal benefit
-            11..=20 => 1.2, // Complex code - more benefit
-            _ => 1.4,       // Very complex - highest benefit
-        };
+        let complexity_multiplier =
+            Self::get_complexity_multiplier(target.complexity.cyclomatic_complexity);
 
         let percentage = (base_reduction_percentage * complexity_multiplier).min(85.0);
-        let absolute = current_risk * (percentage / 100.0);
+        let absolute = target.current_risk * (percentage / 100.0);
 
         RiskReduction {
             absolute,
