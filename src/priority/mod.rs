@@ -110,7 +110,7 @@ impl UnifiedAnalysis {
         // Coverage improvement is the estimated overall project coverage gain
         // Assuming tested functions represent a portion of the codebase
         coverage_improvement = (coverage_improvement * 5.0).min(100.0); // Scale factor for visibility
-        
+
         // Total complexity reduction (sum of all reductions)
         let total_complexity_reduction = complexity_reduction;
 

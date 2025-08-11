@@ -193,11 +193,10 @@ fn generate_recommendation(
             complexity,
         } => {
             let is_complex = *complexity > 10;
-            
             if is_complex {
                 // High complexity: recommend refactoring first
                 (
-                    format!("Refactor to reduce complexity from {} to <10, then add tests", complexity),
+                    format!("Refactor to reduce complexity from {complexity} to <10, then add tests"),
                     format!(
                         "Complex {} (cyclo={}) with {}% coverage - needs simplification before testing",
                         match role {
@@ -317,7 +316,7 @@ fn calculate_expected_impact(
         } => {
             // For high complexity functions, the impact includes both testing and refactoring benefits
             let is_complex = *complexity > 10;
-            
+
             ImpactMetrics {
                 // Show the actual coverage gain for this function/module
                 // High complexity functions get less coverage benefit (need refactoring first)
@@ -327,7 +326,11 @@ fn calculate_expected_impact(
                     (1.0 - coverage) * 100.0 // Full coverage potential for simple functions
                 },
                 lines_reduction: 0,
-                complexity_reduction: if is_complex { *complexity as f64 * 0.3 } else { 0.0 },
+                complexity_reduction: if is_complex {
+                    *complexity as f64 * 0.3
+                } else {
+                    0.0
+                },
                 risk_reduction: score.final_score * 0.42,
             }
         }
