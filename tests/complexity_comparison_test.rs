@@ -15,9 +15,7 @@ fn test_cognitive_vs_cyclomatic_simple_if() {
     let cyclo = calculate_cyclomatic(&block);
     let cognitive = calculate_cognitive(&block);
 
-    println!(
-        "Simple if - Cyclomatic: {cyclo}, Cognitive: {cognitive}"
-    );
+    println!("Simple if - Cyclomatic: {cyclo}, Cognitive: {cognitive}");
 
     // Cyclomatic should be 2 (base 1 + 1 for if)
     assert_eq!(cyclo, 2);
@@ -42,9 +40,7 @@ fn test_cognitive_vs_cyclomatic_nested_if() {
     let cyclo = calculate_cyclomatic(&block);
     let cognitive = calculate_cognitive(&block);
 
-    println!(
-        "Nested if - Cyclomatic: {cyclo}, Cognitive: {cognitive}"
-    );
+    println!("Nested if - Cyclomatic: {cyclo}, Cognitive: {cognitive}");
 
     // Cyclomatic should be 3 (base 1 + 1 for each if)
     assert_eq!(cyclo, 3);
