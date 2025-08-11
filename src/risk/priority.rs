@@ -157,6 +157,15 @@ pub fn prioritize_by_roi(
         recommendations.push_back(recommendation);
     }
 
+    // Sort recommendations by ROI in descending order
+    recommendations.sort_by(|a, b| {
+        let a_roi = a.roi.unwrap_or(0.0);
+        let b_roi = b.roi.unwrap_or(0.0);
+        b_roi
+            .partial_cmp(&a_roi)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
     recommendations
 }
 
