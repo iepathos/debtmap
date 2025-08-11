@@ -1,4 +1,6 @@
-use super::{Difficulty, FunctionRisk, RiskAnalyzer, RiskCategory, RiskInsight, TestingRecommendation};
+use super::{
+    Difficulty, FunctionRisk, RiskAnalyzer, RiskCategory, RiskInsight, TestingRecommendation,
+};
 use crate::risk::correlation::analyze_risk_insights;
 use crate::risk::priority::prioritize_by_roi;
 use im::Vector;
@@ -142,11 +144,9 @@ pub fn format_recommendation_box_header(index: usize, roi_display: &str) -> Stri
     let header = format!("#{index_num}");
     let roi_label = format!("ROI: {roi_display}");
     let dash_count = calculate_dash_count(header.len(), roi_label.len());
-    
+
     let dashes = "─".repeat(dash_count);
-    format!(
-        "┌─ {header} {dashes} {roi_label} ─┐\n"
-    )
+    format!("┌─ {header} {dashes} {roi_label} ─┐\n")
 }
 
 pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -> String {
@@ -177,14 +177,11 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
         let complexity_desc = format_difficulty(&rec.test_effort_estimate.estimated_difficulty);
         let complexity_str = format_complexity_info(
             rec.test_effort_estimate.branch_count,
-            rec.test_effort_estimate.cognitive_load
+            rec.test_effort_estimate.cognitive_load,
         );
 
         // Format dependency info
-        let deps_info = format_dependency_info(
-            rec.dependencies.len(),
-            rec.dependents.len()
-        );
+        let deps_info = format_dependency_info(rec.dependencies.len(), rec.dependents.len());
 
         // Create the top border with proper spacing
         output.push_str(&format_recommendation_box_header(i, &roi_display));
