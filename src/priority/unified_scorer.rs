@@ -210,13 +210,18 @@ fn generate_recommendation(
             cyclomatic,
             cognitive,
         } => {
-            let is_complex = *cyclomatic > 10;
+            // Consider both cyclomatic and cognitive complexity
+            // A function is complex if either metric exceeds its threshold
+            let is_complex = *cyclomatic > 10 || *cognitive > 15;
             if is_complex {
-                // High complexity: recommend refactoring first
+                // High complexity: recommend functional refactoring approach
                 (
-                    format!("Refactor to reduce complexity from {cyclomatic} to <10, then add tests"),
                     format!(
-                        "Complex {} (cyclo={}, cog={}) with {}% coverage - needs simplification before testing",
+                        "Extract pure functions, add property tests, then refactor (cyclo={} to <10, cog={} to <15)",
+                        cyclomatic, cognitive
+                    ),
+                    format!(
+                        "Complex {} (cyclo={}, cog={}) with {}% coverage - extract pure logic first",
                         match role {
                             FunctionRole::PureLogic => "business logic",
                             FunctionRole::Orchestrator => "orchestration",
@@ -229,10 +234,11 @@ fn generate_recommendation(
                         (coverage * 100.0) as i32
                     ),
                     vec![
-                        format!("Extract {} helper functions", (cyclomatic - 5) / 5),
-                        "Reduce nesting and conditional complexity".to_string(),
-                        "Add comprehensive tests after refactoring".to_string(),
-                        "Consider splitting responsibilities".to_string(),
+                        "Identify and extract pure functions (no side effects)".to_string(),
+                        "Add property-based tests for pure logic".to_string(),
+                        "Replace conditionals with pattern matching where possible".to_string(),
+                        "Convert loops to map/filter/fold operations".to_string(),
+                        "Push I/O to the boundaries".to_string(),
                     ],
                 )
             } else {
@@ -240,7 +246,7 @@ fn generate_recommendation(
                 (
                     format!("Add {} unit tests for full coverage", cyclomatic.max(&2)),
                     format!(
-                        "{} with {}% coverage, manageable complexity ({})",
+                        "{} with {}% coverage, manageable complexity (cyclo={}, cog={})",
                         match role {
                             FunctionRole::PureLogic => "Business logic",
                             FunctionRole::Orchestrator => "Orchestration",
@@ -249,7 +255,8 @@ fn generate_recommendation(
                             FunctionRole::Unknown => "Function",
                         },
                         (coverage * 100.0) as i32,
-                        cyclomatic
+                        cyclomatic,
+                        cognitive
                     ),
                     vec![
                         "Test happy path scenarios".to_string(),
@@ -364,10 +371,12 @@ fn calculate_expected_impact(
         DebtType::TestingGap {
             coverage,
             cyclomatic,
-            cognitive: _,
+            cognitive,
         } => {
             // For high complexity functions, the impact includes both testing and refactoring benefits
-            let is_complex = *cyclomatic > 10;
+            // Consider both cyclomatic and cognitive complexity
+            // A function is complex if either metric exceeds its threshold
+            let is_complex = *cyclomatic > 10 || *cognitive > 15;
 
             ImpactMetrics {
                 // Show the actual coverage gain for this function/module
