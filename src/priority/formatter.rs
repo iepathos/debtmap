@@ -445,9 +445,9 @@ fn get_severity_color(score: f64) -> colored::Color {
 
 fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize) {
     let (cyclomatic, cognitive, branch_count) = match &item.debt_type {
-        DebtType::TestingGap { complexity, .. } => {
-            // For testing gaps, use cyclomatic complexity as branch count
-            (*complexity, *complexity, *complexity)
+        DebtType::TestingGap { cyclomatic, cognitive, .. } => {
+            // For testing gaps, use both cyclomatic and cognitive
+            (*cyclomatic, *cognitive, *cyclomatic)
         }
         DebtType::ComplexityHotspot {
             cyclomatic,
@@ -497,7 +497,8 @@ mod tests {
             },
             debt_type: DebtType::TestingGap {
                 coverage: 0.1,
-                complexity: 5,
+                cyclomatic: 5,
+                cognitive: 7,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 5.0,
@@ -577,7 +578,8 @@ mod tests {
         assert_eq!(
             format_debt_type(&DebtType::TestingGap {
                 coverage: 0.1,
-                complexity: 5
+                cyclomatic: 5,
+                cognitive: 7
             }),
             "TEST GAP"
         );

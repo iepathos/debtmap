@@ -177,7 +177,8 @@ fn determine_debt_type(func: &FunctionMetrics, coverage: &Option<TransitiveCover
         if cov.direct < 0.2 && func.cyclomatic > 3 {
             return DebtType::TestingGap {
                 coverage: cov.direct,
-                complexity: func.cyclomatic,
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
             };
         }
     }
@@ -205,15 +206,16 @@ fn generate_recommendation(
     let (primary_action, rationale, steps) = match debt_type {
         DebtType::TestingGap {
             coverage,
-            complexity,
+            cyclomatic,
+            cognitive,
         } => {
-            let is_complex = *complexity > 10;
+            let is_complex = *cyclomatic > 10;
             if is_complex {
                 // High complexity: recommend refactoring first
                 (
-                    format!("Refactor to reduce complexity from {complexity} to <10, then add tests"),
+                    format!("Refactor to reduce complexity from {cyclomatic} to <10, then add tests"),
                     format!(
-                        "Complex {} (cyclo={}) with {}% coverage - needs simplification before testing",
+                        "Complex {} (cyclo={}, cog={}) with {}% coverage - needs simplification before testing",
                         match role {
                             FunctionRole::PureLogic => "business logic",
                             FunctionRole::Orchestrator => "orchestration",
@@ -221,11 +223,12 @@ fn generate_recommendation(
                             FunctionRole::EntryPoint => "entry point",
                             FunctionRole::Unknown => "function",
                         },
-                        complexity,
+                        cyclomatic,
+                        cognitive,
                         (coverage * 100.0) as i32
                     ),
                     vec![
-                        format!("Extract {} helper functions", (complexity - 5) / 5),
+                        format!("Extract {} helper functions", (cyclomatic - 5) / 5),
                         "Reduce nesting and conditional complexity".to_string(),
                         "Add comprehensive tests after refactoring".to_string(),
                         "Consider splitting responsibilities".to_string(),
@@ -234,7 +237,7 @@ fn generate_recommendation(
             } else {
                 // Simple function: just add tests
                 (
-                    format!("Add {} unit tests for full coverage", complexity.max(&2)),
+                    format!("Add {} unit tests for full coverage", cyclomatic.max(&2)),
                     format!(
                         "{} with {}% coverage, manageable complexity ({})",
                         match role {
@@ -245,7 +248,7 @@ fn generate_recommendation(
                             FunctionRole::Unknown => "Function",
                         },
                         (coverage * 100.0) as i32,
-                        complexity
+                        cyclomatic
                     ),
                     vec![
                         "Test happy path scenarios".to_string(),
@@ -359,10 +362,11 @@ fn calculate_expected_impact(
     match debt_type {
         DebtType::TestingGap {
             coverage,
-            complexity,
+            cyclomatic,
+            cognitive: _,
         } => {
             // For high complexity functions, the impact includes both testing and refactoring benefits
-            let is_complex = *complexity > 10;
+            let is_complex = *cyclomatic > 10;
 
             ImpactMetrics {
                 // Show the actual coverage gain for this function/module
@@ -374,7 +378,7 @@ fn calculate_expected_impact(
                 },
                 lines_reduction: 0,
                 complexity_reduction: if is_complex {
-                    *complexity as f64 * 0.3
+                    *cyclomatic as f64 * 0.3
                 } else {
                     0.0
                 },
