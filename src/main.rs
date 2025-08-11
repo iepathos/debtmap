@@ -1,4 +1,4 @@
-use debtmap::analyzers;
+use debtmap::analysis_utils;
 use debtmap::cli;
 use debtmap::core;
 use debtmap::debt;
@@ -9,11 +9,8 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use cli::Commands;
 use core::{
-    AnalysisResults, ComplexityReport, ComplexitySummary, DependencyReport, FileMetrics, Language,
-    TechnicalDebtReport,
+    AnalysisResults, ComplexityReport, DependencyReport, FileMetrics, Language, TechnicalDebtReport,
 };
-use debt::circular::analyze_module_dependencies;
-use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -181,26 +178,15 @@ fn analyze_project(
 }
 
 fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
-    files
-        .par_iter()
-        .filter_map(|path| analyze_single_file(path.as_path()))
-        .collect()
+    analysis_utils::collect_file_metrics(files)
 }
 
 fn extract_all_functions(file_metrics: &[FileMetrics]) -> Vec<core::FunctionMetrics> {
-    file_metrics
-        .iter()
-        .flat_map(|m| &m.complexity.functions)
-        .cloned()
-        .collect()
+    analysis_utils::extract_all_functions(file_metrics)
 }
 
 fn extract_all_debt_items(file_metrics: &[FileMetrics]) -> Vec<core::DebtItem> {
-    file_metrics
-        .iter()
-        .flat_map(|m| &m.debt_items)
-        .cloned()
-        .collect()
+    analysis_utils::extract_all_debt_items(file_metrics)
 }
 
 fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<core::DuplicationBlock> {
@@ -220,36 +206,14 @@ fn build_complexity_report(
     all_functions: &[core::FunctionMetrics],
     complexity_threshold: u32,
 ) -> ComplexityReport {
-    ComplexityReport {
-        metrics: all_functions.to_vec(),
-        summary: ComplexitySummary {
-            total_functions: all_functions.len(),
-            average_complexity: core::metrics::calculate_average_complexity(all_functions),
-            max_complexity: core::metrics::find_max_complexity(all_functions),
-            high_complexity_count: core::metrics::count_high_complexity(
-                all_functions,
-                complexity_threshold,
-            ),
-        },
-    }
+    analysis_utils::build_complexity_report(all_functions, complexity_threshold)
 }
 
 fn build_technical_debt_report(
     all_debt_items: Vec<core::DebtItem>,
     duplications: Vec<core::DuplicationBlock>,
 ) -> TechnicalDebtReport {
-    let debt_by_type = debt::categorize_debt(all_debt_items.clone());
-    let priorities = debt::prioritize_debt(all_debt_items.clone())
-        .into_iter()
-        .map(|item| item.priority)
-        .collect();
-
-    TechnicalDebtReport {
-        items: all_debt_items,
-        by_type: debt_by_type,
-        priorities,
-        duplications,
-    }
+    analysis_utils::build_technical_debt_report(all_debt_items, duplications)
 }
 
 fn output_results_with_risk(
@@ -682,19 +646,6 @@ fn default_languages() -> Vec<Language> {
     ]
 }
 
-fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {
-    let content = io::read_file(file_path).ok()?;
-    let ext = file_path.extension()?.to_str()?;
-    let language = Language::from_extension(ext);
-
-    (language != Language::Unknown)
-        .then(|| {
-            let analyzer = analyzers::get_analyzer(language);
-            analyzers::analyze_file(content, file_path.to_path_buf(), analyzer.as_ref())
-        })?
-        .ok()
-}
-
 fn is_analysis_passing(results: &AnalysisResults, _complexity_threshold: u32) -> bool {
     let debt_score = debt::total_debt_score(&results.technical_debt.items);
     let debt_threshold = 100;
@@ -705,15 +656,5 @@ fn is_analysis_passing(results: &AnalysisResults, _complexity_threshold: u32) ->
 }
 
 fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {
-    let file_deps: Vec<(std::path::PathBuf, Vec<core::Dependency>)> = file_metrics
-        .iter()
-        .map(|m| (m.path.clone(), m.dependencies.clone()))
-        .collect();
-
-    let dep_graph = analyze_module_dependencies(&file_deps);
-
-    DependencyReport {
-        modules: dep_graph.calculate_coupling_metrics(),
-        circular: dep_graph.detect_circular_dependencies(),
-    }
+    analysis_utils::create_dependency_report(file_metrics)
 }

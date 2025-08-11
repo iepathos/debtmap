@@ -1,4 +1,5 @@
 // Export modules for library usage
+pub mod analysis_utils;
 pub mod analyzers;
 pub mod cli;
 pub mod complexity;

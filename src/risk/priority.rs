@@ -120,7 +120,7 @@ pub fn prioritize_by_roi(
         .iter()
         .filter(|f| !f.is_test_function && f.coverage_percentage.unwrap_or(100.0) == 0.0)
         .collect();
-    
+
     let targets: Vec<TestTarget> = functions
         .iter()
         .filter(|f| {
@@ -128,13 +128,13 @@ pub fn prioritize_by_roi(
             if f.is_test_function {
                 return false;
             }
-            
+
             // Skip closures if their parent function (on the same file, earlier line) is also untested
             if f.function_name.starts_with("<closure@") {
                 // Check if there's an untested parent function that would contain this closure
                 let closure_file = &f.file;
                 let closure_line = f.line_range.0;
-                
+
                 // Look for untested functions in the same file that could be the parent
                 // Note: line_range.1 often underestimates the actual end line due to how
                 // function length is calculated (only counting body lines, not signature)
@@ -144,17 +144,17 @@ pub fn prioritize_by_roi(
                     let same_file = parent.file == *closure_file;
                     let not_closure = !parent.function_name.starts_with("<closure@");
                     // More lenient: closure within 20 lines of function start
-                    let likely_contains = parent.line_range.0 <= closure_line 
+                    let likely_contains = parent.line_range.0 <= closure_line
                         && closure_line <= parent.line_range.0 + 20;
-                    
+
                     same_file && not_closure && likely_contains
                 });
-                
+
                 if has_untested_parent {
                     return false; // Skip this closure, its parent is already untested
                 }
             }
-            
+
             true
         })
         .map(function_risk_to_target)
