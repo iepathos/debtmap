@@ -276,7 +276,7 @@ fn generate_recommendation(
 }
 
 fn calculate_expected_impact(
-    _func: &FunctionMetrics,
+    func: &FunctionMetrics,
     debt_type: &DebtType,
     score: &UnifiedScore,
 ) -> ImpactMetrics {
@@ -285,7 +285,9 @@ fn calculate_expected_impact(
             coverage,
             complexity: _,
         } => ImpactMetrics {
-            coverage_improvement: (1.0 - coverage) * 100.0,
+            // Coverage improvement should be relative to the function's size in the project
+            // Assume this function represents ~0.1% of the codebase (more accurate would need total LOC)
+            coverage_improvement: (1.0 - coverage) * (func.length as f64 / 1000.0).min(1.0),
             lines_reduction: 0,
             complexity_reduction: 0.0,
             risk_reduction: score.final_score * 0.42,
