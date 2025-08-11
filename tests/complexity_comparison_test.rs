@@ -11,13 +11,16 @@ fn test_cognitive_vs_cyclomatic_simple_if() {
             }
         }
     "#;
-    
+
     let block: syn::Block = syn::parse_str(code).unwrap();
     let cyclo = calculate_cyclomatic(&block);
     let cognitive = calculate_cognitive(&block);
-    
-    println!("Simple if - Cyclomatic: {}, Cognitive: {}", cyclo, cognitive);
-    
+
+    println!(
+        "Simple if - Cyclomatic: {}, Cognitive: {}",
+        cyclo, cognitive
+    );
+
     // Cyclomatic should be 2 (base 1 + 1 for if)
     assert_eq!(cyclo, 2);
     // Cognitive should be 1 (1 for if at nesting 0)
@@ -36,13 +39,16 @@ fn test_cognitive_vs_cyclomatic_nested_if() {
             }
         }
     "#;
-    
+
     let block: syn::Block = syn::parse_str(code).unwrap();
     let cyclo = calculate_cyclomatic(&block);
     let cognitive = calculate_cognitive(&block);
-    
-    println!("Nested if - Cyclomatic: {}, Cognitive: {}", cyclo, cognitive);
-    
+
+    println!(
+        "Nested if - Cyclomatic: {}, Cognitive: {}",
+        cyclo, cognitive
+    );
+
     // Cyclomatic should be 3 (base 1 + 1 for each if)
     assert_eq!(cyclo, 3);
     // Cognitive should be 3 (1 for first if + 2 for nested if at level 1)
@@ -61,13 +67,13 @@ fn test_cognitive_vs_cyclomatic_match() {
             }
         }
     "#;
-    
+
     let block: syn::Block = syn::parse_str(code).unwrap();
     let cyclo = calculate_cyclomatic(&block);
     let cognitive = calculate_cognitive(&block);
-    
+
     println!("Match - Cyclomatic: {}, Cognitive: {}", cyclo, cognitive);
-    
+
     // Cyclomatic: base 1 + 3 (for 4 arms - 1)
     assert_eq!(cyclo, 4);
     // Cognitive: 1 (base) + 4 (extra for arms)

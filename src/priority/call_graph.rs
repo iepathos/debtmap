@@ -1,21 +1,22 @@
 use im::{HashMap, HashSet, Vector};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionId {
     pub file: PathBuf,
     pub name: String,
     pub line: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionCall {
     pub caller: FunctionId,
     pub callee: FunctionId,
     pub call_type: CallType,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CallType {
     Direct,
     Delegate,
@@ -24,15 +25,61 @@ pub enum CallType {
     Callback,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallGraph {
+    #[serde(with = "function_id_map")]
     nodes: HashMap<FunctionId, FunctionNode>,
     edges: Vector<FunctionCall>,
+    #[serde(with = "function_id_map")]
     caller_index: HashMap<FunctionId, HashSet<FunctionId>>,
+    #[serde(with = "function_id_map")]
     callee_index: HashMap<FunctionId, HashSet<FunctionId>>,
 }
 
-#[derive(Debug, Clone)]
+// Custom serialization for HashMap with FunctionId keys
+mod function_id_map {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap as StdHashMap;
+
+    pub fn serialize<S, V>(
+        map: &im::HashMap<FunctionId, V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        V: Serialize,
+    {
+        let string_map: StdHashMap<String, &V> = map
+            .iter()
+            .map(|(k, v)| (format!("{}:{}:{}", k.file.display(), k.name, k.line), v))
+            .collect();
+        string_map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<im::HashMap<FunctionId, V>, D::Error>
+    where
+        D: Deserializer<'de>,
+        V: Deserialize<'de> + Clone,
+    {
+        let string_map: StdHashMap<String, V> = StdHashMap::deserialize(deserializer)?;
+        let mut result = im::HashMap::new();
+        for (key, value) in string_map {
+            let parts: Vec<&str> = key.rsplitn(3, ':').collect();
+            if parts.len() == 3 {
+                let func_id = FunctionId {
+                    file: parts[2].into(),
+                    name: parts[1].to_string(),
+                    line: parts[0].parse().unwrap_or(0),
+                };
+                result.insert(func_id, value);
+            }
+        }
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct FunctionNode {
     id: FunctionId,
     is_entry_point: bool,

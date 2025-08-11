@@ -17,7 +17,7 @@ use std::process;
 
 struct AnalyzeConfig {
     path: PathBuf,
-    _format: cli::OutputFormat,
+    format: cli::OutputFormat,
     output: Option<PathBuf>,
     threshold_complexity: u32,
     threshold_duplication: usize,
@@ -78,7 +78,7 @@ fn main() -> Result<()> {
         } => {
             let config = AnalyzeConfig {
                 path,
-                _format: format,
+                format,
                 output,
                 threshold_complexity,
                 threshold_duplication,
@@ -166,6 +166,7 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.detailed,
         config.explain_score,
         config.output,
+        Some(config.format),
     )?;
 
     // Check if analysis passed
@@ -864,23 +865,33 @@ fn output_unified_priorities(
     detailed: bool,
     _explain_score: bool,
     output_file: Option<PathBuf>,
+    output_format: Option<cli::OutputFormat>,
 ) -> Result<()> {
     use priority::formatter::format_priorities;
     use std::fs;
     use std::io::Write;
 
-    // Determine output format using pure function
-    let format = determine_priority_output_format(priorities_only, detailed, top);
-
-    // Format the output
-    let output = format_priorities(&analysis, format);
-
-    // Write to file or stdout
-    if let Some(path) = output_file {
-        let mut file = fs::File::create(path)?;
-        file.write_all(output.as_bytes())?;
+    // Check if JSON format is requested
+    if let Some(cli::OutputFormat::Json) = output_format {
+        // For JSON, serialize the analysis directly
+        let json = serde_json::to_string_pretty(&analysis)?;
+        if let Some(path) = output_file {
+            let mut file = fs::File::create(path)?;
+            file.write_all(json.as_bytes())?;
+        } else {
+            println!("{}", json);
+        }
     } else {
-        println!("{output}");
+        // For other formats, use the existing formatter
+        let format = determine_priority_output_format(priorities_only, detailed, top);
+        let output = format_priorities(&analysis, format);
+
+        if let Some(path) = output_file {
+            let mut file = fs::File::create(path)?;
+            file.write_all(output.as_bytes())?;
+        } else {
+            println!("{output}");
+        }
     }
 
     Ok(())

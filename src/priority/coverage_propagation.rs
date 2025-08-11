@@ -1,7 +1,8 @@
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::risk::lcov::LcovData;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransitiveCoverage {
     pub direct: f64,
     pub transitive: f64,
