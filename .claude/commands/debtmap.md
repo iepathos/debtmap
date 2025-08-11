@@ -31,19 +31,32 @@ debtmap analyze . --lcov target/coverage/lcov.info
 ### Step 3: Identify Priority
 From the debtmap output, identify the top priority issue:
 
-1. **FIRST PRIORITY**: Check "TOP 5 TESTING RECOMMENDATIONS" section
-   - Look for items with ROI score ≥ 5
-   - Start with the highest ROI score
+**CRITICAL VALIDATION**: First examine ALL items in "TOP 5 TESTING RECOMMENDATIONS"
+- Count how many items have ROI score ≥ 5
+- If ZERO items have ROI ≥ 5, you MUST skip to SECOND PRIORITY
+- If ANY items have ROI ≥ 5, proceed with FIRST PRIORITY
+
+1. **FIRST PRIORITY**: Testing with ROI ≥ 5
+   - ONLY select from items with ROI score ≥ 5
+   - Start with the highest ROI score ≥ 5
+   - **IMPORTANT**: If ALL testing recommendations have ROI < 5, DO NOT select any testing items
+   - Instead, immediately proceed to SECOND PRIORITY
    
-2. **SECOND PRIORITY**: If no high-ROI testing opportunities exist
+2. **SECOND PRIORITY**: Complexity Hotspots (when no ROI ≥ 5 exists)
    - Check "COMPLEXITY HOTSPOTS" section
    - Focus on functions with highest complexity scores
+   - This is the correct priority when testing ROI is low
    
 3. **THIRD PRIORITY**: "CRITICAL RISK FUNCTIONS"
-   - Only if they also appear in testing recommendations
+   - Only if they also appear in testing recommendations with ROI ≥ 5
 
 ### Step 4: Plan the Fix
 Based on the priority type, create an implementation plan:
+
+**VALIDATION CHECK**: Confirm you selected the correct priority:
+- If working on testing: Verify the selected item has ROI ≥ 5
+- If working on complexity: Verify ALL testing items had ROI < 5
+- If unsure, re-read Step 3 and re-evaluate
 
 **For Testing Priorities (ROI ≥ 5):**
 - First, assess if the function is orchestration or I/O code
