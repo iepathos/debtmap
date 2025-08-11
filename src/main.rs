@@ -43,10 +43,15 @@ struct ValidateConfig {
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
+    #[allow(dead_code)]
     top: Option<usize>,
+    #[allow(dead_code)]
     priorities_only: bool,
+    #[allow(dead_code)]
     detailed: bool,
+    #[allow(dead_code)]
     semantic_off: bool,
+    #[allow(dead_code)]
     explain_score: bool,
 }
 

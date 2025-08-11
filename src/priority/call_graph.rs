@@ -38,7 +38,7 @@ struct FunctionNode {
     is_entry_point: bool,
     is_test: bool,
     complexity: u32,
-    lines: usize,
+    _lines: usize,
 }
 
 impl CallGraph {
@@ -64,7 +64,7 @@ impl CallGraph {
             is_entry_point,
             is_test,
             complexity,
-            lines,
+            _lines: lines,
         };
         self.nodes.insert(id, node);
     }
@@ -80,10 +80,7 @@ impl CallGraph {
             .or_default()
             .insert(callee.clone());
 
-        self.caller_index
-            .entry(callee)
-            .or_default()
-            .insert(caller);
+        self.caller_index.entry(callee).or_default().insert(caller);
     }
 
     pub fn get_callees(&self, func_id: &FunctionId) -> Vec<FunctionId> {
