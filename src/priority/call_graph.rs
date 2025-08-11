@@ -15,7 +15,7 @@ pub struct FunctionCall {
     pub call_type: CallType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CallType {
     Direct,
     Delegate,
@@ -216,6 +216,18 @@ impl CallGraph {
 
     pub fn find_all_functions(&self) -> Vec<FunctionId> {
         self.nodes.keys().cloned().collect()
+    }
+
+    pub fn get_function_calls(&self, func_id: &FunctionId) -> Vec<FunctionCall> {
+        self.edges
+            .iter()
+            .filter(|call| &call.caller == func_id)
+            .cloned()
+            .collect()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
     }
 
     pub fn calculate_criticality(&self, func_id: &FunctionId) -> f64 {
