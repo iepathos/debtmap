@@ -82,10 +82,13 @@ impl ROICalculator {
         // Include dependency count as a factor
         let dependency_factor = 1.0 + (target.dependents.len() as f64 * 0.1).min(1.0);
 
+        // Apply complexity weighting to penalize trivial functions
+        let complexity_weight = self.get_complexity_weight(target);
+
         let raw_roi = if adjusted_effort > 0.0 {
-            (total_impact * dependency_factor) / adjusted_effort
+            (total_impact * dependency_factor * complexity_weight) / adjusted_effort
         } else {
-            total_impact * dependency_factor
+            total_impact * dependency_factor * complexity_weight
         };
 
         // Apply diminishing returns for very high ROI values
@@ -169,6 +172,18 @@ impl ROICalculator {
         }
     }
 
+    fn get_complexity_weight(&self, target: &TestTarget) -> f64 {
+        // Apply complexity weighting to heavily penalize trivial functions
+        // This prevents delegation functions from dominating ROI recommendations
+        match (target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity) {
+            (1, 0..=1) => 0.1,   // Trivial delegation - 90% reduction
+            (1, 2..=3) => 0.3,   // Very simple - 70% reduction  
+            (2..=3, _) => 0.5,   // Simple - 50% reduction
+            (4..=5, _) => 0.7,   // Moderate - 30% reduction
+            _ => 1.0,            // Complex - no reduction
+        }
+    }
+
     fn generate_breakdown(
         &self,
         target: &TestTarget,
@@ -221,14 +236,16 @@ impl ROICalculator {
 
         let module_multiplier = self.get_module_type_multiplier(target);
         let dependency_factor = 1.0 + (target.dependents.len() as f64 * 0.1).min(1.0);
+        let complexity_weight = self.get_complexity_weight(target);
 
         let formula = format!(
-            "ROI = ((Direct[{:.1}%] * {:.1}) + (Cascade[{:.1}%] * {:.1})) * DependencyFactor[{:.1}] / Effort[{:.1}h]",
+            "ROI = ((Direct[{:.1}%] * {:.1}) + (Cascade[{:.1}%] * {:.1})) * DependencyFactor[{:.1}] * ComplexityWeight[{:.1}] / Effort[{:.1}h]",
             direct.percentage,
             module_multiplier,
             cascade.total_risk_reduction,
             self.config.cascade_weight,
             dependency_factor,
+            complexity_weight,
             effort.hours
         );
 
