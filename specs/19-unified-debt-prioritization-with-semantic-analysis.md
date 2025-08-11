@@ -25,8 +25,9 @@ Debtmap currently provides comprehensive technical debt analysis but suffers fro
 2. **False Positives**: Orchestration functions that delegate to tested code are incorrectly prioritized as critical
 3. **Information Overload**: Raw analysis dumps overwhelm users who just want to know "what should I fix?"
 4. **Inconsistent Prioritization**: Different analysis modes (risk, ROI, complexity) provide conflicting recommendations
+5. **Outdated Time Estimates**: Traditional effort estimation has become unreliable with LLM-assisted development fundamentally changing task completion times
 
-This specification unifies all debt analysis into a single, semantic-aware prioritization engine that provides clear, actionable output.
+This specification unifies all debt analysis into a single, semantic-aware prioritization engine that provides clear, actionable output focused on impact rather than estimated effort.
 
 ## Objective
 
@@ -71,9 +72,9 @@ Create a unified technical debt prioritization system that:
 
 5. **Actionable Recommendations**
    - Specific fix recommendations for each priority item
-   - Effort estimates: Trivial (<30min), Simple (<2hr), Moderate (<8hr), Complex (>8hr)
    - Expected impact metrics for each fix
    - Implementation hints and related item groupings
+   - Focus on measurable outcomes rather than time estimates
 
 6. **Call Graph Integration**
    - Extract function calls during AST parsing
@@ -114,6 +115,25 @@ Create a unified technical debt prioritization system that:
 - [ ] Performance overhead <200ms on 1000+ function codebases
 - [ ] All existing tests pass with unified scoring
 - [ ] Output format is immediately clear without reading documentation
+
+## Implementation Notes
+
+### Why No Effort Estimates in Output
+
+Traditional time estimation for software development tasks has become fundamentally unreliable with the advent of LLM-assisted coding:
+
+1. **Variable Skill Amplification**: LLMs amplify developer capabilities differently - a "complex" refactoring might take 20 minutes with AI assistance or 4 hours without
+2. **Context-Dependent Acceleration**: Tasks involving boilerplate, testing, or documentation see 5-10x speedups, while architectural decisions remain similar
+3. **Individual Variation**: Developer familiarity with LLM tools creates dramatic variance in actual completion times
+4. **Dynamic Problem Solving**: AI assistance can change the approach mid-task, making initial estimates meaningless
+
+Instead of potentially misleading time estimates, this specification focuses on:
+- **Measurable Impact**: Concrete improvements to code quality metrics
+- **Actionable Priority**: Clear ordering based on value delivered
+- **Complexity Indicators**: High/medium/low complexity as relative guidance
+- **Dependency Awareness**: Understanding what enables other improvements
+
+The unified scoring algorithm still considers effort internally for ROI calculations, but the output emphasizes **what to fix** and **why** rather than **how long it will take**.
 
 ## Technical Details
 
@@ -277,7 +297,7 @@ pub struct UnifiedDebtItem {
     pub unified_score: UnifiedScore,
     pub function_role: FunctionRole,
     pub recommendation: ActionableRecommendation,
-    pub effort_estimate: EffortLevel,
+    // Note: effort_estimate removed - LLMs make time prediction unreliable
     pub expected_impact: ImpactMetrics,
     pub transitive_coverage: Option<TransitiveCoverage>,
 }
@@ -287,7 +307,7 @@ pub struct ActionableRecommendation {
     pub rationale: String,
     pub implementation_steps: Vec<String>,
     pub related_items: Vec<DebtItemId>,
-    pub expected_time: Duration,
+    // Note: expected_time removed - focus on impact over time estimation
 }
 
 pub enum DebtType {
@@ -311,25 +331,25 @@ pub enum DebtType {
 
 #1  SCORE: 9.2  [CRITICAL]
 ├─ TEST GAP: src/core/parser.rs:45 parse_config()
-├─ EFFORT: Trivial (30min) - Add 3 unit tests
+├─ ACTION: Add 3 unit tests for branch coverage
 ├─ IMPACT: +67% module coverage, -4.2 risk score
 └─ WHY: Core business logic, zero coverage, high dependencies
 
 #2  SCORE: 8.8  [CRITICAL]  
 ├─ COMPLEXITY: src/risk/calc.rs:12 calculate_weighted_risk()
-├─ EFFORT: Moderate (3hr) - Extract 2 sub-functions
+├─ ACTION: Extract 2 sub-functions to reduce complexity
 ├─ IMPACT: -8 cyclomatic complexity, +15% readability
 └─ WHY: Highest complexity function, affects all risk calculations
 
 #3  SCORE: 7.9  [HIGH]
 ├─ DUPLICATION: src/analyzers/*.rs (4 locations)
-├─ EFFORT: Simple (90min) - Extract common parser logic
+├─ ACTION: Extract common parser logic into shared module
 ├─ IMPACT: -180 LOC, single source of truth
 └─ WHY: Maintenance burden, risk of inconsistent behavior
 
 [Items #4-10...]
 
-💡 QUICK WINS (<30min each)
+💡 HIGH-IMPACT LOW-COMPLEXITY FIXES
 • Add missing error tests: src/io/reader.rs:78
 • Remove dead code: src/utils/helpers.rs:156  
 • Fix TODO comment: src/core/cache.rs:23
@@ -338,20 +358,20 @@ pub enum DebtType {
 • +28% test coverage
 • -156 lines of code  
 • -35% average complexity
-• Estimated time: 8.5 hours
+• 10 actionable items prioritized by measurable impact
 ```
 
 ### Minimal Output (--priorities-only)
 ```
 TOP PRIORITIES:
-1. Add tests: src/core/parser.rs:45 parse_config() [30min]
-2. Reduce complexity: src/risk/calc.rs:12 calculate_weighted_risk() [3hr]
-3. Extract duplication: src/analyzers/*.rs [90min]
-4. Add error handling: src/io/writer.rs:34 write_results() [45min]
-5. Test entry point: src/main.rs:67 run_analysis() [60min]
+1. Add tests: src/core/parser.rs:45 parse_config()
+2. Reduce complexity: src/risk/calc.rs:12 calculate_weighted_risk()
+3. Extract duplication: src/analyzers/*.rs
+4. Add error handling: src/io/writer.rs:34 write_results()
+5. Test entry point: src/main.rs:67 run_analysis()
 
-Quick wins: 3 items under 30min
-Total estimated effort: 6.5 hours
+High-impact items: 3 critical, 2 high priority
+Focus on measurable code quality improvements
 ```
 
 ### Detailed Output (--detailed)
@@ -446,7 +466,7 @@ Total estimated effort: 6.5 hours
 - **Acceptance Tests**:
   - Verify `generate_report_if_requested` scores <3.0 
   - Confirm pure business logic maintains high priority
-  - Test that quick wins are actually <30min effort
+  - Test that high-impact low-complexity items are clearly identified
   - Validate output is immediately actionable
 
 ## Migration and Compatibility
