@@ -77,6 +77,13 @@ We have completed the initial implementation with core functionality for analyzi
   - Dependency factor for ROI enhancement
   - Meaningful ROI variation based on code criticality
 
+- [x] **Spec 18**: Intelligent Test Function Debt Handling
+  - Test functions excluded from main debt score calculation
+  - Test functions no longer penalized for lack of coverage
+  - Test-specific debt types and recommendations
+  - Separate tracking of test debt vs production debt
+  - Prevents paradoxical debt score increases when adding tests
+
 - [x] **Spec 19**: Unified Debt Prioritization with Semantic Analysis
   - Single unified priority score combining all metrics
   - Semantic function classification to avoid false positives

@@ -56,7 +56,10 @@ pub fn calculate_unified_priority(
     let complexity_factor = normalize_complexity(func.cyclomatic, func.cognitive);
 
     // Calculate coverage factor (0-10, higher means more urgent to cover)
-    let coverage_factor = if let Some(cov) = coverage {
+    let coverage_factor = if func.is_test {
+        // Test functions don't need coverage - they are the coverage mechanism
+        0.0
+    } else if let Some(cov) = coverage {
         calculate_coverage_urgency(&func_id, call_graph, cov, func.cyclomatic)
     } else {
         // No coverage data - assume worst case
@@ -294,6 +297,38 @@ fn generate_recommendation(
                 "Update documentation".to_string(),
             ],
         ),
+        // Test-specific debt types
+        DebtType::TestComplexityHotspot { 
+            cyclomatic, 
+            cognitive, 
+            threshold 
+        } => (
+            format!("Simplify test - complexity {} exceeds test threshold {}", cyclomatic.max(cognitive), threshold),
+            format!("Test has high complexity (cyclo={cyclomatic}, cognitive={cognitive}) - consider splitting into smaller tests"),
+            vec![
+                "Break complex test into multiple smaller tests".to_string(),
+                "Extract test setup into helper functions".to_string(),
+                "Use parameterized tests for similar test cases".to_string(),
+            ],
+        ),
+        DebtType::TestTodo { priority: _, reason } => (
+            "Complete test TODO".to_string(),
+            format!("Test contains TODO: {}", reason.as_ref().unwrap_or(&"No reason specified".to_string())),
+            vec![
+                "Address the TODO comment".to_string(),
+                "Implement missing test logic".to_string(),
+                "Remove TODO once completed".to_string(),
+            ],
+        ),
+        DebtType::TestDuplication { instances, total_lines, similarity: _ } => (
+            format!("Remove test duplication - {instances} similar test blocks"),
+            format!("{instances} duplicated test blocks found across {total_lines} lines"),
+            vec![
+                "Extract common test logic into helper functions".to_string(),
+                "Create parameterized tests for similar test cases".to_string(),
+                "Use test fixtures for shared setup".to_string(),
+            ],
+        ),
     };
 
     ActionableRecommendation {
@@ -352,11 +387,36 @@ fn calculate_expected_impact(
             complexity_reduction: 0.0,
             risk_reduction: score.final_score * 0.25,
         },
-        _ => ImpactMetrics {
+        DebtType::Orchestration { .. } => ImpactMetrics {
+            coverage_improvement: 0.0,
+            lines_reduction: 0,
+            complexity_reduction: 0.0,
+            risk_reduction: score.final_score * 0.1, // Low priority for orchestration
+        },
+        DebtType::Risk { .. } => ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: 0,
             complexity_reduction: 0.0,
             risk_reduction: score.final_score * 0.2,
+        },
+        // Test-specific debt types have lower impact on overall metrics
+        DebtType::TestComplexityHotspot { cyclomatic, cognitive: _, threshold: _ } => ImpactMetrics {
+            coverage_improvement: 0.0, // Tests don't improve coverage
+            lines_reduction: 0,
+            complexity_reduction: (*cyclomatic as f64 * 0.3),
+            risk_reduction: score.final_score * 0.15, // Lower risk impact for tests
+        },
+        DebtType::TestTodo { .. } => ImpactMetrics {
+            coverage_improvement: 0.0,
+            lines_reduction: 0,
+            complexity_reduction: 0.0,
+            risk_reduction: score.final_score * 0.1,
+        },
+        DebtType::TestDuplication { instances, total_lines, similarity: _ } => ImpactMetrics {
+            coverage_improvement: 0.0,
+            lines_reduction: *total_lines - (*total_lines / instances),
+            complexity_reduction: 0.0,
+            risk_reduction: score.final_score * 0.1,
         },
     }
 }

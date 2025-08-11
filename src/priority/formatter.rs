@@ -363,6 +363,9 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::Orchestration { .. } => "ORCHESTRATION",
         DebtType::Duplication { .. } => "DUPLICATION",
         DebtType::Risk { .. } => "RISK",
+        DebtType::TestComplexityHotspot { .. } => "TEST COMPLEXITY",
+        DebtType::TestTodo { .. } => "TEST TODO",
+        DebtType::TestDuplication { .. } => "TEST DUPLICATION",
     }
 }
 
@@ -383,6 +386,9 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
         DebtType::Orchestration { .. } => "Add integration test",
         DebtType::Duplication { .. } => "Extract duplication",
         DebtType::Risk { .. } => "Fix debt",
+        DebtType::TestComplexityHotspot { .. } => "Simplify test",
+        DebtType::TestTodo { .. } => "Complete TODO",
+        DebtType::TestDuplication { .. } => "Remove test duplication",
     }
 }
 

@@ -91,6 +91,10 @@ pub enum DebtType {
     Duplication,
     Complexity,
     Dependency,
+    // Test-specific debt types
+    TestComplexity,
+    TestTodo,
+    TestDuplication,
 }
 
 impl std::fmt::Display for DebtType {
@@ -102,6 +106,9 @@ impl std::fmt::Display for DebtType {
             (DebtType::Duplication, "Duplication"),
             (DebtType::Complexity, "Complexity"),
             (DebtType::Dependency, "Dependency"),
+            (DebtType::TestComplexity, "Test Complexity"),
+            (DebtType::TestTodo, "Test TODO"),
+            (DebtType::TestDuplication, "Test Duplication"),
         ];
 
         let display_str = DISPLAY_STRINGS
