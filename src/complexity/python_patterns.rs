@@ -62,22 +62,54 @@ impl PythonPatternDetector {
     fn analyze_stmt(&mut self, stmt: &ast::Stmt) {
         use ast::Stmt::*;
 
-        // Direct pattern matching for statement handlers
+        // Use visitor pattern to reduce cyclomatic complexity
+        let handler: Option<fn(&mut Self, &ast::Stmt)> = match stmt {
+            AsyncFunctionDef(_) | FunctionDef(_) | ClassDef(_) => Some(Self::handle_definition),
+            Try(_) | With(_) | AsyncWith(_) => Some(Self::handle_context_manager),
+            AsyncFor(_) | For(_) | If(_) | While(_) => Some(Self::handle_control_flow),
+            Expr(_) | Return(_) | Assign(_) | AugAssign(_) => Some(Self::handle_expression),
+            _ => None,
+        };
+
+        if let Some(handle) = handler {
+            handle(self, stmt);
+        }
+    }
+
+    fn handle_definition(&mut self, stmt: &ast::Stmt) {
         match stmt {
-            AsyncFunctionDef(func) => self.handle_async_function(func),
-            FunctionDef(func) => self.handle_function(func),
-            ClassDef(class) => self.handle_class(class),
-            Try(try_stmt) => self.handle_try(try_stmt),
-            With(with_stmt) => self.handle_with(with_stmt),
-            AsyncWith(with_stmt) => self.handle_async_with(with_stmt),
-            AsyncFor(for_stmt) => self.handle_async_for(for_stmt),
-            For(for_stmt) => self.handle_for(for_stmt),
-            If(if_stmt) => self.handle_if(if_stmt),
-            While(while_stmt) => self.handle_while(while_stmt),
-            Expr(expr) => self.handle_expr_stmt(expr),
-            Return(ret) => self.handle_return(ret),
-            Assign(assign) => self.handle_assign(assign),
-            AugAssign(aug) => self.handle_aug_assign(aug),
+            ast::Stmt::AsyncFunctionDef(func) => self.handle_async_function(func),
+            ast::Stmt::FunctionDef(func) => self.handle_function(func),
+            ast::Stmt::ClassDef(class) => self.handle_class(class),
+            _ => {}
+        }
+    }
+
+    fn handle_context_manager(&mut self, stmt: &ast::Stmt) {
+        match stmt {
+            ast::Stmt::Try(try_stmt) => self.handle_try(try_stmt),
+            ast::Stmt::With(with_stmt) => self.handle_with(with_stmt),
+            ast::Stmt::AsyncWith(with_stmt) => self.handle_async_with(with_stmt),
+            _ => {}
+        }
+    }
+
+    fn handle_control_flow(&mut self, stmt: &ast::Stmt) {
+        match stmt {
+            ast::Stmt::AsyncFor(for_stmt) => self.handle_async_for(for_stmt),
+            ast::Stmt::For(for_stmt) => self.handle_for(for_stmt),
+            ast::Stmt::If(if_stmt) => self.handle_if(if_stmt),
+            ast::Stmt::While(while_stmt) => self.handle_while(while_stmt),
+            _ => {}
+        }
+    }
+
+    fn handle_expression(&mut self, stmt: &ast::Stmt) {
+        match stmt {
+            ast::Stmt::Expr(expr) => self.handle_expr_stmt(expr),
+            ast::Stmt::Return(ret) => self.handle_return(ret),
+            ast::Stmt::Assign(assign) => self.handle_assign(assign),
+            ast::Stmt::AugAssign(aug) => self.handle_aug_assign(aug),
             _ => {}
         }
     }
