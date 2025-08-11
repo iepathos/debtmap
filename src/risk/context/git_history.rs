@@ -586,12 +586,12 @@ mod tests {
 
         // Add more commits to create history
         for i in 1..=3 {
-            std::fs::write(&file_path, format!("fn main() {{ /* change {} */ }}", i))?;
+            std::fs::write(&file_path, format!("fn main() {{ /* change {i} */ }}"))?;
             Command::new("git")
                 .args(["add", "test.rs"])
                 .current_dir(&repo_path)
                 .output()?;
-            commit_with_message(&repo_path, &format!("fix: bug fix {}", i))?;
+            commit_with_message(&repo_path, &format!("fix: bug fix {i}"))?;
         }
 
         let provider = GitHistoryProvider::new(repo_path.clone())?;
