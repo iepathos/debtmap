@@ -70,18 +70,32 @@ impl PythonPatternDetector {
             AsyncWith(with_stmt) => self.handle_async_with(with_stmt),
             AsyncFor(for_stmt) => self.handle_async_for(for_stmt),
             For(for_stmt) => self.handle_for(for_stmt),
-            Expr(expr) => self.analyze_expr(&expr.value),
-            Return(ret) => ret
-                .value
-                .as_ref()
-                .map(|v| self.analyze_expr(v))
-                .unwrap_or(()),
-            Assign(assign) => self.analyze_expr(&assign.value),
-            AugAssign(aug) => self.analyze_expr(&aug.value),
             If(if_stmt) => self.handle_if(if_stmt),
             While(while_stmt) => self.handle_while(while_stmt),
+            Expr(expr) => self.handle_expr_stmt(expr),
+            Return(ret) => self.handle_return(ret),
+            Assign(assign) => self.handle_assign(assign),
+            AugAssign(aug) => self.handle_aug_assign(aug),
             _ => {}
         }
+    }
+
+    fn handle_expr_stmt(&mut self, expr: &ast::StmtExpr) {
+        self.analyze_expr(&expr.value);
+    }
+
+    fn handle_return(&mut self, ret: &ast::StmtReturn) {
+        if let Some(value) = &ret.value {
+            self.analyze_expr(value);
+        }
+    }
+
+    fn handle_assign(&mut self, assign: &ast::StmtAssign) {
+        self.analyze_expr(&assign.value);
+    }
+
+    fn handle_aug_assign(&mut self, aug: &ast::StmtAugAssign) {
+        self.analyze_expr(&aug.value);
     }
 
     fn handle_async_function(&mut self, func: &ast::StmtAsyncFunctionDef) {
