@@ -61,6 +61,8 @@ impl PythonPatternDetector {
 
     fn analyze_stmt(&mut self, stmt: &ast::Stmt) {
         use ast::Stmt::*;
+
+        // Direct pattern matching for statement handlers
         match stmt {
             AsyncFunctionDef(func) => self.handle_async_function(func),
             FunctionDef(func) => self.handle_function(func),
