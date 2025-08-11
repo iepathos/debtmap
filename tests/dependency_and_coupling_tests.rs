@@ -136,3 +136,191 @@ fn test_dependency_graph_operations() {
         "UI should depend on 2 modules"
     );
 }
+
+#[test]
+fn test_build_module_dependency_map_empty() {
+    use debtmap::debt::coupling::build_module_dependency_map;
+
+    let file_dependencies = vec![];
+    let result = build_module_dependency_map(&file_dependencies);
+
+    assert_eq!(result.len(), 0, "Empty input should produce empty output");
+}
+
+#[test]
+fn test_build_module_dependency_map_single_file_no_deps() {
+    use debtmap::debt::coupling::build_module_dependency_map;
+    use std::path::PathBuf;
+
+    let file_dependencies = vec![(PathBuf::from("src/main.rs"), vec![])];
+
+    let result = build_module_dependency_map(&file_dependencies);
+
+    assert_eq!(result.len(), 1, "Should have one module");
+    let module = &result[0];
+    assert_eq!(module.module, "main");
+    assert_eq!(module.dependencies.len(), 0);
+    assert_eq!(module.dependents.len(), 0);
+}
+
+#[test]
+fn test_build_module_dependency_map_with_imports() {
+    use debtmap::debt::coupling::build_module_dependency_map;
+    use debtmap::{Dependency, DependencyKind};
+    use std::path::PathBuf;
+
+    let file_dependencies = vec![
+        (
+            PathBuf::from("src/ui.rs"),
+            vec![
+                Dependency {
+                    name: "core::utils".to_string(),
+                    kind: DependencyKind::Import,
+                },
+                Dependency {
+                    name: "api::client".to_string(),
+                    kind: DependencyKind::Import,
+                },
+            ],
+        ),
+        (PathBuf::from("src/core.rs"), vec![]),
+        (
+            PathBuf::from("src/api.rs"),
+            vec![Dependency {
+                name: "core::config".to_string(),
+                kind: DependencyKind::Import,
+            }],
+        ),
+    ];
+
+    let result = build_module_dependency_map(&file_dependencies);
+
+    // Find the ui module
+    let ui_module = result.iter().find(|m| m.module == "ui").unwrap();
+    assert_eq!(ui_module.dependencies.len(), 2);
+    assert!(ui_module.dependencies.contains(&"core".to_string()));
+    assert!(ui_module.dependencies.contains(&"api".to_string()));
+
+    // Find the core module - should have ui and api as dependents
+    let core_module = result.iter().find(|m| m.module == "core").unwrap();
+    assert_eq!(core_module.dependencies.len(), 0);
+    assert_eq!(core_module.dependents.len(), 2);
+    assert!(core_module.dependents.contains(&"ui".to_string()));
+    assert!(core_module.dependents.contains(&"api".to_string()));
+
+    // Find the api module
+    let api_module = result.iter().find(|m| m.module == "api").unwrap();
+    assert_eq!(api_module.dependencies.len(), 1);
+    assert!(api_module.dependencies.contains(&"core".to_string()));
+    assert_eq!(api_module.dependents.len(), 1);
+    assert!(api_module.dependents.contains(&"ui".to_string()));
+}
+
+#[test]
+fn test_build_module_dependency_map_filters_non_import_deps() {
+    use debtmap::debt::coupling::build_module_dependency_map;
+    use debtmap::{Dependency, DependencyKind};
+    use std::path::PathBuf;
+
+    let file_dependencies = vec![(
+        PathBuf::from("src/main.rs"),
+        vec![
+            Dependency {
+                name: "std::collections".to_string(),
+                kind: DependencyKind::Import,
+            },
+            Dependency {
+                name: "serde".to_string(),
+                kind: DependencyKind::Package, // Should be filtered out
+            },
+            Dependency {
+                name: "utils".to_string(),
+                kind: DependencyKind::Module,
+            },
+        ],
+    )];
+
+    let result = build_module_dependency_map(&file_dependencies);
+
+    let main_module = result.iter().find(|m| m.module == "main").unwrap();
+    assert_eq!(main_module.dependencies.len(), 2);
+    assert!(main_module.dependencies.contains(&"std".to_string()));
+    assert!(main_module.dependencies.contains(&"utils".to_string()));
+    // serde should not be included as it's a Package dependency
+}
+
+#[test]
+fn test_build_module_dependency_map_bidirectional_deps() {
+    use debtmap::debt::coupling::build_module_dependency_map;
+    use debtmap::{Dependency, DependencyKind};
+    use std::path::PathBuf;
+
+    let file_dependencies = vec![
+        (
+            PathBuf::from("src/module_a.rs"),
+            vec![Dependency {
+                name: "module_b::function".to_string(),
+                kind: DependencyKind::Import,
+            }],
+        ),
+        (
+            PathBuf::from("src/module_b.rs"),
+            vec![Dependency {
+                name: "module_a::types".to_string(),
+                kind: DependencyKind::Import,
+            }],
+        ),
+    ];
+
+    let result = build_module_dependency_map(&file_dependencies);
+
+    // Both modules should appear in each other's dependencies and dependents
+    let module_a = result.iter().find(|m| m.module == "module_a").unwrap();
+    assert_eq!(module_a.dependencies.len(), 1);
+    assert!(module_a.dependencies.contains(&"module_b".to_string()));
+    assert_eq!(module_a.dependents.len(), 1);
+    assert!(module_a.dependents.contains(&"module_b".to_string()));
+
+    let module_b = result.iter().find(|m| m.module == "module_b").unwrap();
+    assert_eq!(module_b.dependencies.len(), 1);
+    assert!(module_b.dependencies.contains(&"module_a".to_string()));
+    assert_eq!(module_b.dependents.len(), 1);
+    assert!(module_b.dependents.contains(&"module_a".to_string()));
+}
+
+#[test]
+fn test_build_module_dependency_map_complex_paths() {
+    use debtmap::debt::coupling::build_module_dependency_map;
+    use debtmap::{Dependency, DependencyKind};
+    use std::path::PathBuf;
+
+    let file_dependencies = vec![
+        (
+            PathBuf::from("src/components/header.rs"),
+            vec![Dependency {
+                name: "utils::helpers::format".to_string(),
+                kind: DependencyKind::Import,
+            }],
+        ),
+        (PathBuf::from("src/utils/helpers.rs"), vec![]),
+        (
+            PathBuf::from("/absolute/path/to/footer.rs"),
+            vec![Dependency {
+                name: "header".to_string(),
+                kind: DependencyKind::Module,
+            }],
+        ),
+    ];
+
+    let result = build_module_dependency_map(&file_dependencies);
+
+    // Check that module names are extracted correctly from paths
+    assert!(result.iter().any(|m| m.module == "header"));
+    assert!(result.iter().any(|m| m.module == "helpers"));
+    assert!(result.iter().any(|m| m.module == "footer"));
+
+    // Verify dependency relationships
+    let header_module = result.iter().find(|m| m.module == "header").unwrap();
+    assert!(header_module.dependencies.contains(&"utils".to_string()));
+    assert!(header_module.dependents.contains(&"footer".to_string()));
+}

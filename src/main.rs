@@ -838,6 +838,25 @@ fn perform_unified_analysis(
     ))
 }
 
+/// Determines the priority output format based on command line flags
+fn determine_priority_output_format(
+    priorities_only: bool,
+    detailed: bool,
+    top: Option<usize>,
+) -> priority::formatter::OutputFormat {
+    use priority::formatter::OutputFormat;
+
+    if priorities_only {
+        OutputFormat::PrioritiesOnly
+    } else if detailed {
+        OutputFormat::Detailed
+    } else if let Some(n) = top {
+        OutputFormat::Top(n)
+    } else {
+        OutputFormat::Default
+    }
+}
+
 fn output_unified_priorities(
     analysis: priority::UnifiedAnalysis,
     top: Option<usize>,
@@ -846,20 +865,12 @@ fn output_unified_priorities(
     _explain_score: bool,
     output_file: Option<PathBuf>,
 ) -> Result<()> {
-    use priority::formatter::{format_priorities, OutputFormat};
+    use priority::formatter::format_priorities;
     use std::fs;
     use std::io::Write;
 
-    // Determine output format
-    let format = if priorities_only {
-        OutputFormat::PrioritiesOnly
-    } else if detailed {
-        OutputFormat::Detailed
-    } else if let Some(n) = top {
-        OutputFormat::Top(n)
-    } else {
-        OutputFormat::Default
-    };
+    // Determine output format using pure function
+    let format = determine_priority_output_format(priorities_only, detailed, top);
 
     // Format the output
     let output = format_priorities(&analysis, format);
@@ -1207,6 +1218,70 @@ mod tests {
         // This will depend on how debt::total_debt_score calculates the score
         // For now, we just check that the function runs without panicking
         let _ = passing;
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_priorities_only() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(true, false, None);
+        assert!(matches!(format, OutputFormat::PrioritiesOnly));
+
+        // priorities_only takes precedence over other flags
+        let format = determine_priority_output_format(true, true, Some(5));
+        assert!(matches!(format, OutputFormat::PrioritiesOnly));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_detailed() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(false, true, None);
+        assert!(matches!(format, OutputFormat::Detailed));
+
+        // detailed takes precedence over top when priorities_only is false
+        let format = determine_priority_output_format(false, true, Some(5));
+        assert!(matches!(format, OutputFormat::Detailed));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_top() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(false, false, Some(5));
+        assert!(matches!(format, OutputFormat::Top(5)));
+
+        let format = determine_priority_output_format(false, false, Some(10));
+        assert!(matches!(format, OutputFormat::Top(10)));
+
+        let format = determine_priority_output_format(false, false, Some(1));
+        assert!(matches!(format, OutputFormat::Top(1)));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_default() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(false, false, None);
+        assert!(matches!(format, OutputFormat::Default));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_precedence_order() {
+        use priority::formatter::OutputFormat;
+
+        // Test full precedence: priorities_only > detailed > top > default
+        let format = determine_priority_output_format(true, true, Some(5));
+        assert!(matches!(format, OutputFormat::PrioritiesOnly));
+
+        let format = determine_priority_output_format(false, true, Some(5));
+        assert!(matches!(format, OutputFormat::Detailed));
+
+        let format = determine_priority_output_format(false, false, Some(5));
+        assert!(matches!(format, OutputFormat::Top(5)));
+
+        let format = determine_priority_output_format(false, false, None);
+        assert!(matches!(format, OutputFormat::Default));
     }
 
     #[test]
