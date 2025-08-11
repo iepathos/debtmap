@@ -123,18 +123,21 @@ impl AdvancedEffortModel {
     }
 
     fn estimate_mocking_effort(&self, target: &TestTarget) -> f64 {
-        let external_deps = target
+        let external_deps = self.count_external_dependencies(target);
+        self.calculate_mocking_hours(external_deps)
+    }
+
+    fn count_external_dependencies(&self, target: &TestTarget) -> usize {
+        const EXTERNAL_MARKERS: &[&str] = &["io", "net", "fs", "db", "http"];
+
+        target
             .dependencies
             .iter()
-            .filter(|d| {
-                d.contains("io")
-                    || d.contains("net")
-                    || d.contains("fs")
-                    || d.contains("db")
-                    || d.contains("http")
-            })
-            .count();
+            .filter(|dep| EXTERNAL_MARKERS.iter().any(|marker| dep.contains(marker)))
+            .count()
+    }
 
+    fn calculate_mocking_hours(&self, external_deps: usize) -> f64 {
         match external_deps {
             0 => 0.0,
             1 => 0.5,

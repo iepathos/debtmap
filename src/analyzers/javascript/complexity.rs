@@ -60,15 +60,16 @@ fn get_arrow_function_name(node: Node, source: &str) -> Option<String> {
         return None;
     }
 
-    node.parent()
-        .filter(|parent| parent.kind() == "variable_declarator")
-        .and_then(|parent| {
-            parent
-                .children(&mut parent.walk())
-                .filter(|child| child.kind() == "identifier")
-                .find_map(|child| child.utf8_text(source.as_bytes()).ok())
-                .map(String::from)
-        })
+    let parent = node.parent()?;
+    if parent.kind() != "variable_declarator" {
+        return None;
+    }
+
+    parent
+        .children(&mut parent.walk())
+        .find(|child| child.kind() == "identifier")
+        .and_then(|child| child.utf8_text(source.as_bytes()).ok())
+        .map(String::from)
 }
 
 pub fn calculate_cyclomatic_complexity(node: Node, source: &str) -> u32 {

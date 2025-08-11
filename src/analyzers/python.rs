@@ -447,23 +447,35 @@ fn extract_dependencies(module: &ast::Mod) -> Vec<Dependency> {
 
 fn extract_stmt_dependencies(stmt: &ast::Stmt) -> Vec<Dependency> {
     match stmt {
-        ast::Stmt::Import(import) => import
-            .names
-            .iter()
-            .map(|alias| Dependency {
-                name: alias.name.to_string(),
-                kind: DependencyKind::Import,
-            })
-            .collect(),
-        ast::Stmt::ImportFrom(import_from) => import_from
-            .module
-            .as_ref()
-            .map(|module| Dependency {
-                name: module.to_string(),
-                kind: DependencyKind::Module,
-            })
-            .into_iter()
-            .collect(),
+        ast::Stmt::Import(import) => extract_import_dependencies(import),
+        ast::Stmt::ImportFrom(import_from) => extract_import_from_dependencies(import_from),
         _ => Vec::new(),
+    }
+}
+
+fn extract_import_dependencies(import: &ast::StmtImport) -> Vec<Dependency> {
+    import.names.iter().map(create_import_dependency).collect()
+}
+
+fn extract_import_from_dependencies(import_from: &ast::StmtImportFrom) -> Vec<Dependency> {
+    import_from
+        .module
+        .as_ref()
+        .map(create_module_dependency)
+        .into_iter()
+        .collect()
+}
+
+fn create_import_dependency(alias: &ast::Alias) -> Dependency {
+    Dependency {
+        name: alias.name.to_string(),
+        kind: DependencyKind::Import,
+    }
+}
+
+fn create_module_dependency(module: &ast::Identifier) -> Dependency {
+    Dependency {
+        name: module.to_string(),
+        kind: DependencyKind::Module,
     }
 }
