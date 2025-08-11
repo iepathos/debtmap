@@ -134,40 +134,53 @@ Options:
 ## Example Output
 
 ```
-$ debtmap analyze .
-Debtmap Analysis Report
-=======================
+debtmap analyze . --lcov target/coverage/lcov.info --top 5
+════════════════════════════════════════════
+    PRIORITY TECHNICAL DEBT FIXES
+════════════════════════════════════════════
 
-📊 Summary:
-  Files analyzed: 512
-  Total functions: 512
-  Average complexity: 1.6
-  Debt items: 160
-  Total debt score: 1440 (threshold: 100)
+🎯 TOP 5 RECOMMENDATIONS (by unified priority)
 
-🔨 Top Refactoring Opportunities (High Cognitive Complexity):
-  1. ./src/risk/lcov.rs parse_lcov_file() - Cognitive: 80 (Cyclomatic: 4)
-     💡 Recommendation: Extract parsing logic into separate functions
-     Impact: Reduce complexity by 65%, improve readability
-  
-  2. ./src/io/output.rs write_risk_insights() - Cognitive: 15 (Cyclomatic: 13)
-     💡 Recommendation: Split into smaller formatting functions
-     Impact: Reduce complexity by 40%, easier testing
-  
-  3. ./src/risk/mod.rs categorize_risk() - Cognitive: 13 (Cyclomatic: 13)
-     💡 Recommendation: Use pattern matching or lookup table
-     Impact: Reduce complexity by 50%, clearer logic flow
+#1 SCORE: 9.4 [CRITICAL]
+├─ TEST GAP: ./src/risk/priority/module_detection.rs:66 get_base_dependents()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.9 risk
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=10, nesting=1, lines=13
+├─ DEPENDENCIES: 0 upstream, 3 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=10)
 
-⚠️ Testing Priorities (High Risk, Low Coverage):
-  1. ./src/analyzers/javascript/complexity.rs get_complexity_calculator() - Risk: Critical
-     Coverage: 0% | Complexity: 8 | ROI: 8.5
-     Effort: 2-3 test cases (~1.5 hours)
-  
-  2. ./src/core/mod.rs fmt() - Risk: High
-     Coverage: 15% | Complexity: 7 | ROI: 6.2
-     Effort: 2 test cases (~1 hour)
+#2 SCORE: 9.1 [CRITICAL]
+├─ TEST GAP: ./src/risk/correlation.rs:69 build_risk_distribution()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.8 risk
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=8, nesting=2, lines=22
+├─ DEPENDENCIES: 0 upstream, 1 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=8)
 
-✗ Pass/Fail: FAIL (some metrics exceed thresholds)
+#3 SCORE: 9.0 [CRITICAL]
+├─ TEST GAP: ./src/risk/context/git_history.rs:341 determine_stability_status()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.8 risk
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=7, nesting=1, lines=15
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=7)
+
+#4 SCORE: 9.0 [CRITICAL]
+├─ TEST GAP: ./src/risk/context/critical_path.rs:224 calculate_path_weight()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.8 risk
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=7, nesting=1, lines=10
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=7)
+
+#5 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/risk/context/dependency.rs:198 gather()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.7 risk
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=12, nesting=2, lines=44
+├─ DEPENDENCIES: 0 upstream, 14 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=12)
+
+
+📊 TOTAL DEBT SCORE: 4914
 ```
 
 ### With Coverage Data
