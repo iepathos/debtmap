@@ -850,7 +850,7 @@ fn output_unified_priorities(
         let mut file = fs::File::create(path)?;
         file.write_all(output.as_bytes())?;
     } else {
-        println!("{}", output);
+        println!("{output}");
     }
 
     Ok(())
@@ -1230,6 +1230,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -1248,6 +1253,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -1266,6 +1276,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         // Format takes precedence over output
         assert_eq!(
@@ -1285,6 +1300,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(determine_output_format(&config), None);
     }

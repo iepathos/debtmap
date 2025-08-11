@@ -38,7 +38,7 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     writeln!(
         output,
         "🎯 {} (by unified priority)",
-        format!("TOP {} RECOMMENDATIONS", count)
+        format!("TOP {count} RECOMMENDATIONS")
             .bright_yellow()
             .bold()
     )
@@ -97,8 +97,7 @@ fn format_priorities_only(analysis: &UnifiedAnalysis, limit: usize) -> String {
 
     writeln!(
         output,
-        "High-impact items: {} critical, {} high priority",
-        critical_count, high_count
+        "High-impact items: {critical_count} critical, {high_count} high priority"
     )
     .unwrap();
     writeln!(output, "Focus on measurable code quality improvements").unwrap();
@@ -230,7 +229,7 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     .unwrap();
 
     for step in &item.recommendation.implementation_steps {
-        writeln!(output, "   • {}", step).unwrap();
+        writeln!(output, "   • {step}").unwrap();
     }
 }
 

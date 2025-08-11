@@ -43,9 +43,7 @@ pub fn classify_function_role(
 }
 
 fn is_entry_point_by_name(name: &str) -> bool {
-    let entry_patterns = vec![
-        "main", "run", "start", "init", "handle", "process", "execute", "serve", "listen",
-    ];
+    let entry_patterns = ["main", "run", "start", "init", "handle", "process", "execute", "serve", "listen"];
 
     let name_lower = name.to_lowercase();
     entry_patterns
@@ -168,7 +166,7 @@ mod tests {
         for i in 0..3 {
             let worker_id = FunctionId {
                 file: PathBuf::from("worker.rs"),
-                name: format!("worker_{}", i),
+                name: format!("worker_{i}"),
                 line: i * 10,
             };
             graph.add_function(worker_id.clone(), false, false, 8, 40);
