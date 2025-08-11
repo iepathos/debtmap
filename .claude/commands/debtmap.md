@@ -46,12 +46,18 @@ From the debtmap output, identify the top priority issue:
 Based on the priority type, create an implementation plan:
 
 **For Testing Priorities (ROI ≥ 5):**
-- Identify the function/module needing tests
-- Plan test cases for:
-  - Happy path scenarios
-  - Edge cases and boundary conditions
-  - Error conditions and invalid inputs
-  - Any uncovered branches or paths
+- First, assess if the function is orchestration or I/O code
+- If it's an orchestration/I/O function with trivial complexity:
+  - Consider if it delegates to already-tested functions
+  - Extract any pure business logic into separate testable functions
+  - Move formatting/parsing logic to dedicated modules
+  - Keep thin I/O wrappers untested (they're not the real debt)
+- For actual business logic functions:
+  - Plan test cases for:
+    - Happy path scenarios
+    - Edge cases and boundary conditions
+    - Error conditions and invalid inputs
+    - Any uncovered branches or paths
 
 **For Complexity Hotspots:**
 - Analyze the complex function
@@ -65,7 +71,16 @@ Based on the priority type, create an implementation plan:
 ### Step 5: Implement the Fix
 Apply the planned changes:
 
-**For Testing:**
+**For Orchestration and I/O Functions:**
+- Extract pure logic into testable functions:
+  - Move formatting logic to pure functions that return strings
+  - Extract parsing/validation to separate modules
+  - Create pure functions for decision logic (e.g., "should_generate_report")
+- Keep I/O operations in thin wrappers that call the pure functions
+- Write tests for the extracted pure functions, not the I/O wrappers
+- Consider moving business logic to appropriate modules (e.g., `parsers`, `formatters`, `validators`)
+
+**For Testing Business Logic:**
 - Write comprehensive test cases
 - Ensure all identified scenarios are covered
 - Use descriptive test names
@@ -171,3 +186,24 @@ Complete each step in order:
 - Testing priorities with ROI ≥ 5 provide the best return on investment
 - Complexity refactoring should preserve all existing functionality
 - Each commit should show measurable debt reduction
+
+## Orchestration and I/O Function Guidelines
+
+When debtmap flags orchestration or I/O functions as untested:
+
+1. **Recognize the pattern**: Functions with cyclomatic complexity = 1 that coordinate modules or perform I/O are not the real debt
+2. **Extract testable logic**: Instead of testing I/O directly, extract pure functions that can be unit tested
+3. **Follow functional programming principles**: 
+   - Pure core: Business logic in pure functions
+   - Imperative shell: Thin orchestration/I/O wrappers that don't need testing
+4. **Common patterns to extract**:
+   - Formatting functions: Extract logic that builds strings from data
+   - Parsing functions: Move to dedicated parser modules
+   - Decision functions: Extract "should we do X" logic from "do X" execution
+   - Coordination logic: Extract "how to coordinate" from "perform coordination"
+5. **Don't force unit tests on**: 
+   - Functions that just print to stdout
+   - Simple delegation to other modules
+   - Module orchestration that just sequences calls
+   - File I/O wrappers
+   - Network I/O operations
