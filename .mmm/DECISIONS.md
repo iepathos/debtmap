@@ -234,3 +234,30 @@ Implement dependency-aware ROI calculation that:
 - ✅ More intuitive testing recommendations
 - ⚠️ Dependency inference may not capture all relationships
 - ⚠️ Additional computation for graph construction
+
+---
+
+## ADR-013: Unified Debt Prioritization with Semantic Analysis
+**Date**: 2025-08-11
+**Status**: Accepted
+
+### Context
+Technical debt analysis was providing disconnected metrics that were difficult to action. ROI, complexity, coverage, and risk were reported separately, requiring manual correlation. Orchestration functions that delegate to tested code were incorrectly prioritized as critical, creating false positives. Users needed clear, actionable guidance on what to fix first.
+
+### Decision
+Implement unified debt prioritization system that:
+- Combines all metrics into single priority score (complexity 25%, coverage 35%, ROI 25%, semantic 15%)
+- Classifies functions semantically (PureLogic, Orchestrator, IOWrapper, EntryPoint)
+- Applies role-based multipliers to reduce false positives
+- Propagates coverage through call graph for delegation patterns
+- Provides clean, actionable output formats (--top N, --priorities-only, --detailed)
+- Removes unreliable time estimates in favor of measurable impact metrics
+
+### Consequences
+- ✅ Single clear priority list instead of multiple conflicting views
+- ✅ Orchestration functions correctly deprioritized (score <3.0 vs 8.8)
+- ✅ Clean, immediately actionable output without documentation
+- ✅ Better alignment with actual code criticality and testing needs
+- ✅ Focus on measurable improvements over unreliable time predictions
+- ⚠️ Additional complexity in scoring algorithm
+- ⚠️ Call graph construction adds processing overhead

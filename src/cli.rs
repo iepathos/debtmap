@@ -52,6 +52,26 @@ pub enum Commands {
         /// Disable specific context providers
         #[arg(long = "disable-context", value_delimiter = ',')]
         disable_context: Option<Vec<String>>,
+
+        /// Show only top N priority items
+        #[arg(long = "top")]
+        top: Option<usize>,
+
+        /// Show priorities only (minimal output)
+        #[arg(long = "priorities-only")]
+        priorities_only: bool,
+
+        /// Show detailed analysis with priority breakdown
+        #[arg(long = "detailed")]
+        detailed: bool,
+
+        /// Disable semantic analysis (fallback mode)
+        #[arg(long = "semantic-off")]
+        semantic_off: bool,
+
+        /// Show score breakdown for debugging
+        #[arg(long = "explain-score")]
+        explain_score: bool,
     },
 
     /// Initialize configuration file
@@ -93,6 +113,26 @@ pub enum Commands {
         /// Disable specific context providers
         #[arg(long = "disable-context", value_delimiter = ',')]
         disable_context: Option<Vec<String>>,
+
+        /// Show only top N priority items
+        #[arg(long = "top")]
+        top: Option<usize>,
+
+        /// Show priorities only (minimal output)
+        #[arg(long = "priorities-only")]
+        priorities_only: bool,
+
+        /// Show detailed analysis with priority breakdown
+        #[arg(long = "detailed")]
+        detailed: bool,
+
+        /// Disable semantic analysis (fallback mode)
+        #[arg(long = "semantic-off")]
+        semantic_off: bool,
+
+        /// Show score breakdown for debugging
+        #[arg(long = "explain-score")]
+        explain_score: bool,
     },
 }
 
