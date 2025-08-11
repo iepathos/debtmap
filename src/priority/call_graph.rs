@@ -77,12 +77,12 @@ impl CallGraph {
 
         self.callee_index
             .entry(caller.clone())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(callee.clone());
 
         self.caller_index
             .entry(callee)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(caller);
     }
 

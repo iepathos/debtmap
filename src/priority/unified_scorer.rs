@@ -220,8 +220,7 @@ fn generate_recommendation(
                 cyclomatic / 5 + 1
             ),
             format!(
-                "Highest complexity function (CC:{}, Cog:{}), affects all dependent calculations",
-                cyclomatic, cognitive
+                "Highest complexity function (CC:{cyclomatic}, Cog:{cognitive}), affects all dependent calculations"
             ),
             vec![
                 "Identify logical groups in the function".to_string(),
@@ -246,8 +245,7 @@ fn generate_recommendation(
         } => (
             "Extract common logic into shared module".to_string(),
             format!(
-                "Duplicated across {} locations ({} lines total)",
-                instances, total_lines
+                "Duplicated across {instances} locations ({total_lines} lines total)"
             ),
             vec![
                 "Create shared utility module".to_string(),
