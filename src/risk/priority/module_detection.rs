@@ -160,4 +160,47 @@ mod tests {
         let unknown_deps = get_base_dependencies(&ModuleType::Unknown);
         assert_eq!(unknown_deps, Vec::<String>::new());
     }
+
+    #[test]
+    fn test_get_base_dependents_core() {
+        let dependents = get_base_dependents(&ModuleType::Core);
+        assert_eq!(dependents, vec!["api", "main", "transformers"]);
+    }
+
+    #[test]
+    fn test_get_base_dependents_api() {
+        let dependents = get_base_dependents(&ModuleType::Api);
+        assert_eq!(dependents, vec!["main", "service"]);
+    }
+
+    #[test]
+    fn test_get_base_dependents_model() {
+        let dependents = get_base_dependents(&ModuleType::Model);
+        assert_eq!(dependents, vec!["core", "api", "io"]);
+    }
+
+    #[test]
+    fn test_get_base_dependents_io() {
+        let dependents = get_base_dependents(&ModuleType::IO);
+        assert_eq!(dependents, vec!["api", "main"]);
+    }
+
+    #[test]
+    fn test_get_base_dependents_utility() {
+        let dependents = get_base_dependents(&ModuleType::Utility);
+        assert_eq!(dependents, vec!["core", "models", "api", "io", "main"]);
+    }
+
+    #[test]
+    fn test_get_base_dependents_default_cases() {
+        // Test EntryPoint, Test, and Unknown types which should return empty vectors
+        let entry_point_deps = get_base_dependents(&ModuleType::EntryPoint);
+        assert_eq!(entry_point_deps, Vec::<String>::new());
+
+        let test_deps = get_base_dependents(&ModuleType::Test);
+        assert_eq!(test_deps, Vec::<String>::new());
+
+        let unknown_deps = get_base_dependents(&ModuleType::Unknown);
+        assert_eq!(unknown_deps, Vec::<String>::new());
+    }
 }

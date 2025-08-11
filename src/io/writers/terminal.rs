@@ -39,9 +39,11 @@ impl OutputWriter for TerminalWriter {
 
         // Print risk header
         println!();
-        println!("{}", "═══════════════════════════════════════════".cyan());
-        println!("{}", "           RISK ANALYSIS REPORT".bold().cyan());
-        println!("{}", "═══════════════════════════════════════════".cyan());
+        let divider = "═══════════════════════════════════════════".cyan();
+        let title = "           RISK ANALYSIS REPORT".bold().cyan();
+        println!("{divider}");
+        println!("{title}");
+        println!("{divider}");
         println!();
 
         // Print risk summary
@@ -116,9 +118,11 @@ impl OutputWriter for TerminalWriter {
 
 fn print_header() {
     println!();
-    println!("{}", "═══════════════════════════════════════════".blue());
-    println!("{}", "           DEBTMAP ANALYSIS REPORT".bold().blue());
-    println!("{}", "═══════════════════════════════════════════".blue());
+    let divider = "═══════════════════════════════════════════".blue();
+    let title = "           DEBTMAP ANALYSIS REPORT".bold().blue();
+    println!("{divider}");
+    println!("{title}");
+    println!("{divider}");
     println!();
 }
 

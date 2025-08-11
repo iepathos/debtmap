@@ -217,22 +217,21 @@ fn generate_recommendation(
                 // High complexity: recommend functional refactoring approach
                 (
                     format!(
-                        "Extract pure functions, add property tests, then refactor (cyclo={} to <10, cog={} to <15)",
-                        cyclomatic, cognitive
+                        "Extract pure functions, add property tests, then refactor (cyclo={cyclomatic} to <10, cog={cognitive} to <15)"
                     ),
-                    format!(
-                        "Complex {} (cyclo={}, cog={}) with {}% coverage - extract pure logic first",
-                        match role {
+                    {
+                        let role_str = match role {
                             FunctionRole::PureLogic => "business logic",
                             FunctionRole::Orchestrator => "orchestration",
                             FunctionRole::IOWrapper => "I/O wrapper",
                             FunctionRole::EntryPoint => "entry point",
                             FunctionRole::Unknown => "function",
-                        },
-                        cyclomatic,
-                        cognitive,
-                        (coverage * 100.0) as i32
-                    ),
+                        };
+                        let coverage_pct = (coverage * 100.0) as i32;
+                        format!(
+                            "Complex {role_str} (cyclo={cyclomatic}, cog={cognitive}) with {coverage_pct}% coverage - extract pure logic first"
+                        )
+                    },
                     vec![
                         "Identify and extract pure functions (no side effects)".to_string(),
                         "Add property-based tests for pure logic".to_string(),

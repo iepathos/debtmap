@@ -676,7 +676,8 @@ fn format_risk_function(func: &risk::FunctionRisk) -> String {
 }
 
 fn print_risk_function(func: &risk::FunctionRisk) {
-    println!("{}", format_risk_function(func));
+    let formatted = format_risk_function(func);
+    println!("{formatted}");
 }
 
 fn parse_languages(languages: Option<Vec<String>>) -> Vec<Language> {
@@ -879,7 +880,7 @@ fn output_unified_priorities(
             let mut file = fs::File::create(path)?;
             file.write_all(json.as_bytes())?;
         } else {
-            println!("{}", json);
+            println!("{json}");
         }
     } else {
         // For other formats, use the existing formatter
