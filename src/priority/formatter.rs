@@ -174,6 +174,33 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     )
     .unwrap();
 
+    // Add complexity details with branch information
+    let (cyclomatic, cognitive, branch_count, nesting, length) = extract_complexity_info(item);
+    if cyclomatic > 0 || cognitive > 0 {
+        writeln!(
+            output,
+            "├─ COMPLEXITY: {}, branches={}, cognitive={}, nesting={}, lines={}",
+            format!("cyclomatic={cyclomatic}").dimmed(),
+            branch_count.to_string().dimmed(),
+            cognitive.to_string().dimmed(),
+            nesting.to_string().dimmed(),
+            length.to_string().dimmed()
+        )
+        .unwrap();
+    }
+
+    // Add dependency information if available
+    let (upstream, downstream) = extract_dependency_info(item);
+    if upstream > 0 || downstream > 0 {
+        writeln!(
+            output,
+            "├─ DEPENDENCIES: {} upstream, {} downstream",
+            upstream.to_string().dimmed(),
+            downstream.to_string().dimmed()
+        )
+        .unwrap();
+    }
+
     writeln!(output, "└─ WHY: {}", item.recommendation.rationale.dimmed()).unwrap();
 }
 
@@ -416,6 +443,37 @@ fn get_severity_color(score: f64) -> colored::Color {
     }
 }
 
+fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize) {
+    let (cyclomatic, cognitive, branch_count) = match &item.debt_type {
+        DebtType::TestingGap { complexity, .. } => {
+            // For testing gaps, use cyclomatic complexity as branch count
+            (*complexity, *complexity, *complexity)
+        }
+        DebtType::ComplexityHotspot {
+            cyclomatic,
+            cognitive,
+        } => (*cyclomatic, *cognitive, *cyclomatic),
+        DebtType::TestComplexityHotspot {
+            cyclomatic,
+            cognitive,
+            ..
+        } => (*cyclomatic, *cognitive, *cyclomatic),
+        _ => (0, 0, 0),
+    };
+
+    (
+        cyclomatic,
+        cognitive,
+        branch_count,
+        item.nesting_depth,
+        item.function_length,
+    )
+}
+
+fn extract_dependency_info(item: &UnifiedDebtItem) -> (usize, usize) {
+    (item.upstream_dependencies, item.downstream_dependencies)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -463,6 +521,10 @@ mod tests {
                 risk_reduction: 3.5,
             },
             transitive_coverage: None,
+            upstream_dependencies: 2,
+            downstream_dependencies: 3,
+            nesting_depth: 1,
+            function_length: 15,
         }
     }
 

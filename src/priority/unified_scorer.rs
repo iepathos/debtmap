@@ -31,6 +31,10 @@ pub struct UnifiedDebtItem {
     pub recommendation: ActionableRecommendation,
     pub expected_impact: ImpactMetrics,
     pub transitive_coverage: Option<TransitiveCoverage>,
+    pub upstream_dependencies: usize,
+    pub downstream_dependencies: usize,
+    pub nesting_depth: u32,
+    pub function_length: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +148,10 @@ pub fn create_unified_debt_item(
     let recommendation = generate_recommendation(func, &debt_type, role, &unified_score);
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
+    // Get dependency counts from call graph
+    let upstream_dependencies = call_graph.get_callers(&func_id).len();
+    let downstream_dependencies = call_graph.get_callees(&func_id).len();
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -156,6 +164,10 @@ pub fn create_unified_debt_item(
         recommendation,
         expected_impact,
         transitive_coverage,
+        upstream_dependencies,
+        downstream_dependencies,
+        nesting_depth: func.nesting,
+        function_length: func.length,
     }
 }
 
