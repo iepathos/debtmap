@@ -149,56 +149,24 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.threshold_duplication,
     )?;
 
-    // Check if unified prioritization is requested
-    let use_unified = config.priorities_only || config.detailed || config.top.is_some();
+    // Always use unified prioritization as the default
+    // Build call graph and perform unified analysis
+    let unified_analysis = perform_unified_analysis(
+        &results,
+        config.coverage_file.as_ref(),
+        config.semantic_off,
+        &config.path,
+    )?;
 
-    if use_unified {
-        // Build call graph and perform unified analysis
-        let unified_analysis = perform_unified_analysis(
-            &results,
-            config.coverage_file.as_ref(),
-            config.semantic_off,
-            &config.path,
-        )?;
-
-        // Output unified prioritized results
-        output_unified_priorities(
-            unified_analysis,
-            config.top,
-            config.priorities_only,
-            config.detailed,
-            config.explain_score,
-            config.output,
-        )?;
-    } else {
-        // Handle risk analysis if coverage file provided (existing behavior)
-        let risk_insights = if let Some(lcov_path) = config.coverage_file {
-            analyze_risk_with_coverage(
-                &results,
-                &lcov_path,
-                &config.path,
-                config.enable_context,
-                config.context_providers,
-                config.disable_context,
-            )?
-        } else {
-            analyze_risk_without_coverage(
-                &results,
-                config.enable_context,
-                config.context_providers,
-                config.disable_context,
-                &config.path,
-            )?
-        };
-
-        // Output results
-        output_results_with_risk(
-            results.clone(),
-            risk_insights,
-            config.format.into(),
-            config.output,
-        )?;
-    }
+    // Output unified prioritized results
+    output_unified_priorities(
+        unified_analysis,
+        config.top,
+        config.priorities_only,
+        config.detailed,
+        config.explain_score,
+        config.output,
+    )?;
 
     // Check if analysis passed
     if !is_analysis_passing(&results, config.threshold_complexity) {
@@ -757,7 +725,7 @@ fn perform_unified_analysis(
     results: &AnalysisResults,
     coverage_file: Option<&PathBuf>,
     _semantic_off: bool,
-    _project_path: &Path,
+    project_path: &Path,
 ) -> Result<priority::UnifiedAnalysis> {
     use priority::{unified_scorer, CallGraph, UnifiedAnalysis};
 
@@ -765,7 +733,7 @@ fn perform_unified_analysis(
     let mut call_graph = CallGraph::new();
 
     // Extract functions and build call graph
-    // (This is simplified - actual implementation would extract from AST)
+    // First, add all functions to the graph
     for metrics in &results.complexity.metrics {
         let func_id = priority::call_graph::FunctionId {
             file: metrics.file.clone(),
@@ -790,6 +758,21 @@ fn perform_unified_analysis(
             metrics.cyclomatic,
             metrics.length,
         );
+    }
+
+    // Now extract call relationships from Rust files
+    let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
+        .context("Failed to find Rust files for call graph")?;
+
+    for file_path in rust_files {
+        if let Ok(content) = io::read_file(&file_path) {
+            // Parse the Rust file
+            if let Ok(parsed) = syn::parse_file(&content) {
+                use debtmap::analyzers::rust_call_graph::extract_call_graph;
+                let file_call_graph = extract_call_graph(&parsed, &file_path);
+                call_graph.merge(file_call_graph);
+            }
+        }
     }
 
     // Load coverage data if available

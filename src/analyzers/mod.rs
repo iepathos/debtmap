@@ -4,6 +4,7 @@ use anyhow::Result;
 pub mod javascript;
 pub mod python;
 pub mod rust;
+pub mod rust_call_graph;
 
 pub trait Analyzer: Send + Sync {
     fn parse(&self, content: &str, path: std::path::PathBuf) -> Result<Ast>;
