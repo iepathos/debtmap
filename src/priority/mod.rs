@@ -57,6 +57,21 @@ pub enum DebtType {
         risk_score: f64,
         factors: Vec<String>,
     },
+    // Test-specific debt types
+    TestComplexityHotspot {
+        cyclomatic: u32,
+        cognitive: u32,
+        threshold: u32,
+    },
+    TestTodo {
+        priority: crate::core::Priority,
+        reason: Option<String>,
+    },
+    TestDuplication {
+        instances: u32,
+        total_lines: u32,
+        similarity: f64,
+    },
 }
 
 impl UnifiedAnalysis {

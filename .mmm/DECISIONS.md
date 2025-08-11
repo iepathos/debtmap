@@ -261,3 +261,29 @@ Implement unified debt prioritization system that:
 - ✅ Focus on measurable improvements over unreliable time predictions
 - ⚠️ Additional complexity in scoring algorithm
 - ⚠️ Call graph construction adds processing overhead
+
+---
+
+## ADR-014: Intelligent Test Function Debt Handling
+**Date**: 2025-08-11
+**Status**: Accepted
+
+### Context
+The debt scoring system was paradoxically penalizing test functions for having 0% code coverage (since tests aren't covered by tests), leading to counterintuitive behavior where adding tests increased the total debt score. A comprehensive codebase with many tests would show artificially high debt scores, discouraging good testing practices.
+
+### Decision
+Implement intelligent test function handling that:
+- Excludes test functions from the main debt score calculation in `create_unified_analysis`
+- Sets coverage factor to 0.0 for test functions instead of the maximum penalty (10.0)
+- Introduces test-specific debt types (TestComplexity, TestTodo, TestDuplication)
+- Provides test-specific recommendations for legitimate test debt issues
+- Maintains visibility into actual test quality problems without inflating scores
+
+### Consequences
+- ✅ Debt scores now decrease (or stay same) when tests are added
+- ✅ Eliminates paradoxical behavior where good practices increase debt scores
+- ✅ Test functions can still be flagged for legitimate complexity and quality issues
+- ✅ Separate test debt categorization provides actionable recommendations
+- ✅ More accurate reflection of actual technical debt in production code
+- ⚠️ Breaking change in debt score calculation (scores will generally be lower)
+- ⚠️ Additional logic complexity in the scoring system

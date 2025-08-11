@@ -793,6 +793,12 @@ fn create_unified_analysis(
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
     for metric in metrics {
+        // Skip test functions from debt score calculation
+        // Test functions are analyzed separately to avoid inflating debt scores
+        if metric.is_test {
+            continue;
+        }
+
         let roi_score = 5.0; // Default ROI
         let item =
             unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data, roi_score);
@@ -1500,5 +1506,78 @@ mod tests {
 
         // Verify the unified analysis was created
         assert_eq!(unified.items.len(), 1);
+    }
+
+    #[test]
+    fn test_create_unified_analysis_excludes_test_functions() {
+        use crate::core::FunctionMetrics;
+        use crate::priority::{CallGraph, call_graph::FunctionId};
+
+        // Create test metrics with both production and test functions
+        let metrics = vec![
+            FunctionMetrics {
+                name: "production_function".to_string(),
+                file: PathBuf::from("src/main.rs"),
+                line: 10,
+                cyclomatic: 5,
+                cognitive: 3,
+                nesting: 1,
+                length: 20,
+                is_test: false, // Production function
+            },
+            FunctionMetrics {
+                name: "test_something".to_string(),
+                file: PathBuf::from("src/main.rs"),
+                line: 30,
+                cyclomatic: 8,
+                cognitive: 12,
+                nesting: 2,
+                length: 40,
+                is_test: true, // Test function - should be excluded
+            },
+            FunctionMetrics {
+                name: "another_production_function".to_string(),
+                file: PathBuf::from("src/lib.rs"),
+                line: 50,
+                cyclomatic: 3,
+                cognitive: 2,
+                nesting: 0,
+                length: 15,
+                is_test: false, // Production function
+            },
+        ];
+
+        let mut call_graph = CallGraph::new();
+        
+        // Add all functions to call graph
+        for metric in &metrics {
+            let func_id = FunctionId {
+                file: metric.file.clone(),
+                name: metric.name.clone(),
+                line: metric.line,
+            };
+            call_graph.add_function(func_id, false, metric.is_test, metric.cyclomatic, metric.length);
+        }
+
+        let unified = create_unified_analysis(&metrics, &call_graph, None);
+
+        // Verify only production functions are included in unified analysis
+        // Test function should be excluded, so only 2 items should be present
+        assert_eq!(unified.items.len(), 2);
+        
+        // Verify that the included functions are indeed the production ones
+        let included_names: Vec<&String> = unified.items.iter()
+            .map(|item| &item.location.function)
+            .collect();
+        
+        assert!(included_names.contains(&&"production_function".to_string()));
+        assert!(included_names.contains(&&"another_production_function".to_string()));
+        assert!(!included_names.contains(&&"test_something".to_string()));
+        
+        // Verify that total debt score doesn't include the complex test function
+        // If test functions were included, the score would be much higher due to
+        // the complex test function (cyclomatic=8, cognitive=12, no coverage)
+        let total_debt_score = unified.total_impact.risk_reduction;
+        assert!(total_debt_score < 20.0, "Debt score should be low since test function is excluded");
     }
 }
