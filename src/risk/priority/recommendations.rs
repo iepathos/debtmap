@@ -182,3 +182,283 @@ pub struct ImpactAnalysis {
     pub affected_modules: Vec<String>,
     pub coverage_improvement: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::ComplexityMetrics;
+    use crate::risk::priority::module_detection::ModuleType;
+    use crate::risk::priority::TestTarget;
+
+    #[test]
+    fn test_module_description_entry_point_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::EntryPoint, true);
+        assert_eq!(result, "Critical entry point");
+    }
+
+    #[test]
+    fn test_module_description_entry_point_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::EntryPoint, false);
+        assert_eq!(result, "Critical entry point completely untested");
+    }
+
+    #[test]
+    fn test_module_description_core_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Core, true);
+        assert_eq!(result, "Core module");
+    }
+
+    #[test]
+    fn test_module_description_core_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Core, false);
+        assert_eq!(result, "Core module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_api_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Api, true);
+        assert_eq!(result, "API module");
+    }
+
+    #[test]
+    fn test_module_description_api_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Api, false);
+        assert_eq!(result, "API module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_io_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::IO, true);
+        assert_eq!(result, "I/O module");
+    }
+
+    #[test]
+    fn test_module_description_io_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::IO, false);
+        assert_eq!(result, "I/O module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_model_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Model, true);
+        assert_eq!(result, "Data model");
+    }
+
+    #[test]
+    fn test_module_description_model_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Model, false);
+        assert_eq!(result, "Data model completely untested");
+    }
+
+    #[test]
+    fn test_module_description_utility_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Utility, true);
+        assert_eq!(result, "Utility module");
+    }
+
+    #[test]
+    fn test_module_description_utility_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Utility, false);
+        assert_eq!(result, "Utility module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_test_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Test, true);
+        assert_eq!(result, "Test module");
+    }
+
+    #[test]
+    fn test_module_description_test_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Test, false);
+        assert_eq!(result, "Test module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_unknown_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Unknown, true);
+        assert_eq!(result, "Module");
+    }
+
+    #[test]
+    fn test_module_description_unknown_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Unknown, false);
+        assert_eq!(result, "Module completely untested");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_entry_point_zero_coverage() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/main.rs"),
+            function: Some("main".to_string()),
+            line: 1,
+            module_type: ModuleType::EntryPoint,
+            current_coverage: 0.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "Critical entry point with NO test coverage");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_core_zero_coverage() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/core.rs"),
+            function: Some("process".to_string()),
+            line: 1,
+            module_type: ModuleType::Core,
+            current_coverage: 0.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "Core module completely untested");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_api_zero_coverage() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/api.rs"),
+            function: Some("handler".to_string()),
+            line: 1,
+            module_type: ModuleType::Api,
+            current_coverage: 0.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "API handler with zero coverage");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_io_zero_coverage() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/io.rs"),
+            function: Some("read_file".to_string()),
+            line: 1,
+            module_type: ModuleType::IO,
+            current_coverage: 0.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "I/O module without any tests");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_other_zero_coverage() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/util.rs"),
+            function: Some("helper".to_string()),
+            line: 1,
+            module_type: ModuleType::Utility,
+            current_coverage: 0.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "Module has no test coverage");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_poorly_tested() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/core.rs"),
+            function: Some("process".to_string()),
+            line: 1,
+            module_type: ModuleType::Core,
+            current_coverage: 25.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "Poorly tested");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_moderately_tested() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/core.rs"),
+            function: Some("process".to_string()),
+            line: 1,
+            module_type: ModuleType::Core,
+            current_coverage: 45.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "Moderately tested");
+    }
+
+    #[test]
+    fn test_describe_coverage_status_well_tested() {
+        let target = TestTarget {
+            id: "test".to_string(),
+            path: std::path::PathBuf::from("src/core.rs"),
+            function: Some("process".to_string()),
+            line: 1,
+            module_type: ModuleType::Core,
+            current_coverage: 85.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 10.0,
+            debt_items: 0,
+        };
+
+        let result = describe_coverage_status(&target);
+        assert_eq!(result, "Well tested");
+    }
+}
