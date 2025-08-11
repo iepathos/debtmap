@@ -10,9 +10,10 @@ use crate::priority::{
     ActionableRecommendation, DebtType, ImpactMetrics,
 };
 use crate::risk::lcov::LcovData;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
     pub complexity_factor: f64, // 0-10, weighted 25%
     pub coverage_factor: f64,   // 0-10, weighted 35%
@@ -22,7 +23,7 @@ pub struct UnifiedScore {
     pub final_score: f64,       // Computed composite score
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedDebtItem {
     pub location: Location,
     pub debt_type: DebtType,
@@ -37,7 +38,7 @@ pub struct UnifiedDebtItem {
     pub function_length: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Location {
     pub file: PathBuf,
     pub function: String,
