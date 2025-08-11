@@ -24,6 +24,8 @@ Run debtmap to analyze the current tech debt and get the top recommendation:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
+- **CRITICAL**: Record the TOTAL DEBT SCORE value shown at the bottom (e.g., "TOTAL DEBT SCORE: 3735")
+- Store this as your BASELINE DEBT SCORE for comparison later
 - Note the top recommendation details:
   - Priority SCORE value
   - TEST GAP location (file:line and function)
@@ -120,6 +122,8 @@ Run debtmap again to verify improvement:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
+- **CRITICAL**: Record the NEW TOTAL DEBT SCORE value
+- Calculate debt score change: BASELINE - NEW
 - Verify the original issue is resolved (should no longer be #1 priority)
 - Note what the new top priority is
 - Confirm your coverage change calculation from Step 7
@@ -133,6 +137,7 @@ test: add comprehensive tests for [module/function name]
 
 - Added [number] test cases covering [specific scenarios]
 - Coverage: +X.XX% (from XX.XX% to YY.YY%)
+- Debt score: -XX (from XXXX to YYYY)
 - Resolved: Priority 10.0 - [function] with 0% coverage
 
 Tech debt: Fixed top priority issue
@@ -145,6 +150,7 @@ refactor: reduce complexity in [module/function name]
 - [Specific refactoring applied, e.g., "Replaced nested loops with iterator chain"]
 - Complexity reduced from [X] to [Y]
 - Coverage: +X.XX% (from XX.XX% to YY.YY%) [if tests were added]
+- Debt score: -XX (from XXXX to YYYY)
 - Resolved: Priority 10.0 - [function] complexity [X]
 
 Tech debt: Fixed top priority issue
@@ -158,8 +164,9 @@ Tech debt: Fixed top priority issue
 Every commit MUST include:
 1. What was changed (refactoring or tests added)
 2. **Coverage change with actual percentages** (e.g., "+3.15% (from 48.32% to 51.47%)")
-3. The priority score and description of resolved issue
-4. If coverage wasn't measured, state: "Coverage: not measured (no lcov data)"
+3. **Debt score change with actual values** (e.g., "-150 (from 3735 to 3585)")
+4. The priority score and description of resolved issue
+5. If coverage wasn't measured, state: "Coverage: not measured (no lcov data)"
 
 ## Success Criteria
 

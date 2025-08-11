@@ -53,6 +53,17 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
         writeln!(output).unwrap();
     }
 
+    // Add total debt score
+    writeln!(output).unwrap();
+    writeln!(
+        output,
+        "📊 {}",
+        format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score)
+            .bright_cyan()
+            .bold()
+    )
+    .unwrap();
+
     // Add high-impact low-complexity fixes section
     // _format_quick_wins(&mut output, analysis);
 

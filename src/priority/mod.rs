@@ -100,7 +100,7 @@ impl UnifiedAnalysis {
         for item in &self.items {
             // Sum up all final scores as the total debt score
             total_debt_score += item.unified_score.final_score;
-            
+
             // Only count functions that actually need testing
             if item.expected_impact.coverage_improvement > 0.0 {
                 _functions_to_test += 1;
