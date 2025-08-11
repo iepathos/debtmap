@@ -3,10 +3,13 @@ number: 18
 title: Semantic Delegation Detection with Coverage Propagation
 category: optimization
 priority: high
-status: draft
+status: superseded
 dependencies: [05, 08]
 created: 2025-01-11
+superseded_by: 19
 ---
+
+**Note**: This specification has been superseded by [Specification 19: Unified Debt Prioritization with Semantic Analysis](19-unified-debt-prioritization-with-semantic-analysis.md), which integrates the semantic analysis and delegation detection concepts into a unified prioritization system.
 
 # Specification 18: Semantic Delegation Detection with Coverage Propagation
 

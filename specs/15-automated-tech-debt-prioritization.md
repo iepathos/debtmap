@@ -3,10 +3,13 @@ number: 15
 title: Automated Tech Debt Prioritization
 category: optimization
 priority: high
-status: draft
+status: superseded
 dependencies: [5, 8, 14]
 created: 2025-08-10
+superseded_by: 19
 ---
+
+**Note**: This specification has been superseded by [Specification 19: Unified Debt Prioritization with Semantic Analysis](19-unified-debt-prioritization-with-semantic-analysis.md), which combines the prioritization concepts from this spec with semantic analysis capabilities.
 
 # Specification 15: Automated Tech Debt Prioritization
 
