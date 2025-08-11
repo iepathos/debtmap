@@ -393,6 +393,12 @@ mod tests {
     use crate::priority::{ActionableRecommendation, ImpactMetrics, UnifiedScore};
     use std::path::PathBuf;
 
+    fn strip_ansi_codes(s: &str) -> String {
+        // Simple regex to strip ANSI escape codes
+        let re = regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+        re.replace_all(s, "").to_string()
+    }
+
     fn create_test_item(score: f64) -> UnifiedDebtItem {
         UnifiedDebtItem {
             location: Location {
@@ -438,9 +444,11 @@ mod tests {
         analysis.sort_by_priority();
 
         let output = format_priorities(&analysis, OutputFormat::PrioritiesOnly);
-        assert!(output.contains("TOP PRIORITIES:"));
-        assert!(output.contains("1. Add tests"));
-        assert!(output.contains("High-impact items"));
+        let output_plain = strip_ansi_codes(&output);
+
+        assert!(output_plain.contains("TOP PRIORITIES:"));
+        assert!(output_plain.contains("1. Add tests"));
+        assert!(output_plain.contains("High-impact items"));
     }
 
     #[test]
@@ -452,11 +460,15 @@ mod tests {
         analysis.calculate_total_impact();
 
         let output = format_priorities(&analysis, OutputFormat::Default);
-        assert!(output.contains("PRIORITY TECHNICAL DEBT FIXES"));
-        assert!(output.contains("TOP 2 RECOMMENDATIONS"));
-        assert!(output.contains("SCORE: 9.0"));
-        assert!(output.contains("[CRITICAL]"));
-        assert!(output.contains("TOTAL IMPACT"));
+
+        // Strip ANSI color codes for testing
+        let output_plain = strip_ansi_codes(&output);
+
+        assert!(output_plain.contains("PRIORITY TECHNICAL DEBT FIXES"));
+        assert!(output_plain.contains("TOP 2 RECOMMENDATIONS"));
+        assert!(output_plain.contains("SCORE: 9.0"));
+        assert!(output_plain.contains("[CRITICAL]"));
+        assert!(output_plain.contains("TOTAL IMPACT"));
     }
 
     #[test]
