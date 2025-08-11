@@ -153,7 +153,6 @@ fn extract_rust_function_smell_items(
 ) -> Vec<DebtItem> {
     functions
         .iter()
-        .filter(|func| !func.is_test)
         .flat_map(|func| analyze_function_smells(func, 0))
         .map(|smell| smell.to_debt_item())
         .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
@@ -357,7 +356,7 @@ fn extract_debt_items(
 ) -> Vec<DebtItem> {
     functions
         .iter()
-        .filter(|func| !func.is_test && func.is_complex(threshold))
+        .filter(|func| func.is_complex(threshold))
         .map(|func| create_complexity_debt_item(func, threshold))
         .collect()
 }
