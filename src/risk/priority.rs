@@ -114,11 +114,49 @@ pub fn prioritize_by_roi(
     functions: &Vector<FunctionRisk>,
     analyzer: &RiskAnalyzer,
 ) -> Vector<TestingRecommendation> {
-    // Filter out test functions before generating recommendations
-    // We check against the function metrics to see if it's marked as a test
+    // Filter out test functions and redundant closures
+    // A closure is redundant if its parent function is also untested
+    let untested_functions: Vec<&FunctionRisk> = functions
+        .iter()
+        .filter(|f| !f.is_test_function && f.coverage_percentage.unwrap_or(100.0) == 0.0)
+        .collect();
+    
     let targets: Vec<TestTarget> = functions
         .iter()
-        .filter(|f| !f.is_test_function)
+        .filter(|f| {
+            // Skip test functions
+            if f.is_test_function {
+                return false;
+            }
+            
+            // Skip closures if their parent function (on the same file, earlier line) is also untested
+            if f.function_name.starts_with("<closure@") {
+                // Check if there's an untested parent function that would contain this closure
+                let closure_file = &f.file;
+                let closure_line = f.line_range.0;
+                
+                // Look for untested functions in the same file that could be the parent
+                // Note: line_range.1 often underestimates the actual end line due to how
+                // function length is calculated (only counting body lines, not signature)
+                // So we use a more lenient check: if the closure is within 20 lines after
+                // the function start, it's likely part of that function
+                let has_untested_parent = untested_functions.iter().any(|parent| {
+                    let same_file = parent.file == *closure_file;
+                    let not_closure = !parent.function_name.starts_with("<closure@");
+                    // More lenient: closure within 20 lines of function start
+                    let likely_contains = parent.line_range.0 <= closure_line 
+                        && closure_line <= parent.line_range.0 + 20;
+                    
+                    same_file && not_closure && likely_contains
+                });
+                
+                if has_untested_parent {
+                    return false; // Skip this closure, its parent is already untested
+                }
+            }
+            
+            true
+        })
         .map(function_risk_to_target)
         .collect();
     let pipeline = PrioritizationPipeline::new();
