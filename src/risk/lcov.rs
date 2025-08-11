@@ -189,29 +189,26 @@ impl LcovData {
     ) -> Option<f64> {
         // Special handling for closures: they inherit coverage from their parent function
         if function_name.starts_with("<closure@") {
-            // For closures, find the parent function that contains this line
-            return self
-                .generate_path_variations(file)
-                .into_iter()
-                .filter_map(|path| self.functions.get(&path))
-                .find_map(|funcs| {
-                    // Find the function that contains this line number
-                    // Functions are typically ordered by line number
-                    let mut best_match: Option<&FunctionCoverage> = None;
-                    for func in funcs {
-                        if func.start_line <= line {
-                            best_match = Some(func);
-                        } else if best_match.is_some() {
-                            // We've passed the line, use the previous match
-                            break;
-                        }
-                    }
-                    best_match.map(|f| f.coverage_percentage)
-                });
+            return self.find_closure_coverage(file, line);
         }
 
         // For regular functions, use the standard matching
         self.get_function_coverage(file, function_name)
+    }
+
+    fn find_closure_coverage(&self, file: &Path, line: usize) -> Option<f64> {
+        self.generate_path_variations(file)
+            .into_iter()
+            .filter_map(|path| self.functions.get(&path))
+            .find_map(|funcs| self.find_containing_function(funcs, line))
+    }
+
+    fn find_containing_function(&self, functions: &[FunctionCoverage], line: usize) -> Option<f64> {
+        functions
+            .iter()
+            .rev()
+            .find(|func| func.start_line <= line)
+            .map(|func| func.coverage_percentage)
     }
 
     // Extract path generation logic to a pure function
