@@ -14,18 +14,19 @@ Run the following command to generate LCOV coverage data:
 ```
 cargo tarpaulin --out lcov --output-dir target/coverage --timeout 120
 ```
-- **CRITICAL**: Record the coverage percentage from tarpaulin output (e.g., "Coverage Results: 48.32%")
-- Store this as your BASELINE COVERAGE for comparison later
 - Verify the file `target/coverage/lcov.info` was created
 - If tarpaulin fails, note the error and proceed with analysis without coverage
+- The baseline coverage will be recorded from debtmap's output in Step 2
 
 ### Step 2: Initial Analysis
 Run debtmap to analyze the current tech debt and get the top recommendation:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
-- **CRITICAL**: Record the TOTAL DEBT SCORE value shown at the bottom (e.g., "TOTAL DEBT SCORE: 3735")
-- Store this as your BASELINE DEBT SCORE for comparison later
+- **CRITICAL**: Record the BASELINE values shown at the bottom:
+  - TOTAL DEBT SCORE (e.g., "TOTAL DEBT SCORE: 3735")
+  - OVERALL COVERAGE (e.g., "OVERALL COVERAGE: 48.32%")
+- Store these as your BASELINE values for comparison later
 - Note the top recommendation details:
   - Priority SCORE value
   - TEST GAP location (file:line and function)
@@ -205,25 +206,26 @@ just ci
 - No clippy warnings allowed
 - Code must be properly formatted
 
-### Step 7: Regenerate Coverage and Calculate Change
+### Step 7: Regenerate Coverage
 If you added tests, regenerate coverage:
 ```
 cargo tarpaulin --out lcov --output-dir target/coverage --timeout 120
 ```
-- **CRITICAL**: Record the NEW coverage percentage from tarpaulin output
-- Calculate coverage change: NEW% - BASELINE% 
-- Example: If baseline was 48.32% and new is 51.47%, the change is +3.15%
+- This will update the lcov.info file for the final analysis
 
 ### Step 8: Final Analysis
 Run debtmap again to verify improvement:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
-- **CRITICAL**: Record the NEW TOTAL DEBT SCORE value
-- Calculate debt score change: BASELINE - NEW
+- **CRITICAL**: Record the NEW values:
+  - TOTAL DEBT SCORE
+  - OVERALL COVERAGE percentage
+- Calculate the changes:
+  - Coverage change: NEW% - BASELINE%
+  - Debt score change: BASELINE - NEW
 - Verify the original issue is resolved (should no longer be #1 priority)
 - Note what the new top priority is
-- Confirm your coverage change calculation from Step 7
 
 ### Step 8.5: Understanding Metrics Changes
 
@@ -251,16 +253,16 @@ debtmap analyze . --lcov target/coverage/lcov.info --top 1
 - Consider long-term maintainability over short-term metrics
 
 ### Step 9: Commit Changes
-Create a descriptive commit message:
+Create a descriptive commit message using the values recorded from debtmap:
 
 **For test additions:**
 ```
 test: add comprehensive tests for [module/function name]
 
 - Added [number] test cases covering [specific scenarios]
-- Coverage: +X.XX% (from XX.XX% to YY.YY%)
-- Debt score: -XX (from XXXX to YYYY)
-- Resolved: Priority 10.0 - [function] with 0% coverage
+- Coverage: +X.XX% (from BASELINE% to NEW%)
+- Debt score: [+/-]XX (from BASELINE to NEW)
+- Resolved: Priority [SCORE] - [function] with [coverage]% coverage
 
 Tech debt: Fixed top priority issue
 ```
@@ -271,12 +273,14 @@ refactor: reduce complexity in [module/function name]
 
 - [Specific refactoring applied, e.g., "Replaced nested loops with iterator chain"]
 - Complexity reduced from [X] to [Y]
-- Coverage: +X.XX% (from XX.XX% to YY.YY%) [if tests were added]
-- Debt score: -XX (from XXXX to YYYY)
-- Resolved: Priority 10.0 - [function] complexity [X]
+- Coverage: +X.XX% (from BASELINE% to NEW%) [if coverage changed]
+- Debt score: [+/-]XX (from BASELINE to NEW)
+- Resolved: Priority [SCORE] - [function] complexity [X]
 
 Tech debt: Fixed top priority issue
 ```
+
+**Important**: Use the exact coverage percentages and debt scores from debtmap's output, not from tarpaulin directly.
 
 ## Important Instructions
 
@@ -285,10 +289,12 @@ Tech debt: Fixed top priority issue
 **COMMIT MESSAGE REQUIREMENTS**:
 Every commit MUST include:
 1. What was changed (refactoring or tests added)
-2. **Coverage change with actual percentages** (e.g., "+3.15% (from 48.32% to 51.47%)")
-3. **Debt score change with actual values** (e.g., "-150 (from 3735 to 3585)")
+2. **Coverage change with actual percentages from debtmap** (e.g., "+3.15% (from 48.32% to 51.47%)")
+3. **Debt score change with actual values from debtmap** (e.g., "-150 (from 3735 to 3585)")
 4. The priority score and description of resolved issue
 5. If coverage wasn't measured, state: "Coverage: not measured (no lcov data)"
+
+**Note**: Always use the OVERALL COVERAGE percentage shown by debtmap, not the line coverage from tarpaulin.
 
 ## Success Criteria
 

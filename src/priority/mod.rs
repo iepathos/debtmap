@@ -20,6 +20,7 @@ pub struct UnifiedAnalysis {
     pub total_impact: ImpactMetrics,
     pub total_debt_score: f64,
     pub call_graph: CallGraph,
+    pub overall_coverage: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +90,7 @@ impl UnifiedAnalysis {
             },
             total_debt_score: 0.0,
             call_graph,
+            overall_coverage: None,
         }
     }
 

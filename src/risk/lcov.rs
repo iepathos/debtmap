@@ -264,6 +264,27 @@ impl LcovData {
             }
         })
     }
+
+    /// Calculate the overall project coverage percentage
+    pub fn get_overall_coverage(&self) -> f64 {
+        let mut total_functions = 0;
+        let mut covered_functions = 0;
+
+        for funcs in self.functions.values() {
+            for func in funcs {
+                total_functions += 1;
+                if func.execution_count > 0 {
+                    covered_functions += 1;
+                }
+            }
+        }
+
+        if total_functions == 0 {
+            0.0
+        } else {
+            (covered_functions as f64 / total_functions as f64) * 100.0
+        }
+    }
 }
 
 #[cfg(test)]

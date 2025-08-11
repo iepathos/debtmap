@@ -809,6 +809,12 @@ fn create_unified_analysis(
 
     unified.sort_by_priority();
     unified.calculate_total_impact();
+
+    // Set overall coverage if lcov data is available
+    if let Some(lcov) = coverage_data {
+        unified.overall_coverage = Some(lcov.get_overall_coverage());
+    }
+
     unified
 }
 
