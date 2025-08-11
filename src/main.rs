@@ -256,56 +256,74 @@ fn build_context_aggregator(
         return None;
     }
 
-    let mut aggregator = risk::context::ContextAggregator::new();
-
-    // Determine which providers to enable
-    let enabled_providers = if let Some(providers) = context_providers {
-        providers
-    } else {
-        // Default providers
-        vec![
-            "critical_path".to_string(),
-            "dependency".to_string(),
-            "git_history".to_string(),
-        ]
-    };
-
+    let enabled_providers = context_providers.unwrap_or_else(get_default_providers);
     let disabled = disable_context.unwrap_or_default();
 
-    for provider_name in enabled_providers {
-        if disabled.contains(&provider_name) {
-            continue;
-        }
-
-        match provider_name.as_str() {
-            "critical_path" => {
-                // For now, create a simple critical path analyzer
-                // In a real implementation, we'd build this from the AST
-                let analyzer = risk::context::critical_path::CriticalPathAnalyzer::new();
-                let provider = risk::context::critical_path::CriticalPathProvider::new(analyzer);
-                aggregator = aggregator.with_provider(Box::new(provider));
-            }
-            "dependency" => {
-                // Create dependency graph from analysis results
-                let graph = risk::context::dependency::DependencyGraph::new();
-                let provider = risk::context::dependency::DependencyRiskProvider::new(graph);
-                aggregator = aggregator.with_provider(Box::new(provider));
-            }
-            "git_history" => {
-                // Try to create git history provider
-                if let Ok(provider) =
-                    risk::context::git_history::GitHistoryProvider::new(project_path.to_path_buf())
-                {
-                    aggregator = aggregator.with_provider(Box::new(provider));
-                }
-            }
-            _ => {
-                eprintln!("Warning: Unknown context provider: {provider_name}");
-            }
-        }
-    }
+    let aggregator = enabled_providers
+        .into_iter()
+        .filter(|name| !disabled.contains(name))
+        .fold(
+            risk::context::ContextAggregator::new(),
+            |acc, provider_name| add_provider_to_aggregator(acc, &provider_name, project_path),
+        );
 
     Some(aggregator)
+}
+
+fn get_default_providers() -> Vec<String> {
+    vec![
+        "critical_path".to_string(),
+        "dependency".to_string(),
+        "git_history".to_string(),
+    ]
+}
+
+fn add_provider_to_aggregator(
+    aggregator: risk::context::ContextAggregator,
+    provider_name: &str,
+    project_path: &Path,
+) -> risk::context::ContextAggregator {
+    match create_provider(provider_name, project_path) {
+        Some(provider) => aggregator.with_provider(provider),
+        None => {
+            eprintln!("Warning: Unknown context provider: {provider_name}");
+            aggregator
+        }
+    }
+}
+
+fn create_provider(
+    provider_name: &str,
+    project_path: &Path,
+) -> Option<Box<dyn risk::context::ContextProvider>> {
+    match provider_name {
+        "critical_path" => Some(create_critical_path_provider()),
+        "dependency" => Some(create_dependency_provider()),
+        "git_history" => create_git_history_provider(project_path),
+        _ => None,
+    }
+}
+
+fn create_critical_path_provider() -> Box<dyn risk::context::ContextProvider> {
+    let analyzer = risk::context::critical_path::CriticalPathAnalyzer::new();
+    Box::new(risk::context::critical_path::CriticalPathProvider::new(
+        analyzer,
+    ))
+}
+
+fn create_dependency_provider() -> Box<dyn risk::context::ContextProvider> {
+    let graph = risk::context::dependency::DependencyGraph::new();
+    Box::new(risk::context::dependency::DependencyRiskProvider::new(
+        graph,
+    ))
+}
+
+fn create_git_history_provider(
+    project_path: &Path,
+) -> Option<Box<dyn risk::context::ContextProvider>> {
+    risk::context::git_history::GitHistoryProvider::new(project_path.to_path_buf())
+        .ok()
+        .map(|provider| Box::new(provider) as Box<dyn risk::context::ContextProvider>)
 }
 
 fn analyze_risk_with_coverage(
