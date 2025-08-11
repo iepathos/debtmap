@@ -51,6 +51,18 @@ impl CallGraph {
         }
     }
 
+    pub fn merge(&mut self, other: CallGraph) {
+        // Merge nodes
+        for (id, node) in other.nodes {
+            self.nodes.insert(id, node);
+        }
+
+        // Merge edges
+        for call in other.edges {
+            self.add_call(call);
+        }
+    }
+
     pub fn add_function(
         &mut self,
         id: FunctionId,

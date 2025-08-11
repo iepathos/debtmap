@@ -12,6 +12,7 @@ use crate::debt::patterns::{
 };
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::priority::call_graph::CallGraph;
 use anyhow::Result;
 use quote::ToTokens;
 use std::path::{Path, PathBuf};
@@ -59,6 +60,11 @@ impl Analyzer for RustAnalyzer {
     fn language(&self) -> Language {
         Language::Rust
     }
+}
+
+pub fn extract_rust_call_graph(ast: &RustAst) -> CallGraph {
+    use super::rust_call_graph::extract_call_graph;
+    extract_call_graph(&ast.file, &ast.path)
 }
 
 fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {

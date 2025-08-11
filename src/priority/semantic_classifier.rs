@@ -25,6 +25,11 @@ pub fn classify_function_role(
         return FunctionRole::EntryPoint;
     }
 
+    // Check if function name suggests orchestration
+    if is_orchestrator_by_name(&func_id.name) && func.cyclomatic <= 3 {
+        return FunctionRole::Orchestrator;
+    }
+
     // Simple orchestration: low complexity, mostly delegates
     if func.cyclomatic <= 2
         && func.cognitive <= 3
@@ -51,6 +56,35 @@ fn is_entry_point_by_name(name: &str) -> bool {
     entry_patterns
         .iter()
         .any(|pattern| name_lower.starts_with(pattern) || name_lower.ends_with(pattern))
+}
+
+fn is_orchestrator_by_name(name: &str) -> bool {
+    let orchestrator_patterns = [
+        "orchestrate",
+        "coordinate",
+        "manage",
+        "dispatch",
+        "route",
+        "if_requested",
+        "if_needed",
+        "if_enabled",
+        "maybe",
+        "try_",
+        "attempt_",
+        "delegate",
+        "forward",
+    ];
+
+    let name_lower = name.to_lowercase();
+
+    // Check for conditional patterns like generate_report_if_requested
+    if name_lower.contains("_if_") || name_lower.contains("_when_") {
+        return true;
+    }
+
+    orchestrator_patterns
+        .iter()
+        .any(|pattern| name_lower.contains(pattern))
 }
 
 fn delegates_to_tested_functions(
