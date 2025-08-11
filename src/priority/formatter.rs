@@ -313,7 +313,10 @@ fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
         if impact.coverage_improvement >= 100.0 {
             parts.push("Full test coverage".to_string());
         } else if impact.coverage_improvement >= 50.0 {
-            parts.push(format!("+{}% function coverage", impact.coverage_improvement as i32));
+            parts.push(format!(
+                "+{}% function coverage",
+                impact.coverage_improvement as i32
+            ));
         } else {
             // For complex functions that need refactoring first
             parts.push("Partial coverage after refactor".to_string());
@@ -321,7 +324,10 @@ fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
     }
 
     if impact.complexity_reduction > 0.0 {
-        parts.push(format!("-{} complexity", impact.complexity_reduction as i32));
+        parts.push(format!(
+            "-{} complexity",
+            impact.complexity_reduction as i32
+        ));
     }
 
     if impact.risk_reduction > 0.0 {
