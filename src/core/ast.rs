@@ -275,7 +275,7 @@ mod tests {
             },
             path: PathBuf::from("test.rs"),
         });
-        
+
         // Currently returns empty vec, test that it doesn't panic
         let nodes = ast.extract_rust_nodes();
         assert_eq!(nodes.len(), 0);
@@ -315,7 +315,7 @@ mod tests {
             },
             path: PathBuf::from("test.rs"),
         });
-        
+
         let nodes = ast.extract_nodes();
         assert_eq!(nodes.len(), 0); // Expected since extract_rust_nodes returns empty
     }
@@ -336,21 +336,21 @@ mod tests {
             line: 5,
             children: vec![],
         };
-        
+
         let child2 = AstNode {
             kind: NodeKind::If,
             name: None,
             line: 6,
             children: vec![],
         };
-        
+
         let parent = AstNode {
             kind: NodeKind::Function,
             name: Some("parent_func".to_string()),
             line: 4,
             children: vec![child1, child2],
         };
-        
+
         assert_eq!(parent.children.len(), 2);
         assert_eq!(parent.children[0].kind, NodeKind::Block);
         assert_eq!(parent.children[1].kind, NodeKind::If);
@@ -372,7 +372,7 @@ mod tests {
             NodeKind::For,
             NodeKind::Match,
         ];
-        
+
         let non_branch_kinds = vec![
             NodeKind::Function,
             NodeKind::Method,
@@ -381,20 +381,24 @@ mod tests {
             NodeKind::Try,
             NodeKind::Block,
         ];
-        
+
         for kind in branch_kinds {
             assert!(
-                matches!(kind, NodeKind::If | NodeKind::While | NodeKind::For | NodeKind::Match),
-                "Expected {:?} to be a branch node",
-                kind
+                matches!(
+                    kind,
+                    NodeKind::If | NodeKind::While | NodeKind::For | NodeKind::Match
+                ),
+                "Expected {kind:?} to be a branch node"
             );
         }
-        
+
         for kind in non_branch_kinds {
             assert!(
-                !matches!(kind, NodeKind::If | NodeKind::While | NodeKind::For | NodeKind::Match),
-                "Expected {:?} to not be a branch node",
-                kind
+                !matches!(
+                    kind,
+                    NodeKind::If | NodeKind::While | NodeKind::For | NodeKind::Match
+                ),
+                "Expected {kind:?} to not be a branch node"
             );
         }
     }
@@ -409,7 +413,7 @@ mod tests {
             },
             path: PathBuf::from("test.rs"),
         });
-        
+
         let transformed = rust_ast.transform(|a| a);
         assert!(matches!(transformed, Ast::Rust(_)));
     }
@@ -419,7 +423,7 @@ mod tests {
         let ast1 = Ast::Unknown;
         let ast2 = Ast::Unknown;
         let ast3 = Ast::Unknown;
-        
+
         let combined = combine_asts(vec![ast1, ast2, ast3]);
         assert_eq!(combined.len(), 3);
     }
@@ -433,15 +437,15 @@ mod tests {
     #[test]
     fn test_filter_ast_with_multiple_predicates() {
         let ast = Ast::Unknown;
-        
+
         // Test with always true predicate
         let result1 = filter_ast(ast.clone(), |_| true);
         assert!(result1.is_some());
-        
+
         // Test with always false predicate
         let result2 = filter_ast(ast.clone(), |_| false);
         assert!(result2.is_none());
-        
+
         // Test with specific type check
         let result3 = filter_ast(ast.clone(), |a| matches!(a, Ast::Unknown));
         assert!(result3.is_some());
