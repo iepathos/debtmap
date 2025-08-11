@@ -182,3 +182,105 @@ pub struct ImpactAnalysis {
     pub affected_modules: Vec<String>,
     pub coverage_improvement: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::risk::priority::module_detection::ModuleType;
+
+    #[test]
+    fn test_module_description_entry_point_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::EntryPoint, true);
+        assert_eq!(result, "Critical entry point");
+    }
+
+    #[test]
+    fn test_module_description_entry_point_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::EntryPoint, false);
+        assert_eq!(result, "Critical entry point completely untested");
+    }
+
+    #[test]
+    fn test_module_description_core_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Core, true);
+        assert_eq!(result, "Core module");
+    }
+
+    #[test]
+    fn test_module_description_core_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Core, false);
+        assert_eq!(result, "Core module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_api_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Api, true);
+        assert_eq!(result, "API module");
+    }
+
+    #[test]
+    fn test_module_description_api_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Api, false);
+        assert_eq!(result, "API module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_io_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::IO, true);
+        assert_eq!(result, "I/O module");
+    }
+
+    #[test]
+    fn test_module_description_io_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::IO, false);
+        assert_eq!(result, "I/O module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_model_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Model, true);
+        assert_eq!(result, "Data model");
+    }
+
+    #[test]
+    fn test_module_description_model_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Model, false);
+        assert_eq!(result, "Data model completely untested");
+    }
+
+    #[test]
+    fn test_module_description_utility_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Utility, true);
+        assert_eq!(result, "Utility module");
+    }
+
+    #[test]
+    fn test_module_description_utility_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Utility, false);
+        assert_eq!(result, "Utility module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_test_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Test, true);
+        assert_eq!(result, "Test module");
+    }
+
+    #[test]
+    fn test_module_description_test_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Test, false);
+        assert_eq!(result, "Test module completely untested");
+    }
+
+    #[test]
+    fn test_module_description_unknown_with_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Unknown, true);
+        assert_eq!(result, "Module");
+    }
+
+    #[test]
+    fn test_module_description_unknown_without_coverage() {
+        let result = RationaleBuilder::module_description(&ModuleType::Unknown, false);
+        assert_eq!(result, "Module completely untested");
+    }
+}
