@@ -100,10 +100,20 @@ impl UnifiedAnalysis {
             risk_reduction += item.expected_impact.risk_reduction;
         }
 
+        // Cap coverage improvement at a realistic maximum (can't exceed 100%)
+        coverage_improvement = coverage_improvement.min(100.0);
+        
+        // Calculate average complexity reduction as a percentage
+        let avg_complexity_reduction = if !self.items.is_empty() {
+            (complexity_reduction / self.items.len() as f64).min(100.0)
+        } else {
+            0.0
+        };
+
         self.total_impact = ImpactMetrics {
             coverage_improvement,
             lines_reduction,
-            complexity_reduction,
+            complexity_reduction: avg_complexity_reduction,
             risk_reduction,
         };
     }

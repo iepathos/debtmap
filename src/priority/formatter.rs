@@ -278,7 +278,7 @@ fn format_total_impact(output: &mut String, analysis: &UnifiedAnalysis) {
     if impact.coverage_improvement > 0.0 {
         writeln!(
             output,
-            "• +{:.0}% test coverage",
+            "• +{:.1}% test coverage potential",
             impact.coverage_improvement
         )
         .unwrap();
@@ -309,7 +309,12 @@ fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
     let mut parts = Vec::new();
 
     if impact.coverage_improvement > 0.0 {
-        parts.push(format!("+{:.0}% coverage", impact.coverage_improvement));
+        // Show more realistic coverage contribution
+        if impact.coverage_improvement < 1.0 {
+            parts.push(format!("+{:.1}% module coverage", impact.coverage_improvement));
+        } else {
+            parts.push(format!("+{:.0}% module coverage", impact.coverage_improvement));
+        }
     }
 
     if impact.complexity_reduction > 0.0 {
