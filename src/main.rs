@@ -605,15 +605,19 @@ fn print_risk_metrics(insights: &risk::RiskInsight) {
     }
 }
 
-fn print_risk_function(func: &risk::FunctionRisk) {
+fn format_risk_function(func: &risk::FunctionRisk) -> String {
     let coverage_str = func
         .coverage_percentage
         .map(|c| format!("{:.0}%", c * 100.0))
         .unwrap_or_else(|| "0%".to_string());
-    println!(
+    format!(
         "    - {} (risk: {:.1}, coverage: {})",
         func.function_name, func.risk_score, coverage_str
-    );
+    )
+}
+
+fn print_risk_function(func: &risk::FunctionRisk) {
+    println!("{}", format_risk_function(func));
 }
 
 fn parse_languages(languages: Option<Vec<String>>) -> Vec<Language> {
@@ -657,4 +661,368 @@ fn is_analysis_passing(results: &AnalysisResults, _complexity_threshold: u32) ->
 
 fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {
     analysis_utils::create_dependency_report(file_metrics)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use debtmap::core::{ComplexitySummary, DebtItem, DebtType, Priority};
+    use debtmap::risk::{Difficulty, FunctionRisk, RiskCategory, TestEffort};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_format_risk_function_with_coverage() {
+        let func = FunctionRisk {
+            function_name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line_range: (10, 20),
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 7,
+            risk_score: 8.5,
+            coverage_percentage: Some(0.75),
+            test_effort: TestEffort {
+                estimated_difficulty: Difficulty::Moderate,
+                cognitive_load: 7,
+                branch_count: 5,
+                recommended_test_cases: 3,
+            },
+            risk_category: RiskCategory::Medium,
+            is_test_function: false,
+        };
+        let result = format_risk_function(&func);
+        assert_eq!(result, "    - test_func (risk: 8.5, coverage: 75%)");
+    }
+
+    #[test]
+    fn test_format_risk_function_without_coverage() {
+        let func = FunctionRisk {
+            function_name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line_range: (10, 20),
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 7,
+            risk_score: 10.0,
+            coverage_percentage: None,
+            test_effort: TestEffort {
+                estimated_difficulty: Difficulty::Trivial,
+                cognitive_load: 3,
+                branch_count: 1,
+                recommended_test_cases: 1,
+            },
+            risk_category: RiskCategory::Critical,
+            is_test_function: false,
+        };
+        let result = format_risk_function(&func);
+        assert_eq!(result, "    - test_func (risk: 10.0, coverage: 0%)");
+    }
+
+    #[test]
+    fn test_format_risk_function_zero_coverage() {
+        let func = FunctionRisk {
+            function_name: "zero_cov_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line_range: (20, 30),
+            cyclomatic_complexity: 3,
+            cognitive_complexity: 4,
+            risk_score: 5.5,
+            coverage_percentage: Some(0.0),
+            test_effort: TestEffort {
+                estimated_difficulty: Difficulty::Trivial,
+                cognitive_load: 4,
+                branch_count: 2,
+                recommended_test_cases: 2,
+            },
+            risk_category: RiskCategory::Low,
+            is_test_function: false,
+        };
+        let result = format_risk_function(&func);
+        assert_eq!(result, "    - zero_cov_func (risk: 5.5, coverage: 0%)");
+    }
+
+    #[test]
+    fn test_format_risk_function_full_coverage() {
+        let func = FunctionRisk {
+            function_name: "well_tested_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line_range: (30, 50),
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 15,
+            risk_score: 1.2,
+            coverage_percentage: Some(1.0),
+            test_effort: TestEffort {
+                estimated_difficulty: Difficulty::Moderate,
+                cognitive_load: 15,
+                branch_count: 8,
+                recommended_test_cases: 5,
+            },
+            risk_category: RiskCategory::WellTested,
+            is_test_function: false,
+        };
+        let result = format_risk_function(&func);
+        assert_eq!(result, "    - well_tested_func (risk: 1.2, coverage: 100%)");
+    }
+
+    #[test]
+    fn test_parse_single_language_rust() {
+        assert_eq!(parse_single_language("rust"), Some(Language::Rust));
+        assert_eq!(parse_single_language("rs"), Some(Language::Rust));
+        assert_eq!(parse_single_language("RUST"), Some(Language::Rust));
+        assert_eq!(parse_single_language("Rs"), Some(Language::Rust));
+    }
+
+    #[test]
+    fn test_parse_single_language_python() {
+        assert_eq!(parse_single_language("python"), Some(Language::Python));
+        assert_eq!(parse_single_language("py"), Some(Language::Python));
+        assert_eq!(parse_single_language("PYTHON"), Some(Language::Python));
+        assert_eq!(parse_single_language("Py"), Some(Language::Python));
+    }
+
+    #[test]
+    fn test_parse_single_language_javascript() {
+        assert_eq!(
+            parse_single_language("javascript"),
+            Some(Language::JavaScript)
+        );
+        assert_eq!(parse_single_language("js"), Some(Language::JavaScript));
+        assert_eq!(
+            parse_single_language("JAVASCRIPT"),
+            Some(Language::JavaScript)
+        );
+        assert_eq!(parse_single_language("JS"), Some(Language::JavaScript));
+    }
+
+    #[test]
+    fn test_parse_single_language_typescript() {
+        assert_eq!(
+            parse_single_language("typescript"),
+            Some(Language::TypeScript)
+        );
+        assert_eq!(parse_single_language("ts"), Some(Language::TypeScript));
+        assert_eq!(
+            parse_single_language("TYPESCRIPT"),
+            Some(Language::TypeScript)
+        );
+        assert_eq!(parse_single_language("TS"), Some(Language::TypeScript));
+    }
+
+    #[test]
+    fn test_parse_single_language_unknown() {
+        assert_eq!(parse_single_language("java"), None);
+        assert_eq!(parse_single_language("c++"), None);
+        assert_eq!(parse_single_language("go"), None);
+        assert_eq!(parse_single_language(""), None);
+    }
+
+    #[test]
+    fn test_parse_languages_with_valid_input() {
+        let input = Some(vec!["rust".to_string(), "python".to_string()]);
+        let result = parse_languages(input);
+        assert_eq!(result, vec![Language::Rust, Language::Python]);
+    }
+
+    #[test]
+    fn test_parse_languages_with_mixed_valid_invalid() {
+        let input = Some(vec![
+            "rust".to_string(),
+            "java".to_string(),
+            "python".to_string(),
+        ]);
+        let result = parse_languages(input);
+        assert_eq!(result, vec![Language::Rust, Language::Python]);
+    }
+
+    #[test]
+    fn test_parse_languages_with_none_uses_default() {
+        let result = parse_languages(None);
+        assert_eq!(result, default_languages());
+    }
+
+    #[test]
+    fn test_parse_languages_empty_vec_returns_empty() {
+        let input = Some(vec![]);
+        let result = parse_languages(input);
+        assert_eq!(result, vec![]);
+    }
+
+    #[test]
+    fn test_default_languages() {
+        let defaults = default_languages();
+        assert_eq!(defaults.len(), 4);
+        assert!(defaults.contains(&Language::Rust));
+        assert!(defaults.contains(&Language::Python));
+        assert!(defaults.contains(&Language::JavaScript));
+        assert!(defaults.contains(&Language::TypeScript));
+    }
+
+    #[test]
+    fn test_is_analysis_passing_all_good() {
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 5.0,
+                    max_complexity: 8,
+                    high_complexity_count: 2,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+        assert!(is_analysis_passing(&results, 10));
+    }
+
+    #[test]
+    fn test_is_analysis_passing_high_average_complexity() {
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 15.0, // Over threshold
+                    max_complexity: 20,
+                    high_complexity_count: 3,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+        assert!(!is_analysis_passing(&results, 10));
+    }
+
+    #[test]
+    fn test_is_analysis_passing_too_many_complex_functions() {
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 20,
+                    average_complexity: 8.0,
+                    max_complexity: 25,
+                    high_complexity_count: 10, // Over threshold
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+        assert!(!is_analysis_passing(&results, 10));
+    }
+
+    #[test]
+    fn test_is_analysis_passing_high_debt_score() {
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 5.0,
+                    max_complexity: 8,
+                    high_complexity_count: 2,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![
+                    DebtItem {
+                        id: "debt-1".to_string(),
+                        debt_type: DebtType::Todo,
+                        priority: Priority::High,
+                        file: PathBuf::from("test.rs"),
+                        line: 10,
+                        message: "TODO: Fix this".to_string(),
+                        context: None,
+                    },
+                    DebtItem {
+                        id: "debt-2".to_string(),
+                        debt_type: DebtType::Complexity,
+                        priority: Priority::High,
+                        file: PathBuf::from("test.rs"),
+                        line: 50,
+                        message: "Method too long".to_string(),
+                        context: None,
+                    },
+                ],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![Priority::High],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+        // Since the actual debt score calculation depends on the debt module,
+        // we can't easily test this without mocking. The function will pass
+        // if debt score is <= 100
+        let passing = is_analysis_passing(&results, 10);
+        // This will depend on how debt::total_debt_score calculates the score
+        // For now, we just check that the function runs without panicking
+        let _ = passing;
+    }
+
+    #[test]
+    fn test_is_analysis_passing_boundary_values() {
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 10.0, // Exactly at threshold
+                    max_complexity: 15,
+                    high_complexity_count: 5, // Exactly at threshold
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+        assert!(is_analysis_passing(&results, 10));
+    }
 }

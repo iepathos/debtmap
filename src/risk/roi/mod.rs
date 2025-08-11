@@ -175,12 +175,15 @@ impl ROICalculator {
     fn get_complexity_weight(&self, target: &TestTarget) -> f64 {
         // Apply complexity weighting to heavily penalize trivial functions
         // This prevents delegation functions from dominating ROI recommendations
-        match (target.complexity.cyclomatic_complexity, target.complexity.cognitive_complexity) {
-            (1, 0..=1) => 0.1,   // Trivial delegation - 90% reduction
-            (1, 2..=3) => 0.3,   // Very simple - 70% reduction  
-            (2..=3, _) => 0.5,   // Simple - 50% reduction
-            (4..=5, _) => 0.7,   // Moderate - 30% reduction
-            _ => 1.0,            // Complex - no reduction
+        match (
+            target.complexity.cyclomatic_complexity,
+            target.complexity.cognitive_complexity,
+        ) {
+            (1, 0..=1) => 0.1, // Trivial delegation - 90% reduction
+            (1, 2..=3) => 0.3, // Very simple - 70% reduction
+            (2..=3, _) => 0.5, // Simple - 50% reduction
+            (4..=5, _) => 0.7, // Moderate - 30% reduction
+            _ => 1.0,          // Complex - no reduction
         }
     }
 
