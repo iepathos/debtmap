@@ -305,7 +305,7 @@ fn generate_recommendation(
 }
 
 fn calculate_expected_impact(
-    func: &FunctionMetrics,
+    _func: &FunctionMetrics,
     debt_type: &DebtType,
     score: &UnifiedScore,
 ) -> ImpactMetrics {

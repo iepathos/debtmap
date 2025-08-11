@@ -16,6 +16,7 @@ use im::Vector;
 pub struct UnifiedAnalysis {
     pub items: Vector<UnifiedDebtItem>,
     pub total_impact: ImpactMetrics,
+    pub total_debt_score: f64,
     pub call_graph: CallGraph,
 }
 
@@ -68,6 +69,7 @@ impl UnifiedAnalysis {
                 complexity_reduction: 0.0,
                 risk_reduction: 0.0,
             },
+            total_debt_score: 0.0,
             call_graph,
         }
     }
@@ -92,12 +94,16 @@ impl UnifiedAnalysis {
         let mut lines_reduction = 0;
         let mut complexity_reduction = 0.0;
         let mut risk_reduction = 0.0;
-        let mut functions_to_test = 0;
+        let mut _functions_to_test = 0;
+        let mut total_debt_score = 0.0;
 
         for item in &self.items {
+            // Sum up all final scores as the total debt score
+            total_debt_score += item.unified_score.final_score;
+            
             // Only count functions that actually need testing
             if item.expected_impact.coverage_improvement > 0.0 {
-                functions_to_test += 1;
+                _functions_to_test += 1;
                 // Each function contributes a small amount to overall coverage
                 // Estimate based on function count (rough approximation)
                 coverage_improvement += item.expected_impact.coverage_improvement / 100.0;
@@ -114,6 +120,7 @@ impl UnifiedAnalysis {
         // Total complexity reduction (sum of all reductions)
         let total_complexity_reduction = complexity_reduction;
 
+        self.total_debt_score = total_debt_score;
         self.total_impact = ImpactMetrics {
             coverage_improvement,
             lines_reduction,

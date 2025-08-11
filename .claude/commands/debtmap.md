@@ -9,11 +9,13 @@ Use debtmap to analyze the repository and identify tech debt, then fix the highe
 
 ## Process
 
-### Step 1: Generate Coverage Data
+### Step 1: Generate Coverage Data and Record Baseline
 Run the following command to generate LCOV coverage data:
 ```
 cargo tarpaulin --out lcov --output-dir target/coverage --timeout 120
 ```
+- **CRITICAL**: Record the coverage percentage from tarpaulin output (e.g., "Coverage Results: 48.32%")
+- Store this as your BASELINE COVERAGE for comparison later
 - Verify the file `target/coverage/lcov.info` was created
 - If tarpaulin fails, note the error and proceed with analysis without coverage
 
@@ -22,10 +24,11 @@ Run debtmap to analyze the current tech debt and get the top recommendation:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
-- **CRITICAL - RECORD ALL INITIAL VALUES**: You MUST save and note:
-  - Current test coverage percentage (if lcov is available)
-  - Complexity metrics from the top recommendation
-  - Function/file being analyzed
+- Note the top recommendation details:
+  - Priority SCORE value
+  - TEST GAP location (file:line and function)
+  - ACTION required
+  - IMPACT predictions
 - If LCOV file is missing, run without the `--lcov` flag but note "Coverage: not measured"
 
 ### Step 3: Identify Priority
@@ -103,24 +106,23 @@ just ci
 - No clippy warnings allowed
 - Code must be properly formatted
 
-### Step 7: Regenerate Coverage
+### Step 7: Regenerate Coverage and Calculate Change
 If you added tests, regenerate coverage:
 ```
 cargo tarpaulin --out lcov --output-dir target/coverage --timeout 120
 ```
+- **CRITICAL**: Record the NEW coverage percentage from tarpaulin output
+- Calculate coverage change: NEW% - BASELINE% 
+- Example: If baseline was 48.32% and new is 51.47%, the change is +3.15%
 
 ### Step 8: Final Analysis
-Run debtmap again to measure improvement:
+Run debtmap again to verify improvement:
 ```
 debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
-- **CRITICAL**: Note the new top recommendation
-- Compare with initial analysis:
-  - Has the original issue been resolved?
-  - What is the new top priority?
-  - Document coverage improvements if tests were added
-- **REQUIRED**: If coverage was measured, you MUST include the coverage change in the commit message
-- Document specific improvements achieved
+- Verify the original issue is resolved (should no longer be #1 priority)
+- Note what the new top priority is
+- Confirm your coverage change calculation from Step 7
 
 ### Step 9: Commit Changes
 Create a descriptive commit message:
@@ -130,10 +132,10 @@ Create a descriptive commit message:
 test: add comprehensive tests for [module/function name]
 
 - Added [number] test cases covering [specific scenarios]
-- Coverage improvement: [describe impact if measured]
-- Resolved priority: [describe the specific issue from debtmap]
+- Coverage: +X.XX% (from XX.XX% to YY.YY%)
+- Resolved: Priority 10.0 - [function] with 0% coverage
 
-Tech debt: Priority score [X] issue resolved
+Tech debt: Fixed top priority issue
 ```
 
 **For complexity reduction:**
@@ -142,21 +144,22 @@ refactor: reduce complexity in [module/function name]
 
 - [Specific refactoring applied, e.g., "Replaced nested loops with iterator chain"]
 - Complexity reduced from [X] to [Y]
-- Resolved priority: [describe the specific issue from debtmap]
+- Coverage: +X.XX% (from XX.XX% to YY.YY%) [if tests were added]
+- Resolved: Priority 10.0 - [function] complexity [X]
 
-Tech debt: Priority score [X] issue resolved
+Tech debt: Fixed top priority issue
 ```
 
 ## Important Instructions
 
 **IMPORTANT**: When making ANY commits, do NOT include attribution text like "🤖 Generated with Claude Code" or "Co-Authored-By: Claude" in commit messages. Keep commits clean and focused on the actual changes.
 
-**COMMIT MESSAGE FOCUS**:
-Commit messages should focus on:
+**COMMIT MESSAGE REQUIREMENTS**:
+Every commit MUST include:
 1. What was changed (refactoring or tests added)
-2. The specific improvement made
-3. The priority score of the resolved issue
-4. Coverage impact if applicable
+2. **Coverage change with actual percentages** (e.g., "+3.15% (from 48.32% to 51.47%)")
+3. The priority score and description of resolved issue
+4. If coverage wasn't measured, state: "Coverage: not measured (no lcov data)"
 
 ## Success Criteria
 
