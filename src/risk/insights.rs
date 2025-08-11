@@ -232,66 +232,87 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     output
 }
 
-pub fn format_actionable_insights(insight: &RiskInsight) -> String {
-    let mut output = String::new();
-
-    output.push_str("💡 ACTIONABLE INSIGHTS\n");
-    output.push_str("──────────────────────\n");
-
-    let critical_count = insight.risk_distribution.critical_count;
-    let high_count = insight.risk_distribution.high_count;
-
-    if critical_count > 0 {
-        output.push_str(&format!(
+fn format_critical_functions_insight(critical_count: usize) -> Option<String> {
+    (critical_count > 0).then(|| {
+        format!(
             "• Focus testing on the {} critical risk function{} first\n",
             critical_count,
             if critical_count == 1 { "" } else { "s" }
-        ));
-    }
+        )
+    })
+}
 
-    if let Some(correlation) = insight.complexity_coverage_correlation {
-        if correlation < -0.3 {
-            output.push_str(&format!(
-                "• ✅ Good news: Complex code tends to be better tested (correlation: {correlation:.2})\n"
-            ));
-        } else if correlation > 0.3 {
-            output.push_str(&format!(
-                "• ⚠️  Warning: Complex code lacks coverage (correlation: {correlation:.2})\n"
-            ));
-        }
+fn format_correlation_insight(correlation: f64) -> Option<String> {
+    match correlation {
+        c if c < -0.3 => Some(format!(
+            "• ✅ Good news: Complex code tends to be better tested (correlation: {c:.2})\n"
+        )),
+        c if c > 0.3 => Some(format!(
+            "• ⚠️  Warning: Complex code lacks coverage (correlation: {c:.2})\n"
+        )),
+        _ => None,
     }
+}
 
+fn calculate_estimated_effort(insight: &RiskInsight, total_high_risk: usize) -> u32 {
+    insight
+        .top_risks
+        .iter()
+        .take(total_high_risk)
+        .map(|r| r.test_effort.recommended_test_cases)
+        .sum()
+}
+
+fn format_effort_insight(estimated_effort: u32) -> Option<String> {
+    (estimated_effort > 0).then(|| {
+        format!(
+            "• Estimated test effort for safe risk level: {}-{} test cases\n",
+            estimated_effort,
+            estimated_effort + (estimated_effort / 2)
+        )
+    })
+}
+
+fn calculate_total_risk_reduction(insight: &RiskInsight) -> f64 {
+    insight
+        .risk_reduction_opportunities
+        .iter()
+        .map(|r| r.potential_risk_reduction)
+        .sum()
+}
+
+fn format_risk_reduction_insight(total_reduction: f64) -> Option<String> {
+    (total_reduction >= 1.0).then(|| {
+        format!("• Potential risk reduction from top 5 recommendations: {total_reduction:.0}%\n")
+    })
+}
+
+pub fn format_actionable_insights(insight: &RiskInsight) -> String {
+    let critical_count = insight.risk_distribution.critical_count;
+    let high_count = insight.risk_distribution.high_count;
     let total_high_risk = critical_count + high_count;
-    if total_high_risk > 0 {
-        let estimated_effort: u32 = insight
-            .top_risks
-            .iter()
-            .take(total_high_risk)
-            .map(|r| r.test_effort.recommended_test_cases)
-            .sum();
 
-        if estimated_effort > 0 {
-            output.push_str(&format!(
-                "• Estimated test effort for safe risk level: {}-{} test cases\n",
-                estimated_effort,
-                estimated_effort + (estimated_effort / 2)
-            ));
-        }
-    }
+    let insights = [
+        format_critical_functions_insight(critical_count),
+        insight
+            .complexity_coverage_correlation
+            .and_then(format_correlation_insight),
+        (total_high_risk > 0)
+            .then(|| {
+                let effort = calculate_estimated_effort(insight, total_high_risk);
+                format_effort_insight(effort)
+            })
+            .flatten(),
+        (!insight.risk_reduction_opportunities.is_empty())
+            .then(|| {
+                let reduction = calculate_total_risk_reduction(insight);
+                format_risk_reduction_insight(reduction)
+            })
+            .flatten(),
+    ];
 
-    if !insight.risk_reduction_opportunities.is_empty() {
-        let total_reduction: f64 = insight
-            .risk_reduction_opportunities
-            .iter()
-            .map(|r| r.potential_risk_reduction)
-            .sum();
-
-        if total_reduction >= 1.0 {
-            output.push_str(&format!(
-                "• Potential risk reduction from top 5 recommendations: {total_reduction:.0}%\n"
-            ));
-        }
-    }
-
-    output
+    format!(
+        "💡 ACTIONABLE INSIGHTS\n──────────────────────\n{}",
+        insights.into_iter().flatten().collect::<String>()
+    )
 }
