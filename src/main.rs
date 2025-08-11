@@ -1511,7 +1511,7 @@ mod tests {
     #[test]
     fn test_create_unified_analysis_excludes_test_functions() {
         use crate::core::FunctionMetrics;
-        use crate::priority::{CallGraph, call_graph::FunctionId};
+        use crate::priority::{call_graph::FunctionId, CallGraph};
 
         // Create test metrics with both production and test functions
         let metrics = vec![
@@ -1548,7 +1548,7 @@ mod tests {
         ];
 
         let mut call_graph = CallGraph::new();
-        
+
         // Add all functions to call graph
         for metric in &metrics {
             let func_id = FunctionId {
@@ -1556,7 +1556,13 @@ mod tests {
                 name: metric.name.clone(),
                 line: metric.line,
             };
-            call_graph.add_function(func_id, false, metric.is_test, metric.cyclomatic, metric.length);
+            call_graph.add_function(
+                func_id,
+                false,
+                metric.is_test,
+                metric.cyclomatic,
+                metric.length,
+            );
         }
 
         let unified = create_unified_analysis(&metrics, &call_graph, None);
@@ -1564,20 +1570,25 @@ mod tests {
         // Verify only production functions are included in unified analysis
         // Test function should be excluded, so only 2 items should be present
         assert_eq!(unified.items.len(), 2);
-        
+
         // Verify that the included functions are indeed the production ones
-        let included_names: Vec<&String> = unified.items.iter()
+        let included_names: Vec<&String> = unified
+            .items
+            .iter()
             .map(|item| &item.location.function)
             .collect();
-        
+
         assert!(included_names.contains(&&"production_function".to_string()));
         assert!(included_names.contains(&&"another_production_function".to_string()));
         assert!(!included_names.contains(&&"test_something".to_string()));
-        
+
         // Verify that total debt score doesn't include the complex test function
         // If test functions were included, the score would be much higher due to
         // the complex test function (cyclomatic=8, cognitive=12, no coverage)
         let total_debt_score = unified.total_impact.risk_reduction;
-        assert!(total_debt_score < 20.0, "Debt score should be low since test function is excluded");
+        assert!(
+            total_debt_score < 20.0,
+            "Debt score should be low since test function is excluded"
+        );
     }
 }
