@@ -108,3 +108,137 @@ pub fn analyze_risk_insights(functions: Vector<FunctionRisk>) -> RiskInsight {
         risk_distribution,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::risk::{Difficulty, TestEffort};
+    use std::path::PathBuf;
+
+    fn create_test_function_risk(risk_category: RiskCategory) -> FunctionRisk {
+        FunctionRisk {
+            file: PathBuf::from("test.rs"),
+            function_name: "test_function".to_string(),
+            line_range: (1, 10),
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 5,
+            coverage_percentage: Some(50.0),
+            risk_score: 10.0,
+            test_effort: TestEffort {
+                estimated_difficulty: Difficulty::Simple,
+                cognitive_load: 5,
+                branch_count: 2,
+                recommended_test_cases: 3,
+            },
+            risk_category,
+            is_test_function: false,
+        }
+    }
+
+    #[test]
+    fn test_build_risk_distribution_empty() {
+        let functions = Vector::new();
+        let dist = build_risk_distribution(&functions);
+
+        assert_eq!(dist.critical_count, 0);
+        assert_eq!(dist.high_count, 0);
+        assert_eq!(dist.medium_count, 0);
+        assert_eq!(dist.low_count, 0);
+        assert_eq!(dist.well_tested_count, 0);
+        assert_eq!(dist.total_functions, 0);
+    }
+
+    #[test]
+    fn test_build_risk_distribution_single_critical() {
+        let mut functions = Vector::new();
+        functions.push_back(create_test_function_risk(RiskCategory::Critical));
+
+        let dist = build_risk_distribution(&functions);
+
+        assert_eq!(dist.critical_count, 1);
+        assert_eq!(dist.high_count, 0);
+        assert_eq!(dist.medium_count, 0);
+        assert_eq!(dist.low_count, 0);
+        assert_eq!(dist.well_tested_count, 0);
+        assert_eq!(dist.total_functions, 1);
+    }
+
+    #[test]
+    fn test_build_risk_distribution_mixed_categories() {
+        let mut functions = Vector::new();
+        functions.push_back(create_test_function_risk(RiskCategory::Critical));
+        functions.push_back(create_test_function_risk(RiskCategory::High));
+        functions.push_back(create_test_function_risk(RiskCategory::Medium));
+        functions.push_back(create_test_function_risk(RiskCategory::Low));
+        functions.push_back(create_test_function_risk(RiskCategory::WellTested));
+
+        let dist = build_risk_distribution(&functions);
+
+        assert_eq!(dist.critical_count, 1);
+        assert_eq!(dist.high_count, 1);
+        assert_eq!(dist.medium_count, 1);
+        assert_eq!(dist.low_count, 1);
+        assert_eq!(dist.well_tested_count, 1);
+        assert_eq!(dist.total_functions, 5);
+    }
+
+    #[test]
+    fn test_build_risk_distribution_multiple_same_category() {
+        let mut functions = Vector::new();
+        functions.push_back(create_test_function_risk(RiskCategory::High));
+        functions.push_back(create_test_function_risk(RiskCategory::High));
+        functions.push_back(create_test_function_risk(RiskCategory::High));
+
+        let dist = build_risk_distribution(&functions);
+
+        assert_eq!(dist.critical_count, 0);
+        assert_eq!(dist.high_count, 3);
+        assert_eq!(dist.medium_count, 0);
+        assert_eq!(dist.low_count, 0);
+        assert_eq!(dist.well_tested_count, 0);
+        assert_eq!(dist.total_functions, 3);
+    }
+
+    #[test]
+    fn test_build_risk_distribution_all_well_tested() {
+        let mut functions = Vector::new();
+        for _ in 0..10 {
+            functions.push_back(create_test_function_risk(RiskCategory::WellTested));
+        }
+
+        let dist = build_risk_distribution(&functions);
+
+        assert_eq!(dist.critical_count, 0);
+        assert_eq!(dist.high_count, 0);
+        assert_eq!(dist.medium_count, 0);
+        assert_eq!(dist.low_count, 0);
+        assert_eq!(dist.well_tested_count, 10);
+        assert_eq!(dist.total_functions, 10);
+    }
+
+    #[test]
+    fn test_build_risk_distribution_large_dataset() {
+        let mut functions = Vector::new();
+
+        // Add 100 functions with various risk categories
+        for i in 0..100 {
+            let category = match i % 5 {
+                0 => RiskCategory::Critical,
+                1 => RiskCategory::High,
+                2 => RiskCategory::Medium,
+                3 => RiskCategory::Low,
+                _ => RiskCategory::WellTested,
+            };
+            functions.push_back(create_test_function_risk(category));
+        }
+
+        let dist = build_risk_distribution(&functions);
+
+        assert_eq!(dist.critical_count, 20);
+        assert_eq!(dist.high_count, 20);
+        assert_eq!(dist.medium_count, 20);
+        assert_eq!(dist.low_count, 20);
+        assert_eq!(dist.well_tested_count, 20);
+        assert_eq!(dist.total_functions, 100);
+    }
+}
