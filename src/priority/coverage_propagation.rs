@@ -60,18 +60,10 @@ pub fn calculate_transitive_coverage(
 }
 
 fn get_function_coverage(func_id: &FunctionId, coverage: &LcovData) -> f64 {
-    // Map function ID to coverage data
-    // This is a simplified version - actual implementation would need to
-    // correlate function location with coverage line data
+    // Use the LCOV module's fuzzy matching logic
     coverage
-        .functions
-        .get(&func_id.file)
-        .and_then(|funcs| {
-            funcs
-                .iter()
-                .find(|f| f.name == func_id.name)
-                .map(|f| f.coverage_percentage / 100.0)
-        })
+        .get_function_coverage_with_line(&func_id.file, &func_id.name, func_id.line)
+        .map(|percentage| percentage / 100.0)
         .unwrap_or(0.0)
 }
 

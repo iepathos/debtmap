@@ -265,3 +265,30 @@ impl LcovData {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_matching_function_with_qualified_name() {
+        let lcov = LcovData::default();
+        let functions = vec![FunctionCoverage {
+            name: "CallGraphExtractor::classify_call_type".to_string(),
+            start_line: 24,
+            execution_count: 31,
+            coverage_percentage: 100.0,
+        }];
+
+        // Should match when searching for short name
+        let result = lcov.find_matching_function(&functions, "classify_call_type");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().coverage_percentage, 100.0);
+
+        // Should also match with full name
+        let result =
+            lcov.find_matching_function(&functions, "CallGraphExtractor::classify_call_type");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().coverage_percentage, 100.0);
+    }
+}
