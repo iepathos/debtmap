@@ -113,3 +113,51 @@ pub fn infer_module_relationships(
 
     (dependencies, dependents)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_base_dependencies_entry_point() {
+        let deps = get_base_dependencies(&ModuleType::EntryPoint);
+        assert_eq!(deps, vec!["cli", "core", "io"]);
+    }
+
+    #[test]
+    fn test_get_base_dependencies_core() {
+        let deps = get_base_dependencies(&ModuleType::Core);
+        assert_eq!(deps, vec!["models", "utils"]);
+    }
+
+    #[test]
+    fn test_get_base_dependencies_api() {
+        let deps = get_base_dependencies(&ModuleType::Api);
+        assert_eq!(deps, vec!["core", "models", "io"]);
+    }
+
+    #[test]
+    fn test_get_base_dependencies_model() {
+        let deps = get_base_dependencies(&ModuleType::Model);
+        assert_eq!(deps, vec!["utils"]);
+    }
+
+    #[test]
+    fn test_get_base_dependencies_io() {
+        let deps = get_base_dependencies(&ModuleType::IO);
+        assert_eq!(deps, vec!["models", "utils"]);
+    }
+
+    #[test]
+    fn test_get_base_dependencies_default_cases() {
+        // Test Utility, Test, and Unknown types which should return empty vectors
+        let utility_deps = get_base_dependencies(&ModuleType::Utility);
+        assert_eq!(utility_deps, Vec::<String>::new());
+
+        let test_deps = get_base_dependencies(&ModuleType::Test);
+        assert_eq!(test_deps, Vec::<String>::new());
+
+        let unknown_deps = get_base_dependencies(&ModuleType::Unknown);
+        assert_eq!(unknown_deps, Vec::<String>::new());
+    }
+}
