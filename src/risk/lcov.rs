@@ -181,6 +181,39 @@ impl LcovData {
             .map(|func| func.coverage_percentage)
     }
 
+    pub fn get_function_coverage_with_line(
+        &self,
+        file: &Path,
+        function_name: &str,
+        line: usize,
+    ) -> Option<f64> {
+        // Special handling for closures: they inherit coverage from their parent function
+        if function_name.starts_with("<closure@") {
+            // For closures, find the parent function that contains this line
+            return self
+                .generate_path_variations(file)
+                .into_iter()
+                .filter_map(|path| self.functions.get(&path))
+                .find_map(|funcs| {
+                    // Find the function that contains this line number
+                    // Functions are typically ordered by line number
+                    let mut best_match: Option<&FunctionCoverage> = None;
+                    for func in funcs {
+                        if func.start_line <= line {
+                            best_match = Some(func);
+                        } else if best_match.is_some() {
+                            // We've passed the line, use the previous match
+                            break;
+                        }
+                    }
+                    best_match.map(|f| f.coverage_percentage)
+                });
+        }
+
+        // For regular functions, use the standard matching
+        self.get_function_coverage(file, function_name)
+    }
+
     // Extract path generation logic to a pure function
     fn generate_path_variations(&self, file: &Path) -> Vec<PathBuf> {
         let current_dir = std::env::current_dir().ok();
