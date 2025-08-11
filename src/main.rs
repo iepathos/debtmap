@@ -879,7 +879,7 @@ fn output_unified_priorities(
             let mut file = fs::File::create(path)?;
             file.write_all(json.as_bytes())?;
         } else {
-            println!("{}", json);
+            println!("{json}");
         }
     } else {
         // For other formats, use the existing formatter
