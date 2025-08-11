@@ -40,7 +40,8 @@ pub struct ActionableRecommendation {
 pub enum DebtType {
     TestingGap {
         coverage: f64,
-        complexity: u32,
+        cyclomatic: u32,
+        cognitive: u32,
     },
     ComplexityHotspot {
         cyclomatic: u32,
