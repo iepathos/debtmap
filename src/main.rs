@@ -676,7 +676,8 @@ fn format_risk_function(func: &risk::FunctionRisk) -> String {
 }
 
 fn print_risk_function(func: &risk::FunctionRisk) {
-    println!("{}", format_risk_function(func));
+    let formatted = format_risk_function(func);
+    println!("{formatted}");
 }
 
 fn parse_languages(languages: Option<Vec<String>>) -> Vec<Language> {
