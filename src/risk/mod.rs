@@ -1,5 +1,6 @@
 pub mod context;
 pub mod correlation;
+pub mod delegation;
 pub mod insights;
 pub mod lcov;
 pub mod priority;
