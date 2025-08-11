@@ -371,8 +371,8 @@ fn analyze_risk_with_coverage(
     for func in &results.complexity.metrics {
         let complexity_metrics = core::ComplexityMetrics::from_function(func);
 
-        // Try to get coverage for this function
-        let coverage = lcov_data.get_function_coverage(&func.file, &func.name);
+        // Try to get coverage for this function (use line number for closures)
+        let coverage = lcov_data.get_function_coverage_with_line(&func.file, &func.name, func.line);
 
         let risk = analyzer.analyze_function(
             func.file.clone(),
