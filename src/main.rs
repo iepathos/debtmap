@@ -3,6 +3,7 @@ use debtmap::cli;
 use debtmap::core;
 use debtmap::debt;
 use debtmap::io;
+use debtmap::priority;
 use debtmap::risk;
 
 use anyhow::{Context, Result};
@@ -25,6 +26,11 @@ struct AnalyzeConfig {
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
+    top: Option<usize>,
+    priorities_only: bool,
+    detailed: bool,
+    semantic_off: bool,
+    explain_score: bool,
 }
 
 struct ValidateConfig {
@@ -37,6 +43,11 @@ struct ValidateConfig {
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
+    top: Option<usize>,
+    priorities_only: bool,
+    detailed: bool,
+    semantic_off: bool,
+    explain_score: bool,
 }
 
 fn main() -> Result<()> {
@@ -54,6 +65,11 @@ fn main() -> Result<()> {
             enable_context,
             context_providers,
             disable_context,
+            top,
+            priorities_only,
+            detailed,
+            semantic_off,
+            explain_score,
         } => {
             let config = AnalyzeConfig {
                 path,
@@ -66,6 +82,11 @@ fn main() -> Result<()> {
                 enable_context,
                 context_providers,
                 disable_context,
+                top,
+                priorities_only,
+                detailed,
+                semantic_off,
+                explain_score,
             };
             handle_analyze(config)
         }
@@ -79,6 +100,11 @@ fn main() -> Result<()> {
             enable_context,
             context_providers,
             disable_context,
+            top,
+            priorities_only,
+            detailed,
+            semantic_off,
+            explain_score,
         } => {
             let config = ValidateConfig {
                 path,
@@ -89,6 +115,11 @@ fn main() -> Result<()> {
                 enable_context,
                 context_providers,
                 disable_context,
+                top,
+                priorities_only,
+                detailed,
+                semantic_off,
+                explain_score,
             };
             validate_project(config)
         }
@@ -113,33 +144,56 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.threshold_duplication,
     )?;
 
-    // Handle risk analysis if coverage file provided
-    let risk_insights = if let Some(lcov_path) = config.coverage_file {
-        analyze_risk_with_coverage(
-            &results,
-            &lcov_path,
-            &config.path,
-            config.enable_context,
-            config.context_providers,
-            config.disable_context,
-        )?
-    } else {
-        analyze_risk_without_coverage(
-            &results,
-            config.enable_context,
-            config.context_providers,
-            config.disable_context,
-            &config.path,
-        )?
-    };
+    // Check if unified prioritization is requested
+    let use_unified = config.priorities_only || config.detailed || config.top.is_some();
 
-    // Output results
-    output_results_with_risk(
-        results.clone(),
-        risk_insights,
-        config.format.into(),
-        config.output,
-    )?;
+    if use_unified {
+        // Build call graph and perform unified analysis
+        let unified_analysis = perform_unified_analysis(
+            &results,
+            config.coverage_file.as_ref(),
+            config.semantic_off,
+            &config.path,
+        )?;
+
+        // Output unified prioritized results
+        output_unified_priorities(
+            unified_analysis,
+            config.top,
+            config.priorities_only,
+            config.detailed,
+            config.explain_score,
+            config.output,
+        )?;
+    } else {
+        // Handle risk analysis if coverage file provided (existing behavior)
+        let risk_insights = if let Some(lcov_path) = config.coverage_file {
+            analyze_risk_with_coverage(
+                &results,
+                &lcov_path,
+                &config.path,
+                config.enable_context,
+                config.context_providers,
+                config.disable_context,
+            )?
+        } else {
+            analyze_risk_without_coverage(
+                &results,
+                config.enable_context,
+                config.context_providers,
+                config.disable_context,
+                &config.path,
+            )?
+        };
+
+        // Output results
+        output_results_with_risk(
+            results.clone(),
+            risk_insights,
+            config.format.into(),
+            config.output,
+        )?;
+    }
 
     // Check if analysis passed
     if !is_analysis_passing(&results, config.threshold_complexity) {
@@ -694,6 +748,114 @@ fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {
     analysis_utils::create_dependency_report(file_metrics)
 }
 
+fn perform_unified_analysis(
+    results: &AnalysisResults,
+    coverage_file: Option<&PathBuf>,
+    _semantic_off: bool,
+    _project_path: &Path,
+) -> Result<priority::UnifiedAnalysis> {
+    use priority::{unified_scorer, CallGraph, UnifiedAnalysis};
+
+    // Build call graph from analysis results
+    let mut call_graph = CallGraph::new();
+
+    // Extract functions and build call graph
+    // (This is simplified - actual implementation would extract from AST)
+    for metrics in &results.complexity.metrics {
+        let func_id = priority::call_graph::FunctionId {
+            file: metrics.file.clone(),
+            name: metrics.name.clone(),
+            line: metrics.line,
+        };
+
+        // Detect entry points
+        let is_entry = metrics.name == "main"
+            || metrics.name.starts_with("handle_")
+            || metrics.name.starts_with("run_");
+
+        // Detect test functions
+        let is_test = metrics.is_test
+            || metrics.name.starts_with("test_")
+            || metrics.file.to_string_lossy().contains("test");
+
+        call_graph.add_function(
+            func_id,
+            is_entry,
+            is_test,
+            metrics.cyclomatic,
+            metrics.length,
+        );
+    }
+
+    // Load coverage data if available
+    let coverage_data = if let Some(lcov_path) = coverage_file {
+        Some(risk::lcov::parse_lcov_file(lcov_path).context("Failed to parse LCOV file")?)
+    } else {
+        None
+    };
+
+    // Create unified analysis
+    let mut unified = UnifiedAnalysis::new(call_graph.clone());
+
+    // Convert each function metrics to unified debt item
+    for metrics in &results.complexity.metrics {
+        // Calculate ROI (simplified - actual would use full ROI calculation)
+        let roi_score = 5.0; // Default ROI
+
+        let item = unified_scorer::create_unified_debt_item(
+            metrics,
+            &call_graph,
+            coverage_data.as_ref(),
+            roi_score,
+        );
+
+        unified.add_item(item);
+    }
+
+    // Sort by priority
+    unified.sort_by_priority();
+    unified.calculate_total_impact();
+
+    Ok(unified)
+}
+
+fn output_unified_priorities(
+    analysis: priority::UnifiedAnalysis,
+    top: Option<usize>,
+    priorities_only: bool,
+    detailed: bool,
+    _explain_score: bool,
+    output_file: Option<PathBuf>,
+) -> Result<()> {
+    use priority::formatter::{format_priorities, OutputFormat};
+    use std::fs;
+    use std::io::Write;
+
+    // Determine output format
+    let format = if priorities_only {
+        OutputFormat::PrioritiesOnly
+    } else if detailed {
+        OutputFormat::Detailed
+    } else if let Some(n) = top {
+        OutputFormat::Top(n)
+    } else {
+        OutputFormat::Default
+    };
+
+    // Format the output
+    let output = format_priorities(&analysis, format);
+
+    // Write to file or stdout
+    if let Some(path) = output_file {
+        let mut file = fs::File::create(path)?;
+        file.write_all(output.as_bytes())?;
+    } else {
+        println!("{output}");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1068,6 +1230,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -1086,6 +1253,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -1104,6 +1276,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         // Format takes precedence over output
         assert_eq!(
@@ -1123,6 +1300,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(determine_output_format(&config), None);
     }

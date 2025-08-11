@@ -65,6 +65,15 @@ Risk analysis and coverage correlation:
   - `dependency.rs`: Dependency risk propagation
   - `git_history.rs`: Git history and change frequency analysis
 
+### Priority (`src/priority/`)
+Unified debt prioritization system:
+- `mod.rs`: Core types for unified analysis
+- `call_graph.rs`: Function call graph construction and analysis
+- `semantic_classifier.rs`: Function role classification (PureLogic, Orchestrator, etc.)
+- `coverage_propagation.rs`: Transitive coverage calculation through call graph
+- `unified_scorer.rs`: Unified priority scoring algorithm combining all metrics
+- `formatter.rs`: Clean output formatters for different verbosity levels
+
 ### IO (`src/io/`)
 Side-effectful operations:
 - `walker.rs`: File system traversal

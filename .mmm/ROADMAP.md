@@ -77,6 +77,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Dependency factor for ROI enhancement
   - Meaningful ROI variation based on code criticality
 
+- [x] **Spec 19**: Unified Debt Prioritization with Semantic Analysis
+  - Single unified priority score combining all metrics
+  - Semantic function classification to avoid false positives
+  - Call graph construction for delegation detection
+  - Coverage propagation through transitive dependencies
+  - Clean output formats for different use cases
+  - Focus on measurable impact over time estimates
+
 ## Pending Specs
 
 ### Enhancements
