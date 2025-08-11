@@ -259,15 +259,11 @@ impl ContextProvider for GitHistoryProvider {
 
         // Calculate contribution based on instability
         let _instability = 1.0 - history.stability_score;
-        let bug_density = GitHistoryProvider::calculate_bug_density(
-            history.bug_fix_count,
-            history.total_commits,
-        );
+        let bug_density =
+            GitHistoryProvider::calculate_bug_density(history.bug_fix_count, history.total_commits);
 
-        let contribution = GitHistoryProvider::classify_risk_contribution(
-            history.change_frequency,
-            bug_density,
-        );
+        let contribution =
+            GitHistoryProvider::classify_risk_contribution(history.change_frequency, bug_density);
 
         Ok(Context {
             provider: self.name().to_string(),
@@ -607,10 +603,10 @@ mod tests {
         };
 
         let context = provider.gather(&target)?;
-        
+
         assert_eq!(context.provider, "git_history");
         assert_eq!(context.weight, 1.0);
-        
+
         // Check that the contribution is calculated correctly
         if let ContextDetails::Historical { bug_density, .. } = context.details {
             // We have 3 bug fixes out of 4 commits = 0.75 bug density
