@@ -92,28 +92,32 @@ impl UnifiedAnalysis {
         let mut lines_reduction = 0;
         let mut complexity_reduction = 0.0;
         let mut risk_reduction = 0.0;
+        let mut functions_to_test = 0;
 
         for item in &self.items {
-            coverage_improvement += item.expected_impact.coverage_improvement;
+            // Only count functions that actually need testing
+            if item.expected_impact.coverage_improvement > 0.0 {
+                functions_to_test += 1;
+                // Each function contributes a small amount to overall coverage
+                // Estimate based on function count (rough approximation)
+                coverage_improvement += item.expected_impact.coverage_improvement / 100.0;
+            }
             lines_reduction += item.expected_impact.lines_reduction;
             complexity_reduction += item.expected_impact.complexity_reduction;
             risk_reduction += item.expected_impact.risk_reduction;
         }
 
-        // Cap coverage improvement at a realistic maximum (can't exceed 100%)
-        coverage_improvement = coverage_improvement.min(100.0);
+        // Coverage improvement is the estimated overall project coverage gain
+        // Assuming tested functions represent a portion of the codebase
+        coverage_improvement = (coverage_improvement * 5.0).min(100.0); // Scale factor for visibility
         
-        // Calculate average complexity reduction as a percentage
-        let avg_complexity_reduction = if !self.items.is_empty() {
-            (complexity_reduction / self.items.len() as f64).min(100.0)
-        } else {
-            0.0
-        };
+        // Total complexity reduction (sum of all reductions)
+        let total_complexity_reduction = complexity_reduction;
 
         self.total_impact = ImpactMetrics {
             coverage_improvement,
             lines_reduction,
-            complexity_reduction: avg_complexity_reduction,
+            complexity_reduction: total_complexity_reduction,
             risk_reduction,
         };
     }

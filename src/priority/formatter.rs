@@ -309,20 +309,23 @@ fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
     let mut parts = Vec::new();
 
     if impact.coverage_improvement > 0.0 {
-        // Show more realistic coverage contribution
-        if impact.coverage_improvement < 1.0 {
-            parts.push(format!("+{:.1}% module coverage", impact.coverage_improvement));
+        // Show function-level coverage improvement
+        if impact.coverage_improvement >= 100.0 {
+            parts.push("Full test coverage".to_string());
+        } else if impact.coverage_improvement >= 50.0 {
+            parts.push(format!("+{}% function coverage", impact.coverage_improvement as i32));
         } else {
-            parts.push(format!("+{:.0}% module coverage", impact.coverage_improvement));
+            // For complex functions that need refactoring first
+            parts.push("Partial coverage after refactor".to_string());
         }
     }
 
     if impact.complexity_reduction > 0.0 {
-        parts.push(format!("-{:.0} complexity", impact.complexity_reduction));
+        parts.push(format!("-{} complexity", impact.complexity_reduction as i32));
     }
 
     if impact.risk_reduction > 0.0 {
-        parts.push(format!("-{:.1} risk score", impact.risk_reduction));
+        parts.push(format!("-{:.1} risk", impact.risk_reduction));
     }
 
     if impact.lines_reduction > 0 {

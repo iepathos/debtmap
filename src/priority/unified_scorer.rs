@@ -191,26 +191,56 @@ fn generate_recommendation(
         DebtType::TestingGap {
             coverage,
             complexity,
-        } => (
-            format!("Add {} unit tests for branch coverage", complexity / 3 + 1),
-            format!(
-                "Core {} with {}% coverage and complexity {}, high dependencies",
-                match role {
-                    FunctionRole::PureLogic => "business logic",
-                    FunctionRole::Orchestrator => "orchestration",
-                    FunctionRole::IOWrapper => "I/O wrapper",
-                    FunctionRole::EntryPoint => "entry point",
-                    FunctionRole::Unknown => "function",
-                },
-                (coverage * 100.0) as i32,
-                complexity
-            ),
-            vec![
-                "Identify uncovered branches".to_string(),
-                "Write tests for edge cases".to_string(),
-                "Add error condition tests".to_string(),
-            ],
-        ),
+        } => {
+            let is_complex = *complexity > 10;
+            
+            if is_complex {
+                // High complexity: recommend refactoring first
+                (
+                    format!("Refactor to reduce complexity from {} to <10, then add tests", complexity),
+                    format!(
+                        "Complex {} (cyclo={}) with {}% coverage - needs simplification before testing",
+                        match role {
+                            FunctionRole::PureLogic => "business logic",
+                            FunctionRole::Orchestrator => "orchestration",
+                            FunctionRole::IOWrapper => "I/O wrapper",
+                            FunctionRole::EntryPoint => "entry point",
+                            FunctionRole::Unknown => "function",
+                        },
+                        complexity,
+                        (coverage * 100.0) as i32
+                    ),
+                    vec![
+                        format!("Extract {} helper functions", (complexity - 5) / 5),
+                        "Reduce nesting and conditional complexity".to_string(),
+                        "Add comprehensive tests after refactoring".to_string(),
+                        "Consider splitting responsibilities".to_string(),
+                    ],
+                )
+            } else {
+                // Simple function: just add tests
+                (
+                    format!("Add {} unit tests for full coverage", complexity.max(&2)),
+                    format!(
+                        "{} with {}% coverage, manageable complexity ({})",
+                        match role {
+                            FunctionRole::PureLogic => "Business logic",
+                            FunctionRole::Orchestrator => "Orchestration",
+                            FunctionRole::IOWrapper => "I/O wrapper",
+                            FunctionRole::EntryPoint => "Entry point",
+                            FunctionRole::Unknown => "Function",
+                        },
+                        (coverage * 100.0) as i32,
+                        complexity
+                    ),
+                    vec![
+                        "Test happy path scenarios".to_string(),
+                        "Add edge case tests".to_string(),
+                        "Cover error conditions".to_string(),
+                    ],
+                )
+            }
+        }
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
@@ -283,15 +313,24 @@ fn calculate_expected_impact(
     match debt_type {
         DebtType::TestingGap {
             coverage,
-            complexity: _,
-        } => ImpactMetrics {
-            // Coverage improvement should be relative to the function's size in the project
-            // Assume this function represents ~0.1% of the codebase (more accurate would need total LOC)
-            coverage_improvement: (1.0 - coverage) * (func.length as f64 / 1000.0).min(1.0),
-            lines_reduction: 0,
-            complexity_reduction: 0.0,
-            risk_reduction: score.final_score * 0.42,
-        },
+            complexity,
+        } => {
+            // For high complexity functions, the impact includes both testing and refactoring benefits
+            let is_complex = *complexity > 10;
+            
+            ImpactMetrics {
+                // Show the actual coverage gain for this function/module
+                // High complexity functions get less coverage benefit (need refactoring first)
+                coverage_improvement: if is_complex {
+                    (1.0 - coverage) * 50.0 // 50% of potential due to complexity
+                } else {
+                    (1.0 - coverage) * 100.0 // Full coverage potential for simple functions
+                },
+                lines_reduction: 0,
+                complexity_reduction: if is_complex { *complexity as f64 * 0.3 } else { 0.0 },
+                risk_reduction: score.final_score * 0.42,
+            }
+        }
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive: _,
