@@ -1,6 +1,5 @@
 use debtmap::complexity::cognitive::calculate_cognitive;
 use debtmap::complexity::cyclomatic::calculate_cyclomatic;
-use syn;
 
 #[test]
 fn test_cognitive_vs_cyclomatic_simple_if() {
@@ -17,8 +16,7 @@ fn test_cognitive_vs_cyclomatic_simple_if() {
     let cognitive = calculate_cognitive(&block);
 
     println!(
-        "Simple if - Cyclomatic: {}, Cognitive: {}",
-        cyclo, cognitive
+        "Simple if - Cyclomatic: {cyclo}, Cognitive: {cognitive}"
     );
 
     // Cyclomatic should be 2 (base 1 + 1 for if)
@@ -45,8 +43,7 @@ fn test_cognitive_vs_cyclomatic_nested_if() {
     let cognitive = calculate_cognitive(&block);
 
     println!(
-        "Nested if - Cyclomatic: {}, Cognitive: {}",
-        cyclo, cognitive
+        "Nested if - Cyclomatic: {cyclo}, Cognitive: {cognitive}"
     );
 
     // Cyclomatic should be 3 (base 1 + 1 for each if)
@@ -72,7 +69,7 @@ fn test_cognitive_vs_cyclomatic_match() {
     let cyclo = calculate_cyclomatic(&block);
     let cognitive = calculate_cognitive(&block);
 
-    println!("Match - Cyclomatic: {}, Cognitive: {}", cyclo, cognitive);
+    println!("Match - Cyclomatic: {cyclo}, Cognitive: {cognitive}");
 
     // Cyclomatic: base 1 + 3 (for 4 arms - 1)
     assert_eq!(cyclo, 4);

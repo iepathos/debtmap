@@ -217,8 +217,7 @@ fn generate_recommendation(
                 // High complexity: recommend functional refactoring approach
                 (
                     format!(
-                        "Extract pure functions, add property tests, then refactor (cyclo={} to <10, cog={} to <15)",
-                        cyclomatic, cognitive
+                        "Extract pure functions, add property tests, then refactor (cyclo={cyclomatic} to <10, cog={cognitive} to <15)"
                     ),
                     format!(
                         "Complex {} (cyclo={}, cog={}) with {}% coverage - extract pure logic first",
