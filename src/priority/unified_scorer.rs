@@ -185,7 +185,7 @@ fn generate_recommendation(
     _func: &FunctionMetrics,
     debt_type: &DebtType,
     role: FunctionRole,
-    score: &UnifiedScore,
+    _score: &UnifiedScore,
 ) -> ActionableRecommendation {
     let (primary_action, rationale, steps) = match debt_type {
         DebtType::TestingGap {

@@ -37,13 +37,11 @@ pub fn calculate_transitive_coverage(
 
     // Check coverage of each callee
     let mut covered_callees = Vec::new();
-    let mut total_coverage = 0.0;
 
     for callee in &callees {
         let callee_coverage = get_function_coverage(callee, coverage);
         if callee_coverage > 0.8 {
             covered_callees.push(callee.clone());
-            total_coverage += callee_coverage;
         }
     }
 

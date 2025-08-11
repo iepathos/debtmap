@@ -43,7 +43,9 @@ pub fn classify_function_role(
 }
 
 fn is_entry_point_by_name(name: &str) -> bool {
-    let entry_patterns = ["main", "run", "start", "init", "handle", "process", "execute", "serve", "listen"];
+    let entry_patterns = [
+        "main", "run", "start", "init", "handle", "process", "execute", "serve", "listen",
+    ];
 
     let name_lower = name.to_lowercase();
     entry_patterns
