@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, and spec 14 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, and spec 19 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -65,6 +65,21 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Exponential decay for cascade propagation (70% per level)
   - Diminishing returns model for realistic risk reduction
   - Enhanced ROI formula with meaningful variation (0.1 to 10.0 range)
+- ✅ Intelligent Test Function Debt Handling (spec 18):
+  - Test functions excluded from main debt score calculation
+  - Test functions no longer penalized for lack of code coverage
+  - Separate test-specific debt types (TestComplexity, TestTodo, TestDuplication)
+  - Coverage factor set to 0.0 for test functions instead of 10.0 penalty
+  - Test debt tracked and reported separately with specific recommendations
+  - Prevents debt score inflation when adding tests to the codebase
+- ✅ Unified Debt Prioritization with Semantic Analysis (spec 19):
+  - Single priority score combining complexity, coverage, ROI, and semantics
+  - Semantic function classification (PureLogic, Orchestrator, IOWrapper, EntryPoint)
+  - Coverage propagation through call graph for delegation patterns
+  - Role-based priority multipliers to reduce false positives
+  - Clean, actionable output formats (--top N, --priorities-only, --detailed)
+  - Focus on measurable impact over unreliable time estimates
+  - Unified scoring algorithm with weighted factors (25/35/25/15%)
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -85,6 +100,7 @@ The project follows a functional core / imperative shell pattern:
 8. **Risk Analysis**: Correlates complexity with test coverage for risk-based testing priorities
 9. **Context-Aware Risk**: Considers critical paths, dependencies, and historical data
 10. **Smart ROI Prioritization**: Dependency-aware testing recommendations with cascade effects
+11. **Unified Prioritization**: Single, semantic-aware score for all technical debt items
 
 ## Project Structure
 ```

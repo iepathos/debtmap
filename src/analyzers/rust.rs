@@ -12,6 +12,7 @@ use crate::debt::patterns::{
 };
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::priority::call_graph::CallGraph;
 use anyhow::Result;
 use quote::ToTokens;
 use std::path::{Path, PathBuf};
@@ -59,6 +60,11 @@ impl Analyzer for RustAnalyzer {
     fn language(&self) -> Language {
         Language::Rust
     }
+}
+
+pub fn extract_rust_call_graph(ast: &RustAst) -> CallGraph {
+    use super::rust_call_graph::extract_call_graph;
+    extract_call_graph(&ast.file, &ast.path)
 }
 
 fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
@@ -212,7 +218,7 @@ impl FunctionVisitor {
             cyclomatic: calculate_cyclomatic_syn(&item_fn.block),
             cognitive: calculate_cognitive_syn(&item_fn.block),
             nesting: calculate_nesting(&item_fn.block),
-            length: count_lines(&item_fn.block),
+            length: count_function_lines(item_fn),
             is_test,
         };
 
@@ -344,8 +350,31 @@ fn calculate_nesting(block: &syn::Block) -> u32 {
 }
 
 fn count_lines(block: &syn::Block) -> usize {
-    let tokens = quote::quote! { #block };
-    tokens.to_string().lines().count()
+    // Get the span of the entire block to calculate actual source lines
+    let span = block.span();
+    let start_line = span.start().line;
+    let end_line = span.end().line;
+
+    // Calculate the number of lines the function spans
+    if end_line >= start_line {
+        end_line - start_line + 1
+    } else {
+        1 // Fallback for edge cases
+    }
+}
+
+fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
+    // Get the span of the entire function (from signature to end of body)
+    let span = item_fn.span();
+    let start_line = span.start().line;
+    let end_line = span.end().line;
+
+    // Calculate the number of lines the function spans
+    if end_line >= start_line {
+        end_line - start_line + 1
+    } else {
+        1 // Fallback for edge cases
+    }
 }
 
 fn extract_debt_items(

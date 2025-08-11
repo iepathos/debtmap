@@ -82,36 +82,47 @@ impl SuppressionContext {
     }
 
     pub fn get_stats(&self) -> SuppressionStats {
-        let block_stats = self
-            .active_blocks
-            .iter()
-            .filter(|block| block.end_line.is_some())
-            .flat_map(|block| block.debt_types.iter().copied());
-
-        let line_stats = self
-            .line_suppressions
-            .values()
-            .flat_map(|rule| rule.debt_types.iter().copied());
-
-        let all_debt_types: Vec<DebtType> = block_stats.chain(line_stats).collect();
-
-        let total_suppressions = self
-            .active_blocks
-            .iter()
-            .filter(|block| block.end_line.is_some())
-            .count()
-            + self.line_suppressions.len();
-
-        let mut suppressions_by_type = HashMap::new();
-        for debt_type in all_debt_types {
-            *suppressions_by_type.entry(debt_type).or_insert(0) += 1;
-        }
+        let completed_blocks = self.count_completed_blocks();
+        let all_debt_types = self.collect_all_debt_types();
+        let total_suppressions = completed_blocks + self.line_suppressions.len();
+        let suppressions_by_type = self.count_suppressions_by_type(all_debt_types);
 
         SuppressionStats {
             total_suppressions,
             suppressions_by_type,
             unclosed_blocks: self.unclosed_blocks.clone(),
         }
+    }
+
+    fn count_completed_blocks(&self) -> usize {
+        self.active_blocks
+            .iter()
+            .filter(|block| block.end_line.is_some())
+            .count()
+    }
+
+    fn collect_all_debt_types(&self) -> Vec<DebtType> {
+        let block_types = self
+            .active_blocks
+            .iter()
+            .filter(|block| block.end_line.is_some())
+            .flat_map(|block| block.debt_types.iter().copied());
+
+        let line_types = self
+            .line_suppressions
+            .values()
+            .flat_map(|rule| rule.debt_types.iter().copied());
+
+        block_types.chain(line_types).collect()
+    }
+
+    fn count_suppressions_by_type(&self, debt_types: Vec<DebtType>) -> HashMap<DebtType, usize> {
+        debt_types
+            .into_iter()
+            .fold(HashMap::new(), |mut acc, debt_type| {
+                *acc.entry(debt_type).or_insert(0) += 1;
+                acc
+            })
     }
 }
 

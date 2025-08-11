@@ -12,48 +12,47 @@ pub fn calculate_complexity_coverage_correlation(functions: &Vector<FunctionRisk
         return None;
     }
 
-    // Calculate Pearson correlation coefficient
-    let n = with_coverage.len() as f64;
-
-    // Calculate means
-    let mean_complexity: f64 = with_coverage
+    // Extract complexity and coverage values
+    let complexities: Vec<f64> = with_coverage
         .iter()
         .map(|f| (f.cyclomatic_complexity + f.cognitive_complexity) as f64 / 2.0)
-        .sum::<f64>()
-        / n;
+        .collect();
 
-    let mean_coverage: f64 = with_coverage
+    let coverages: Vec<f64> = with_coverage
         .iter()
         .map(|f| f.coverage_percentage.unwrap())
-        .sum::<f64>()
-        / n;
+        .collect();
 
-    // Calculate covariance and standard deviations
-    let mut covariance = 0.0;
-    let mut std_dev_complexity = 0.0;
-    let mut std_dev_coverage = 0.0;
+    calculate_pearson_correlation(&complexities, &coverages)
+}
 
-    for func in &with_coverage {
-        let complexity = (func.cyclomatic_complexity + func.cognitive_complexity) as f64 / 2.0;
-        let coverage = func.coverage_percentage.unwrap();
+fn calculate_pearson_correlation(x_values: &[f64], y_values: &[f64]) -> Option<f64> {
+    let n = x_values.len() as f64;
 
-        let diff_complexity = complexity - mean_complexity;
-        let diff_coverage = coverage - mean_coverage;
+    let mean_x = x_values.iter().sum::<f64>() / n;
+    let mean_y = y_values.iter().sum::<f64>() / n;
 
-        covariance += diff_complexity * diff_coverage;
-        std_dev_complexity += diff_complexity * diff_complexity;
-        std_dev_coverage += diff_coverage * diff_coverage;
-    }
+    // Calculate statistics using functional approach
+    let (covariance, variance_x, variance_y) = x_values
+        .iter()
+        .zip(y_values.iter())
+        .map(|(x, y)| {
+            let diff_x = x - mean_x;
+            let diff_y = y - mean_y;
+            (diff_x * diff_y, diff_x * diff_x, diff_y * diff_y)
+        })
+        .fold((0.0, 0.0, 0.0), |acc, (cov, var_x, var_y)| {
+            (acc.0 + cov, acc.1 + var_x, acc.2 + var_y)
+        });
 
-    let std_dev_complexity = (std_dev_complexity / n).sqrt();
-    let std_dev_coverage = (std_dev_coverage / n).sqrt();
+    let std_dev_x = (variance_x / n).sqrt();
+    let std_dev_y = (variance_y / n).sqrt();
 
-    if std_dev_complexity == 0.0 || std_dev_coverage == 0.0 {
+    if std_dev_x == 0.0 || std_dev_y == 0.0 {
         return None;
     }
 
-    let correlation = covariance / (n * std_dev_complexity * std_dev_coverage);
-    Some(correlation)
+    Some(covariance / (n * std_dev_x * std_dev_y))
 }
 
 pub fn calculate_codebase_risk_score(functions: &Vector<FunctionRisk>) -> f64 {

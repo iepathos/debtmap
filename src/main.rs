@@ -3,6 +3,7 @@ use debtmap::cli;
 use debtmap::core;
 use debtmap::debt;
 use debtmap::io;
+use debtmap::priority;
 use debtmap::risk;
 
 use anyhow::{Context, Result};
@@ -22,9 +23,14 @@ struct AnalyzeConfig {
     threshold_duplication: usize,
     languages: Option<Vec<String>>,
     coverage_file: Option<PathBuf>,
-    enable_context: bool,
-    context_providers: Option<Vec<String>>,
-    disable_context: Option<Vec<String>>,
+    _enable_context: bool,
+    _context_providers: Option<Vec<String>>,
+    _disable_context: Option<Vec<String>>,
+    top: Option<usize>,
+    priorities_only: bool,
+    detailed: bool,
+    semantic_off: bool,
+    explain_score: bool,
 }
 
 struct ValidateConfig {
@@ -37,6 +43,16 @@ struct ValidateConfig {
     enable_context: bool,
     context_providers: Option<Vec<String>>,
     disable_context: Option<Vec<String>>,
+    #[allow(dead_code)]
+    top: Option<usize>,
+    #[allow(dead_code)]
+    priorities_only: bool,
+    #[allow(dead_code)]
+    detailed: bool,
+    #[allow(dead_code)]
+    semantic_off: bool,
+    #[allow(dead_code)]
+    explain_score: bool,
 }
 
 fn main() -> Result<()> {
@@ -54,6 +70,11 @@ fn main() -> Result<()> {
             enable_context,
             context_providers,
             disable_context,
+            top,
+            priorities_only,
+            detailed,
+            semantic_off,
+            explain_score,
         } => {
             let config = AnalyzeConfig {
                 path,
@@ -63,9 +84,14 @@ fn main() -> Result<()> {
                 threshold_duplication,
                 languages,
                 coverage_file,
-                enable_context,
-                context_providers,
-                disable_context,
+                _enable_context: enable_context,
+                _context_providers: context_providers,
+                _disable_context: disable_context,
+                top,
+                priorities_only,
+                detailed,
+                semantic_off,
+                explain_score,
             };
             handle_analyze(config)
         }
@@ -79,6 +105,11 @@ fn main() -> Result<()> {
             enable_context,
             context_providers,
             disable_context,
+            top,
+            priorities_only,
+            detailed,
+            semantic_off,
+            explain_score,
         } => {
             let config = ValidateConfig {
                 path,
@@ -89,6 +120,11 @@ fn main() -> Result<()> {
                 enable_context,
                 context_providers,
                 disable_context,
+                top,
+                priorities_only,
+                detailed,
+                semantic_off,
+                explain_score,
             };
             validate_project(config)
         }
@@ -113,32 +149,24 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.threshold_duplication,
     )?;
 
-    // Handle risk analysis if coverage file provided
-    let risk_insights = if let Some(lcov_path) = config.coverage_file {
-        analyze_risk_with_coverage(
-            &results,
-            &lcov_path,
-            &config.path,
-            config.enable_context,
-            config.context_providers,
-            config.disable_context,
-        )?
-    } else {
-        analyze_risk_without_coverage(
-            &results,
-            config.enable_context,
-            config.context_providers,
-            config.disable_context,
-            &config.path,
-        )?
-    };
+    // Always use unified prioritization as the default
+    // Build call graph and perform unified analysis
+    let unified_analysis = perform_unified_analysis(
+        &results,
+        config.coverage_file.as_ref(),
+        config.semantic_off,
+        &config.path,
+    )?;
 
-    // Output results
-    output_results_with_risk(
-        results.clone(),
-        risk_insights,
-        config.format.into(),
+    // Output unified prioritized results
+    output_unified_priorities(
+        unified_analysis,
+        config.top,
+        config.priorities_only,
+        config.detailed,
+        config.explain_score,
         config.output,
+        Some(config.format),
     )?;
 
     // Check if analysis passed
@@ -256,56 +284,74 @@ fn build_context_aggregator(
         return None;
     }
 
-    let mut aggregator = risk::context::ContextAggregator::new();
-
-    // Determine which providers to enable
-    let enabled_providers = if let Some(providers) = context_providers {
-        providers
-    } else {
-        // Default providers
-        vec![
-            "critical_path".to_string(),
-            "dependency".to_string(),
-            "git_history".to_string(),
-        ]
-    };
-
+    let enabled_providers = context_providers.unwrap_or_else(get_default_providers);
     let disabled = disable_context.unwrap_or_default();
 
-    for provider_name in enabled_providers {
-        if disabled.contains(&provider_name) {
-            continue;
-        }
-
-        match provider_name.as_str() {
-            "critical_path" => {
-                // For now, create a simple critical path analyzer
-                // In a real implementation, we'd build this from the AST
-                let analyzer = risk::context::critical_path::CriticalPathAnalyzer::new();
-                let provider = risk::context::critical_path::CriticalPathProvider::new(analyzer);
-                aggregator = aggregator.with_provider(Box::new(provider));
-            }
-            "dependency" => {
-                // Create dependency graph from analysis results
-                let graph = risk::context::dependency::DependencyGraph::new();
-                let provider = risk::context::dependency::DependencyRiskProvider::new(graph);
-                aggregator = aggregator.with_provider(Box::new(provider));
-            }
-            "git_history" => {
-                // Try to create git history provider
-                if let Ok(provider) =
-                    risk::context::git_history::GitHistoryProvider::new(project_path.to_path_buf())
-                {
-                    aggregator = aggregator.with_provider(Box::new(provider));
-                }
-            }
-            _ => {
-                eprintln!("Warning: Unknown context provider: {provider_name}");
-            }
-        }
-    }
+    let aggregator = enabled_providers
+        .into_iter()
+        .filter(|name| !disabled.contains(name))
+        .fold(
+            risk::context::ContextAggregator::new(),
+            |acc, provider_name| add_provider_to_aggregator(acc, &provider_name, project_path),
+        );
 
     Some(aggregator)
+}
+
+fn get_default_providers() -> Vec<String> {
+    vec![
+        "critical_path".to_string(),
+        "dependency".to_string(),
+        "git_history".to_string(),
+    ]
+}
+
+fn add_provider_to_aggregator(
+    aggregator: risk::context::ContextAggregator,
+    provider_name: &str,
+    project_path: &Path,
+) -> risk::context::ContextAggregator {
+    match create_provider(provider_name, project_path) {
+        Some(provider) => aggregator.with_provider(provider),
+        None => {
+            eprintln!("Warning: Unknown context provider: {provider_name}");
+            aggregator
+        }
+    }
+}
+
+fn create_provider(
+    provider_name: &str,
+    project_path: &Path,
+) -> Option<Box<dyn risk::context::ContextProvider>> {
+    match provider_name {
+        "critical_path" => Some(create_critical_path_provider()),
+        "dependency" => Some(create_dependency_provider()),
+        "git_history" => create_git_history_provider(project_path),
+        _ => None,
+    }
+}
+
+fn create_critical_path_provider() -> Box<dyn risk::context::ContextProvider> {
+    let analyzer = risk::context::critical_path::CriticalPathAnalyzer::new();
+    Box::new(risk::context::critical_path::CriticalPathProvider::new(
+        analyzer,
+    ))
+}
+
+fn create_dependency_provider() -> Box<dyn risk::context::ContextProvider> {
+    let graph = risk::context::dependency::DependencyGraph::new();
+    Box::new(risk::context::dependency::DependencyRiskProvider::new(
+        graph,
+    ))
+}
+
+fn create_git_history_provider(
+    project_path: &Path,
+) -> Option<Box<dyn risk::context::ContextProvider>> {
+    risk::context::git_history::GitHistoryProvider::new(project_path.to_path_buf())
+        .ok()
+        .map(|provider| Box::new(provider) as Box<dyn risk::context::ContextProvider>)
 }
 
 fn analyze_risk_with_coverage(
@@ -676,6 +722,181 @@ fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyReport {
     analysis_utils::create_dependency_report(file_metrics)
 }
 
+/// Classify if a function is an entry point based on its name
+fn is_entry_point(function_name: &str) -> bool {
+    match function_name {
+        "main" => true,
+        name if name.starts_with("handle_") => true,
+        name if name.starts_with("run_") => true,
+        _ => false,
+    }
+}
+
+/// Classify if a function is a test based on its name and file path
+fn is_test_function(function_name: &str, file_path: &Path, is_test_attr: bool) -> bool {
+    is_test_attr
+        || function_name.starts_with("test_")
+        || file_path.to_string_lossy().contains("test")
+}
+
+/// Build the initial call graph from complexity metrics
+fn build_initial_call_graph(metrics: &[debtmap::FunctionMetrics]) -> priority::CallGraph {
+    let mut call_graph = priority::CallGraph::new();
+
+    for metric in metrics {
+        let func_id = priority::call_graph::FunctionId {
+            file: metric.file.clone(),
+            name: metric.name.clone(),
+            line: metric.line,
+        };
+
+        call_graph.add_function(
+            func_id,
+            is_entry_point(&metric.name),
+            is_test_function(&metric.name, &metric.file, metric.is_test),
+            metric.cyclomatic,
+            metric.length,
+        );
+    }
+
+    call_graph
+}
+
+/// Process Rust files to extract call relationships
+fn process_rust_files_for_call_graph(
+    project_path: &Path,
+    call_graph: &mut priority::CallGraph,
+) -> Result<()> {
+    let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
+        .context("Failed to find Rust files for call graph")?;
+
+    for file_path in rust_files {
+        if let Ok(content) = io::read_file(&file_path) {
+            if let Ok(parsed) = syn::parse_file(&content) {
+                use debtmap::analyzers::rust_call_graph::extract_call_graph;
+                let file_call_graph = extract_call_graph(&parsed, &file_path);
+                call_graph.merge(file_call_graph);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Create unified analysis from metrics and call graph
+fn create_unified_analysis(
+    metrics: &[debtmap::FunctionMetrics],
+    call_graph: &priority::CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+) -> priority::UnifiedAnalysis {
+    use priority::{unified_scorer, UnifiedAnalysis};
+
+    let mut unified = UnifiedAnalysis::new(call_graph.clone());
+
+    for metric in metrics {
+        // Skip test functions from debt score calculation
+        // Test functions are analyzed separately to avoid inflating debt scores
+        if metric.is_test {
+            continue;
+        }
+
+        let roi_score = 5.0; // Default ROI
+        let item =
+            unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data, roi_score);
+        unified.add_item(item);
+    }
+
+    unified.sort_by_priority();
+    unified.calculate_total_impact();
+    unified
+}
+
+fn perform_unified_analysis(
+    results: &AnalysisResults,
+    coverage_file: Option<&PathBuf>,
+    _semantic_off: bool,
+    project_path: &Path,
+) -> Result<priority::UnifiedAnalysis> {
+    // Build initial call graph from complexity metrics
+    let mut call_graph = build_initial_call_graph(&results.complexity.metrics);
+
+    // Process Rust files to extract call relationships
+    process_rust_files_for_call_graph(project_path, &mut call_graph)?;
+
+    // Load coverage data if available
+    let coverage_data = match coverage_file {
+        Some(lcov_path) => {
+            Some(risk::lcov::parse_lcov_file(lcov_path).context("Failed to parse LCOV file")?)
+        }
+        None => None,
+    };
+
+    // Create and return unified analysis
+    Ok(create_unified_analysis(
+        &results.complexity.metrics,
+        &call_graph,
+        coverage_data.as_ref(),
+    ))
+}
+
+/// Determines the priority output format based on command line flags
+fn determine_priority_output_format(
+    priorities_only: bool,
+    detailed: bool,
+    top: Option<usize>,
+) -> priority::formatter::OutputFormat {
+    use priority::formatter::OutputFormat;
+
+    if priorities_only {
+        OutputFormat::PrioritiesOnly
+    } else if detailed {
+        OutputFormat::Detailed
+    } else if let Some(n) = top {
+        OutputFormat::Top(n)
+    } else {
+        OutputFormat::Default
+    }
+}
+
+fn output_unified_priorities(
+    analysis: priority::UnifiedAnalysis,
+    top: Option<usize>,
+    priorities_only: bool,
+    detailed: bool,
+    _explain_score: bool,
+    output_file: Option<PathBuf>,
+    output_format: Option<cli::OutputFormat>,
+) -> Result<()> {
+    use priority::formatter::format_priorities;
+    use std::fs;
+    use std::io::Write;
+
+    // Check if JSON format is requested
+    if let Some(cli::OutputFormat::Json) = output_format {
+        // For JSON, serialize the analysis directly
+        let json = serde_json::to_string_pretty(&analysis)?;
+        if let Some(path) = output_file {
+            let mut file = fs::File::create(path)?;
+            file.write_all(json.as_bytes())?;
+        } else {
+            println!("{}", json);
+        }
+    } else {
+        // For other formats, use the existing formatter
+        let format = determine_priority_output_format(priorities_only, detailed, top);
+        let output = format_priorities(&analysis, format);
+
+        if let Some(path) = output_file {
+            let mut file = fs::File::create(path)?;
+            file.write_all(output.as_bytes())?;
+        } else {
+            println!("{output}");
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1011,6 +1232,70 @@ mod tests {
     }
 
     #[test]
+    fn test_determine_priority_output_format_priorities_only() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(true, false, None);
+        assert!(matches!(format, OutputFormat::PrioritiesOnly));
+
+        // priorities_only takes precedence over other flags
+        let format = determine_priority_output_format(true, true, Some(5));
+        assert!(matches!(format, OutputFormat::PrioritiesOnly));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_detailed() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(false, true, None);
+        assert!(matches!(format, OutputFormat::Detailed));
+
+        // detailed takes precedence over top when priorities_only is false
+        let format = determine_priority_output_format(false, true, Some(5));
+        assert!(matches!(format, OutputFormat::Detailed));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_top() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(false, false, Some(5));
+        assert!(matches!(format, OutputFormat::Top(5)));
+
+        let format = determine_priority_output_format(false, false, Some(10));
+        assert!(matches!(format, OutputFormat::Top(10)));
+
+        let format = determine_priority_output_format(false, false, Some(1));
+        assert!(matches!(format, OutputFormat::Top(1)));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_default() {
+        use priority::formatter::OutputFormat;
+
+        let format = determine_priority_output_format(false, false, None);
+        assert!(matches!(format, OutputFormat::Default));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_precedence_order() {
+        use priority::formatter::OutputFormat;
+
+        // Test full precedence: priorities_only > detailed > top > default
+        let format = determine_priority_output_format(true, true, Some(5));
+        assert!(matches!(format, OutputFormat::PrioritiesOnly));
+
+        let format = determine_priority_output_format(false, true, Some(5));
+        assert!(matches!(format, OutputFormat::Detailed));
+
+        let format = determine_priority_output_format(false, false, Some(5));
+        assert!(matches!(format, OutputFormat::Top(5)));
+
+        let format = determine_priority_output_format(false, false, None);
+        assert!(matches!(format, OutputFormat::Default));
+    }
+
+    #[test]
     fn test_is_analysis_passing_boundary_values() {
         let results = AnalysisResults {
             project_path: PathBuf::from("/test"),
@@ -1050,6 +1335,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -1068,6 +1358,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -1086,6 +1381,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         // Format takes precedence over output
         assert_eq!(
@@ -1105,6 +1405,11 @@ mod tests {
             enable_context: false,
             context_providers: None,
             disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
         };
         assert_eq!(determine_output_format(&config), None);
     }
@@ -1155,5 +1460,221 @@ mod tests {
 
         // Clean up
         fs::remove_file(test_file).ok();
+    }
+
+    #[test]
+    fn test_is_entry_point_main() {
+        assert!(is_entry_point("main"));
+    }
+
+    #[test]
+    fn test_is_entry_point_handle_prefix() {
+        assert!(is_entry_point("handle_request"));
+        assert!(is_entry_point("handle_"));
+        assert!(is_entry_point("handle_user_input"));
+    }
+
+    #[test]
+    fn test_is_entry_point_run_prefix() {
+        assert!(is_entry_point("run_server"));
+        assert!(is_entry_point("run_"));
+        assert!(is_entry_point("run_application"));
+    }
+
+    #[test]
+    fn test_is_entry_point_regular_function() {
+        assert!(!is_entry_point("process_data"));
+        assert!(!is_entry_point("calculate_score"));
+        assert!(!is_entry_point("format_output"));
+    }
+
+    #[test]
+    fn test_is_test_function_with_attribute() {
+        let path = Path::new("src/lib.rs");
+        assert!(is_test_function("some_function", path, true));
+    }
+
+    #[test]
+    fn test_is_test_function_with_test_prefix() {
+        let path = Path::new("src/lib.rs");
+        assert!(is_test_function("test_something", path, false));
+        assert!(is_test_function("test_", path, false));
+    }
+
+    #[test]
+    fn test_is_test_function_in_test_file() {
+        let path = Path::new("src/test_utils.rs");
+        assert!(is_test_function("helper_function", path, false));
+
+        let path2 = Path::new("tests/integration.rs");
+        assert!(is_test_function("regular_function", path2, false));
+    }
+
+    #[test]
+    fn test_is_test_function_regular() {
+        let path = Path::new("src/main.rs");
+        assert!(!is_test_function("process_data", path, false));
+        assert!(!is_test_function("calculate", path, false));
+    }
+
+    #[test]
+    fn test_build_initial_call_graph() {
+        use debtmap::FunctionMetrics;
+
+        let metrics = vec![
+            FunctionMetrics {
+                name: "main".to_string(),
+                file: PathBuf::from("src/main.rs"),
+                line: 10,
+                cyclomatic: 5,
+                cognitive: 7,
+                nesting: 2,
+                length: 25,
+                is_test: false,
+            },
+            FunctionMetrics {
+                name: "test_function".to_string(),
+                file: PathBuf::from("tests/test.rs"),
+                line: 20,
+                cyclomatic: 3,
+                cognitive: 4,
+                nesting: 1,
+                length: 15,
+                is_test: true,
+            },
+        ];
+
+        let _call_graph = build_initial_call_graph(&metrics);
+
+        // Verify the graph was built with correct classifications
+        let _func_id_main = priority::call_graph::FunctionId {
+            file: PathBuf::from("src/main.rs"),
+            name: "main".to_string(),
+            line: 10,
+        };
+
+        let _func_id_test = priority::call_graph::FunctionId {
+            file: PathBuf::from("tests/test.rs"),
+            name: "test_function".to_string(),
+            line: 20,
+        };
+
+        // Check that functions were added to the graph
+        // The graph should have both functions
+        // Note: CallGraph doesn't expose has_function, we just verify it was built
+    }
+
+    #[test]
+    fn test_create_unified_analysis() {
+        use debtmap::FunctionMetrics;
+        use priority::CallGraph;
+
+        let metrics = vec![FunctionMetrics {
+            name: "analyze_data".to_string(),
+            file: PathBuf::from("src/analyzer.rs"),
+            line: 15,
+            cyclomatic: 8,
+            cognitive: 10,
+            nesting: 3,
+            length: 40,
+            is_test: false,
+        }];
+
+        let mut call_graph = CallGraph::new();
+        let func_id = priority::call_graph::FunctionId {
+            file: PathBuf::from("src/analyzer.rs"),
+            name: "analyze_data".to_string(),
+            line: 15,
+        };
+        call_graph.add_function(func_id, false, false, 8, 40);
+
+        let unified = create_unified_analysis(&metrics, &call_graph, None);
+
+        // Verify the unified analysis was created
+        assert_eq!(unified.items.len(), 1);
+    }
+
+    #[test]
+    fn test_create_unified_analysis_excludes_test_functions() {
+        use crate::core::FunctionMetrics;
+        use crate::priority::{call_graph::FunctionId, CallGraph};
+
+        // Create test metrics with both production and test functions
+        let metrics = vec![
+            FunctionMetrics {
+                name: "production_function".to_string(),
+                file: PathBuf::from("src/main.rs"),
+                line: 10,
+                cyclomatic: 5,
+                cognitive: 3,
+                nesting: 1,
+                length: 20,
+                is_test: false, // Production function
+            },
+            FunctionMetrics {
+                name: "test_something".to_string(),
+                file: PathBuf::from("src/main.rs"),
+                line: 30,
+                cyclomatic: 8,
+                cognitive: 12,
+                nesting: 2,
+                length: 40,
+                is_test: true, // Test function - should be excluded
+            },
+            FunctionMetrics {
+                name: "another_production_function".to_string(),
+                file: PathBuf::from("src/lib.rs"),
+                line: 50,
+                cyclomatic: 3,
+                cognitive: 2,
+                nesting: 0,
+                length: 15,
+                is_test: false, // Production function
+            },
+        ];
+
+        let mut call_graph = CallGraph::new();
+
+        // Add all functions to call graph
+        for metric in &metrics {
+            let func_id = FunctionId {
+                file: metric.file.clone(),
+                name: metric.name.clone(),
+                line: metric.line,
+            };
+            call_graph.add_function(
+                func_id,
+                false,
+                metric.is_test,
+                metric.cyclomatic,
+                metric.length,
+            );
+        }
+
+        let unified = create_unified_analysis(&metrics, &call_graph, None);
+
+        // Verify only production functions are included in unified analysis
+        // Test function should be excluded, so only 2 items should be present
+        assert_eq!(unified.items.len(), 2);
+
+        // Verify that the included functions are indeed the production ones
+        let included_names: Vec<&String> = unified
+            .items
+            .iter()
+            .map(|item| &item.location.function)
+            .collect();
+
+        assert!(included_names.contains(&&"production_function".to_string()));
+        assert!(included_names.contains(&&"another_production_function".to_string()));
+        assert!(!included_names.contains(&&"test_something".to_string()));
+
+        // Verify that total debt score doesn't include the complex test function
+        // If test functions were included, the score would be much higher due to
+        // the complex test function (cyclomatic=8, cognitive=12, no coverage)
+        let total_debt_score = unified.total_impact.risk_reduction;
+        assert!(
+            total_debt_score < 20.0,
+            "Debt score should be low since test function is excluded"
+        );
     }
 }

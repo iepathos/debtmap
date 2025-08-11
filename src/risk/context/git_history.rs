@@ -259,21 +259,11 @@ impl ContextProvider for GitHistoryProvider {
 
         // Calculate contribution based on instability
         let _instability = 1.0 - history.stability_score;
-        let bug_density = if history.total_commits > 0 {
-            history.bug_fix_count as f64 / history.total_commits as f64
-        } else {
-            0.0
-        };
+        let bug_density =
+            GitHistoryProvider::calculate_bug_density(history.bug_fix_count, history.total_commits);
 
-        let contribution = if history.change_frequency > 5.0 && bug_density > 0.3 {
-            2.0 // Very unstable, high risk
-        } else if history.change_frequency > 2.0 || bug_density > 0.2 {
-            1.0 // Moderately unstable
-        } else if history.change_frequency > 1.0 || bug_density > 0.1 {
-            0.5 // Slightly unstable
-        } else {
-            0.1 // Stable
-        };
+        let contribution =
+            GitHistoryProvider::classify_risk_contribution(history.change_frequency, bug_density);
 
         Ok(Context {
             provider: self.name().to_string(),
@@ -311,6 +301,25 @@ impl ContextProvider for GitHistoryProvider {
 }
 
 impl GitHistoryProvider {
+    /// Calculate bug density as a ratio of bug fixes to total commits
+    fn calculate_bug_density(bug_fix_count: usize, total_commits: usize) -> f64 {
+        if total_commits > 0 {
+            bug_fix_count as f64 / total_commits as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Classify the risk contribution based on change frequency and bug density
+    fn classify_risk_contribution(change_frequency: f64, bug_density: f64) -> f64 {
+        match () {
+            _ if change_frequency > 5.0 && bug_density > 0.3 => 2.0, // Very unstable, high risk
+            _ if change_frequency > 2.0 || bug_density > 0.2 => 1.0, // Moderately unstable
+            _ if change_frequency > 1.0 || bug_density > 0.1 => 0.5, // Slightly unstable
+            _ => 0.1,                                                // Stable
+        }
+    }
+
     fn explain_historical_context(
         &self,
         change_frequency: f64,
@@ -335,16 +344,13 @@ impl GitHistoryProvider {
         bug_density: f64,
         age_days: u64,
     ) -> StabilityStatus {
-        if change_frequency > 5.0 && bug_density > 0.3 {
-            StabilityStatus::HighlyUnstable
-        } else if change_frequency > 2.0 {
-            StabilityStatus::FrequentlyChanged
-        } else if bug_density > 0.2 {
-            StabilityStatus::BugProne
-        } else if age_days > 365 {
-            StabilityStatus::MatureStable
-        } else {
-            StabilityStatus::RelativelyStable
+        // Use pattern matching with early returns to reduce cognitive complexity
+        match (change_frequency, bug_density, age_days) {
+            (freq, bug, _) if freq > 5.0 && bug > 0.3 => StabilityStatus::HighlyUnstable,
+            (freq, _, _) if freq > 2.0 => StabilityStatus::FrequentlyChanged,
+            (_, bug, _) if bug > 0.2 => StabilityStatus::BugProne,
+            (_, _, age) if age > 365 => StabilityStatus::MatureStable,
+            _ => StabilityStatus::RelativelyStable,
         }
     }
 
@@ -467,6 +473,149 @@ mod tests {
         assert_eq!(history.total_commits, 2);
         assert_eq!(history.bug_fix_count, 1);
         assert_eq!(history.author_count, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_calculate_bug_density_with_commits() {
+        assert_eq!(GitHistoryProvider::calculate_bug_density(0, 10), 0.0);
+        assert_eq!(GitHistoryProvider::calculate_bug_density(5, 10), 0.5);
+        assert_eq!(GitHistoryProvider::calculate_bug_density(10, 10), 1.0);
+        assert_eq!(GitHistoryProvider::calculate_bug_density(3, 10), 0.3);
+    }
+
+    #[test]
+    fn test_calculate_bug_density_no_commits() {
+        assert_eq!(GitHistoryProvider::calculate_bug_density(0, 0), 0.0);
+        assert_eq!(GitHistoryProvider::calculate_bug_density(5, 0), 0.0);
+    }
+
+    #[test]
+    fn test_classify_risk_contribution_very_unstable() {
+        // Very unstable: high frequency AND high bug density
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(6.0, 0.4),
+            2.0
+        );
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(10.0, 0.5),
+            2.0
+        );
+    }
+
+    #[test]
+    fn test_classify_risk_contribution_moderately_unstable() {
+        // Moderately unstable: high frequency OR high bug density
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(3.0, 0.1),
+            1.0
+        );
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(1.5, 0.25),
+            1.0
+        );
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(2.5, 0.0),
+            1.0
+        );
+    }
+
+    #[test]
+    fn test_classify_risk_contribution_slightly_unstable() {
+        // Slightly unstable: moderate frequency OR moderate bug density
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(1.5, 0.05),
+            0.5
+        );
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(0.5, 0.15),
+            0.5
+        );
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(1.2, 0.0),
+            0.5
+        );
+    }
+
+    #[test]
+    fn test_classify_risk_contribution_stable() {
+        // Stable: low frequency and low bug density
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(0.5, 0.05),
+            0.1
+        );
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(0.0, 0.0),
+            0.1
+        );
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(0.9, 0.09),
+            0.1
+        );
+    }
+
+    #[test]
+    fn test_classify_risk_contribution_edge_cases() {
+        // Test boundary values
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(5.0, 0.3),
+            1.0
+        ); // Not quite very unstable (needs BOTH conditions)
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(5.1, 0.31),
+            2.0
+        ); // Just over the threshold for very unstable
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(2.0, 0.2),
+            0.5
+        ); // On the boundary (falls through to slightly unstable)
+        assert_eq!(
+            GitHistoryProvider::classify_risk_contribution(1.0, 0.1),
+            0.1
+        ); // On the boundary (falls through to stable)
+    }
+
+    #[test]
+    fn test_gather_integration() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create and commit a test file with multiple changes
+        let file_path = create_test_file(&repo_path, "test.rs", "fn main() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        // Add more commits to create history
+        for i in 1..=3 {
+            std::fs::write(&file_path, format!("fn main() {{ /* change {i} */ }}"))?;
+            Command::new("git")
+                .args(["add", "test.rs"])
+                .current_dir(&repo_path)
+                .output()?;
+            commit_with_message(&repo_path, &format!("fix: bug fix {i}"))?;
+        }
+
+        let provider = GitHistoryProvider::new(repo_path.clone())?;
+        let target = AnalysisTarget {
+            root_path: repo_path,
+            file_path: PathBuf::from("test.rs"),
+            function_name: "main".to_string(),
+            line_range: (1, 10),
+        };
+
+        let context = provider.gather(&target)?;
+
+        assert_eq!(context.provider, "git_history");
+        assert_eq!(context.weight, 1.0);
+
+        // Check that the contribution is calculated correctly
+        if let ContextDetails::Historical { bug_density, .. } = context.details {
+            // We have 3 bug fixes out of 4 commits = 0.75 bug density
+            assert!(bug_density > 0.7);
+            // With high bug density (>0.3), we expect high contribution
+            assert!(context.contribution >= 1.0);
+        } else {
+            panic!("Expected Historical context details");
+        }
 
         Ok(())
     }
