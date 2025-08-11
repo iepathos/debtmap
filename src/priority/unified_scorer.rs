@@ -298,10 +298,10 @@ fn generate_recommendation(
             ],
         ),
         // Test-specific debt types
-        DebtType::TestComplexityHotspot { 
-            cyclomatic, 
-            cognitive, 
-            threshold 
+        DebtType::TestComplexityHotspot {
+            cyclomatic,
+            cognitive,
+            threshold
         } => (
             format!("Simplify test - complexity {} exceeds test threshold {}", cyclomatic.max(cognitive), threshold),
             format!("Test has high complexity (cyclo={cyclomatic}, cognitive={cognitive}) - consider splitting into smaller tests"),
@@ -400,7 +400,11 @@ fn calculate_expected_impact(
             risk_reduction: score.final_score * 0.2,
         },
         // Test-specific debt types have lower impact on overall metrics
-        DebtType::TestComplexityHotspot { cyclomatic, cognitive: _, threshold: _ } => ImpactMetrics {
+        DebtType::TestComplexityHotspot {
+            cyclomatic,
+            cognitive: _,
+            threshold: _,
+        } => ImpactMetrics {
             coverage_improvement: 0.0, // Tests don't improve coverage
             lines_reduction: 0,
             complexity_reduction: (*cyclomatic as f64 * 0.3),
@@ -412,7 +416,11 @@ fn calculate_expected_impact(
             complexity_reduction: 0.0,
             risk_reduction: score.final_score * 0.1,
         },
-        DebtType::TestDuplication { instances, total_lines, similarity: _ } => ImpactMetrics {
+        DebtType::TestDuplication {
+            instances,
+            total_lines,
+            similarity: _,
+        } => ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: *total_lines - (*total_lines / instances),
             complexity_reduction: 0.0,
