@@ -1,4 +1,4 @@
-use super::{FunctionRisk, RiskAnalyzer, RiskCategory, RiskInsight, TestingRecommendation};
+use super::{Difficulty, FunctionRisk, RiskAnalyzer, RiskCategory, RiskInsight, TestingRecommendation};
 use crate::risk::correlation::analyze_risk_insights;
 use crate::risk::priority::prioritize_by_roi;
 use im::Vector;
@@ -87,6 +87,68 @@ fn wrap_text(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
+// Pure functions for formatting components
+
+pub fn format_risk_reduction(potential_risk_reduction: f64) -> String {
+    if potential_risk_reduction < 0.5 {
+        "<1".to_string()
+    } else {
+        format!("{potential_risk_reduction:.0}")
+    }
+}
+
+pub fn format_roi_display(roi_score: f64) -> String {
+    if roi_score >= 10.0 {
+        format!("{roi_score:.0}")
+    } else {
+        format!("{roi_score:.1}")
+    }
+}
+
+pub fn determine_risk_level(current_risk: f64) -> &'static str {
+    if current_risk >= 8.0 {
+        "HIGH"
+    } else if current_risk >= 5.0 {
+        "MEDIUM"
+    } else {
+        "LOW"
+    }
+}
+
+pub fn format_difficulty(difficulty: &Difficulty) -> &'static str {
+    match difficulty {
+        Difficulty::Trivial => "trivial",
+        Difficulty::Simple => "simple",
+        Difficulty::Moderate => "moderate",
+        Difficulty::Complex => "complex",
+        Difficulty::VeryComplex => "very complex",
+    }
+}
+
+pub fn format_complexity_info(branch_count: u32, cognitive_load: u32) -> String {
+    format!("branches={branch_count}, cognitive={cognitive_load}")
+}
+
+pub fn format_dependency_info(dependencies_count: usize, dependents_count: usize) -> String {
+    format!("{dependencies_count} upstream, {dependents_count} downstream")
+}
+
+pub fn calculate_dash_count(header_len: usize, roi_label_len: usize) -> usize {
+    82 - header_len - roi_label_len - 8 // Account for "┌─ " + " ─┐" + spaces
+}
+
+pub fn format_recommendation_box_header(index: usize, roi_display: &str) -> String {
+    let index_num = index + 1;
+    let header = format!("#{index_num}");
+    let roi_label = format!("ROI: {roi_display}");
+    let dash_count = calculate_dash_count(header.len(), roi_label.len());
+    
+    let dashes = "─".repeat(dash_count);
+    format!(
+        "┌─ {header} {dashes} {roi_label} ─┐\n"
+    )
+}
+
 pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -> String {
     let mut output = String::new();
 
@@ -100,66 +162,36 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
 
     for (i, rec) in recommendations.iter().take(5).enumerate() {
         let roi_score = rec.roi.unwrap_or(0.1);
-        let risk_reduction = if rec.potential_risk_reduction < 0.5 {
-            "<1".to_string()
-        } else {
-            format!("{:.0}", rec.potential_risk_reduction)
-        };
-
-        let roi_display = if roi_score >= 10.0 {
-            format!("{roi_score:.0}")
-        } else {
-            format!("{roi_score:.1}")
-        };
+        let risk_reduction = format_risk_reduction(rec.potential_risk_reduction);
+        let roi_display = format_roi_display(roi_score);
 
         // Format file path with line number
         let file_str = rec.file.to_string_lossy();
-        let location_display = format!("{}:{}", file_str, rec.line);
+        let line = rec.line;
+        let location_display = format!("{file_str}:{line}");
 
         // Determine risk level string
-        let risk_level = if rec.current_risk >= 8.0 {
-            "HIGH"
-        } else if rec.current_risk >= 5.0 {
-            "MEDIUM"
-        } else {
-            "LOW"
-        };
+        let risk_level = determine_risk_level(rec.current_risk);
 
         // Format complexity based on test effort
-        let complexity_desc = match rec.test_effort_estimate.estimated_difficulty {
-            super::Difficulty::Trivial => "trivial",
-            super::Difficulty::Simple => "simple",
-            super::Difficulty::Moderate => "moderate",
-            super::Difficulty::Complex => "complex",
-            super::Difficulty::VeryComplex => "very complex",
-        };
-
-        let complexity_str = format!(
-            "branches={}, cognitive={}",
-            rec.test_effort_estimate.branch_count, rec.test_effort_estimate.cognitive_load
+        let complexity_desc = format_difficulty(&rec.test_effort_estimate.estimated_difficulty);
+        let complexity_str = format_complexity_info(
+            rec.test_effort_estimate.branch_count,
+            rec.test_effort_estimate.cognitive_load
         );
 
         // Format dependency info
-        let deps_info = format!(
-            "{} upstream, {} downstream",
+        let deps_info = format_dependency_info(
             rec.dependencies.len(),
             rec.dependents.len()
         );
 
         // Create the top border with proper spacing
-        let header = format!("#{}", i + 1);
-        let roi_label = format!("ROI: {roi_display}");
-        let dash_count = 82 - header.len() - roi_label.len() - 8; // Account for "┌─ " + " ─┐" + spaces
-
-        output.push_str(&format!(
-            "┌─ {} {} {} ─┐\n",
-            header,
-            "─".repeat(dash_count),
-            roi_label
-        ));
+        output.push_str(&format_recommendation_box_header(i, &roi_display));
 
         // Function and location line - pad to 78 chars (82 - 4 for "│ " and " │")
-        let func_loc = format!("{}() @ {}", rec.function, location_display);
+        let func_name = &rec.function;
+        let func_loc = format!("{func_name}() @ {location_display}");
         output.push_str(&format!("│ {func_loc:<78} │\n"));
 
         // Divider - exactly 82 chars total
@@ -168,9 +200,9 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
         );
 
         // Risk line
+        let current_risk = rec.current_risk;
         let risk_line = format!(
-            "Risk: {} ({:.1})  Impact: -{}%  Complexity: {} ({})",
-            risk_level, rec.current_risk, risk_reduction, complexity_desc, complexity_str
+            "Risk: {risk_level} ({current_risk:.1})  Impact: -{risk_reduction}%  Complexity: {complexity_desc} ({complexity_str})"
         );
         output.push_str(&format!("│ {risk_line:<78} │\n"));
 
@@ -186,7 +218,8 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
 
         // Add used by info if present
         if !rec.dependents.is_empty() {
-            let used_by = format!("Used by: {}", rec.dependents.join(", "));
+            let dependents = rec.dependents.join(", ");
+            let used_by = format!("Used by: {dependents}");
             let used_by_lines = wrap_text(&used_by, 78);
             for line in used_by_lines {
                 output.push_str(&format!("│ {line:<78} │\n"));
