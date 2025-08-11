@@ -220,14 +220,11 @@ impl ContextProvider for DependencyRiskProvider {
         let depth = self.calculate_dependency_depth(&target.function_name);
 
         // Higher contribution for functions with large blast radius or many dependents
-        let contribution = if blast_radius > 10 {
-            1.5
-        } else if blast_radius > 5 {
-            1.0
-        } else if blast_radius > 2 {
-            0.5
-        } else {
-            0.2
+        let contribution = match blast_radius {
+            r if r > 10 => 1.5,
+            r if r > 5 => 1.0,
+            r if r > 2 => 0.5,
+            _ => 0.2,
         };
 
         Ok(Context {
@@ -248,32 +245,27 @@ impl ContextProvider for DependencyRiskProvider {
     }
 
     fn explain(&self, context: &Context) -> String {
-        if let ContextDetails::DependencyChain {
-            depth,
-            propagated_risk,
-            dependents,
-            blast_radius,
-        } = &context.details
-        {
-            if *blast_radius > 10 {
-                format!(
+        match &context.details {
+            ContextDetails::DependencyChain {
+                depth,
+                propagated_risk,
+                dependents,
+                blast_radius,
+            } => match *blast_radius {
+                r if r > 10 => format!(
                     "Critical dependency with blast radius {} affecting {} modules",
                     blast_radius,
                     dependents.len()
-                )
-            } else if *blast_radius > 5 {
-                format!(
+                ),
+                r if r > 5 => format!(
                     "Important dependency with {} dependents (risk: {:.1})",
                     dependents.len(),
                     propagated_risk
-                )
-            } else if *blast_radius > 0 {
-                format!("Dependency depth {depth} with limited impact")
-            } else {
-                "Isolated component with no dependencies".to_string()
-            }
-        } else {
-            "No dependency information".to_string()
+                ),
+                r if r > 0 => format!("Dependency depth {depth} with limited impact"),
+                _ => "Isolated component with no dependencies".to_string(),
+            },
+            _ => "No dependency information".to_string(),
         }
     }
 }

@@ -265,14 +265,11 @@ impl ContextProvider for GitHistoryProvider {
             0.0
         };
 
-        let contribution = if history.change_frequency > 5.0 && bug_density > 0.3 {
-            2.0 // Very unstable, high risk
-        } else if history.change_frequency > 2.0 || bug_density > 0.2 {
-            1.0 // Moderately unstable
-        } else if history.change_frequency > 1.0 || bug_density > 0.1 {
-            0.5 // Slightly unstable
-        } else {
-            0.1 // Stable
+        let contribution = match (history.change_frequency, bug_density) {
+            (freq, bug) if freq > 5.0 && bug > 0.3 => 2.0, // Very unstable, high risk
+            (freq, bug) if freq > 2.0 || bug > 0.2 => 1.0, // Moderately unstable
+            (freq, bug) if freq > 1.0 || bug > 0.1 => 0.5, // Slightly unstable
+            _ => 0.1,                                      // Stable
         };
 
         Ok(Context {
@@ -335,16 +332,13 @@ impl GitHistoryProvider {
         bug_density: f64,
         age_days: u64,
     ) -> StabilityStatus {
-        if change_frequency > 5.0 && bug_density > 0.3 {
-            StabilityStatus::HighlyUnstable
-        } else if change_frequency > 2.0 {
-            StabilityStatus::FrequentlyChanged
-        } else if bug_density > 0.2 {
-            StabilityStatus::BugProne
-        } else if age_days > 365 {
-            StabilityStatus::MatureStable
-        } else {
-            StabilityStatus::RelativelyStable
+        // Use pattern matching with early returns to reduce cognitive complexity
+        match (change_frequency, bug_density, age_days) {
+            (freq, bug, _) if freq > 5.0 && bug > 0.3 => StabilityStatus::HighlyUnstable,
+            (freq, _, _) if freq > 2.0 => StabilityStatus::FrequentlyChanged,
+            (_, bug, _) if bug > 0.2 => StabilityStatus::BugProne,
+            (_, _, age) if age > 365 => StabilityStatus::MatureStable,
+            _ => StabilityStatus::RelativelyStable,
         }
     }
 
