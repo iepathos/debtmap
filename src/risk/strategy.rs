@@ -221,40 +221,44 @@ impl EnhancedRiskStrategy {
         let avg_complexity =
             (complexity.cyclomatic_complexity + complexity.cognitive_complexity) / 2;
 
-        // For test functions, categorize based on complexity only (not coverage)
-        if is_test {
-            return match avg_complexity {
-                c if c > 20 => RiskCategory::High,   // Very complex test
-                c if c > 10 => RiskCategory::Medium, // Complex test
-                c if c > 5 => RiskCategory::Low,     // Moderately complex test
-                _ => RiskCategory::Low,              // Simple test
-            };
+        match (is_test, coverage) {
+            // Test functions: categorize by complexity alone
+            (true, _) => categorize_by_complexity_for_test(avg_complexity),
+            // Well-tested complex functions
+            (false, Some(cov)) if avg_complexity > 10 && cov > 80.0 => RiskCategory::WellTested,
+            // Unknown coverage: use complexity-based categorization
+            (false, None) => categorize_by_complexity(avg_complexity),
+            // Known coverage: use risk score
+            (false, Some(_)) => categorize_by_risk_score(risk_score),
         }
+    }
+}
 
-        if let Some(cov) = coverage {
-            if avg_complexity > 10 && cov > 80.0 {
-                return RiskCategory::WellTested;
-            }
-        }
+// Pure helper functions for risk categorization
+fn categorize_by_complexity_for_test(avg_complexity: u32) -> RiskCategory {
+    match avg_complexity {
+        c if c > 20 => RiskCategory::High,   // Very complex test
+        c if c > 10 => RiskCategory::Medium, // Complex test
+        c if c > 5 => RiskCategory::Low,     // Moderately complex test
+        _ => RiskCategory::Low,              // Simple test
+    }
+}
 
-        // When coverage is unknown, also consider complexity for categorization
-        if coverage.is_none() {
-            // Use complexity-based categorization when coverage is unknown
-            return match avg_complexity {
-                c if c > 15 => RiskCategory::Critical,
-                c if c > 10 => RiskCategory::High,
-                c if c > 5 => RiskCategory::Medium,
-                _ => RiskCategory::Low,
-            };
-        }
+fn categorize_by_complexity(avg_complexity: u32) -> RiskCategory {
+    match avg_complexity {
+        c if c > 15 => RiskCategory::Critical,
+        c if c > 10 => RiskCategory::High,
+        c if c > 5 => RiskCategory::Medium,
+        _ => RiskCategory::Low,
+    }
+}
 
-        // When coverage is known, use risk score based categorization
-        match risk_score {
-            r if r >= 8.0 => RiskCategory::Critical,
-            r if r >= 6.0 => RiskCategory::High,
-            r if r >= 4.0 => RiskCategory::Medium,
-            _ => RiskCategory::Low,
-        }
+fn categorize_by_risk_score(risk_score: f64) -> RiskCategory {
+    match risk_score {
+        r if r >= 8.0 => RiskCategory::Critical,
+        r if r >= 6.0 => RiskCategory::High,
+        r if r >= 4.0 => RiskCategory::Medium,
+        _ => RiskCategory::Low,
     }
 }
 
@@ -445,5 +449,29 @@ mod tests {
                 "Score {score} should map to {expected_category:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_categorize_by_complexity_for_test() {
+        assert_eq!(categorize_by_complexity_for_test(25), RiskCategory::High);
+        assert_eq!(categorize_by_complexity_for_test(15), RiskCategory::Medium);
+        assert_eq!(categorize_by_complexity_for_test(7), RiskCategory::Low);
+        assert_eq!(categorize_by_complexity_for_test(3), RiskCategory::Low);
+    }
+
+    #[test]
+    fn test_categorize_by_complexity() {
+        assert_eq!(categorize_by_complexity(20), RiskCategory::Critical);
+        assert_eq!(categorize_by_complexity(12), RiskCategory::High);
+        assert_eq!(categorize_by_complexity(7), RiskCategory::Medium);
+        assert_eq!(categorize_by_complexity(3), RiskCategory::Low);
+    }
+
+    #[test]
+    fn test_categorize_by_risk_score() {
+        assert_eq!(categorize_by_risk_score(9.0), RiskCategory::Critical);
+        assert_eq!(categorize_by_risk_score(7.0), RiskCategory::High);
+        assert_eq!(categorize_by_risk_score(5.0), RiskCategory::Medium);
+        assert_eq!(categorize_by_risk_score(2.0), RiskCategory::Low);
     }
 }
