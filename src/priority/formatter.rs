@@ -54,10 +54,10 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     }
 
     // Add high-impact low-complexity fixes section
-    format_quick_wins(&mut output, analysis);
+    // _format_quick_wins(&mut output, analysis);
 
     // Add total impact summary
-    format_total_impact(&mut output, analysis);
+    // _format_total_impact(&mut output, analysis);
 
     output
 }
@@ -233,7 +233,7 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     }
 }
 
-fn format_quick_wins(output: &mut String, analysis: &UnifiedAnalysis) {
+fn _format_quick_wins(output: &mut String, analysis: &UnifiedAnalysis) {
     writeln!(output).unwrap();
     writeln!(
         output,
@@ -264,7 +264,7 @@ fn format_quick_wins(output: &mut String, analysis: &UnifiedAnalysis) {
     }
 }
 
-fn format_total_impact(output: &mut String, analysis: &UnifiedAnalysis) {
+fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalysis) {
     writeln!(output).unwrap();
     writeln!(
         output,
@@ -482,7 +482,7 @@ mod tests {
         assert!(output_plain.contains("TOP 2 RECOMMENDATIONS"));
         assert!(output_plain.contains("SCORE: 9.0"));
         assert!(output_plain.contains("[CRITICAL]"));
-        assert!(output_plain.contains("TOTAL IMPACT"));
+        // assert!(output_plain.contains("TOTAL IMPACT"));
     }
 
     #[test]

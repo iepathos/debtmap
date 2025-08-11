@@ -1,5 +1,5 @@
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMethodCall, ImplItemFn, ItemFn};
@@ -203,8 +203,8 @@ fn count_lines(block: &syn::Block) -> usize {
 }
 
 /// Extract call graph from a parsed Rust file
-pub fn extract_call_graph(file: &syn::File, path: &PathBuf) -> CallGraph {
-    let mut extractor = CallGraphExtractor::new(path.clone());
+pub fn extract_call_graph(file: &syn::File, path: &Path) -> CallGraph {
+    let mut extractor = CallGraphExtractor::new(path.to_path_buf());
     extractor.visit_file(file);
     extractor.call_graph
 }
