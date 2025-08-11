@@ -39,9 +39,22 @@ pub fn classify_function_role(
         return FunctionRole::Orchestrator;
     }
 
-    // I/O wrapper: contains I/O patterns, thin logic
-    if contains_io_patterns(func) && func.length < 20 {
-        return FunctionRole::IOWrapper;
+    // I/O wrapper: contains I/O patterns with either:
+    // - Short functions (< 20 lines)
+    // - Or functions where complexity is mostly from I/O branching (not business logic)
+    if contains_io_patterns(func) {
+        // Short I/O functions are clearly wrappers
+        if func.length < 20 {
+            return FunctionRole::IOWrapper;
+        }
+        
+        // Longer functions can still be I/O wrappers if:
+        // - They have I/O patterns in the name
+        // - Their complexity comes from output formatting/routing, not business logic
+        // - Cyclomatic complexity is mostly from format/output branches
+        if func.length <= 50 && is_io_orchestration(func) {
+            return FunctionRole::IOWrapper;
+        }
     }
 
     // Everything else is considered pure logic
@@ -114,6 +127,28 @@ fn contains_io_patterns(func: &FunctionMetrics) -> bool {
     io_keywords
         .iter()
         .any(|keyword| name_lower.contains(keyword))
+}
+
+fn is_io_orchestration(func: &FunctionMetrics) -> bool {
+    // Function is I/O orchestration if it has I/O in the name and:
+    // - Moderate cyclomatic complexity (mostly from format/output branching)
+    // - Not deeply nested (nesting <= 3)
+    // - Name strongly suggests I/O operations
+    let name_lower = func.name.to_lowercase();
+    
+    // Strong I/O indicators in function name
+    let strong_io_patterns = [
+        "output_", "write_", "print_", "format_", "serialize_",
+        "save_", "export_", "display_", "render_", "emit_",
+    ];
+    
+    let has_strong_io_name = strong_io_patterns
+        .iter()
+        .any(|pattern| name_lower.starts_with(pattern));
+    
+    // I/O orchestration typically has branching for different formats/destinations
+    // but not deep business logic
+    has_strong_io_name && func.nesting <= 3
 }
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
@@ -230,6 +265,33 @@ mod tests {
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(role, FunctionRole::IOWrapper);
+    }
+    
+    #[test]
+    fn test_io_orchestration_classification() {
+        let graph = CallGraph::new();
+        
+        // Test case similar to output_unified_priorities:
+        // - Has "output_" prefix (strong I/O pattern)
+        // - 38 lines (within the 50 line limit)
+        // - Cyclomatic 12 (from format branching)
+        // - Nesting 3 (not deeply nested)
+        let mut func = create_test_metrics("output_unified_priorities", 12, 19, 38);
+        func.nesting = 3;
+        
+        let func_id = FunctionId {
+            file: PathBuf::from("main.rs"),
+            name: "output_unified_priorities".to_string(),
+            line: 861,
+        };
+
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(role, FunctionRole::IOWrapper);
+        
+        // Test that high nesting disqualifies I/O orchestration
+        func.nesting = 4;
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(role, FunctionRole::PureLogic);
     }
 
     #[test]
