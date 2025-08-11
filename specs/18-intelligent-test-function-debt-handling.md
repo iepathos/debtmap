@@ -23,7 +23,25 @@ Currently, debtmap treats all functions equally when calculating technical debt 
 - TODO/FIXME comments
 - Code smells
 
-The problem is that test functions receive debt scores for being "untested" even though it doesn't make sense to test test functions. This causes the total debt score to increase when tests are added, which is counterintuitive and discourages adding tests.
+**Root Cause Analysis (from codebase investigation):**
+
+The problem originates in how the total debt score is calculated:
+
+1. **All functions contribute equally**: In `src/main.rs:795-799`, the `create_unified_analysis` function iterates through ALL metrics (including test functions) and adds each to the unified analysis without discrimination.
+
+2. **Score accumulation**: In `src/priority/mod.rs:98-102`, the total debt score is calculated as a simple sum: `total_debt_score += item.unified_score.final_score` for every function.
+
+3. **Test function scoring**: Test functions receive high scores because:
+   - They have 0% coverage (contributes 7-10 points to coverage_factor)
+   - They have some complexity (even simple tests have cyclomatic complexity ≥ 1)
+   - The unified score formula weights coverage at 35%, making it the dominant factor
+
+4. **Paradoxical outcomes observed**:
+   - Adding a test function increases debt by ~5-10 points per test
+   - Refactoring a complex function into smaller functions increases debt (more functions = higher total)
+   - Following best practices (more tests, smaller functions) results in worse debt scores
+
+This causes the total debt score to increase when tests are added, which is counterintuitive and discourages adding tests.
 
 However, test functions can still contain legitimate technical debt:
 - Overly complex test logic that's hard to maintain
@@ -109,14 +127,43 @@ Improve debtmap's handling of test functions to:
 
 ### Implementation Approach
 
-1. **Modify Unified Scorer**
+1. **Primary Fix - Filter Test Functions from Debt Score (src/main.rs:795-799)**
    ```rust
-   // In unified_scorer::create_unified_debt_item
-   if metrics.is_test {
-       // Skip coverage-based debt scoring
-       // Apply test-specific complexity thresholds
-       // Mark as test debt category
+   // Current code that causes the problem:
+   for metric in metrics {
+       let roi_score = 5.0;
+       let item = unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data, roi_score);
+       unified.add_item(item);  // ALL functions contribute to debt
    }
+   
+   // Simple fix - exclude test functions:
+   for metric in metrics {
+       if metric.is_test {
+           continue;  // Skip test functions entirely
+       }
+       let roi_score = 5.0;
+       let item = unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data, roi_score);
+       unified.add_item(item);
+   }
+   ```
+
+2. **Alternative Fix - Modify Coverage Scoring (src/priority/unified_scorer.rs:59-64)**
+   ```rust
+   // Current code that penalizes test functions:
+   let coverage_factor = if let Some(cov) = coverage {
+       calculate_coverage_urgency(&func_id, call_graph, cov, func.cyclomatic)
+   } else {
+       10.0  // Test functions get maximum penalty here
+   };
+   
+   // Fix by checking is_test first:
+   let coverage_factor = if func.is_test {
+       0.0  // Test functions don't need coverage
+   } else if let Some(cov) = coverage {
+       calculate_coverage_urgency(&func_id, call_graph, cov, func.cyclomatic)
+   } else {
+       10.0
+   };
    ```
 
 2. **Update Debt Type Enum**
@@ -260,16 +307,39 @@ None - all changes are additive or internal
    - Adding simple tests reduces overall debt score
    - Complex tests are still identified as debt
    - Test TODOs are tracked appropriately
+   - **Key Validation**: Running `debtmap analyze` before and after adding tests should show a decrease in total debt score
 
 2. **User Experience**
    - Clear separation of test vs production debt
    - Actionable recommendations for test improvements
    - Intuitive debt score behavior
+   - **No more paradoxes**: Refactoring and adding tests should improve scores, not worsen them
 
 3. **Adoption**
    - No user complaints about test debt scoring
    - Positive feedback on test quality insights
    - Increased test coverage due to accurate incentives
+
+## Validation Test Case
+
+To verify the fix resolves the issue:
+
+1. **Before fix**: 
+   ```bash
+   # Record baseline
+   debtmap analyze . --lcov target/coverage/lcov.info | grep "TOTAL DEBT SCORE"
+   # Add 5 simple test functions
+   # Re-run analysis
+   debtmap analyze . --lcov target/coverage/lcov.info | grep "TOTAL DEBT SCORE"
+   # Score should incorrectly increase by ~25-50 points
+   ```
+
+2. **After fix**:
+   ```bash
+   # Same test
+   # Score should decrease or stay the same when tests are added
+   # Each test should not add 5-10 points to the total
+   ```
 
 ## Future Enhancements
 
