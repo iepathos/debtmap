@@ -11,7 +11,7 @@ fn test_format_risk_reduction_less_than_half() {
 
 #[test]
 fn test_format_risk_reduction_half_or_greater() {
-    assert_eq!(format_risk_reduction(0.5), "0");  // Rounds down
+    assert_eq!(format_risk_reduction(0.5), "0"); // Rounds down
     assert_eq!(format_risk_reduction(1.0), "1");
     assert_eq!(format_risk_reduction(5.7), "6");
     assert_eq!(format_risk_reduction(10.2), "10");
@@ -54,7 +54,10 @@ fn test_format_difficulty_all_levels() {
 fn test_format_complexity_info() {
     assert_eq!(format_complexity_info(0, 0), "branches=0, cognitive=0");
     assert_eq!(format_complexity_info(5, 10), "branches=5, cognitive=10");
-    assert_eq!(format_complexity_info(100, 200), "branches=100, cognitive=200");
+    assert_eq!(
+        format_complexity_info(100, 200),
+        "branches=100, cognitive=200"
+    );
 }
 
 #[test]
@@ -109,13 +112,13 @@ fn test_format_recommendations_with_single_item() {
     });
 
     let result = format_recommendations(&recommendations);
-    
+
     assert!(result.contains("🎯 TOP 5 TESTING RECOMMENDATIONS"));
     assert!(result.contains("ROI: 5.0"));
     assert!(result.contains("test_func()"));
     assert!(result.contains("test.rs:10"));
     assert!(result.contains("Risk: HIGH (8.5)"));
-    assert!(result.contains("Impact: -2%"));  // 2.5 rounds down to 2
+    assert!(result.contains("Impact: -2%")); // 2.5 rounds down to 2
     assert!(result.contains("Complexity: simple"));
     assert!(result.contains("branches=3, cognitive=5"));
     assert!(result.contains("0 upstream, 0 downstream"));
@@ -144,7 +147,7 @@ fn test_format_recommendations_with_dependents() {
     });
 
     let result = format_recommendations(&recommendations);
-    
+
     assert!(result.contains("Risk: MEDIUM"));
     assert!(result.contains("2 upstream, 2 downstream"));
     assert!(result.contains("Used by: caller1, caller2"));
@@ -174,7 +177,7 @@ fn test_format_recommendations_truncates_to_five() {
     }
 
     let result = format_recommendations(&recommendations);
-    
+
     // Should only show first 5
     for i in 0..5 {
         assert!(result.contains(&format!("func_{i}()")));
@@ -207,7 +210,7 @@ fn test_format_recommendations_with_low_risk() {
     });
 
     let result = format_recommendations(&recommendations);
-    
+
     assert!(result.contains("Risk: LOW"));
     assert!(result.contains("Impact: -<1%"));
     assert!(result.contains("ROI: 0.5"));
@@ -236,7 +239,7 @@ fn test_format_recommendations_with_high_roi() {
     });
 
     let result = format_recommendations(&recommendations);
-    
+
     assert!(result.contains("ROI: 16")); // 15.5 rounds to 16 for display
     assert!(result.contains("Risk: HIGH (10.0)"));
     assert!(result.contains("Impact: -8%"));
@@ -266,6 +269,6 @@ fn test_format_recommendations_with_none_roi() {
     });
 
     let result = format_recommendations(&recommendations);
-    
+
     assert!(result.contains("ROI: 0.1")); // Default value when None
 }

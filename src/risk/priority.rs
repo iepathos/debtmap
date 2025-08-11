@@ -110,92 +110,119 @@ pub struct ROI {
     pub explanation: String,
 }
 
+fn is_untested_function(f: &FunctionRisk) -> bool {
+    !f.is_test_function && f.coverage_percentage.unwrap_or(100.0) == 0.0
+}
+
+fn is_closure(function_name: &str) -> bool {
+    function_name.starts_with("<closure@")
+}
+
+fn has_untested_parent(
+    closure_file: &std::path::Path,
+    closure_line: usize,
+    untested_functions: &[&FunctionRisk],
+) -> bool {
+    untested_functions.iter().any(|parent| {
+        parent.file == closure_file
+            && !is_closure(&parent.function_name)
+            && is_likely_parent(parent.line_range.0, closure_line)
+    })
+}
+
+fn is_likely_parent(parent_start: usize, closure_line: usize) -> bool {
+    // More lenient: closure within 20 lines of function start
+    parent_start <= closure_line && closure_line <= parent_start + 20
+}
+
+fn should_include_function(f: &FunctionRisk, untested_functions: &[&FunctionRisk]) -> bool {
+    if f.is_test_function {
+        return false;
+    }
+
+    if is_closure(&f.function_name) {
+        return !has_untested_parent(&f.file, f.line_range.0, untested_functions);
+    }
+
+    true
+}
+
 pub fn prioritize_by_roi(
     functions: &Vector<FunctionRisk>,
     analyzer: &RiskAnalyzer,
 ) -> Vector<TestingRecommendation> {
-    // Filter out test functions and redundant closures
-    // A closure is redundant if its parent function is also untested
     let untested_functions: Vec<&FunctionRisk> = functions
         .iter()
-        .filter(|f| !f.is_test_function && f.coverage_percentage.unwrap_or(100.0) == 0.0)
+        .filter(|f| is_untested_function(f))
         .collect();
 
     let targets: Vec<TestTarget> = functions
         .iter()
-        .filter(|f| {
-            // Skip test functions
-            if f.is_test_function {
-                return false;
-            }
-
-            // Skip closures if their parent function (on the same file, earlier line) is also untested
-            if f.function_name.starts_with("<closure@") {
-                // Check if there's an untested parent function that would contain this closure
-                let closure_file = &f.file;
-                let closure_line = f.line_range.0;
-
-                // Look for untested functions in the same file that could be the parent
-                // Note: line_range.1 often underestimates the actual end line due to how
-                // function length is calculated (only counting body lines, not signature)
-                // So we use a more lenient check: if the closure is within 20 lines after
-                // the function start, it's likely part of that function
-                let has_untested_parent = untested_functions.iter().any(|parent| {
-                    let same_file = parent.file == *closure_file;
-                    let not_closure = !parent.function_name.starts_with("<closure@");
-                    // More lenient: closure within 20 lines of function start
-                    let likely_contains = parent.line_range.0 <= closure_line
-                        && closure_line <= parent.line_range.0 + 20;
-
-                    same_file && not_closure && likely_contains
-                });
-
-                if has_untested_parent {
-                    return false; // Skip this closure, its parent is already untested
-                }
-            }
-
-            true
-        })
+        .filter(|f| should_include_function(f, &untested_functions))
         .map(function_risk_to_target)
         .collect();
+    let prioritized = process_and_sort_targets(targets);
+    let context = build_roi_context(&prioritized);
+    let roi_calc = crate::risk::roi::ROICalculator::new(analyzer.clone());
+
+    let mut recommendations = create_recommendations(&prioritized, &roi_calc, &context);
+    sort_recommendations_by_roi(&mut recommendations);
+
+    recommendations
+}
+
+fn process_and_sort_targets(targets: Vec<TestTarget>) -> Vec<TestTarget> {
     let pipeline = PrioritizationPipeline::new();
     let mut prioritized = pipeline.process(targets);
     prioritized.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
+    prioritized
+}
 
-    let dependency_graph = build_dependency_graph(&prioritized);
-    let critical_paths = identify_critical_paths(&prioritized);
-    let roi_calc = crate::risk::roi::ROICalculator::new(analyzer.clone());
-
-    let context = crate::risk::roi::Context {
-        dependency_graph,
-        critical_paths,
+fn build_roi_context(prioritized: &[TestTarget]) -> crate::risk::roi::Context {
+    crate::risk::roi::Context {
+        dependency_graph: build_dependency_graph(prioritized),
+        critical_paths: identify_critical_paths(prioritized),
         historical_data: None,
-    };
-
-    let mut recommendations = Vector::new();
-    for target in prioritized.into_iter().take(10) {
-        let roi = roi_calc.calculate(&target, &context);
-
-        let recommendation = TestingRecommendation {
-            function: target
-                .function
-                .clone()
-                .unwrap_or_else(|| target.path.to_string_lossy().to_string()),
-            file: target.path.clone(),
-            line: target.line,
-            current_risk: target.current_risk,
-            potential_risk_reduction: roi.direct_impact.percentage,
-            test_effort_estimate: complexity_to_test_effort(&target.complexity),
-            rationale: generate_enhanced_rationale_v2(&target, &roi),
-            roi: Some(roi.value),
-            dependencies: target.dependencies.clone(),
-            dependents: target.dependents.clone(),
-        };
-        recommendations.push_back(recommendation);
     }
+}
 
-    // Sort recommendations by ROI in descending order
+fn create_recommendations(
+    prioritized: &[TestTarget],
+    roi_calc: &crate::risk::roi::ROICalculator,
+    context: &crate::risk::roi::Context,
+) -> Vector<TestingRecommendation> {
+    prioritized
+        .iter()
+        .take(10)
+        .map(|target| create_single_recommendation(target, roi_calc, context))
+        .collect()
+}
+
+fn create_single_recommendation(
+    target: &TestTarget,
+    roi_calc: &crate::risk::roi::ROICalculator,
+    context: &crate::risk::roi::Context,
+) -> TestingRecommendation {
+    let roi = roi_calc.calculate(target, context);
+
+    TestingRecommendation {
+        function: target
+            .function
+            .clone()
+            .unwrap_or_else(|| target.path.to_string_lossy().to_string()),
+        file: target.path.clone(),
+        line: target.line,
+        current_risk: target.current_risk,
+        potential_risk_reduction: roi.direct_impact.percentage,
+        test_effort_estimate: complexity_to_test_effort(&target.complexity),
+        rationale: generate_enhanced_rationale_v2(target, &roi),
+        roi: Some(roi.value),
+        dependencies: target.dependencies.clone(),
+        dependents: target.dependents.clone(),
+    }
+}
+
+fn sort_recommendations_by_roi(recommendations: &mut Vector<TestingRecommendation>) {
     recommendations.sort_by(|a, b| {
         let a_roi = a.roi.unwrap_or(0.0);
         let b_roi = b.roi.unwrap_or(0.0);
@@ -203,8 +230,6 @@ pub fn prioritize_by_roi(
             .partial_cmp(&a_roi)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-
-    recommendations
 }
 
 fn function_risk_to_target(risk: &FunctionRisk) -> TestTarget {
