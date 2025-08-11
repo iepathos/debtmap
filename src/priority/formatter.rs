@@ -64,6 +64,18 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     )
     .unwrap();
 
+    // Add overall coverage if available
+    if let Some(coverage) = analysis.overall_coverage {
+        writeln!(
+            output,
+            "📈 {}",
+            format!("OVERALL COVERAGE: {coverage:.2}%")
+                .bright_green()
+                .bold()
+        )
+        .unwrap();
+    }
+
     // Add high-impact low-complexity fixes section
     // _format_quick_wins(&mut output, analysis);
 
