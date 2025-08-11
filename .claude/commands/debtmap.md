@@ -49,18 +49,115 @@ Priority categories:
 3. **MEDIUM (Score 4-6)**: Moderate complexity or coverage issues
 4. **LOW (Score 1-3)**: Minor improvements
 
+### Step 3.5: Evaluate Refactoring Approach (for Complexity Issues)
+
+When debtmap identifies a function with high complexity (>10), evaluate different refactoring strategies:
+
+**CRITICAL: Before extracting helper methods, consider these approaches in order:**
+
+1. **Static Pure Function Extraction (PREFERRED)**
+   - Extract classification/decision logic as static pure functions
+   - These functions should be reusable across the codebase
+   - Example: `classify_type(name: &str) -> Type` instead of multiple helpers
+   - Benefits: Testable in isolation, reduces main function complexity, functional style
+
+2. **Pattern Consolidation**
+   - Look for repeated patterns in conditionals
+   - Use match expressions with guards instead of if-else chains
+   - Combine similar branches using pattern matching
+   - Example: Replace multiple if-else checking string patterns with a single match
+
+3. **Functional Composition**
+   - Use `.map()`, `.filter()`, `.fold()` instead of loops
+   - Chain operations instead of intermediate variables
+   - Extract predicates as pure functions
+
+**WARNING: Avoid these anti-patterns:**
+- Creating multiple single-use helper methods that are only called from tests
+- Extracting helpers that aren't used in production code paths
+- Over-engineering: 5+ helper methods for a 15-line function
+- Adding complexity to reduce complexity
+
+**Validation Check:**
+Before implementing, verify your approach will:
+- Actually reduce the complexity score (not just move it)
+- Keep or improve test coverage (not decrease it)
+- Result in fewer total functions (or same number with better structure)
+- Use functional programming patterns where appropriate
+
+### Step 3.7: Quick Refactoring Decision Tree
+
+For functions with complexity > 10:
+
+```
+Is it a visitor pattern or large switch/match?
+├─ YES → Don't refactor, add tests if needed
+└─ NO → Continue
+   │
+   Does it classify/categorize inputs?
+   ├─ YES → Extract as pure static function
+   └─ NO → Continue
+      │
+      Does it have repeated similar conditions?
+      ├─ YES → Consolidate with pattern matching
+      └─ NO → Continue
+         │
+         Does it have nested loops?
+         ├─ YES → Convert to iterator chains
+         └─ NO → Consider if refactoring is needed
+```
+
 ### Step 4: Plan the Fix
 Based on the ACTION specified in the top recommendation:
 
 **For "Refactor to reduce complexity" actions:**
-- Analyze the complex function
-- Plan refactoring using functional patterns:
-  - Replace loops with iterators
-  - Convert if-else chains to pattern matching
-  - Extract pure functions from side-effect code
-  - Simplify nested logic
-  - Break large functions into smaller, composable units
-- After refactoring, add comprehensive tests
+
+1. **Analyze the function structure:**
+   - Is it mostly a large switch/match on different cases? → Keep as-is, it's already functional
+   - Is it performing classification/categorization? → Extract as pure static function
+   - Is it orchestrating I/O operations? → Extract business logic only
+   - Is it a visitor pattern implementation? → Consider if complexity is inherent
+
+2. **Choose refactoring strategy based on complexity source:**
+   
+   **Pattern: Multiple similar conditionals**
+   ```rust
+   // Before: Complexity 15
+   if name.contains("async") || name.contains("await") { 
+       CallType::Async 
+   } else if name.starts_with("handle_") { 
+       CallType::Delegate 
+   } else if name.starts_with("map") { 
+       CallType::Pipeline 
+   } else { 
+       CallType::Direct 
+   }
+   
+   // After: Extract as pure function
+   fn classify_call_type(name: &str) -> CallType {
+       match () {
+           _ if name.contains("async") || name.contains("await") => CallType::Async,
+           _ if name.starts_with("handle_") => CallType::Delegate,
+           _ if name.starts_with("map") => CallType::Pipeline,
+           _ => CallType::Direct,
+       }
+   }
+   ```
+
+   **Pattern: Nested loops and conditions**
+   - Replace with iterator chains and functional combinators
+   - Extract predicates as named functions
+
+   **Pattern: Large match/switch statement**
+   - Often this is the CORRECT pattern - don't refactor
+   - Cyclomatic complexity ≠ bad code
+   - Visitor patterns naturally have high complexity
+
+3. **Test the refactoring impact:**
+   - Count functions before: `find src -name "*.rs" | xargs grep -E "^\s*(pub\s+)?fn\s+" | wc -l`
+   - Apply refactoring
+   - Count functions after
+   - If function count increased by >20%, reconsider approach
 
 **For "Add X unit tests" actions:**
 - First, assess if the function is orchestration or I/O code
@@ -127,6 +224,31 @@ debtmap analyze . --lcov target/coverage/lcov.info --top 1
 - Verify the original issue is resolved (should no longer be #1 priority)
 - Note what the new top priority is
 - Confirm your coverage change calculation from Step 7
+
+### Step 8.5: Understanding Metrics Changes
+
+**Interpret your metrics changes:**
+
+**Debt Score Changes:**
+- **Decreased**: The refactoring/tests successfully reduced technical debt
+- **Increased slightly (<100 points)**: Often due to test functions being counted (they have 0% coverage)
+- **Increased significantly (>100 points)**: May indicate added complexity without corresponding benefit
+
+**Coverage Changes:**
+- **Increased**: Tests are covering more production code
+- **Decreased slightly (<1%)**: Usually because new test functions aren't covered by other tests
+- **Decreased significantly (>1%)**: New production code may lack tests
+
+**Function Count Changes:**
+- **Same or slight decrease**: Good refactoring that consolidated logic
+- **Increase <10**: Acceptable for better code structure
+- **Increase >20**: Consider if the refactoring added too much abstraction
+
+**Understanding Trade-offs:**
+- Test functions add to debt score (limitation of the tool)
+- Extracting pure functions may temporarily increase metrics but improve maintainability
+- Focus on whether the specific issue was resolved, not just raw metrics
+- Consider long-term maintainability over short-term metrics
 
 ### Step 9: Commit Changes
 Create a descriptive commit message:
@@ -210,3 +332,67 @@ When debtmap flags orchestration or I/O functions as untested:
    - Module orchestration that just sequences calls
    - File I/O wrappers
    - Network I/O operations
+
+## Common Pitfalls to Avoid
+
+### When Refactoring for Complexity:
+
+❌ **DON'T:**
+- Extract helper methods that are only called once
+- Create test-only helper functions (helpers not used in production code)
+- Break apart a clear match/switch into multiple functions
+- Add abstraction layers for simple logic
+- Refactor visitor pattern implementations (they're meant to have many branches)
+- Create 5+ helper methods for a 15-line function
+
+✅ **DO:**
+- Extract reusable classification/decision logic as static pure functions
+- Use functional patterns (map, filter, fold) where appropriate
+- Consolidate similar patterns into single functions
+- Keep related logic together
+- Accept that some functions legitimately have high complexity
+- Test the extracted pure functions thoroughly
+
+### Understanding Debt Score Impact:
+
+**Why debt score might increase after adding tests:**
+- Test functions are counted in metrics but have 0% coverage themselves
+- Each test function adds ~5-10 points to debt score
+- This is a current limitation of the debtmap tool
+
+**What to focus on:**
+- Whether the TARGET function's complexity was reduced
+- Whether the specific issue identified was resolved
+- Overall code quality and maintainability
+- Whether the refactoring follows functional programming principles
+
+### Functional Programming Preferences:
+
+**Prefer these patterns:**
+- Pure functions over stateful methods
+- Static methods for classification/utility functions
+- Match expressions with guards over if-else chains
+- Iterator chains over imperative loops
+- Function composition over deep nesting
+- Immutability by default
+
+**Example of good refactoring:**
+```rust
+// Extract classification logic as pure static function
+impl MyStruct {
+    // This can be tested in isolation and reused
+    fn classify_item(name: &str) -> ItemType {
+        match () {
+            _ if name.starts_with("test_") => ItemType::Test,
+            _ if name.contains("_impl") => ItemType::Implementation,
+            _ => ItemType::Regular,
+        }
+    }
+    
+    // Main function uses the pure classifier
+    fn process(&mut self, name: &str) {
+        let item_type = Self::classify_item(name);
+        // ... rest of logic
+    }
+}
+```
