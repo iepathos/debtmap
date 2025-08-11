@@ -492,6 +492,106 @@ mod tests {
     }
 
     #[test]
+    fn test_determine_stability_status_highly_unstable() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        // Test highly unstable: high change frequency AND high bug density
+        let status = provider.determine_stability_status(6.0, 0.4, 100);
+        assert!(matches!(status, StabilityStatus::HighlyUnstable));
+
+        // Edge case: exactly at thresholds
+        let status = provider.determine_stability_status(5.1, 0.31, 100);
+        assert!(matches!(status, StabilityStatus::HighlyUnstable));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_determine_stability_status_frequently_changed() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        // Test frequently changed: high change frequency but low bug density
+        let status = provider.determine_stability_status(3.0, 0.1, 100);
+        assert!(matches!(status, StabilityStatus::FrequentlyChanged));
+
+        // Edge case: just above threshold
+        let status = provider.determine_stability_status(2.1, 0.05, 50);
+        assert!(matches!(status, StabilityStatus::FrequentlyChanged));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_determine_stability_status_bug_prone() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        // Test bug prone: high bug density but low change frequency
+        let status = provider.determine_stability_status(1.0, 0.25, 100);
+        assert!(matches!(status, StabilityStatus::BugProne));
+
+        // Edge case: just above bug density threshold
+        let status = provider.determine_stability_status(0.5, 0.21, 200);
+        assert!(matches!(status, StabilityStatus::BugProne));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_determine_stability_status_mature_stable() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        // Test mature stable: old code with low change frequency and bug density
+        let status = provider.determine_stability_status(0.5, 0.1, 400);
+        assert!(matches!(status, StabilityStatus::MatureStable));
+
+        // Edge case: exactly 366 days old
+        let status = provider.determine_stability_status(1.0, 0.15, 366);
+        assert!(matches!(status, StabilityStatus::MatureStable));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_determine_stability_status_relatively_stable() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        // Test relatively stable: doesn't meet any special criteria
+        let status = provider.determine_stability_status(1.5, 0.15, 200);
+        assert!(matches!(status, StabilityStatus::RelativelyStable));
+
+        // Edge case: just below all thresholds
+        let status = provider.determine_stability_status(2.0, 0.2, 365);
+        assert!(matches!(status, StabilityStatus::RelativelyStable));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_determine_stability_status_edge_cases() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        // Test priority: highly unstable takes precedence
+        let status = provider.determine_stability_status(6.0, 0.4, 400);
+        assert!(matches!(status, StabilityStatus::HighlyUnstable));
+
+        // Test zero values
+        let status = provider.determine_stability_status(0.0, 0.0, 0);
+        assert!(matches!(status, StabilityStatus::RelativelyStable));
+
+        // Test boundary values for frequently changed vs bug prone
+        let status = provider.determine_stability_status(2.5, 0.25, 100);
+        assert!(matches!(status, StabilityStatus::FrequentlyChanged)); // freq change takes precedence
+
+        Ok(())
+    }
+
+    #[test]
     fn test_classify_risk_contribution_very_unstable() {
         // Very unstable: high frequency AND high bug density
         assert_eq!(
