@@ -182,3 +182,185 @@ pub fn compose_filters(
 ) -> Box<dyn Fn(FileMetrics) -> FileMetrics> {
     Box::new(move |metrics| filters.iter().fold(metrics, |acc, filter| filter(acc)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{ComplexityMetrics, DebtItem};
+    use std::path::PathBuf;
+
+    fn create_test_metrics() -> FileMetrics {
+        FileMetrics {
+            path: PathBuf::from("test.rs"),
+            language: Language::Rust,
+            complexity: ComplexityMetrics {
+                functions: vec![
+                    FunctionMetrics {
+                        name: "low_complexity".to_string(),
+                        file: PathBuf::from("test.rs"),
+                        line: 10,
+                        cyclomatic: 2,
+                        cognitive: 3,
+                        nesting: 1,
+                        length: 15,
+                        is_test: false,
+                    },
+                    FunctionMetrics {
+                        name: "high_complexity".to_string(),
+                        file: PathBuf::from("test.rs"),
+                        line: 30,
+                        cyclomatic: 15,
+                        cognitive: 20,
+                        nesting: 4,
+                        length: 100,
+                        is_test: false,
+                    },
+                ],
+                cyclomatic_complexity: 17,
+                cognitive_complexity: 23,
+            },
+            debt_items: vec![
+                DebtItem {
+                    id: "debt1".to_string(),
+                    debt_type: DebtType::Todo,
+                    priority: Priority::Low,
+                    file: PathBuf::from("test.rs"),
+                    line: 5,
+                    message: "TODO: Fix this".to_string(),
+                    context: None,
+                },
+                DebtItem {
+                    id: "debt2".to_string(),
+                    debt_type: DebtType::Fixme,
+                    priority: Priority::High,
+                    file: PathBuf::from("test.rs"),
+                    line: 50,
+                    message: "FIXME: Critical issue".to_string(),
+                    context: None,
+                },
+            ],
+            dependencies: Vec::new(),
+            duplications: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn test_apply_no_filters() {
+        let config = FilterConfig::default();
+        let metrics = create_test_metrics();
+        let original_functions = metrics.complexity.functions.len();
+        let original_debt = metrics.debt_items.len();
+
+        let result = config.apply(metrics);
+
+        assert_eq!(result.complexity.functions.len(), original_functions);
+        assert_eq!(result.debt_items.len(), original_debt);
+    }
+
+    #[test]
+    fn test_apply_min_complexity_filter() {
+        let config = FilterConfig {
+            min_complexity: Some(10),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        assert_eq!(result.complexity.functions.len(), 1);
+        assert_eq!(result.complexity.functions[0].name, "high_complexity");
+        assert_eq!(result.complexity.cyclomatic_complexity, 15);
+        assert_eq!(result.complexity.cognitive_complexity, 20);
+    }
+
+    #[test]
+    fn test_apply_max_complexity_filter() {
+        let config = FilterConfig {
+            max_complexity: Some(5),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        assert_eq!(result.complexity.functions.len(), 1);
+        assert_eq!(result.complexity.functions[0].name, "low_complexity");
+        assert_eq!(result.complexity.cyclomatic_complexity, 2);
+        assert_eq!(result.complexity.cognitive_complexity, 3);
+    }
+
+    #[test]
+    fn test_apply_language_filter() {
+        let config = FilterConfig {
+            languages: Some(vec![Language::Python]),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        assert_eq!(result.complexity.functions.len(), 0);
+        assert_eq!(result.debt_items.len(), 0);
+    }
+
+    #[test]
+    fn test_apply_file_pattern_filter() {
+        let config = FilterConfig {
+            file_patterns: Some(vec!["*.rs".to_string()]),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        assert_eq!(result.complexity.functions.len(), 2);
+        assert_eq!(result.debt_items.len(), 2);
+    }
+
+    #[test]
+    fn test_apply_min_priority_filter() {
+        let config = FilterConfig {
+            min_priority: Some(Priority::High),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        assert_eq!(result.debt_items.len(), 1);
+        assert_eq!(result.debt_items[0].priority, Priority::High);
+    }
+
+    #[test]
+    fn test_apply_debt_types_filter() {
+        let config = FilterConfig {
+            debt_types: Some(vec![DebtType::Fixme]),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        assert_eq!(result.debt_items.len(), 1);
+        assert_eq!(result.debt_items[0].debt_type, DebtType::Fixme);
+    }
+
+    #[test]
+    fn test_apply_combined_filters() {
+        let config = FilterConfig {
+            min_complexity: Some(10),
+            min_priority: Some(Priority::High),
+            debt_types: Some(vec![DebtType::Fixme]),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        assert_eq!(result.complexity.functions.len(), 1);
+        assert_eq!(result.complexity.functions[0].name, "high_complexity");
+        assert_eq!(result.debt_items.len(), 1);
+        assert_eq!(result.debt_items[0].debt_type, DebtType::Fixme);
+        assert_eq!(result.debt_items[0].priority, Priority::High);
+    }
+}
