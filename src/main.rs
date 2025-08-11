@@ -189,17 +189,26 @@ fn extract_all_debt_items(file_metrics: &[FileMetrics]) -> Vec<core::DebtItem> {
     analysis_utils::extract_all_debt_items(file_metrics)
 }
 
-fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<core::DuplicationBlock> {
-    let files_with_content: Vec<(PathBuf, String)> = files
+const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.8;
+
+fn prepare_files_for_duplication_check(files: &[PathBuf]) -> Vec<(PathBuf, String)> {
+    files
         .iter()
         .filter_map(|path| {
             io::read_file(path)
                 .ok()
                 .map(|content| (path.clone(), content))
         })
-        .collect();
+        .collect()
+}
 
-    debt::duplication::detect_duplication(files_with_content, threshold, 0.8)
+fn detect_duplications(files: &[PathBuf], threshold: usize) -> Vec<core::DuplicationBlock> {
+    let files_with_content = prepare_files_for_duplication_check(files);
+    debt::duplication::detect_duplication(
+        files_with_content,
+        threshold,
+        DEFAULT_SIMILARITY_THRESHOLD,
+    )
 }
 
 fn build_complexity_report(
@@ -514,14 +523,18 @@ fn get_risk_insights(
     }
 }
 
+fn determine_output_format(config: &ValidateConfig) -> Option<cli::OutputFormat> {
+    config
+        .format
+        .or(config.output.as_ref().map(|_| cli::OutputFormat::Terminal))
+}
+
 fn generate_report_if_requested(
     config: &ValidateConfig,
     results: &AnalysisResults,
     risk_insights: &Option<risk::RiskInsight>,
 ) -> Result<()> {
-    config
-        .format
-        .or(config.output.as_ref().map(|_| cli::OutputFormat::Terminal))
+    determine_output_format(config)
         .map(|format| {
             output_results_with_risk(
                 results.clone(),
@@ -1024,5 +1037,123 @@ mod tests {
             duplications: vec![],
         };
         assert!(is_analysis_passing(&results, 10));
+    }
+
+    #[test]
+    fn test_determine_output_format_with_explicit_format() {
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: Some(cli::OutputFormat::Json),
+            output: None,
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+        };
+        assert_eq!(
+            determine_output_format(&config),
+            Some(cli::OutputFormat::Json)
+        );
+    }
+
+    #[test]
+    fn test_determine_output_format_with_output_no_format() {
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: Some(PathBuf::from("output.txt")),
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+        };
+        assert_eq!(
+            determine_output_format(&config),
+            Some(cli::OutputFormat::Terminal)
+        );
+    }
+
+    #[test]
+    fn test_determine_output_format_with_both() {
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: Some(cli::OutputFormat::Markdown),
+            output: Some(PathBuf::from("output.md")),
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+        };
+        // Format takes precedence over output
+        assert_eq!(
+            determine_output_format(&config),
+            Some(cli::OutputFormat::Markdown)
+        );
+    }
+
+    #[test]
+    fn test_determine_output_format_with_neither() {
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: None,
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+        };
+        assert_eq!(determine_output_format(&config), None);
+    }
+
+    #[test]
+    fn test_prepare_files_for_duplication_check_empty() {
+        let files: Vec<PathBuf> = vec![];
+        let result = prepare_files_for_duplication_check(&files);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_prepare_files_for_duplication_check_nonexistent_files() {
+        let files = vec![
+            PathBuf::from("/nonexistent/file1.rs"),
+            PathBuf::from("/nonexistent/file2.rs"),
+        ];
+        let result = prepare_files_for_duplication_check(&files);
+        // Nonexistent files are filtered out
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_default_similarity_threshold() {
+        // Just verify the constant is set to expected value
+        assert_eq!(DEFAULT_SIMILARITY_THRESHOLD, 0.8);
+    }
+
+    #[test]
+    fn test_prepare_files_for_duplication_check_with_real_file() {
+        use std::fs;
+        use std::io::Write;
+
+        // Create a temporary file for testing
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_dup_check.txt");
+
+        // Write some content to the file
+        let mut file = fs::File::create(&test_file).unwrap();
+        writeln!(file, "test content").unwrap();
+
+        let files = vec![test_file.clone()];
+        let result = prepare_files_for_duplication_check(&files);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, test_file);
+        assert_eq!(result[0].1, "test content\n");
+
+        // Clean up
+        fs::remove_file(test_file).ok();
     }
 }
