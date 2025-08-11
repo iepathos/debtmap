@@ -140,30 +140,45 @@ fn check_nesting_level(
 }
 
 pub fn detect_duplicate_strings(content: &str, file: &Path) -> Vec<DebtItem> {
-    let string_regex = Regex::new(r#"["']([^"']{20,})["']"#).unwrap();
-
-    let string_counts = content
-        .lines()
-        .enumerate()
-        .flat_map(|(line_num, line)| {
-            string_regex
-                .captures_iter(line)
-                .filter_map(|captures| captures.get(1))
-                .map(move |matched| (matched.as_str().to_string(), line_num + 1))
-        })
-        .fold(
-            HashMap::<String, Vec<usize>>::new(),
-            |mut acc, (string, line)| {
-                acc.entry(string).or_default().push(line);
-                acc
-            },
-        );
+    let string_occurrences = extract_string_occurrences(content);
+    let string_counts = group_string_occurrences(string_occurrences);
 
     string_counts
         .into_iter()
         .filter(|(_, lines)| lines.len() > 2)
         .map(|(string, lines)| create_duplicate_string_item(&string, &lines, file))
         .collect()
+}
+
+fn extract_string_occurrences(content: &str) -> Vec<(String, usize)> {
+    let string_regex = Regex::new(r#"["']([^"']{20,})["']"#).unwrap();
+
+    content
+        .lines()
+        .enumerate()
+        .flat_map(|(line_num, line)| extract_strings_from_line(&string_regex, line, line_num + 1))
+        .collect()
+}
+
+fn extract_strings_from_line(
+    regex: &Regex,
+    line: &str,
+    line_number: usize,
+) -> Vec<(String, usize)> {
+    regex
+        .captures_iter(line)
+        .filter_map(|captures| captures.get(1))
+        .map(|matched| (matched.as_str().to_string(), line_number))
+        .collect()
+}
+
+fn group_string_occurrences(occurrences: Vec<(String, usize)>) -> HashMap<String, Vec<usize>> {
+    occurrences
+        .into_iter()
+        .fold(HashMap::new(), |mut acc, (string, line)| {
+            acc.entry(string).or_default().push(line);
+            acc
+        })
 }
 
 fn create_duplicate_string_item(string: &str, lines: &[usize], file: &Path) -> DebtItem {
