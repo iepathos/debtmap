@@ -588,23 +588,20 @@ mod tests {
     #[test]
     fn test_get_files_to_analyze_with_changed_files() {
         let mut inc = IncrementalAnalysis::new();
-        
+
         // Add some files to previous state
         let metrics1 = create_test_metrics();
         inc.previous_state = inc
             .previous_state
             .update(PathBuf::from("existing.rs"), metrics1);
-        
+
         // Mark a file as changed
         inc.mark_changed(PathBuf::from("existing.rs"));
-        
-        let all_files = vec![
-            PathBuf::from("existing.rs"),
-            PathBuf::from("new.rs"),
-        ];
-        
+
+        let all_files = vec![PathBuf::from("existing.rs"), PathBuf::from("new.rs")];
+
         let files_to_analyze = inc.get_files_to_analyze(&all_files);
-        
+
         // Should analyze both changed and new files
         assert_eq!(files_to_analyze.len(), 2);
         assert!(files_to_analyze.contains(&PathBuf::from("existing.rs")));
@@ -614,21 +611,21 @@ mod tests {
     #[test]
     fn test_get_files_to_analyze_only_new_files() {
         let mut inc = IncrementalAnalysis::new();
-        
+
         // Add existing file to previous state
         let metrics1 = create_test_metrics();
         inc.previous_state = inc
             .previous_state
             .update(PathBuf::from("existing.rs"), metrics1);
-        
+
         let all_files = vec![
             PathBuf::from("existing.rs"),
             PathBuf::from("new1.rs"),
             PathBuf::from("new2.rs"),
         ];
-        
+
         let files_to_analyze = inc.get_files_to_analyze(&all_files);
-        
+
         // Should only analyze new files
         assert_eq!(files_to_analyze.len(), 2);
         assert!(files_to_analyze.contains(&PathBuf::from("new1.rs")));
@@ -655,7 +652,7 @@ mod tests {
     fn test_metrics_equal_different_functions() {
         let metrics1 = create_test_metrics();
         let mut metrics2 = create_test_metrics();
-        
+
         // Add an extra function to metrics2
         metrics2.complexity.functions.push(FunctionMetrics {
             name: "extra_func".to_string(),
@@ -667,7 +664,7 @@ mod tests {
             length: 15,
             is_test: false,
         });
-        
+
         assert!(!metrics_equal(&metrics1, &metrics2));
     }
 
@@ -675,7 +672,7 @@ mod tests {
     fn test_metrics_equal_different_debt_items() {
         let metrics1 = create_test_metrics();
         let mut metrics2 = create_test_metrics();
-        
+
         // Add a debt item to metrics2
         metrics2.debt_items.push(crate::core::DebtItem {
             id: "test-debt".to_string(),
@@ -686,7 +683,7 @@ mod tests {
             message: "TODO: Fix this".to_string(),
             context: None,
         });
-        
+
         assert!(!metrics_equal(&metrics1, &metrics2));
     }
 
@@ -695,7 +692,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let mut cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
         let mut inc = IncrementalAnalysis::new();
-        
+
         // Add entries to cache
         let metrics = create_test_metrics();
         let entry = CacheEntry {
@@ -704,10 +701,10 @@ mod tests {
             metrics: metrics.clone(),
         };
         cache.index = cache.index.update("test_hash".to_string(), entry);
-        
+
         // Load from cache
         inc.load_previous(&cache);
-        
+
         assert_eq!(inc.previous_state.len(), 1);
         assert!(inc.previous_state.contains_key(&PathBuf::from("test.rs")));
     }
@@ -716,9 +713,9 @@ mod tests {
     fn test_update_file_metrics() {
         let mut inc = IncrementalAnalysis::new();
         let metrics = create_test_metrics();
-        
+
         inc.update_file(metrics.clone());
-        
+
         assert_eq!(inc.current_state.len(), 1);
         assert!(inc.current_state.contains_key(&PathBuf::from("test.rs")));
     }
@@ -726,11 +723,11 @@ mod tests {
     #[test]
     fn test_calculate_diff_modified_files() {
         let mut inc = IncrementalAnalysis::new();
-        
+
         // Create two different metrics for the same file
         let metrics1 = create_test_metrics();
         let mut metrics2 = create_test_metrics();
-        
+
         // Make them different
         metrics2.complexity.functions.push(FunctionMetrics {
             name: "new_func".to_string(),
@@ -742,16 +739,14 @@ mod tests {
             length: 5,
             is_test: false,
         });
-        
+
         inc.previous_state = inc
             .previous_state
             .update(PathBuf::from("test.rs"), metrics1);
-        inc.current_state = inc
-            .current_state
-            .update(PathBuf::from("test.rs"), metrics2);
-        
+        inc.current_state = inc.current_state.update(PathBuf::from("test.rs"), metrics2);
+
         let diff = inc.calculate_diff();
-        
+
         assert_eq!(diff.added.len(), 0);
         assert_eq!(diff.removed.len(), 0);
         assert_eq!(diff.modified.len(), 1);
