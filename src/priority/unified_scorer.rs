@@ -737,9 +737,7 @@ mod tests {
                 visibility: FunctionVisibility::Private,
                 ..
             } => (),
-            _ => panic!(
-                "Expected DeadCode for unused private function, got {debt_type:?}"
-            ),
+            _ => panic!("Expected DeadCode for unused private function, got {debt_type:?}"),
         }
     }
 
@@ -758,7 +756,9 @@ mod tests {
         let debt_type = determine_debt_type(&func, &None, &call_graph, &func_id);
 
         // Main should not be flagged as dead code
-        if let DebtType::DeadCode { .. } = debt_type { panic!("Main function should not be flagged as dead code") }
+        if let DebtType::DeadCode { .. } = debt_type {
+            panic!("Main function should not be flagged as dead code")
+        }
     }
 
     #[test]
