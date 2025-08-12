@@ -96,7 +96,7 @@ debtmap validate ./src
 ## Commands
 
 ### `analyze`
-Comprehensive analysis including complexity metrics, code duplication, technical debt patterns, and dependency analysis.
+Comprehensive analysis with unified prioritization that identifies the highest-value improvements for both testing and refactoring efforts.
 
 ```bash
 debtmap analyze <PATH> [OPTIONS]
@@ -104,11 +104,18 @@ debtmap analyze <PATH> [OPTIONS]
 Options:
   -f, --format <FORMAT>              Output format [default: terminal] [possible values: json, markdown, terminal]
   -o, --output <FILE>                Output file (stdout if not specified)
-  --lcov <FILE>                      LCOV coverage file for risk analysis
-  --coverage-file <FILE>             Alias for --lcov (LCOV coverage file)
   --threshold-complexity <N>         Complexity threshold [default: 10]
   --threshold-duplication <N>        Duplication threshold in lines [default: 50]
   --languages <LANGS>                Comma-separated list of languages to analyze
+  --coverage-file <FILE>             LCOV coverage file for risk analysis (alias: --lcov)
+  --context                          Enable context-aware risk analysis
+  --context-providers <PROVIDERS>    Context providers to use (critical_path, dependency, git_history)
+  --disable-context <PROVIDERS>      Disable specific context providers
+  --top <N>                          Show only top N priority items
+  --priorities-only                  Show priorities only (minimal output)
+  --detailed                         Show detailed analysis with priority breakdown
+  --semantic-off                     Disable semantic analysis (fallback mode)
+  --explain-score                    Show score breakdown for debugging
 ```
 
 ### `init`
@@ -122,19 +129,31 @@ Options:
 ```
 
 ### `validate`
-Validate code against configured thresholds and fail if metrics exceed limits.
+Validate code against configured thresholds and fail if metrics exceed limits. Supports risk-based validation with coverage data.
 
 ```bash
 debtmap validate <PATH> [OPTIONS]
 
 Options:
-  -c, --config <FILE>    Configuration file to use [default: .debtmap.toml]
+  -c, --config <FILE>                Configuration file to use [default: .debtmap.toml]
+  -f, --format <FORMAT>               Output format for validation report
+  -o, --output <FILE>                 Output file for validation results
+  --coverage-file <FILE>              LCOV coverage file for risk-based validation
+  --context                           Enable context-aware risk analysis
+  --context-providers <PROVIDERS>     Context providers to use
+  --disable-context <PROVIDERS>       Disable specific context providers
+  --top <N>                           Show only top N priority items
+  --priorities-only                   Show priorities only (minimal output)
+  --detailed                          Show detailed analysis
+  --semantic-off                      Disable semantic analysis
+  --explain-score                     Show score breakdown
 ```
 
 ## Example Output
 
+### Unified Priority Output (Default)
 ```
-debtmap analyze . --lcov target/coverage/lcov.info --top 5
+debtmap analyze . --coverage-file target/coverage/lcov.info --top 5
 ════════════════════════════════════════════
     PRIORITY TECHNICAL DEBT FIXES
 ════════════════════════════════════════════
@@ -157,31 +176,192 @@ debtmap analyze . --lcov target/coverage/lcov.info --top 5
 ├─ DEPENDENCIES: 0 upstream, 1 downstream
 └─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=8)
 
-#3 SCORE: 9.0 [CRITICAL]
-├─ TEST GAP: ./src/risk/context/git_history.rs:341 determine_stability_status()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.8 risk
-├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=7, nesting=1, lines=15
-└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=7)
-
-#4 SCORE: 9.0 [CRITICAL]
-├─ TEST GAP: ./src/risk/context/critical_path.rs:224 calculate_path_weight()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.8 risk
-├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=7, nesting=1, lines=10
-└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=7)
-
-#5 SCORE: 8.9 [CRITICAL]
-├─ TEST GAP: ./src/risk/context/dependency.rs:198 gather()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.7 risk
-├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=12, nesting=2, lines=44
-├─ DEPENDENCIES: 0 upstream, 14 downstream
-└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=12)
-
-
-📊 TOTAL DEBT SCORE: 4914
+📊 OVERALL METRICS:
+├─ TOTAL DEBT SCORE: 4914
+├─ OVERALL COVERAGE: 82.3%
+├─ HIGH RISK FUNCTIONS: 12
+└─ CRITICAL ISSUES: 5
 ```
+
+### JSON Output Format
+```json
+{
+  "items": [
+    {
+      "location": {
+        "file": "src/risk/priority/module_detection.rs",
+        "function": "get_base_dependents",
+        "line": 66
+      },
+      "debt_type": "TestGap",
+      "unified_score": {
+        "complexity_factor": 3.2,
+        "coverage_factor": 10.0,
+        "roi_factor": 8.5,
+        "semantic_factor": 7.0,
+        "role_multiplier": 1.2,
+        "final_score": 9.4
+      },
+      "function_role": "BusinessLogic",
+      "recommendation": {
+        "action": "Add unit tests",
+        "details": "Add 6 unit tests for full coverage",
+        "effort_estimate": "2-3 hours"
+      },
+      "expected_impact": {
+        "risk_reduction": 3.9,
+        "complexity_reduction": 0,
+        "coverage_improvement": 100
+      },
+      "upstream_dependencies": 0,
+      "downstream_dependencies": 3,
+      "nesting_depth": 1,
+      "function_length": 13
+    }
+  ],
+  "call_graph": {
+    "total_functions": 1523,
+    "entry_points": 12,
+    "test_functions": 456,
+    "max_depth": 8
+  },
+  "overall_coverage": 82.3,
+  "total_impact": {
+    "risk_reduction": 45.2,
+    "complexity_reduction": 12.3,
+    "coverage_improvement": 18.5
+  }
+}
+```
+
+## How Debtmap Works
+
+### Analysis Workflow
+
+```mermaid
+graph TD
+    A[Start: debtmap analyze] --> B[Parse Source Files]
+    B --> C{Language?}
+    
+    C -->|Rust| D[syn AST Parser]
+    C -->|Python| E[rustpython Parser]
+    C -->|JS/TS| F[tree-sitter Parser]
+    
+    D --> G[Extract Metrics]
+    E --> G
+    F --> G
+    
+    G --> H[Build Call Graph]
+    H --> I[Semantic Classification]
+    
+    G --> J[Calculate Complexity]
+    J --> K[Cyclomatic Complexity]
+    J --> L[Cognitive Complexity]
+    J --> M[Nesting Depth]
+    
+    G --> N[Detect Patterns]
+    N --> O[Code Duplication]
+    N --> P[Technical Debt Markers]
+    N --> Q[Long Functions]
+    
+    I --> R{Coverage Data?}
+    R -->|Yes| S[Parse LCOV]
+    R -->|No| T[Assume No Coverage]
+    
+    S --> U[Coverage Propagation]
+    T --> U
+    
+    U --> V[Unified Scoring]
+    V --> W[Calculate Factors]
+    
+    W --> X[Complexity Factor: 25%]
+    W --> Y[Coverage Factor: 35%]
+    W --> Z[ROI Factor: 25%]
+    W --> AA[Semantic Factor: 15%]
+    
+    X --> AB[Final Score]
+    Y --> AB
+    Z --> AB
+    AA --> AB
+    
+    AB --> AC[Apply Role Multiplier]
+    AC --> AD[Sort by Priority]
+    AD --> AE[Generate Recommendations]
+    AE --> AF[Output Results]
+```
+
+### Unified Scoring Algorithm
+
+Debtmap uses a sophisticated multi-factor scoring system to prioritize technical debt:
+
+#### 1. Base Score Calculation
+
+Each function receives a score from 0-10 based on four weighted factors:
+
+```
+Base Score = (Complexity × 0.25) + (Coverage × 0.35) + (ROI × 0.25) + (Semantic × 0.15)
+```
+
+**Factor Breakdown:**
+
+- **Complexity Factor (25%)**: Combines cyclomatic and cognitive complexity
+  - Normalized using: `min(10, (cyclomatic / 10 + cognitive / 20) × 5)`
+  - Higher complexity = higher score = higher priority
+
+- **Coverage Factor (35%)**: Urgency of adding test coverage
+  - Test functions: 0 (they don't need coverage)
+  - With coverage data: `10 × (1 - coverage_percentage) × complexity_weight`
+  - Without coverage data: 10 (assume worst case)
+  - Considers transitive coverage through call graph
+
+- **ROI Factor (25%)**: Return on investment for fixing
+  - Based on: function size, downstream dependencies, change frequency
+  - Normalized to 0-10 scale
+  - Higher ROI = higher priority
+
+- **Semantic Factor (15%)**: Importance based on function role
+  - Entry points: 8-10 (critical path)
+  - Business logic: 6-8 (core functionality)
+  - Data access: 5-7 (important but stable)
+  - Utilities: 3-5 (lower priority)
+  - Test helpers: 1-3 (lowest priority)
+
+#### 2. Role Multiplier
+
+The base score is adjusted by a role-based multiplier:
+
+```
+Final Score = Base Score × Role Multiplier
+```
+
+**Multipliers by Function Role:**
+- Entry Points: 1.5× (main, handlers, API endpoints)
+- Business Logic: 1.2× (core domain functions)
+- Data Access: 1.0× (database, file I/O)
+- Infrastructure: 0.8× (logging, configuration)
+- Utilities: 0.5× (helpers, formatters)
+- Test Code: 0.1× (test functions, fixtures)
+
+#### 3. Coverage Propagation
+
+Coverage impact flows through the call graph:
+
+```
+Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)
+```
+
+- Functions called by well-tested code have reduced urgency
+- Functions that many others depend on have increased urgency
+- Weights decrease with distance in call graph
+
+#### 4. Priority Classification
+
+Based on final scores:
+- **CRITICAL** (9.0-10.0): Immediate action required
+- **HIGH** (7.0-8.9): Should be addressed soon
+- **MEDIUM** (5.0-6.9): Plan for next sprint
+- **LOW** (3.0-4.9): Nice to have
+- **MINIMAL** (0.0-2.9): Can be deferred
 
 ## Metrics Explained
 
@@ -358,14 +538,43 @@ enabled = ["rust", "python", "javascript"]
 
 ## Architecture
 
-Debtmap is built with a functional, modular architecture:
+Debtmap is built with a functional, modular architecture designed for extensibility and performance:
+
+### Core Modules
 
 - **`analyzers/`** - Language-specific AST parsers and analyzers
-- **`complexity/`** - Complexity calculation algorithms
+  - Rust analyzer using `syn` for full AST parsing
+  - Python analyzer using `rustpython-parser`
+  - JavaScript/TypeScript analyzer using `tree-sitter`
+  - Call graph extraction for dependency analysis
+
+- **`priority/`** - Unified prioritization system
+  - Call graph construction and analysis
+  - Coverage propagation through dependencies
+  - Semantic function classification (entry points, business logic, utilities)
+  - ROI-based scoring and recommendations
+
+- **`risk/`** - Risk analysis and coverage integration
+  - LCOV parser for coverage data
+  - Risk scoring based on complexity-coverage correlation
+  - Context providers for enhanced risk assessment
+  - Test effort estimation
+
 - **`debt/`** - Technical debt pattern detection
+  - Code duplication detection with similarity scoring
+  - TODO/FIXME/HACK marker extraction
+  - Complexity-based debt identification
+  - Suppression comment handling
+
 - **`core/`** - Core data structures and traits
-- **`io/`** - File walking and output formatting
-- **`transformers/`** - Data transformation pipelines
+  - Language-agnostic metrics types
+  - Shared analysis results structures
+  - Configuration management
+
+- **`io/`** - File I/O and output formatting
+  - Parallel file walking with ignore patterns
+  - Multiple output formats (Terminal, JSON, Markdown)
+  - Pretty-printing with colored output
 
 ## Contributing
 
