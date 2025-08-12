@@ -12,6 +12,7 @@ fn test_code_smell_long_parameter_list() {
         nesting: 2,
         length: 30,
         is_test: false,
+        visibility: None,
     };
 
     // Test with 7 parameters (over threshold of 5)
@@ -41,6 +42,7 @@ fn test_code_smell_long_method() {
         nesting: 2,
         length: 100, // Over threshold of 50
         is_test: false,
+        visibility: None,
     };
 
     let smell = detect_long_method(&func);
@@ -70,6 +72,7 @@ fn test_code_smell_deep_nesting() {
         nesting: 6, // Over threshold of 4
         length: 30,
         is_test: false,
+        visibility: None,
     };
 
     let smell = detect_deep_nesting(&func);
@@ -99,6 +102,7 @@ fn test_code_smell_detection_multiple() {
         nesting: 6,
         length: 100,
         is_test: false,
+        visibility: None,
     };
 
     let smells = analyze_function_smells(&func, 7);

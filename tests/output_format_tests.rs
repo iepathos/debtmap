@@ -18,6 +18,7 @@ fn test_output_json_format() {
                 nesting: 2,
                 length: 25,
                 is_test: false,
+                visibility: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

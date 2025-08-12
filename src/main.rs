@@ -1202,6 +1202,7 @@ end_of_record
                     nesting: 2,
                     length: 4,
                     is_test: false,
+                    visibility: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -1259,6 +1260,7 @@ end_of_record
                     nesting: 1,
                     length: 10,
                     is_test: false,
+                    visibility: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -1334,6 +1336,7 @@ end_of_record
                     nesting: 0,
                     length: 2,
                     is_test: false,
+                    visibility: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -1432,6 +1435,7 @@ end_of_record
                         nesting: 0,
                         length: 2,
                         is_test: false,
+                        visibility: None,
                     },
                     FunctionMetrics {
                         name: "partially_tested".to_string(),
@@ -1442,6 +1446,7 @@ end_of_record
                         nesting: 1,
                         length: 3, // Adjusted to match LCOV data
                         is_test: false,
+                        visibility: None,
                     },
                     FunctionMetrics {
                         name: "untested".to_string(),
@@ -1452,6 +1457,7 @@ end_of_record
                         nesting: 2,
                         length: 2,
                         is_test: false,
+                        visibility: None,
                     },
                     FunctionMetrics {
                         name: "test_function".to_string(),
@@ -1462,6 +1468,7 @@ end_of_record
                         nesting: 0,
                         length: 5,
                         is_test: true,
+                        visibility: None,
                     },
                 ],
                 summary: ComplexitySummary {
@@ -1976,6 +1983,7 @@ end_of_record
                 nesting: 2,
                 length: 25,
                 is_test: false,
+                visibility: None,
             },
             FunctionMetrics {
                 name: "test_function".to_string(),
@@ -1986,6 +1994,7 @@ end_of_record
                 nesting: 1,
                 length: 15,
                 is_test: true,
+                visibility: None,
             },
         ];
 
@@ -2023,6 +2032,7 @@ end_of_record
             nesting: 3,
             length: 40,
             is_test: false,
+            visibility: None,
         }];
 
         let mut call_graph = CallGraph::new();
@@ -2055,6 +2065,7 @@ end_of_record
                 nesting: 1,
                 length: 20,
                 is_test: false, // Production function
+                visibility: None,
             },
             FunctionMetrics {
                 name: "test_something".to_string(),
@@ -2065,6 +2076,7 @@ end_of_record
                 nesting: 2,
                 length: 40,
                 is_test: true, // Test function - should be excluded
+                visibility: None,
             },
             FunctionMetrics {
                 name: "another_production_function".to_string(),
@@ -2075,6 +2087,7 @@ end_of_record
                 nesting: 0,
                 length: 15,
                 is_test: false, // Production function
+                visibility: None,
             },
         ];
 

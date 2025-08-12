@@ -322,6 +322,7 @@ mod tests {
                     nesting: 0,
                     length: 10,
                     is_test: false,
+                    visibility: None,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -663,6 +664,7 @@ mod tests {
             nesting: 1,
             length: 15,
             is_test: false,
+            visibility: None,
         });
 
         assert!(!metrics_equal(&metrics1, &metrics2));
@@ -738,6 +740,7 @@ mod tests {
             nesting: 0,
             length: 5,
             is_test: false,
+            visibility: None,
         });
 
         inc.previous_state = inc
