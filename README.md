@@ -153,34 +153,40 @@ Options:
 
 ### Unified Priority Output (Default)
 ```
-debtmap analyze . --coverage-file target/coverage/lcov.info --top 5
+debtmap analyze . --lcov target/coverage/lcov.info --top 3
 ════════════════════════════════════════════
     PRIORITY TECHNICAL DEBT FIXES
 ════════════════════════════════════════════
 
-🎯 TOP 5 RECOMMENDATIONS (by unified priority)
+🎯 TOP 3 RECOMMENDATIONS (by unified priority)
 
-#1 SCORE: 9.4 [CRITICAL]
-├─ TEST GAP: ./src/risk/priority/module_detection.rs:66 get_base_dependents()
+#1 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/analyzers/rust_call_graph.rs:38 add_function_to_graph()
 ├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.9 risk
-├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=10, nesting=1, lines=13
-├─ DEPENDENCIES: 0 upstream, 3 downstream
-└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=10)
-
-#2 SCORE: 9.1 [CRITICAL]
-├─ TEST GAP: ./src/risk/correlation.rs:69 build_risk_distribution()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: Full test coverage, -3.8 risk
-├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=8, nesting=2, lines=22
-├─ DEPENDENCIES: 0 upstream, 1 downstream
+├─ IMPACT: Full test coverage, -3.7 risk
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=8, nesting=2, lines=32
+├─ DEPENDENCIES: 0 upstream, 11 downstream
 └─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=8)
 
-📊 OVERALL METRICS:
-├─ TOTAL DEBT SCORE: 4914
-├─ OVERALL COVERAGE: 82.3%
-├─ HIGH RISK FUNCTIONS: 12
-└─ CRITICAL ISSUES: 5
+#2 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/debt/smells.rs:196 detect_data_clumps()
+├─ ACTION: Add 5 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.7 risk
+├─ COMPLEXITY: cyclomatic=5, branches=5, cognitive=11, nesting=5, lines=31
+├─ DEPENDENCIES: 0 upstream, 4 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=5, cog=11)
+
+#3 SCORE: 8.6 [CRITICAL]
+├─ TEST GAP: ./src/risk/context/dependency.rs:247 explain()
+├─ ACTION: Add 5 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.6 risk
+├─ COMPLEXITY: cyclomatic=5, branches=5, cognitive=9, nesting=1, lines=24
+├─ DEPENDENCIES: 0 upstream, 1 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=5, cog=9)
+
+
+📊 TOTAL DEBT SCORE: 4907
+📈 OVERALL COVERAGE: 67.12%
 ```
 
 ### JSON Output Format
