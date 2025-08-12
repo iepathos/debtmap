@@ -456,26 +456,10 @@ fn get_severity_color(score: f64) -> colored::Color {
 }
 
 fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize) {
-    let (cyclomatic, cognitive, branch_count) = match &item.debt_type {
-        DebtType::TestingGap {
-            cyclomatic,
-            cognitive,
-            ..
-        } => {
-            // For testing gaps, use both cyclomatic and cognitive
-            (*cyclomatic, *cognitive, *cyclomatic)
-        }
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            cognitive,
-        } => (*cyclomatic, *cognitive, *cyclomatic),
-        DebtType::TestComplexityHotspot {
-            cyclomatic,
-            cognitive,
-            ..
-        } => (*cyclomatic, *cognitive, *cyclomatic),
-        _ => (0, 0, 0),
-    };
+    // Always show complexity metrics from the item itself, regardless of debt type
+    let cyclomatic = item.cyclomatic_complexity;
+    let cognitive = item.cognitive_complexity;
+    let branch_count = cyclomatic; // Use cyclomatic as proxy for branch count
 
     (
         cyclomatic,
@@ -542,6 +526,8 @@ mod tests {
             downstream_dependencies: 3,
             nesting_depth: 1,
             function_length: 15,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 7,
         }
     }
 
