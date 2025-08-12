@@ -122,6 +122,7 @@ src/
 - Spec 10: Add modern pattern detection (async/await, callbacks, functional)
 - Spec 12: Improve ROI calculations
 - Spec 13: Add risk categorization system
+- Spec 20: Priority Index Flag for Parallel Processing (NEW - enables extracting specific priority items by index for distributed processing with mmm's --map-args feature)
 
 ### Long-term Goals
 - Add more language support via tree-sitter
