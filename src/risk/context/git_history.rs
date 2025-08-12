@@ -677,6 +677,120 @@ mod tests {
     }
 
     #[test]
+    fn test_format_stability_message_highly_unstable() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        let message =
+            provider.format_stability_message(StabilityStatus::HighlyUnstable, 8.5, 0.45, 180, 5);
+
+        assert_eq!(message, "Highly unstable: 8.5 changes/month, 45% bug fixes");
+
+        // Test with different values
+        let message =
+            provider.format_stability_message(StabilityStatus::HighlyUnstable, 12.3, 0.67, 90, 10);
+
+        assert_eq!(
+            message,
+            "Highly unstable: 12.3 changes/month, 67% bug fixes"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_format_stability_message_frequently_changed() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        let message = provider.format_stability_message(
+            StabilityStatus::FrequentlyChanged,
+            3.5,
+            0.15,
+            200,
+            7,
+        );
+
+        assert_eq!(
+            message,
+            "Frequently changed: 3.5 changes/month by 7 authors"
+        );
+
+        // Test with single author
+        let message = provider.format_stability_message(
+            StabilityStatus::FrequentlyChanged,
+            5.2,
+            0.08,
+            100,
+            1,
+        );
+
+        assert_eq!(
+            message,
+            "Frequently changed: 5.2 changes/month by 1 authors"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_format_stability_message_bug_prone() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        let message =
+            provider.format_stability_message(StabilityStatus::BugProne, 1.2, 0.35, 150, 3);
+
+        assert_eq!(message, "Bug-prone: 35% of commits are bug fixes");
+
+        // Test with different bug density
+        let message =
+            provider.format_stability_message(StabilityStatus::BugProne, 0.8, 0.72, 300, 2);
+
+        assert_eq!(message, "Bug-prone: 72% of commits are bug fixes");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_format_stability_message_mature_stable() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        let message =
+            provider.format_stability_message(StabilityStatus::MatureStable, 0.5, 0.05, 730, 2);
+
+        assert_eq!(message, "Mature and stable: 730 days old");
+
+        // Test with different age
+        let message =
+            provider.format_stability_message(StabilityStatus::MatureStable, 0.3, 0.02, 1095, 1);
+
+        assert_eq!(message, "Mature and stable: 1095 days old");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_format_stability_message_relatively_stable() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+        let provider = GitHistoryProvider::new(repo_path)?;
+
+        let message =
+            provider.format_stability_message(StabilityStatus::RelativelyStable, 1.8, 0.12, 250, 4);
+
+        assert_eq!(message, "Relatively stable: 1.8 changes/month");
+
+        // Test with different change frequency
+        let message =
+            provider.format_stability_message(StabilityStatus::RelativelyStable, 0.2, 0.0, 30, 1);
+
+        assert_eq!(message, "Relatively stable: 0.2 changes/month");
+
+        Ok(())
+    }
+
+    #[test]
     fn test_gather_integration() -> Result<()> {
         let (_temp, repo_path) = setup_test_repo()?;
 

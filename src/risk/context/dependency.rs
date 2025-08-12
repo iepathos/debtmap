@@ -398,6 +398,126 @@ mod tests {
     }
 
     #[test]
+    fn test_explain_critical_dependency_blast_radius_over_10() {
+        let provider = DependencyRiskProvider {
+            calculator: DependencyRiskCalculator::new(DependencyGraph::new()),
+        };
+
+        let context = Context {
+            provider: "dependency".to_string(),
+            weight: 1.2,
+            contribution: 5.0,
+            details: ContextDetails::DependencyChain {
+                depth: 3,
+                propagated_risk: 8.5,
+                dependents: vec!["module_a".to_string(), "module_b".to_string()],
+                blast_radius: 15,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(
+            explanation,
+            "Critical dependency with blast radius 15 affecting 2 modules"
+        );
+    }
+
+    #[test]
+    fn test_explain_important_dependency_blast_radius_6_to_10() {
+        let provider = DependencyRiskProvider {
+            calculator: DependencyRiskCalculator::new(DependencyGraph::new()),
+        };
+
+        let context = Context {
+            provider: "dependency".to_string(),
+            weight: 1.2,
+            contribution: 3.0,
+            details: ContextDetails::DependencyChain {
+                depth: 2,
+                propagated_risk: 6.3,
+                dependents: vec![
+                    "module_x".to_string(),
+                    "module_y".to_string(),
+                    "module_z".to_string(),
+                ],
+                blast_radius: 7,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(
+            explanation,
+            "Important dependency with 3 dependents (risk: 6.3)"
+        );
+    }
+
+    #[test]
+    fn test_explain_limited_impact_blast_radius_1_to_5() {
+        let provider = DependencyRiskProvider {
+            calculator: DependencyRiskCalculator::new(DependencyGraph::new()),
+        };
+
+        let context = Context {
+            provider: "dependency".to_string(),
+            weight: 1.2,
+            contribution: 1.5,
+            details: ContextDetails::DependencyChain {
+                depth: 1,
+                propagated_risk: 2.0,
+                dependents: vec!["module_single".to_string()],
+                blast_radius: 3,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "Dependency depth 1 with limited impact");
+    }
+
+    #[test]
+    fn test_explain_isolated_component_blast_radius_0() {
+        let provider = DependencyRiskProvider {
+            calculator: DependencyRiskCalculator::new(DependencyGraph::new()),
+        };
+
+        let context = Context {
+            provider: "dependency".to_string(),
+            weight: 1.2,
+            contribution: 0.0,
+            details: ContextDetails::DependencyChain {
+                depth: 0,
+                propagated_risk: 0.0,
+                dependents: vec![],
+                blast_radius: 0,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "Isolated component with no dependencies");
+    }
+
+    #[test]
+    fn test_explain_non_dependency_context() {
+        let provider = DependencyRiskProvider {
+            calculator: DependencyRiskCalculator::new(DependencyGraph::new()),
+        };
+
+        let context = Context {
+            provider: "dependency".to_string(),
+            weight: 1.2,
+            contribution: 0.0,
+            details: ContextDetails::Historical {
+                change_frequency: 5.0,
+                bug_density: 0.1,
+                age_days: 365,
+                author_count: 3,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "No dependency information");
+    }
+
+    #[test]
     fn test_gather_with_high_blast_radius() {
         // Test gather() when module has blast radius > 10
         let mut graph = DependencyGraph::new();

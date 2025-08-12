@@ -223,3 +223,174 @@ pub fn detect_data_clumps(functions: &[FunctionMetrics]) -> Vec<CodeSmell> {
 
     smells
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::FunctionMetrics;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_detect_data_clumps_empty_functions() {
+        let functions = vec![];
+        let smells = detect_data_clumps(&functions);
+        assert_eq!(
+            smells.len(),
+            0,
+            "No smells should be detected for empty input"
+        );
+    }
+
+    #[test]
+    fn test_detect_data_clumps_single_function() {
+        let functions = vec![FunctionMetrics {
+            name: "large_function".to_string(),
+            file: PathBuf::from("src/lib.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 10,
+            nesting: 2,
+            length: 35,
+            is_test: false,
+        }];
+        let smells = detect_data_clumps(&functions);
+        assert_eq!(
+            smells.len(),
+            0,
+            "Single function cannot have data clumps with itself"
+        );
+    }
+
+    #[test]
+    fn test_detect_data_clumps_different_files() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "function_a".to_string(),
+                file: PathBuf::from("src/module_a.rs"),
+                line: 10,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 2,
+                length: 35,
+                is_test: false,
+            },
+            FunctionMetrics {
+                name: "function_b".to_string(),
+                file: PathBuf::from("src/module_b.rs"),
+                line: 20,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 2,
+                length: 35,
+                is_test: false,
+            },
+        ];
+        let smells = detect_data_clumps(&functions);
+        assert_eq!(
+            smells.len(),
+            0,
+            "Functions in different files should not be reported as data clumps"
+        );
+    }
+
+    #[test]
+    fn test_detect_data_clumps_same_file_large_functions() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "process_user_data".to_string(),
+                file: PathBuf::from("src/user_handler.rs"),
+                line: 10,
+                cyclomatic: 8,
+                cognitive: 15,
+                nesting: 3,
+                length: 40,
+                is_test: false,
+            },
+            FunctionMetrics {
+                name: "validate_user_data".to_string(),
+                file: PathBuf::from("src/user_handler.rs"),
+                line: 60,
+                cyclomatic: 6,
+                cognitive: 12,
+                nesting: 2,
+                length: 35,
+                is_test: false,
+            },
+        ];
+        let smells = detect_data_clumps(&functions);
+        assert_eq!(
+            smells.len(),
+            1,
+            "Should detect data clump for large functions in same file"
+        );
+
+        let smell = &smells[0];
+        assert_eq!(smell.smell_type, SmellType::DataClump);
+        assert_eq!(smell.location, PathBuf::from("src/user_handler.rs"));
+        assert_eq!(smell.line, 10);
+        assert!(smell.message.contains("process_user_data"));
+        assert!(smell.message.contains("validate_user_data"));
+        assert_eq!(smell.severity, Priority::Low);
+    }
+
+    #[test]
+    fn test_detect_data_clumps_multiple_clumps() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "func_a".to_string(),
+                file: PathBuf::from("src/module.rs"),
+                line: 10,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 2,
+                length: 35,
+                is_test: false,
+            },
+            FunctionMetrics {
+                name: "func_b".to_string(),
+                file: PathBuf::from("src/module.rs"),
+                line: 50,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 2,
+                length: 32,
+                is_test: false,
+            },
+            FunctionMetrics {
+                name: "func_c".to_string(),
+                file: PathBuf::from("src/module.rs"),
+                line: 90,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 2,
+                length: 31,
+                is_test: false,
+            },
+            FunctionMetrics {
+                name: "small_func".to_string(),
+                file: PathBuf::from("src/module.rs"),
+                line: 130,
+                cyclomatic: 2,
+                cognitive: 3,
+                nesting: 1,
+                length: 10,
+                is_test: false,
+            },
+        ];
+        let smells = detect_data_clumps(&functions);
+
+        // Should detect clumps between func_a & func_b, func_a & func_c
+        // But due to break after first match per function, we get 2 smells (one for func_a, one for func_b)
+        assert_eq!(smells.len(), 2, "Should detect multiple data clumps");
+
+        // First smell should be between func_a and func_b
+        assert_eq!(smells[0].line, 10);
+        assert!(smells[0].message.contains("func_a"));
+        assert!(smells[0].message.contains("func_b"));
+
+        // Second smell should be between func_b and func_c
+        assert_eq!(smells[1].line, 50);
+        assert!(smells[1].message.contains("func_b"));
+        assert!(smells[1].message.contains("func_c"));
+    }
+}

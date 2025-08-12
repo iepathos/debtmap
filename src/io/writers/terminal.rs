@@ -246,3 +246,113 @@ fn is_passing(results: &AnalysisResults) -> bool {
         && results.complexity.summary.high_complexity_count <= 5
         && debt_score <= debt_threshold
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::risk::{
+        Difficulty, FunctionRisk, RiskCategory, RiskDistribution, TestEffort, TestingRecommendation,
+    };
+    use im::Vector;
+    use std::path::PathBuf;
+
+    fn create_test_risk_insight() -> RiskInsight {
+        RiskInsight {
+            top_risks: Vector::from(vec![FunctionRisk {
+                function_name: "high_risk_func".to_string(),
+                file: PathBuf::from("src/main.rs"),
+                line_range: (42, 50),
+                risk_score: 85.0,
+                cyclomatic_complexity: 15,
+                cognitive_complexity: 20,
+                coverage_percentage: Some(0.0),
+                test_effort: TestEffort {
+                    estimated_difficulty: Difficulty::Complex,
+                    cognitive_load: 20,
+                    branch_count: 10,
+                    recommended_test_cases: 5,
+                },
+                risk_category: RiskCategory::Critical,
+                is_test_function: false,
+            }]),
+            risk_reduction_opportunities: Vector::from(vec![TestingRecommendation {
+                function: "test_me".to_string(),
+                file: PathBuf::from("src/lib.rs"),
+                line: 100,
+                current_risk: 75.0,
+                potential_risk_reduction: 40.0,
+                test_effort_estimate: TestEffort {
+                    estimated_difficulty: Difficulty::Moderate,
+                    cognitive_load: 8,
+                    branch_count: 5,
+                    recommended_test_cases: 3,
+                },
+                rationale: "High risk function with low coverage".to_string(),
+                roi: Some(5.0),
+                dependencies: vec![],
+                dependents: vec![],
+            }]),
+            codebase_risk_score: 45.5,
+            complexity_coverage_correlation: Some(-0.65),
+            risk_distribution: RiskDistribution {
+                critical_count: 2,
+                high_count: 5,
+                medium_count: 10,
+                low_count: 15,
+                well_tested_count: 20,
+                total_functions: 52,
+            },
+        }
+    }
+
+    #[test]
+    fn test_write_risk_insights_complete_output() {
+        let mut writer = TerminalWriter::new();
+        let insights = create_test_risk_insight();
+
+        // Test that the method completes without error
+        let result = writer.write_risk_insights(&insights);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_write_risk_insights_low_risk() {
+        let mut writer = TerminalWriter::new();
+        let mut insights = create_test_risk_insight();
+        insights.codebase_risk_score = 25.0;
+
+        let result = writer.write_risk_insights(&insights);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_write_risk_insights_high_risk() {
+        let mut writer = TerminalWriter::new();
+        let mut insights = create_test_risk_insight();
+        insights.codebase_risk_score = 75.0;
+
+        let result = writer.write_risk_insights(&insights);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_write_risk_insights_no_correlation() {
+        let mut writer = TerminalWriter::new();
+        let mut insights = create_test_risk_insight();
+        insights.complexity_coverage_correlation = None;
+
+        let result = writer.write_risk_insights(&insights);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_write_risk_insights_empty_recommendations() {
+        let mut writer = TerminalWriter::new();
+        let mut insights = create_test_risk_insight();
+        insights.risk_reduction_opportunities = Vector::new();
+        insights.top_risks = Vector::new();
+
+        let result = writer.write_risk_insights(&insights);
+        assert!(result.is_ok());
+    }
+}
