@@ -191,8 +191,8 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     if cyclomatic > 0 || cognitive > 0 {
         writeln!(
             output,
-            "├─ COMPLEXITY: {}, branches={}, cognitive={}, nesting={}, lines={}",
-            format!("cyclomatic={cyclomatic}").dimmed(),
+            "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}, lines={}",
+            cyclomatic.to_string().dimmed(),
             branch_count.to_string().dimmed(),
             cognitive.to_string().dimmed(),
             nesting.to_string().dimmed(),
