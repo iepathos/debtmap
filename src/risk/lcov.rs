@@ -44,12 +44,35 @@ fn parse_source_file(line: &str) -> Option<LcovLine> {
 
 // Parse function definition line
 fn parse_function(line: &str) -> Option<LcovLine> {
-    line.strip_prefix("FN:")
-        .and_then(parse_comma_data::<usize>)
-        .map(|(line_num, name)| LcovLine::Function {
-            line: line_num,
-            name,
-        })
+    line.strip_prefix("FN:").and_then(|data| {
+        // Handle both formats:
+        // Rust format: line,name
+        // Python format: line_start,line_end,name
+        let parts: Vec<&str> = data.splitn(3, ',').collect();
+        match parts.len() {
+            2 => {
+                // Rust format: line,name
+                parts[0]
+                    .parse::<usize>()
+                    .ok()
+                    .map(|line_num| LcovLine::Function {
+                        line: line_num,
+                        name: parts[1].to_string(),
+                    })
+            }
+            3 => {
+                // Python format: line_start,line_end,name
+                parts[0]
+                    .parse::<usize>()
+                    .ok()
+                    .map(|line_num| LcovLine::Function {
+                        line: line_num,
+                        name: parts[2].to_string(),
+                    })
+            }
+            _ => None,
+        }
+    })
 }
 
 // Parse function data line
@@ -290,6 +313,34 @@ impl LcovData {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_function_python_format() {
+        // Test Python format with line_start,line_end,name
+        let line = "FN:18,64,create_app";
+        let result = parse_function(line);
+        match result {
+            Some(LcovLine::Function { line, name }) => {
+                assert_eq!(line, 18);
+                assert_eq!(name, "create_app");
+            }
+            _ => panic!("Failed to parse Python format FN line"),
+        }
+    }
+
+    #[test]
+    fn test_parse_function_rust_format() {
+        // Test Rust format with line,name
+        let line = "FN:11,collect_file_metrics";
+        let result = parse_function(line);
+        match result {
+            Some(LcovLine::Function { line, name }) => {
+                assert_eq!(line, 11);
+                assert_eq!(name, "collect_file_metrics");
+            }
+            _ => panic!("Failed to parse Rust format FN line"),
+        }
+    }
 
     #[test]
     fn test_find_matching_function_with_qualified_name() {
