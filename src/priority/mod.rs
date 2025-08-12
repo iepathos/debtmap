@@ -1,5 +1,6 @@
 pub mod call_graph;
 pub mod coverage_propagation;
+pub mod external_api_detector;
 pub mod formatter;
 pub mod semantic_classifier;
 pub mod unified_scorer;
