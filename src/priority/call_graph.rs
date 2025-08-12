@@ -725,4 +725,238 @@ mod tests {
         assert!(callers_f_depth_2.contains(&b));
         assert!(callers_f_depth_2.contains(&c));
     }
+
+    #[test]
+    fn test_call_graph_serialization_roundtrip() {
+        use serde_json;
+
+        // Create a CallGraph
+        let mut graph = CallGraph::new();
+
+        let func1 = FunctionId {
+            file: PathBuf::from("src/main.rs"),
+            name: "main".to_string(),
+            line: 10,
+        };
+
+        let func2 = FunctionId {
+            file: PathBuf::from("src/lib.rs"),
+            name: "helper".to_string(),
+            line: 25,
+        };
+
+        graph.add_function(func1.clone(), true, false, 5, 50);
+        graph.add_function(func2.clone(), false, false, 3, 30);
+        graph.add_call(FunctionCall {
+            caller: func1.clone(),
+            callee: func2.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&graph).unwrap();
+
+        // Deserialize back - this will trigger our custom deserialize function
+        let deserialized: CallGraph = serde_json::from_str(&json).unwrap();
+
+        // Verify the graph was correctly deserialized
+        assert_eq!(deserialized.get_callees(&func1).len(), 1);
+        assert_eq!(deserialized.get_callers(&func2).len(), 1);
+        assert!(deserialized.is_entry_point(&func1));
+        assert!(!deserialized.is_entry_point(&func2));
+    }
+
+    #[test]
+    fn test_function_id_map_deserialize_happy_path() {
+        use serde_json;
+        use std::collections::HashMap as StdHashMap;
+
+        // Create a JSON representation with string keys in "file:name:line" format
+        let json_data = r#"{
+            "src/main.rs:main:10": {"value": 100},
+            "src/lib.rs:helper:25": {"value": 200},
+            "src/utils.rs:process_data:42": {"value": 300}
+        }"#;
+
+        #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+        struct TestValue {
+            value: u32,
+        }
+
+        // Deserialize using our custom deserializer
+        let result: Result<im::HashMap<FunctionId, TestValue>, _> = serde_json::from_str(json_data)
+            .map(|map: StdHashMap<String, TestValue>| {
+                let mut result = im::HashMap::new();
+                for (key, value) in map {
+                    let parts: Vec<&str> = key.rsplitn(3, ':').collect();
+                    if parts.len() == 3 {
+                        let func_id = FunctionId {
+                            file: parts[2].into(),
+                            name: parts[1].to_string(),
+                            line: parts[0].parse().unwrap_or(0),
+                        };
+                        result.insert(func_id, value);
+                    }
+                }
+                result
+            });
+
+        assert!(result.is_ok());
+        let map = result.unwrap();
+        assert_eq!(map.len(), 3);
+
+        // Verify specific entries
+        let main_id = FunctionId {
+            file: PathBuf::from("src/main.rs"),
+            name: "main".to_string(),
+            line: 10,
+        };
+        assert_eq!(map.get(&main_id).unwrap().value, 100);
+
+        let helper_id = FunctionId {
+            file: PathBuf::from("src/lib.rs"),
+            name: "helper".to_string(),
+            line: 25,
+        };
+        assert_eq!(map.get(&helper_id).unwrap().value, 200);
+    }
+
+    #[test]
+    fn test_function_id_map_deserialize_empty_map() {
+        use serde_json;
+        use std::collections::HashMap as StdHashMap;
+
+        // Test with empty JSON object
+        let json_data = r#"{}"#;
+
+        #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+        struct TestValue {
+            value: u32,
+        }
+
+        let result: Result<im::HashMap<FunctionId, TestValue>, _> = serde_json::from_str(json_data)
+            .map(|map: StdHashMap<String, TestValue>| {
+                let mut result = im::HashMap::new();
+                for (key, value) in map {
+                    let parts: Vec<&str> = key.rsplitn(3, ':').collect();
+                    if parts.len() == 3 {
+                        let func_id = FunctionId {
+                            file: parts[2].into(),
+                            name: parts[1].to_string(),
+                            line: parts[0].parse().unwrap_or(0),
+                        };
+                        result.insert(func_id, value);
+                    }
+                }
+                result
+            });
+
+        assert!(result.is_ok());
+        let map = result.unwrap();
+        assert_eq!(map.len(), 0);
+    }
+
+    #[test]
+    fn test_function_id_map_deserialize_malformed_keys() {
+        use serde_json;
+        use std::collections::HashMap as StdHashMap;
+
+        // Test with malformed keys (missing parts)
+        let json_data = r#"{
+            "src/main.rs:main:10": {"value": 100},
+            "malformed_key": {"value": 200},
+            "only:two": {"value": 300},
+            "src/lib.rs:helper:25": {"value": 400}
+        }"#;
+
+        #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+        struct TestValue {
+            value: u32,
+        }
+
+        let result: Result<im::HashMap<FunctionId, TestValue>, _> = serde_json::from_str(json_data)
+            .map(|map: StdHashMap<String, TestValue>| {
+                let mut result = im::HashMap::new();
+                for (key, value) in map {
+                    let parts: Vec<&str> = key.rsplitn(3, ':').collect();
+                    if parts.len() == 3 {
+                        let func_id = FunctionId {
+                            file: parts[2].into(),
+                            name: parts[1].to_string(),
+                            line: parts[0].parse().unwrap_or(0),
+                        };
+                        result.insert(func_id, value);
+                    }
+                }
+                result
+            });
+
+        assert!(result.is_ok());
+        let map = result.unwrap();
+        // Only valid keys should be included
+        assert_eq!(map.len(), 2);
+
+        // Verify valid entries are present
+        let main_id = FunctionId {
+            file: PathBuf::from("src/main.rs"),
+            name: "main".to_string(),
+            line: 10,
+        };
+        assert_eq!(map.get(&main_id).unwrap().value, 100);
+    }
+
+    #[test]
+    fn test_function_id_map_deserialize_invalid_line_numbers() {
+        use serde_json;
+        use std::collections::HashMap as StdHashMap;
+
+        // Test with invalid line numbers
+        let json_data = r#"{
+            "src/main.rs:main:10": {"value": 100},
+            "src/lib.rs:helper:not_a_number": {"value": 200},
+            "src/utils.rs:process:999999": {"value": 300}
+        }"#;
+
+        #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+        struct TestValue {
+            value: u32,
+        }
+
+        let result: Result<im::HashMap<FunctionId, TestValue>, _> = serde_json::from_str(json_data)
+            .map(|map: StdHashMap<String, TestValue>| {
+                let mut result = im::HashMap::new();
+                for (key, value) in map {
+                    let parts: Vec<&str> = key.rsplitn(3, ':').collect();
+                    if parts.len() == 3 {
+                        let func_id = FunctionId {
+                            file: parts[2].into(),
+                            name: parts[1].to_string(),
+                            line: parts[0].parse().unwrap_or(0),
+                        };
+                        result.insert(func_id, value);
+                    }
+                }
+                result
+            });
+
+        assert!(result.is_ok());
+        let map = result.unwrap();
+        assert_eq!(map.len(), 3);
+
+        // Verify that invalid line numbers default to 0
+        let helper_id = FunctionId {
+            file: PathBuf::from("src/lib.rs"),
+            name: "helper".to_string(),
+            line: 0, // Should default to 0 when parsing fails
+        };
+        assert_eq!(map.get(&helper_id).unwrap().value, 200);
+
+        // Large numbers should parse successfully
+        let process_id = FunctionId {
+            file: PathBuf::from("src/utils.rs"),
+            name: "process".to_string(),
+            line: 999999,
+        };
+        assert_eq!(map.get(&process_id).unwrap().value, 300);
+    }
 }
