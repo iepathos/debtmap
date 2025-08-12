@@ -463,4 +463,183 @@ mod tests {
             Some("Vec".to_string())
         );
     }
+
+    #[test]
+    fn test_add_function_to_graph_regular_function() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        
+        // Create a regular function without test attributes or entry point pattern
+        let item_fn: ItemFn = parse_quote! {
+            fn calculate_sum(a: i32, b: i32) -> i32 {
+                a + b
+            }
+        };
+        
+        extractor.add_function_to_graph("calculate_sum".to_string(), 10, &item_fn);
+        
+        // Verify function was added to graph
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "calculate_sum".to_string(),
+            line: 10,
+        };
+        
+        // Verify function properties using available methods
+        assert!(!extractor.call_graph.is_entry_point(&func_id), "Regular function should not be entry point");
+        assert!(!extractor.call_graph.is_test_function(&func_id), "Regular function should not be test");
+        
+        // Verify current function was set
+        assert_eq!(extractor.current_function, Some(func_id));
+    }
+
+    #[test]
+    fn test_add_function_to_graph_test_function() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        
+        // Create a test function with #[test] attribute
+        let item_fn: ItemFn = parse_quote! {
+            #[test]
+            fn test_something() {
+                assert_eq!(1, 1);
+            }
+        };
+        
+        extractor.add_function_to_graph("test_something".to_string(), 20, &item_fn);
+        
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test_something".to_string(),
+            line: 20,
+        };
+        
+        // Verify function properties
+        assert!(extractor.call_graph.is_test_function(&func_id), "Function with #[test] attribute should be marked as test");
+        assert!(!extractor.call_graph.is_entry_point(&func_id), "Test function should not be entry point");
+    }
+
+    #[test]
+    fn test_add_function_to_graph_tokio_test_function() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        
+        // Create a tokio test function
+        let item_fn: ItemFn = parse_quote! {
+            #[tokio_test]
+            async fn test_async_something() {
+                assert_eq!(1, 1);
+            }
+        };
+        
+        extractor.add_function_to_graph("test_async_something".to_string(), 30, &item_fn);
+        
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test_async_something".to_string(),
+            line: 30,
+        };
+        
+        // Verify function properties
+        assert!(extractor.call_graph.is_test_function(&func_id), "Function with #[tokio_test] attribute should be marked as test");
+    }
+
+    #[test]
+    fn test_add_function_to_graph_main_entry_point() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("main.rs"));
+        
+        // Create main function
+        let item_fn: ItemFn = parse_quote! {
+            fn main() {
+                println!("Hello, world!");
+            }
+        };
+        
+        extractor.add_function_to_graph("main".to_string(), 1, &item_fn);
+        
+        let func_id = FunctionId {
+            file: PathBuf::from("main.rs"),
+            name: "main".to_string(),
+            line: 1,
+        };
+        
+        // Verify function properties
+        assert!(extractor.call_graph.is_entry_point(&func_id), "main function should be marked as entry point");
+        assert!(!extractor.call_graph.is_test_function(&func_id), "main function should not be test");
+    }
+
+    #[test]
+    fn test_add_function_to_graph_handle_entry_point() {
+        // Test all entry point patterns
+        let test_cases = vec![
+            ("handle_request", true),
+            ("process_data", true),
+            ("run_pipeline", true),
+            ("execute_command", true),
+            ("handle_", true),  // Edge case: just the prefix
+            ("handler_function", false),  // Should NOT be entry point
+            ("some_handle", false),  // Should NOT be entry point
+        ];
+        
+        for (name, should_be_entry) in test_cases {
+            let item_fn: ItemFn = parse_quote! {
+                fn some_function() {}
+            };
+            
+            let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+            extractor.add_function_to_graph(name.to_string(), 1, &item_fn);
+            
+            let func_id = FunctionId {
+                file: PathBuf::from("test.rs"),
+                name: name.to_string(),
+                line: 1,
+            };
+            
+            // Verify entry point status
+            assert_eq!(
+                extractor.call_graph.is_entry_point(&func_id), 
+                should_be_entry, 
+                "Function '{}' entry point status mismatch", 
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_add_function_to_graph_with_complexity() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("complex.rs"));
+        
+        // Create a function with some complexity
+        let item_fn: ItemFn = parse_quote! {
+            fn complex_function(x: i32) -> i32 {
+                if x > 0 {
+                    if x > 10 {
+                        x * 2
+                    } else {
+                        x + 1
+                    }
+                } else {
+                    match x {
+                        -1 => 0,
+                        -2 => 1,
+                        _ => -x
+                    }
+                }
+            }
+        };
+        
+        extractor.add_function_to_graph("complex_function".to_string(), 50, &item_fn);
+        
+        let func_id = FunctionId {
+            file: PathBuf::from("complex.rs"),
+            name: "complex_function".to_string(),
+            line: 50,
+        };
+        
+        // Verify function was added to the graph
+        // We can verify it exists by checking if it has no callers initially
+        let callers = extractor.call_graph.get_callers(&func_id);
+        assert_eq!(callers.len(), 0, "New function should have no callers");
+        
+        // Verify it's not marked as test or entry point (since name doesn't match patterns)
+        assert!(!extractor.call_graph.is_test_function(&func_id));
+        assert!(!extractor.call_graph.is_entry_point(&func_id));
+    }
 }
