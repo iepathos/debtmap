@@ -396,4 +396,274 @@ mod tests {
         // Module 0 affects all modules (0, 1, 2, 3, 4)
         assert_eq!(calculator.calculate_blast_radius("module_0"), 5);
     }
+
+    #[test]
+    fn test_gather_with_high_blast_radius() {
+        // Test gather() when module has blast radius > 10
+        let mut graph = DependencyGraph::new();
+
+        // Create a central module with many dependents
+        graph.add_module(Module {
+            name: "core".to_string(),
+            path: PathBuf::from("src/core"),
+            intrinsic_risk: 5.0,
+            functions: vector!["critical_function".to_string()],
+        });
+
+        // Add 12 modules that depend on core
+        for i in 0..12 {
+            graph.add_module(Module {
+                name: format!("dependent_{i}"),
+                path: PathBuf::from(format!("src/dep{i}")),
+                intrinsic_risk: 2.0,
+                functions: vector![format!("func_{i}")],
+            });
+            graph.add_dependency(format!("dependent_{i}"), "core".to_string(), 0.8);
+        }
+
+        let calculator = DependencyRiskCalculator::new(graph);
+        let provider = DependencyRiskProvider { calculator };
+
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("."),
+            file_path: PathBuf::from("src/core/lib.rs"),
+            function_name: "critical_function".to_string(),
+            line_range: (10, 50),
+        };
+
+        let context = provider.gather(&target).unwrap();
+
+        assert_eq!(context.provider, "dependency_risk");
+        assert_eq!(context.weight, 1.2);
+        assert_eq!(context.contribution, 1.5); // High blast radius contribution
+
+        match context.details {
+            ContextDetails::DependencyChain {
+                blast_radius,
+                dependents,
+                ..
+            } => {
+                assert!(blast_radius > 10);
+                assert_eq!(dependents.len(), 12);
+            }
+            _ => panic!("Expected DependencyChain details"),
+        }
+    }
+
+    #[test]
+    fn test_gather_with_medium_blast_radius() {
+        // Test gather() when module has blast radius between 6-10
+        let mut graph = DependencyGraph::new();
+
+        graph.add_module(Module {
+            name: "service".to_string(),
+            path: PathBuf::from("src/service"),
+            intrinsic_risk: 4.0,
+            functions: vector!["process".to_string()],
+        });
+
+        // Add 7 dependent modules
+        for i in 0..7 {
+            graph.add_module(Module {
+                name: format!("consumer_{i}"),
+                path: PathBuf::from(format!("src/consumer{i}")),
+                intrinsic_risk: 2.0,
+                functions: vector![format!("use_{i}")],
+            });
+            graph.add_dependency(format!("consumer_{i}"), "service".to_string(), 0.6);
+        }
+
+        let calculator = DependencyRiskCalculator::new(graph);
+        let provider = DependencyRiskProvider { calculator };
+
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("."),
+            file_path: PathBuf::from("src/service/mod.rs"),
+            function_name: "process".to_string(),
+            line_range: (5, 25),
+        };
+
+        let context = provider.gather(&target).unwrap();
+
+        assert_eq!(context.contribution, 1.0); // Medium blast radius contribution
+
+        match context.details {
+            ContextDetails::DependencyChain { blast_radius, .. } => {
+                assert!(blast_radius > 5);
+                assert!(blast_radius <= 10);
+            }
+            _ => panic!("Expected DependencyChain details"),
+        }
+    }
+
+    #[test]
+    fn test_gather_with_low_blast_radius() {
+        // Test gather() when module has blast radius between 3-5
+        let mut graph = DependencyGraph::new();
+
+        graph.add_module(Module {
+            name: "util".to_string(),
+            path: PathBuf::from("src/util"),
+            intrinsic_risk: 3.0,
+            functions: vector!["helper".to_string()],
+        });
+
+        // Add 3 dependent modules
+        for i in 0..3 {
+            graph.add_module(Module {
+                name: format!("user_{i}"),
+                path: PathBuf::from(format!("src/user{i}")),
+                intrinsic_risk: 2.0,
+                functions: vector![format!("call_{i}")],
+            });
+            graph.add_dependency(format!("user_{i}"), "util".to_string(), 0.5);
+        }
+
+        let calculator = DependencyRiskCalculator::new(graph);
+        let provider = DependencyRiskProvider { calculator };
+
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("."),
+            file_path: PathBuf::from("src/util/helpers.rs"),
+            function_name: "helper".to_string(),
+            line_range: (1, 10),
+        };
+
+        let context = provider.gather(&target).unwrap();
+
+        assert_eq!(context.contribution, 0.5); // Low blast radius contribution
+
+        match context.details {
+            ContextDetails::DependencyChain { blast_radius, .. } => {
+                assert!(blast_radius > 2);
+                assert!(blast_radius <= 5);
+            }
+            _ => panic!("Expected DependencyChain details"),
+        }
+    }
+
+    #[test]
+    fn test_gather_with_minimal_blast_radius() {
+        // Test gather() when module has blast radius <= 2
+        let mut graph = DependencyGraph::new();
+
+        graph.add_module(Module {
+            name: "leaf".to_string(),
+            path: PathBuf::from("src/leaf"),
+            intrinsic_risk: 2.0,
+            functions: vector!["simple".to_string()],
+        });
+
+        // Add just 1 dependent module
+        graph.add_module(Module {
+            name: "caller".to_string(),
+            path: PathBuf::from("src/caller"),
+            intrinsic_risk: 2.0,
+            functions: vector!["invoke".to_string()],
+        });
+        graph.add_dependency("caller".to_string(), "leaf".to_string(), 0.3);
+
+        let calculator = DependencyRiskCalculator::new(graph);
+        let provider = DependencyRiskProvider { calculator };
+
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("."),
+            file_path: PathBuf::from("src/leaf/simple.rs"),
+            function_name: "simple".to_string(),
+            line_range: (1, 5),
+        };
+
+        let context = provider.gather(&target).unwrap();
+
+        assert_eq!(context.contribution, 0.2); // Minimal blast radius contribution
+
+        match context.details {
+            ContextDetails::DependencyChain {
+                blast_radius,
+                dependents,
+                ..
+            } => {
+                assert!(blast_radius <= 2);
+                assert_eq!(dependents.len(), 1);
+            }
+            _ => panic!("Expected DependencyChain details"),
+        }
+    }
+
+    #[test]
+    fn test_gather_without_module() {
+        // Test gather() when function has no associated module
+        let graph = DependencyGraph::new();
+        let calculator = DependencyRiskCalculator::new(graph);
+        let provider = DependencyRiskProvider { calculator };
+
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("."),
+            file_path: PathBuf::from("src/unknown/file.rs"),
+            function_name: "orphan_function".to_string(),
+            line_range: (1, 10),
+        };
+
+        let context = provider.gather(&target).unwrap();
+
+        assert_eq!(context.provider, "dependency_risk");
+        assert_eq!(context.weight, 1.2);
+        assert_eq!(context.contribution, 0.2); // Default minimal contribution
+
+        match context.details {
+            ContextDetails::DependencyChain {
+                depth,
+                propagated_risk,
+                dependents,
+                blast_radius,
+            } => {
+                assert_eq!(depth, 0);
+                assert_eq!(propagated_risk, 0.0);
+                assert!(dependents.is_empty());
+                assert_eq!(blast_radius, 0);
+            }
+            _ => panic!("Expected DependencyChain details"),
+        }
+    }
+
+    #[test]
+    fn test_gather_with_module_no_dependencies() {
+        // Test gather() when module exists but has no dependencies
+        let mut graph = DependencyGraph::new();
+
+        graph.add_module(Module {
+            name: "isolated".to_string(),
+            path: PathBuf::from("src/isolated"),
+            intrinsic_risk: 3.0,
+            functions: vector!["standalone".to_string()],
+        });
+
+        let calculator = DependencyRiskCalculator::new(graph);
+        let provider = DependencyRiskProvider { calculator };
+
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("."),
+            file_path: PathBuf::from("src/isolated/mod.rs"),
+            function_name: "standalone".to_string(),
+            line_range: (10, 20),
+        };
+
+        let context = provider.gather(&target).unwrap();
+
+        assert_eq!(context.contribution, 0.2); // Minimal contribution (blast_radius = 1)
+
+        match context.details {
+            ContextDetails::DependencyChain {
+                blast_radius,
+                dependents,
+                propagated_risk,
+                ..
+            } => {
+                assert_eq!(blast_radius, 1); // Only affects itself
+                assert!(dependents.is_empty());
+                assert_eq!(propagated_risk, 3.0); // Intrinsic risk only
+            }
+            _ => panic!("Expected DependencyChain details"),
+        }
+    }
 }

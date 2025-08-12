@@ -312,4 +312,145 @@ mod tests {
         assert!(result.is_some());
         assert_eq!(result.unwrap().coverage_percentage, 100.0);
     }
+
+    #[test]
+    fn test_get_overall_coverage_empty() {
+        let lcov = LcovData::default();
+        assert_eq!(lcov.get_overall_coverage(), 0.0);
+    }
+
+    #[test]
+    fn test_get_overall_coverage_single_covered_function() {
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            Path::new("src/lib.rs").to_path_buf(),
+            vec![FunctionCoverage {
+                name: "test_func".to_string(),
+                start_line: 10,
+                execution_count: 5,
+                coverage_percentage: 100.0,
+            }],
+        );
+        assert_eq!(lcov.get_overall_coverage(), 100.0);
+    }
+
+    #[test]
+    fn test_get_overall_coverage_single_uncovered_function() {
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            Path::new("src/lib.rs").to_path_buf(),
+            vec![FunctionCoverage {
+                name: "test_func".to_string(),
+                start_line: 10,
+                execution_count: 0,
+                coverage_percentage: 0.0,
+            }],
+        );
+        assert_eq!(lcov.get_overall_coverage(), 0.0);
+    }
+
+    #[test]
+    fn test_get_overall_coverage_mixed_coverage() {
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            Path::new("src/main.rs").to_path_buf(),
+            vec![
+                FunctionCoverage {
+                    name: "main".to_string(),
+                    start_line: 10,
+                    execution_count: 1,
+                    coverage_percentage: 100.0,
+                },
+                FunctionCoverage {
+                    name: "helper".to_string(),
+                    start_line: 20,
+                    execution_count: 0,
+                    coverage_percentage: 0.0,
+                },
+            ],
+        );
+        lcov.functions.insert(
+            Path::new("src/lib.rs").to_path_buf(),
+            vec![
+                FunctionCoverage {
+                    name: "process".to_string(),
+                    start_line: 5,
+                    execution_count: 10,
+                    coverage_percentage: 100.0,
+                },
+                FunctionCoverage {
+                    name: "validate".to_string(),
+                    start_line: 15,
+                    execution_count: 0,
+                    coverage_percentage: 0.0,
+                },
+            ],
+        );
+        // 2 covered out of 4 total = 50%
+        assert_eq!(lcov.get_overall_coverage(), 50.0);
+    }
+
+    #[test]
+    fn test_get_overall_coverage_all_covered() {
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            Path::new("src/main.rs").to_path_buf(),
+            vec![
+                FunctionCoverage {
+                    name: "main".to_string(),
+                    start_line: 10,
+                    execution_count: 1,
+                    coverage_percentage: 100.0,
+                },
+                FunctionCoverage {
+                    name: "helper".to_string(),
+                    start_line: 20,
+                    execution_count: 5,
+                    coverage_percentage: 100.0,
+                },
+            ],
+        );
+        lcov.functions.insert(
+            Path::new("src/lib.rs").to_path_buf(),
+            vec![FunctionCoverage {
+                name: "process".to_string(),
+                start_line: 5,
+                execution_count: 10,
+                coverage_percentage: 100.0,
+            }],
+        );
+        assert_eq!(lcov.get_overall_coverage(), 100.0);
+    }
+
+    #[test]
+    fn test_get_overall_coverage_none_covered() {
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            Path::new("src/main.rs").to_path_buf(),
+            vec![
+                FunctionCoverage {
+                    name: "main".to_string(),
+                    start_line: 10,
+                    execution_count: 0,
+                    coverage_percentage: 0.0,
+                },
+                FunctionCoverage {
+                    name: "helper".to_string(),
+                    start_line: 20,
+                    execution_count: 0,
+                    coverage_percentage: 0.0,
+                },
+            ],
+        );
+        lcov.functions.insert(
+            Path::new("src/lib.rs").to_path_buf(),
+            vec![FunctionCoverage {
+                name: "process".to_string(),
+                start_line: 5,
+                execution_count: 0,
+                coverage_percentage: 0.0,
+            }],
+        );
+        assert_eq!(lcov.get_overall_coverage(), 0.0);
+    }
 }
