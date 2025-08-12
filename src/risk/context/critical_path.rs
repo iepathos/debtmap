@@ -414,4 +414,88 @@ mod tests {
         assert_eq!(callers.len(), 1);
         assert!(callers.contains(&"main".to_string()));
     }
+
+    #[test]
+    fn test_calculate_path_weight_main() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let entry = EntryPoint {
+            function_name: "main".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: EntryType::Main,
+            is_user_facing: true,
+        };
+
+        let weight = analyzer.calculate_path_weight(&entry);
+        assert_eq!(weight, 10.0);
+    }
+
+    #[test]
+    fn test_calculate_path_weight_api_endpoint() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let entry = EntryPoint {
+            function_name: "handle_request".to_string(),
+            file_path: PathBuf::from("src/api.rs"),
+            entry_type: EntryType::ApiEndpoint,
+            is_user_facing: true,
+        };
+
+        let weight = analyzer.calculate_path_weight(&entry);
+        assert_eq!(weight, 8.0);
+    }
+
+    #[test]
+    fn test_calculate_path_weight_cli_command() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let entry = EntryPoint {
+            function_name: "cmd_run".to_string(),
+            file_path: PathBuf::from("src/cli.rs"),
+            entry_type: EntryType::CliCommand,
+            is_user_facing: true,
+        };
+
+        let weight = analyzer.calculate_path_weight(&entry);
+        assert_eq!(weight, 7.0);
+    }
+
+    #[test]
+    fn test_calculate_path_weight_web_handler() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let entry = EntryPoint {
+            function_name: "handle_web".to_string(),
+            file_path: PathBuf::from("src/web.rs"),
+            entry_type: EntryType::WebHandler,
+            is_user_facing: true,
+        };
+
+        let weight = analyzer.calculate_path_weight(&entry);
+        assert_eq!(weight, 7.0);
+    }
+
+    #[test]
+    fn test_calculate_path_weight_event_handler() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let entry = EntryPoint {
+            function_name: "on_message".to_string(),
+            file_path: PathBuf::from("src/events.rs"),
+            entry_type: EntryType::EventHandler,
+            is_user_facing: false,
+        };
+
+        let weight = analyzer.calculate_path_weight(&entry);
+        assert_eq!(weight, 5.0);
+    }
+
+    #[test]
+    fn test_calculate_path_weight_test_entry() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let entry = EntryPoint {
+            function_name: "test_something".to_string(),
+            file_path: PathBuf::from("tests/test.rs"),
+            entry_type: EntryType::TestEntry,
+            is_user_facing: false,
+        };
+
+        let weight = analyzer.calculate_path_weight(&entry);
+        assert_eq!(weight, 2.0);
+    }
 }
