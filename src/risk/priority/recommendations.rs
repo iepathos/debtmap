@@ -489,4 +489,61 @@ mod tests {
         assert_eq!(RationaleBuilder::complexity_level(50), "Very complex");
         assert_eq!(RationaleBuilder::complexity_level(100), "Very complex");
     }
+
+    #[test]
+    fn test_effort_description_easy_win() {
+        // Test case for (1..=3, 1..=7) => " - easy win"
+        assert_eq!(RationaleBuilder::effort_description(1, 1), " - easy win");
+        assert_eq!(RationaleBuilder::effort_description(2, 5), " - easy win");
+        assert_eq!(RationaleBuilder::effort_description(3, 7), " - easy win");
+    }
+
+    #[test]
+    fn test_effort_description_quick_test() {
+        // Test case for (1..=5, 1..=10) => " - quick test"
+        // This matches when cyclomatic is 4-5 with cognitive 1-10
+        // or cyclomatic 1-3 with cognitive 8-10 (not already caught by easy win)
+        assert_eq!(RationaleBuilder::effort_description(4, 8), " - quick test");
+        assert_eq!(RationaleBuilder::effort_description(5, 10), " - quick test");
+        assert_eq!(RationaleBuilder::effort_description(1, 9), " - quick test");
+    }
+
+    #[test]
+    fn test_effort_description_moderate_effort() {
+        // Test case for (6..=10, _) => " - moderate effort"
+        assert_eq!(
+            RationaleBuilder::effort_description(6, 1),
+            " - moderate effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(8, 15),
+            " - moderate effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(10, 100),
+            " - moderate effort"
+        );
+    }
+
+    #[test]
+    fn test_effort_description_requires_effort() {
+        // Test case for _ => " - requires effort"
+        // This matches when cyclomatic > 10, or cyclomatic > 5 with cognitive > 10
+        assert_eq!(
+            RationaleBuilder::effort_description(11, 1),
+            " - requires effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(15, 20),
+            " - requires effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(5, 11),
+            " - requires effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(0, 0),
+            " - requires effort"
+        );
+    }
 }
