@@ -123,6 +123,7 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
    - Include brief description of the specification purpose
    - Reference the specification number in commit message
    - Ensure all related changes are included in single commit
+   - Do NOT include Claude Code attribution in commit message
 
 3. **Verify Commit**
    - Check that all modified files are included
