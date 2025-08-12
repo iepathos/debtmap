@@ -461,4 +461,32 @@ mod tests {
         let result = describe_coverage_status(&target);
         assert_eq!(result, "Well tested");
     }
+
+    #[test]
+    fn test_complexity_level_simple() {
+        assert_eq!(RationaleBuilder::complexity_level(0), "Simple");
+        assert_eq!(RationaleBuilder::complexity_level(3), "Simple");
+        assert_eq!(RationaleBuilder::complexity_level(7), "Simple");
+    }
+
+    #[test]
+    fn test_complexity_level_moderate() {
+        assert_eq!(RationaleBuilder::complexity_level(8), "Moderate");
+        assert_eq!(RationaleBuilder::complexity_level(12), "Moderate");
+        assert_eq!(RationaleBuilder::complexity_level(15), "Moderate");
+    }
+
+    #[test]
+    fn test_complexity_level_complex() {
+        assert_eq!(RationaleBuilder::complexity_level(16), "Complex");
+        assert_eq!(RationaleBuilder::complexity_level(23), "Complex");
+        assert_eq!(RationaleBuilder::complexity_level(30), "Complex");
+    }
+
+    #[test]
+    fn test_complexity_level_very_complex() {
+        assert_eq!(RationaleBuilder::complexity_level(31), "Very complex");
+        assert_eq!(RationaleBuilder::complexity_level(50), "Very complex");
+        assert_eq!(RationaleBuilder::complexity_level(100), "Very complex");
+    }
 }
