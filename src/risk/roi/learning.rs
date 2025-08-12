@@ -206,3 +206,92 @@ impl ROILearningSystem {
         serde_json::from_str(data)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_outcome(predicted_effort: f64, actual_effort: f64) -> ROIOutcome {
+        ROIOutcome {
+            prediction: ROIPrediction {
+                effort: predicted_effort,
+                risk_reduction: 0.5,
+                roi: 1.0,
+                target_id: "test".to_string(),
+            },
+            actual: ROIActual {
+                effort: actual_effort,
+                risk_reduction: 0.5,
+                test_cases_written: 5,
+                coverage_achieved: 0.8,
+            },
+            timestamp: Utc::now(),
+            context: OutcomeContext {
+                module_type: "Core".to_string(),
+                complexity_level: "Medium".to_string(),
+                initial_coverage: 0.0,
+                dependencies_count: 2,
+            },
+        }
+    }
+
+    #[test]
+    fn test_calculate_adjustment_empty_outcomes() {
+        let system = ROILearningSystem::new();
+        let outcomes: Vec<&ROIOutcome> = vec![];
+
+        let adjustment = system.calculate_adjustment(&outcomes);
+
+        assert_eq!(adjustment, 1.0, "Empty outcomes should return 1.0");
+    }
+
+    #[test]
+    fn test_calculate_adjustment_normal_predictions() {
+        let system = ROILearningSystem::new();
+        let outcome1 = create_test_outcome(10.0, 12.0); // 1.2 ratio
+        let outcome2 = create_test_outcome(5.0, 4.0); // 0.8 ratio
+        let outcome3 = create_test_outcome(8.0, 8.0); // 1.0 ratio
+        let outcomes = vec![&outcome1, &outcome2, &outcome3];
+
+        let adjustment = system.calculate_adjustment(&outcomes);
+
+        // Average: (1.2 + 0.8 + 1.0) / 3 = 1.0
+        assert!(
+            (adjustment - 1.0).abs() < 0.01,
+            "Should calculate average ratio"
+        );
+    }
+
+    #[test]
+    fn test_calculate_adjustment_zero_prediction_effort() {
+        let system = ROILearningSystem::new();
+        let outcome1 = create_test_outcome(0.0, 5.0); // Should use 1.0 for ratio
+        let outcome2 = create_test_outcome(10.0, 15.0); // 1.5 ratio
+        let outcomes = vec![&outcome1, &outcome2];
+
+        let adjustment = system.calculate_adjustment(&outcomes);
+
+        // Average: (1.0 + 1.5) / 2 = 1.25
+        assert!(
+            (adjustment - 1.25).abs() < 0.01,
+            "Should handle zero prediction effort"
+        );
+    }
+
+    #[test]
+    fn test_calculate_adjustment_clamping() {
+        let system = ROILearningSystem::new();
+
+        // Test upper bound clamping
+        let outcome_high = create_test_outcome(1.0, 10.0); // 10.0 ratio
+        let outcomes_high = vec![&outcome_high];
+        let adjustment_high = system.calculate_adjustment(&outcomes_high);
+        assert_eq!(adjustment_high, 2.0, "Should clamp to maximum of 2.0");
+
+        // Test lower bound clamping
+        let outcome_low = create_test_outcome(10.0, 1.0); // 0.1 ratio
+        let outcomes_low = vec![&outcome_low];
+        let adjustment_low = system.calculate_adjustment(&outcomes_low);
+        assert_eq!(adjustment_low, 0.5, "Should clamp to minimum of 0.5");
+    }
+}
