@@ -203,4 +203,68 @@ mod tests {
         let unknown_deps = get_base_dependents(&ModuleType::Unknown);
         assert_eq!(unknown_deps, Vec::<String>::new());
     }
+
+    #[test]
+    fn test_add_path_specific_dependencies_analyzers() {
+        let mut dependencies = Vec::new();
+        let mut dependents = Vec::new();
+
+        add_path_specific_dependencies("src/analyzers/rust.rs", &mut dependencies, &mut dependents);
+
+        assert!(dependencies.contains(&"syntax".to_string()));
+        assert!(dependents.contains(&"main".to_string()));
+    }
+
+    #[test]
+    fn test_add_path_specific_dependencies_risk() {
+        let mut dependencies = Vec::new();
+        let mut dependents = Vec::new();
+
+        add_path_specific_dependencies("src/risk/priority.rs", &mut dependencies, &mut dependents);
+
+        assert!(dependencies.contains(&"complexity".to_string()));
+        assert!(dependencies.contains(&"debt".to_string()));
+        assert!(dependents.contains(&"reporting".to_string()));
+    }
+
+    #[test]
+    fn test_add_path_specific_dependencies_complexity() {
+        let mut dependencies = Vec::new();
+        let mut dependents = Vec::new();
+
+        add_path_specific_dependencies(
+            "src/complexity/metrics.rs",
+            &mut dependencies,
+            &mut dependents,
+        );
+
+        assert!(dependencies.contains(&"ast".to_string()));
+        assert!(dependents.contains(&"risk".to_string()));
+        assert!(dependents.contains(&"reporting".to_string()));
+    }
+
+    #[test]
+    fn test_add_path_specific_dependencies_output_and_writers() {
+        // Test "output" path
+        let mut dependencies = Vec::new();
+        let mut dependents = Vec::new();
+
+        add_path_specific_dependencies("src/io/output.rs", &mut dependencies, &mut dependents);
+
+        assert!(dependencies.contains(&"models".to_string()));
+        assert!(dependents.contains(&"cli".to_string()));
+
+        // Test "writers" path
+        dependencies.clear();
+        dependents.clear();
+
+        add_path_specific_dependencies(
+            "src/io/writers/json.rs",
+            &mut dependencies,
+            &mut dependents,
+        );
+
+        assert!(dependencies.contains(&"models".to_string()));
+        assert!(dependents.contains(&"cli".to_string()));
+    }
 }
