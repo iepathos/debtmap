@@ -592,106 +592,105 @@ fn generate_recommendation(
     }
 }
 
-fn calculate_expected_impact(
-    _func: &FunctionMetrics,
-    debt_type: &DebtType,
-    score: &UnifiedScore,
-) -> ImpactMetrics {
+/// Determines if a function is considered complex based on its metrics
+fn is_function_complex(cyclomatic: u32, cognitive: u32) -> bool {
+    cyclomatic > 10 || cognitive > 15
+}
+
+/// Calculates the risk reduction factor based on debt type
+fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
+    match debt_type {
+        DebtType::TestingGap { .. } => 0.42,
+        DebtType::ComplexityHotspot { .. } => 0.35,
+        DebtType::DeadCode { .. } => 0.3,
+        DebtType::Duplication { .. } => 0.25,
+        DebtType::Risk { .. } => 0.2,
+        DebtType::TestComplexityHotspot { .. } => 0.15,
+        DebtType::Orchestration { .. }
+        | DebtType::TestTodo { .. }
+        | DebtType::TestDuplication { .. } => 0.1,
+    }
+}
+
+/// Calculates coverage improvement potential for testing gaps
+fn calculate_coverage_improvement(coverage: f64, is_complex: bool) -> f64 {
+    let potential = 1.0 - coverage;
+    if is_complex {
+        potential * 50.0 // 50% of potential due to complexity
+    } else {
+        potential * 100.0 // Full coverage potential for simple functions
+    }
+}
+
+/// Calculates lines that could be reduced through refactoring
+fn calculate_lines_reduction(debt_type: &DebtType) -> u32 {
     match debt_type {
         DebtType::DeadCode {
             cyclomatic,
             cognitive,
             ..
-        } => ImpactMetrics {
-            coverage_improvement: 0.0, // Dead code doesn't affect coverage
-            lines_reduction: *cyclomatic + *cognitive, // Estimate based on complexity
-            complexity_reduction: (*cyclomatic + *cognitive) as f64 * 0.5, // Removing reduces overall complexity
-            risk_reduction: score.final_score * 0.3, // Moderate risk reduction from cleanup
-        },
+        } => *cyclomatic + *cognitive,
+        DebtType::Duplication {
+            instances,
+            total_lines,
+        }
+        | DebtType::TestDuplication {
+            instances,
+            total_lines,
+            ..
+        } => *total_lines - (*total_lines / instances),
+        _ => 0,
+    }
+}
+
+/// Calculates complexity reduction potential based on debt type
+fn calculate_complexity_reduction(debt_type: &DebtType, is_complex: bool) -> f64 {
+    match debt_type {
+        DebtType::DeadCode {
+            cyclomatic,
+            cognitive,
+            ..
+        } => (*cyclomatic + *cognitive) as f64 * 0.5,
+        DebtType::TestingGap { cyclomatic, .. } if is_complex => *cyclomatic as f64 * 0.3,
+        DebtType::ComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.5,
+        DebtType::TestComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.3,
+        _ => 0.0,
+    }
+}
+
+fn calculate_expected_impact(
+    _func: &FunctionMetrics,
+    debt_type: &DebtType,
+    score: &UnifiedScore,
+) -> ImpactMetrics {
+    let risk_factor = calculate_risk_factor(debt_type);
+    let risk_reduction = score.final_score * risk_factor;
+
+    let (coverage_improvement, lines_reduction, complexity_reduction) = match debt_type {
         DebtType::TestingGap {
             coverage,
             cyclomatic,
             cognitive,
         } => {
-            // For high complexity functions, the impact includes both testing and refactoring benefits
-            // Consider both cyclomatic and cognitive complexity
-            // A function is complex if either metric exceeds its threshold
-            let is_complex = *cyclomatic > 10 || *cognitive > 15;
-
-            ImpactMetrics {
-                // Show the actual coverage gain for this function/module
-                // High complexity functions get less coverage benefit (need refactoring first)
-                coverage_improvement: if is_complex {
-                    (1.0 - coverage) * 50.0 // 50% of potential due to complexity
-                } else {
-                    (1.0 - coverage) * 100.0 // Full coverage potential for simple functions
-                },
-                lines_reduction: 0,
-                complexity_reduction: if is_complex {
-                    *cyclomatic as f64 * 0.3
-                } else {
-                    0.0
-                },
-                risk_reduction: score.final_score * 0.42,
-            }
+            let is_complex = is_function_complex(*cyclomatic, *cognitive);
+            (
+                calculate_coverage_improvement(*coverage, is_complex),
+                0,
+                calculate_complexity_reduction(debt_type, is_complex),
+            )
         }
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            cognitive: _,
-        } => ImpactMetrics {
-            coverage_improvement: 0.0,
-            lines_reduction: 0,
-            complexity_reduction: (*cyclomatic as f64 * 0.5),
-            risk_reduction: score.final_score * 0.35,
-        },
-        DebtType::Duplication {
-            instances,
-            total_lines,
-        } => ImpactMetrics {
-            coverage_improvement: 0.0,
-            lines_reduction: *total_lines - (*total_lines / instances),
-            complexity_reduction: 0.0,
-            risk_reduction: score.final_score * 0.25,
-        },
-        DebtType::Orchestration { .. } => ImpactMetrics {
-            coverage_improvement: 0.0,
-            lines_reduction: 0,
-            complexity_reduction: 0.0,
-            risk_reduction: score.final_score * 0.1, // Low priority for orchestration
-        },
-        DebtType::Risk { .. } => ImpactMetrics {
-            coverage_improvement: 0.0,
-            lines_reduction: 0,
-            complexity_reduction: 0.0,
-            risk_reduction: score.final_score * 0.2,
-        },
-        // Test-specific debt types have lower impact on overall metrics
-        DebtType::TestComplexityHotspot {
-            cyclomatic,
-            cognitive: _,
-            threshold: _,
-        } => ImpactMetrics {
-            coverage_improvement: 0.0, // Tests don't improve coverage
-            lines_reduction: 0,
-            complexity_reduction: (*cyclomatic as f64 * 0.3),
-            risk_reduction: score.final_score * 0.15, // Lower risk impact for tests
-        },
-        DebtType::TestTodo { .. } => ImpactMetrics {
-            coverage_improvement: 0.0,
-            lines_reduction: 0,
-            complexity_reduction: 0.0,
-            risk_reduction: score.final_score * 0.1,
-        },
-        DebtType::TestDuplication {
-            instances,
-            total_lines,
-            similarity: _,
-        } => ImpactMetrics {
-            coverage_improvement: 0.0,
-            lines_reduction: *total_lines - (*total_lines / instances),
-            complexity_reduction: 0.0,
-            risk_reduction: score.final_score * 0.1,
-        },
+        _ => (
+            0.0,
+            calculate_lines_reduction(debt_type),
+            calculate_complexity_reduction(debt_type, false),
+        ),
+    };
+
+    ImpactMetrics {
+        coverage_improvement,
+        lines_reduction,
+        complexity_reduction,
+        risk_reduction,
     }
 }
 
@@ -1104,5 +1103,192 @@ mod tests {
             "Create parameterized tests for similar test cases"
         );
         assert_eq!(steps[2], "Use test fixtures for shared setup");
+    }
+
+    #[test]
+    fn test_is_function_complex() {
+        // Not complex - both metrics below thresholds
+        assert!(!is_function_complex(5, 10));
+        assert!(!is_function_complex(10, 15));
+
+        // Complex - cyclomatic exceeds threshold
+        assert!(is_function_complex(11, 10));
+        assert!(is_function_complex(15, 5));
+
+        // Complex - cognitive exceeds threshold
+        assert!(is_function_complex(5, 16));
+        assert!(is_function_complex(10, 20));
+
+        // Complex - both exceed thresholds
+        assert!(is_function_complex(11, 16));
+        assert!(is_function_complex(20, 25));
+    }
+
+    #[test]
+    fn test_calculate_risk_factor() {
+        // Test each debt type returns expected risk factor
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.5,
+            cyclomatic: 5,
+            cognitive: 8,
+        };
+        assert_eq!(calculate_risk_factor(&testing_gap), 0.42);
+
+        let complexity = DebtType::ComplexityHotspot {
+            cyclomatic: 15,
+            cognitive: 20,
+        };
+        assert_eq!(calculate_risk_factor(&complexity), 0.35);
+
+        let dead_code = DebtType::DeadCode {
+            cyclomatic: 5,
+            cognitive: 7,
+            visibility: FunctionVisibility::Private,
+            usage_hints: vec![],
+        };
+        assert_eq!(calculate_risk_factor(&dead_code), 0.3);
+
+        let duplication = DebtType::Duplication {
+            instances: 3,
+            total_lines: 90,
+        };
+        assert_eq!(calculate_risk_factor(&duplication), 0.25);
+
+        let risk = DebtType::Risk {
+            risk_score: 2.0,
+            factors: vec!["test".to_string()],
+        };
+        assert_eq!(calculate_risk_factor(&risk), 0.2);
+
+        let test_complexity = DebtType::TestComplexityHotspot {
+            cyclomatic: 12,
+            cognitive: 18,
+            threshold: 10,
+        };
+        assert_eq!(calculate_risk_factor(&test_complexity), 0.15);
+
+        let orchestration = DebtType::Orchestration {
+            delegates_to: vec!["func1".to_string(), "func2".to_string()],
+        };
+        assert_eq!(calculate_risk_factor(&orchestration), 0.1);
+    }
+
+    #[test]
+    fn test_calculate_coverage_improvement() {
+        // Simple function with 0% coverage
+        assert_eq!(calculate_coverage_improvement(0.0, false), 100.0);
+
+        // Simple function with 60% coverage
+        assert_eq!(calculate_coverage_improvement(0.6, false), 40.0);
+
+        // Complex function with 0% coverage (reduced potential)
+        assert_eq!(calculate_coverage_improvement(0.0, true), 50.0);
+
+        // Complex function with 60% coverage (reduced potential)
+        assert_eq!(calculate_coverage_improvement(0.6, true), 20.0);
+
+        // Full coverage - no improvement possible
+        assert_eq!(calculate_coverage_improvement(1.0, false), 0.0);
+        assert_eq!(calculate_coverage_improvement(1.0, true), 0.0);
+    }
+
+    #[test]
+    fn test_calculate_lines_reduction() {
+        // Dead code reduction
+        let dead_code = DebtType::DeadCode {
+            cyclomatic: 5,
+            cognitive: 7,
+            visibility: FunctionVisibility::Private,
+            usage_hints: vec![],
+        };
+        assert_eq!(calculate_lines_reduction(&dead_code), 12);
+
+        // Duplication reduction
+        let duplication = DebtType::Duplication {
+            instances: 3,
+            total_lines: 90,
+        };
+        assert_eq!(calculate_lines_reduction(&duplication), 60);
+
+        // Test duplication reduction
+        let test_dup = DebtType::TestDuplication {
+            instances: 2,
+            total_lines: 50,
+            similarity: 0.9,
+        };
+        assert_eq!(calculate_lines_reduction(&test_dup), 25);
+
+        // No reduction for other types
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.5,
+            cyclomatic: 5,
+            cognitive: 8,
+        };
+        assert_eq!(calculate_lines_reduction(&testing_gap), 0);
+    }
+
+    #[test]
+    fn test_calculate_complexity_reduction() {
+        // Dead code complexity reduction
+        let dead_code = DebtType::DeadCode {
+            cyclomatic: 10,
+            cognitive: 14,
+            visibility: FunctionVisibility::Private,
+            usage_hints: vec![],
+        };
+        assert_eq!(calculate_complexity_reduction(&dead_code, false), 12.0);
+
+        // Testing gap - complex function
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.3,
+            cyclomatic: 15,
+            cognitive: 20,
+        };
+        assert_eq!(calculate_complexity_reduction(&testing_gap, true), 4.5);
+
+        // Testing gap - simple function
+        assert_eq!(calculate_complexity_reduction(&testing_gap, false), 0.0);
+
+        // Complexity hotspot
+        let complexity = DebtType::ComplexityHotspot {
+            cyclomatic: 20,
+            cognitive: 25,
+        };
+        assert_eq!(calculate_complexity_reduction(&complexity, false), 10.0);
+
+        // Test complexity hotspot
+        let test_complexity = DebtType::TestComplexityHotspot {
+            cyclomatic: 12,
+            cognitive: 16,
+            threshold: 10,
+        };
+        assert!((calculate_complexity_reduction(&test_complexity, false) - 3.6).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_calculate_expected_impact_integration() {
+        // Test the main function with various debt types
+        let func = create_test_metrics();
+
+        // Testing gap with complex function
+        let testing_gap = DebtType::TestingGap {
+            coverage: 0.2,
+            cyclomatic: 12,
+            cognitive: 18,
+        };
+        let score = UnifiedScore {
+            complexity_factor: 5.0,
+            coverage_factor: 6.0,
+            roi_factor: 4.0,
+            semantic_factor: 3.0,
+            role_multiplier: 1.0,
+            final_score: 7.5,
+        };
+
+        let impact = calculate_expected_impact(&func, &testing_gap, &score);
+        assert_eq!(impact.coverage_improvement, 40.0); // (1-0.2) * 50 for complex
+        assert_eq!(impact.lines_reduction, 0);
+        assert!((impact.complexity_reduction - 3.6).abs() < 0.001); // 12 * 0.3
+        assert_eq!(impact.risk_reduction, 3.15); // 7.5 * 0.42
     }
 }
