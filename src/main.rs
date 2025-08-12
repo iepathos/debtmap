@@ -253,6 +253,65 @@ fn build_technical_debt_report(
     analysis_utils::build_technical_debt_report(all_debt_items, duplications)
 }
 
+/// Pure function: Create JSON output structure
+fn create_json_output(
+    results: &AnalysisResults,
+    risk_insights: &Option<risk::RiskInsight>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "analysis": results,
+        "risk_insights": risk_insights,
+    })
+}
+
+/// Pure function: Format results to string based on format type
+fn format_results_to_string(
+    results: &AnalysisResults,
+    risk_insights: &Option<risk::RiskInsight>,
+    format: io::output::OutputFormat,
+) -> Result<String> {
+    match format {
+        io::output::OutputFormat::Json => {
+            let output = create_json_output(results, risk_insights);
+            Ok(serde_json::to_string_pretty(&output)?)
+        }
+        _ => {
+            let mut buffer = Vec::new();
+            write_formatted_output(&mut buffer, results, risk_insights, format)?;
+            Ok(String::from_utf8_lossy(&buffer).into_owned())
+        }
+    }
+}
+
+/// Helper function to write formatted output to a buffer
+fn write_formatted_output(
+    buffer: &mut Vec<u8>,
+    results: &AnalysisResults,
+    risk_insights: &Option<risk::RiskInsight>,
+    format: io::output::OutputFormat,
+) -> Result<()> {
+    let mut writer = create_file_writer(buffer, format);
+    writer.write_results(results)?;
+    if let Some(insights) = risk_insights {
+        writer.write_risk_insights(insights)?;
+    }
+    Ok(())
+}
+
+/// Pure function: Create appropriate writer for file output
+fn create_file_writer<'a>(
+    buffer: &'a mut Vec<u8>,
+    format: io::output::OutputFormat,
+) -> Box<dyn io::output::OutputWriter + 'a> {
+    match format {
+        io::output::OutputFormat::Markdown | io::output::OutputFormat::Terminal => {
+            Box::new(io::writers::MarkdownWriter::new(buffer))
+        }
+        _ => Box::new(io::writers::MarkdownWriter::new(buffer)), // Default fallback
+    }
+}
+
+/// Simplified I/O orchestrator function
 fn output_results_with_risk(
     results: AnalysisResults,
     risk_insights: Option<risk::RiskInsight>,
@@ -261,44 +320,10 @@ fn output_results_with_risk(
 ) -> Result<()> {
     match output_file {
         Some(path) => {
-            // When output file is specified, write only to file
-            match format {
-                io::output::OutputFormat::Json => {
-                    // Create a combined JSON structure
-                    let output = serde_json::json!({
-                        "analysis": results,
-                        "risk_insights": risk_insights,
-                    });
-                    let json_str = serde_json::to_string_pretty(&output)?;
-                    io::write_file(&path, &json_str)?;
-                }
-                _ => {
-                    // For non-JSON formats, use the existing writer approach but to a file
-                    let mut buffer = Vec::new();
-                    {
-                        let mut writer = match format {
-                            io::output::OutputFormat::Markdown => {
-                                Box::new(io::writers::MarkdownWriter::new(&mut buffer))
-                                    as Box<dyn io::output::OutputWriter>
-                            }
-                            io::output::OutputFormat::Terminal => {
-                                // Terminal format to file doesn't make much sense, but handle it
-                                Box::new(io::writers::MarkdownWriter::new(&mut buffer))
-                                    as Box<dyn io::output::OutputWriter>
-                            }
-                            _ => unreachable!(),
-                        };
-                        writer.write_results(&results)?;
-                        if let Some(insights) = risk_insights {
-                            writer.write_risk_insights(&insights)?;
-                        }
-                    }
-                    io::write_file(&path, &String::from_utf8_lossy(&buffer))?;
-                }
-            }
+            let content = format_results_to_string(&results, &risk_insights, format)?;
+            io::write_file(&path, &content)?;
         }
         None => {
-            // When no output file, write to stdout
             let mut writer = io::output::create_writer(format);
             writer.write_results(&results)?;
             if let Some(insights) = risk_insights {
@@ -306,7 +331,6 @@ fn output_results_with_risk(
             }
         }
     }
-
     Ok(())
 }
 
@@ -1975,5 +1999,155 @@ mod tests {
         };
 
         assert!(!validate_with_risk(&results, &insights));
+    }
+
+    #[test]
+    fn test_create_json_output() {
+        use crate::core::{
+            ComplexityReport, ComplexitySummary, DependencyReport, TechnicalDebtReport,
+        };
+        use chrono::Utc;
+        use std::path::PathBuf;
+
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 5.0,
+                    max_complexity: 10,
+                    high_complexity_count: 2,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let risk_insights = None;
+        let output = create_json_output(&results, &risk_insights);
+
+        assert!(output.is_object());
+        assert!(output["analysis"].is_object());
+        assert!(output["risk_insights"].is_null());
+    }
+
+    #[test]
+    fn test_create_json_output_with_risk() {
+        use crate::core::{
+            ComplexityReport, ComplexitySummary, DependencyReport, TechnicalDebtReport,
+        };
+        use crate::risk::{RiskDistribution, RiskInsight};
+        use chrono::Utc;
+        use im::Vector;
+        use std::path::PathBuf;
+
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 5.0,
+                    max_complexity: 10,
+                    high_complexity_count: 2,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let risk_insights = Some(RiskInsight {
+            top_risks: Vector::new(),
+            risk_reduction_opportunities: Vector::new(),
+            codebase_risk_score: 5.0,
+            complexity_coverage_correlation: None,
+            risk_distribution: RiskDistribution {
+                critical_count: 0,
+                high_count: 1,
+                medium_count: 2,
+                low_count: 3,
+                well_tested_count: 4,
+                total_functions: 10,
+            },
+        });
+
+        let output = create_json_output(&results, &risk_insights);
+
+        assert!(output.is_object());
+        assert!(output["analysis"].is_object());
+        assert!(output["risk_insights"].is_object());
+    }
+
+    #[test]
+    fn test_format_results_to_string_json() {
+        use crate::core::{
+            ComplexityReport, ComplexitySummary, DependencyReport, TechnicalDebtReport,
+        };
+        use chrono::Utc;
+        use std::path::PathBuf;
+
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 5.0,
+                    max_complexity: 10,
+                    high_complexity_count: 2,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let risk_insights = None;
+        let result =
+            format_results_to_string(&results, &risk_insights, io::output::OutputFormat::Json);
+
+        assert!(result.is_ok());
+        let json_str = result.unwrap();
+
+        // Verify it's valid JSON
+        let parsed: Result<serde_json::Value, _> = serde_json::from_str(&json_str);
+        assert!(parsed.is_ok());
+    }
+
+    #[test]
+    fn test_create_file_writer() {
+        let mut buffer = Vec::new();
+        let _writer = create_file_writer(&mut buffer, io::output::OutputFormat::Markdown);
+        // Just verify it doesn't panic
     }
 }
