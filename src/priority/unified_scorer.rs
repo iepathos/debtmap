@@ -399,71 +399,100 @@ fn generate_testing_gap_steps(is_complex: bool) -> Vec<String> {
     }
 }
 
-fn generate_recommendation(
-    func: &FunctionMetrics,
-    debt_type: &DebtType,
+/// Generate recommendation for testing gap debt type
+fn generate_testing_gap_recommendation(
+    coverage: f64,
+    cyclomatic: u32,
+    cognitive: u32,
     role: FunctionRole,
-    _score: &UnifiedScore,
-) -> ActionableRecommendation {
-    let (primary_action, rationale, steps) = match debt_type {
-        DebtType::DeadCode { visibility, usage_hints, cyclomatic, cognitive } => {
-            let (action, rationale) = generate_dead_code_action(func, visibility, &func.name, cyclomatic, cognitive);
-            let mut steps = generate_dead_code_steps(visibility);
+) -> (String, String, Vec<String>) {
+    let is_complex = cyclomatic > 10 || cognitive > 15;
+    let coverage_pct = (coverage * 100.0) as i32;
+    let role_str = format_role_description(role);
 
-            // Add usage hints to the steps
-            for hint in usage_hints {
-                steps.push(format!("Note: {hint}"));
-            }
+    if is_complex {
+        (
+            format!("Extract pure functions, add property tests, then refactor (cyclo={cyclomatic} to <10, cog={cognitive} to <15)"),
+            format!("Complex {role_str} (cyclo={cyclomatic}, cog={cognitive}) with {coverage_pct}% coverage - extract pure logic first"),
+            generate_testing_gap_steps(true),
+        )
+    } else {
+        let role_display = match role {
+            FunctionRole::PureLogic => "Business logic",
+            FunctionRole::Orchestrator => "Orchestration",
+            FunctionRole::IOWrapper => "I/O wrapper",
+            FunctionRole::EntryPoint => "Entry point",
+            FunctionRole::Unknown => "Function",
+        };
+        (
+            format!("Add {} unit tests for full coverage", cyclomatic.max(2)),
+            format!("{role_display} with {coverage_pct}% coverage, manageable complexity (cyclo={cyclomatic}, cog={cognitive})"),
+            generate_testing_gap_steps(false),
+        )
+    }
+}
 
-            (action, rationale, steps)
-        }
-        DebtType::TestingGap {
-            coverage,
+/// Generate recommendation for dead code debt type
+fn generate_dead_code_recommendation(
+    func: &FunctionMetrics,
+    visibility: &FunctionVisibility,
+    usage_hints: &[String],
+    cyclomatic: u32,
+    cognitive: u32,
+) -> (String, String, Vec<String>) {
+    let (action, rationale) =
+        generate_dead_code_action(func, visibility, &func.name, &cyclomatic, &cognitive);
+    let mut steps = generate_dead_code_steps(visibility);
+
+    // Add usage hints to the steps
+    for hint in usage_hints {
+        steps.push(format!("Note: {hint}"));
+    }
+
+    (action, rationale, steps)
+}
+
+/// Generate recommendation for test-specific debt types
+fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
+    match debt_type {
+        DebtType::TestComplexityHotspot {
             cyclomatic,
             cognitive,
-        } => {
-            let is_complex = *cyclomatic > 10 || *cognitive > 15;
-            let coverage_pct = (coverage * 100.0) as i32;
-            let role_str = format_role_description(role);
-
-            if is_complex {
-                (
-                    format!("Extract pure functions, add property tests, then refactor (cyclo={cyclomatic} to <10, cog={cognitive} to <15)"),
-                    format!("Complex {role_str} (cyclo={cyclomatic}, cog={cognitive}) with {coverage_pct}% coverage - extract pure logic first"),
-                    generate_testing_gap_steps(true),
-                )
-            } else {
-                let role_display = match role {
-                    FunctionRole::PureLogic => "Business logic",
-                    FunctionRole::Orchestrator => "Orchestration",
-                    FunctionRole::IOWrapper => "I/O wrapper",
-                    FunctionRole::EntryPoint => "Entry point",
-                    FunctionRole::Unknown => "Function",
-                };
-                (
-                    format!("Add {} unit tests for full coverage", cyclomatic.max(&2)),
-                    format!("{role_display} with {coverage_pct}% coverage, manageable complexity (cyclo={cyclomatic}, cog={cognitive})"),
-                    generate_testing_gap_steps(false),
-                )
-            }
-        }
-        DebtType::ComplexityHotspot {
-            cyclomatic,
-            cognitive,
+            threshold
         } => (
-            format!(
-                "Extract {} sub-functions to reduce complexity",
-                cyclomatic / 5 + 1
-            ),
-            format!(
-                "Highest complexity function (CC:{cyclomatic}, Cog:{cognitive}), affects all dependent calculations"
-            ),
+            format!("Simplify test - complexity {} exceeds test threshold {}", cyclomatic.max(cognitive), threshold),
+            format!("Test has high complexity (cyclo={cyclomatic}, cognitive={cognitive}) - consider splitting into smaller tests"),
             vec![
-                "Identify logical groups in the function".to_string(),
-                "Extract each group into a named function".to_string(),
-                "Add unit tests for extracted functions".to_string(),
+                "Break complex test into multiple smaller tests".to_string(),
+                "Extract test setup into helper functions".to_string(),
+                "Use parameterized tests for similar test cases".to_string(),
             ],
         ),
+        DebtType::TestTodo { priority: _, reason } => (
+            "Complete test TODO".to_string(),
+            format!("Test contains TODO: {}", reason.as_ref().unwrap_or(&"No reason specified".to_string())),
+            vec![
+                "Address the TODO comment".to_string(),
+                "Implement missing test logic".to_string(),
+                "Remove TODO once completed".to_string(),
+            ],
+        ),
+        DebtType::TestDuplication { instances, total_lines, similarity: _ } => (
+            format!("Remove test duplication - {instances} similar test blocks"),
+            format!("{instances} duplicated test blocks found across {total_lines} lines"),
+            vec![
+                "Extract common test logic into helper functions".to_string(),
+                "Create parameterized tests for similar test cases".to_string(),
+                "Use test fixtures for shared setup".to_string(),
+            ],
+        ),
+        _ => unreachable!("Not a test debt type"),
+    }
+}
+
+/// Generate recommendation for infrastructure debt types (orchestration, duplication, risk)
+fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
+    match debt_type {
         DebtType::Orchestration { delegates_to } => (
             "Consider integration test instead of unit tests".to_string(),
             format!(
@@ -501,38 +530,58 @@ fn generate_recommendation(
                 "Update documentation".to_string(),
             ],
         ),
-        // Test-specific debt types
-        DebtType::TestComplexityHotspot {
+        DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-            threshold
         } => (
-            format!("Simplify test - complexity {} exceeds test threshold {}", cyclomatic.max(cognitive), threshold),
-            format!("Test has high complexity (cyclo={cyclomatic}, cognitive={cognitive}) - consider splitting into smaller tests"),
+            format!(
+                "Extract {} sub-functions to reduce complexity",
+                cyclomatic / 5 + 1
+            ),
+            format!(
+                "Highest complexity function (CC:{cyclomatic}, Cog:{cognitive}), affects all dependent calculations"
+            ),
             vec![
-                "Break complex test into multiple smaller tests".to_string(),
-                "Extract test setup into helper functions".to_string(),
-                "Use parameterized tests for similar test cases".to_string(),
+                "Identify logical groups in the function".to_string(),
+                "Extract each group into a named function".to_string(),
+                "Add unit tests for extracted functions".to_string(),
             ],
         ),
-        DebtType::TestTodo { priority: _, reason } => (
-            "Complete test TODO".to_string(),
-            format!("Test contains TODO: {}", reason.as_ref().unwrap_or(&"No reason specified".to_string())),
-            vec![
-                "Address the TODO comment".to_string(),
-                "Implement missing test logic".to_string(),
-                "Remove TODO once completed".to_string(),
-            ],
+        _ => unreachable!("Not an infrastructure debt type"),
+    }
+}
+
+fn generate_recommendation(
+    func: &FunctionMetrics,
+    debt_type: &DebtType,
+    role: FunctionRole,
+    _score: &UnifiedScore,
+) -> ActionableRecommendation {
+    let (primary_action, rationale, steps) = match debt_type {
+        DebtType::DeadCode {
+            visibility,
+            usage_hints,
+            cyclomatic,
+            cognitive,
+        } => generate_dead_code_recommendation(
+            func,
+            visibility,
+            usage_hints,
+            *cyclomatic,
+            *cognitive,
         ),
-        DebtType::TestDuplication { instances, total_lines, similarity: _ } => (
-            format!("Remove test duplication - {instances} similar test blocks"),
-            format!("{instances} duplicated test blocks found across {total_lines} lines"),
-            vec![
-                "Extract common test logic into helper functions".to_string(),
-                "Create parameterized tests for similar test cases".to_string(),
-                "Use test fixtures for shared setup".to_string(),
-            ],
-        ),
+        DebtType::TestingGap {
+            coverage,
+            cyclomatic,
+            cognitive,
+        } => generate_testing_gap_recommendation(*coverage, *cyclomatic, *cognitive, role),
+        DebtType::ComplexityHotspot { .. }
+        | DebtType::Orchestration { .. }
+        | DebtType::Duplication { .. }
+        | DebtType::Risk { .. } => generate_infrastructure_recommendation(debt_type),
+        DebtType::TestComplexityHotspot { .. }
+        | DebtType::TestTodo { .. }
+        | DebtType::TestDuplication { .. } => generate_test_debt_recommendation(debt_type),
     };
 
     ActionableRecommendation {
@@ -809,8 +858,10 @@ mod tests {
         let rec = generate_recommendation(&func, &debt_type, FunctionRole::Unknown, &score);
         // With the new API detection, a public function in test.rs with no special indicators
         // will be marked as "Remove unused public function (no API indicators)"
-        assert!(rec.primary_action.contains("Remove unused public function") || 
-                rec.primary_action.contains("Verify external usage"));
+        assert!(
+            rec.primary_action.contains("Remove unused public function")
+                || rec.primary_action.contains("Verify external usage")
+        );
         assert!(rec.rationale.contains("no callers"));
         assert!(rec
             .implementation_steps
