@@ -96,6 +96,7 @@ mod tests {
             nesting: 0,
             length: 10,
             is_test: false,
+            visibility: None,
         }
     }
 

@@ -43,6 +43,7 @@ pub struct FunctionMetrics {
     pub nesting: u32,
     pub length: usize,
     pub is_test: bool,
+    pub visibility: Option<String>, // "pub", "pub(crate)", or None for private
 }
 
 impl FunctionMetrics {
@@ -56,6 +57,7 @@ impl FunctionMetrics {
             nesting: 0,
             length: 0,
             is_test: false,
+            visibility: None,
         }
     }
 

@@ -1,4 +1,6 @@
-use crate::priority::{DebtType, FunctionRole, UnifiedAnalysis, UnifiedDebtItem};
+use crate::priority::{
+    DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis, UnifiedDebtItem,
+};
 use colored::*;
 use std::fmt::Write;
 
@@ -213,6 +215,25 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         .unwrap();
     }
 
+    // Add dead code specific information
+    if let DebtType::DeadCode {
+        visibility,
+        usage_hints,
+        ..
+    } = &item.debt_type
+    {
+        writeln!(
+            output,
+            "├─ VISIBILITY: {} function with no callers",
+            format_visibility(visibility).yellow()
+        )
+        .unwrap();
+
+        for hint in usage_hints {
+            writeln!(output, "│  • {}", hint.dimmed()).unwrap();
+        }
+    }
+
     writeln!(output, "└─ WHY: {}", item.recommendation.rationale.dimmed()).unwrap();
 }
 
@@ -399,6 +420,7 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
     match debt_type {
         DebtType::TestingGap { .. } => "TEST GAP",
         DebtType::ComplexityHotspot { .. } => "COMPLEXITY",
+        DebtType::DeadCode { .. } => "DEAD CODE",
         DebtType::Orchestration { .. } => "ORCHESTRATION",
         DebtType::Duplication { .. } => "DUPLICATION",
         DebtType::Risk { .. } => "RISK",
@@ -422,6 +444,7 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
     match debt_type {
         DebtType::TestingGap { .. } => "Add tests",
         DebtType::ComplexityHotspot { .. } => "Reduce complexity",
+        DebtType::DeadCode { .. } => "Remove dead code",
         DebtType::Orchestration { .. } => "Add integration test",
         DebtType::Duplication { .. } => "Extract duplication",
         DebtType::Risk { .. } => "Fix debt",
@@ -472,6 +495,14 @@ fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize
 
 fn extract_dependency_info(item: &UnifiedDebtItem) -> (usize, usize) {
     (item.upstream_dependencies, item.downstream_dependencies)
+}
+
+fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
+    match visibility {
+        FunctionVisibility::Private => "private",
+        FunctionVisibility::Crate => "crate-public",
+        FunctionVisibility::Public => "public",
+    }
 }
 
 #[cfg(test)]

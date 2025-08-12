@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, and spec 19 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, and spec 21 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -80,6 +80,13 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Clean, actionable output formats (--top N, --priorities-only, --detailed)
   - Focus on measurable impact over unreliable time estimates
   - Unified scoring algorithm with weighted factors (25/35/25/15%)
+- ✅ Dead Code Detection (spec 21):
+  - Automatic detection of unused functions via call graph analysis
+  - Visibility-aware recommendations (private vs public vs crate)
+  - Framework pattern exclusions (main, handlers, callbacks, traits)
+  - Smart usage hints based on function complexity and dependencies
+  - Integration with unified priority scoring system
+  - Separate DebtType::DeadCode with visibility classification
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:

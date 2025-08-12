@@ -50,6 +50,12 @@ pub enum DebtType {
         cyclomatic: u32,
         cognitive: u32,
     },
+    DeadCode {
+        visibility: FunctionVisibility,
+        cyclomatic: u32,
+        cognitive: u32,
+        usage_hints: Vec<String>,
+    },
     Orchestration {
         delegates_to: Vec<String>,
     },
@@ -76,6 +82,13 @@ pub enum DebtType {
         total_lines: u32,
         similarity: f64,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FunctionVisibility {
+    Private,
+    Crate,
+    Public,
 }
 
 impl UnifiedAnalysis {
