@@ -1029,4 +1029,80 @@ mod tests {
         assert!(steps.iter().any(|s| s.contains("pattern matching")));
         assert!(steps.iter().any(|s| s.contains("map/filter/fold")));
     }
+
+    #[test]
+    fn test_generate_test_debt_recommendation_complexity_hotspot() {
+        let debt_type = DebtType::TestComplexityHotspot {
+            cyclomatic: 15,
+            cognitive: 20,
+            threshold: 10,
+        };
+
+        let (action, rationale, steps) = generate_test_debt_recommendation(&debt_type);
+
+        assert_eq!(
+            action,
+            "Simplify test - complexity 20 exceeds test threshold 10"
+        );
+        assert_eq!(rationale, "Test has high complexity (cyclo=15, cognitive=20) - consider splitting into smaller tests");
+        assert_eq!(steps.len(), 3);
+        assert_eq!(steps[0], "Break complex test into multiple smaller tests");
+        assert_eq!(steps[1], "Extract test setup into helper functions");
+        assert_eq!(steps[2], "Use parameterized tests for similar test cases");
+    }
+
+    #[test]
+    fn test_generate_test_debt_recommendation_todo_with_reason() {
+        let debt_type = DebtType::TestTodo {
+            priority: crate::core::Priority::Medium,
+            reason: Some("Need to test error handling".to_string()),
+        };
+
+        let (action, rationale, steps) = generate_test_debt_recommendation(&debt_type);
+
+        assert_eq!(action, "Complete test TODO");
+        assert_eq!(rationale, "Test contains TODO: Need to test error handling");
+        assert_eq!(steps.len(), 3);
+        assert_eq!(steps[0], "Address the TODO comment");
+        assert_eq!(steps[1], "Implement missing test logic");
+        assert_eq!(steps[2], "Remove TODO once completed");
+    }
+
+    #[test]
+    fn test_generate_test_debt_recommendation_todo_without_reason() {
+        let debt_type = DebtType::TestTodo {
+            priority: crate::core::Priority::Low,
+            reason: None,
+        };
+
+        let (action, rationale, steps) = generate_test_debt_recommendation(&debt_type);
+
+        assert_eq!(action, "Complete test TODO");
+        assert_eq!(rationale, "Test contains TODO: No reason specified");
+        assert_eq!(steps.len(), 3);
+        assert_eq!(steps[0], "Address the TODO comment");
+        assert_eq!(steps[1], "Implement missing test logic");
+        assert_eq!(steps[2], "Remove TODO once completed");
+    }
+
+    #[test]
+    fn test_generate_test_debt_recommendation_duplication() {
+        let debt_type = DebtType::TestDuplication {
+            instances: 5,
+            total_lines: 150,
+            similarity: 0.85,
+        };
+
+        let (action, rationale, steps) = generate_test_debt_recommendation(&debt_type);
+
+        assert_eq!(action, "Remove test duplication - 5 similar test blocks");
+        assert_eq!(rationale, "5 duplicated test blocks found across 150 lines");
+        assert_eq!(steps.len(), 3);
+        assert_eq!(steps[0], "Extract common test logic into helper functions");
+        assert_eq!(
+            steps[1],
+            "Create parameterized tests for similar test cases"
+        );
+        assert_eq!(steps[2], "Use test fixtures for shared setup");
+    }
 }
