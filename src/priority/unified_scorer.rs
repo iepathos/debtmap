@@ -36,6 +36,8 @@ pub struct UnifiedDebtItem {
     pub downstream_dependencies: usize,
     pub nesting_depth: u32,
     pub function_length: usize,
+    pub cyclomatic_complexity: u32,
+    pub cognitive_complexity: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,6 +171,8 @@ pub fn create_unified_debt_item(
         downstream_dependencies,
         nesting_depth: func.nesting,
         function_length: func.length,
+        cyclomatic_complexity: func.cyclomatic,
+        cognitive_complexity: func.cognitive,
     }
 }
 
