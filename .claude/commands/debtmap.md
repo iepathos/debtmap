@@ -263,8 +263,6 @@ test: add comprehensive tests for [module/function name]
 - Coverage: +X.XX% (from BASELINE% to NEW%)
 - Debt score: [+/-]XX (from BASELINE to NEW)
 - Resolved: Priority [SCORE] - [function] with [coverage]% coverage
-
-Tech debt: Fixed top priority issue
 ```
 
 **For complexity reduction:**
@@ -276,8 +274,6 @@ refactor: reduce complexity in [module/function name]
 - Coverage: +X.XX% (from BASELINE% to NEW%) [if coverage changed]
 - Debt score: [+/-]XX (from BASELINE to NEW)
 - Resolved: Priority [SCORE] - [function] complexity [X]
-
-Tech debt: Fixed top priority issue
 ```
 
 **Important**: Use the exact coverage percentages and debt scores from debtmap's output, not from tarpaulin directly.
