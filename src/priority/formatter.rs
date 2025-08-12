@@ -78,9 +78,6 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
         .unwrap();
     }
 
-    // Add high-impact low-complexity fixes section
-    // _format_quick_wins(&mut output, analysis);
-
     // Add total impact summary
     // _format_total_impact(&mut output, analysis);
 
@@ -301,37 +298,6 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
 
     for step in &item.recommendation.implementation_steps {
         writeln!(output, "   • {step}").unwrap();
-    }
-}
-
-fn _format_quick_wins(output: &mut String, analysis: &UnifiedAnalysis) {
-    writeln!(output).unwrap();
-    writeln!(
-        output,
-        "💡 {}",
-        "HIGH-IMPACT LOW-COMPLEXITY FIXES".bright_yellow().bold()
-    )
-    .unwrap();
-
-    // Find items with high impact but low complexity
-    let quick_wins: Vec<_> = analysis
-        .items
-        .iter()
-        .filter(|item| {
-            item.unified_score.final_score >= 5.0 && item.unified_score.complexity_factor < 3.0
-        })
-        .take(3)
-        .collect();
-
-    for item in quick_wins {
-        writeln!(
-            output,
-            "• {}: {}:{}",
-            get_action_verb(&item.debt_type),
-            item.location.file.display(),
-            item.location.line
-        )
-        .unwrap();
     }
 }
 
