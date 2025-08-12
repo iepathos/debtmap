@@ -968,10 +968,13 @@ fn output_unified_priorities(
 mod tests {
     use super::*;
     use chrono::Utc;
-    use debtmap::core::{ComplexitySummary, DebtItem, DebtType, Priority};
+    use debtmap::core::{
+        ComplexityReport, ComplexitySummary, DebtItem, DebtType, DependencyReport, Priority,
+        TechnicalDebtReport,
+    };
     use debtmap::risk::{Difficulty, FunctionRisk, RiskCategory, RiskDistribution, TestEffort};
     use im::Vector;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_format_risk_function_with_coverage() {
@@ -1156,6 +1159,380 @@ mod tests {
         assert!(defaults.contains(&Language::Python));
         assert!(defaults.contains(&Language::JavaScript));
         assert!(defaults.contains(&Language::TypeScript));
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_success() {
+        use debtmap::FunctionMetrics;
+        use std::fs;
+        use tempfile::TempDir;
+
+        // Create test data
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("test.lcov");
+
+        // Create a simple LCOV file
+        let lcov_content = r#"TN:
+SF:src/test.rs
+FN:10,test_func
+FNDA:5,test_func
+FNF:1
+FNH:1
+DA:10,5
+DA:11,5
+DA:12,0
+DA:13,0
+LF:4
+LH:2
+end_of_record
+"#;
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        // Create analysis results with test functions
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "test_func".to_string(),
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    cyclomatic: 4,
+                    cognitive: 3,
+                    nesting: 2,
+                    length: 4,
+                    is_test: false,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 4.0,
+                    max_complexity: 4,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        // Test with coverage analysis
+        let result =
+            analyze_risk_with_coverage(&results, &lcov_path, temp_dir.path(), false, None, None);
+
+        assert!(result.is_ok());
+        let insight = result.unwrap();
+        assert!(insight.is_some());
+
+        let insight = insight.unwrap();
+        // Should have analyzed one function
+        assert!(!insight.top_risks.is_empty());
+        // Coverage should be calculated (50% in our test LCOV)
+        assert!(insight.top_risks[0].coverage_percentage.is_some());
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_invalid_lcov_path() {
+        use debtmap::FunctionMetrics;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let non_existent_lcov = temp_dir.path().join("missing.lcov");
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "test_func".to_string(),
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    cyclomatic: 3,
+                    cognitive: 2,
+                    nesting: 1,
+                    length: 10,
+                    is_test: false,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 3.0,
+                    max_complexity: 3,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        // Should fail when LCOV file doesn't exist
+        let result = analyze_risk_with_coverage(
+            &results,
+            &non_existent_lcov,
+            temp_dir.path(),
+            false,
+            None,
+            None,
+        );
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse LCOV file"));
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_with_context() {
+        use debtmap::FunctionMetrics;
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("test.lcov");
+
+        // Create LCOV with no coverage
+        let lcov_content = r#"TN:
+SF:src/test.rs
+FN:10,main
+FNDA:0,main
+FNF:1
+FNH:0
+DA:10,0
+DA:11,0
+LF:2
+LH:0
+end_of_record
+"#;
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "main".to_string(),
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    cyclomatic: 2,
+                    cognitive: 1,
+                    nesting: 0,
+                    length: 2,
+                    is_test: false,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 2.0,
+                    max_complexity: 2,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![DebtItem {
+                    id: "debt-1".to_string(),
+                    debt_type: DebtType::Todo,
+                    priority: Priority::High,
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    message: "TODO: Implement feature".to_string(),
+                    context: None,
+                }],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![Priority::High],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        // Test with context enabled
+        let result = analyze_risk_with_coverage(
+            &results,
+            &lcov_path,
+            temp_dir.path(),
+            true,
+            Some(vec!["dependency".to_string()]),
+            None,
+        );
+
+        assert!(result.is_ok());
+        let insight = result.unwrap();
+        assert!(insight.is_some());
+
+        let insight = insight.unwrap();
+        // Should identify entry point main with 0% coverage
+        assert!(!insight.top_risks.is_empty());
+        assert_eq!(insight.top_risks[0].function_name, "main");
+        assert_eq!(insight.top_risks[0].coverage_percentage, Some(0.0));
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_multiple_functions() {
+        use debtmap::FunctionMetrics;
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("test.lcov");
+
+        // Create LCOV with mixed coverage
+        // The LCOV format shows line coverage, not function coverage percentages
+        let lcov_content = r#"TN:
+SF:src/lib.rs
+FN:10,well_tested
+FNDA:10,well_tested
+FN:20,partially_tested
+FNDA:5,partially_tested
+FN:30,untested
+FNDA:0,untested
+FNF:3
+FNH:2
+DA:10,10
+DA:11,10
+DA:20,5
+DA:21,5
+DA:22,0
+DA:30,0
+DA:31,0
+LF:7
+LH:4
+end_of_record
+"#;
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![
+                    FunctionMetrics {
+                        name: "well_tested".to_string(),
+                        file: PathBuf::from("src/lib.rs"),
+                        line: 10,
+                        cyclomatic: 2,
+                        cognitive: 1,
+                        nesting: 0,
+                        length: 2,
+                        is_test: false,
+                    },
+                    FunctionMetrics {
+                        name: "partially_tested".to_string(),
+                        file: PathBuf::from("src/lib.rs"),
+                        line: 20,
+                        cyclomatic: 3,
+                        cognitive: 2,
+                        nesting: 1,
+                        length: 3, // Adjusted to match LCOV data
+                        is_test: false,
+                    },
+                    FunctionMetrics {
+                        name: "untested".to_string(),
+                        file: PathBuf::from("src/lib.rs"),
+                        line: 30,
+                        cyclomatic: 5,
+                        cognitive: 4,
+                        nesting: 2,
+                        length: 2,
+                        is_test: false,
+                    },
+                    FunctionMetrics {
+                        name: "test_function".to_string(),
+                        file: PathBuf::from("src/lib.rs"),
+                        line: 40,
+                        cyclomatic: 1,
+                        cognitive: 1,
+                        nesting: 0,
+                        length: 5,
+                        is_test: true,
+                    },
+                ],
+                summary: ComplexitySummary {
+                    total_functions: 4,
+                    average_complexity: 2.75,
+                    max_complexity: 5,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        // Test with multiple functions of varying coverage
+        let result = analyze_risk_with_coverage(
+            &results,
+            &lcov_path,
+            temp_dir.path(),
+            false,
+            None,
+            Some(vec!["git_history".to_string()]),
+        );
+
+        assert!(result.is_ok());
+        let insight = result.unwrap();
+        assert!(insight.is_some());
+
+        let insight = insight.unwrap();
+        // Should have analyzed functions - check top_risks list
+        assert!(!insight.top_risks.is_empty());
+
+        // Find functions in top_risks and verify expected coverage patterns
+        let all_risks = &insight.top_risks;
+
+        // Well tested function should have coverage data
+        if let Some(well_tested) = all_risks.iter().find(|r| r.function_name == "well_tested") {
+            assert!(well_tested.coverage_percentage.is_some());
+            // Should have high coverage since all lines are executed
+            assert!(well_tested.coverage_percentage.unwrap() > 50.0);
+        }
+
+        // Partially tested function should have some coverage
+        if let Some(partially_tested) = all_risks
+            .iter()
+            .find(|r| r.function_name == "partially_tested")
+        {
+            // Just verify it has coverage data
+            assert!(partially_tested.coverage_percentage.is_some());
+        }
+
+        // Untested function should have zero coverage
+        if let Some(untested) = all_risks.iter().find(|r| r.function_name == "untested") {
+            assert_eq!(untested.coverage_percentage, Some(0.0));
+        }
+
+        // Test functions should be marked as such
+        if let Some(test_func) = all_risks
+            .iter()
+            .find(|r| r.function_name == "test_function")
+        {
+            assert!(test_func.is_test_function);
+        }
     }
 
     #[test]
