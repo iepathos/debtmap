@@ -259,16 +259,52 @@ fn output_results_with_risk(
     format: io::output::OutputFormat,
     output_file: Option<PathBuf>,
 ) -> Result<()> {
-    let mut writer = io::output::create_writer(format);
-    writer.write_results(&results)?;
-
-    // Add risk insights if available
-    if let Some(insights) = risk_insights {
-        writer.write_risk_insights(&insights)?;
-    }
-
-    if let Some(path) = output_file {
-        io::write_file(&path, &format!("{results:?}"))?;
+    match output_file {
+        Some(path) => {
+            // When output file is specified, write only to file
+            match format {
+                io::output::OutputFormat::Json => {
+                    // Create a combined JSON structure
+                    let output = serde_json::json!({
+                        "analysis": results,
+                        "risk_insights": risk_insights,
+                    });
+                    let json_str = serde_json::to_string_pretty(&output)?;
+                    io::write_file(&path, &json_str)?;
+                }
+                _ => {
+                    // For non-JSON formats, use the existing writer approach but to a file
+                    let mut buffer = Vec::new();
+                    {
+                        let mut writer = match format {
+                            io::output::OutputFormat::Markdown => {
+                                Box::new(io::writers::MarkdownWriter::new(&mut buffer))
+                                    as Box<dyn io::output::OutputWriter>
+                            }
+                            io::output::OutputFormat::Terminal => {
+                                // Terminal format to file doesn't make much sense, but handle it
+                                Box::new(io::writers::MarkdownWriter::new(&mut buffer))
+                                    as Box<dyn io::output::OutputWriter>
+                            }
+                            _ => unreachable!(),
+                        };
+                        writer.write_results(&results)?;
+                        if let Some(insights) = risk_insights {
+                            writer.write_risk_insights(&insights)?;
+                        }
+                    }
+                    io::write_file(&path, &String::from_utf8_lossy(&buffer))?;
+                }
+            }
+        }
+        None => {
+            // When no output file, write to stdout
+            let mut writer = io::output::create_writer(format);
+            writer.write_results(&results)?;
+            if let Some(insights) = risk_insights {
+                writer.write_risk_insights(&insights)?;
+            }
+        }
     }
 
     Ok(())
