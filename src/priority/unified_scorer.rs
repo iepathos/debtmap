@@ -908,11 +908,11 @@ mod tests {
     fn test_generate_testing_gap_recommendation_complex_high_cyclomatic() {
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.25,
-            15,  // high cyclomatic (> 10)
-            10,  // normal cognitive
+            15, // high cyclomatic (> 10)
+            10, // normal cognitive
             FunctionRole::PureLogic,
         );
-        
+
         assert!(action.contains("Extract pure functions"));
         assert!(action.contains("cyclo=15"));
         assert!(action.contains("cog=10"));
@@ -926,11 +926,11 @@ mod tests {
     fn test_generate_testing_gap_recommendation_complex_high_cognitive() {
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.5,
-            8,   // normal cyclomatic
-            20,  // high cognitive (> 15)
+            8,  // normal cyclomatic
+            20, // high cognitive (> 15)
             FunctionRole::Orchestrator,
         );
-        
+
         assert!(action.contains("Extract pure functions"));
         assert!(action.contains("cyclo=8"));
         assert!(action.contains("cog=20"));
@@ -944,11 +944,11 @@ mod tests {
     fn test_generate_testing_gap_recommendation_simple_pure_logic() {
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.0,
-            5,  // low complexity
-            8,  // low cognitive
+            5, // low complexity
+            8, // low cognitive
             FunctionRole::PureLogic,
         );
-        
+
         assert!(action.contains("Add 5 unit tests"));
         assert!(rationale.contains("Business logic"));
         assert!(rationale.contains("0% coverage"));
@@ -959,13 +959,9 @@ mod tests {
 
     #[test]
     fn test_generate_testing_gap_recommendation_simple_orchestrator() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
-            0.75,
-            3,
-            5,
-            FunctionRole::Orchestrator,
-        );
-        
+        let (action, rationale, steps) =
+            generate_testing_gap_recommendation(0.75, 3, 5, FunctionRole::Orchestrator);
+
         assert!(action.contains("Add 3 unit tests"));
         assert!(rationale.contains("Orchestration"));
         assert!(rationale.contains("75% coverage"));
@@ -976,13 +972,9 @@ mod tests {
 
     #[test]
     fn test_generate_testing_gap_recommendation_simple_io_wrapper() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
-            0.33,
-            2,
-            3,
-            FunctionRole::IOWrapper,
-        );
-        
+        let (action, rationale, steps) =
+            generate_testing_gap_recommendation(0.33, 2, 3, FunctionRole::IOWrapper);
+
         assert!(action.contains("Add 2 unit tests"));
         assert!(rationale.contains("I/O wrapper"));
         assert!(rationale.contains("33% coverage"));
@@ -993,13 +985,9 @@ mod tests {
 
     #[test]
     fn test_generate_testing_gap_recommendation_simple_entry_point() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
-            1.0,
-            1,
-            1,
-            FunctionRole::EntryPoint,
-        );
-        
+        let (action, rationale, steps) =
+            generate_testing_gap_recommendation(1.0, 1, 1, FunctionRole::EntryPoint);
+
         assert!(action.contains("Add 2 unit tests")); // max(1, 2) = 2
         assert!(rationale.contains("Entry point"));
         assert!(rationale.contains("100% coverage"));
@@ -1011,11 +999,11 @@ mod tests {
     fn test_generate_testing_gap_recommendation_simple_unknown_role() {
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.0,
-            0,  // will use max(0, 2) = 2
+            0, // will use max(0, 2) = 2
             0,
             FunctionRole::Unknown,
         );
-        
+
         assert!(action.contains("Add 2 unit tests"));
         assert!(rationale.contains("Function"));
         assert!(rationale.contains("0% coverage"));
@@ -1027,11 +1015,11 @@ mod tests {
     fn test_generate_testing_gap_recommendation_both_high_complexity() {
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.1,
-            25,  // very high cyclomatic
-            30,  // very high cognitive
+            25, // very high cyclomatic
+            30, // very high cognitive
             FunctionRole::PureLogic,
         );
-        
+
         assert!(action.contains("Extract pure functions"));
         assert!(action.contains("cyclo=25 to <10"));
         assert!(action.contains("cog=30 to <15"));
