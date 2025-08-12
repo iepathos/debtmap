@@ -1435,7 +1435,7 @@ end_of_record
                         nesting: 0,
                         length: 2,
                         is_test: false,
-                    visibility: None,
+                        visibility: None,
                     },
                     FunctionMetrics {
                         name: "partially_tested".to_string(),
@@ -1446,7 +1446,7 @@ end_of_record
                         nesting: 1,
                         length: 3, // Adjusted to match LCOV data
                         is_test: false,
-                    visibility: None,
+                        visibility: None,
                     },
                     FunctionMetrics {
                         name: "untested".to_string(),
@@ -1457,7 +1457,7 @@ end_of_record
                         nesting: 2,
                         length: 2,
                         is_test: false,
-                    visibility: None,
+                        visibility: None,
                     },
                     FunctionMetrics {
                         name: "test_function".to_string(),
@@ -1468,7 +1468,7 @@ end_of_record
                         nesting: 0,
                         length: 5,
                         is_test: true,
-                    visibility: None,
+                        visibility: None,
                     },
                 ],
                 summary: ComplexitySummary {
@@ -1983,7 +1983,7 @@ end_of_record
                 nesting: 2,
                 length: 25,
                 is_test: false,
-                    visibility: None,
+                visibility: None,
             },
             FunctionMetrics {
                 name: "test_function".to_string(),
@@ -1994,7 +1994,7 @@ end_of_record
                 nesting: 1,
                 length: 15,
                 is_test: true,
-                    visibility: None,
+                visibility: None,
             },
         ];
 
@@ -2032,7 +2032,7 @@ end_of_record
             nesting: 3,
             length: 40,
             is_test: false,
-                    visibility: None,
+            visibility: None,
         }];
 
         let mut call_graph = CallGraph::new();
