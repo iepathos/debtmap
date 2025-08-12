@@ -35,14 +35,11 @@ fn test_lib_rs_functions_are_apis() {
 
         assert!(
             is_api,
-            "Function '{}' in '{}' should be detected as API",
-            name, path
+            "Function '{name}' in '{path}' should be detected as API"
         );
         assert!(
             indicators.iter().any(|i| i.contains("lib.rs")),
-            "Should have lib.rs indicator for '{}' in '{}'",
-            name,
-            path
+            "Should have lib.rs indicator for '{name}' in '{path}'"
         );
     }
 }
@@ -62,9 +59,7 @@ fn test_mod_rs_functions_are_likely_apis() {
 
         assert!(
             indicators.iter().any(|i| i.contains("mod.rs")),
-            "Should have mod.rs indicator for '{}' in '{}'",
-            name,
-            path
+            "Should have mod.rs indicator for '{name}' in '{path}'"
         );
     }
 }
@@ -89,13 +84,12 @@ fn test_common_constructors_are_apis() {
         let visibility = FunctionVisibility::Public;
         let (is_api, indicators) = is_likely_external_api(&func, &visibility);
 
-        assert!(is_api, "Constructor '{}' should be detected as API", name);
+        assert!(is_api, "Constructor '{name}' should be detected as API");
         assert!(
             indicators.iter().any(|i| i.contains("Constructor")
                 || i.contains("Builder")
                 || i.contains("trait method")),
-            "Should have constructor/builder indicator for '{}'",
-            name
+            "Should have constructor/builder indicator for '{name}'"
         );
     }
 }
@@ -123,9 +117,7 @@ fn test_api_pattern_prefixes() {
 
         assert!(
             indicators.iter().any(|i| i.contains("API pattern")),
-            "Function '{}' should have API pattern indicator ({})",
-            name,
-            expected_pattern
+            "Function '{name}' should have API pattern indicator ({expected_pattern})"
         );
     }
 }
@@ -149,15 +141,13 @@ fn test_internal_paths_not_apis() {
 
         assert!(
             !is_api,
-            "Function in '{}' should NOT be detected as API",
-            path
+            "Function in '{path}' should NOT be detected as API"
         );
 
         // Should still get some indicators but not enough to be classified as API
         assert!(
             !indicators.is_empty() || path.contains("internal") || path.contains("private"),
-            "Should have some analysis for '{}'",
-            path
+            "Should have some analysis for '{path}'"
         );
     }
 }
@@ -231,8 +221,7 @@ fn test_specific_api_prefixes() {
 
         assert!(
             indicators.iter().any(|i| i.contains("Public API prefix")),
-            "Function '{}' should have public API prefix indicator",
-            name
+            "Function '{name}' should have public API prefix indicator"
         );
     }
 }
@@ -272,8 +261,7 @@ fn test_test_helper_detection() {
 
         assert!(
             hints.iter().any(|h| h.contains("test helper")),
-            "Function '{}' should be identified as potential test helper",
-            name
+            "Function '{name}' should be identified as potential test helper"
         );
     }
 }
