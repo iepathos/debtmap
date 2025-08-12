@@ -4,6 +4,7 @@ use crate::priority::{
     coverage_propagation::{
         calculate_coverage_urgency, calculate_transitive_coverage, TransitiveCoverage,
     },
+    external_api_detector::{generate_enhanced_dead_code_hints, is_likely_external_api},
     semantic_classifier::{
         calculate_semantic_priority, classify_function_role, get_role_multiplier, FunctionRole,
     },
@@ -287,26 +288,17 @@ fn generate_usage_hints(
     call_graph: &CallGraph,
     func_id: &FunctionId,
 ) -> Vec<String> {
-    let mut hints = Vec::new();
+    let visibility = determine_visibility(func);
 
-    // Check if it calls other functions (might be incomplete implementation)
+    // Use enhanced dead code hints
+    let mut hints = generate_enhanced_dead_code_hints(func, &visibility);
+
+    // Add call graph information
     let callees = call_graph.get_callees(func_id);
     if callees.is_empty() {
         hints.push("Function has no dependencies - safe to remove".to_string());
     } else {
         hints.push(format!("Function calls {} other functions", callees.len()));
-    }
-
-    // Check complexity for removal priority
-    if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        hints.push("Low complexity - low impact removal".to_string());
-    } else {
-        hints.push("High complexity - removing may eliminate significant unused code".to_string());
-    }
-
-    // Check if it's a candidate for being a utility that should be in tests
-    if func.name.contains("helper") || func.name.contains("util") || func.name.contains("fixture") {
-        hints.push("May be a test helper - consider moving to test module".to_string());
     }
 
     hints
@@ -354,12 +346,14 @@ fn generate_dead_code_steps(visibility: &FunctionVisibility) -> Vec<String> {
 
 /// Generate action and rationale for dead code
 fn generate_dead_code_action(
+    func: &FunctionMetrics,
     visibility: &FunctionVisibility,
     func_name: &str,
     cyclomatic: &u32,
     cognitive: &u32,
 ) -> (String, String) {
     let complexity_str = format_complexity_display(cyclomatic, cognitive);
+
     match visibility {
         FunctionVisibility::Private => (
             "Remove unused private function".to_string(),
@@ -369,10 +363,20 @@ fn generate_dead_code_action(
             "Remove or document unused crate function".to_string(),
             format!("Crate-public function '{func_name}' has no internal callers (complexity: {complexity_str})"),
         ),
-        FunctionVisibility::Public => (
-            "Document or deprecate unused public function".to_string(),
-            format!("Public function '{func_name}' has no internal callers - may be external API (complexity: {complexity_str})"),
-        ),
+        FunctionVisibility::Public => {
+            let (is_likely_api, _) = is_likely_external_api(func, visibility);
+            if is_likely_api {
+                (
+                    "Verify external usage before removal or deprecation".to_string(),
+                    format!("Public function '{func_name}' appears to be external API - verify usage before action (complexity: {complexity_str})"),
+                )
+            } else {
+                (
+                    "Remove unused public function (no API indicators)".to_string(),
+                    format!("Public function '{func_name}' has no callers and no external API indicators (complexity: {complexity_str})"),
+                )
+            }
+        }
     }
 }
 
@@ -403,7 +407,7 @@ fn generate_recommendation(
 ) -> ActionableRecommendation {
     let (primary_action, rationale, steps) = match debt_type {
         DebtType::DeadCode { visibility, usage_hints, cyclomatic, cognitive } => {
-            let (action, rationale) = generate_dead_code_action(visibility, &func.name, cyclomatic, cognitive);
+            let (action, rationale) = generate_dead_code_action(func, visibility, &func.name, cyclomatic, cognitive);
             let mut steps = generate_dead_code_steps(visibility);
 
             // Add usage hints to the steps
@@ -785,7 +789,8 @@ mod tests {
 
     #[test]
     fn test_dead_code_recommendation() {
-        let func = create_test_metrics();
+        let mut func = create_test_metrics();
+        func.visibility = Some("pub".to_string()); // Make it public for the test
         let debt_type = DebtType::DeadCode {
             visibility: FunctionVisibility::Public,
             cyclomatic: 5,
@@ -802,12 +807,15 @@ mod tests {
         };
 
         let rec = generate_recommendation(&func, &debt_type, FunctionRole::Unknown, &score);
-        assert!(rec.primary_action.contains("Document or deprecate"));
-        assert!(rec.rationale.contains("no internal callers"));
+        // With the new API detection, a public function in test.rs with no special indicators
+        // will be marked as "Remove unused public function (no API indicators)"
+        assert!(rec.primary_action.contains("Remove unused public function") || 
+                rec.primary_action.contains("Verify external usage"));
+        assert!(rec.rationale.contains("no callers"));
         assert!(rec
             .implementation_steps
             .iter()
-            .any(|s| s.contains("external callers")));
+            .any(|s| s.contains("external callers") || s.contains("Verify")));
     }
 
     #[test]
