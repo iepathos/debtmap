@@ -809,4 +809,39 @@ mod tests {
             .iter()
             .any(|s| s.contains("external callers")));
     }
+
+    #[test]
+    fn test_format_role_description_pure_logic() {
+        let role = FunctionRole::PureLogic;
+        let description = format_role_description(role);
+        assert_eq!(description, "business logic");
+    }
+
+    #[test]
+    fn test_format_role_description_orchestrator() {
+        let role = FunctionRole::Orchestrator;
+        let description = format_role_description(role);
+        assert_eq!(description, "orchestration");
+    }
+
+    #[test]
+    fn test_format_role_description_io_wrapper() {
+        let role = FunctionRole::IOWrapper;
+        let description = format_role_description(role);
+        assert_eq!(description, "I/O wrapper");
+    }
+
+    #[test]
+    fn test_format_role_description_entry_point() {
+        let role = FunctionRole::EntryPoint;
+        let description = format_role_description(role);
+        assert_eq!(description, "entry point");
+    }
+
+    #[test]
+    fn test_format_role_description_unknown() {
+        let role = FunctionRole::Unknown;
+        let description = format_role_description(role);
+        assert_eq!(description, "function");
+    }
 }
