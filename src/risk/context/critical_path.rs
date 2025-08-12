@@ -681,4 +681,107 @@ mod tests {
             panic!("Expected CriticalPath context details");
         }
     }
+
+    #[test]
+    fn test_explain_with_empty_entry_points() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.0,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec![],
+                path_weight: 0.0,
+                is_user_facing: false,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "Not on any critical path");
+    }
+
+    #[test]
+    fn test_explain_with_single_path_not_user_facing() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.5,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec!["main".to_string()],
+                path_weight: 5.0,
+                is_user_facing: false,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "On 1 critical path(s) with weight 5.0");
+    }
+
+    #[test]
+    fn test_explain_with_multiple_paths_user_facing() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.8,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec!["main".to_string(), "handle_request".to_string()],
+                path_weight: 10.5,
+                is_user_facing: true,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(
+            explanation,
+            "On 2 critical path(s) with weight 10.5 (user-facing)"
+        );
+    }
+
+    #[test]
+    fn test_explain_with_non_critical_path_context() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.0,
+            details: ContextDetails::DependencyChain {
+                depth: 3,
+                propagated_risk: 0.5,
+                dependents: vec![],
+                blast_radius: 0,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "No critical path information");
+    }
+
+    #[test]
+    fn test_explain_with_multiple_entry_points_formatting() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.6,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec![
+                    "main".to_string(),
+                    "api_handler".to_string(),
+                    "cli_command".to_string(),
+                ],
+                path_weight: 8.7,
+                is_user_facing: false,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "On 3 critical path(s) with weight 8.7");
+    }
 }
