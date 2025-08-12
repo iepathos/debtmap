@@ -325,23 +325,6 @@ fn complexity_to_test_effort(complexity: &ComplexityMetrics) -> TestEffort {
     }
 }
 
-pub fn identify_untested_complex_functions(
-    functions: &Vector<FunctionRisk>,
-    complexity_threshold: u32,
-) -> Vector<FunctionRisk> {
-    functions
-        .iter()
-        .filter(|f| {
-            let avg_complexity = (f.cyclomatic_complexity + f.cognitive_complexity) / 2;
-            match f.coverage_percentage {
-                Some(cov) => avg_complexity > complexity_threshold && cov < 30.0,
-                None => avg_complexity > complexity_threshold,
-            }
-        })
-        .cloned()
-        .collect()
-}
-
 pub fn identify_well_tested_complex_functions(
     functions: &Vector<FunctionRisk>,
     complexity_threshold: u32,

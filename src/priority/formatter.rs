@@ -335,7 +335,8 @@ fn _format_quick_wins(output: &mut String, analysis: &UnifiedAnalysis) {
     }
 }
 
-fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalysis) {
+#[cfg_attr(test, allow(dead_code))]
+pub(crate) fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalysis) {
     writeln!(output).unwrap();
     writeln!(
         output,
@@ -604,6 +605,95 @@ mod tests {
         assert_eq!(get_severity_label(7.0), "HIGH");
         assert_eq!(get_severity_label(5.0), "MEDIUM");
         assert_eq!(get_severity_label(2.0), "LOW");
+    }
+
+    #[test]
+    fn test_format_total_impact_with_all_improvements() {
+        let mut analysis = UnifiedAnalysis::new(CallGraph::new());
+        analysis.total_impact = ImpactMetrics {
+            coverage_improvement: 25.5,
+            lines_reduction: 150,
+            complexity_reduction: 12.7,
+            risk_reduction: 8.2,
+        };
+        analysis.add_item(create_test_item(7.0));
+        analysis.add_item(create_test_item(5.0));
+
+        let mut output = String::new();
+        super::_format_total_impact(&mut output, &analysis);
+        let output_plain = strip_ansi_codes(&output);
+
+        assert!(output_plain.contains("TOTAL IMPACT IF ALL FIXED"));
+        assert!(output_plain.contains("+25.5% test coverage potential"));
+        assert!(output_plain.contains("-150 lines of code"));
+        assert!(output_plain.contains("-13% average complexity")); // 12.7 rounds to 13
+        assert!(output_plain.contains("2 actionable items prioritized"));
+    }
+
+    #[test]
+    fn test_format_total_impact_coverage_only() {
+        let mut analysis = UnifiedAnalysis::new(CallGraph::new());
+        analysis.total_impact = ImpactMetrics {
+            coverage_improvement: 45.3,
+            lines_reduction: 0,
+            complexity_reduction: 0.0,
+            risk_reduction: 5.0,
+        };
+        analysis.add_item(create_test_item(8.0));
+
+        let mut output = String::new();
+        super::_format_total_impact(&mut output, &analysis);
+        let output_plain = strip_ansi_codes(&output);
+
+        assert!(output_plain.contains("+45.3% test coverage potential"));
+        assert!(!output_plain.contains("lines of code")); // Should not show 0 lines
+        assert!(!output_plain.contains("average complexity")); // Should not show 0 complexity
+        assert!(output_plain.contains("1 actionable items prioritized"));
+    }
+
+    #[test]
+    fn test_format_total_impact_complexity_and_lines() {
+        let mut analysis = UnifiedAnalysis::new(CallGraph::new());
+        analysis.total_impact = ImpactMetrics {
+            coverage_improvement: 0.0,
+            lines_reduction: 75,
+            complexity_reduction: 8.9,
+            risk_reduction: 3.2,
+        };
+        analysis.add_item(create_test_item(6.0));
+        analysis.add_item(create_test_item(4.0));
+        analysis.add_item(create_test_item(3.0));
+
+        let mut output = String::new();
+        super::_format_total_impact(&mut output, &analysis);
+        let output_plain = strip_ansi_codes(&output);
+
+        assert!(!output_plain.contains("test coverage")); // Should not show 0 coverage
+        assert!(output_plain.contains("-75 lines of code"));
+        assert!(output_plain.contains("-9% average complexity")); // 8.9 rounds to 9
+        assert!(output_plain.contains("3 actionable items prioritized"));
+    }
+
+    #[test]
+    fn test_format_total_impact_no_improvements() {
+        let mut analysis = UnifiedAnalysis::new(CallGraph::new());
+        analysis.total_impact = ImpactMetrics {
+            coverage_improvement: 0.0,
+            lines_reduction: 0,
+            complexity_reduction: 0.0,
+            risk_reduction: 0.0,
+        };
+        // Empty analysis with no items
+
+        let mut output = String::new();
+        super::_format_total_impact(&mut output, &analysis);
+        let output_plain = strip_ansi_codes(&output);
+
+        assert!(output_plain.contains("TOTAL IMPACT IF ALL FIXED"));
+        assert!(!output_plain.contains("test coverage")); // No coverage improvement
+        assert!(!output_plain.contains("lines of code")); // No lines reduction
+        assert!(!output_plain.contains("average complexity")); // No complexity reduction
+        assert!(output_plain.contains("0 actionable items prioritized"));
     }
 
     #[test]

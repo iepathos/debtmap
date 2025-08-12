@@ -35,8 +35,7 @@ fn test_workflow_public_api_in_lib_rs() {
     let hints = generate_enhanced_dead_code_hints(&func, &visibility);
     assert!(
         hints.iter().any(|h| h.contains("Likely external API")),
-        "Hints should indicate external API: {:?}",
-        hints
+        "Hints should indicate external API: {hints:?}"
     );
 }
 
@@ -104,8 +103,7 @@ fn test_workflow_mod_rs_with_api_pattern() {
     // Should have multiple indicators
     assert!(
         indicators.len() >= 2,
-        "Should have multiple indicators: {:?}",
-        indicators
+        "Should have multiple indicators: {indicators:?}"
     );
 
     // Check specific indicators
