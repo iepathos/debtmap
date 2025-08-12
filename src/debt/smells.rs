@@ -252,6 +252,7 @@ mod tests {
             nesting: 2,
             length: 35,
             is_test: false,
+            visibility: None,
         }];
         let smells = detect_data_clumps(&functions);
         assert_eq!(
@@ -273,6 +274,7 @@ mod tests {
                 nesting: 2,
                 length: 35,
                 is_test: false,
+                visibility: None,
             },
             FunctionMetrics {
                 name: "function_b".to_string(),
@@ -283,6 +285,7 @@ mod tests {
                 nesting: 2,
                 length: 35,
                 is_test: false,
+                visibility: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -305,6 +308,7 @@ mod tests {
                 nesting: 3,
                 length: 40,
                 is_test: false,
+                visibility: None,
             },
             FunctionMetrics {
                 name: "validate_user_data".to_string(),
@@ -315,6 +319,7 @@ mod tests {
                 nesting: 2,
                 length: 35,
                 is_test: false,
+                visibility: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -345,6 +350,7 @@ mod tests {
                 nesting: 2,
                 length: 35,
                 is_test: false,
+                visibility: None,
             },
             FunctionMetrics {
                 name: "func_b".to_string(),
@@ -355,6 +361,7 @@ mod tests {
                 nesting: 2,
                 length: 32,
                 is_test: false,
+                visibility: None,
             },
             FunctionMetrics {
                 name: "func_c".to_string(),
@@ -365,6 +372,7 @@ mod tests {
                 nesting: 2,
                 length: 31,
                 is_test: false,
+                visibility: None,
             },
             FunctionMetrics {
                 name: "small_func".to_string(),
@@ -375,6 +383,7 @@ mod tests {
                 nesting: 1,
                 length: 10,
                 is_test: false,
+                visibility: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
