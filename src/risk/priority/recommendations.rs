@@ -546,4 +546,104 @@ mod tests {
             " - requires effort"
         );
     }
+
+    #[test]
+    fn test_describe_complexity_simple() {
+        // Test max_complexity in range 0..=2 -> "simple"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 0,
+            cognitive_complexity: 0,
+        };
+        assert_eq!(describe_complexity(&metrics), "simple");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 4, // 4/2 = 2
+            cognitive_complexity: 8,  // 8/4 = 2
+        };
+        assert_eq!(describe_complexity(&metrics), "simple");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 2, // 2/2 = 1
+            cognitive_complexity: 4,  // 4/4 = 1
+        };
+        assert_eq!(describe_complexity(&metrics), "simple");
+    }
+
+    #[test]
+    fn test_describe_complexity_moderately_complex() {
+        // Test max_complexity in range 3..=5 -> "moderately complex"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 6, // 6/2 = 3
+            cognitive_complexity: 12, // 12/4 = 3
+        };
+        assert_eq!(describe_complexity(&metrics), "moderately complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 10, // 10/2 = 5
+            cognitive_complexity: 16,  // 16/4 = 4
+        };
+        assert_eq!(describe_complexity(&metrics), "moderately complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 8, // 8/2 = 4
+            cognitive_complexity: 20, // 20/4 = 5
+        };
+        assert_eq!(describe_complexity(&metrics), "moderately complex");
+    }
+
+    #[test]
+    fn test_describe_complexity_highly_complex() {
+        // Test max_complexity in range 6..=10 -> "highly complex"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 12, // 12/2 = 6
+            cognitive_complexity: 24,  // 24/4 = 6
+        };
+        assert_eq!(describe_complexity(&metrics), "highly complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 20, // 20/2 = 10
+            cognitive_complexity: 32,  // 32/4 = 8
+        };
+        assert_eq!(describe_complexity(&metrics), "highly complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 16, // 16/2 = 8
+            cognitive_complexity: 40,  // 40/4 = 10
+        };
+        assert_eq!(describe_complexity(&metrics), "highly complex");
+    }
+
+    #[test]
+    fn test_describe_complexity_extremely_complex() {
+        // Test max_complexity > 10 -> "extremely complex"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 22, // 22/2 = 11
+            cognitive_complexity: 44,  // 44/4 = 11
+        };
+        assert_eq!(describe_complexity(&metrics), "extremely complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 50, // 50/2 = 25
+            cognitive_complexity: 100, // 100/4 = 25
+        };
+        assert_eq!(describe_complexity(&metrics), "extremely complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 30, // 30/2 = 15
+            cognitive_complexity: 80,  // 80/4 = 20
+        };
+        assert_eq!(describe_complexity(&metrics), "extremely complex");
+    }
 }
