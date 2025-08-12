@@ -186,9 +186,9 @@ fn analyze_project(
     let files = io::walker::find_project_files(&path, languages.clone())
         .context("Failed to find project files")?;
 
-    let file_metrics = collect_file_metrics(&files);
-    let all_functions = extract_all_functions(&file_metrics);
-    let all_debt_items = extract_all_debt_items(&file_metrics);
+    let file_metrics = analysis_utils::collect_file_metrics(&files);
+    let all_functions = analysis_utils::extract_all_functions(&file_metrics);
+    let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);
     let duplications = detect_duplications(&files, duplication_threshold);
 
     let complexity_report = build_complexity_report(&all_functions, complexity_threshold);
@@ -203,18 +203,6 @@ fn analyze_project(
         dependencies,
         duplications,
     })
-}
-
-fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
-    analysis_utils::collect_file_metrics(files)
-}
-
-fn extract_all_functions(file_metrics: &[FileMetrics]) -> Vec<core::FunctionMetrics> {
-    analysis_utils::extract_all_functions(file_metrics)
-}
-
-fn extract_all_debt_items(file_metrics: &[FileMetrics]) -> Vec<core::DebtItem> {
-    analysis_utils::extract_all_debt_items(file_metrics)
 }
 
 const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.8;
