@@ -312,6 +312,89 @@ fn generate_usage_hints(
     hints
 }
 
+/// Helper to format complexity metrics for display
+fn format_complexity_display(cyclomatic: &u32, cognitive: &u32) -> String {
+    format!("cyclo={cyclomatic}, cog={cognitive}")
+}
+
+/// Helper to format role description
+fn format_role_description(role: FunctionRole) -> &'static str {
+    match role {
+        FunctionRole::PureLogic => "business logic",
+        FunctionRole::Orchestrator => "orchestration",
+        FunctionRole::IOWrapper => "I/O wrapper",
+        FunctionRole::EntryPoint => "entry point",
+        FunctionRole::Unknown => "function",
+    }
+}
+
+/// Generate steps for dead code based on visibility
+fn generate_dead_code_steps(visibility: &FunctionVisibility) -> Vec<String> {
+    match visibility {
+        FunctionVisibility::Private => vec![
+            "Verify no dynamic calls or reflection usage".to_string(),
+            "Remove function definition".to_string(),
+            "Remove associated tests if any".to_string(),
+            "Check if removal enables further cleanup".to_string(),
+        ],
+        FunctionVisibility::Crate => vec![
+            "Check if function is intended as internal API".to_string(),
+            "Add documentation if keeping for future use".to_string(),
+            "Remove if truly unused".to_string(),
+            "Consider making private if only locally needed".to_string(),
+        ],
+        FunctionVisibility::Public => vec![
+            "Verify no external callers exist".to_string(),
+            "Add comprehensive documentation if keeping".to_string(),
+            "Mark as deprecated if phasing out".to_string(),
+            "Consider adding usage examples or tests".to_string(),
+        ],
+    }
+}
+
+/// Generate action and rationale for dead code
+fn generate_dead_code_action(
+    visibility: &FunctionVisibility,
+    func_name: &str,
+    cyclomatic: &u32,
+    cognitive: &u32,
+) -> (String, String) {
+    let complexity_str = format_complexity_display(cyclomatic, cognitive);
+    match visibility {
+        FunctionVisibility::Private => (
+            "Remove unused private function".to_string(),
+            format!("Private function '{func_name}' has no callers and can be safely removed (complexity: {complexity_str})"),
+        ),
+        FunctionVisibility::Crate => (
+            "Remove or document unused crate function".to_string(),
+            format!("Crate-public function '{func_name}' has no internal callers (complexity: {complexity_str})"),
+        ),
+        FunctionVisibility::Public => (
+            "Document or deprecate unused public function".to_string(),
+            format!("Public function '{func_name}' has no internal callers - may be external API (complexity: {complexity_str})"),
+        ),
+    }
+}
+
+/// Generate steps for testing gap based on complexity
+fn generate_testing_gap_steps(is_complex: bool) -> Vec<String> {
+    if is_complex {
+        vec![
+            "Identify and extract pure functions (no side effects)".to_string(),
+            "Add property-based tests for pure logic".to_string(),
+            "Replace conditionals with pattern matching where possible".to_string(),
+            "Convert loops to map/filter/fold operations".to_string(),
+            "Push I/O to the boundaries".to_string(),
+        ]
+    } else {
+        vec![
+            "Test happy path scenarios".to_string(),
+            "Add edge case tests".to_string(),
+            "Cover error conditions".to_string(),
+        ]
+    }
+}
+
 fn generate_recommendation(
     func: &FunctionMetrics,
     debt_type: &DebtType,
@@ -320,104 +403,43 @@ fn generate_recommendation(
 ) -> ActionableRecommendation {
     let (primary_action, rationale, steps) = match debt_type {
         DebtType::DeadCode { visibility, usage_hints, cyclomatic, cognitive } => {
-            let (action, rationale, steps) = match visibility {
-                FunctionVisibility::Private => (
-                    "Remove unused private function".to_string(),
-                    format!("Private function '{}' has no callers and can be safely removed (complexity: cyclo={}, cog={})", func.name, cyclomatic, cognitive),
-                    vec![
-                        "Verify no dynamic calls or reflection usage".to_string(),
-                        "Remove function definition".to_string(),
-                        "Remove associated tests if any".to_string(),
-                        "Check if removal enables further cleanup".to_string(),
-                    ]
-                ),
-                FunctionVisibility::Crate => (
-                    "Remove or document unused crate function".to_string(),
-                    format!("Crate-public function '{}' has no internal callers (complexity: cyclo={}, cog={})", func.name, cyclomatic, cognitive),
-                    vec![
-                        "Check if function is intended as internal API".to_string(),
-                        "Add documentation if keeping for future use".to_string(),
-                        "Remove if truly unused".to_string(),
-                        "Consider making private if only locally needed".to_string(),
-                    ]
-                ),
-                FunctionVisibility::Public => (
-                    "Document or deprecate unused public function".to_string(),
-                    format!("Public function '{}' has no internal callers - may be external API (complexity: cyclo={}, cog={})", func.name, cyclomatic, cognitive),
-                    vec![
-                        "Verify no external callers exist".to_string(),
-                        "Add comprehensive documentation if keeping".to_string(),
-                        "Mark as deprecated if phasing out".to_string(),
-                        "Consider adding usage examples or tests".to_string(),
-                    ]
-                ),
-            };
+            let (action, rationale) = generate_dead_code_action(visibility, &func.name, cyclomatic, cognitive);
+            let mut steps = generate_dead_code_steps(visibility);
 
             // Add usage hints to the steps
-            let mut final_steps = steps;
             for hint in usage_hints {
-                final_steps.push(format!("Note: {hint}"));
+                steps.push(format!("Note: {hint}"));
             }
 
-            (action, rationale, final_steps)
+            (action, rationale, steps)
         }
         DebtType::TestingGap {
             coverage,
             cyclomatic,
             cognitive,
         } => {
-            // Consider both cyclomatic and cognitive complexity
-            // A function is complex if either metric exceeds its threshold
             let is_complex = *cyclomatic > 10 || *cognitive > 15;
+            let coverage_pct = (coverage * 100.0) as i32;
+            let role_str = format_role_description(role);
+
             if is_complex {
-                // High complexity: recommend functional refactoring approach
                 (
-                    format!(
-                        "Extract pure functions, add property tests, then refactor (cyclo={cyclomatic} to <10, cog={cognitive} to <15)"
-                    ),
-                    {
-                        let role_str = match role {
-                            FunctionRole::PureLogic => "business logic",
-                            FunctionRole::Orchestrator => "orchestration",
-                            FunctionRole::IOWrapper => "I/O wrapper",
-                            FunctionRole::EntryPoint => "entry point",
-                            FunctionRole::Unknown => "function",
-                        };
-                        let coverage_pct = (coverage * 100.0) as i32;
-                        format!(
-                            "Complex {role_str} (cyclo={cyclomatic}, cog={cognitive}) with {coverage_pct}% coverage - extract pure logic first"
-                        )
-                    },
-                    vec![
-                        "Identify and extract pure functions (no side effects)".to_string(),
-                        "Add property-based tests for pure logic".to_string(),
-                        "Replace conditionals with pattern matching where possible".to_string(),
-                        "Convert loops to map/filter/fold operations".to_string(),
-                        "Push I/O to the boundaries".to_string(),
-                    ],
+                    format!("Extract pure functions, add property tests, then refactor (cyclo={cyclomatic} to <10, cog={cognitive} to <15)"),
+                    format!("Complex {role_str} (cyclo={cyclomatic}, cog={cognitive}) with {coverage_pct}% coverage - extract pure logic first"),
+                    generate_testing_gap_steps(true),
                 )
             } else {
-                // Simple function: just add tests
+                let role_display = match role {
+                    FunctionRole::PureLogic => "Business logic",
+                    FunctionRole::Orchestrator => "Orchestration",
+                    FunctionRole::IOWrapper => "I/O wrapper",
+                    FunctionRole::EntryPoint => "Entry point",
+                    FunctionRole::Unknown => "Function",
+                };
                 (
                     format!("Add {} unit tests for full coverage", cyclomatic.max(&2)),
-                    format!(
-                        "{} with {}% coverage, manageable complexity (cyclo={}, cog={})",
-                        match role {
-                            FunctionRole::PureLogic => "Business logic",
-                            FunctionRole::Orchestrator => "Orchestration",
-                            FunctionRole::IOWrapper => "I/O wrapper",
-                            FunctionRole::EntryPoint => "Entry point",
-                            FunctionRole::Unknown => "Function",
-                        },
-                        (coverage * 100.0) as i32,
-                        cyclomatic,
-                        cognitive
-                    ),
-                    vec![
-                        "Test happy path scenarios".to_string(),
-                        "Add edge case tests".to_string(),
-                        "Cover error conditions".to_string(),
-                    ],
+                    format!("{role_display} with {coverage_pct}% coverage, manageable complexity (cyclo={cyclomatic}, cog={cognitive})"),
+                    generate_testing_gap_steps(false),
                 )
             }
         }
@@ -786,5 +808,40 @@ mod tests {
             .implementation_steps
             .iter()
             .any(|s| s.contains("external callers")));
+    }
+
+    #[test]
+    fn test_format_role_description_pure_logic() {
+        let role = FunctionRole::PureLogic;
+        let description = format_role_description(role);
+        assert_eq!(description, "business logic");
+    }
+
+    #[test]
+    fn test_format_role_description_orchestrator() {
+        let role = FunctionRole::Orchestrator;
+        let description = format_role_description(role);
+        assert_eq!(description, "orchestration");
+    }
+
+    #[test]
+    fn test_format_role_description_io_wrapper() {
+        let role = FunctionRole::IOWrapper;
+        let description = format_role_description(role);
+        assert_eq!(description, "I/O wrapper");
+    }
+
+    #[test]
+    fn test_format_role_description_entry_point() {
+        let role = FunctionRole::EntryPoint;
+        let description = format_role_description(role);
+        assert_eq!(description, "entry point");
+    }
+
+    #[test]
+    fn test_format_role_description_unknown() {
+        let role = FunctionRole::Unknown;
+        let description = format_role_description(role);
+        assert_eq!(description, "function");
     }
 }
