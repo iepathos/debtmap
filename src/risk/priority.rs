@@ -560,6 +560,70 @@ mod tests {
     }
 
     #[test]
+    fn test_complexity_to_test_effort_trivial() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 2,
+            cognitive_complexity: 3,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Trivial);
+        assert_eq!(effort.cognitive_load, 3);
+        assert_eq!(effort.branch_count, 2);
+        assert_eq!(effort.recommended_test_cases, 3);
+    }
+
+    #[test]
+    fn test_complexity_to_test_effort_simple() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 8,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Simple);
+        assert_eq!(effort.cognitive_load, 8);
+        assert_eq!(effort.branch_count, 5);
+        assert_eq!(effort.recommended_test_cases, 6);
+    }
+
+    #[test]
+    fn test_complexity_to_test_effort_moderate() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 16,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Moderate);
+        assert_eq!(effort.cognitive_load, 16);
+        assert_eq!(effort.branch_count, 10);
+        assert_eq!(effort.recommended_test_cases, 11);
+    }
+
+    #[test]
+    fn test_complexity_to_test_effort_complex() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 15,
+            cognitive_complexity: 30,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Complex);
+        assert_eq!(effort.cognitive_load, 30);
+        assert_eq!(effort.branch_count, 15);
+        assert_eq!(effort.recommended_test_cases, 16);
+    }
+
+    #[test]
     fn test_calculate_edge_weight_api_and_model() {
         let api_target = TestTarget {
             id: "api".to_string(),
