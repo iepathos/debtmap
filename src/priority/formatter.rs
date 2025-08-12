@@ -614,4 +614,29 @@ mod tests {
             "DUPLICATION"
         );
     }
+
+    #[test]
+    fn test_format_role_pure_logic() {
+        assert_eq!(format_role(FunctionRole::PureLogic), "PureLogic");
+    }
+
+    #[test]
+    fn test_format_role_orchestrator() {
+        assert_eq!(format_role(FunctionRole::Orchestrator), "Orchestrator");
+    }
+
+    #[test]
+    fn test_format_role_io_wrapper() {
+        assert_eq!(format_role(FunctionRole::IOWrapper), "IOWrapper");
+    }
+
+    #[test]
+    fn test_format_role_entry_point() {
+        assert_eq!(format_role(FunctionRole::EntryPoint), "EntryPoint");
+    }
+
+    #[test]
+    fn test_format_role_unknown() {
+        assert_eq!(format_role(FunctionRole::Unknown), "Unknown");
+    }
 }
