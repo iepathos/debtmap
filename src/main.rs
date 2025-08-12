@@ -2150,4 +2150,70 @@ mod tests {
         let _writer = create_file_writer(&mut buffer, io::output::OutputFormat::Markdown);
         // Just verify it doesn't panic
     }
+
+    #[test]
+    fn test_create_provider_critical_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let provider = create_provider("critical_path", temp_dir.path());
+        assert!(provider.is_some());
+
+        // Verify it's the correct provider type by checking its name
+        let provider = provider.unwrap();
+        assert_eq!(provider.name(), "critical_path");
+        // Verify weight is positive
+        assert!(provider.weight() > 0.0);
+    }
+
+    #[test]
+    fn test_create_provider_dependency() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let provider = create_provider("dependency", temp_dir.path());
+        assert!(provider.is_some());
+
+        // Verify it's the correct provider type by checking its name
+        let provider = provider.unwrap();
+        assert_eq!(provider.name(), "dependency_risk");
+        // Verify weight is positive
+        assert!(provider.weight() > 0.0);
+    }
+
+    #[test]
+    fn test_create_provider_git_history() {
+        // Create a temporary directory with a git repo
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Initialize git repo
+        std::process::Command::new("git")
+            .arg("init")
+            .current_dir(temp_dir.path())
+            .output()
+            .expect("Failed to init git repo");
+
+        // Create provider - should succeed with valid git repo
+        let provider = create_provider("git_history", temp_dir.path());
+        assert!(provider.is_some());
+
+        // Test with non-git directory
+        let non_git_dir = tempfile::tempdir().unwrap();
+        let provider_none = create_provider("git_history", non_git_dir.path());
+        // Git history provider returns None for non-git directories
+        assert!(provider_none.is_none());
+    }
+
+    #[test]
+    fn test_create_provider_unknown() {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Test with unknown provider name
+        let provider = create_provider("unknown_provider", temp_dir.path());
+        assert!(provider.is_none());
+
+        // Test with empty string
+        let provider_empty = create_provider("", temp_dir.path());
+        assert!(provider_empty.is_none());
+
+        // Test with other invalid names
+        let provider_invalid = create_provider("invalid", temp_dir.path());
+        assert!(provider_invalid.is_none());
+    }
 }
