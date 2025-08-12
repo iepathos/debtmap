@@ -520,4 +520,237 @@ mod tests {
             ModuleType::Test
         );
     }
+
+    #[test]
+    fn test_calculate_edge_weight_entry_point_and_core() {
+        let entry_target = TestTarget {
+            id: "entry".to_string(),
+            path: PathBuf::from("src/main.rs"),
+            function: Some("main".to_string()),
+            line: 1,
+            module_type: ModuleType::EntryPoint,
+            current_coverage: 0.0,
+            current_risk: 5.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 50,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        let core_target = TestTarget {
+            id: "core".to_string(),
+            path: PathBuf::from("src/core/engine.rs"),
+            function: Some("process".to_string()),
+            line: 10,
+            module_type: ModuleType::Core,
+            current_coverage: 0.0,
+            current_risk: 8.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 100,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        assert_eq!(calculate_edge_weight(&entry_target), 0.5);
+        assert_eq!(calculate_edge_weight(&core_target), 0.8);
+    }
+
+    #[test]
+    fn test_complexity_to_test_effort_trivial() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 2,
+            cognitive_complexity: 3,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Trivial);
+        assert_eq!(effort.cognitive_load, 3);
+        assert_eq!(effort.branch_count, 2);
+        assert_eq!(effort.recommended_test_cases, 3);
+    }
+
+    #[test]
+    fn test_complexity_to_test_effort_simple() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 8,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Simple);
+        assert_eq!(effort.cognitive_load, 8);
+        assert_eq!(effort.branch_count, 5);
+        assert_eq!(effort.recommended_test_cases, 6);
+    }
+
+    #[test]
+    fn test_complexity_to_test_effort_moderate() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 16,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Moderate);
+        assert_eq!(effort.cognitive_load, 16);
+        assert_eq!(effort.branch_count, 10);
+        assert_eq!(effort.recommended_test_cases, 11);
+    }
+
+    #[test]
+    fn test_complexity_to_test_effort_complex() {
+        let complexity = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 15,
+            cognitive_complexity: 30,
+        };
+
+        let effort = complexity_to_test_effort(&complexity);
+
+        assert_eq!(effort.estimated_difficulty, Difficulty::Complex);
+        assert_eq!(effort.cognitive_load, 30);
+        assert_eq!(effort.branch_count, 15);
+        assert_eq!(effort.recommended_test_cases, 16);
+    }
+
+    #[test]
+    fn test_calculate_edge_weight_api_and_model() {
+        let api_target = TestTarget {
+            id: "api".to_string(),
+            path: PathBuf::from("src/api/handler.rs"),
+            function: Some("handle_request".to_string()),
+            line: 5,
+            module_type: ModuleType::Api,
+            current_coverage: 0.0,
+            current_risk: 3.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 30,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        let model_target = TestTarget {
+            id: "model".to_string(),
+            path: PathBuf::from("src/models/user.rs"),
+            function: Some("validate".to_string()),
+            line: 15,
+            module_type: ModuleType::Model,
+            current_coverage: 0.0,
+            current_risk: 10.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 40,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        assert_eq!(calculate_edge_weight(&api_target), 0.24);
+        assert_eq!(calculate_edge_weight(&model_target), 0.8);
+    }
+
+    #[test]
+    fn test_calculate_edge_weight_io_and_other() {
+        let io_target = TestTarget {
+            id: "io".to_string(),
+            path: PathBuf::from("src/io/file.rs"),
+            function: Some("read_file".to_string()),
+            line: 20,
+            module_type: ModuleType::IO,
+            current_coverage: 0.0,
+            current_risk: 6.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 60,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        let utility_target = TestTarget {
+            id: "util".to_string(),
+            path: PathBuf::from("src/utils/helper.rs"),
+            function: Some("format_string".to_string()),
+            line: 25,
+            module_type: ModuleType::Utility,
+            current_coverage: 0.0,
+            current_risk: 2.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 20,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        assert!((calculate_edge_weight(&io_target) - 0.36).abs() < 1e-10);
+        assert!((calculate_edge_weight(&utility_target) - 0.08).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_calculate_edge_weight_risk_factor_capping() {
+        let high_risk_target = TestTarget {
+            id: "high_risk".to_string(),
+            path: PathBuf::from("src/main.rs"),
+            function: Some("critical".to_string()),
+            line: 1,
+            module_type: ModuleType::EntryPoint,
+            current_coverage: 0.0,
+            current_risk: 20.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 100,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        let extreme_risk_target = TestTarget {
+            id: "extreme_risk".to_string(),
+            path: PathBuf::from("src/core/critical.rs"),
+            function: Some("process".to_string()),
+            line: 1,
+            module_type: ModuleType::Core,
+            current_coverage: 0.0,
+            current_risk: 50.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 200,
+            priority_score: 0.0,
+            debt_items: 10,
+        };
+
+        let zero_risk_target = TestTarget {
+            id: "zero_risk".to_string(),
+            path: PathBuf::from("src/api/safe.rs"),
+            function: Some("safe_handler".to_string()),
+            line: 1,
+            module_type: ModuleType::Api,
+            current_coverage: 100.0,
+            current_risk: 0.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 10,
+            priority_score: 0.0,
+            debt_items: 0,
+        };
+
+        assert_eq!(calculate_edge_weight(&high_risk_target), 1.5);
+        assert_eq!(calculate_edge_weight(&extreme_risk_target), 1.5);
+        assert_eq!(calculate_edge_weight(&zero_risk_target), 0.0);
+    }
 }

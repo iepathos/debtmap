@@ -267,4 +267,103 @@ mod tests {
         assert_eq!(intimate.len(), 1);
         assert!(intimate.contains(&("A".to_string(), "B".to_string())));
     }
+
+    #[test]
+    fn test_identify_coupling_issues_no_issues() {
+        let mut metrics = HashMap::new();
+
+        let mut metric1 = CouplingMetrics {
+            module: "module1".to_string(),
+            afferent_coupling: 2,
+            efferent_coupling: 2,
+            instability: 0.0,
+            abstractness: 0.0,
+        };
+        metric1.calculate_instability();
+
+        let mut metric2 = CouplingMetrics {
+            module: "module2".to_string(),
+            afferent_coupling: 1,
+            efferent_coupling: 1,
+            instability: 0.0,
+            abstractness: 0.0,
+        };
+        metric2.calculate_instability();
+
+        metrics.insert("module1".to_string(), metric1);
+        metrics.insert("module2".to_string(), metric2);
+
+        let issues = identify_coupling_issues(&metrics, 5);
+        assert_eq!(issues.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_coupling_issues_high_coupling() {
+        let mut metrics = HashMap::new();
+
+        let mut metric = CouplingMetrics {
+            module: "highly_coupled".to_string(),
+            afferent_coupling: 8,
+            efferent_coupling: 2,
+            instability: 0.0,
+            abstractness: 0.0,
+        };
+        metric.calculate_instability();
+
+        metrics.insert("highly_coupled".to_string(), metric);
+
+        let issues = identify_coupling_issues(&metrics, 5);
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("high coupling"));
+        assert!(issues[0].contains("highly_coupled"));
+        assert!(issues[0].contains("afferent: 8"));
+    }
+
+    #[test]
+    fn test_identify_coupling_issues_stable_dependencies_violation() {
+        let mut metrics = HashMap::new();
+
+        let mut metric = CouplingMetrics {
+            module: "unstable_but_depended_on".to_string(),
+            afferent_coupling: 3,
+            efferent_coupling: 14,
+            instability: 0.0,
+            abstractness: 0.0,
+        };
+        metric.calculate_instability();
+
+        metrics.insert("unstable_but_depended_on".to_string(), metric);
+
+        let issues = identify_coupling_issues(&metrics, 20);
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("Stable Dependencies Principle"));
+        assert!(issues[0].contains("unstable_but_depended_on"));
+    }
+
+    #[test]
+    fn test_identify_coupling_issues_multiple_problems() {
+        let mut metrics = HashMap::new();
+
+        let mut metric = CouplingMetrics {
+            module: "problematic".to_string(),
+            afferent_coupling: 3,
+            efferent_coupling: 13,
+            instability: 0.0,
+            abstractness: 0.0,
+        };
+        metric.calculate_instability();
+
+        metrics.insert("problematic".to_string(), metric);
+
+        let issues = identify_coupling_issues(&metrics, 5);
+        assert_eq!(issues.len(), 2);
+
+        let has_coupling_issue = issues.iter().any(|i| i.contains("high coupling"));
+        let has_sdp_issue = issues
+            .iter()
+            .any(|i| i.contains("Stable Dependencies Principle"));
+
+        assert!(has_coupling_issue);
+        assert!(has_sdp_issue);
+    }
 }

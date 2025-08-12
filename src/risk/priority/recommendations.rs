@@ -461,4 +461,189 @@ mod tests {
         let result = describe_coverage_status(&target);
         assert_eq!(result, "Well tested");
     }
+
+    #[test]
+    fn test_complexity_level_simple() {
+        assert_eq!(RationaleBuilder::complexity_level(0), "Simple");
+        assert_eq!(RationaleBuilder::complexity_level(3), "Simple");
+        assert_eq!(RationaleBuilder::complexity_level(7), "Simple");
+    }
+
+    #[test]
+    fn test_complexity_level_moderate() {
+        assert_eq!(RationaleBuilder::complexity_level(8), "Moderate");
+        assert_eq!(RationaleBuilder::complexity_level(12), "Moderate");
+        assert_eq!(RationaleBuilder::complexity_level(15), "Moderate");
+    }
+
+    #[test]
+    fn test_complexity_level_complex() {
+        assert_eq!(RationaleBuilder::complexity_level(16), "Complex");
+        assert_eq!(RationaleBuilder::complexity_level(23), "Complex");
+        assert_eq!(RationaleBuilder::complexity_level(30), "Complex");
+    }
+
+    #[test]
+    fn test_complexity_level_very_complex() {
+        assert_eq!(RationaleBuilder::complexity_level(31), "Very complex");
+        assert_eq!(RationaleBuilder::complexity_level(50), "Very complex");
+        assert_eq!(RationaleBuilder::complexity_level(100), "Very complex");
+    }
+
+    #[test]
+    fn test_effort_description_easy_win() {
+        // Test case for (1..=3, 1..=7) => " - easy win"
+        assert_eq!(RationaleBuilder::effort_description(1, 1), " - easy win");
+        assert_eq!(RationaleBuilder::effort_description(2, 5), " - easy win");
+        assert_eq!(RationaleBuilder::effort_description(3, 7), " - easy win");
+    }
+
+    #[test]
+    fn test_effort_description_quick_test() {
+        // Test case for (1..=5, 1..=10) => " - quick test"
+        // This matches when cyclomatic is 4-5 with cognitive 1-10
+        // or cyclomatic 1-3 with cognitive 8-10 (not already caught by easy win)
+        assert_eq!(RationaleBuilder::effort_description(4, 8), " - quick test");
+        assert_eq!(RationaleBuilder::effort_description(5, 10), " - quick test");
+        assert_eq!(RationaleBuilder::effort_description(1, 9), " - quick test");
+    }
+
+    #[test]
+    fn test_effort_description_moderate_effort() {
+        // Test case for (6..=10, _) => " - moderate effort"
+        assert_eq!(
+            RationaleBuilder::effort_description(6, 1),
+            " - moderate effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(8, 15),
+            " - moderate effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(10, 100),
+            " - moderate effort"
+        );
+    }
+
+    #[test]
+    fn test_effort_description_requires_effort() {
+        // Test case for _ => " - requires effort"
+        // This matches when cyclomatic > 10, or cyclomatic > 5 with cognitive > 10
+        assert_eq!(
+            RationaleBuilder::effort_description(11, 1),
+            " - requires effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(15, 20),
+            " - requires effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(5, 11),
+            " - requires effort"
+        );
+        assert_eq!(
+            RationaleBuilder::effort_description(0, 0),
+            " - requires effort"
+        );
+    }
+
+    #[test]
+    fn test_describe_complexity_simple() {
+        // Test max_complexity in range 0..=2 -> "simple"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 0,
+            cognitive_complexity: 0,
+        };
+        assert_eq!(describe_complexity(&metrics), "simple");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 4, // 4/2 = 2
+            cognitive_complexity: 8,  // 8/4 = 2
+        };
+        assert_eq!(describe_complexity(&metrics), "simple");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 2, // 2/2 = 1
+            cognitive_complexity: 4,  // 4/4 = 1
+        };
+        assert_eq!(describe_complexity(&metrics), "simple");
+    }
+
+    #[test]
+    fn test_describe_complexity_moderately_complex() {
+        // Test max_complexity in range 3..=5 -> "moderately complex"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 6, // 6/2 = 3
+            cognitive_complexity: 12, // 12/4 = 3
+        };
+        assert_eq!(describe_complexity(&metrics), "moderately complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 10, // 10/2 = 5
+            cognitive_complexity: 16,  // 16/4 = 4
+        };
+        assert_eq!(describe_complexity(&metrics), "moderately complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 8, // 8/2 = 4
+            cognitive_complexity: 20, // 20/4 = 5
+        };
+        assert_eq!(describe_complexity(&metrics), "moderately complex");
+    }
+
+    #[test]
+    fn test_describe_complexity_highly_complex() {
+        // Test max_complexity in range 6..=10 -> "highly complex"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 12, // 12/2 = 6
+            cognitive_complexity: 24,  // 24/4 = 6
+        };
+        assert_eq!(describe_complexity(&metrics), "highly complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 20, // 20/2 = 10
+            cognitive_complexity: 32,  // 32/4 = 8
+        };
+        assert_eq!(describe_complexity(&metrics), "highly complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 16, // 16/2 = 8
+            cognitive_complexity: 40,  // 40/4 = 10
+        };
+        assert_eq!(describe_complexity(&metrics), "highly complex");
+    }
+
+    #[test]
+    fn test_describe_complexity_extremely_complex() {
+        // Test max_complexity > 10 -> "extremely complex"
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 22, // 22/2 = 11
+            cognitive_complexity: 44,  // 44/4 = 11
+        };
+        assert_eq!(describe_complexity(&metrics), "extremely complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 50, // 50/2 = 25
+            cognitive_complexity: 100, // 100/4 = 25
+        };
+        assert_eq!(describe_complexity(&metrics), "extremely complex");
+
+        let metrics = ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: 30, // 30/2 = 15
+            cognitive_complexity: 80,  // 80/4 = 20
+        };
+        assert_eq!(describe_complexity(&metrics), "extremely complex");
+    }
 }
