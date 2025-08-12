@@ -295,4 +295,108 @@ mod tests {
         assert_eq!(p1.async_await_count, 3);
         assert_eq!(p1.callback_depth, 3);
     }
+
+    #[test]
+    fn test_detect_method_chain_simple() {
+        let code = r#"
+            fn example() {
+                foo.bar().baz().qux();
+            }
+        "#;
+
+        let file = syn::parse_file(code).unwrap();
+        let mut detector = PatternDetector::default();
+
+        // Visit the AST to detect patterns
+        detector.visit_file(&file);
+
+        // Method chain of length 3 should be detected
+        assert!(detector.patterns.method_chain_length >= 3);
+    }
+
+    #[test]
+    fn test_detect_method_chain_no_crash_on_fields() {
+        // Test that field accesses don't crash the detector
+        // Note: Currently field-only chains aren't tracked by the visitor
+        let code = r#"
+            fn example() {
+                let value = obj.field1.field2.field3;
+            }
+        "#;
+
+        let file = syn::parse_file(code).unwrap();
+        let mut detector = PatternDetector::default();
+
+        // Visit the AST to detect patterns - should not panic
+        detector.visit_file(&file);
+
+        // Field-only chains currently aren't detected since visit_expr doesn't handle Expr::Field
+        // This test ensures the detector doesn't crash on field expressions
+        assert_eq!(detector.patterns.method_chain_length, 0);
+    }
+
+    #[test]
+    fn test_detect_method_chain_mixed() {
+        let code = r#"
+            fn example() {
+                let result = obj.field.method().another_field.final_method();
+            }
+        "#;
+
+        let file = syn::parse_file(code).unwrap();
+        let mut detector = PatternDetector::default();
+
+        // Visit the AST to detect patterns
+        detector.visit_file(&file);
+
+        // Mixed chain of length 4 should be detected
+        assert!(detector.patterns.method_chain_length >= 4);
+    }
+
+    #[test]
+    fn test_detect_method_chain_single_expr() {
+        let code = r#"
+            fn example() {
+                let x = simple_var;
+                let y = function_call();
+            }
+        "#;
+
+        let file = syn::parse_file(code).unwrap();
+        let mut detector = PatternDetector::default();
+
+        // Visit the AST to detect patterns
+        detector.visit_file(&file);
+
+        // No significant chain should be detected (chain length 0 or 1)
+        assert!(detector.patterns.method_chain_length <= 1);
+    }
+
+    #[test]
+    fn test_detect_method_chain_direct_call() {
+        // Test the detect_method_chain function directly to ensure full coverage
+        use syn::parse_quote;
+
+        let mut detector = PatternDetector::default();
+
+        // Test with a method chain
+        let method_chain: Expr = parse_quote!(foo.bar().baz().qux());
+        let length = detector.detect_method_chain(&method_chain);
+        assert_eq!(length, 3);
+
+        // Test with field accesses
+        let field_chain: Expr = parse_quote!(obj.field1.field2);
+        let field_length = detector.detect_method_chain(&field_chain);
+        assert_eq!(field_length, 2);
+
+        // Test with a simple identifier (no chain)
+        let simple: Expr = parse_quote!(variable);
+        let simple_length = detector.detect_method_chain(&simple);
+        assert_eq!(simple_length, 0);
+
+        // Test with mixed method and field
+        let mixed: Expr = parse_quote!(obj.field.method());
+        let mixed_length = detector.detect_method_chain(&mixed);
+        assert_eq!(mixed_length, 2);
+    }
 }
