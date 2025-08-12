@@ -155,6 +155,7 @@ mod tests {
             nesting: 2,
             length: 25,
             is_test: false,
+            visibility: None,
         }];
 
         AnalysisResults {

@@ -212,6 +212,7 @@ mod tests {
             cognitive,
             nesting: 0,
             is_test: false,
+            visibility: None,
         }
     }
 

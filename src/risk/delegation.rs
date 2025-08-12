@@ -37,6 +37,7 @@ mod tests {
             nesting: 0,
             length: 1,
             is_test: false,
+            visibility: None,
         };
         assert!(is_trivial_delegation(&trivial));
 
@@ -49,6 +50,7 @@ mod tests {
             nesting: 0,
             length: 3,
             is_test: false,
+            visibility: None,
         };
         assert!(is_trivial_delegation(&simple));
 
@@ -61,6 +63,7 @@ mod tests {
             nesting: 2,
             length: 20,
             is_test: false,
+            visibility: None,
         };
         assert!(!is_trivial_delegation(&complex));
     }
@@ -76,6 +79,7 @@ mod tests {
             nesting: 0,
             length: 1,
             is_test: false,
+            visibility: None,
         };
         assert_eq!(calculate_complexity_weight(&trivial), 0.1);
 
@@ -88,6 +92,7 @@ mod tests {
             nesting: 0,
             length: 10,
             is_test: false,
+            visibility: None,
         };
         assert_eq!(calculate_complexity_weight(&simple), 0.5);
 
@@ -100,6 +105,7 @@ mod tests {
             nesting: 3,
             length: 50,
             is_test: false,
+            visibility: None,
         };
         assert_eq!(calculate_complexity_weight(&complex), 1.0);
     }

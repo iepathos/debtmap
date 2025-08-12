@@ -209,6 +209,7 @@ fn extract_functions_from_stmts(
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
                     is_test: func_def.name.starts_with("test_"),
+                    visibility: None, // Python doesn't have explicit visibility modifiers
                 });
 
                 // Recursively look for nested functions
@@ -232,6 +233,7 @@ fn extract_functions_from_stmts(
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
                     is_test: func_def.name.starts_with("test_"),
+                    visibility: None, // Python doesn't have explicit visibility modifiers
                 });
 
                 // Recursively look for nested functions

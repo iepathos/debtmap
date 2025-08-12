@@ -211,6 +211,19 @@ impl FunctionVisitor {
 
         let is_test = has_test_attribute || self.in_test_module;
 
+        // Extract visibility information
+        let visibility = match &item_fn.vis {
+            syn::Visibility::Public(_) => Some("pub".to_string()),
+            syn::Visibility::Restricted(restricted) => {
+                if restricted.path.is_ident("crate") {
+                    Some("pub(crate)".to_string())
+                } else {
+                    Some(format!("pub({})", quote::quote!(#restricted.path)))
+                }
+            }
+            syn::Visibility::Inherited => None,
+        };
+
         let metrics = FunctionMetrics {
             name,
             file: self.current_file.clone(),
@@ -220,6 +233,7 @@ impl FunctionVisitor {
             nesting: calculate_nesting(&item_fn.block),
             length: count_function_lines(item_fn),
             is_test,
+            visibility,
         };
 
         self.functions.push(metrics);
@@ -256,9 +270,11 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     fn visit_impl_item_fn(&mut self, impl_fn: &'ast syn::ImplItemFn) {
         let name = impl_fn.sig.ident.to_string();
         let line = self.get_line_number(impl_fn.sig.ident.span());
+        // Use the actual visibility from impl_fn
+        let vis = impl_fn.vis.clone();
         let item_fn = syn::ItemFn {
             attrs: impl_fn.attrs.clone(),
-            vis: syn::Visibility::Inherited,
+            vis,
             sig: impl_fn.sig.clone(),
             block: Box::new(impl_fn.block.clone()),
         };
@@ -305,6 +321,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     nesting,
                     length,
                     is_test: self.in_test_module, // Closures in test modules are test-related
+                    visibility: None,             // Closures are always private
                 };
 
                 self.functions.push(metrics);
