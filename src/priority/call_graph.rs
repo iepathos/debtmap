@@ -208,15 +208,17 @@ impl CallGraph {
         to_visit.push_back((func_id.clone(), 0));
 
         while let Some((current, depth)) = to_visit.pop_front() {
-            if depth >= max_depth || visited.contains(&current) {
+            if visited.contains(&current) {
                 continue;
             }
 
             visited.insert(current.clone());
 
-            for caller in self.get_callers(&current) {
-                if !visited.contains(&caller) {
-                    to_visit.push_back((caller, depth + 1));
+            if depth < max_depth {
+                for caller in self.get_callers(&current) {
+                    if !visited.contains(&caller) {
+                        to_visit.push_back((caller, depth + 1));
+                    }
                 }
             }
         }
@@ -424,5 +426,303 @@ mod tests {
         });
 
         assert!(graph.detect_delegation_pattern(&orchestrator));
+    }
+
+    #[test]
+    fn test_get_transitive_callers_single_level() {
+        let mut graph = CallGraph::new();
+
+        let a = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_a".to_string(),
+            line: 1,
+        };
+        let b = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_b".to_string(),
+            line: 10,
+        };
+        let c = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_c".to_string(),
+            line: 20,
+        };
+
+        graph.add_function(a.clone(), false, false, 1, 10);
+        graph.add_function(b.clone(), false, false, 1, 10);
+        graph.add_function(c.clone(), false, false, 1, 10);
+
+        // a -> b, c -> b (b has two callers)
+        graph.add_call(FunctionCall {
+            caller: a.clone(),
+            callee: b.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: c.clone(),
+            callee: b.clone(),
+            call_type: CallType::Direct,
+        });
+
+        let callers = graph.get_transitive_callers(&b, 1);
+        assert_eq!(callers.len(), 2);
+        assert!(callers.contains(&a));
+        assert!(callers.contains(&c));
+    }
+
+    #[test]
+    fn test_get_transitive_callers_multi_level() {
+        let mut graph = CallGraph::new();
+
+        let a = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_a".to_string(),
+            line: 1,
+        };
+        let b = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_b".to_string(),
+            line: 10,
+        };
+        let c = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_c".to_string(),
+            line: 20,
+        };
+        let d = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_d".to_string(),
+            line: 30,
+        };
+
+        graph.add_function(a.clone(), false, false, 1, 10);
+        graph.add_function(b.clone(), false, false, 1, 10);
+        graph.add_function(c.clone(), false, false, 1, 10);
+        graph.add_function(d.clone(), false, false, 1, 10);
+
+        // a -> b -> c -> d (chain of calls)
+        graph.add_call(FunctionCall {
+            caller: a.clone(),
+            callee: b.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: b.clone(),
+            callee: c.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: c.clone(),
+            callee: d.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Get all transitive callers of d with max_depth 3
+        let callers = graph.get_transitive_callers(&d, 3);
+        assert_eq!(callers.len(), 3);
+        assert!(callers.contains(&a));
+        assert!(callers.contains(&b));
+        assert!(callers.contains(&c));
+
+        // Test with limited depth
+        let callers_depth_1 = graph.get_transitive_callers(&d, 1);
+        assert_eq!(callers_depth_1.len(), 1);
+        assert!(callers_depth_1.contains(&c));
+
+        let callers_depth_2 = graph.get_transitive_callers(&d, 2);
+        assert_eq!(callers_depth_2.len(), 2);
+        assert!(callers_depth_2.contains(&b));
+        assert!(callers_depth_2.contains(&c));
+    }
+
+    #[test]
+    fn test_get_transitive_callers_with_cycles() {
+        let mut graph = CallGraph::new();
+
+        let a = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_a".to_string(),
+            line: 1,
+        };
+        let b = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_b".to_string(),
+            line: 10,
+        };
+        let c = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_c".to_string(),
+            line: 20,
+        };
+
+        graph.add_function(a.clone(), false, false, 1, 10);
+        graph.add_function(b.clone(), false, false, 1, 10);
+        graph.add_function(c.clone(), false, false, 1, 10);
+
+        // Create a cycle: a -> b -> c -> a
+        graph.add_call(FunctionCall {
+            caller: a.clone(),
+            callee: b.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: b.clone(),
+            callee: c.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: c.clone(),
+            callee: a.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Should handle cycles without infinite loop
+        let callers = graph.get_transitive_callers(&a, 10);
+        assert_eq!(callers.len(), 2);
+        assert!(callers.contains(&b));
+        assert!(callers.contains(&c));
+    }
+
+    #[test]
+    fn test_get_transitive_callers_no_callers() {
+        let mut graph = CallGraph::new();
+
+        let a = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_a".to_string(),
+            line: 1,
+        };
+        let b = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_b".to_string(),
+            line: 10,
+        };
+
+        graph.add_function(a.clone(), false, false, 1, 10);
+        graph.add_function(b.clone(), false, false, 1, 10);
+
+        // a -> b (a calls b, so b has one caller but a has none)
+        graph.add_call(FunctionCall {
+            caller: a.clone(),
+            callee: b.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // a has no callers
+        let callers = graph.get_transitive_callers(&a, 5);
+        assert_eq!(callers.len(), 0);
+    }
+
+    #[test]
+    fn test_get_transitive_callers_complex_graph() {
+        let mut graph = CallGraph::new();
+
+        // Create a complex graph structure
+        //      a
+        //     / \
+        //    b   c
+        //    |\ /|
+        //    | X |
+        //    |/ \|
+        //    d   e
+        //     \ /
+        //      f
+
+        let a = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_a".to_string(),
+            line: 1,
+        };
+        let b = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_b".to_string(),
+            line: 10,
+        };
+        let c = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_c".to_string(),
+            line: 20,
+        };
+        let d = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_d".to_string(),
+            line: 30,
+        };
+        let e = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_e".to_string(),
+            line: 40,
+        };
+        let f = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "func_f".to_string(),
+            line: 50,
+        };
+
+        graph.add_function(a.clone(), false, false, 1, 10);
+        graph.add_function(b.clone(), false, false, 1, 10);
+        graph.add_function(c.clone(), false, false, 1, 10);
+        graph.add_function(d.clone(), false, false, 1, 10);
+        graph.add_function(e.clone(), false, false, 1, 10);
+        graph.add_function(f.clone(), false, false, 1, 10);
+
+        // Add edges
+        graph.add_call(FunctionCall {
+            caller: a.clone(),
+            callee: b.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: a.clone(),
+            callee: c.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: b.clone(),
+            callee: d.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: b.clone(),
+            callee: e.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: c.clone(),
+            callee: d.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: c.clone(),
+            callee: e.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: d.clone(),
+            callee: f.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: e.clone(),
+            callee: f.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Test transitive callers of f
+        let callers_f = graph.get_transitive_callers(&f, 10);
+        assert_eq!(callers_f.len(), 5); // All except f itself
+        assert!(callers_f.contains(&a));
+        assert!(callers_f.contains(&b));
+        assert!(callers_f.contains(&c));
+        assert!(callers_f.contains(&d));
+        assert!(callers_f.contains(&e));
+
+        // Test with limited depth
+        let callers_f_depth_2 = graph.get_transitive_callers(&f, 2);
+        assert_eq!(callers_f_depth_2.len(), 4); // d, e, b, c
+        assert!(callers_f_depth_2.contains(&d));
+        assert!(callers_f_depth_2.contains(&e));
+        assert!(callers_f_depth_2.contains(&b));
+        assert!(callers_f_depth_2.contains(&c));
     }
 }
