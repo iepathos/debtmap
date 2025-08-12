@@ -498,4 +498,290 @@ mod tests {
         let weight = analyzer.calculate_path_weight(&entry);
         assert_eq!(weight, 2.0);
     }
+
+    #[test]
+    fn test_gather_with_no_entry_points() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "some_function".to_string(),
+            file_path: PathBuf::from("src/lib.rs"),
+            line_range: (10, 20),
+        };
+
+        let result = provider.gather(&target).unwrap();
+
+        assert_eq!(result.provider, "critical_path");
+        assert_eq!(result.contribution, 0.0);
+        if let ContextDetails::CriticalPath {
+            entry_points,
+            path_weight,
+            is_user_facing,
+        } = result.details
+        {
+            assert!(entry_points.is_empty());
+            assert_eq!(path_weight, 0.0);
+            assert!(!is_user_facing);
+        } else {
+            panic!("Expected CriticalPath context details");
+        }
+    }
+
+    #[test]
+    fn test_gather_with_non_user_facing_entry_point() {
+        let mut analyzer = CriticalPathAnalyzer::new();
+
+        // Add an event handler entry point (non-user-facing)
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "handle_event".to_string(),
+            file_path: PathBuf::from("src/events.rs"),
+            entry_type: EntryType::EventHandler,
+            is_user_facing: false,
+        });
+
+        // Add the function to the call graph
+        analyzer.call_graph.add_edge(
+            "handle_event".to_string(),
+            "process_data".to_string(),
+            PathBuf::from("src/events.rs"),
+        );
+
+        let provider = CriticalPathProvider::new(analyzer);
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "handle_event".to_string(),
+            file_path: PathBuf::from("src/events.rs"),
+            line_range: (20, 40),
+        };
+
+        let result = provider.gather(&target).unwrap();
+
+        assert_eq!(result.provider, "critical_path");
+        assert_eq!(result.contribution, 0.5); // 5.0 / 10.0 for non-user-facing
+        if let ContextDetails::CriticalPath {
+            entry_points,
+            path_weight,
+            is_user_facing,
+        } = result.details
+        {
+            assert_eq!(entry_points.len(), 1);
+            assert_eq!(path_weight, 5.0);
+            assert!(!is_user_facing);
+            assert!(entry_points[0].contains("handle_event"));
+        } else {
+            panic!("Expected CriticalPath context details");
+        }
+    }
+
+    #[test]
+    fn test_gather_with_user_facing_entry_point() {
+        let mut analyzer = CriticalPathAnalyzer::new();
+
+        // Add a main entry point (user-facing)
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "main".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: EntryType::Main,
+            is_user_facing: true,
+        });
+
+        // Add the function to the call graph
+        analyzer.call_graph.add_edge(
+            "main".to_string(),
+            "init".to_string(),
+            PathBuf::from("src/main.rs"),
+        );
+
+        let provider = CriticalPathProvider::new(analyzer);
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "main".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            line_range: (1, 10),
+        };
+
+        let result = provider.gather(&target).unwrap();
+
+        assert_eq!(result.provider, "critical_path");
+        assert_eq!(result.contribution, 2.0); // (10.0 / 10.0) * 2.0 for user-facing
+        if let ContextDetails::CriticalPath {
+            entry_points,
+            path_weight,
+            is_user_facing,
+        } = result.details
+        {
+            assert_eq!(entry_points.len(), 1);
+            assert_eq!(path_weight, 10.0);
+            assert!(is_user_facing);
+            assert!(entry_points[0].contains("main"));
+        } else {
+            panic!("Expected CriticalPath context details");
+        }
+    }
+
+    #[test]
+    fn test_gather_with_multiple_entry_points() {
+        let mut analyzer = CriticalPathAnalyzer::new();
+
+        // Add multiple entry points with different weights
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "main".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: EntryType::Main,
+            is_user_facing: true,
+        });
+
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "handle_api".to_string(),
+            file_path: PathBuf::from("src/api.rs"),
+            entry_type: EntryType::ApiEndpoint,
+            is_user_facing: true,
+        });
+
+        // Add shared function to both paths
+        analyzer.call_graph.add_edge(
+            "main".to_string(),
+            "shared_function".to_string(),
+            PathBuf::from("src/main.rs"),
+        );
+        analyzer.call_graph.add_edge(
+            "handle_api".to_string(),
+            "shared_function".to_string(),
+            PathBuf::from("src/api.rs"),
+        );
+
+        let provider = CriticalPathProvider::new(analyzer);
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "shared_function".to_string(),
+            file_path: PathBuf::from("src/shared.rs"),
+            line_range: (50, 100),
+        };
+
+        let result = provider.gather(&target).unwrap();
+
+        assert_eq!(result.provider, "critical_path");
+        // Should use the max weight (main = 10.0) and double it for user-facing
+        assert_eq!(result.contribution, 2.0); // (10.0 / 10.0) * 2.0
+        if let ContextDetails::CriticalPath {
+            entry_points,
+            path_weight,
+            is_user_facing,
+        } = result.details
+        {
+            assert_eq!(entry_points.len(), 2);
+            assert_eq!(path_weight, 10.0); // max of main (10.0) and api (8.0)
+            assert!(is_user_facing);
+            // Check both entry points are included
+            let entry_str = entry_points.join(" ");
+            assert!(entry_str.contains("main"));
+            assert!(entry_str.contains("handle_api"));
+        } else {
+            panic!("Expected CriticalPath context details");
+        }
+    }
+
+    #[test]
+    fn test_explain_with_empty_entry_points() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.0,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec![],
+                path_weight: 0.0,
+                is_user_facing: false,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "Not on any critical path");
+    }
+
+    #[test]
+    fn test_explain_with_single_path_not_user_facing() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.5,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec!["main".to_string()],
+                path_weight: 5.0,
+                is_user_facing: false,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "On 1 critical path(s) with weight 5.0");
+    }
+
+    #[test]
+    fn test_explain_with_multiple_paths_user_facing() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.8,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec!["main".to_string(), "handle_request".to_string()],
+                path_weight: 10.5,
+                is_user_facing: true,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(
+            explanation,
+            "On 2 critical path(s) with weight 10.5 (user-facing)"
+        );
+    }
+
+    #[test]
+    fn test_explain_with_non_critical_path_context() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.0,
+            details: ContextDetails::DependencyChain {
+                depth: 3,
+                propagated_risk: 0.5,
+                dependents: vec![],
+                blast_radius: 0,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "No critical path information");
+    }
+
+    #[test]
+    fn test_explain_with_multiple_entry_points_formatting() {
+        let analyzer = CriticalPathAnalyzer::new();
+        let provider = CriticalPathProvider::new(analyzer);
+        let context = Context {
+            provider: "critical_path".to_string(),
+            weight: 1.5,
+            contribution: 0.6,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec![
+                    "main".to_string(),
+                    "api_handler".to_string(),
+                    "cli_command".to_string(),
+                ],
+                path_weight: 8.7,
+                is_user_facing: false,
+            },
+        };
+
+        let explanation = provider.explain(&context);
+        assert_eq!(explanation, "On 3 critical path(s) with weight 8.7");
+    }
 }
