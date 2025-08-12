@@ -15,16 +15,11 @@ pub fn is_likely_external_api(
         return (false, vec![]);
     }
 
-    // Check if in lib.rs or mod.rs (module boundary)
-    if let Some(file_name) = func.file.file_name() {
-        let name = file_name.to_string_lossy();
-        if name == "lib.rs" {
-            confidence_score += 3;
-            indicators.push("Defined in lib.rs (library root)".to_string());
-        } else if name == "mod.rs" {
-            confidence_score += 2;
-            indicators.push("Defined in mod.rs (module root)".to_string());
-        }
+    // Check module boundary indicators
+    let (boundary_score, boundary_indicator) = classify_module_boundary(&func.file);
+    confidence_score += boundary_score;
+    if let Some(indicator) = boundary_indicator {
+        indicators.push(indicator);
     }
 
     // Check if re-exported in lib.rs (would need call graph info)
@@ -34,50 +29,89 @@ pub fn is_likely_external_api(
         indicators.push("In public module hierarchy".to_string());
     }
 
-    // Check for common API patterns in function name
-    if has_api_pattern_in_name(&func.name) {
-        confidence_score += 2;
-        indicators.push(format!("API pattern in name: {}", func.name));
-    }
-
-    // Check for builder/factory patterns
-    if is_builder_or_factory(&func.name) {
-        confidence_score += 2;
-        indicators.push("Builder/factory pattern detected".to_string());
-    }
-
-    // Check for trait implementations (would need more AST info)
-    if func.name.starts_with("from_") || func.name == "new" || func.name == "default" {
-        confidence_score += 2;
-        indicators.push("Common trait method pattern".to_string());
-    }
-
-    // Check if it's a constructor or initialization function
-    if is_constructor_pattern(&func.name) {
-        confidence_score += 3;
-        indicators.push("Constructor/initialization pattern".to_string());
-    }
-
-    // Functions with specific prefixes that indicate public API
-    if has_public_api_prefix(&func.name) {
-        confidence_score += 2;
-        indicators.push("Public API prefix detected".to_string());
-    }
+    // Check for API naming patterns
+    let (pattern_score, pattern_indicators) = classify_api_patterns(&func.name);
+    confidence_score += pattern_score;
+    indicators.extend(pattern_indicators);
 
     // Check module path depth - deeper paths less likely to be external API
-    let path_depth = func.file.components().count();
-    if path_depth <= 3 {
-        confidence_score += 1;
-        indicators.push("Shallow module path (likely public)".to_string());
-    } else if path_depth > 5 {
-        confidence_score -= 1;
-        indicators.push("Deep module path (likely internal)".to_string());
+    let (depth_score, depth_indicator) = classify_path_depth(&func.file);
+    confidence_score += depth_score;
+    if let Some(indicator) = depth_indicator {
+        indicators.push(indicator);
     }
 
     // Decision threshold
     let is_likely_api = confidence_score >= 4;
 
     (is_likely_api, indicators)
+}
+
+/// Classify module boundary indicators (lib.rs, mod.rs)
+fn classify_module_boundary(path: &Path) -> (i32, Option<String>) {
+    if let Some(file_name) = path.file_name() {
+        let name = file_name.to_string_lossy();
+        match name.as_ref() {
+            "lib.rs" => (3, Some("Defined in lib.rs (library root)".to_string())),
+            "mod.rs" => (2, Some("Defined in mod.rs (module root)".to_string())),
+            _ => (0, None),
+        }
+    } else {
+        (0, None)
+    }
+}
+
+/// Classify API patterns in function names
+fn classify_api_patterns(name: &str) -> (i32, Vec<String>) {
+    let mut score = 0;
+    let mut indicators = Vec::new();
+
+    // Check for common API patterns
+    if has_api_pattern_in_name(name) {
+        score += 2;
+        indicators.push(format!("API pattern in name: {name}"));
+    }
+
+    // Check for builder/factory patterns
+    if is_builder_or_factory(name) {
+        score += 2;
+        indicators.push("Builder/factory pattern detected".to_string());
+    }
+
+    // Check for trait implementations
+    if is_trait_method_pattern(name) {
+        score += 2;
+        indicators.push("Common trait method pattern".to_string());
+    }
+
+    // Check for constructor patterns (gets higher score)
+    if is_constructor_pattern(name) {
+        score += 3;
+        indicators.push("Constructor/initialization pattern".to_string());
+    }
+
+    // Check for public API prefixes
+    if has_public_api_prefix(name) {
+        score += 2;
+        indicators.push("Public API prefix detected".to_string());
+    }
+
+    (score, indicators)
+}
+
+/// Check if function name matches trait method patterns
+fn is_trait_method_pattern(name: &str) -> bool {
+    name.starts_with("from_") || name == "new" || name == "default"
+}
+
+/// Classify module path depth
+fn classify_path_depth(path: &Path) -> (i32, Option<String>) {
+    let path_depth = path.components().count();
+    match path_depth {
+        0..=3 => (1, Some("Shallow module path (likely public)".to_string())),
+        4..=5 => (0, None),
+        _ => (-1, Some("Deep module path (likely internal)".to_string())),
+    }
 }
 
 /// Check if the file is in a public module hierarchy
