@@ -2593,4 +2593,184 @@ end_of_record
         let provider_invalid = create_provider("invalid", temp_dir.path());
         assert!(provider_invalid.is_none());
     }
+
+    #[test]
+    fn test_validate_project_success() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        // Create a temporary directory with test files
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.rs");
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        writeln!(file, "fn simple_function() {{ println!(\"Hello\"); }}").unwrap();
+
+        // Create config for successful validation
+        let config = ValidateConfig {
+            path: temp_dir.path().to_path_buf(),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: None,
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
+        };
+
+        // Run validation - should succeed
+        let result = validate_project(config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_project_with_coverage() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        // Create temporary directory with test files
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.rs");
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        writeln!(file, "fn covered_function() {{ let x = 1 + 1; }}").unwrap();
+
+        // Create a simple LCOV file
+        let lcov_file = temp_dir.path().join("coverage.lcov");
+        let mut lcov = std::fs::File::create(&lcov_file).unwrap();
+        writeln!(lcov, "TN:").unwrap();
+        writeln!(lcov, "SF:test.rs").unwrap();
+        writeln!(lcov, "FN:1,covered_function").unwrap();
+        writeln!(lcov, "FNDA:1,covered_function").unwrap();
+        writeln!(lcov, "FNF:1").unwrap();
+        writeln!(lcov, "FNH:1").unwrap();
+        writeln!(lcov, "end_of_record").unwrap();
+
+        // Create config with coverage file
+        let config = ValidateConfig {
+            path: temp_dir.path().to_path_buf(),
+            config: None,
+            coverage_file: Some(lcov_file),
+            format: None,
+            output: None,
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
+        };
+
+        // Run validation with coverage
+        let result = validate_project(config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_project_with_output_format() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        // Create temporary directory
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("main.rs");
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        writeln!(file, "fn main() {{ println!(\"Test\"); }}").unwrap();
+
+        let output_file = temp_dir.path().join("output.json");
+
+        // Create config with JSON output format
+        let config = ValidateConfig {
+            path: temp_dir.path().to_path_buf(),
+            config: None,
+            coverage_file: None,
+            format: Some(cli::OutputFormat::Json),
+            output: Some(output_file.clone()),
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
+        };
+
+        // Run validation with output format
+        let result = validate_project(config);
+        assert!(result.is_ok());
+        // Output file should be created
+        assert!(output_file.exists());
+    }
+
+    #[test]
+    fn test_validate_project_with_context_enabled() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        // Create temporary directory with git repo
+        let temp_dir = TempDir::new().unwrap();
+
+        // Initialize git repo
+        std::process::Command::new("git")
+            .arg("init")
+            .current_dir(temp_dir.path())
+            .output()
+            .unwrap();
+
+        let test_file = temp_dir.path().join("test.rs");
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        writeln!(file, "fn context_test() {{ let x = 42; }}").unwrap();
+
+        // Add and commit file for git history
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(temp_dir.path())
+            .output()
+            .unwrap();
+
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(temp_dir.path())
+            .output()
+            .unwrap();
+
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(temp_dir.path())
+            .output()
+            .unwrap();
+
+        std::process::Command::new("git")
+            .args(["commit", "-m", "Initial commit"])
+            .current_dir(temp_dir.path())
+            .output()
+            .unwrap();
+
+        // Create config with context enabled
+        let config = ValidateConfig {
+            path: temp_dir.path().to_path_buf(),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: None,
+            enable_context: true,
+            context_providers: Some(vec!["git-history".to_string()]),
+            disable_context: None,
+            top: None,
+            priorities_only: false,
+            detailed: false,
+            semantic_off: false,
+            explain_score: false,
+        };
+
+        // Run validation with context
+        let result = validate_project(config);
+        assert!(result.is_ok());
+    }
 }
