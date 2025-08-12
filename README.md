@@ -47,6 +47,31 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 
 ## Installation
 
+### Quick Install (Recommended)
+
+Install the latest release with a single command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+```
+
+Or with wget:
+```bash
+wget -qO- https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+```
+
+This will:
+- Automatically detect your OS and architecture
+- Download the appropriate pre-built binary from the latest GitHub release
+- Install debtmap to `~/.local/bin` (or `$INSTALL_DIR` if set)
+- Provide instructions to add the install directory to your PATH if needed
+
+### Using Cargo
+
+```bash
+cargo install debtmap
+```
+
 ### From Source
 
 ```bash
@@ -56,12 +81,6 @@ cd debtmap
 
 # Build and install
 cargo install --path .
-```
-
-### Using Cargo
-
-```bash
-cargo install debtmap
 ```
 
 ## Quick Start
