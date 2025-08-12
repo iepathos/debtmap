@@ -909,7 +909,8 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use debtmap::core::{ComplexitySummary, DebtItem, DebtType, Priority};
-    use debtmap::risk::{Difficulty, FunctionRisk, RiskCategory, TestEffort};
+    use debtmap::risk::{Difficulty, FunctionRisk, RiskCategory, RiskDistribution, TestEffort};
+    use im::Vector;
     use std::path::PathBuf;
 
     #[test]
@@ -1683,5 +1684,260 @@ mod tests {
             total_debt_score < 20.0,
             "Debt score should be low since test function is excluded"
         );
+    }
+
+    #[test]
+    fn test_validate_with_risk_all_passing() {
+        // Test case 1: All metrics are well within acceptable limits
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 3.5, // Well below 10.0
+                    max_complexity: 8,
+                    high_complexity_count: 1,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![DebtItem {
+                    id: "debt-1".to_string(),
+                    debt_type: DebtType::Todo,
+                    priority: Priority::Low,
+                    file: PathBuf::from("test.rs"),
+                    line: 10,
+                    message: "TODO: Minor cleanup".to_string(),
+                    context: None,
+                }], // Only 1 item, well below 150
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![Priority::Low],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let insights = risk::RiskInsight {
+            top_risks: Vector::from(vec![FunctionRisk {
+                function_name: "low_risk_func".to_string(),
+                file: PathBuf::from("test.rs"),
+                line_range: (10, 20),
+                cyclomatic_complexity: 3,
+                cognitive_complexity: 4,
+                risk_score: 2.5, // Below 7.0 threshold
+                coverage_percentage: Some(0.8),
+                test_effort: TestEffort {
+                    estimated_difficulty: Difficulty::Trivial,
+                    cognitive_load: 4,
+                    branch_count: 2,
+                    recommended_test_cases: 2,
+                },
+                risk_category: RiskCategory::Low,
+                is_test_function: false,
+            }]),
+            codebase_risk_score: 4.5, // Below 7.0
+            risk_reduction_opportunities: Vector::new(),
+            complexity_coverage_correlation: None,
+            risk_distribution: RiskDistribution {
+                critical_count: 0,
+                high_count: 0,
+                medium_count: 0,
+                low_count: 1,
+                well_tested_count: 0,
+                total_functions: 1,
+            },
+        };
+
+        assert!(validate_with_risk(&results, &insights));
+    }
+
+    #[test]
+    fn test_validate_with_risk_high_complexity_fails() {
+        // Test case 2: High average complexity causes failure
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 10,
+                    average_complexity: 15.0, // Above 10.0 threshold
+                    max_complexity: 25,
+                    high_complexity_count: 5,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let insights = risk::RiskInsight {
+            top_risks: Vector::new(),
+            codebase_risk_score: 5.0, // Still acceptable
+            risk_reduction_opportunities: Vector::new(),
+            complexity_coverage_correlation: None,
+            risk_distribution: RiskDistribution {
+                critical_count: 0,
+                high_count: 0,
+                medium_count: 0,
+                low_count: 0,
+                well_tested_count: 0,
+                total_functions: 0,
+            },
+        };
+
+        assert!(!validate_with_risk(&results, &insights));
+    }
+
+    #[test]
+    fn test_validate_with_risk_too_many_high_risk_functions() {
+        // Test case 3: Too many high-risk functions (5 or more)
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 20,
+                    average_complexity: 5.0, // Acceptable
+                    max_complexity: 10,
+                    high_complexity_count: 2,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let mut high_risk_functions = vec![];
+        for i in 0..5 {
+            high_risk_functions.push(FunctionRisk {
+                function_name: format!("high_risk_func_{i}"),
+                file: PathBuf::from("test.rs"),
+                line_range: (i * 20, i * 20 + 15),
+                cyclomatic_complexity: 12,
+                cognitive_complexity: 18,
+                risk_score: 8.5, // Above 7.0 threshold
+                coverage_percentage: Some(0.0),
+                test_effort: TestEffort {
+                    estimated_difficulty: Difficulty::Complex,
+                    cognitive_load: 18,
+                    branch_count: 10,
+                    recommended_test_cases: 8,
+                },
+                risk_category: RiskCategory::High,
+                is_test_function: false,
+            });
+        }
+
+        let insights = risk::RiskInsight {
+            top_risks: Vector::from(high_risk_functions),
+            codebase_risk_score: 6.5, // Still below 7.0
+            risk_reduction_opportunities: Vector::new(),
+            complexity_coverage_correlation: None,
+            risk_distribution: RiskDistribution {
+                critical_count: 0,
+                high_count: 5,
+                medium_count: 0,
+                low_count: 0,
+                well_tested_count: 0,
+                total_functions: 5,
+            },
+        };
+
+        assert!(!validate_with_risk(&results, &insights));
+    }
+
+    #[test]
+    fn test_validate_with_risk_excessive_technical_debt() {
+        // Test case 4: Too many technical debt items (150 or more)
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 30,
+                    average_complexity: 4.0, // Acceptable
+                    max_complexity: 8,
+                    high_complexity_count: 1,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: (0..150)
+                    .map(|i| DebtItem {
+                        id: format!("debt-{i}"),
+                        debt_type: DebtType::Todo,
+                        priority: Priority::Low,
+                        file: PathBuf::from(format!("test{}.rs", i % 10)),
+                        line: (i * 10) as usize,
+                        message: format!("TODO: Item {i}"),
+                        context: None,
+                    })
+                    .collect(), // Exactly 150 items
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![Priority::Low],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let insights = risk::RiskInsight {
+            top_risks: Vector::from(vec![FunctionRisk {
+                function_name: "moderate_risk".to_string(),
+                file: PathBuf::from("test.rs"),
+                line_range: (10, 30),
+                cyclomatic_complexity: 5,
+                cognitive_complexity: 7,
+                risk_score: 5.0, // Below threshold
+                coverage_percentage: Some(0.6),
+                test_effort: TestEffort {
+                    estimated_difficulty: Difficulty::Moderate,
+                    cognitive_load: 7,
+                    branch_count: 4,
+                    recommended_test_cases: 3,
+                },
+                risk_category: RiskCategory::Medium,
+                is_test_function: false,
+            }]),
+            codebase_risk_score: 6.0, // Below 7.0
+            risk_reduction_opportunities: Vector::new(),
+            complexity_coverage_correlation: None,
+            risk_distribution: RiskDistribution {
+                critical_count: 0,
+                high_count: 0,
+                medium_count: 1,
+                low_count: 0,
+                well_tested_count: 0,
+                total_functions: 1,
+            },
+        };
+
+        assert!(!validate_with_risk(&results, &insights));
     }
 }
