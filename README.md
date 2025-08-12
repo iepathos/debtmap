@@ -63,8 +63,8 @@ wget -qO- https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh |
 This will:
 - Automatically detect your OS and architecture
 - Download the appropriate pre-built binary from the latest GitHub release
-- Install debtmap to `~/.local/bin` (or `$INSTALL_DIR` if set)
-- Provide instructions to add the install directory to your PATH if needed
+- Install debtmap to `~/.cargo/bin` if it exists, otherwise `~/.local/bin` (or `$INSTALL_DIR` if set)
+- Offer to automatically add the install directory to your PATH if needed
 
 ### Using Cargo
 

@@ -14,7 +14,12 @@ NC='\033[0m' # No Color
 
 # Configuration
 REPO="iepathos/debtmap"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+# Default to cargo bin directory if it exists, otherwise use .local/bin
+if [ -d "$HOME/.cargo/bin" ]; then
+    INSTALL_DIR="${INSTALL_DIR:-$HOME/.cargo/bin}"
+else
+    INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+fi
 GITHUB_API="https://api.github.com/repos/${REPO}"
 
 # Helper functions
@@ -147,18 +152,99 @@ download_and_install() {
     success "debtmap installed successfully!"
 }
 
-# Check if install directory is in PATH
+# Check if install directory is in PATH and offer to add it
 check_path() {
     if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
         echo ""
         info "Note: ${INSTALL_DIR} is not in your PATH"
-        echo "Add it to your shell configuration file:"
-        echo ""
-        echo "  export PATH=\"\$PATH:${INSTALL_DIR}\""
-        echo ""
-        echo "For bash, add to ~/.bashrc or ~/.bash_profile"
-        echo "For zsh, add to ~/.zshrc"
-        echo "For fish, run: set -U fish_user_paths ${INSTALL_DIR} \$fish_user_paths"
+        
+        # Detect the current shell
+        SHELL_NAME=$(basename "$SHELL")
+        
+        # Determine the appropriate config file
+        case "$SHELL_NAME" in
+            bash)
+                if [ -f "$HOME/.bash_profile" ]; then
+                    SHELL_CONFIG="$HOME/.bash_profile"
+                elif [ -f "$HOME/.bashrc" ]; then
+                    SHELL_CONFIG="$HOME/.bashrc"
+                else
+                    SHELL_CONFIG="$HOME/.bashrc"
+                fi
+                ;;
+            zsh)
+                SHELL_CONFIG="$HOME/.zshrc"
+                ;;
+            fish)
+                SHELL_CONFIG="$HOME/.config/fish/config.fish"
+                ;;
+            *)
+                SHELL_CONFIG=""
+                ;;
+        esac
+        
+        if [ -n "$SHELL_CONFIG" ]; then
+            echo ""
+            echo "Would you like to add ${INSTALL_DIR} to your PATH automatically?"
+            echo "This will add the following line to ${SHELL_CONFIG}:"
+            echo ""
+            if [ "$SHELL_NAME" = "fish" ]; then
+                echo "  fish_add_path ${INSTALL_DIR}"
+            else
+                echo "  export PATH=\"\$PATH:${INSTALL_DIR}\""
+            fi
+            echo ""
+            read -p "Add to PATH? [y/N] " -n 1 -r
+            echo ""
+            
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                # Check if PATH export already exists in the config file
+                if [ "$SHELL_NAME" = "fish" ]; then
+                    if grep -q "fish_add_path.*${INSTALL_DIR}" "$SHELL_CONFIG" 2>/dev/null; then
+                        info "PATH entry for ${INSTALL_DIR} already exists in ${SHELL_CONFIG}"
+                    else
+                        echo "" >> "$SHELL_CONFIG"
+                        echo "# Added by debtmap installer" >> "$SHELL_CONFIG"
+                        echo "fish_add_path ${INSTALL_DIR}" >> "$SHELL_CONFIG"
+                        success "Added ${INSTALL_DIR} to PATH in ${SHELL_CONFIG}"
+                    fi
+                else
+                    # Check if the PATH export already exists (handle both forms)
+                    if grep -q "${INSTALL_DIR}" "$SHELL_CONFIG" 2>/dev/null; then
+                        info "PATH entry for ${INSTALL_DIR} already exists in ${SHELL_CONFIG}"
+                    else
+                        echo "" >> "$SHELL_CONFIG"
+                        echo "# Added by debtmap installer" >> "$SHELL_CONFIG"
+                        echo "export PATH=\"\$PATH:${INSTALL_DIR}\"" >> "$SHELL_CONFIG"
+                        success "Added ${INSTALL_DIR} to PATH in ${SHELL_CONFIG}"
+                    fi
+                fi
+                echo ""
+                info "Please restart your terminal or run:"
+                echo "  source ${SHELL_CONFIG}"
+            else
+                echo ""
+                echo "To add it manually, add this line to your shell configuration:"
+                if [ "$SHELL_NAME" = "fish" ]; then
+                    echo "  fish_add_path ${INSTALL_DIR}"
+                    echo ""
+                    echo "Add to: ${SHELL_CONFIG}"
+                else
+                    echo "  export PATH=\"\$PATH:${INSTALL_DIR}\""
+                    echo ""
+                    echo "Add to: ${SHELL_CONFIG}"
+                fi
+            fi
+        else
+            echo ""
+            echo "To add it to your PATH, add this line to your shell configuration:"
+            echo "  export PATH=\"\$PATH:${INSTALL_DIR}\""
+            echo ""
+            echo "Common shell config files:"
+            echo "  - bash: ~/.bashrc or ~/.bash_profile"
+            echo "  - zsh: ~/.zshrc"
+            echo "  - fish: ~/.config/fish/config.fish"
+        fi
     fi
 }
 
