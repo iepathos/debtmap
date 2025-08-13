@@ -1,0 +1,390 @@
+use super::{
+    ComparisonResult, CouplingEvidence, CouplingIssue, CouplingMetrics, DesignPattern,
+    RemediationAction, RiskEvidence, RiskFactor, RiskSeverity, RiskType,
+};
+use crate::priority::call_graph::CallGraph;
+use crate::priority::FunctionAnalysis;
+use crate::risk::evidence::{ModuleType, RiskContext};
+use crate::risk::thresholds::{CouplingThresholds, StatisticalThresholdProvider};
+
+pub struct CouplingRiskAnalyzer {
+    thresholds: CouplingThresholds,
+    threshold_provider: StatisticalThresholdProvider,
+}
+
+impl Default for CouplingRiskAnalyzer {
+    fn default() -> Self {
+        Self {
+            thresholds: CouplingThresholds::default(),
+            threshold_provider: StatisticalThresholdProvider::new(),
+        }
+    }
+}
+
+impl CouplingRiskAnalyzer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn analyze(
+        &self,
+        function: &FunctionAnalysis,
+        context: &RiskContext,
+        call_graph: &CallGraph,
+    ) -> RiskFactor {
+        let func_id = crate::priority::call_graph::FunctionId {
+            file: function.file.clone(),
+            name: function.function.clone(),
+            line: function.line,
+        };
+
+        let afferent_coupling = call_graph.get_callers(&func_id).len() as u32;
+        let efferent_coupling = call_graph.get_callees(&func_id).len() as u32;
+        let instability = self.calculate_instability(afferent_coupling, efferent_coupling);
+        let circular_dependencies = self.detect_circular_dependencies(&func_id, call_graph);
+
+        // Module-type adjusted thresholds
+        let adjusted_thresholds = self.adjust_for_module_type(&context.module_type);
+
+        let coupling_score = self.calculate_coupling_risk(
+            afferent_coupling,
+            efferent_coupling,
+            instability,
+            circular_dependencies,
+            &adjusted_thresholds,
+        );
+
+        let comparison = self.compare_to_baseline(
+            (afferent_coupling + efferent_coupling) / 2,
+            &context.module_type,
+        );
+
+        let evidence = CouplingEvidence {
+            afferent_coupling,
+            efferent_coupling,
+            instability,
+            circular_dependencies,
+            comparison_to_baseline: comparison,
+        };
+
+        let severity = self.classify_coupling_severity(coupling_score, &adjusted_thresholds);
+        let coupling_issues = self.identify_coupling_issues(
+            afferent_coupling,
+            efferent_coupling,
+            instability,
+            circular_dependencies,
+        );
+
+        let remediation_actions = self.get_coupling_actions(
+            afferent_coupling,
+            efferent_coupling,
+            instability,
+            &coupling_issues,
+            &severity,
+        );
+
+        RiskFactor {
+            risk_type: RiskType::Coupling {
+                afferent_coupling,
+                efferent_coupling,
+                instability,
+                circular_dependencies,
+            },
+            score: coupling_score,
+            severity,
+            evidence: RiskEvidence::Coupling(evidence),
+            remediation_actions,
+            weight: self.get_weight_for_module_type(&context.module_type),
+            confidence: self.calculate_confidence(afferent_coupling + efferent_coupling),
+        }
+    }
+
+    fn calculate_instability(&self, afferent: u32, efferent: u32) -> f64 {
+        if afferent + efferent == 0 {
+            return 0.0;
+        }
+        efferent as f64 / (afferent + efferent) as f64
+    }
+
+    fn detect_circular_dependencies(
+        &self,
+        func_id: &crate::priority::call_graph::FunctionId,
+        call_graph: &CallGraph,
+    ) -> u32 {
+        // Simple circular dependency detection
+        let mut visited = std::collections::HashSet::new();
+        let mut circular_count = 0;
+
+        for callee in call_graph.get_callees(func_id) {
+            if self.has_path_back(&callee, func_id, call_graph, &mut visited, 0, 5) {
+                circular_count += 1;
+            }
+            visited.clear();
+        }
+
+        circular_count
+    }
+
+    fn has_path_back(
+        &self,
+        from: &crate::priority::call_graph::FunctionId,
+        to: &crate::priority::call_graph::FunctionId,
+        call_graph: &CallGraph,
+        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        depth: u32,
+        max_depth: u32,
+    ) -> bool {
+        if depth > max_depth {
+            return false;
+        }
+
+        if from == to {
+            return true;
+        }
+
+        if !visited.insert(from.clone()) {
+            return false;
+        }
+
+        for callee in call_graph.get_callees(from) {
+            if self.has_path_back(&callee, to, call_graph, visited, depth + 1, max_depth) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn adjust_for_module_type(&self, module_type: &ModuleType) -> CouplingThresholds {
+        let base_thresholds = self.threshold_provider.get_coupling_thresholds(module_type);
+
+        match module_type {
+            ModuleType::Util => CouplingThresholds {
+                // Utilities should have low coupling
+                low: base_thresholds.low,
+                moderate: base_thresholds.moderate,
+                high: base_thresholds.high,
+                critical: base_thresholds.critical,
+            },
+            ModuleType::Core => CouplingThresholds {
+                // Core modules can have higher coupling
+                low: base_thresholds.low * 2,
+                moderate: base_thresholds.moderate * 2,
+                high: base_thresholds.high * 2,
+                critical: base_thresholds.critical * 2,
+            },
+            ModuleType::Api => CouplingThresholds {
+                // API modules have moderate coupling tolerance
+                low: (base_thresholds.low as f64 * 1.5) as u32,
+                moderate: (base_thresholds.moderate as f64 * 1.5) as u32,
+                high: (base_thresholds.high as f64 * 1.5) as u32,
+                critical: (base_thresholds.critical as f64 * 1.5) as u32,
+            },
+            ModuleType::Test => CouplingThresholds {
+                // Test modules can have high coupling
+                low: base_thresholds.low * 3,
+                moderate: base_thresholds.moderate * 3,
+                high: base_thresholds.high * 3,
+                critical: base_thresholds.critical * 3,
+            },
+            ModuleType::Infrastructure => base_thresholds,
+        }
+    }
+
+    fn calculate_coupling_risk(
+        &self,
+        afferent: u32,
+        efferent: u32,
+        instability: f64,
+        circular: u32,
+        thresholds: &CouplingThresholds,
+    ) -> f64 {
+        let total_coupling = afferent + efferent;
+        let coupling_score = self.score_coupling(total_coupling, thresholds);
+        let instability_score = self.score_instability(instability);
+        let circular_score = self.score_circular(circular);
+
+        // Weighted average: coupling 50%, instability 30%, circular 20%
+        coupling_score * 0.5 + instability_score * 0.3 + circular_score * 0.2
+    }
+
+    fn score_coupling(&self, coupling: u32, thresholds: &CouplingThresholds) -> f64 {
+        if coupling <= thresholds.low {
+            coupling as f64 / thresholds.low as f64 * 2.5
+        } else if coupling <= thresholds.moderate {
+            2.5 + (coupling - thresholds.low) as f64 / (thresholds.moderate - thresholds.low) as f64
+                * 2.5
+        } else if coupling <= thresholds.high {
+            5.0 + (coupling - thresholds.moderate) as f64
+                / (thresholds.high - thresholds.moderate) as f64
+                * 2.5
+        } else if coupling <= thresholds.critical {
+            7.5 + (coupling - thresholds.high) as f64
+                / (thresholds.critical - thresholds.high) as f64
+                * 2.0
+        } else {
+            9.5 + ((coupling - thresholds.critical) as f64 / thresholds.critical as f64 * 0.5)
+                .min(0.5)
+        }
+    }
+
+    fn score_instability(&self, instability: f64) -> f64 {
+        // Ideal instability is around 0.5 (balanced)
+        // Too stable (0.0) or too unstable (1.0) are both risky
+        let deviation = (instability - 0.5).abs();
+        deviation * 20.0 // Scale to 0-10
+    }
+
+    fn score_circular(&self, circular: u32) -> f64 {
+        match circular {
+            0 => 0.0,
+            1 => 3.0,
+            2 => 6.0,
+            3 => 8.0,
+            _ => 10.0,
+        }
+    }
+
+    fn classify_coupling_severity(
+        &self,
+        score: f64,
+        _thresholds: &CouplingThresholds,
+    ) -> RiskSeverity {
+        match score {
+            s if s <= 2.0 => RiskSeverity::None,
+            s if s <= 4.0 => RiskSeverity::Low,
+            s if s <= 6.0 => RiskSeverity::Moderate,
+            s if s <= 8.0 => RiskSeverity::High,
+            _ => RiskSeverity::Critical,
+        }
+    }
+
+    fn compare_to_baseline(&self, avg_coupling: u32, module_type: &ModuleType) -> ComparisonResult {
+        let baseline = self.threshold_provider.get_coupling_thresholds(module_type);
+
+        if avg_coupling <= baseline.low {
+            ComparisonResult::BelowMedian
+        } else if avg_coupling <= baseline.moderate {
+            ComparisonResult::AboveMedian
+        } else if avg_coupling <= baseline.high {
+            ComparisonResult::AboveP75
+        } else if avg_coupling <= baseline.critical {
+            ComparisonResult::AboveP90
+        } else {
+            ComparisonResult::AboveP95
+        }
+    }
+
+    fn identify_coupling_issues(
+        &self,
+        afferent: u32,
+        efferent: u32,
+        instability: f64,
+        circular: u32,
+    ) -> Vec<CouplingIssue> {
+        let mut issues = Vec::new();
+
+        if circular > 0 {
+            issues.push(CouplingIssue::CircularDependency(format!(
+                "{circular} circular dependencies detected"
+            )));
+        }
+
+        if !(0.2..=0.8).contains(&instability) {
+            issues.push(CouplingIssue::HighInstability);
+        }
+
+        if afferent + efferent > 20 {
+            issues.push(CouplingIssue::TooManyDependencies);
+        }
+
+        if afferent > 15 {
+            issues.push(CouplingIssue::GodClass);
+        }
+
+        issues
+    }
+
+    fn get_coupling_actions(
+        &self,
+        afferent: u32,
+        efferent: u32,
+        instability: f64,
+        issues: &[CouplingIssue],
+        severity: &RiskSeverity,
+    ) -> Vec<RemediationAction> {
+        match severity {
+            RiskSeverity::None | RiskSeverity::Low => vec![],
+            RiskSeverity::Moderate => vec![RemediationAction::ReduceCoupling {
+                current_coupling: CouplingMetrics {
+                    afferent,
+                    efferent,
+                    instability,
+                },
+                coupling_issues: issues.to_vec(),
+                suggested_patterns: vec![DesignPattern::DependencyInjection],
+                estimated_effort_hours: 2,
+            }],
+            RiskSeverity::High => vec![RemediationAction::ReduceCoupling {
+                current_coupling: CouplingMetrics {
+                    afferent,
+                    efferent,
+                    instability,
+                },
+                coupling_issues: issues.to_vec(),
+                suggested_patterns: vec![
+                    DesignPattern::DependencyInjection,
+                    DesignPattern::FacadePattern,
+                    DesignPattern::AdapterPattern,
+                ],
+                estimated_effort_hours: 4,
+            }],
+            RiskSeverity::Critical => vec![
+                RemediationAction::ReduceCoupling {
+                    current_coupling: CouplingMetrics {
+                        afferent,
+                        efferent,
+                        instability,
+                    },
+                    coupling_issues: issues.to_vec(),
+                    suggested_patterns: vec![
+                        DesignPattern::DependencyInjection,
+                        DesignPattern::StrategyPattern,
+                        DesignPattern::ObserverPattern,
+                        DesignPattern::FacadePattern,
+                        DesignPattern::AdapterPattern,
+                    ],
+                    estimated_effort_hours: 8,
+                },
+                RemediationAction::ExtractLogic {
+                    extraction_candidates: vec![],
+                    pure_function_opportunities: efferent / 3,
+                    testability_improvement: 0.4,
+                },
+            ],
+        }
+    }
+
+    fn get_weight_for_module_type(&self, module_type: &ModuleType) -> f64 {
+        match module_type {
+            ModuleType::Core => 1.0,           // Full weight for core modules
+            ModuleType::Api => 0.9,            // High weight for API modules
+            ModuleType::Infrastructure => 0.7, // Moderate weight for infrastructure
+            ModuleType::Util => 0.8,           // Good weight for utilities
+            ModuleType::Test => 0.3,           // Low weight for test modules
+        }
+    }
+
+    fn calculate_confidence(&self, total_coupling: u32) -> f64 {
+        // More connections means more confidence in the analysis
+        if total_coupling == 0 {
+            0.5 // Low confidence for isolated functions
+        } else if total_coupling < 5 {
+            0.7
+        } else if total_coupling < 15 {
+            0.85
+        } else {
+            0.95
+        }
+    }
+}

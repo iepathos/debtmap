@@ -8,10 +8,7 @@ use anyhow::Result;
 use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use syn::visit::Visit;
-use syn::{
-    File, ImplItem, ItemImpl, ItemTrait, Path as SynPath, TraitItem,
-    Type, TypePath,
-};
+use syn::{File, ImplItem, ItemImpl, ItemTrait, Path as SynPath, TraitItem, Type, TypePath};
 
 /// Information about a trait method
 #[derive(Debug, Clone)]
