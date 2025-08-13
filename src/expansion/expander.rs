@@ -221,34 +221,54 @@ impl MacroExpander {
     }
 }
 
-impl super::MacroExpansion for MacroExpander {
-    fn expand_file(&mut self, path: &Path) -> Result<ExpandedFile> {
-        // Check if cargo-expand is available
-        if !self.check_cargo_expand()? {
-            if self.config.fallback_on_error {
+impl MacroExpander {
+    /// Validate cargo-expand availability and return appropriate error
+    fn validate_cargo_expand(&self, is_available: bool, fallback_on_error: bool) -> Result<()> {
+        if !is_available {
+            if fallback_on_error {
                 bail!("cargo-expand not available. Install with: cargo install cargo-expand");
             } else {
                 bail!("cargo-expand required but not found");
             }
         }
+        Ok(())
+    }
 
-        // Check cache first
+    /// Try to retrieve cached expansion if valid
+    fn try_cached_expansion(&self, path: &Path, hash: &str) -> Result<Option<ExpandedFile>> {
+        self.cache.get(path, hash)
+    }
+
+    /// Perform the actual file expansion process
+    fn perform_expansion(
+        &self,
+        path: &Path,
+        module_path: &str,
+        manifest: &Path,
+    ) -> Result<ExpandedFile> {
+        let expanded_content = self.run_cargo_expand(module_path, manifest)?;
+        self.parse_expansion(expanded_content, path)
+    }
+}
+
+impl super::MacroExpansion for MacroExpander {
+    fn expand_file(&mut self, path: &Path) -> Result<ExpandedFile> {
+        // Validate cargo-expand availability
+        let is_available = self.check_cargo_expand()?;
+        self.validate_cargo_expand(is_available, self.config.fallback_on_error)?;
+
+        // Try cache first
         let hash = self.compute_file_hash(path)?;
-        if let Some(cached) = self.cache.get(path, &hash)? {
+        if let Some(cached) = self.try_cached_expansion(path, &hash)? {
             return Ok(cached);
         }
 
-        // Find manifest
+        // Prepare expansion parameters
         let manifest = self.find_manifest(path)?;
-
-        // Get module path
         let module_path = self.get_module_path(path)?;
 
-        // Run expansion
-        let expanded_content = self.run_cargo_expand(&module_path, &manifest)?;
-
-        // Parse and create expanded file
-        let expanded = self.parse_expansion(expanded_content, path)?;
+        // Perform expansion
+        let expanded = self.perform_expansion(path, &module_path, &manifest)?;
 
         // Cache the result
         self.cache.store(path, &hash, &expanded)?;
