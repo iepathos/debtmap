@@ -952,6 +952,18 @@ fn create_unified_analysis(
             continue;
         }
 
+        // Skip trivial functions with minimal complexity and no real logic
+        // These are typically simple getters, setters, or one-line delegations
+        if metric.cyclomatic == 1 && metric.cognitive == 0 && metric.length <= 5 {
+            // Check if it's a simple delegation (calls exactly one function)
+            let callees = call_graph.get_callees(&func_id);
+            if callees.len() <= 1 {
+                // This is either a trivial wrapper or a simple getter/setter
+                // Not worth tracking as technical debt
+                continue;
+            }
+        }
+
         let roi_score = 5.0; // Default ROI
         let item =
             unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data, roi_score);
