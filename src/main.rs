@@ -849,6 +849,17 @@ fn create_unified_analysis(
             continue;
         }
 
+        // Skip test helper functions (functions only called by test functions)
+        let func_id = priority::call_graph::FunctionId {
+            file: metric.file.clone(),
+            name: metric.name.clone(),
+            line: metric.line,
+        };
+
+        if call_graph.is_test_helper(&func_id) {
+            continue;
+        }
+
         let roi_score = 5.0; // Default ROI
         let item =
             unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data, roi_score);
