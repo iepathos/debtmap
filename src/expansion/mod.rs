@@ -33,7 +33,7 @@ pub struct ExpansionConfig {
 impl Default for ExpansionConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true, // Default to enabled for accurate analysis
             cache_dir: PathBuf::from(".debtmap/cache/expanded"),
             fallback_on_error: true,
             parallel: true,

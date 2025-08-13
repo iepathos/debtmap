@@ -1,0 +1,27 @@
+# Example .debtmap.toml configuration for a library project
+
+[thresholds]
+complexity = 15
+duplication = 50
+
+[external_api]
+# Enable external API detection for library projects
+detect_external_api = true
+
+# Explicitly mark specific functions as external APIs
+# These won't be flagged as dead code even if they have no internal callers
+api_functions = [
+    "parse",                    # Simple function name
+    "Parser::new",              # Specific struct method
+    "client::connect",          # Module-qualified function
+    "create_connection_pool",   # Another API function
+]
+
+# Mark entire files as containing external APIs
+# All public functions in these files will be treated as external APIs
+api_files = [
+    "src/lib.rs",              # Main library interface
+    "src/api.rs",              # Dedicated API module
+    "src/public/*.rs",         # All files in public module (glob pattern)
+    "**/api/*.rs",             # Any api directory (recursive glob)
+]

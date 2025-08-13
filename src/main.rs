@@ -31,8 +31,6 @@ struct AnalyzeConfig {
     detailed: bool,
     semantic_off: bool,
     explain_score: bool,
-    expand_macros: bool,
-    #[allow(dead_code)]
     no_expand_macros: bool,
     clear_expansion_cache: bool,
 }
@@ -79,7 +77,6 @@ fn main() -> Result<()> {
             detailed,
             semantic_off,
             explain_score,
-            expand_macros,
             no_expand_macros,
             clear_expansion_cache,
         } => {
@@ -99,7 +96,6 @@ fn main() -> Result<()> {
                 detailed,
                 semantic_off,
                 explain_score,
-                expand_macros,
                 no_expand_macros,
                 clear_expansion_cache,
             };
@@ -166,7 +162,7 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.coverage_file.as_ref(),
         config.semantic_off,
         &config.path,
-        config.expand_macros,
+        !config.no_expand_macros, // Enable by default, disable with flag
         config.clear_expansion_cache,
     )?;
 
