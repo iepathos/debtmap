@@ -308,7 +308,8 @@ pub fn generate_enhanced_dead_code_hints_with_config(
     let mut hints = Vec::new();
 
     // Get external API detection results
-    let (is_likely_api, api_indicators) = is_likely_external_api_with_config(func, visibility, config);
+    let (is_likely_api, api_indicators) =
+        is_likely_external_api_with_config(func, visibility, config);
 
     if is_likely_api {
         hints.push("Likely external API - verify before removing".to_string());

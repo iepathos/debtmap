@@ -1,6 +1,7 @@
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::external_api_detector::{
-    generate_enhanced_dead_code_hints_with_config, is_likely_external_api_with_config, ExternalApiConfig,
+    generate_enhanced_dead_code_hints_with_config, is_likely_external_api_with_config,
+    ExternalApiConfig,
 };
 use debtmap::priority::FunctionVisibility;
 use std::path::PathBuf;
@@ -40,7 +41,8 @@ fn test_lib_rs_functions_are_apis() {
     for (name, path) in test_cases {
         let func = create_function(name, path, Some("pub".to_string()));
         let visibility = FunctionVisibility::Public;
-        let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+        let (is_api, indicators) =
+            is_likely_external_api_with_config(&func, &visibility, &test_config());
 
         assert!(
             is_api,
@@ -64,7 +66,8 @@ fn test_mod_rs_functions_are_likely_apis() {
     for (name, path) in test_cases {
         let func = create_function(name, path, Some("pub".to_string()));
         let visibility = FunctionVisibility::Public;
-        let (_is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+        let (_is_api, indicators) =
+            is_likely_external_api_with_config(&func, &visibility, &test_config());
 
         assert!(
             indicators.iter().any(|i| i.contains("mod.rs")),
@@ -91,7 +94,8 @@ fn test_common_constructors_are_apis() {
     for name in constructors {
         let func = create_function(name, "src/any/path.rs", Some("pub".to_string()));
         let visibility = FunctionVisibility::Public;
-        let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+        let (is_api, indicators) =
+            is_likely_external_api_with_config(&func, &visibility, &test_config());
 
         assert!(is_api, "Constructor '{name}' should be detected as API");
         assert!(
@@ -122,7 +126,8 @@ fn test_api_pattern_prefixes() {
     for (name, expected_pattern) in api_functions {
         let func = create_function(name, "src/module.rs", Some("pub".to_string()));
         let visibility = FunctionVisibility::Public;
-        let (_is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+        let (_is_api, indicators) =
+            is_likely_external_api_with_config(&func, &visibility, &test_config());
 
         assert!(
             indicators.iter().any(|i| i.contains("API pattern")),
@@ -146,7 +151,8 @@ fn test_internal_paths_not_apis() {
     for path in internal_paths {
         let func = create_function("public_func", path, Some("pub".to_string()));
         let visibility = FunctionVisibility::Public;
-        let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+        let (is_api, indicators) =
+            is_likely_external_api_with_config(&func, &visibility, &test_config());
 
         assert!(
             !is_api,
@@ -172,8 +178,10 @@ fn test_deep_vs_shallow_paths() {
 
     let visibility = FunctionVisibility::Public;
 
-    let (shallow_is_api, shallow_indicators) = is_likely_external_api_with_config(&shallow_api, &visibility, &test_config());
-    let (deep_is_api, deep_indicators) = is_likely_external_api_with_config(&deep_internal, &visibility, &test_config());
+    let (shallow_is_api, shallow_indicators) =
+        is_likely_external_api_with_config(&shallow_api, &visibility, &test_config());
+    let (deep_is_api, deep_indicators) =
+        is_likely_external_api_with_config(&deep_internal, &visibility, &test_config());
 
     assert!(
         shallow_indicators
@@ -206,7 +214,8 @@ fn test_non_public_functions_never_apis() {
 
     for (vis_enum, vis_string) in visibilities {
         let func = create_function("new", "src/lib.rs", vis_string);
-        let (is_api, indicators) = is_likely_external_api_with_config(&func, &vis_enum, &test_config());
+        let (is_api, indicators) =
+            is_likely_external_api_with_config(&func, &vis_enum, &test_config());
 
         assert!(
             !is_api,
@@ -226,7 +235,8 @@ fn test_specific_api_prefixes() {
     for name in api_prefixed {
         let func = create_function(name, "src/some/path.rs", Some("pub".to_string()));
         let visibility = FunctionVisibility::Public;
-        let (_is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+        let (_is_api, indicators) =
+            is_likely_external_api_with_config(&func, &visibility, &test_config());
 
         assert!(
             indicators.iter().any(|i| i.contains("Public API prefix")),
@@ -241,7 +251,8 @@ fn test_enhanced_hints_generation() {
     let api_func = create_function("new", "src/lib.rs", Some("pub".to_string()));
     let visibility = FunctionVisibility::Public;
 
-    let hints = generate_enhanced_dead_code_hints_with_config(&api_func, &visibility, &test_config());
+    let hints =
+        generate_enhanced_dead_code_hints_with_config(&api_func, &visibility, &test_config());
 
     assert!(
         hints.iter().any(|h| h.contains("Likely external API")),
@@ -266,7 +277,8 @@ fn test_test_helper_detection() {
         let func = create_function(name, "src/utils.rs", Some("pub".to_string()));
         let visibility = FunctionVisibility::Public;
 
-        let hints = generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
+        let hints =
+            generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
 
         assert!(
             hints.iter().any(|h| h.contains("test helper")),
@@ -283,7 +295,8 @@ fn test_complexity_impact_hints() {
     simple_func.cognitive = 3;
 
     let visibility = FunctionVisibility::Public;
-    let hints = generate_enhanced_dead_code_hints_with_config(&simple_func, &visibility, &test_config());
+    let hints =
+        generate_enhanced_dead_code_hints_with_config(&simple_func, &visibility, &test_config());
 
     assert!(
         hints.iter().any(|h| h.contains("Low complexity")),
@@ -295,7 +308,8 @@ fn test_complexity_impact_hints() {
     complex_func.cyclomatic = 15;
     complex_func.cognitive = 20;
 
-    let hints_complex = generate_enhanced_dead_code_hints_with_config(&complex_func, &visibility, &test_config());
+    let hints_complex =
+        generate_enhanced_dead_code_hints_with_config(&complex_func, &visibility, &test_config());
 
     assert!(
         hints_complex.iter().any(|h| h.contains("High complexity")),
@@ -323,13 +337,15 @@ fn test_score_threshold_for_api_detection() {
 
     // Case 2: Multiple strong indicators - should be API
     let func2 = create_function("new", "src/lib.rs", Some("pub".to_string()));
-    let (is_api2, indicators2) = is_likely_external_api_with_config(&func2, &visibility, &test_config());
+    let (is_api2, indicators2) =
+        is_likely_external_api_with_config(&func2, &visibility, &test_config());
     assert!(is_api2, "Multiple strong indicators should classify as API");
     assert!(indicators2.len() >= 3, "Should have multiple indicators");
 
     // Case 3: Medium indicators - should be API
     let func3 = create_function("get_config", "src/mod.rs", Some("pub".to_string()));
-    let (is_api3, indicators3) = is_likely_external_api_with_config(&func3, &visibility, &test_config());
+    let (is_api3, indicators3) =
+        is_likely_external_api_with_config(&func3, &visibility, &test_config());
     assert!(is_api3, "Medium strength indicators should be enough");
     assert!(indicators3.len() >= 2, "Should have at least 2 indicators");
 }

@@ -1,7 +1,10 @@
 /// Integration tests for external API detection in the dead code analysis workflow
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::{
-    external_api_detector::{generate_enhanced_dead_code_hints_with_config, is_likely_external_api_with_config, ExternalApiConfig},
+    external_api_detector::{
+        generate_enhanced_dead_code_hints_with_config, is_likely_external_api_with_config,
+        ExternalApiConfig,
+    },
     FunctionVisibility,
 };
 use std::path::PathBuf;
@@ -36,7 +39,8 @@ fn test_workflow_public_api_in_lib_rs() {
     let visibility = FunctionVisibility::Public;
 
     // Check if it's detected as external API
-    let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+    let (is_api, indicators) =
+        is_likely_external_api_with_config(&func, &visibility, &test_config());
     assert!(is_api, "Constructor in lib.rs should be external API");
     assert!(!indicators.is_empty(), "Should have indicators");
 
@@ -82,7 +86,8 @@ fn test_workflow_private_function() {
     let func = create_test_function("internal_helper", "src/utils.rs", None);
     let visibility = FunctionVisibility::Private;
 
-    let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+    let (is_api, indicators) =
+        is_likely_external_api_with_config(&func, &visibility, &test_config());
     assert!(!is_api, "Private functions cannot be external APIs");
     assert!(
         indicators.is_empty(),
@@ -106,7 +111,8 @@ fn test_workflow_mod_rs_with_api_pattern() {
     );
     let visibility = FunctionVisibility::Public;
 
-    let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
+    let (is_api, indicators) =
+        is_likely_external_api_with_config(&func, &visibility, &test_config());
     assert!(is_api, "get_* function in mod.rs should be detected as API");
 
     // Should have multiple indicators
@@ -184,7 +190,8 @@ fn test_complexity_hints_integration() {
     func.cyclomatic = 15;
     func.cognitive = 20;
 
-    let hints_high = generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
+    let hints_high =
+        generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
     assert!(
         hints_high.iter().any(|h| h.contains("High complexity")),
         "Should indicate high complexity"
