@@ -99,6 +99,18 @@ pub fn is_likely_external_api(
     func: &FunctionMetrics,
     visibility: &FunctionVisibility,
 ) -> (bool, Vec<String>) {
+    // Check configuration
+    let config = get_config();
+    is_likely_external_api_with_config(func, visibility, config)
+}
+
+/// Internal version that accepts a config parameter (useful for testing)
+#[doc(hidden)]
+pub fn is_likely_external_api_with_config(
+    func: &FunctionMetrics,
+    visibility: &FunctionVisibility,
+    config: &ExternalApiConfig,
+) -> (bool, Vec<String>) {
     let mut indicators = Vec::new();
     let mut confidence_score = 0;
 
@@ -106,9 +118,6 @@ pub fn is_likely_external_api(
     if !matches!(visibility, FunctionVisibility::Public) {
         return (false, vec![]);
     }
-
-    // Check configuration
-    let config = get_config();
 
     // Check if explicitly marked as API (this takes precedence over detection setting)
     if is_explicitly_marked_api(func, config) {
@@ -285,10 +294,21 @@ pub fn generate_enhanced_dead_code_hints(
     func: &FunctionMetrics,
     visibility: &FunctionVisibility,
 ) -> Vec<String> {
+    let config = get_config();
+    generate_enhanced_dead_code_hints_with_config(func, visibility, config)
+}
+
+/// Internal version that accepts a config parameter (useful for testing)
+#[doc(hidden)]
+pub fn generate_enhanced_dead_code_hints_with_config(
+    func: &FunctionMetrics,
+    visibility: &FunctionVisibility,
+    config: &ExternalApiConfig,
+) -> Vec<String> {
     let mut hints = Vec::new();
 
     // Get external API detection results
-    let (is_likely_api, api_indicators) = is_likely_external_api(func, visibility);
+    let (is_likely_api, api_indicators) = is_likely_external_api_with_config(func, visibility, config);
 
     if is_likely_api {
         hints.push("Likely external API - verify before removing".to_string());
@@ -338,42 +358,47 @@ mod tests {
         }
     }
 
+    // Create a test config with detection enabled
+    fn test_config() -> ExternalApiConfig {
+        ExternalApiConfig {
+            detect_external_api: true,
+            api_functions: vec![],
+            api_files: vec![],
+        }
+    }
+
     #[test]
     fn test_lib_rs_detection() {
-        // When config is not present or detection is enabled, lib.rs functions might be APIs
         let func = create_test_function("process_data", "src/lib.rs");
         let visibility = FunctionVisibility::Public;
+        let config = test_config();
 
-        let (is_api, indicators) = is_likely_external_api(&func, &visibility);
+        let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &config);
 
-        // Without a .debtmap.toml disabling it, this could be an API
-        // The test result depends on whether detection is enabled
-        if is_api {
-            assert!(indicators.iter().any(|i| i.contains("lib.rs")));
-        }
+        assert!(is_api);
+        assert!(indicators.iter().any(|i| i.contains("lib.rs")));
     }
 
     #[test]
     fn test_constructor_pattern() {
         let func = create_test_function("new", "src/data/processor.rs");
         let visibility = FunctionVisibility::Public;
+        let config = test_config();
 
-        let (is_api, indicators) = is_likely_external_api(&func, &visibility);
+        let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &config);
 
-        // Constructor patterns are common API patterns when detection is enabled
-        if is_api {
-            assert!(indicators.iter().any(|i| i.contains("Constructor")));
-        }
+        assert!(is_api);
+        assert!(indicators.iter().any(|i| i.contains("Constructor")));
     }
 
     #[test]
     fn test_deep_internal_module() {
         let func = create_test_function("helper", "src/internal/impl/detail/utils/helpers.rs");
         let visibility = FunctionVisibility::Public;
+        let config = test_config();
 
-        let (is_api, _indicators) = is_likely_external_api(&func, &visibility);
+        let (is_api, _indicators) = is_likely_external_api_with_config(&func, &visibility, &config);
 
-        // Deep internal modules should not be APIs regardless of config
         assert!(!is_api);
     }
 
@@ -381,24 +406,20 @@ mod tests {
     fn test_api_pattern_names() {
         let func = create_test_function("get_configuration", "src/config.rs");
         let visibility = FunctionVisibility::Public;
+        let config = test_config();
 
-        let (_is_api, indicators) = is_likely_external_api(&func, &visibility);
+        let (_is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &config);
 
-        // Check that API patterns are detected when analysis runs
-        // (may be disabled by config)
-        if !indicators.iter().any(|i| i.contains("disabled")) {
-            assert!(indicators
-                .iter()
-                .any(|i| i.contains("API pattern") || i.contains("get_")));
-        }
+        assert!(indicators.iter().any(|i| i.contains("API pattern")));
     }
 
     #[test]
     fn test_private_function() {
         let func = create_test_function("internal_helper", "src/utils.rs");
         let visibility = FunctionVisibility::Private;
+        let config = test_config();
 
-        let (is_api, indicators) = is_likely_external_api(&func, &visibility);
+        let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &config);
 
         assert!(!is_api);
         assert!(indicators.is_empty());

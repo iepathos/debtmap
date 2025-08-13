@@ -23,7 +23,7 @@ default_format = "terminal"
 
 [external_api]
 # Enable automatic external API detection for testing
-detect_external_api = true
+detect_external_api = false
 
 # However, we can still explicitly mark certain functions as APIs if needed
 # (Currently empty since debtmap doesn't expose any external APIs)
