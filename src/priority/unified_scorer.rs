@@ -243,6 +243,11 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
         return true;
     }
 
+    // Closures are part of their parent function - not independent dead code
+    if func.name.contains("<closure@") {
+        return true;
+    }
+
     // Exported functions (likely FFI or API) - check for common patterns
     if func.name.contains("extern") || func.name.starts_with("__") {
         return true;

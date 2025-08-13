@@ -849,6 +849,12 @@ fn create_unified_analysis(
             continue;
         }
 
+        // Skip closures - they're part of their parent function's implementation
+        // Their complexity already contributes to the parent function's metrics
+        if metric.name.contains("<closure@") {
+            continue;
+        }
+
         // Skip test helper functions (functions only called by test functions)
         let func_id = priority::call_graph::FunctionId {
             file: metric.file.clone(),

@@ -289,14 +289,14 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
         let name = item_fn.sig.ident.to_string();
         let line = self.get_line_number(item_fn.sig.ident.span());
         self.analyze_function(name.clone(), item_fn, line);
-        
+
         // Track the current function for closures
         let prev_function = self.current_function.clone();
         self.current_function = Some(name);
-        
+
         // Continue visiting to find nested functions
         syn::visit::visit_item_fn(self, item_fn);
-        
+
         // Restore previous function context
         self.current_function = prev_function;
     }
@@ -313,14 +313,14 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             block: Box::new(impl_fn.block.clone()),
         };
         self.analyze_function(name.clone(), &item_fn, line);
-        
+
         // Track the current function for closures
         let prev_function = self.current_function.clone();
         self.current_function = Some(name);
-        
+
         // Continue visiting to find nested items
         syn::visit::visit_impl_item_fn(self, impl_fn);
-        
+
         // Restore previous function context
         self.current_function = prev_function;
     }

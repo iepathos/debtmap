@@ -115,7 +115,7 @@ fn is_untested_function(f: &FunctionRisk) -> bool {
 }
 
 fn is_closure(function_name: &str) -> bool {
-    function_name.starts_with("<closure@")
+    function_name.contains("<closure@")
 }
 
 fn has_untested_parent(
