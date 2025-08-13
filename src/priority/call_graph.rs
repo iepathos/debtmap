@@ -333,7 +333,7 @@ impl CallGraph {
         for func_id in self.nodes.keys() {
             functions_by_name
                 .entry(func_id.name.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(func_id.clone());
         }
 
