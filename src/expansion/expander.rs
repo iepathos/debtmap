@@ -630,6 +630,258 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_cargo_expand_available() {
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            // Test when cargo-expand is available
+            let result = expander.validate_cargo_expand(true, false);
+            assert!(result.is_ok());
+
+            let result_with_fallback = expander.validate_cargo_expand(true, true);
+            assert!(result_with_fallback.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_validate_cargo_expand_not_available() {
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            // Test when cargo-expand is not available without fallback
+            let result = expander.validate_cargo_expand(false, false);
+            assert!(result.is_err());
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains("cargo-expand required"));
+
+            // Test when cargo-expand is not available with fallback
+            let result = expander.validate_cargo_expand(false, true);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("Install with"));
+        }
+    }
+
+    #[test]
+    fn test_try_cached_expansion_miss() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ExpansionConfig {
+            cache_dir: temp_dir.path().join(".debtmap/cache"),
+            ..Default::default()
+        };
+
+        if let Ok(expander) = MacroExpander::new(config) {
+            let path = Path::new("nonexistent.rs");
+            let hash = "test_hash";
+            let result = expander.try_cached_expansion(path, hash);
+            assert!(result.is_ok());
+            assert!(result.unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn test_perform_expansion_invalid_manifest() {
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            let path = Path::new("test.rs");
+            let module_path = "test";
+            let manifest = Path::new("nonexistent/Cargo.toml");
+
+            let result = expander.perform_expansion(path, module_path, manifest);
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_expand_file_with_invalid_path() {
+        let config = ExpansionConfig {
+            fallback_on_error: true,
+            ..Default::default()
+        };
+
+        if let Ok(mut expander) = MacroExpander::new(config) {
+            let result = expander.expand_file(Path::new("/nonexistent/file.rs"));
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_expand_file_caching() {
+        let temp_dir = TempDir::new().unwrap();
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        // Create a simple Cargo.toml
+        let cargo_toml = r#"
+[package]
+name = "test_caching"
+version = "0.1.0"
+edition = "2021"
+"#;
+        fs::write(temp_dir.path().join("Cargo.toml"), cargo_toml).unwrap();
+
+        // Create a simple Rust file
+        let rust_file = src_dir.join("lib.rs");
+        fs::write(&rust_file, "pub fn test() -> i32 { 42 }").unwrap();
+
+        let config = ExpansionConfig {
+            cache_dir: temp_dir.path().join(".debtmap/cache"),
+            ..Default::default()
+        };
+
+        if let Ok(mut expander) = MacroExpander::new(config) {
+            // First expansion should work (if cargo-expand is available)
+            let first_result = expander.expand_file(&rust_file);
+
+            if first_result.is_ok() {
+                // Second expansion should use cache
+                let second_result = expander.expand_file(&rust_file);
+                assert!(second_result.is_ok());
+
+                // Both results should be the same
+                let first = first_result.unwrap();
+                let second = second_result.unwrap();
+                assert_eq!(first.expanded_content, second.expanded_content);
+            }
+        }
+    }
+
+    #[test]
+    fn test_compute_file_hash() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.rs");
+        fs::write(&test_file, "fn main() {}").unwrap();
+
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            let result = expander.compute_file_hash(&test_file);
+            assert!(result.is_ok());
+
+            let hash = result.unwrap();
+            assert!(!hash.is_empty());
+            assert_eq!(hash.len(), 64); // SHA256 produces 64 hex chars
+        }
+    }
+
+    #[test]
+    fn test_compute_file_hash_nonexistent() {
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            let result = expander.compute_file_hash(Path::new("/nonexistent/file.rs"));
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_find_manifest() {
+        let temp_dir = TempDir::new().unwrap();
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir(&src_dir).unwrap();
+
+        // Create Cargo.toml
+        let cargo_toml = r#"
+[package]
+name = "test_project"
+version = "0.1.0"
+"#;
+        fs::write(temp_dir.path().join("Cargo.toml"), cargo_toml).unwrap();
+
+        // Create a Rust file in src
+        let rust_file = src_dir.join("main.rs");
+        fs::write(&rust_file, "fn main() {}").unwrap();
+
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            let result = expander.find_manifest(&rust_file);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap().file_name().unwrap(), "Cargo.toml");
+        }
+    }
+
+    #[test]
+    fn test_find_manifest_not_found() {
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            let result = expander.find_manifest(Path::new("/no/cargo/here.rs"));
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("No Cargo.toml"));
+        }
+    }
+
+    #[test]
+    fn test_get_module_path() {
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            // Test with src prefix
+            let path = Path::new("src/analyzers/rust.rs");
+            let result = expander.get_module_path(path);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "analyzers::rust");
+
+            // Test without src prefix
+            let path = Path::new("lib.rs");
+            let result = expander.get_module_path(path);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "lib");
+
+            // Test nested modules
+            let path = Path::new("src/deep/nested/module.rs");
+            let result = expander.get_module_path(path);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), "deep::nested::module");
+        }
+    }
+
+    #[test]
+    fn test_parse_expansion() {
+        let config = ExpansionConfig::default();
+        if let Ok(expander) = MacroExpander::new(config) {
+            let expanded = r#"
+#[line = 10]
+fn foo() {
+    println!("hello");
+}
+"#;
+            let path = Path::new("test.rs");
+            let result = expander.parse_expansion(expanded.to_string(), path);
+            assert!(result.is_ok());
+
+            let expanded_file = result.unwrap();
+            assert_eq!(expanded_file.original_path, path);
+            assert_eq!(expanded_file.expanded_content, expanded);
+        }
+    }
+
+    #[test]
+    fn test_expand_workspace_no_cargo_expand() {
+        let config = ExpansionConfig {
+            fallback_on_error: true,
+            ..Default::default()
+        };
+
+        if let Ok(mut expander) = MacroExpander::new(config) {
+            // This test mocks the scenario where cargo-expand is not available
+            // The actual behavior depends on whether cargo-expand is installed
+            let result = expander.expand_workspace();
+            assert!(result.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_clear_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = ExpansionConfig {
+            cache_dir: temp_dir.path().join(".debtmap/cache"),
+            ..Default::default()
+        };
+
+        if let Ok(mut expander) = MacroExpander::new(config) {
+            // Should succeed even with empty cache
+            let result = expander.clear_cache();
+            assert!(result.is_ok());
+        }
+    }
+
+    #[test]
     fn test_find_rust_files_ignores_hidden_dirs() {
         let temp_dir = TempDir::new().unwrap();
 
