@@ -283,11 +283,78 @@ fn determine_debt_type(
         };
     }
 
-    // Default to risk-based debt
-    DebtType::Risk {
-        risk_score: 5.0,
-        factors: vec!["General technical debt".to_string()],
+    // Check if this is an orchestrator that doesn't need tests
+    let role = classify_function_role(func, func_id, call_graph);
+    if role == FunctionRole::Orchestrator {
+        let callees = call_graph.get_callees(func_id);
+        if !callees.is_empty() {
+            return DebtType::Orchestration {
+                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+            };
+        }
     }
+
+    // Low complexity functions that are I/O wrappers or simple utilities
+    // should not be flagged as technical debt
+    if func.cyclomatic <= 3 && func.cognitive <= 5 {
+        // Check if it's an I/O wrapper or simple utility
+        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+            // These are acceptable patterns, not debt
+            return DebtType::Orchestration {
+                delegates_to: vec![], // Empty indicates it's a simple wrapper
+            };
+        }
+    }
+
+    // Only flag as risk-based debt if there's actual complexity or other indicators
+    if func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50 {
+        DebtType::Risk {
+            risk_score: calculate_risk_score(func),
+            factors: identify_risk_factors(func, coverage),
+        }
+    } else {
+        // Very simple functions shouldn't be flagged as debt at all
+        // Use orchestration as a way to indicate "not really debt"
+        DebtType::Orchestration {
+            delegates_to: vec![],
+        }
+    }
+}
+
+fn calculate_risk_score(func: &FunctionMetrics) -> f64 {
+    // Calculate a risk score based on complexity metrics
+    let complexity_score = (func.cyclomatic as f64 + func.cognitive as f64) / 2.0;
+    let length_factor = (func.length as f64 / 50.0).min(2.0);
+    
+    (complexity_score * 0.7 + length_factor * 3.0).min(10.0)
+}
+
+fn identify_risk_factors(func: &FunctionMetrics, coverage: &Option<TransitiveCoverage>) -> Vec<String> {
+    let mut factors = Vec::new();
+    
+    if func.cyclomatic > 5 {
+        factors.push(format!("Moderate complexity (cyclomatic: {})", func.cyclomatic));
+    }
+    
+    if func.cognitive > 8 {
+        factors.push(format!("Cognitive complexity: {}", func.cognitive));
+    }
+    
+    if func.length > 50 {
+        factors.push(format!("Long function ({} lines)", func.length));
+    }
+    
+    if let Some(cov) = coverage {
+        if cov.direct < 0.5 {
+            factors.push(format!("Low coverage: {:.0}%", cov.direct * 100.0));
+        }
+    }
+    
+    if factors.is_empty() {
+        factors.push("Potential improvement opportunity".to_string());
+    }
+    
+    factors
 }
 
 fn is_dead_code(func: &FunctionMetrics, call_graph: &CallGraph, func_id: &FunctionId) -> bool {
@@ -342,10 +409,41 @@ pub fn classify_debt_type_enhanced(
         };
     }
 
-    // Default to risk-based debt
-    DebtType::Risk {
-        risk_score: 5.0,
-        factors: vec!["General technical debt".to_string()],
+    // Check if this is an orchestrator that doesn't need tests
+    let role = classify_function_role(func, func_id, call_graph);
+    if role == FunctionRole::Orchestrator {
+        let callees = call_graph.get_callees(func_id);
+        if !callees.is_empty() {
+            return DebtType::Orchestration {
+                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+            };
+        }
+    }
+
+    // Low complexity functions that are I/O wrappers or simple utilities
+    // should not be flagged as technical debt
+    if func.cyclomatic <= 3 && func.cognitive <= 5 {
+        // Check if it's an I/O wrapper or simple utility
+        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+            // These are acceptable patterns, not debt
+            return DebtType::Orchestration {
+                delegates_to: vec![], // Empty indicates it's a simple wrapper
+            };
+        }
+    }
+
+    // Only flag as risk-based debt if there's actual complexity or other indicators
+    if func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50 {
+        DebtType::Risk {
+            risk_score: calculate_risk_score(func),
+            factors: identify_risk_factors(func, &None),
+        }
+    } else {
+        // Very simple functions shouldn't be flagged as debt at all
+        // Use orchestration as a way to indicate "not really debt"
+        DebtType::Orchestration {
+            delegates_to: vec![],
+        }
     }
 }
 
