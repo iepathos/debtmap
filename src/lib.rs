@@ -1,4 +1,5 @@
 // Export modules for library usage
+pub mod analysis;
 pub mod analysis_utils;
 pub mod analyzers;
 pub mod cli;
@@ -45,4 +46,9 @@ pub use crate::analyzers::{analyze_file, get_analyzer, Analyzer};
 pub use crate::risk::{
     insights::generate_risk_insights, lcov::parse_lcov_file, FunctionRisk, RiskAnalyzer,
     RiskCategory, RiskInsight, TestingRecommendation,
+};
+
+pub use crate::analysis::{
+    AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, EnhancedCallGraph,
+    EnhancedCallGraphBuilder, FrameworkPatternDetector, FunctionPointerTracker, TraitRegistry,
 };
