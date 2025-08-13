@@ -1,17 +1,10 @@
-use super::{
-    ChangeEvidence, ComparisonResult, RiskEvidence, RiskFactor, RiskSeverity,
-    RiskType,
-};
+use super::{ChangeEvidence, ComparisonResult, RiskEvidence, RiskFactor, RiskSeverity, RiskType};
 use crate::priority::FunctionAnalysis;
 use crate::risk::evidence::RiskContext;
 
+#[derive(Default)]
 pub struct ChangeRiskAnalyzer {}
 
-impl Default for ChangeRiskAnalyzer {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 impl ChangeRiskAnalyzer {
     pub fn new() -> Self {

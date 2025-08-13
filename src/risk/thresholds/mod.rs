@@ -290,19 +290,12 @@ impl Default for ProjectContext {
     }
 }
 
+#[derive(Default)]
 pub struct StatisticalThresholdProvider {
     baseline_data: BaselineDatabase,
     project_context: ProjectContext,
 }
 
-impl Default for StatisticalThresholdProvider {
-    fn default() -> Self {
-        Self {
-            baseline_data: BaselineDatabase::default(),
-            project_context: ProjectContext::default(),
-        }
-    }
-}
 
 impl StatisticalThresholdProvider {
     pub fn new() -> Self {
