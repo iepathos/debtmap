@@ -137,7 +137,9 @@ fn contains_io_patterns(func: &FunctionMetrics) -> bool {
     // Check for I/O related patterns in function name or content
     let io_keywords = vec![
         "read", "write", "file", "socket", "http", "request", "response", "stream", "buffer",
-        "stdin", "stdout", "stderr", "print", "input", "output",
+        "stdin", "stdout", "stderr", "print", "input", "output", "display", "format", "json",
+        "serialize", "deserialize", "emit", "render", "save", "load", "export", "import",
+        "log", "trace", "debug", "info", "warn", "error", "summary", "report",
     ];
 
     let name_lower = func.name.to_lowercase();
