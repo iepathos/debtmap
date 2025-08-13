@@ -15,6 +15,8 @@ pub struct FunctionCoverage {
 #[derive(Debug, Default)]
 pub struct LcovData {
     pub functions: HashMap<PathBuf, Vec<FunctionCoverage>>,
+    pub total_lines: usize,
+    pub lines_hit: usize,
 }
 
 // Pure function to parse a line and return its type
@@ -23,6 +25,8 @@ enum LcovLine {
     SourceFile(PathBuf),
     Function { line: usize, name: String },
     FunctionData { count: u64, name: String },
+    LinesFound(usize),
+    LinesHit(usize),
     EndOfRecord,
     Other,
 }
@@ -88,6 +92,8 @@ fn parse_lcov_line(line: &str) -> LcovLine {
     parse_source_file(line)
         .or_else(|| parse_function(line))
         .or_else(|| parse_function_data(line))
+        .or_else(|| parse_lines_found(line))
+        .or_else(|| parse_lines_hit(line))
         .or_else(|| {
             if line == "end_of_record" {
                 Some(LcovLine::EndOfRecord)
@@ -96,6 +102,20 @@ fn parse_lcov_line(line: &str) -> LcovLine {
             }
         })
         .unwrap_or(LcovLine::Other)
+}
+
+// Parse lines found (total lines)
+fn parse_lines_found(line: &str) -> Option<LcovLine> {
+    line.strip_prefix("LF:")
+        .and_then(|count| count.parse::<usize>().ok())
+        .map(LcovLine::LinesFound)
+}
+
+// Parse lines hit (covered lines)
+fn parse_lines_hit(line: &str) -> Option<LcovLine> {
+    line.strip_prefix("LH:")
+        .and_then(|count| count.parse::<usize>().ok())
+        .map(LcovLine::LinesHit)
 }
 
 // State for processing a single file's records
@@ -152,6 +172,12 @@ fn process_lcov_line(line_type: LcovLine, current_record: &mut FileRecord, data:
         }
         LcovLine::FunctionData { count, name } => {
             current_record.add_function_data(count, name);
+        }
+        LcovLine::LinesFound(count) => {
+            data.total_lines += count;
+        }
+        LcovLine::LinesHit(count) => {
+            data.lines_hit += count;
         }
         LcovLine::EndOfRecord => {
             finalize_record(current_record, data);
@@ -289,7 +315,14 @@ impl LcovData {
     }
 
     /// Calculate the overall project coverage percentage
+    /// Uses line coverage if available, falls back to function coverage
     pub fn get_overall_coverage(&self) -> f64 {
+        // Prefer line coverage if available
+        if self.total_lines > 0 {
+            return (self.lines_hit as f64 / self.total_lines as f64) * 100.0;
+        }
+
+        // Fall back to function coverage
         let mut total_functions = 0;
         let mut covered_functions = 0;
 
