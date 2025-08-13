@@ -8,8 +8,9 @@ use crate::priority::{
     semantic_classifier::{
         calculate_semantic_priority, classify_function_role, get_role_multiplier, FunctionRole,
     },
-    ActionableRecommendation, DebtType, FunctionVisibility, ImpactMetrics,
+    ActionableRecommendation, DebtType, FunctionAnalysis, FunctionVisibility, ImpactMetrics,
 };
+use crate::risk::evidence_calculator::EvidenceBasedRiskCalculator;
 use crate::risk::lcov::LcovData;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -128,6 +129,30 @@ fn normalize_roi(roi: f64) -> f64 {
     } else {
         7.0 + ((roi - 5.0) * 0.6).min(3.0)
     }
+}
+
+/// Create evidence-based risk assessment for a function
+pub fn create_evidence_based_risk_assessment(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    coverage: Option<&LcovData>,
+) -> crate::risk::evidence::RiskAssessment {
+    let calculator = EvidenceBasedRiskCalculator::new();
+
+    // Convert FunctionMetrics to FunctionAnalysis
+    let function_analysis = FunctionAnalysis {
+        file: func.file.clone(),
+        function: func.name.clone(),
+        line: func.line,
+        function_length: func.length,
+        cyclomatic_complexity: func.cyclomatic,
+        cognitive_complexity: func.cognitive,
+        nesting_depth: func.nesting,
+        is_test: func.is_test,
+        visibility: determine_visibility(func),
+    };
+
+    calculator.calculate_risk(&function_analysis, call_graph, coverage)
 }
 
 /// Create a unified debt item with enhanced call graph analysis

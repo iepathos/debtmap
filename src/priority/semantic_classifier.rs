@@ -2,7 +2,7 @@ use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FunctionRole {
     PureLogic,    // Business logic, high test priority
     Orchestrator, // Coordinates other functions

@@ -1,11 +1,14 @@
 pub mod context;
 pub mod correlation;
 pub mod delegation;
+pub mod evidence;
+pub mod evidence_calculator;
 pub mod insights;
 pub mod lcov;
 pub mod priority;
 pub mod roi;
 pub mod strategy;
+pub mod thresholds;
 
 use crate::core::ComplexityMetrics;
 use im::Vector;

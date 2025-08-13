@@ -9,10 +9,7 @@ use im::{HashMap, HashSet, Vector};
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{
-    File, ItemFn, ItemMod, ItemUse, Path as SynPath, UseTree,
-    Visibility,
-};
+use syn::{File, ItemFn, ItemMod, ItemUse, Path as SynPath, UseTree, Visibility};
 
 /// Information about a module boundary
 #[derive(Debug, Clone)]
