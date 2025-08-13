@@ -22,7 +22,7 @@ fn test_create_expander() {
     let result = MacroExpander::new(config);
     // This might fail if cargo is not in PATH, which is OK for CI
     if result.is_ok() {
-        assert!(result.unwrap().is_cache_valid(Path::new("nonexistent.rs")) == false);
+        assert!(!result.unwrap().is_cache_valid(Path::new("nonexistent.rs")));
     }
 }
 
@@ -32,8 +32,10 @@ fn test_cache_directory_creation() {
     let temp_dir = TempDir::new().unwrap();
     let cache_dir = temp_dir.path().join(".debtmap/cache/expanded");
 
-    let mut config = ExpansionConfig::default();
-    config.cache_dir = cache_dir.clone();
+    let config = ExpansionConfig {
+        cache_dir: cache_dir.clone(),
+        ..Default::default()
+    };
 
     if let Ok(_expander) = MacroExpander::new(config) {
         assert!(cache_dir.exists());
@@ -95,8 +97,10 @@ fn helper() -> String {
     fs::write(&lib_path, rust_code).unwrap();
 
     // Try to expand (might fail if cargo-expand is not installed)
-    let mut config = ExpansionConfig::default();
-    config.enabled = true;
+    let config = ExpansionConfig {
+        enabled: true,
+        ..Default::default()
+    };
 
     if let Ok(mut expander) = MacroExpander::new(config) {
         // Check if cargo-expand is available
@@ -110,9 +114,11 @@ fn helper() -> String {
 /// Test that fallback works when expansion fails
 #[test]
 fn test_fallback_on_error() {
-    let mut config = ExpansionConfig::default();
-    config.enabled = true;
-    config.fallback_on_error = true;
+    let config = ExpansionConfig {
+        enabled: true,
+        fallback_on_error: true,
+        ..Default::default()
+    };
 
     // Try to expand a non-existent file
     if let Ok(mut expander) = MacroExpander::new(config) {
@@ -128,8 +134,10 @@ fn test_clear_cache() {
     let temp_dir = TempDir::new().unwrap();
     let cache_dir = temp_dir.path().join(".debtmap/cache/expanded");
 
-    let mut config = ExpansionConfig::default();
-    config.cache_dir = cache_dir;
+    let config = ExpansionConfig {
+        cache_dir,
+        ..Default::default()
+    };
 
     if let Ok(mut expander) = MacroExpander::new(config) {
         // Clear cache should succeed even if empty

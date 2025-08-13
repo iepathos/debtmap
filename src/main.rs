@@ -837,9 +837,10 @@ fn process_rust_files_for_call_graph(
 
     // Create expansion config if enabled
     let expansion_config = if expand_macros {
-        let mut config = ExpansionConfig::default();
-        config.enabled = true;
-        Some(config)
+        Some(ExpansionConfig {
+            enabled: true,
+            ..Default::default()
+        })
     } else {
         None
     };
@@ -884,7 +885,7 @@ fn process_rust_files_for_call_graph(
 }
 
 /// Extract call graph from a file without expansion
-fn extract_regular_call_graph(file_path: &PathBuf) -> Result<priority::CallGraph> {
+fn extract_regular_call_graph(file_path: &Path) -> Result<priority::CallGraph> {
     if let Ok(content) = io::read_file(file_path) {
         if let Ok(parsed) = syn::parse_file(&content) {
             use debtmap::analyzers::rust_call_graph::extract_call_graph;
