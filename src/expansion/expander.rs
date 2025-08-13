@@ -359,23 +359,27 @@ fn process_entry(entry: fs::DirEntry) -> Result<(Option<PathBuf>, Option<PathBuf
 /// Find all Rust files in a directory recursively
 fn find_rust_files(root: Option<&Path>) -> Result<Vec<PathBuf>> {
     let root = root.unwrap_or_else(|| Path::new("."));
-    let mut rust_files = Vec::new();
-    let mut dirs_to_visit = vec![root.to_path_buf()];
+    collect_rust_files_from_dir(root)
+}
 
-    while let Some(dir) = dirs_to_visit.pop() {
-        for entry in fs::read_dir(&dir)? {
+/// Recursively collect Rust files from a directory
+fn collect_rust_files_from_dir(dir: &Path) -> Result<Vec<PathBuf>> {
+    let entries: Result<Vec<Vec<PathBuf>>> = fs::read_dir(dir)?
+        .map(|entry| -> Result<Vec<PathBuf>> {
             let (file, subdir) = process_entry(entry?)?;
 
+            let mut files = Vec::new();
             if let Some(file) = file {
-                rust_files.push(file);
+                files.push(file);
             }
             if let Some(subdir) = subdir {
-                dirs_to_visit.push(subdir);
+                files.extend(collect_rust_files_from_dir(&subdir)?);
             }
-        }
-    }
+            Ok(files)
+        })
+        .collect();
 
-    Ok(rust_files)
+    Ok(entries?.into_iter().flatten().collect())
 }
 
 #[cfg(test)]
