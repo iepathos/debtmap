@@ -8,6 +8,7 @@ use crate::risk::evidence::RiskContext;
 use crate::risk::thresholds::{ComplexityThresholds, StatisticalThresholdProvider};
 
 pub struct ComplexityRiskAnalyzer {
+    #[allow(dead_code)]
     thresholds: ComplexityThresholds,
     threshold_provider: StatisticalThresholdProvider,
 }
@@ -264,7 +265,7 @@ impl ComplexityRiskAnalyzer {
         cyclomatic: u32,
         cognitive: u32,
     ) -> Vec<super::ExtractionCandidate> {
-        let num_candidates = ((cyclomatic + cognitive) / 10).max(1).min(5);
+        let num_candidates = ((cyclomatic + cognitive) / 10).clamp(1, 5);
 
         (0..num_candidates)
             .map(|i| super::ExtractionCandidate {

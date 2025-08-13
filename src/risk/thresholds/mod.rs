@@ -293,9 +293,9 @@ impl Default for ProjectContext {
 #[derive(Default)]
 pub struct StatisticalThresholdProvider {
     baseline_data: BaselineDatabase,
+    #[allow(dead_code)]
     project_context: ProjectContext,
 }
-
 
 impl StatisticalThresholdProvider {
     pub fn new() -> Self {

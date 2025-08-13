@@ -352,21 +352,17 @@ impl FunctionPointerVisitor {
         if let Some(caller) = &self.current_function {
             let line = self.get_line_number(call.paren_token.span.open());
 
-            match &*call.func {
-                // Direct function pointer call: func_ptr(args)
-                Expr::Path(path) => {
-                    if let Some(func_name) = self.extract_function_name_from_path(path) {
-                        // Check if this might be a function pointer call
-                        let pointer_call = FunctionPointerCall {
-                            caller: caller.clone(),
-                            pointer_id: func_name,
-                            line,
-                        };
-                        self.pointer_calls.push(pointer_call);
-                    }
+            // Direct function pointer call: func_ptr(args)
+            if let Expr::Path(path) = &*call.func {
+                if let Some(func_name) = self.extract_function_name_from_path(path) {
+                    // Check if this might be a function pointer call
+                    let pointer_call = FunctionPointerCall {
+                        caller: caller.clone(),
+                        pointer_id: func_name,
+                        line,
+                    };
+                    self.pointer_calls.push(pointer_call);
                 }
-                // Other types of calls could be added here
-                _ => {}
             }
 
             // Check for higher-order function calls

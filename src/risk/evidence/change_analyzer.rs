@@ -5,7 +5,6 @@ use crate::risk::evidence::RiskContext;
 #[derive(Default)]
 pub struct ChangeRiskAnalyzer {}
 
-
 impl ChangeRiskAnalyzer {
     pub fn new() -> Self {
         Self::default()

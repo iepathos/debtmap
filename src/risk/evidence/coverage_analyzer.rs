@@ -9,6 +9,7 @@ use crate::risk::lcov::LcovData;
 use crate::risk::thresholds::{CoverageThresholds, StatisticalThresholdProvider};
 
 pub struct CoverageRiskAnalyzer {
+    #[allow(dead_code)]
     thresholds: CoverageThresholds,
     threshold_provider: StatisticalThresholdProvider,
 }

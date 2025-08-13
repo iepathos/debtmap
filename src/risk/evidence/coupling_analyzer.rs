@@ -8,6 +8,7 @@ use crate::risk::evidence::{ModuleType, RiskContext};
 use crate::risk::thresholds::{CouplingThresholds, StatisticalThresholdProvider};
 
 pub struct CouplingRiskAnalyzer {
+    #[allow(dead_code)]
     thresholds: CouplingThresholds,
     threshold_provider: StatisticalThresholdProvider,
 }
@@ -125,6 +126,7 @@ impl CouplingRiskAnalyzer {
         circular_count
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn has_path_back(
         &self,
         from: &crate::priority::call_graph::FunctionId,

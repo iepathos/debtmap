@@ -94,6 +94,7 @@ pub struct CrossModuleCall {
 
 /// Information about module imports
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ModuleImport {
     /// Module doing the importing
     pub importing_module: String,
