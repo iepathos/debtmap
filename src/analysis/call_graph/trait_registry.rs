@@ -9,7 +9,7 @@ use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use syn::visit::Visit;
 use syn::{
-    File, Ident, ImplItem, Item, ItemImpl, ItemTrait, Path as SynPath, PathSegment, TraitItem,
+    File, ImplItem, ItemImpl, ItemTrait, Path as SynPath, TraitItem,
     Type, TypePath,
 };
 
@@ -288,7 +288,7 @@ impl<'ast> Visit<'ast> for TraitVisitor {
 
                 let method_id = FunctionId {
                     file: self.file_path.clone(),
-                    name: format!("{}::{}", trait_name, method_name),
+                    name: format!("{trait_name}::{method_name}"),
                     line,
                 };
 
@@ -323,7 +323,7 @@ impl<'ast> Visit<'ast> for TraitVisitor {
 
                             let method_id = FunctionId {
                                 file: self.file_path.clone(),
-                                name: format!("{}::{}", implementing_type, method_name),
+                                name: format!("{implementing_type}::{method_name}"),
                                 line,
                             };
 

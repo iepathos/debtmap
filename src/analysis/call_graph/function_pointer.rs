@@ -9,8 +9,7 @@ use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use syn::visit::Visit;
 use syn::{
-    Expr, ExprCall, ExprClosure, ExprPath, File, Ident, ItemFn, Local, Pat, PatIdent, Stmt, Type,
-    TypeBareFn,
+    Expr, ExprCall, ExprClosure, ExprPath, File, ItemFn, Local, Pat, PatIdent, Type,
 };
 
 /// Information about a closure
@@ -306,7 +305,7 @@ impl FunctionPointerVisitor {
                 containing_function: containing_function.clone(),
                 line,
                 calls: closure_visitor.function_calls.into_iter().collect(),
-                captures_variables: !closure.capture.is_none(),
+                captures_variables: closure.capture.is_some(),
                 captured_by_ref: HashSet::new(), // Would need more analysis
                 captured_by_value: HashSet::new(), // Would need more analysis
             };
