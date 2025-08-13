@@ -2860,4 +2860,137 @@ end_of_record
         let result = validate_project(config);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_extract_regular_call_graph_success() {
+        use std::io::Write;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let test_file = temp_dir.path().join("test.rs");
+
+        let rust_code = r#"
+            fn main() {
+                helper();
+                process_data();
+            }
+            
+            fn helper() {
+                println!("Helper");
+            }
+            
+            fn process_data() {
+                helper();
+            }
+        "#;
+
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        file.write_all(rust_code.as_bytes()).unwrap();
+
+        let result = extract_regular_call_graph(&test_file).unwrap();
+
+        // Should have functions in the call graph
+        assert!(!result.is_empty());
+
+        let functions = result.find_all_functions();
+        assert!(functions.iter().any(|f| f.name == "main"));
+        assert!(functions.iter().any(|f| f.name == "helper"));
+        assert!(functions.iter().any(|f| f.name == "process_data"));
+    }
+
+    #[test]
+    fn test_extract_regular_call_graph_nonexistent_file() {
+        let nonexistent_path = Path::new("/nonexistent/file.rs");
+        let result = extract_regular_call_graph(nonexistent_path);
+
+        // Should return Ok with empty call graph for file read errors
+        assert!(result.is_ok());
+        let call_graph = result.unwrap();
+        assert!(call_graph.is_empty());
+    }
+
+    #[test]
+    fn test_extract_regular_call_graph_invalid_rust_syntax() {
+        use std::io::Write;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let test_file = temp_dir.path().join("invalid.rs");
+
+        // Invalid Rust syntax
+        let invalid_code = "fn main() { this is not valid rust }";
+
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        file.write_all(invalid_code.as_bytes()).unwrap();
+
+        let result = extract_regular_call_graph(&test_file);
+
+        // Should return Ok with empty call graph for parse errors
+        assert!(result.is_ok());
+        let call_graph = result.unwrap();
+        assert!(call_graph.is_empty());
+    }
+
+    #[test]
+    fn test_extract_regular_call_graph_empty_file() {
+        use std::io::Write;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let test_file = temp_dir.path().join("empty.rs");
+
+        // Create empty file
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        file.write_all(b"").unwrap();
+
+        let result = extract_regular_call_graph(&test_file);
+
+        // Should return Ok with empty call graph
+        assert!(result.is_ok());
+        let call_graph = result.unwrap();
+        assert!(call_graph.is_empty());
+    }
+
+    #[test]
+    fn test_extract_regular_call_graph_with_complex_calls() {
+        use std::io::Write;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let test_file = temp_dir.path().join("complex.rs");
+
+        let rust_code = r#"
+            use std::collections::HashMap;
+            
+            fn analyze() -> HashMap<String, i32> {
+                let mut map = HashMap::new();
+                map.insert(format_key("test"), calculate_value(42));
+                map
+            }
+            
+            fn format_key(s: &str) -> String {
+                s.to_uppercase()
+            }
+            
+            fn calculate_value(n: i32) -> i32 {
+                validate_input(n);
+                n * 2
+            }
+            
+            fn validate_input(n: i32) {
+                if n < 0 {
+                    panic!("Invalid input");
+                }
+            }
+        "#;
+
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        file.write_all(rust_code.as_bytes()).unwrap();
+
+        let result = extract_regular_call_graph(&test_file).unwrap();
+
+        // Should extract all functions
+        let functions = result.find_all_functions();
+        assert!(functions.iter().any(|f| f.name == "analyze"));
+        assert!(functions.iter().any(|f| f.name == "format_key"));
+        assert!(functions.iter().any(|f| f.name == "calculate_value"));
+        assert!(functions.iter().any(|f| f.name == "validate_input"));
+
+        // Should track function calls
+        let analyze_func = functions.iter().find(|f| f.name == "analyze").unwrap();
+        let callees = result.get_callees(analyze_func);
+        assert!(!callees.is_empty());
+    }
 }
