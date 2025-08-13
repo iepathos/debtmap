@@ -184,6 +184,7 @@ struct FunctionVisitor {
     #[allow(dead_code)]
     source_content: String,
     in_test_module: bool,
+    current_function: Option<String>,
 }
 
 impl FunctionVisitor {
@@ -205,6 +206,7 @@ impl FunctionVisitor {
             current_file: file,
             source_content,
             in_test_module: is_test_file,
+            current_function: None,
         }
     }
 
@@ -286,9 +288,17 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     fn visit_item_fn(&mut self, item_fn: &'ast syn::ItemFn) {
         let name = item_fn.sig.ident.to_string();
         let line = self.get_line_number(item_fn.sig.ident.span());
-        self.analyze_function(name, item_fn, line);
+        self.analyze_function(name.clone(), item_fn, line);
+        
+        // Track the current function for closures
+        let prev_function = self.current_function.clone();
+        self.current_function = Some(name);
+        
         // Continue visiting to find nested functions
         syn::visit::visit_item_fn(self, item_fn);
+        
+        // Restore previous function context
+        self.current_function = prev_function;
     }
 
     fn visit_impl_item_fn(&mut self, impl_fn: &'ast syn::ImplItemFn) {
@@ -302,9 +312,17 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             sig: impl_fn.sig.clone(),
             block: Box::new(impl_fn.block.clone()),
         };
-        self.analyze_function(name, &item_fn, line);
+        self.analyze_function(name.clone(), &item_fn, line);
+        
+        // Track the current function for closures
+        let prev_function = self.current_function.clone();
+        self.current_function = Some(name);
+        
         // Continue visiting to find nested items
         syn::visit::visit_impl_item_fn(self, impl_fn);
+        
+        // Restore previous function context
+        self.current_function = prev_function;
     }
 
     fn visit_expr(&mut self, expr: &'ast syn::Expr) {
@@ -333,7 +351,11 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             // - OR length > 1 (multi-line)
             // - OR cyclomatic > 1 (has branches)
             if cognitive > 1 || length > 1 || cyclomatic > 1 {
-                let name = format!("<closure@{}>", self.functions.len());
+                let name = if let Some(ref parent) = self.current_function {
+                    format!("{}::<closure@{}>", parent, self.functions.len())
+                } else {
+                    format!("<closure@{}>", self.functions.len())
+                };
                 let line = self.get_line_number(closure.body.span());
 
                 let metrics = FunctionMetrics {
