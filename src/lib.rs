@@ -5,6 +5,7 @@ pub mod cli;
 pub mod complexity;
 pub mod core;
 pub mod debt;
+pub mod expansion;
 pub mod io;
 pub mod priority;
 pub mod risk;
