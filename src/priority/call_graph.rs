@@ -263,6 +263,22 @@ impl CallGraph {
             .collect()
     }
 
+    /// Check if a function is only called by test functions (test helper)
+    /// Returns true if:
+    /// - The function has at least one caller
+    /// - All callers are test functions
+    pub fn is_test_helper(&self, func_id: &FunctionId) -> bool {
+        let callers = self.get_callers(func_id);
+
+        // If no callers, it's not a test helper
+        if callers.is_empty() {
+            return false;
+        }
+
+        // Check if all callers are test functions
+        callers.iter().all(|caller| self.is_test_function(caller))
+    }
+
     pub fn find_all_functions(&self) -> Vec<FunctionId> {
         self.nodes.keys().cloned().collect()
     }
@@ -958,5 +974,126 @@ mod tests {
             line: 999999,
         };
         assert_eq!(map.get(&process_id).unwrap().value, 300);
+    }
+
+    #[test]
+    fn test_is_test_helper_detection() {
+        let mut graph = CallGraph::new();
+
+        // Create test functions
+        let test_func1 = FunctionId {
+            file: PathBuf::from("tests/test.rs"),
+            name: "test_something".to_string(),
+            line: 10,
+        };
+
+        let test_func2 = FunctionId {
+            file: PathBuf::from("tests/test.rs"),
+            name: "test_another".to_string(),
+            line: 30,
+        };
+
+        // Create a helper function called only by tests
+        let test_helper = FunctionId {
+            file: PathBuf::from("src/lib.rs"),
+            name: "validate_initial_state".to_string(),
+            line: 100,
+        };
+
+        // Create a regular function called by non-test code
+        let regular_func = FunctionId {
+            file: PathBuf::from("src/lib.rs"),
+            name: "process_data".to_string(),
+            line: 200,
+        };
+
+        // Create a main function
+        let main_func = FunctionId {
+            file: PathBuf::from("src/main.rs"),
+            name: "main".to_string(),
+            line: 1,
+        };
+
+        // Add functions to graph
+        graph.add_function(test_func1.clone(), false, true, 3, 20); // is_test = true
+        graph.add_function(test_func2.clone(), false, true, 4, 25); // is_test = true
+        graph.add_function(test_helper.clone(), false, false, 5, 30); // regular function
+        graph.add_function(regular_func.clone(), false, false, 6, 40); // regular function
+        graph.add_function(main_func.clone(), true, false, 2, 15); // entry point
+
+        // Add calls: test functions call the helper
+        graph.add_call(FunctionCall {
+            caller: test_func1.clone(),
+            callee: test_helper.clone(),
+            call_type: CallType::Direct,
+        });
+
+        graph.add_call(FunctionCall {
+            caller: test_func2.clone(),
+            callee: test_helper.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Main calls regular_func
+        graph.add_call(FunctionCall {
+            caller: main_func.clone(),
+            callee: regular_func.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Test: test_helper should be identified as a test helper
+        assert!(
+            graph.is_test_helper(&test_helper),
+            "validate_initial_state should be identified as a test helper"
+        );
+
+        // Test: regular_func should NOT be a test helper (called by main)
+        assert!(
+            !graph.is_test_helper(&regular_func),
+            "process_data should not be identified as a test helper"
+        );
+
+        // Test: test functions themselves are not test helpers
+        assert!(
+            !graph.is_test_helper(&test_func1),
+            "Test functions should not be identified as test helpers"
+        );
+
+        // Test: functions with no callers are not test helpers
+        let orphan_func = FunctionId {
+            file: PathBuf::from("src/orphan.rs"),
+            name: "unused_func".to_string(),
+            line: 1,
+        };
+        graph.add_function(orphan_func.clone(), false, false, 1, 10);
+        assert!(
+            !graph.is_test_helper(&orphan_func),
+            "Functions with no callers should not be test helpers"
+        );
+
+        // Test: mixed callers (test and non-test) - should NOT be a test helper
+        let mixed_helper = FunctionId {
+            file: PathBuf::from("src/lib.rs"),
+            name: "mixed_use_helper".to_string(),
+            line: 300,
+        };
+        graph.add_function(mixed_helper.clone(), false, false, 4, 20);
+
+        // Called by both test and main
+        graph.add_call(FunctionCall {
+            caller: test_func1.clone(),
+            callee: mixed_helper.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: main_func.clone(),
+            callee: mixed_helper.clone(),
+            call_type: CallType::Direct,
+        });
+
+        assert!(
+            !graph.is_test_helper(&mixed_helper),
+            "Functions called by both test and non-test code should not be test helpers"
+        );
     }
 }

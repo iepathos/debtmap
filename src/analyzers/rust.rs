@@ -188,11 +188,23 @@ struct FunctionVisitor {
 
 impl FunctionVisitor {
     fn new(file: PathBuf, source_content: String) -> Self {
+        // Check if this file is a test file based on its path
+        let is_test_file = {
+            let path_str = file.to_string_lossy();
+            path_str.contains("/tests/") 
+                || path_str.contains("/test/")
+                || path_str.ends_with("_test.rs")
+                || path_str.ends_with("_tests.rs")
+                || path_str.contains("/test_")
+                || path_str.contains("\\tests\\")  // Windows paths
+                || path_str.contains("\\test\\") // Windows paths
+        };
+
         Self {
             functions: Vec::new(),
             current_file: file,
             source_content,
-            in_test_module: false,
+            in_test_module: is_test_file,
         }
     }
 
@@ -204,12 +216,24 @@ impl FunctionVisitor {
     fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
         // Check if this is a test function (either has #[test] attribute or is in a test module)
         let has_test_attribute = item_fn.attrs.iter().any(|attr| {
+            // Check for #[test] attribute
             attr.path().is_ident("test")
+                // Check for #[tokio::test] attribute
+                || attr.path().segments.last().is_some_and(|seg| seg.ident == "test")
+                // Check for #[cfg(test)] attribute
                 || (attr.path().is_ident("cfg")
                     && attr.meta.to_token_stream().to_string().contains("test"))
         });
 
-        let is_test = has_test_attribute || self.in_test_module;
+        // Also check if the function name indicates it's a test
+        let has_test_name =
+            name.starts_with("test_") || name.starts_with("it_") || name.starts_with("should_");
+
+        // A function is a test if:
+        // 1. It has a test attribute (#[test] or #[tokio::test]), OR
+        // 2. It has a test-like name (test_, it_, should_)
+        // Note: Being in a test file/module alone doesn't make a function a test
+        let is_test = has_test_attribute || has_test_name;
 
         // Extract visibility information
         let visibility = match &item_fn.vis {
