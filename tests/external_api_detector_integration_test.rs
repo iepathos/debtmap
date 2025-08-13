@@ -1,7 +1,7 @@
 /// Integration tests for external API detection in the dead code analysis workflow
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::{
-    external_api_detector::{generate_enhanced_dead_code_hints, is_likely_external_api},
+    external_api_detector::{generate_enhanced_dead_code_hints_with_config, is_likely_external_api_with_config, ExternalApiConfig},
     FunctionVisibility,
 };
 use std::path::PathBuf;
@@ -20,6 +20,15 @@ fn create_test_function(name: &str, path: &str, visibility: Option<String>) -> F
     }
 }
 
+// Create a test config with detection enabled (for test isolation)
+fn test_config() -> ExternalApiConfig {
+    ExternalApiConfig {
+        detect_external_api: true,
+        api_functions: vec![],
+        api_files: vec![],
+    }
+}
+
 #[test]
 fn test_workflow_public_api_in_lib_rs() {
     // Simulate a public function in lib.rs
@@ -27,12 +36,12 @@ fn test_workflow_public_api_in_lib_rs() {
     let visibility = FunctionVisibility::Public;
 
     // Check if it's detected as external API
-    let (is_api, indicators) = is_likely_external_api(&func, &visibility);
+    let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
     assert!(is_api, "Constructor in lib.rs should be external API");
     assert!(!indicators.is_empty(), "Should have indicators");
 
     // Verify enhanced hints
-    let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+    let hints = generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
     assert!(
         hints.iter().any(|h| h.contains("Likely external API")),
         "Hints should indicate external API: {hints:?}"
@@ -50,14 +59,14 @@ fn test_workflow_internal_public_function() {
     let visibility = FunctionVisibility::Public;
 
     // Check it's NOT detected as external API
-    let (is_api, _) = is_likely_external_api(&func, &visibility);
+    let (is_api, _) = is_likely_external_api_with_config(&func, &visibility, &test_config());
     assert!(
         !is_api,
         "Internal module function should not be external API"
     );
 
     // Verify hints don't suggest it's an API
-    let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+    let hints = generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
 
     // Should still get analyzed but not flagged as likely API
     let has_api_warning = hints.iter().any(|h| h.contains("⚠️ Likely external API"));
@@ -73,14 +82,14 @@ fn test_workflow_private_function() {
     let func = create_test_function("internal_helper", "src/utils.rs", None);
     let visibility = FunctionVisibility::Private;
 
-    let (is_api, indicators) = is_likely_external_api(&func, &visibility);
+    let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
     assert!(!is_api, "Private functions cannot be external APIs");
     assert!(
         indicators.is_empty(),
         "Private functions should have no API indicators"
     );
 
-    let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+    let hints = generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
     assert!(
         !hints.iter().any(|h| h.contains("external API")),
         "Private functions should not mention external API"
@@ -97,7 +106,7 @@ fn test_workflow_mod_rs_with_api_pattern() {
     );
     let visibility = FunctionVisibility::Public;
 
-    let (is_api, indicators) = is_likely_external_api(&func, &visibility);
+    let (is_api, indicators) = is_likely_external_api_with_config(&func, &visibility, &test_config());
     assert!(is_api, "get_* function in mod.rs should be detected as API");
 
     // Should have multiple indicators
@@ -125,7 +134,7 @@ fn test_action_recommendations_based_on_api_detection() {
     let api_func = create_test_function("builder", "src/lib.rs", Some("pub".to_string()));
     let pub_vis = FunctionVisibility::Public;
 
-    let (is_api, _) = is_likely_external_api(&api_func, &pub_vis);
+    let (is_api, _) = is_likely_external_api_with_config(&api_func, &pub_vis, &test_config());
     assert!(is_api);
 
     // The action for API functions should be to verify before removal
@@ -144,7 +153,7 @@ fn test_action_recommendations_based_on_api_detection() {
         Some("pub".to_string()),
     );
 
-    let (is_api2, _) = is_likely_external_api(&non_api_func, &pub_vis);
+    let (is_api2, _) = is_likely_external_api_with_config(&non_api_func, &pub_vis, &test_config());
     assert!(!is_api2);
 
     let expected_action2 = if is_api2 {
@@ -165,7 +174,7 @@ fn test_complexity_hints_integration() {
     func.cognitive = 3;
     let visibility = FunctionVisibility::Public;
 
-    let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+    let hints = generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
     assert!(
         hints.iter().any(|h| h.contains("Low complexity")),
         "Should indicate low complexity"
@@ -175,7 +184,7 @@ fn test_complexity_hints_integration() {
     func.cyclomatic = 15;
     func.cognitive = 20;
 
-    let hints_high = generate_enhanced_dead_code_hints(&func, &visibility);
+    let hints_high = generate_enhanced_dead_code_hints_with_config(&func, &visibility, &test_config());
     assert!(
         hints_high.iter().any(|h| h.contains("High complexity")),
         "Should indicate high complexity"
