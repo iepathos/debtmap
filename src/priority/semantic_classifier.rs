@@ -16,49 +16,66 @@ pub fn classify_function_role(
     func_id: &FunctionId,
     call_graph: &CallGraph,
 ) -> FunctionRole {
-    // Entry point detection
-    if call_graph.is_entry_point(func_id) {
-        return FunctionRole::EntryPoint;
+    // Use a functional approach with classification rules
+    classify_by_rules(func, func_id, call_graph).unwrap_or(FunctionRole::PureLogic)
+}
+
+// Pure function that applies classification rules in order
+fn classify_by_rules(
+    func: &FunctionMetrics,
+    func_id: &FunctionId,
+    call_graph: &CallGraph,
+) -> Option<FunctionRole> {
+    // Entry point has highest precedence
+    if is_entry_point(func_id, call_graph) {
+        return Some(FunctionRole::EntryPoint);
     }
 
-    // Check if function name suggests entry point
-    if is_entry_point_by_name(&func_id.name) {
-        return FunctionRole::EntryPoint;
+    // Check orchestration patterns
+    if is_orchestrator(func, func_id, call_graph) {
+        return Some(FunctionRole::Orchestrator);
     }
 
-    // Check if function name suggests orchestration
-    if is_orchestrator_by_name(&func_id.name) && func.cyclomatic <= 3 {
-        return FunctionRole::Orchestrator;
+    // Check I/O wrapper patterns
+    if is_io_wrapper(func) {
+        return Some(FunctionRole::IOWrapper);
     }
 
-    // Simple orchestration: low complexity, mostly delegates
-    if func.cyclomatic <= 2
+    None // Will default to PureLogic
+}
+
+// Pure function to check if a function is an entry point
+fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
+    call_graph.is_entry_point(func_id) || is_entry_point_by_name(&func_id.name)
+}
+
+// Pure function to check if a function is an orchestrator
+fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &CallGraph) -> bool {
+    // Name-based orchestration with low complexity
+    let name_suggests_orchestration =
+        is_orchestrator_by_name(&func_id.name) && func.cyclomatic <= 3;
+
+    // Low complexity delegation pattern
+    let is_simple_delegation = func.cyclomatic <= 2
         && func.cognitive <= 3
-        && delegates_to_tested_functions(func_id, call_graph, 0.8)
-    {
-        return FunctionRole::Orchestrator;
+        && delegates_to_tested_functions(func_id, call_graph, 0.8);
+
+    name_suggests_orchestration || is_simple_delegation
+}
+
+// Pure function to check if a function is an I/O wrapper
+fn is_io_wrapper(func: &FunctionMetrics) -> bool {
+    if !contains_io_patterns(func) {
+        return false;
     }
 
-    // I/O wrapper: contains I/O patterns with either:
-    // - Short functions (< 20 lines)
-    // - Or functions where complexity is mostly from I/O branching (not business logic)
-    if contains_io_patterns(func) {
-        // Short I/O functions are clearly wrappers
-        if func.length < 20 {
-            return FunctionRole::IOWrapper;
-        }
-
-        // Longer functions can still be I/O wrappers if:
-        // - They have I/O patterns in the name
-        // - Their complexity comes from output formatting/routing, not business logic
-        // - Cyclomatic complexity is mostly from format/output branches
-        if func.length <= 50 && is_io_orchestration(func) {
-            return FunctionRole::IOWrapper;
-        }
+    // Short I/O functions are clearly wrappers
+    if func.length < 20 {
+        return true;
     }
 
-    // Everything else is considered pure logic
-    FunctionRole::PureLogic
+    // Longer functions can still be I/O wrappers if they match I/O orchestration patterns
+    func.length <= 50 && is_io_orchestration(func)
 }
 
 fn is_entry_point_by_name(name: &str) -> bool {
