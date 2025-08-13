@@ -322,6 +322,66 @@ impl CallGraph {
 
         criticality
     }
+
+    /// Resolve cross-file function calls by matching function names across all files
+    /// This is needed because method calls like `obj.method()` don't know the target file
+    /// at parse time and default to the current file
+    pub fn resolve_cross_file_calls(&mut self) {
+        // Build a map of all functions by name (excluding file path)
+        let mut functions_by_name: std::collections::HashMap<String, Vec<FunctionId>> =
+            std::collections::HashMap::new();
+        for func_id in self.nodes.keys() {
+            functions_by_name
+                .entry(func_id.name.clone())
+                .or_insert_with(Vec::new)
+                .push(func_id.clone());
+        }
+
+        // Find calls that might need resolution (line 0 indicates unresolved)
+        let mut calls_to_resolve: Vec<FunctionCall> = Vec::new();
+        for call in self.edges.iter() {
+            if call.callee.line == 0 {
+                calls_to_resolve.push(call.clone());
+            }
+        }
+
+        // Resolve each unresolved call
+        for call in calls_to_resolve {
+            // Look for a function with the same name in the nodes
+            if let Some(candidates) = functions_by_name.get(&call.callee.name) {
+                // If we find exactly one function with this name, update the call
+                if candidates.len() == 1 {
+                    let resolved_callee = candidates[0].clone();
+
+                    // Remove the old unresolved call from indexes
+                    if let Some(callee_set) = self.callee_index.get_mut(&call.caller) {
+                        callee_set.remove(&call.callee);
+                        callee_set.insert(resolved_callee.clone());
+                    }
+
+                    if let Some(caller_set) = self.caller_index.get_mut(&call.callee) {
+                        caller_set.remove(&call.caller);
+                    }
+
+                    // Add to the resolved callee's caller index
+                    self.caller_index
+                        .entry(resolved_callee.clone())
+                        .or_default()
+                        .insert(call.caller.clone());
+
+                    // Update the edge
+                    for edge in self.edges.iter_mut() {
+                        if edge.caller == call.caller && edge.callee == call.callee {
+                            edge.callee = resolved_callee.clone();
+                            break;
+                        }
+                    }
+                }
+                // If multiple candidates, try to match by file proximity or other heuristics
+                // For now, we'll leave these unresolved
+            }
+        }
+    }
 }
 
 impl Default for CallGraph {

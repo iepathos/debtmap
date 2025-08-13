@@ -877,6 +877,9 @@ fn process_rust_files_for_call_graph(
         call_graph.merge(file_call_graph);
     }
 
+    // Resolve cross-file function calls after all files have been processed
+    call_graph.resolve_cross_file_calls();
+
     Ok(())
 }
 
