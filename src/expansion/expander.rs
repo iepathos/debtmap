@@ -224,14 +224,13 @@ impl MacroExpander {
 impl MacroExpander {
     /// Validate cargo-expand availability and return appropriate error
     fn validate_cargo_expand(&self, is_available: bool, fallback_on_error: bool) -> Result<()> {
-        if !is_available {
-            if fallback_on_error {
-                bail!("cargo-expand not available. Install with: cargo install cargo-expand");
-            } else {
-                bail!("cargo-expand required but not found");
+        match (is_available, fallback_on_error) {
+            (true, _) => Ok(()),
+            (false, true) => {
+                bail!("cargo-expand not available. Install with: cargo install cargo-expand")
             }
+            (false, false) => bail!("cargo-expand required but not found"),
         }
-        Ok(())
     }
 
     /// Try to retrieve cached expansion if valid
