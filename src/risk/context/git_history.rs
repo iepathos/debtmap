@@ -833,4 +833,94 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_setup_test_repo_creates_temp_directory() -> Result<()> {
+        let (temp_dir, repo_path) = setup_test_repo()?;
+
+        // Verify temp directory exists
+        assert!(temp_dir.path().exists());
+        assert!(repo_path.exists());
+
+        // Verify they point to the same location
+        assert_eq!(temp_dir.path(), repo_path);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_setup_test_repo_initializes_git_repository() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Verify .git directory exists
+        let git_dir = repo_path.join(".git");
+        assert!(git_dir.exists());
+        assert!(git_dir.is_dir());
+
+        // Verify it's a valid git repository
+        let output = Command::new("git")
+            .args(["status"])
+            .current_dir(&repo_path)
+            .output()?;
+        assert!(output.status.success());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_setup_test_repo_configures_user_email() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Verify user email is configured
+        let output = Command::new("git")
+            .args(["config", "user.email"])
+            .current_dir(&repo_path)
+            .output()?;
+
+        assert!(output.status.success());
+        let email = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        assert_eq!(email, "test@example.com");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_setup_test_repo_configures_user_name() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Verify user name is configured
+        let output = Command::new("git")
+            .args(["config", "user.name"])
+            .current_dir(&repo_path)
+            .output()?;
+
+        assert!(output.status.success());
+        let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        assert_eq!(name, "Test User");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_setup_test_repo_returns_valid_paths() -> Result<()> {
+        let (temp_dir, repo_path) = setup_test_repo()?;
+
+        // Verify both paths are absolute
+        assert!(repo_path.is_absolute());
+        assert!(temp_dir.path().is_absolute());
+
+        // Verify we can create files in the repository
+        let test_file = repo_path.join("test.txt");
+        std::fs::write(&test_file, "test content")?;
+        assert!(test_file.exists());
+
+        // Verify we can run git commands in the repository
+        let output = Command::new("git")
+            .args(["add", "test.txt"])
+            .current_dir(&repo_path)
+            .output()?;
+        assert!(output.status.success());
+
+        Ok(())
+    }
 }
