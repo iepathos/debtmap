@@ -128,9 +128,15 @@ fn delegates_to_tested_functions(
         return false;
     }
 
+    // Filter out standard library functions and common utilities
+    let meaningful_callees: Vec<_> = callees
+        .iter()
+        .filter(|f| !is_std_or_utility_function(&f.name))
+        .collect();
+
     // For now, assume delegation if the function calls multiple other functions
     // and has low complexity (actual coverage check would require coverage data)
-    callees.len() >= 2 && call_graph.detect_delegation_pattern(func_id)
+    meaningful_callees.len() >= 2 && call_graph.detect_delegation_pattern(func_id)
 }
 
 fn contains_io_patterns(func: &FunctionMetrics) -> bool {
@@ -152,7 +158,7 @@ fn contains_io_patterns(func: &FunctionMetrics) -> bool {
         "input",
         "output",
         "display",
-        "format",
+        // Note: "format" removed - string formatting is not I/O
         "json",
         "serialize",
         "deserialize",
@@ -208,6 +214,26 @@ fn is_io_orchestration(func: &FunctionMetrics) -> bool {
     has_strong_io_name && func.nesting <= 3
 }
 
+// Helper to identify standard library and utility functions that shouldn't count as delegation targets
+fn is_std_or_utility_function(name: &str) -> bool {
+    // Standard library functions from macro expansion
+    if name == "format" || name == "write" || name == "print" || name == "println" {
+        return true;
+    }
+
+    // Functions that are clearly from std library based on path
+    if name.starts_with("std::") || name.starts_with("core::") || name.starts_with("alloc::") {
+        return true;
+    }
+
+    // Common utility functions that are too generic
+    if name == "clone" || name == "to_string" || name == "into" || name == "from" {
+        return true;
+    }
+
+    false
+}
+
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
     match role {
         FunctionRole::PureLogic => 1.5,    // High priority for business logic
@@ -243,7 +269,8 @@ pub fn calculate_semantic_priority(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::call_graph::CallGraph;
+    use crate::core::FunctionMetrics;
+    use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
     use std::path::PathBuf;
 
     fn create_test_metrics(
@@ -373,5 +400,135 @@ mod tests {
         assert_eq!(get_role_multiplier(FunctionRole::IOWrapper), 0.1);
         assert_eq!(get_role_multiplier(FunctionRole::EntryPoint), 0.8);
         assert_eq!(get_role_multiplier(FunctionRole::Unknown), 1.0);
+    }
+
+    #[test]
+    fn test_is_std_or_utility_function() {
+        // Test standard library functions from macro expansion
+        assert!(is_std_or_utility_function("format"));
+        assert!(is_std_or_utility_function("write"));
+        assert!(is_std_or_utility_function("print"));
+        assert!(is_std_or_utility_function("println"));
+
+        // Test std library paths
+        assert!(is_std_or_utility_function("std::fmt::format"));
+        assert!(is_std_or_utility_function("core::mem::drop"));
+        assert!(is_std_or_utility_function("alloc::vec::Vec"));
+
+        // Test common utility functions
+        assert!(is_std_or_utility_function("clone"));
+        assert!(is_std_or_utility_function("to_string"));
+        assert!(is_std_or_utility_function("into"));
+        assert!(is_std_or_utility_function("from"));
+
+        // Test non-std functions
+        assert!(!is_std_or_utility_function("calculate_dash_count"));
+        assert!(!is_std_or_utility_function("format_complexity_info"));
+        assert!(!is_std_or_utility_function("my_custom_function"));
+    }
+
+    #[test]
+    fn test_formatting_function_not_orchestrator() {
+        let mut graph = CallGraph::new();
+
+        // Create a function like format_recommendation_box_header
+        let func = create_test_metrics("format_recommendation_box_header", 1, 0, 9);
+        let func_id = FunctionId {
+            file: PathBuf::from("insights.rs"),
+            name: "format_recommendation_box_header".to_string(),
+            line: 142,
+        };
+
+        // Add the function to the graph
+        graph.add_function(func_id.clone(), false, false, 1, 9);
+
+        // Add callees: calculate_dash_count and format (from macro)
+        let callee1 = FunctionId {
+            file: PathBuf::from("insights.rs"),
+            name: "calculate_dash_count".to_string(),
+            line: 138,
+        };
+        let callee2 = FunctionId {
+            file: PathBuf::from("std"),
+            name: "format".to_string(),
+            line: 1,
+        };
+
+        graph.add_function(callee1.clone(), false, false, 1, 3);
+        graph.add_function(callee2.clone(), false, false, 1, 1);
+
+        graph.add_call(FunctionCall {
+            caller: func_id.clone(),
+            callee: callee1,
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: func_id.clone(),
+            callee: callee2,
+            call_type: CallType::Direct,
+        });
+
+        // Test that it's not classified as orchestrator
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::PureLogic,
+            "Formatting function should be PureLogic, not Orchestrator"
+        );
+
+        // Verify it doesn't match delegation pattern
+        assert!(
+            !delegates_to_tested_functions(&func_id, &graph, 0.8),
+            "Should not be considered delegation when calling std functions"
+        );
+    }
+
+    #[test]
+    fn test_actual_orchestrator_with_meaningful_callees() {
+        let mut graph = CallGraph::new();
+
+        // Create an actual orchestrator function
+        let func = create_test_metrics("coordinate_workflow", 2, 3, 15);
+        let func_id = FunctionId {
+            file: PathBuf::from("workflow.rs"),
+            name: "coordinate_workflow".to_string(),
+            line: 10,
+        };
+
+        graph.add_function(func_id.clone(), false, false, 2, 15);
+
+        // Add meaningful callees (not std library)
+        let callee1 = FunctionId {
+            file: PathBuf::from("workflow.rs"),
+            name: "process_step_one".to_string(),
+            line: 50,
+        };
+        let callee2 = FunctionId {
+            file: PathBuf::from("workflow.rs"),
+            name: "process_step_two".to_string(),
+            line: 100,
+        };
+
+        graph.add_function(callee1.clone(), false, false, 5, 30);
+        graph.add_function(callee2.clone(), false, false, 5, 30);
+
+        graph.add_call(FunctionCall {
+            caller: func_id.clone(),
+            callee: callee1,
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: func_id.clone(),
+            callee: callee2,
+            call_type: CallType::Direct,
+        });
+
+        // This should be classified as orchestrator
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::Orchestrator,
+            "Function coordinating multiple steps should be Orchestrator"
+        );
     }
 }

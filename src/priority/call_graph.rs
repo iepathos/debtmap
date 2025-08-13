@@ -389,7 +389,7 @@ impl CallGraph {
                 let same_file_match = candidates
                     .iter()
                     .find(|func_id| func_id.file == call.caller.file);
-                
+
                 if let Some(resolved) = same_file_match {
                     // Prefer same-file resolution
                     self.apply_call_resolution(&call, resolved);
