@@ -9,7 +9,7 @@ use crate::risk::evidence::{
     ModuleType, RiskAssessment, RiskClassification, RiskContext, RiskFactor,
 };
 use crate::risk::lcov::LcovData;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct EvidenceBasedRiskCalculator {
     complexity_analyzer: ComplexityRiskAnalyzer,
@@ -111,7 +111,7 @@ impl EvidenceBasedRiskCalculator {
         }
     }
 
-    fn determine_module_type(&self, file: &PathBuf) -> ModuleType {
+    fn determine_module_type(&self, file: &Path) -> ModuleType {
         let path_str = file.to_string_lossy();
 
         if path_str.contains("/tests/") || path_str.contains("_test.rs") {
@@ -274,9 +274,7 @@ impl EvidenceBasedRiskCalculator {
                     cognitive,
                     ..
                 } => {
-                    format!(
-                        "High complexity (cyclomatic: {cyclomatic}, cognitive: {cognitive})"
-                    )
+                    format!("High complexity (cyclomatic: {cyclomatic}, cognitive: {cognitive})")
                 }
                 RiskType::Coverage {
                     coverage_percentage,
@@ -296,9 +294,7 @@ impl EvidenceBasedRiskCalculator {
                 RiskType::ChangeFrequency {
                     commits_last_month, ..
                 } => {
-                    format!(
-                        "Frequent changes ({commits_last_month} commits last month)"
-                    )
+                    format!("Frequent changes ({commits_last_month} commits last month)")
                 }
                 RiskType::Architecture { .. } => "Architectural issues detected".to_string(),
             };
