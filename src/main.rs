@@ -27,6 +27,7 @@ struct AnalyzeConfig {
     _context_providers: Option<Vec<String>>,
     _disable_context: Option<Vec<String>>,
     top: Option<usize>,
+    tail: Option<usize>,
     priorities_only: bool,
     detailed: bool,
     semantic_off: bool,
@@ -47,6 +48,8 @@ struct ValidateConfig {
     disable_context: Option<Vec<String>>,
     #[allow(dead_code)]
     top: Option<usize>,
+    #[allow(dead_code)]
+    tail: Option<usize>,
     #[allow(dead_code)]
     priorities_only: bool,
     #[allow(dead_code)]
@@ -73,6 +76,7 @@ fn main() -> Result<()> {
             context_providers,
             disable_context,
             top,
+            tail,
             priorities_only,
             detailed,
             semantic_off,
@@ -92,6 +96,7 @@ fn main() -> Result<()> {
                 _context_providers: context_providers,
                 _disable_context: disable_context,
                 top,
+                tail,
                 priorities_only,
                 detailed,
                 semantic_off,
@@ -112,6 +117,7 @@ fn main() -> Result<()> {
             context_providers,
             disable_context,
             top,
+            tail,
             priorities_only,
             detailed,
             semantic_off,
@@ -127,6 +133,7 @@ fn main() -> Result<()> {
                 context_providers,
                 disable_context,
                 top,
+                tail,
                 priorities_only,
                 detailed,
                 semantic_off,
@@ -170,6 +177,7 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     output_unified_priorities(
         unified_analysis,
         config.top,
+        config.tail,
         config.priorities_only,
         config.detailed,
         config.explain_score,
@@ -1001,6 +1009,7 @@ fn determine_priority_output_format(
     priorities_only: bool,
     detailed: bool,
     top: Option<usize>,
+    tail: Option<usize>,
 ) -> priority::formatter::OutputFormat {
     use priority::formatter::OutputFormat;
 
@@ -1008,6 +1017,8 @@ fn determine_priority_output_format(
         OutputFormat::PrioritiesOnly
     } else if detailed {
         OutputFormat::Detailed
+    } else if let Some(n) = tail {
+        OutputFormat::Tail(n)
     } else if let Some(n) = top {
         OutputFormat::Top(n)
     } else {
@@ -1015,9 +1026,11 @@ fn determine_priority_output_format(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn output_unified_priorities(
     analysis: priority::UnifiedAnalysis,
     top: Option<usize>,
+    tail: Option<usize>,
     priorities_only: bool,
     detailed: bool,
     _explain_score: bool,
@@ -1040,7 +1053,7 @@ fn output_unified_priorities(
         }
     } else {
         // For other formats, use the existing formatter
-        let format = determine_priority_output_format(priorities_only, detailed, top);
+        let format = determine_priority_output_format(priorities_only, detailed, top, tail);
         let output = format_priorities(&analysis, format);
 
         if let Some(path) = output_file {
@@ -1777,11 +1790,11 @@ end_of_record
     fn test_determine_priority_output_format_priorities_only() {
         use priority::formatter::OutputFormat;
 
-        let format = determine_priority_output_format(true, false, None);
+        let format = determine_priority_output_format(true, false, None, None);
         assert!(matches!(format, OutputFormat::PrioritiesOnly));
 
         // priorities_only takes precedence over other flags
-        let format = determine_priority_output_format(true, true, Some(5));
+        let format = determine_priority_output_format(true, true, Some(5), None);
         assert!(matches!(format, OutputFormat::PrioritiesOnly));
     }
 
@@ -1789,11 +1802,11 @@ end_of_record
     fn test_determine_priority_output_format_detailed() {
         use priority::formatter::OutputFormat;
 
-        let format = determine_priority_output_format(false, true, None);
+        let format = determine_priority_output_format(false, true, None, None);
         assert!(matches!(format, OutputFormat::Detailed));
 
         // detailed takes precedence over top when priorities_only is false
-        let format = determine_priority_output_format(false, true, Some(5));
+        let format = determine_priority_output_format(false, true, Some(5), None);
         assert!(matches!(format, OutputFormat::Detailed));
     }
 
@@ -1801,13 +1814,13 @@ end_of_record
     fn test_determine_priority_output_format_top() {
         use priority::formatter::OutputFormat;
 
-        let format = determine_priority_output_format(false, false, Some(5));
+        let format = determine_priority_output_format(false, false, Some(5), None);
         assert!(matches!(format, OutputFormat::Top(5)));
 
-        let format = determine_priority_output_format(false, false, Some(10));
+        let format = determine_priority_output_format(false, false, Some(10), None);
         assert!(matches!(format, OutputFormat::Top(10)));
 
-        let format = determine_priority_output_format(false, false, Some(1));
+        let format = determine_priority_output_format(false, false, Some(1), None);
         assert!(matches!(format, OutputFormat::Top(1)));
     }
 
@@ -1815,7 +1828,7 @@ end_of_record
     fn test_determine_priority_output_format_default() {
         use priority::formatter::OutputFormat;
 
-        let format = determine_priority_output_format(false, false, None);
+        let format = determine_priority_output_format(false, false, None, None);
         assert!(matches!(format, OutputFormat::Default));
     }
 
@@ -1824,17 +1837,38 @@ end_of_record
         use priority::formatter::OutputFormat;
 
         // Test full precedence: priorities_only > detailed > top > default
-        let format = determine_priority_output_format(true, true, Some(5));
+        let format = determine_priority_output_format(true, true, Some(5), None);
         assert!(matches!(format, OutputFormat::PrioritiesOnly));
 
-        let format = determine_priority_output_format(false, true, Some(5));
+        let format = determine_priority_output_format(false, true, Some(5), None);
         assert!(matches!(format, OutputFormat::Detailed));
 
-        let format = determine_priority_output_format(false, false, Some(5));
+        let format = determine_priority_output_format(false, false, Some(5), None);
         assert!(matches!(format, OutputFormat::Top(5)));
 
-        let format = determine_priority_output_format(false, false, None);
+        let format = determine_priority_output_format(false, false, None, None);
         assert!(matches!(format, OutputFormat::Default));
+    }
+
+    #[test]
+    fn test_determine_priority_output_format_tail() {
+        use priority::formatter::OutputFormat;
+
+        // tail should work when specified alone
+        let format = determine_priority_output_format(false, false, None, Some(5));
+        assert!(matches!(format, OutputFormat::Tail(5)));
+
+        // tail with different values
+        let format = determine_priority_output_format(false, false, None, Some(10));
+        assert!(matches!(format, OutputFormat::Tail(10)));
+
+        // tail should be overridden by detailed
+        let format = determine_priority_output_format(false, true, None, Some(5));
+        assert!(matches!(format, OutputFormat::Detailed));
+
+        // tail should take precedence over top when both are specified
+        let format = determine_priority_output_format(false, false, Some(3), Some(5));
+        assert!(matches!(format, OutputFormat::Tail(5)));
     }
 
     #[test]
@@ -1878,6 +1912,7 @@ end_of_record
             context_providers: None,
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
@@ -1901,6 +1936,7 @@ end_of_record
             context_providers: None,
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
@@ -1924,6 +1960,7 @@ end_of_record
             context_providers: None,
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
@@ -1948,6 +1985,7 @@ end_of_record
             context_providers: None,
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
@@ -2719,6 +2757,7 @@ end_of_record
             context_providers: None,
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
@@ -2763,6 +2802,7 @@ end_of_record
             context_providers: None,
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
@@ -2798,6 +2838,7 @@ end_of_record
             context_providers: None,
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
@@ -2866,6 +2907,7 @@ end_of_record
             context_providers: Some(vec!["git-history".to_string()]),
             disable_context: None,
             top: None,
+            tail: None,
             priorities_only: false,
             detailed: false,
             semantic_off: false,
