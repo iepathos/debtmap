@@ -307,33 +307,54 @@ fn find_workspace_root() -> Option<PathBuf> {
     }
 }
 
+/// Check if a directory should be skipped during traversal
+fn should_skip_directory(dir_name: &str) -> bool {
+    dir_name == "target" || dir_name == ".git" || dir_name.starts_with('.')
+}
+
+/// Check if a path is a Rust source file
+fn is_rust_file(path: &Path) -> bool {
+    path.extension().and_then(|e| e.to_str()) == Some("rs")
+}
+
+/// Process a single directory entry, returning files to add and directories to visit
+fn process_entry(entry: fs::DirEntry) -> Result<(Option<PathBuf>, Option<PathBuf>)> {
+    let path = entry.path();
+
+    if path.is_dir() {
+        let should_visit = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|name| !should_skip_directory(name))
+            .unwrap_or(false);
+
+        Ok((None, if should_visit { Some(path) } else { None }))
+    } else if is_rust_file(&path) {
+        Ok((Some(path), None))
+    } else {
+        Ok((None, None))
+    }
+}
+
 /// Find all Rust files in a directory recursively
 fn find_rust_files(root: Option<&Path>) -> Result<Vec<PathBuf>> {
     let root = root.unwrap_or_else(|| Path::new("."));
     let mut rust_files = Vec::new();
+    let mut dirs_to_visit = vec![root.to_path_buf()];
 
-    fn visit_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
+    while let Some(dir) = dirs_to_visit.pop() {
+        for entry in fs::read_dir(&dir)? {
+            let (file, subdir) = process_entry(entry?)?;
 
-            if path.is_dir() {
-                // Skip target and other build directories
-                let dir_name = path.file_name().and_then(|n| n.to_str());
-                if let Some(name) = dir_name {
-                    if name == "target" || name == ".git" || name.starts_with('.') {
-                        continue;
-                    }
-                }
-                visit_dir(&path, files)?;
-            } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
-                files.push(path);
+            if let Some(file) = file {
+                rust_files.push(file);
+            }
+            if let Some(subdir) = subdir {
+                dirs_to_visit.push(subdir);
             }
         }
-        Ok(())
     }
 
-    visit_dir(root, &mut rust_files)?;
     Ok(rust_files)
 }
 
@@ -452,6 +473,79 @@ mod tests {
         // In CI or in a real Rust project, this should find the root
         if root.is_some() {
             assert!(root.unwrap().join("Cargo.toml").exists());
+        }
+    }
+
+    #[test]
+    fn test_should_skip_directory() {
+        // Test directories that should be skipped
+        assert!(should_skip_directory("target"));
+        assert!(should_skip_directory(".git"));
+        assert!(should_skip_directory(".hidden"));
+        assert!(should_skip_directory(".vscode"));
+
+        // Test directories that should not be skipped
+        assert!(!should_skip_directory("src"));
+        assert!(!should_skip_directory("tests"));
+        assert!(!should_skip_directory("benches"));
+        assert!(!should_skip_directory("examples"));
+    }
+
+    #[test]
+    fn test_is_rust_file() {
+        // Test Rust files
+        assert!(is_rust_file(Path::new("main.rs")));
+        assert!(is_rust_file(Path::new("lib.rs")));
+        assert!(is_rust_file(Path::new("src/module.rs")));
+        assert!(is_rust_file(Path::new("/absolute/path/file.rs")));
+
+        // Test non-Rust files
+        assert!(!is_rust_file(Path::new("README.md")));
+        assert!(!is_rust_file(Path::new("Cargo.toml")));
+        assert!(!is_rust_file(Path::new("script.py")));
+        assert!(!is_rust_file(Path::new("no_extension")));
+        assert!(!is_rust_file(Path::new(".rs"))); // Just extension, no name
+    }
+
+    #[test]
+    fn test_process_entry() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a Rust file
+        let rust_file = temp_dir.path().join("test.rs");
+        fs::write(&rust_file, "fn main() {}").unwrap();
+
+        // Create a non-Rust file
+        let other_file = temp_dir.path().join("README.md");
+        fs::write(&other_file, "# README").unwrap();
+
+        // Create a directory
+        let sub_dir = temp_dir.path().join("src");
+        fs::create_dir(&sub_dir).unwrap();
+
+        // Create a target directory (should be skipped)
+        let target_dir = temp_dir.path().join("target");
+        fs::create_dir(&target_dir).unwrap();
+
+        // Test processing entries
+        for entry in fs::read_dir(temp_dir.path()).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            let result = process_entry(entry).unwrap();
+
+            if path == rust_file {
+                assert!(result.0.is_some()); // Should return the Rust file
+                assert!(result.1.is_none());
+            } else if path == other_file {
+                assert!(result.0.is_none()); // Should not return non-Rust file
+                assert!(result.1.is_none());
+            } else if path == sub_dir {
+                assert!(result.0.is_none());
+                assert!(result.1.is_some()); // Should return directory to visit
+            } else if path == target_dir {
+                assert!(result.0.is_none());
+                assert!(result.1.is_none()); // Should skip target directory
+            }
         }
     }
 
