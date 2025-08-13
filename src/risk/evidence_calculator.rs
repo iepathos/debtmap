@@ -275,15 +275,14 @@ impl EvidenceBasedRiskCalculator {
                     ..
                 } => {
                     format!(
-                        "High complexity (cyclomatic: {}, cognitive: {})",
-                        cyclomatic, cognitive
+                        "High complexity (cyclomatic: {cyclomatic}, cognitive: {cognitive})"
                     )
                 }
                 RiskType::Coverage {
                     coverage_percentage,
                     ..
                 } => {
-                    format!("Low test coverage ({:.0}%)", coverage_percentage)
+                    format!("Low test coverage ({coverage_percentage:.0}%)")
                 }
                 RiskType::Coupling {
                     afferent_coupling,
@@ -291,16 +290,14 @@ impl EvidenceBasedRiskCalculator {
                     ..
                 } => {
                     format!(
-                        "High coupling (incoming: {}, outgoing: {})",
-                        afferent_coupling, efferent_coupling
+                        "High coupling (incoming: {afferent_coupling}, outgoing: {efferent_coupling})"
                     )
                 }
                 RiskType::ChangeFrequency {
                     commits_last_month, ..
                 } => {
                     format!(
-                        "Frequent changes ({} commits last month)",
-                        commits_last_month
+                        "Frequent changes ({commits_last_month} commits last month)"
                     )
                 }
                 RiskType::Architecture { .. } => "Architectural issues detected".to_string(),
@@ -315,8 +312,7 @@ impl EvidenceBasedRiskCalculator {
             };
 
             explanation.push_str(&format!(
-                "Primary factor: {} with {}.",
-                factor_desc, severity_desc
+                "Primary factor: {factor_desc} with {severity_desc}."
             ));
         }
 

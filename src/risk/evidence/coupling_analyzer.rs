@@ -286,12 +286,11 @@ impl CouplingRiskAnalyzer {
 
         if circular > 0 {
             issues.push(CouplingIssue::CircularDependency(format!(
-                "{} circular dependencies detected",
-                circular
+                "{circular} circular dependencies detected"
             )));
         }
 
-        if instability > 0.8 || instability < 0.2 {
+        if !(0.2..=0.8).contains(&instability) {
             issues.push(CouplingIssue::HighInstability);
         }
 
