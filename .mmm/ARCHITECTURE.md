@@ -74,6 +74,13 @@ Unified debt prioritization system:
 - `unified_scorer.rs`: Unified priority scoring algorithm combining all metrics, includes dead code detection
 - `formatter.rs`: Clean output formatters for different verbosity levels
 
+### Expansion (`src/expansion/`)
+Macro expansion for perfect call graph analysis:
+- `mod.rs`: Public API and configuration
+- `expander.rs`: cargo-expand integration
+- `cache.rs`: Expansion caching system
+- `source_map.rs`: Source location mapping
+
 ### IO (`src/io/`)
 Side-effectful operations:
 - `walker.rs`: File system traversal

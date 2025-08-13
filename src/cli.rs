@@ -72,6 +72,18 @@ pub enum Commands {
         /// Show score breakdown for debugging
         #[arg(long = "explain-score")]
         explain_score: bool,
+
+        /// Enable macro expansion using cargo-expand
+        #[arg(long = "expand-macros")]
+        expand_macros: bool,
+
+        /// Disable macro expansion explicitly
+        #[arg(long = "no-expand-macros", conflicts_with = "expand_macros")]
+        no_expand_macros: bool,
+
+        /// Clear expansion cache before analysis
+        #[arg(long = "clear-expansion-cache")]
+        clear_expansion_cache: bool,
     },
 
     /// Initialize configuration file

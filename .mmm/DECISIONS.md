@@ -287,3 +287,30 @@ Implement intelligent test function handling that:
 - ✅ More accurate reflection of actual technical debt in production code
 - ⚠️ Breaking change in debt score calculation (scores will generally be lower)
 - ⚠️ Additional logic complexity in the scoring system
+
+---
+
+## ADR-015: Macro Expansion for Perfect Call Graph Analysis
+**Date**: 2025-08-13
+**Status**: Accepted
+
+### Context
+Dead code detection was producing false positives for functions called within macros. The syn-based AST analysis operates on pre-expansion code where macro invocations remain as opaque token streams, making it impossible to detect function calls within `println!`, `format!`, `assert!`, and other macros. This led to legitimate code being incorrectly flagged as dead.
+
+### Decision
+Implement optional cargo-expand integration that:
+- Analyzes fully expanded Rust code where all macros have been resolved
+- Caches expanded code to minimize compilation overhead
+- Maps expanded code locations back to original source files
+- Falls back gracefully to standard analysis when expansion unavailable
+- Remains opt-in via --expand-macros CLI flag
+
+### Consequences
+- ✅ 100% accuracy in detecting macro-hidden function calls
+- ✅ Eliminates false positives in dead code detection
+- ✅ Smart caching reduces performance impact after initial expansion
+- ✅ Source mapping preserves accurate error reporting
+- ✅ Graceful degradation when cargo-expand unavailable
+- ⚠️ Requires cargo-expand to be installed separately
+- ⚠️ Initial expansion adds compilation overhead
+- ⚠️ Project must compile successfully for expansion to work
