@@ -385,12 +385,20 @@ impl CallGraph {
         for call in calls_to_resolve {
             // Look for a function with the same name in the nodes
             if let Some(candidates) = functions_by_name.get(&call.callee.name) {
-                // If we find exactly one function with this name, resolve it
-                if candidates.len() == 1 {
+                // First, try to find a match in the same file
+                let same_file_match = candidates
+                    .iter()
+                    .find(|func_id| func_id.file == call.caller.file);
+                
+                if let Some(resolved) = same_file_match {
+                    // Prefer same-file resolution
+                    self.apply_call_resolution(&call, resolved);
+                } else if candidates.len() == 1 {
+                    // If no same-file match, but only one candidate globally, use it
                     self.apply_call_resolution(&call, &candidates[0]);
                 }
-                // If multiple candidates, we leave them unresolved
-                // Future enhancement: use file proximity or other heuristics
+                // If multiple candidates across files and none in the same file,
+                // we leave them unresolved for now
             }
         }
     }

@@ -297,8 +297,10 @@ fn determine_debt_type(
     // Low complexity functions that are I/O wrappers or simple utilities
     // should not be flagged as technical debt
     if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        // Check if it's an I/O wrapper or simple utility
-        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+        // Check if it's an I/O wrapper, simple utility, or trivial delegation
+        if role == FunctionRole::IOWrapper 
+            || role == FunctionRole::EntryPoint 
+            || func.length <= 5 {  // Very short functions are likely trivial wrappers
             // These are acceptable patterns, not debt
             return DebtType::Orchestration {
                 delegates_to: vec![], // Empty indicates it's a simple wrapper
@@ -313,10 +315,20 @@ fn determine_debt_type(
             factors: identify_risk_factors(func, coverage),
         }
     } else {
-        // Very simple functions shouldn't be flagged as debt at all
-        // Use orchestration as a way to indicate "not really debt"
-        DebtType::Orchestration {
-            delegates_to: vec![],
+        // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
+        // Check if they're calling other functions (true delegation)
+        let callees = call_graph.get_callees(func_id);
+        if !callees.is_empty() && func.cyclomatic <= 2 {
+            // This is a simple delegation function
+            DebtType::Orchestration {
+                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+            }
+        } else {
+            // This is a simple function that does actual work - not really debt
+            // Return orchestration with empty delegates to indicate low priority
+            DebtType::Orchestration {
+                delegates_to: vec![],
+            }
         }
     }
 }
@@ -325,35 +337,41 @@ fn calculate_risk_score(func: &FunctionMetrics) -> f64 {
     // Calculate a risk score based on complexity metrics
     let complexity_score = (func.cyclomatic as f64 + func.cognitive as f64) / 2.0;
     let length_factor = (func.length as f64 / 50.0).min(2.0);
-    
+
     (complexity_score * 0.7 + length_factor * 3.0).min(10.0)
 }
 
-fn identify_risk_factors(func: &FunctionMetrics, coverage: &Option<TransitiveCoverage>) -> Vec<String> {
+fn identify_risk_factors(
+    func: &FunctionMetrics,
+    coverage: &Option<TransitiveCoverage>,
+) -> Vec<String> {
     let mut factors = Vec::new();
-    
+
     if func.cyclomatic > 5 {
-        factors.push(format!("Moderate complexity (cyclomatic: {})", func.cyclomatic));
+        factors.push(format!(
+            "Moderate complexity (cyclomatic: {})",
+            func.cyclomatic
+        ));
     }
-    
+
     if func.cognitive > 8 {
         factors.push(format!("Cognitive complexity: {}", func.cognitive));
     }
-    
+
     if func.length > 50 {
         factors.push(format!("Long function ({} lines)", func.length));
     }
-    
+
     if let Some(cov) = coverage {
         if cov.direct < 0.5 {
             factors.push(format!("Low coverage: {:.0}%", cov.direct * 100.0));
         }
     }
-    
+
     if factors.is_empty() {
         factors.push("Potential improvement opportunity".to_string());
     }
-    
+
     factors
 }
 
@@ -423,8 +441,10 @@ pub fn classify_debt_type_enhanced(
     // Low complexity functions that are I/O wrappers or simple utilities
     // should not be flagged as technical debt
     if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        // Check if it's an I/O wrapper or simple utility
-        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+        // Check if it's an I/O wrapper, simple utility, or trivial delegation
+        if role == FunctionRole::IOWrapper 
+            || role == FunctionRole::EntryPoint 
+            || func.length <= 5 {  // Very short functions are likely trivial wrappers
             // These are acceptable patterns, not debt
             return DebtType::Orchestration {
                 delegates_to: vec![], // Empty indicates it's a simple wrapper
@@ -439,10 +459,20 @@ pub fn classify_debt_type_enhanced(
             factors: identify_risk_factors(func, &None),
         }
     } else {
-        // Very simple functions shouldn't be flagged as debt at all
-        // Use orchestration as a way to indicate "not really debt"
-        DebtType::Orchestration {
-            delegates_to: vec![],
+        // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
+        // Check if they're calling other functions (true delegation)
+        let callees = call_graph.get_callees(func_id);
+        if !callees.is_empty() && func.cyclomatic <= 2 {
+            // This is a simple delegation function
+            DebtType::Orchestration {
+                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+            }
+        } else {
+            // This is a simple function that does actual work - not really debt
+            // Return orchestration with empty delegates to indicate low priority
+            DebtType::Orchestration {
+                delegates_to: vec![],
+            }
         }
     }
 }
