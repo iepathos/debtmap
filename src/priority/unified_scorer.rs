@@ -130,6 +130,53 @@ fn normalize_roi(roi: f64) -> f64 {
     }
 }
 
+/// Create a unified debt item with enhanced call graph analysis
+pub fn create_unified_debt_item_enhanced(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    _enhanced_call_graph: Option<()>, // Placeholder for future enhanced call graph
+    coverage: Option<&LcovData>,
+    roi_score: f64,
+) -> UnifiedDebtItem {
+    let func_id = FunctionId {
+        file: func.file.clone(),
+        name: func.name.clone(),
+        line: func.line,
+    };
+
+    let unified_score = calculate_unified_priority(func, call_graph, coverage, roi_score);
+    let role = classify_function_role(func, &func_id, call_graph);
+
+    let transitive_coverage =
+        coverage.map(|cov| calculate_transitive_coverage(&func_id, call_graph, cov));
+
+    // Use enhanced debt type classification
+    let debt_type = classify_debt_type_enhanced(func, call_graph, &func_id);
+
+    let recommendation = generate_recommendation(func, &debt_type, role, &unified_score);
+    let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
+
+    UnifiedDebtItem {
+        location: Location {
+            file: func.file.clone(),
+            function: func.name.clone(),
+            line: func.line,
+        },
+        debt_type,
+        unified_score,
+        function_role: role,
+        recommendation,
+        expected_impact,
+        transitive_coverage,
+        upstream_dependencies: call_graph.get_callers(&func_id).len(),
+        downstream_dependencies: call_graph.get_callees(&func_id).len(),
+        nesting_depth: 0,   // Would need to be calculated from AST
+        function_length: 0, // Would need to be calculated from AST or additional metadata
+        cyclomatic_complexity: func.cyclomatic,
+        cognitive_complexity: func.cognitive,
+    }
+}
+
 pub fn create_unified_debt_item(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
@@ -227,6 +274,54 @@ fn is_dead_code(func: &FunctionMetrics, call_graph: &CallGraph, func_id: &Functi
     // Check if function has incoming calls
     let callers = call_graph.get_callers(func_id);
     callers.is_empty()
+}
+
+/// Enhanced dead code detection using the enhanced call graph
+/// Enhanced version of debt type classification
+pub fn classify_debt_type_enhanced(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+) -> DebtType {
+    // Test functions are special debt cases
+    if func.is_test {
+        return match () {
+            _ if func.cyclomatic > 15 || func.cognitive > 20 => DebtType::TestComplexityHotspot {
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
+                threshold: 15,
+            },
+            _ => DebtType::TestingGap {
+                coverage: 0.0, // Test functions don't have coverage themselves
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
+            },
+        };
+    }
+
+    // Check for complexity hotspots first
+    if func.cyclomatic > 10 || func.cognitive > 15 {
+        return DebtType::ComplexityHotspot {
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+        };
+    }
+
+    // Check for dead code
+    if is_dead_code(func, call_graph, func_id) {
+        return DebtType::DeadCode {
+            visibility: determine_visibility(func),
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+            usage_hints: generate_usage_hints(func, call_graph, func_id),
+        };
+    }
+
+    // Default to risk-based debt
+    DebtType::Risk {
+        risk_score: 5.0,
+        factors: vec!["General technical debt".to_string()],
+    }
 }
 
 fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
