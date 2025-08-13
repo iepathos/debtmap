@@ -181,13 +181,13 @@ fn classify_api_patterns(name: &str) -> (i32, Vec<String>) {
     // Check for common API patterns
     if has_api_pattern_in_name(name) {
         score += 2;
-        indicators.push(format!("API pattern in name: {name}"));
+        indicators.push("API pattern".to_string());
     }
 
     // Check for builder/factory patterns
     if is_builder_or_factory(name) {
         score += 2;
-        indicators.push("Builder/factory pattern detected".to_string());
+        indicators.push("Builder".to_string());
     }
 
     // Check for trait implementations
@@ -199,13 +199,13 @@ fn classify_api_patterns(name: &str) -> (i32, Vec<String>) {
     // Check for constructor patterns (gets higher score)
     if is_constructor_pattern(name) {
         score += 3;
-        indicators.push("Constructor/initialization pattern".to_string());
+        indicators.push("Constructor".to_string());
     }
 
     // Check for public API prefixes
     if has_public_api_prefix(name) {
         score += 2;
-        indicators.push("Public API prefix detected".to_string());
+        indicators.push("Public API prefix".to_string());
     }
 
     (score, indicators)
@@ -291,9 +291,9 @@ pub fn generate_enhanced_dead_code_hints(
     let (is_likely_api, api_indicators) = is_likely_external_api(func, visibility);
 
     if is_likely_api {
-        hints.push("⚠️ Likely external API - verify before removing".to_string());
+        hints.push("Likely external API - verify before removing".to_string());
         for indicator in api_indicators {
-            hints.push(format!("  • {indicator}"));
+            hints.push(indicator);
         }
     } else if matches!(visibility, FunctionVisibility::Public) {
         hints.push("Public but no external API indicators found".to_string());
@@ -302,13 +302,17 @@ pub fn generate_enhanced_dead_code_hints(
     // Add existing hints based on function characteristics
     if func.cyclomatic <= 3 && func.cognitive <= 5 {
         hints.push("Low complexity - low impact removal".to_string());
-    } else {
+    } else if func.cyclomatic > 10 || func.cognitive > 15 {
         hints.push("High complexity - removing may eliminate significant unused code".to_string());
     }
 
     // Check for test helper patterns
-    if func.name.contains("helper") || func.name.contains("util") || func.name.contains("fixture") {
-        hints.push("May be a test helper - consider moving to test module".to_string());
+    if func.name.contains("test") && func.name.contains("helper") {
+        hints.push("Potential test helper - consider moving to test module".to_string());
+    } else if func.name.contains("mock") || func.name.contains("fixture") {
+        hints.push("Potential test helper - consider moving to test module".to_string());
+    } else if func.name.contains("helper") || func.name.contains("util") {
+        hints.push("Potential test helper - consider moving to test module".to_string());
     }
 
     hints
