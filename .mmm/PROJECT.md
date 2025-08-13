@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, and spec 21 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, and spec 22 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -87,6 +87,14 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Smart usage hints based on function complexity and dependencies
   - Integration with unified priority scoring system
   - Separate DebtType::DeadCode with visibility classification
+- ✅ Perfect Macro Function Call Detection (spec 22):
+  - cargo-expand integration for analyzing fully expanded Rust code
+  - Eliminates false positives from macro-hidden function calls
+  - Smart caching system to avoid repeated compilation overhead
+  - Source location mapping back to original files
+  - Graceful fallback when expansion unavailable
+  - Optional via --expand-macros CLI flag
+  - Support for workspace and single-package projects
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -108,6 +116,7 @@ The project follows a functional core / imperative shell pattern:
 9. **Context-Aware Risk**: Considers critical paths, dependencies, and historical data
 10. **Smart ROI Prioritization**: Dependency-aware testing recommendations with cascade effects
 11. **Unified Prioritization**: Single, semantic-aware score for all technical debt items
+12. **Macro-Aware Analysis**: Perfect function call detection through macro expansion
 
 ## Project Structure
 ```
