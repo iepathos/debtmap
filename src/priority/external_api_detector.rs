@@ -307,11 +307,12 @@ pub fn generate_enhanced_dead_code_hints(
     }
 
     // Check for test helper patterns
-    if func.name.contains("test") && func.name.contains("helper") {
-        hints.push("Potential test helper - consider moving to test module".to_string());
-    } else if func.name.contains("mock") || func.name.contains("fixture") {
-        hints.push("Potential test helper - consider moving to test module".to_string());
-    } else if func.name.contains("helper") || func.name.contains("util") {
+    if (func.name.contains("test") && func.name.contains("helper"))
+        || func.name.contains("mock")
+        || func.name.contains("fixture")
+        || func.name.contains("helper")
+        || func.name.contains("util")
+    {
         hints.push("Potential test helper - consider moving to test module".to_string());
     }
 
