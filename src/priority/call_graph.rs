@@ -231,17 +231,20 @@ impl CallGraph {
         if let Some(node) = self.nodes.get(func_id) {
             let callees = self.get_callees(func_id);
 
-            // Simple delegation: low complexity, mostly calls other functions
-            if node.complexity <= 2 && !callees.is_empty() {
+            // Delegation pattern requires:
+            // 1. Low complexity in the orchestrator
+            // 2. Multiple functions being coordinated (not just one wrapper call)
+            // 3. Callees doing the real work (higher complexity)
+            if node.complexity <= 3 && callees.len() >= 2 {
                 let avg_callee_complexity: f64 = callees
                     .iter()
                     .filter_map(|id| self.nodes.get(id))
                     .map(|n| n.complexity as f64)
                     .sum::<f64>()
-                    / callees.len() as f64;
+                    / callees.len().max(1) as f64;
 
-                // Delegates if callees are more complex
-                return avg_callee_complexity > node.complexity as f64 * 2.0;
+                // Delegates if callees are more complex on average
+                return avg_callee_complexity > node.complexity as f64 * 1.5;
             }
         }
         false
@@ -289,6 +292,11 @@ impl CallGraph {
             .filter(|call| &call.caller == func_id)
             .cloned()
             .collect()
+    }
+
+    /// Get all function calls in the graph (for testing and debugging)
+    pub fn get_all_calls(&self) -> Vec<FunctionCall> {
+        self.edges.iter().cloned().collect()
     }
 
     pub fn is_empty(&self) -> bool {

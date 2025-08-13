@@ -190,6 +190,9 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                     format!("<closure@{}>", closure.body.span().start().line),
                     CallType::Callback,
                 );
+                // Visit the closure body to find calls inside it
+                syn::visit::visit_expr(self, &closure.body);
+                return; // Early return to avoid visiting twice
             }
             _ => {}
         }

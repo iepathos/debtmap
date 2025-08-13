@@ -134,9 +134,9 @@ fn delegates_to_tested_functions(
         .filter(|f| !is_std_or_utility_function(&f.name))
         .collect();
 
-    // For now, assume delegation if the function calls multiple other functions
-    // and has low complexity (actual coverage check would require coverage data)
-    meaningful_callees.len() >= 2 && call_graph.detect_delegation_pattern(func_id)
+    // Orchestrators should coordinate MULTIPLE functions, not just wrap a single one
+    // A function that calls only one other function is just a wrapper, not an orchestrator
+    meaningful_callees.len() >= 3 && call_graph.detect_delegation_pattern(func_id)
 }
 
 fn contains_io_patterns(func: &FunctionMetrics) -> bool {

@@ -476,7 +476,7 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
         DebtType::TestingGap { .. } => "Add tests",
         DebtType::ComplexityHotspot { .. } => "Reduce complexity",
         DebtType::DeadCode { .. } => "Remove dead code",
-        DebtType::Orchestration { .. } => "Add integration test",
+        DebtType::Orchestration { .. } => "Refactor to pure functions",
         DebtType::Duplication { .. } => "Extract duplication",
         DebtType::Risk { .. } => "Fix debt",
         DebtType::TestComplexityHotspot { .. } => "Simplify test",
