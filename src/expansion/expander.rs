@@ -54,7 +54,7 @@ impl MacroExpander {
     /// Check if cargo-expand is available
     pub fn check_cargo_expand(&self) -> Result<bool> {
         let output = Command::new(&self.cargo_path)
-            .args(&["expand", "--version"])
+            .args(["expand", "--version"])
             .output()
             .context("Failed to run cargo expand")?;
 
@@ -79,7 +79,7 @@ impl MacroExpander {
     /// Compute hash of file content for cache validation
     fn compute_file_hash(&self, path: &Path) -> Result<String> {
         let content =
-            fs::read_to_string(path).with_context(|| format!("Failed to read file: {:?}", path))?;
+            fs::read_to_string(path).with_context(|| format!("Failed to read file: {path:?}"))?;
 
         let mut hasher = Sha256::new();
         hasher.update(content.as_bytes());
@@ -91,7 +91,7 @@ impl MacroExpander {
         let _timeout = Duration::from_secs(self.config.timeout_secs);
 
         let output = Command::new(&self.cargo_path)
-            .args(&[
+            .args([
                 "expand",
                 "--lib",
                 "--theme=none",
@@ -107,7 +107,7 @@ impl MacroExpander {
             bail!("cargo expand failed: {}", stderr);
         }
 
-        Ok(String::from_utf8(output.stdout).context("Invalid UTF-8 in cargo expand output")?)
+        String::from_utf8(output.stdout).context("Invalid UTF-8 in cargo expand output")
     }
 
     /// Parse the expanded output and create source mappings
@@ -140,8 +140,7 @@ impl MacroExpander {
             .trim_start_matches("src/")
             .trim_start_matches("src\\")
             .trim_end_matches(".rs")
-            .replace('/', "::")
-            .replace('\\', "::");
+            .replace(['/', '\\'], "::");
 
         Ok(module_path)
     }

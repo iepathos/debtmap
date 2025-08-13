@@ -45,7 +45,7 @@ impl ExpansionCache {
     pub fn new(cache_dir: &Path) -> Result<Self> {
         // Create cache directory if it doesn't exist
         fs::create_dir_all(cache_dir)
-            .with_context(|| format!("Failed to create cache directory: {:?}", cache_dir))?;
+            .with_context(|| format!("Failed to create cache directory: {cache_dir:?}"))?;
 
         let mut cache = Self {
             cache_dir: cache_dir.to_path_buf(),
