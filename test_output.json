@@ -1,0 +1,107 @@
+════════════════════════════════════════════
+    PRIORITY TECHNICAL DEBT FIXES
+════════════════════════════════════════════
+
+🎯 TOP 10 RECOMMENDATIONS (by unified priority)
+
+#1 SCORE: 10.0 [CRITICAL]
+├─ RISK: src/expansion/cache.rs:45 new()
+├─ ACTION: Address technical debt
+├─ IMPACT: -2.0 risk
+├─ COMPLEXITY: cyclomatic=3, branches=3, cognitive=4, nesting=1, lines=16
+└─ WHY: Risk score 5.0: General technical debt
+
+#2 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/cache.rs:62 load_cache()
+├─ ACTION: Remove unused private function
+├─ IMPACT: -3 complexity, -3.0 risk, -7 LOC
+├─ COMPLEXITY: cyclomatic=4, branches=4, cognitive=3, nesting=2, lines=14
+├─ VISIBILITY: private function with no callers
+│  • High complexity - removing may eliminate significant unused code
+│  • Function has no dependencies - safe to remove
+└─ WHY: Private function 'load_cache' has no callers and can be safely removed (complexity: cyclo=4, cog=3)
+
+#3 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/cache.rs:77 save_cache()
+├─ ACTION: Remove unused private function
+├─ IMPACT: -2 complexity, -3.0 risk, -5 LOC
+├─ COMPLEXITY: cyclomatic=3, branches=3, cognitive=2, nesting=1, lines=11
+├─ VISIBILITY: private function with no callers
+│  • Low complexity - low impact removal
+│  • Function has no dependencies - safe to remove
+└─ WHY: Private function 'save_cache' has no callers and can be safely removed (complexity: cyclo=3, cog=2)
+
+#4 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/cache.rs:89 get()
+├─ ACTION: Remove unused public function (no API indicators)
+├─ IMPACT: -7 complexity, -3.0 risk, -15 LOC
+├─ COMPLEXITY: cyclomatic=4, branches=4, cognitive=11, nesting=4, lines=36
+├─ VISIBILITY: public function with no callers
+│  • Public but no external API indicators found
+│  • High complexity - removing may eliminate significant unused code
+│  • Function has no dependencies - safe to remove
+└─ WHY: Public function 'get' has no callers and no external API indicators (complexity: cyclo=4, cog=11)
+
+#5 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/cache.rs:126 store()
+├─ ACTION: Remove unused public function (no API indicators)
+├─ IMPACT: -4 complexity, -3.0 risk, -9 LOC
+├─ COMPLEXITY: cyclomatic=3, branches=3, cognitive=6, nesting=1, lines=36
+├─ VISIBILITY: public function with no callers
+│  • Public but no external API indicators found
+│  • High complexity - removing may eliminate significant unused code
+│  • Function has no dependencies - safe to remove
+└─ WHY: Public function 'store' has no callers and no external API indicators (complexity: cyclo=3, cog=6)
+
+#6 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/cache.rs:163 clear()
+├─ ACTION: Remove unused public function (no API indicators)
+├─ IMPACT: -3 complexity, -3.0 risk, -6 LOC
+├─ COMPLEXITY: cyclomatic=3, branches=3, cognitive=3, nesting=2, lines=12
+├─ VISIBILITY: public function with no callers
+│  • Public but no external API indicators found
+│  • Low complexity - low impact removal
+│  • Function has no dependencies - safe to remove
+└─ WHY: Public function 'clear' has no callers and no external API indicators (complexity: cyclo=3, cog=3)
+
+#7 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/cache.rs:176 is_valid()
+├─ ACTION: Remove unused public function (no API indicators)
+├─ IMPACT: -2 complexity, -3.0 risk, -5 LOC
+├─ COMPLEXITY: cyclomatic=3, branches=3, cognitive=2, nesting=2, lines=8
+├─ VISIBILITY: public function with no callers
+│  • Public but no external API indicators found
+│  • Low complexity - low impact removal
+│  • Function has no dependencies - safe to remove
+└─ WHY: Public function 'is_valid' has no callers and no external API indicators (complexity: cyclo=3, cog=2)
+
+#8 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/cache.rs:186 get_rust_version()
+├─ ACTION: Remove unused private function
+├─ IMPACT: -2 complexity, -3.0 risk, -4 LOC
+├─ COMPLEXITY: cyclomatic=2, branches=2, cognitive=2, nesting=1, lines=11
+├─ VISIBILITY: private function with no callers
+│  • Low complexity - low impact removal
+│  • Function has no dependencies - safe to remove
+└─ WHY: Private function 'get_rust_version' has no callers and can be safely removed (complexity: cyclo=2, cog=2)
+
+#9 SCORE: 10.0 [CRITICAL]
+├─ COMPLEXITY: src/expansion/source_map.rs:28 from_expanded()
+├─ ACTION: Extract 3 sub-functions to reduce complexity
+├─ IMPACT: -5 complexity, -3.5 risk
+├─ COMPLEXITY: cyclomatic=11, branches=11, cognitive=26, nesting=4, lines=60
+└─ WHY: Highest complexity function (CC:11, Cog:26), affects all dependent calculations
+
+#10 SCORE: 10.0 [CRITICAL]
+├─ DEAD CODE: src/expansion/source_map.rs:99 get_original()
+├─ ACTION: Remove unused public function (no API indicators)
+├─ IMPACT: -1 complexity, -3.0 risk, -3 LOC
+├─ COMPLEXITY: cyclomatic=1, branches=1, cognitive=2, nesting=1, lines=6
+├─ VISIBILITY: public function with no callers
+│  • Public but no external API indicators found
+│  • Low complexity - low impact removal
+│  • Function has no dependencies - safe to remove
+└─ WHY: Public function 'get_original' has no callers and no external API indicators (complexity: cyclo=1, cog=2)
+
+
+📊 TOTAL DEBT SCORE: 285

@@ -9,7 +9,7 @@ use tempfile::TempDir;
 #[test]
 fn test_expansion_config_defaults() {
     let config = ExpansionConfig::default();
-    assert!(!config.enabled);
+    assert!(config.enabled); // Now enabled by default for accuracy
     assert!(config.fallback_on_error);
     assert!(config.parallel);
     assert_eq!(config.timeout_secs, 60);

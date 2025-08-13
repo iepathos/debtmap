@@ -520,6 +520,26 @@ patterns = ["*.generated.rs", "*.pb.go", "*.min.js", "test/fixtures/**"]
 [languages]
 # Languages to analyze (rust, python, javascript, typescript)
 enabled = ["rust", "python", "javascript"]
+
+[external_api]
+# Control external API detection for dead code analysis
+# Set to false for CLI tools and applications that don't expose a library API
+detect_external_api = true  # default: true
+
+# Explicitly mark functions as external APIs (won't be flagged as dead code)
+api_functions = [
+    "parse",                   # Simple function name
+    "Parser::new",             # Struct method
+    "client::connect",         # Module-qualified function
+]
+
+# Mark files containing external APIs (all public functions in these files are APIs)
+api_files = [
+    "src/lib.rs",              # Exact file path
+    "src/api.rs",              # Another exact path
+    "src/public/*.rs",         # Glob pattern for multiple files
+    "**/api/*.rs",             # Recursive glob pattern
+]
 ```
 
 ## Output Examples

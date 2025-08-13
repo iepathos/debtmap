@@ -20,3 +20,12 @@ patterns = [
 
 [output]
 default_format = "terminal"
+
+[external_api]
+# Disable automatic external API detection since debtmap is a CLI tool, not a library
+detect_external_api = false
+
+# However, we can still explicitly mark certain functions as APIs if needed
+# (Currently empty since debtmap doesn't expose any external APIs)
+api_functions = []
+api_files = []
