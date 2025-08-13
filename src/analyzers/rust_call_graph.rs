@@ -94,6 +94,17 @@ impl CallGraphExtractor {
             });
         }
     }
+
+    fn check_for_function_reference(&mut self, expr: &Expr) {
+        if let Expr::Path(expr_path) = expr {
+            if let Some(func_name) = Self::extract_function_name_from_path(&expr_path.path) {
+                // Function passed as argument
+                if !is_likely_variable_name(&func_name) {
+                    self.add_call(func_name, CallType::Callback);
+                }
+            }
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for CallGraphExtractor {
@@ -136,17 +147,42 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         match expr {
             // Handle regular function calls: foo(), module::foo()
-            Expr::Call(ExprCall { func, .. }) => {
+            Expr::Call(ExprCall { func, args, .. }) => {
                 if let Expr::Path(expr_path) = &**func {
                     if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
                         self.add_call(name.clone(), Self::classify_call_type(&name));
                     }
                 }
+                // Also check arguments for function references
+                for arg in args {
+                    self.check_for_function_reference(arg);
+                }
+                // Don't continue visiting the function part to avoid duplicates
+                for arg in args {
+                    syn::visit::visit_expr(self, arg);
+                }
+                return; // Early return to avoid visiting children
             }
             // Handle method calls: obj.method()
-            Expr::MethodCall(ExprMethodCall { method, .. }) => {
+            Expr::MethodCall(ExprMethodCall {
+                method,
+                args,
+                receiver,
+                ..
+            }) => {
                 let name = method.to_string();
                 self.add_call(name.clone(), Self::classify_call_type(&name));
+
+                // Check arguments for function references (e.g., .for_each(print_func))
+                for arg in args {
+                    self.check_for_function_reference(arg);
+                }
+                // Visit receiver and arguments but not the method itself
+                syn::visit::visit_expr(self, receiver);
+                for arg in args {
+                    syn::visit::visit_expr(self, arg);
+                }
+                return; // Early return to avoid visiting children
             }
             // Handle closures that might be callbacks
             Expr::Closure(closure) if self.current_function.is_some() => {
@@ -161,6 +197,15 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         // Continue visiting nested expressions
         syn::visit::visit_expr(self, expr);
     }
+}
+
+fn is_likely_variable_name(name: &str) -> bool {
+    // Common variable names and language keywords that shouldn't be treated as function references
+    matches!(
+        name,
+        "self" | "super" | "crate" | "true" | "false" | "None" | "Some" | "Ok" | "Err"
+    ) || name.starts_with("r#") // Raw identifiers
+      || name.chars().next().is_some_and(|c| c.is_uppercase()) // Likely a constant or enum variant
 }
 
 fn calculate_basic_complexity(block: &syn::Block) -> u32 {
