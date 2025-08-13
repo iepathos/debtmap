@@ -10,6 +10,7 @@ pub enum OutputFormat {
     PrioritiesOnly, // Minimal list
     Detailed,       // Full analysis with priority overlay
     Top(usize),     // Top N items
+    Tail(usize),    // Bottom N items (lowest priority)
 }
 
 pub fn format_priorities(analysis: &UnifiedAnalysis, format: OutputFormat) -> String {
@@ -18,6 +19,7 @@ pub fn format_priorities(analysis: &UnifiedAnalysis, format: OutputFormat) -> St
         OutputFormat::PrioritiesOnly => format_priorities_only(analysis, 10),
         OutputFormat::Detailed => format_detailed(analysis),
         OutputFormat::Top(n) => format_default(analysis, n),
+        OutputFormat::Tail(n) => format_tail(analysis, n),
     }
 }
 
@@ -80,6 +82,68 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
 
     // Add total impact summary
     // _format_total_impact(&mut output, analysis);
+
+    output
+}
+
+fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
+    let mut output = String::new();
+
+    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(
+        output,
+        "    {}",
+        "LOWEST PRIORITY TECHNICAL DEBT".bright_white().bold()
+    )
+    .unwrap();
+    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(output).unwrap();
+
+    let bottom_items = analysis.get_bottom_priorities(limit);
+    let count = bottom_items.len().min(limit);
+    let total_items = analysis.items.len();
+
+    writeln!(
+        output,
+        "📉 {} (items {}-{})",
+        format!("BOTTOM {count} ITEMS").bright_yellow().bold(),
+        total_items.saturating_sub(count - 1),
+        total_items
+    )
+    .unwrap();
+    writeln!(output).unwrap();
+
+    for (idx, item) in bottom_items.iter().enumerate() {
+        if idx >= limit {
+            break;
+        }
+        let rank = total_items - bottom_items.len() + idx + 1;
+        format_priority_item(&mut output, rank, item);
+        writeln!(output).unwrap();
+    }
+
+    // Add total debt score
+    writeln!(output).unwrap();
+    writeln!(
+        output,
+        "📊 {}",
+        format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score)
+            .bright_cyan()
+            .bold()
+    )
+    .unwrap();
+
+    // Add overall coverage if available
+    if let Some(coverage) = analysis.overall_coverage {
+        writeln!(
+            output,
+            "📈 {}",
+            format!("OVERALL COVERAGE: {coverage:.2}%")
+                .bright_green()
+                .bold()
+        )
+        .unwrap();
+    }
 
     output
 }

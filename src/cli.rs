@@ -54,8 +54,12 @@ pub enum Commands {
         disable_context: Option<Vec<String>>,
 
         /// Show only top N priority items
-        #[arg(long = "top")]
+        #[arg(long = "top", visible_alias = "head")]
         top: Option<usize>,
+
+        /// Show only bottom N priority items (lowest priority)
+        #[arg(long = "tail")]
+        tail: Option<usize>,
 
         /// Show priorities only (minimal output)
         #[arg(long = "priorities-only")]
@@ -123,8 +127,12 @@ pub enum Commands {
         disable_context: Option<Vec<String>>,
 
         /// Show only top N priority items
-        #[arg(long = "top")]
+        #[arg(long = "top", visible_alias = "head")]
         top: Option<usize>,
+
+        /// Show only bottom N priority items (lowest priority)
+        #[arg(long = "tail")]
+        tail: Option<usize>,
 
         /// Show priorities only (minimal output)
         #[arg(long = "priorities-only")]

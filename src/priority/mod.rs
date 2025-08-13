@@ -166,4 +166,13 @@ impl UnifiedAnalysis {
     pub fn get_top_priorities(&self, n: usize) -> Vector<UnifiedDebtItem> {
         self.items.iter().take(n).cloned().collect()
     }
+
+    pub fn get_bottom_priorities(&self, n: usize) -> Vector<UnifiedDebtItem> {
+        let total_items = self.items.len();
+        if total_items <= n {
+            self.items.clone()
+        } else {
+            self.items.iter().skip(total_items - n).cloned().collect()
+        }
+    }
 }
