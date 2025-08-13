@@ -7,10 +7,10 @@ use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
 use im::{HashMap, HashSet, Vector};
 use std::path::{Path, PathBuf};
-use syn::visit::Visit;
 use syn::spanned::Spanned;
+use syn::visit::Visit;
 use syn::{
-    File, Ident, Item, ItemFn, ItemMod, ItemUse, Path as SynPath, PathSegment, UsePath, UseTree,
+    File, ItemFn, ItemMod, ItemUse, Path as SynPath, UseTree,
     Visibility,
 };
 
@@ -297,7 +297,7 @@ impl CrossModuleTracker {
         match module_path.as_str() {
             "lib" => "crate".to_string(),
             "main" => "crate".to_string(),
-            _ => format!("crate::{}", module_path),
+            _ => format!("crate::{module_path}"),
         }
     }
 

@@ -170,7 +170,7 @@ pub fn create_unified_debt_item_enhanced(
         transitive_coverage,
         upstream_dependencies: call_graph.get_callers(&func_id).len(),
         downstream_dependencies: call_graph.get_callees(&func_id).len(),
-        nesting_depth: 0, // Would need to be calculated from AST
+        nesting_depth: 0,   // Would need to be calculated from AST
         function_length: 0, // Would need to be calculated from AST or additional metadata
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
@@ -323,7 +323,6 @@ pub fn classify_debt_type_enhanced(
         factors: vec!["General technical debt".to_string()],
     }
 }
-
 
 fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
     // Entry points

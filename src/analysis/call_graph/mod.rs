@@ -13,7 +13,7 @@
 
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use anyhow::Result;
-use im::{HashMap, HashSet};
+use im::HashSet;
 use std::path::{Path, PathBuf};
 use syn::File;
 
