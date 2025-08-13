@@ -300,8 +300,9 @@ fn determine_debt_type(
         // Check if it's an I/O wrapper or entry point
         if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
             // These are acceptable patterns, not debt
-            return DebtType::Orchestration {
-                delegates_to: vec![], // Empty indicates it's a simple wrapper
+            return DebtType::Risk {
+                risk_score: 0.0,
+                factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
             };
         }
 
@@ -458,8 +459,9 @@ pub fn classify_debt_type_enhanced(
         // Check if it's an I/O wrapper or entry point
         if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
             // These are acceptable patterns, not debt
-            return DebtType::Orchestration {
-                delegates_to: vec![], // Empty indicates it's a simple wrapper
+            return DebtType::Risk {
+                risk_score: 0.0,
+                factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
             };
         }
 
@@ -775,14 +777,15 @@ fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, V
 fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
     match debt_type {
         DebtType::Orchestration { delegates_to } => (
-            "Consider integration test instead of unit tests".to_string(),
+            "Refactor to pure functions or extract testable units".to_string(),
             format!(
-                "Orchestration function delegating to {} tested functions",
+                "Orchestration function delegating to {} functions",
                 delegates_to.len()
             ),
             vec![
-                "Write integration test covering the flow".to_string(),
-                "Verify delegation behavior".to_string(),
+                "Extract logic into pure functions".to_string(),
+                "Compose smaller, testable functions".to_string(),
+                "Add unit tests for extracted functions".to_string(),
             ],
         ),
         DebtType::Duplication {
