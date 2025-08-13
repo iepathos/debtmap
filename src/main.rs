@@ -819,6 +819,56 @@ fn build_initial_call_graph(metrics: &[debtmap::FunctionMetrics]) -> priority::C
     call_graph
 }
 
+/// Create expansion config based on whether macro expansion is enabled
+fn create_expansion_config(expand_macros: bool) -> Option<debtmap::expansion::ExpansionConfig> {
+    if expand_macros {
+        Some(debtmap::expansion::ExpansionConfig {
+            enabled: true,
+            ..Default::default()
+        })
+    } else {
+        None
+    }
+}
+
+/// Clear the expansion cache if requested and configured
+fn clear_expansion_cache_if_needed(
+    clear_cache: bool,
+    expansion_config: Option<&debtmap::expansion::ExpansionConfig>,
+) {
+    use debtmap::expansion::{MacroExpander, MacroExpansion};
+
+    if clear_cache && expansion_config.is_some() {
+        if let Ok(mut expander) = MacroExpander::new(expansion_config.unwrap().clone()) {
+            let _ = expander.clear_cache();
+        }
+    }
+}
+
+/// Process a single Rust file with optional macro expansion
+fn process_file_with_expansion(
+    file_path: &Path,
+    expansion_config: Option<&debtmap::expansion::ExpansionConfig>,
+) -> Result<priority::CallGraph> {
+    use debtmap::expansion::{MacroExpander, MacroExpansion};
+
+    if let Some(config) = expansion_config {
+        // Try to expand the file first
+        if let Ok(mut expander) = MacroExpander::new(config.clone()) {
+            if let Ok(expanded) = expander.expand_file(file_path) {
+                // Parse the expanded content
+                if let Ok(parsed) = syn::parse_file(&expanded.expanded_content) {
+                    use debtmap::analyzers::rust_call_graph::extract_call_graph;
+                    return Ok(extract_call_graph(&parsed, file_path));
+                }
+            }
+        }
+    }
+
+    // Fall back to regular parsing
+    extract_regular_call_graph(file_path)
+}
+
 /// Process Rust files to extract call relationships
 fn process_rust_files_for_call_graph(
     project_path: &Path,
@@ -826,54 +876,17 @@ fn process_rust_files_for_call_graph(
     expand_macros: bool,
     clear_expansion_cache: bool,
 ) -> Result<()> {
-    use debtmap::expansion::{ExpansionConfig, MacroExpander, MacroExpansion};
-
     let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
         .context("Failed to find Rust files for call graph")?;
 
     // Create expansion config if enabled
-    let expansion_config = if expand_macros {
-        Some(ExpansionConfig {
-            enabled: true,
-            ..Default::default()
-        })
-    } else {
-        None
-    };
+    let expansion_config = create_expansion_config(expand_macros);
 
     // Clear cache if requested
-    if clear_expansion_cache && expansion_config.is_some() {
-        if let Ok(mut expander) = MacroExpander::new(expansion_config.as_ref().unwrap().clone()) {
-            let _ = expander.clear_cache();
-        }
-    }
+    clear_expansion_cache_if_needed(clear_expansion_cache, expansion_config.as_ref());
 
     for file_path in rust_files {
-        let file_call_graph = if let Some(ref config) = expansion_config {
-            // Try to expand the file first
-            if let Ok(mut expander) = MacroExpander::new(config.clone()) {
-                if let Ok(expanded) = expander.expand_file(&file_path) {
-                    // Parse the expanded content
-                    if let Ok(parsed) = syn::parse_file(&expanded.expanded_content) {
-                        use debtmap::analyzers::rust_call_graph::extract_call_graph;
-                        extract_call_graph(&parsed, &file_path)
-                    } else {
-                        // Fall back to regular parsing
-                        extract_regular_call_graph(&file_path)?
-                    }
-                } else {
-                    // Fall back to regular parsing
-                    extract_regular_call_graph(&file_path)?
-                }
-            } else {
-                // Fall back to regular parsing
-                extract_regular_call_graph(&file_path)?
-            }
-        } else {
-            // Regular parsing without expansion
-            extract_regular_call_graph(&file_path)?
-        };
-
+        let file_call_graph = process_file_with_expansion(&file_path, expansion_config.as_ref())?;
         call_graph.merge(file_call_graph);
     }
 
@@ -2995,5 +3008,94 @@ end_of_record
         let analyze_func = functions.iter().find(|f| f.name == "analyze").unwrap();
         let callees = result.get_callees(analyze_func);
         assert!(!callees.is_empty());
+    }
+
+    #[test]
+    fn test_create_expansion_config_enabled() {
+        let config = create_expansion_config(true);
+        assert!(config.is_some());
+        let config = config.unwrap();
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn test_create_expansion_config_disabled() {
+        let config = create_expansion_config(false);
+        assert!(config.is_none());
+    }
+
+    #[test]
+    fn test_clear_expansion_cache_if_needed_no_clear() {
+        use debtmap::expansion::ExpansionConfig;
+        let config = ExpansionConfig {
+            enabled: true,
+            ..Default::default()
+        };
+        // Should not panic or cause issues when clear_cache is false
+        clear_expansion_cache_if_needed(false, Some(&config));
+    }
+
+    #[test]
+    fn test_clear_expansion_cache_if_needed_no_config() {
+        // Should not panic when config is None
+        clear_expansion_cache_if_needed(true, None);
+    }
+
+    #[test]
+    fn test_process_file_with_expansion_no_config() {
+        use std::fs::File;
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let test_file = dir.path().join("test.rs");
+
+        let rust_code = r#"
+            fn simple_function() {
+                println!("Hello");
+            }
+        "#;
+
+        let mut file = File::create(&test_file).unwrap();
+        file.write_all(rust_code.as_bytes()).unwrap();
+
+        // Should fall back to regular parsing when no config
+        let result = process_file_with_expansion(&test_file, None);
+        assert!(result.is_ok());
+        let call_graph = result.unwrap();
+        let functions = call_graph.find_all_functions();
+        assert!(functions.iter().any(|f| f.name == "simple_function"));
+    }
+
+    #[test]
+    fn test_process_file_with_expansion_with_config() {
+        use debtmap::expansion::ExpansionConfig;
+        use std::fs::File;
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let test_file = dir.path().join("test.rs");
+
+        let rust_code = r#"
+            fn another_function() {
+                println!("World");
+            }
+        "#;
+
+        let mut file = File::create(&test_file).unwrap();
+        file.write_all(rust_code.as_bytes()).unwrap();
+
+        let config = ExpansionConfig {
+            enabled: true,
+            ..Default::default()
+        };
+
+        // Should process with expansion config (falls back to regular if expand fails)
+        let result = process_file_with_expansion(&test_file, Some(&config));
+        assert!(result.is_ok());
+        let call_graph = result.unwrap();
+        let functions = call_graph.find_all_functions();
+        assert!(functions.iter().any(|f| f.name == "another_function"));
     }
 }
