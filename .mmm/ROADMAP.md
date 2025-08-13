@@ -92,6 +92,19 @@ We have completed the initial implementation with core functionality for analyzi
   - Clean output formats for different use cases
   - Focus on measurable impact over time estimates
 
+- [x] **Spec 21**: Dead Code Detection
+  - Automatic detection of unused functions via call graph
+  - Visibility-aware recommendations
+  - Framework pattern exclusions
+  - Integration with unified priority scoring
+
+- [x] **Spec 22**: Perfect Macro Function Call Detection with cargo-expand
+  - cargo-expand integration for expanded AST analysis
+  - Eliminates false positives from macro-hidden calls
+  - Smart caching for performance
+  - Source location mapping
+  - Graceful fallback mechanism
+
 ## Pending Specs
 
 ### Enhancements

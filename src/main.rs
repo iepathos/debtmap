@@ -31,6 +31,10 @@ struct AnalyzeConfig {
     detailed: bool,
     semantic_off: bool,
     explain_score: bool,
+    expand_macros: bool,
+    #[allow(dead_code)]
+    no_expand_macros: bool,
+    clear_expansion_cache: bool,
 }
 
 struct ValidateConfig {
@@ -75,6 +79,9 @@ fn main() -> Result<()> {
             detailed,
             semantic_off,
             explain_score,
+            expand_macros,
+            no_expand_macros,
+            clear_expansion_cache,
         } => {
             let config = AnalyzeConfig {
                 path,
@@ -92,6 +99,9 @@ fn main() -> Result<()> {
                 detailed,
                 semantic_off,
                 explain_score,
+                expand_macros,
+                no_expand_macros,
+                clear_expansion_cache,
             };
             handle_analyze(config)
         }
@@ -156,6 +166,8 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.coverage_file.as_ref(),
         config.semantic_off,
         &config.path,
+        config.expand_macros,
+        config.clear_expansion_cache,
     )?;
 
     // Output unified prioritized results
@@ -815,21 +827,75 @@ fn build_initial_call_graph(metrics: &[debtmap::FunctionMetrics]) -> priority::C
 fn process_rust_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
+    expand_macros: bool,
+    clear_expansion_cache: bool,
 ) -> Result<()> {
+    use debtmap::expansion::{ExpansionConfig, MacroExpander, MacroExpansion};
+
     let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
         .context("Failed to find Rust files for call graph")?;
 
-    for file_path in rust_files {
-        if let Ok(content) = io::read_file(&file_path) {
-            if let Ok(parsed) = syn::parse_file(&content) {
-                use debtmap::analyzers::rust_call_graph::extract_call_graph;
-                let file_call_graph = extract_call_graph(&parsed, &file_path);
-                call_graph.merge(file_call_graph);
-            }
+    // Create expansion config if enabled
+    let expansion_config = if expand_macros {
+        Some(ExpansionConfig {
+            enabled: true,
+            ..Default::default()
+        })
+    } else {
+        None
+    };
+
+    // Clear cache if requested
+    if clear_expansion_cache && expansion_config.is_some() {
+        if let Ok(mut expander) = MacroExpander::new(expansion_config.as_ref().unwrap().clone()) {
+            let _ = expander.clear_cache();
         }
     }
 
+    for file_path in rust_files {
+        let file_call_graph = if let Some(ref config) = expansion_config {
+            // Try to expand the file first
+            if let Ok(mut expander) = MacroExpander::new(config.clone()) {
+                if let Ok(expanded) = expander.expand_file(&file_path) {
+                    // Parse the expanded content
+                    if let Ok(parsed) = syn::parse_file(&expanded.expanded_content) {
+                        use debtmap::analyzers::rust_call_graph::extract_call_graph;
+                        extract_call_graph(&parsed, &file_path)
+                    } else {
+                        // Fall back to regular parsing
+                        extract_regular_call_graph(&file_path)?
+                    }
+                } else {
+                    // Fall back to regular parsing
+                    extract_regular_call_graph(&file_path)?
+                }
+            } else {
+                // Fall back to regular parsing
+                extract_regular_call_graph(&file_path)?
+            }
+        } else {
+            // Regular parsing without expansion
+            extract_regular_call_graph(&file_path)?
+        };
+
+        call_graph.merge(file_call_graph);
+    }
+
     Ok(())
+}
+
+/// Extract call graph from a file without expansion
+fn extract_regular_call_graph(file_path: &Path) -> Result<priority::CallGraph> {
+    if let Ok(content) = io::read_file(file_path) {
+        if let Ok(parsed) = syn::parse_file(&content) {
+            use debtmap::analyzers::rust_call_graph::extract_call_graph;
+            Ok(extract_call_graph(&parsed, file_path))
+        } else {
+            Ok(priority::CallGraph::new())
+        }
+    } else {
+        Ok(priority::CallGraph::new())
+    }
 }
 
 /// Create unified analysis from metrics and call graph
@@ -888,12 +954,19 @@ fn perform_unified_analysis(
     coverage_file: Option<&PathBuf>,
     _semantic_off: bool,
     project_path: &Path,
+    expand_macros: bool,
+    clear_expansion_cache: bool,
 ) -> Result<priority::UnifiedAnalysis> {
     // Build initial call graph from complexity metrics
     let mut call_graph = build_initial_call_graph(&results.complexity.metrics);
 
     // Process Rust files to extract call relationships
-    process_rust_files_for_call_graph(project_path, &mut call_graph)?;
+    process_rust_files_for_call_graph(
+        project_path,
+        &mut call_graph,
+        expand_macros,
+        clear_expansion_cache,
+    )?;
 
     // Load coverage data if available
     let coverage_data = match coverage_file {
