@@ -289,6 +289,32 @@ fn has_public_api_prefix(name: &str) -> bool {
     name.starts_with("public_") || name.starts_with("api_") || name.starts_with("export_")
 }
 
+/// Classify function complexity and generate appropriate hints
+fn classify_complexity_hints(func: &FunctionMetrics) -> Option<String> {
+    match (func.cyclomatic, func.cognitive) {
+        (c, g) if c <= 3 && g <= 5 => Some("Low complexity - low impact removal".to_string()),
+        (c, g) if c > 10 || g > 15 => {
+            Some("High complexity - removing may eliminate significant unused code".to_string())
+        }
+        _ => None,
+    }
+}
+
+/// Detect if function is likely a test helper based on naming patterns
+fn detect_test_helper_hints(func_name: &str) -> Option<String> {
+    let is_test_helper = (func_name.contains("test") && func_name.contains("helper"))
+        || func_name.contains("mock")
+        || func_name.contains("fixture")
+        || func_name.contains("helper")
+        || func_name.contains("util");
+
+    if is_test_helper {
+        Some("Potential test helper - consider moving to test module".to_string())
+    } else {
+        None
+    }
+}
+
 /// Generate enhanced dead code hints with API detection
 pub fn generate_enhanced_dead_code_hints(
     func: &FunctionMetrics,
@@ -313,28 +339,19 @@ pub fn generate_enhanced_dead_code_hints_with_config(
 
     if is_likely_api {
         hints.push("Likely external API - verify before removing".to_string());
-        for indicator in api_indicators {
-            hints.push(indicator);
-        }
+        hints.extend(api_indicators);
     } else if matches!(visibility, FunctionVisibility::Public) {
         hints.push("Public but no external API indicators found".to_string());
     }
 
-    // Add existing hints based on function characteristics
-    if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        hints.push("Low complexity - low impact removal".to_string());
-    } else if func.cyclomatic > 10 || func.cognitive > 15 {
-        hints.push("High complexity - removing may eliminate significant unused code".to_string());
+    // Add complexity-based hints
+    if let Some(hint) = classify_complexity_hints(func) {
+        hints.push(hint);
     }
 
-    // Check for test helper patterns
-    if (func.name.contains("test") && func.name.contains("helper"))
-        || func.name.contains("mock")
-        || func.name.contains("fixture")
-        || func.name.contains("helper")
-        || func.name.contains("util")
-    {
-        hints.push("Potential test helper - consider moving to test module".to_string());
+    // Add test helper hints
+    if let Some(hint) = detect_test_helper_hints(&func.name) {
+        hints.push(hint);
     }
 
     hints
@@ -454,5 +471,112 @@ mod tests {
         // Test non-match
         let func5 = create_test_function("helper", "src/internal/utils.rs");
         assert!(!is_explicitly_marked_api(&func5, &config));
+    }
+
+    #[test]
+    fn test_classify_complexity_hints_low() {
+        let mut func = create_test_function("simple_func", "src/lib.rs");
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+
+        let hint = classify_complexity_hints(&func);
+        assert_eq!(
+            hint,
+            Some("Low complexity - low impact removal".to_string())
+        );
+    }
+
+    #[test]
+    fn test_classify_complexity_hints_high_cyclomatic() {
+        let mut func = create_test_function("complex_func", "src/lib.rs");
+        func.cyclomatic = 15;
+        func.cognitive = 10;
+
+        let hint = classify_complexity_hints(&func);
+        assert_eq!(
+            hint,
+            Some("High complexity - removing may eliminate significant unused code".to_string())
+        );
+    }
+
+    #[test]
+    fn test_classify_complexity_hints_high_cognitive() {
+        let mut func = create_test_function("cognitive_func", "src/lib.rs");
+        func.cyclomatic = 8;
+        func.cognitive = 20;
+
+        let hint = classify_complexity_hints(&func);
+        assert_eq!(
+            hint,
+            Some("High complexity - removing may eliminate significant unused code".to_string())
+        );
+    }
+
+    #[test]
+    fn test_classify_complexity_hints_medium() {
+        let mut func = create_test_function("medium_func", "src/lib.rs");
+        func.cyclomatic = 6;
+        func.cognitive = 10;
+
+        let hint = classify_complexity_hints(&func);
+        assert_eq!(hint, None);
+    }
+
+    #[test]
+    fn test_detect_test_helper_hints_test_helper() {
+        let hint = detect_test_helper_hints("test_helper_function");
+        assert_eq!(
+            hint,
+            Some("Potential test helper - consider moving to test module".to_string())
+        );
+    }
+
+    #[test]
+    fn test_detect_test_helper_hints_mock() {
+        let hint = detect_test_helper_hints("create_mock_data");
+        assert_eq!(
+            hint,
+            Some("Potential test helper - consider moving to test module".to_string())
+        );
+    }
+
+    #[test]
+    fn test_detect_test_helper_hints_fixture() {
+        let hint = detect_test_helper_hints("setup_fixture");
+        assert_eq!(
+            hint,
+            Some("Potential test helper - consider moving to test module".to_string())
+        );
+    }
+
+    #[test]
+    fn test_detect_test_helper_hints_general_helper() {
+        let hint = detect_test_helper_hints("helper_function");
+        assert_eq!(
+            hint,
+            Some("Potential test helper - consider moving to test module".to_string())
+        );
+    }
+
+    #[test]
+    fn test_detect_test_helper_hints_util() {
+        let hint = detect_test_helper_hints("util_process");
+        assert_eq!(
+            hint,
+            Some("Potential test helper - consider moving to test module".to_string())
+        );
+    }
+
+    #[test]
+    fn test_detect_test_helper_hints_regular_function() {
+        let hint = detect_test_helper_hints("process_data");
+        assert_eq!(hint, None);
+    }
+
+    #[test]
+    fn test_detect_test_helper_hints_test_without_helper() {
+        // "test" alone without "helper" shouldn't match
+        let hint = detect_test_helper_hints("test_something");
+        assert_eq!(hint, None);
     }
 }
