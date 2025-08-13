@@ -1,0 +1,335 @@
+use crate::priority::call_graph::CallGraph;
+use crate::priority::semantic_classifier::{classify_function_role, FunctionRole};
+use crate::priority::{FunctionAnalysis, FunctionVisibility};
+use crate::risk::evidence::change_analyzer::ChangeRiskAnalyzer;
+use crate::risk::evidence::complexity_analyzer::ComplexityRiskAnalyzer;
+use crate::risk::evidence::coupling_analyzer::CouplingRiskAnalyzer;
+use crate::risk::evidence::coverage_analyzer::CoverageRiskAnalyzer;
+use crate::risk::evidence::{
+    ModuleType, RiskAssessment, RiskClassification, RiskContext, RiskFactor,
+};
+use crate::risk::lcov::LcovData;
+use std::path::PathBuf;
+
+pub struct EvidenceBasedRiskCalculator {
+    complexity_analyzer: ComplexityRiskAnalyzer,
+    coverage_analyzer: CoverageRiskAnalyzer,
+    coupling_analyzer: CouplingRiskAnalyzer,
+    change_analyzer: ChangeRiskAnalyzer,
+}
+
+impl Default for EvidenceBasedRiskCalculator {
+    fn default() -> Self {
+        Self {
+            complexity_analyzer: ComplexityRiskAnalyzer::new(),
+            coverage_analyzer: CoverageRiskAnalyzer::new(),
+            coupling_analyzer: CouplingRiskAnalyzer::new(),
+            change_analyzer: ChangeRiskAnalyzer::new(),
+        }
+    }
+}
+
+impl EvidenceBasedRiskCalculator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn calculate_risk(
+        &self,
+        function: &FunctionAnalysis,
+        call_graph: &CallGraph,
+        coverage_data: Option<&LcovData>,
+    ) -> RiskAssessment {
+        let role = self.classify_function_role(function, call_graph);
+        let context = self.build_risk_context(function, role);
+
+        let risk_factors = vec![
+            self.complexity_analyzer.analyze(function, &context),
+            self.coverage_analyzer
+                .analyze(function, &context, coverage_data),
+            self.coupling_analyzer
+                .analyze(function, &context, call_graph),
+            self.change_analyzer.analyze(function, &context),
+        ];
+
+        let risk_score = self.aggregate_risk_factors(&risk_factors, &role);
+        let risk_classification = self.classify_risk_level(risk_score, &role);
+        let recommendations = self.generate_recommendations(&risk_factors, &role);
+        let confidence = self.calculate_confidence(&risk_factors);
+        let explanation = self.generate_explanation(&risk_factors, &role, risk_score);
+
+        RiskAssessment {
+            score: risk_score,
+            classification: risk_classification,
+            factors: risk_factors,
+            role_context: role,
+            recommendations,
+            confidence,
+            explanation,
+        }
+    }
+
+    fn classify_function_role(
+        &self,
+        function: &FunctionAnalysis,
+        call_graph: &CallGraph,
+    ) -> FunctionRole {
+        let func_id = crate::priority::call_graph::FunctionId {
+            file: function.file.clone(),
+            name: function.function.clone(),
+            line: function.line,
+        };
+
+        let func_metrics = crate::core::FunctionMetrics {
+            file: function.file.clone(),
+            name: function.function.clone(),
+            line: function.line,
+            length: function.function_length,
+            cyclomatic: function.cyclomatic_complexity,
+            cognitive: function.cognitive_complexity,
+            nesting: function.nesting_depth,
+            is_test: function.is_test,
+            visibility: Some(self.visibility_to_string(&function.visibility)),
+        };
+
+        classify_function_role(&func_metrics, &func_id, call_graph)
+    }
+
+    fn visibility_to_string(&self, visibility: &FunctionVisibility) -> String {
+        match visibility {
+            FunctionVisibility::Public => "pub".to_string(),
+            FunctionVisibility::Crate => "pub(crate)".to_string(),
+            FunctionVisibility::Private => "".to_string(),
+        }
+    }
+
+    fn build_risk_context(&self, function: &FunctionAnalysis, role: FunctionRole) -> RiskContext {
+        RiskContext {
+            role,
+            visibility: function.visibility.clone(),
+            module_type: self.determine_module_type(&function.file),
+        }
+    }
+
+    fn determine_module_type(&self, file: &PathBuf) -> ModuleType {
+        let path_str = file.to_string_lossy();
+
+        if path_str.contains("/tests/") || path_str.contains("_test.rs") {
+            ModuleType::Test
+        } else if path_str.contains("/core/") || path_str.contains("/domain/") {
+            ModuleType::Core
+        } else if path_str.contains("/api/") || path_str.contains("/handlers/") {
+            ModuleType::Api
+        } else if path_str.contains("/utils/") || path_str.contains("/helpers/") {
+            ModuleType::Util
+        } else if path_str.contains("/infra/") || path_str.contains("/db/") {
+            ModuleType::Infrastructure
+        } else {
+            // Try to infer from filename
+            if path_str.ends_with("mod.rs") || path_str.ends_with("lib.rs") {
+                ModuleType::Core
+            } else if path_str.contains("main.rs") {
+                ModuleType::Infrastructure
+            } else {
+                ModuleType::Util
+            }
+        }
+    }
+
+    fn aggregate_risk_factors(&self, factors: &[RiskFactor], role: &FunctionRole) -> f64 {
+        let mut total_score = 0.0;
+        let mut total_weight = 0.0;
+
+        for factor in factors {
+            // Skip factors with zero weight (e.g., disabled change analysis)
+            if factor.weight > 0.0 {
+                total_score += factor.score * factor.weight;
+                total_weight += factor.weight;
+            }
+        }
+
+        if total_weight == 0.0 {
+            return 0.0;
+        }
+
+        let base_score = total_score / total_weight;
+
+        // Apply role-based adjustments
+        let role_multiplier = match role {
+            FunctionRole::PureLogic => 1.2,    // Business logic is more critical
+            FunctionRole::EntryPoint => 1.1,   // Entry points are important
+            FunctionRole::Orchestrator => 0.9, // Orchestration is less risky
+            FunctionRole::IOWrapper => 0.7,    // I/O wrappers are expected to be simple
+            FunctionRole::Unknown => 1.0,      // Default multiplier
+        };
+
+        (base_score * role_multiplier).min(10.0)
+    }
+
+    fn classify_risk_level(&self, score: f64, role: &FunctionRole) -> RiskClassification {
+        // Adjust thresholds based on role
+        let adjustment = match role {
+            FunctionRole::IOWrapper => 1.0,    // More lenient for I/O
+            FunctionRole::Orchestrator => 0.5, // Slightly more lenient
+            _ => 0.0,                          // Standard thresholds
+        };
+
+        let adjusted_score = (score - adjustment).max(0.0);
+
+        match adjusted_score {
+            s if s <= 2.0 => RiskClassification::WellDesigned,
+            s if s <= 4.0 => RiskClassification::Acceptable,
+            s if s <= 7.0 => RiskClassification::NeedsImprovement,
+            s if s <= 9.0 => RiskClassification::Risky,
+            _ => RiskClassification::Critical,
+        }
+    }
+
+    fn generate_recommendations(
+        &self,
+        factors: &[RiskFactor],
+        _role: &FunctionRole,
+    ) -> Vec<crate::risk::evidence::RemediationAction> {
+        let mut all_actions = Vec::new();
+
+        for factor in factors {
+            all_actions.extend(factor.remediation_actions.clone());
+        }
+
+        // Sort by expected effort (lowest first) and take top 3
+        all_actions.sort_by(|a, b| {
+            let effort_a = self.get_effort_estimate(a);
+            let effort_b = self.get_effort_estimate(b);
+            effort_a.cmp(&effort_b)
+        });
+
+        all_actions.into_iter().take(3).collect()
+    }
+
+    fn get_effort_estimate(&self, action: &crate::risk::evidence::RemediationAction) -> u32 {
+        use crate::risk::evidence::RemediationAction;
+
+        match action {
+            RemediationAction::RefactorComplexity {
+                estimated_effort_hours,
+                ..
+            } => *estimated_effort_hours,
+            RemediationAction::AddTestCoverage {
+                estimated_effort_hours,
+                ..
+            } => *estimated_effort_hours,
+            RemediationAction::ReduceCoupling {
+                estimated_effort_hours,
+                ..
+            } => *estimated_effort_hours,
+            RemediationAction::ExtractLogic { .. } => 2, // Default low effort for extraction
+        }
+    }
+
+    fn calculate_confidence(&self, factors: &[RiskFactor]) -> f64 {
+        if factors.is_empty() {
+            return 0.0;
+        }
+
+        let mut total_confidence = 0.0;
+        let mut total_weight = 0.0;
+
+        for factor in factors {
+            if factor.weight > 0.0 {
+                total_confidence += factor.confidence * factor.weight;
+                total_weight += factor.weight;
+            }
+        }
+
+        if total_weight == 0.0 {
+            return 0.5;
+        }
+
+        total_confidence / total_weight
+    }
+
+    fn generate_explanation(
+        &self,
+        factors: &[RiskFactor],
+        role: &FunctionRole,
+        score: f64,
+    ) -> String {
+        let mut explanation = format!(
+            "Risk score {:.1}/10 for {} function. ",
+            score,
+            self.role_to_string(role)
+        );
+
+        // Find the most significant risk factor
+        if let Some(highest) = factors.iter().filter(|f| f.weight > 0.0).max_by(|a, b| {
+            (a.score * a.weight)
+                .partial_cmp(&(b.score * b.weight))
+                .unwrap()
+        }) {
+            use crate::risk::evidence::{RiskSeverity, RiskType};
+
+            let factor_desc = match &highest.risk_type {
+                RiskType::Complexity {
+                    cyclomatic,
+                    cognitive,
+                    ..
+                } => {
+                    format!(
+                        "High complexity (cyclomatic: {}, cognitive: {})",
+                        cyclomatic, cognitive
+                    )
+                }
+                RiskType::Coverage {
+                    coverage_percentage,
+                    ..
+                } => {
+                    format!("Low test coverage ({:.0}%)", coverage_percentage)
+                }
+                RiskType::Coupling {
+                    afferent_coupling,
+                    efferent_coupling,
+                    ..
+                } => {
+                    format!(
+                        "High coupling (incoming: {}, outgoing: {})",
+                        afferent_coupling, efferent_coupling
+                    )
+                }
+                RiskType::ChangeFrequency {
+                    commits_last_month, ..
+                } => {
+                    format!(
+                        "Frequent changes ({} commits last month)",
+                        commits_last_month
+                    )
+                }
+                RiskType::Architecture { .. } => "Architectural issues detected".to_string(),
+            };
+
+            let severity_desc = match highest.severity {
+                RiskSeverity::None => "no significant issues",
+                RiskSeverity::Low => "minor issues",
+                RiskSeverity::Moderate => "moderate issues requiring attention",
+                RiskSeverity::High => "significant issues requiring prompt action",
+                RiskSeverity::Critical => "critical issues requiring immediate attention",
+            };
+
+            explanation.push_str(&format!(
+                "Primary factor: {} with {}.",
+                factor_desc, severity_desc
+            ));
+        }
+
+        explanation
+    }
+
+    fn role_to_string(&self, role: &FunctionRole) -> &str {
+        match role {
+            FunctionRole::PureLogic => "pure logic",
+            FunctionRole::Orchestrator => "orchestrator",
+            FunctionRole::IOWrapper => "I/O wrapper",
+            FunctionRole::EntryPoint => "entry point",
+            FunctionRole::Unknown => "general",
+        }
+    }
+}

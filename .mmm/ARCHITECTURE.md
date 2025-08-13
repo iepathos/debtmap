@@ -64,6 +64,15 @@ Risk analysis and coverage correlation:
   - `critical_path.rs`: Critical path analysis from entry points
   - `dependency.rs`: Dependency risk propagation
   - `git_history.rs`: Git history and change frequency analysis
+- `evidence/`: Evidence-based risk assessment (spec 24)
+  - `mod.rs`: Core risk types and evidence structures
+  - `complexity_analyzer.rs`: Role-aware complexity risk analysis
+  - `coverage_analyzer.rs`: Test coverage gap risk analysis
+  - `coupling_analyzer.rs`: Module coupling and dependency risk
+  - `change_analyzer.rs`: Change frequency and hotspot analysis
+- `thresholds/`: Statistical risk thresholds
+  - `mod.rs`: Baseline distributions and percentile-based thresholds
+- `evidence_calculator.rs`: Main evidence-based risk calculator
 
 ### Priority (`src/priority/`)
 Unified debt prioritization system:
