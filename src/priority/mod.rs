@@ -14,6 +14,7 @@ pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use unified_scorer::{calculate_unified_priority, UnifiedDebtItem, UnifiedScore};
 
 use im::Vector;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedAnalysis {
@@ -22,6 +23,20 @@ pub struct UnifiedAnalysis {
     pub total_debt_score: f64,
     pub call_graph: CallGraph,
     pub overall_coverage: Option<f64>,
+}
+
+// Single function analysis for evidence-based risk calculation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionAnalysis {
+    pub file: PathBuf,
+    pub function: String,
+    pub line: usize,
+    pub function_length: usize,
+    pub cyclomatic_complexity: u32,
+    pub cognitive_complexity: u32,
+    pub nesting_depth: u32,
+    pub is_test: bool,
+    pub visibility: FunctionVisibility,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

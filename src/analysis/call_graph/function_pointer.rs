@@ -8,9 +8,7 @@ use anyhow::Result;
 use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use syn::visit::Visit;
-use syn::{
-    Expr, ExprCall, ExprClosure, ExprPath, File, ItemFn, Local, Pat, PatIdent, Type,
-};
+use syn::{Expr, ExprCall, ExprClosure, ExprPath, File, ItemFn, Local, Pat, PatIdent, Type};
 
 /// Information about a closure
 #[derive(Debug, Clone)]

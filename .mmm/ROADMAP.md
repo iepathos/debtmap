@@ -115,6 +115,16 @@ We have completed the initial implementation with core functionality for analyzi
   - Confidence scoring for dead code findings
   - Extensible pattern matching system
 
+- [x] **Spec 24**: Refined Risk Scoring Methodology
+  - Evidence-based risk assessment with measurable factors
+  - Statistical baselines from codebase analysis (P50, P90, P95, P99)
+  - Role-aware risk calculation for different function types
+  - Specific risk analyzers for complexity, coverage, coupling, and change frequency
+  - Actionable remediation recommendations with effort estimates
+  - Risk classification system from WellDesigned to Critical
+  - Confidence scoring for risk predictions
+  - Module-type aware thresholds for different code contexts
+
 ## Pending Specs
 
 ### Enhancements

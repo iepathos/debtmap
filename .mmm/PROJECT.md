@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, and spec 23 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, and spec 24 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -104,6 +104,15 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Dramatic reduction in dead code false positives (90%+)
   - Confidence scoring for dead code detection
   - Extensible pattern matching system
+- ✅ Refined Risk Scoring Methodology (spec 24):
+  - Evidence-based risk assessment with measurable factors
+  - Statistical baselines from codebase analysis (P50, P90, P95, P99)
+  - Role-aware risk calculation (PureLogic, Orchestrator, IOWrapper, EntryPoint)
+  - Specific risk analyzers for complexity, coverage, coupling, and change frequency
+  - Actionable remediation recommendations with effort estimates
+  - Risk classification system (WellDesigned to Critical)
+  - Confidence scoring for risk predictions
+  - Module-type aware thresholds (Core, API, Util, Test, Infrastructure)
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -127,6 +136,7 @@ The project follows a functional core / imperative shell pattern:
 11. **Unified Prioritization**: Single, semantic-aware score for all technical debt items
 12. **Macro-Aware Analysis**: Perfect function call detection through macro expansion
 13. **Enhanced Call Graph**: Multi-phase analysis with trait dispatch and function pointer tracking
+14. **Evidence-Based Risk**: Statistical risk assessment with role-aware thresholds and remediation guidance
 
 ## Project Structure
 ```
