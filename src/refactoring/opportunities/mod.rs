@@ -1,9 +1,8 @@
 use crate::core::{FileMetrics, FunctionMetrics};
 use crate::refactoring::{
     ComplexityLevel, DetectedPattern, EffortEstimate, ExtractionStrategy, FunctionRole,
-    FunctionalPattern, FunctionalTransformExample, IoShellSpec, MonadicPattern,
-    Priority, PureFunctionSpec, RefactoringDetector, RefactoringOpportunity,
-    TestabilityLevel,
+    FunctionalPattern, FunctionalTransformExample, IoShellSpec, MonadicPattern, Priority,
+    PureFunctionSpec, RefactoringDetector, RefactoringOpportunity, TestabilityLevel,
 };
 use std::sync::Arc;
 
