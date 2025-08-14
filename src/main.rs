@@ -1,3 +1,4 @@
+use debtmap::analysis::call_graph::EnhancedCallGraphBuilder;
 use debtmap::analysis_utils;
 use debtmap::cli;
 use debtmap::core;
@@ -877,7 +878,7 @@ fn process_file_with_expansion(
     extract_regular_call_graph(file_path)
 }
 
-/// Process Rust files to extract call relationships
+/// Process Rust files to extract call relationships with enhanced analysis
 fn process_rust_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
@@ -893,10 +894,39 @@ fn process_rust_files_for_call_graph(
     // Clear cache if requested
     clear_expansion_cache_if_needed(clear_expansion_cache, expansion_config.as_ref());
 
+    // Create enhanced call graph builder from the base graph
+    let mut enhanced_builder = EnhancedCallGraphBuilder::from_base_graph(call_graph.clone());
+
+    // Collect all parsed files for cross-module analysis
+    let mut workspace_files = Vec::new();
+
     for file_path in rust_files {
+        // First extract basic call graph
         let file_call_graph = process_file_with_expansion(&file_path, expansion_config.as_ref())?;
         call_graph.merge(file_call_graph);
+
+        // Then perform enhanced analysis if we can parse the file
+        if let Ok(content) = io::read_file(&file_path) {
+            if let Ok(parsed) = syn::parse_file(&content) {
+                // Run per-file enhanced analysis phases
+                enhanced_builder
+                    .analyze_basic_calls(&file_path, &parsed)?
+                    .analyze_trait_dispatch(&file_path, &parsed)?
+                    .analyze_function_pointers(&file_path, &parsed)?
+                    .analyze_framework_patterns(&file_path, &parsed)?;
+                
+                // Collect for cross-module analysis
+                workspace_files.push((file_path.clone(), parsed));
+            }
+        }
     }
+
+    // Run cross-module analysis with all files
+    enhanced_builder.analyze_cross_module(&workspace_files)?;
+
+    // Build the enhanced graph and extract the enhanced base graph
+    let enhanced_graph = enhanced_builder.build();
+    *call_graph = enhanced_graph.base_graph;
 
     // Resolve cross-file function calls after all files have been processed
     call_graph.resolve_cross_file_calls();

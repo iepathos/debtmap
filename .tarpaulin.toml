@@ -26,3 +26,6 @@ follow-exec = false
 
 # Don't count lines with only closing braces
 avoid-cfg-tarpaulin = true
+
+# Include test functions in coverage to track what they call
+include-tests = true
