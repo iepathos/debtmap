@@ -473,38 +473,32 @@ impl FormattingDetector for MarkdownFormattingDetector {
 // Trait analyzers
 struct StandardTraitAnalyzer;
 
+impl StandardTraitAnalyzer {
+    // Pure function to classify trait method names
+    fn classify_trait_method(method_name: &str) -> Option<&'static str> {
+        match method_name {
+            "fmt" => Some("Display/Debug"),
+            "clone" => Some("Clone"),
+            "eq" => Some("PartialEq"),
+            "hash" => Some("Hash"),
+            "default" => Some("Default"),
+            "from" => Some("From"),
+            "try_from" => Some("TryFrom"),
+            _ => None,
+        }
+    }
+}
+
 impl TraitAnalyzer for StandardTraitAnalyzer {
     fn detect_trait_implementation(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<TraitInfo> {
-        // Check for common trait method names
-        if function.name == "fmt"
-            || function.name == "clone"
-            || function.name == "eq"
-            || function.name == "hash"
-            || function.name == "default"
-            || function.name == "from"
-            || function.name == "try_from"
-        {
-            Some(TraitInfo {
-                trait_name: match function.name.as_str() {
-                    "fmt" => "Display/Debug",
-                    "clone" => "Clone",
-                    "eq" => "PartialEq",
-                    "hash" => "Hash",
-                    "default" => "Default",
-                    "from" => "From",
-                    "try_from" => "TryFrom",
-                    _ => "Unknown",
-                }
-                .to_string(),
-                method_name: function.name.clone(),
-            })
-        } else {
-            None
-        }
+        Self::classify_trait_method(&function.name).map(|trait_name| TraitInfo {
+            trait_name: trait_name.to_string(),
+            method_name: function.name.clone(),
+        })
     }
 }
 
