@@ -989,6 +989,74 @@ fn process_python_files_for_call_graph(
     Ok(())
 }
 
+/// Determine if a function metric should be included in debt analysis
+/// Returns true if the metric should be skipped, false if it should be included
+fn should_skip_metric_for_debt_analysis(
+    metric: &debtmap::FunctionMetrics,
+    call_graph: &priority::CallGraph,
+) -> bool {
+    // Skip test functions from debt score calculation
+    // Test functions are analyzed separately to avoid inflating debt scores
+    if metric.is_test {
+        return true;
+    }
+
+    // Skip closures - they're part of their parent function's implementation
+    // Their complexity already contributes to the parent function's metrics
+    if metric.name.contains("<closure@") {
+        return true;
+    }
+
+    let func_id = priority::call_graph::FunctionId {
+        file: metric.file.clone(),
+        name: metric.name.clone(),
+        line: metric.line,
+    };
+
+    // Skip test helper functions (functions only called by test functions)
+    // based on the call graph analysis
+    let callers = call_graph.get_callers(&func_id);
+    if !callers.is_empty()
+        && callers
+            .iter()
+            .all(|caller| caller.name.starts_with("test_"))
+    {
+        return true;
+    }
+
+    // Skip trivial wrappers that only delegate to a single function
+    // Unless they have high complexity (cyclomatic > 3)
+    if metric.cyclomatic <= 3 {
+        let callees = call_graph.get_callees(&func_id);
+        if callees.len() <= 1 {
+            // This is either a trivial wrapper or a simple getter/setter
+            // Not worth tracking as technical debt
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Create a debt item from a metric with framework exclusions
+fn create_debt_item_from_metric(
+    metric: &debtmap::FunctionMetrics,
+    call_graph: &priority::CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    framework_exclusions: &std::collections::HashSet<priority::call_graph::FunctionId>,
+) -> priority::UnifiedDebtItem {
+    use priority::unified_scorer;
+
+    let roi_score = 5.0; // Default ROI
+    unified_scorer::create_unified_debt_item_with_exclusions(
+        metric,
+        call_graph,
+        coverage_data,
+        roi_score,
+        framework_exclusions,
+    )
+}
+
 /// Create unified analysis from metrics and call graph with framework exclusions
 fn create_unified_analysis_with_exclusions(
     metrics: &[debtmap::FunctionMetrics],
@@ -996,59 +1064,17 @@ fn create_unified_analysis_with_exclusions(
     coverage_data: Option<&risk::lcov::LcovData>,
     framework_exclusions: &std::collections::HashSet<priority::call_graph::FunctionId>,
 ) -> priority::UnifiedAnalysis {
-    use priority::{unified_scorer, UnifiedAnalysis};
+    use priority::UnifiedAnalysis;
 
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
     for metric in metrics {
-        // Skip test functions from debt score calculation
-        // Test functions are analyzed separately to avoid inflating debt scores
-        if metric.is_test {
+        if should_skip_metric_for_debt_analysis(metric, call_graph) {
             continue;
         }
 
-        // Skip closures - they're part of their parent function's implementation
-        // Their complexity already contributes to the parent function's metrics
-        if metric.name.contains("<closure@") {
-            continue;
-        }
-
-        // Skip test helper functions (functions only called by test functions)
-        // based on the call graph analysis
-        let func_id = priority::call_graph::FunctionId {
-            file: metric.file.clone(),
-            name: metric.name.clone(),
-            line: metric.line,
-        };
-
-        let callers = call_graph.get_callers(&func_id);
-        if !callers.is_empty()
-            && callers
-                .iter()
-                .all(|caller| caller.name.starts_with("test_"))
-        {
-            continue;
-        }
-
-        // Skip trivial wrappers that only delegate to a single function
-        // Unless they have high complexity (cyclomatic > 3)
-        if metric.cyclomatic <= 3 {
-            let callees = call_graph.get_callees(&func_id);
-            if callees.len() <= 1 {
-                // This is either a trivial wrapper or a simple getter/setter
-                // Not worth tracking as technical debt
-                continue;
-            }
-        }
-
-        let roi_score = 5.0; // Default ROI
-        let item = unified_scorer::create_unified_debt_item_with_exclusions(
-            metric,
-            call_graph,
-            coverage_data,
-            roi_score,
-            framework_exclusions,
-        );
+        let item =
+            create_debt_item_from_metric(metric, call_graph, coverage_data, framework_exclusions);
         unified.add_item(item);
     }
 
