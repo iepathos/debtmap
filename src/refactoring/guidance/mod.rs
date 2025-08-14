@@ -6,7 +6,6 @@ use crate::refactoring::{
 #[derive(Default)]
 pub struct RefactoringGuidanceGenerator;
 
-
 impl RefactoringGuidanceGenerator {
     pub fn new() -> Self {
         Self

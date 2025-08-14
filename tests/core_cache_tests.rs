@@ -20,6 +20,7 @@ fn create_test_metrics(path: &str, cyclo: u32, cognitive: u32) -> FileMetrics {
                 length: 15,
                 is_test: false,
                 visibility: None,
+                is_trait_method: false,
             }],
             cyclomatic_complexity: cyclo,
             cognitive_complexity: cognitive,

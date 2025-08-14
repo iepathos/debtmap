@@ -373,6 +373,7 @@ mod tests {
             length: 20,
             is_test: false,
             visibility: Some("pub".to_string()),
+            is_trait_method: false,
         }
     }
 

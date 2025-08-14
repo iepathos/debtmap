@@ -97,6 +97,7 @@ mod tests {
             length: 10,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         }
     }
 

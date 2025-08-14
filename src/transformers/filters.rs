@@ -205,6 +205,7 @@ mod tests {
                         length: 15,
                         is_test: false,
                         visibility: None,
+                        is_trait_method: false,
                     },
                     FunctionMetrics {
                         name: "high_complexity".to_string(),
@@ -216,6 +217,7 @@ mod tests {
                         length: 100,
                         is_test: false,
                         visibility: None,
+                        is_trait_method: false,
                     },
                 ],
                 cyclomatic_complexity: 17,

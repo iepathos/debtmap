@@ -219,6 +219,7 @@ fn extract_functions_from_stmts(
                     length: func_def.body.len(),
                     is_test: func_def.name.starts_with("test_"),
                     visibility: None, // Python doesn't have explicit visibility modifiers
+                    is_trait_method: false, // Python doesn't have traits like Rust
                 });
 
                 // Recursively look for nested functions
@@ -252,6 +253,7 @@ fn extract_functions_from_stmts(
                     length: func_def.body.len(),
                     is_test: func_def.name.starts_with("test_"),
                     visibility: None, // Python doesn't have explicit visibility modifiers
+                    is_trait_method: false, // Python doesn't have traits like Rust
                 });
 
                 // Recursively look for nested functions

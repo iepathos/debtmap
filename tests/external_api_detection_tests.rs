@@ -17,6 +17,7 @@ fn create_function(name: &str, path: &str, visibility: Option<String>) -> Functi
         length: 20,
         is_test: false,
         visibility,
+        is_trait_method: false,
     }
 }
 

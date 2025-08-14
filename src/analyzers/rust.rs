@@ -249,7 +249,13 @@ impl FunctionVisitor {
         span.start().line
     }
 
-    fn analyze_function(&mut self, name: String, item_fn: &syn::ItemFn, line: usize) {
+    fn analyze_function(
+        &mut self,
+        name: String,
+        item_fn: &syn::ItemFn,
+        line: usize,
+        is_trait_method: bool,
+    ) {
         // Check if this is a test function (either has #[test] attribute or is in a test module)
         let has_test_attribute = item_fn.attrs.iter().any(|attr| {
             // Check for #[test] attribute
@@ -294,6 +300,7 @@ impl FunctionVisitor {
             length: count_function_lines(item_fn),
             is_test,
             visibility,
+            is_trait_method, // Use the parameter passed to this function
         };
 
         self.functions.push(metrics);
@@ -351,7 +358,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     fn visit_item_fn(&mut self, item_fn: &'ast syn::ItemFn) {
         let name = item_fn.sig.ident.to_string();
         let line = self.get_line_number(item_fn.sig.ident.span());
-        self.analyze_function(name.clone(), item_fn, line);
+        self.analyze_function(name.clone(), item_fn, line, false);
 
         // Track the current function for closures
         let prev_function = self.current_function.clone();
@@ -391,7 +398,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             sig: impl_fn.sig.clone(),
             block: Box::new(impl_fn.block.clone()),
         };
-        self.analyze_function(name.clone(), &item_fn, line);
+        self.analyze_function(name.clone(), &item_fn, line, self.current_impl_is_trait);
 
         // Track the current function for closures
         let prev_function = self.current_function.clone();
@@ -447,6 +454,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     length,
                     is_test: self.in_test_module, // Closures in test modules are test-related
                     visibility: None,             // Closures are always private
+                    is_trait_method: false,       // Closures are not trait methods
                 };
 
                 self.functions.push(metrics);
