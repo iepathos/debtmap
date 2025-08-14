@@ -157,7 +157,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 for arg in args {
                     self.check_for_function_reference(arg);
                 }
-                // Don't continue visiting the function part to avoid duplicates
+                // Visit arguments to find nested calls
                 for arg in args {
                     syn::visit::visit_expr(self, arg);
                 }
@@ -184,15 +184,13 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 }
                 return; // Early return to avoid visiting children
             }
-            // Handle closures that might be callbacks
+            // Handle closures that might be callbacks  
             Expr::Closure(closure) if self.current_function.is_some() => {
                 self.add_call(
                     format!("<closure@{}>", closure.body.span().start().line),
                     CallType::Callback,
                 );
-                // Visit the closure body to find calls inside it
-                syn::visit::visit_expr(self, &closure.body);
-                return; // Early return to avoid visiting twice
+                // Don't return - let the default visitor handle the closure body
             }
             _ => {}
         }
