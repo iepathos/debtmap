@@ -184,7 +184,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 }
                 return; // Early return to avoid visiting children
             }
-            // Handle closures that might be callbacks  
+            // Handle closures that might be callbacks
             Expr::Closure(closure) if self.current_function.is_some() => {
                 self.add_call(
                     format!("<closure@{}>", closure.body.span().start().line),

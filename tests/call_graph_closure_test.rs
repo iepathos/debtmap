@@ -1,7 +1,6 @@
-use debtmap::analyzers::rust_call_graph::{extract_call_graph, CallGraphExtractor};
-use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use debtmap::analyzers::rust_call_graph::extract_call_graph;
+use debtmap::priority::call_graph::CallGraph;
 use std::path::PathBuf;
-use syn::visit::Visit;
 
 /// Helper to parse code and extract call graph
 fn parse_and_extract(code: &str) -> CallGraph {
@@ -11,9 +10,10 @@ fn parse_and_extract(code: &str) -> CallGraph {
 
 /// Helper to check if a specific call exists in the graph
 fn has_call(graph: &CallGraph, caller_name: &str, callee_name: &str) -> bool {
-    graph.get_all_calls().iter().any(|call| {
-        call.caller.name == caller_name && call.callee.name == callee_name
-    })
+    graph
+        .get_all_calls()
+        .iter()
+        .any(|call| call.caller.name == caller_name && call.callee.name == callee_name)
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn helper(x: i32) -> i32 {
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     // Should detect the call from outer to helper
     assert!(
         has_call(&graph, "outer", "helper"),
@@ -60,7 +60,7 @@ fn transform(s: &str) -> String {
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     // Should detect the call from process_items to transform
     assert!(
         has_call(&graph, "process_items", "transform"),
@@ -84,7 +84,7 @@ fn process(x: &i32) -> i32 {
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     // Should detect the call from outer to process (even in nested closure)
     assert!(
         has_call(&graph, "outer", "process"),
@@ -110,7 +110,7 @@ fn finalize(x: i32) -> i32 { x + 1 }
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "orchestrator", "validate"),
         "Should detect call to validate"
@@ -144,7 +144,7 @@ fn transform_string(s: &str) -> String {
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "process_strings", "transform_string"),
         "Should detect call to transform_string inside closure"
@@ -170,7 +170,7 @@ fn handle_event() {
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "setup", "handle_event"),
         "Should detect call to handle_event inside closure passed as argument"
@@ -195,7 +195,7 @@ fn process_negative(x: &i32) -> i32 { -*x }
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "process_conditionally", "process_positive"),
         "Should detect call to process_positive in if branch"
@@ -221,7 +221,7 @@ async fn process_item(x: &i32) -> i32 {
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "process_async", "process_item"),
         "Should detect call to process_item inside async closure"
@@ -242,7 +242,7 @@ fn print_result(x: i32) { println!("{}", x); }
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "apply_operations", "transform"),
         "Should detect call to transform"
@@ -266,7 +266,7 @@ fn helper3(x: i32) {}
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(has_call(&graph, "regular_function", "helper1"));
     assert!(has_call(&graph, "regular_function", "helper2"));
     assert!(has_call(&graph, "regular_function", "helper3"));
@@ -305,19 +305,24 @@ impl Dependency {
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     // This is the critical test - should detect the call inside filter_map
     assert!(
-        has_call(&graph, "build_module_dependency_map", "extract_module_from_import"),
+        has_call(
+            &graph,
+            "build_module_dependency_map",
+            "extract_module_from_import"
+        ),
         "Should detect call to extract_module_from_import inside filter_map closure with Some()"
     );
-    
+
     // Also check that the function exists in the graph
-    let all_functions: Vec<String> = graph.find_all_functions()
+    let all_functions: Vec<String> = graph
+        .find_all_functions()
         .into_iter()
         .map(|f| f.name)
         .collect();
-    
+
     assert!(
         all_functions.contains(&"extract_module_from_import".to_string()),
         "extract_module_from_import should be registered as a function"
@@ -341,7 +346,7 @@ fn process_none() -> i32 { 0 }
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "process_options", "process_some"),
         "Should detect call in match arm"
@@ -369,7 +374,7 @@ fn transform(x: &i32) -> i32 { *x * 2 }
 "#;
 
     let graph = parse_and_extract(code);
-    
+
     assert!(
         has_call(&graph, "process_with_validation", "validate"),
         "Should detect validate call"

@@ -13,11 +13,11 @@ use syn::{Attribute, File, ItemFn};
 /// Types of framework patterns that can be detected
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PatternType {
-    /// Test function (marked with #[test], #[tokio::test], etc.)
+    /// Test function (marked with `#[test]`, `#[tokio::test]`, etc.)
     TestFunction,
-    /// Benchmark function (marked with #[bench])
+    /// Benchmark function (marked with `#[bench]`)
     BenchmarkFunction,
-    /// Web handler (marked with route attributes like #[get], #[post], etc.)
+    /// Web handler (marked with route attributes like `#[get]`, `#[post]`, etc.)
     WebHandler,
     /// Event handler (async functions with specific patterns)
     EventHandler,
