@@ -90,19 +90,6 @@ pub fn calculate_unified_priority(
             final_score: 0.0,
         };
     }
-    
-    // Also exclude trivial trait method implementations regardless of coverage
-    // These are required by the interface and not technical debt
-    if is_trivial && is_likely_trait_method(func) {
-        return UnifiedScore {
-            complexity_factor: 0.0,
-            coverage_factor: 0.0,
-            roi_factor: 0.0,
-            semantic_factor: 0.0,
-            role_multiplier: 1.0,
-            final_score: 0.0,
-        };
-    }
 
     // Calculate complexity factor (normalized to 0-10)
     let complexity_factor = normalize_complexity(func.cyclomatic, func.cognitive);
