@@ -159,7 +159,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 }
                 // Visit arguments to find nested calls
                 for arg in args {
-                    syn::visit::visit_expr(self, arg);
+                    self.visit_expr(arg);
                 }
                 return; // Early return to avoid visiting children
             }
@@ -178,9 +178,9 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                     self.check_for_function_reference(arg);
                 }
                 // Visit receiver and arguments but not the method itself
-                syn::visit::visit_expr(self, receiver);
+                self.visit_expr(receiver);
                 for arg in args {
-                    syn::visit::visit_expr(self, arg);
+                    self.visit_expr(arg);
                 }
                 return; // Early return to avoid visiting children
             }
@@ -190,7 +190,10 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                     format!("<closure@{}>", closure.body.span().start().line),
                     CallType::Callback,
                 );
-                // Don't return - let the default visitor handle the closure body
+                // Explicitly visit the closure body to ensure calls inside are detected
+                // The body is an expression that needs to be visited
+                self.visit_expr(&closure.body);
+                return; // Return to avoid double-visiting
             }
             _ => {}
         }
