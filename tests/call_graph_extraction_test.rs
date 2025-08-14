@@ -99,7 +99,7 @@ impl Processor {
         .iter()
         .find(|f| f.name == "Processor::process")
         .expect("Should find process method");
-    let process_callees = call_graph.get_callees(&process_id);
+    let process_callees = call_graph.get_callees(process_id);
     assert_eq!(process_callees.len(), 2, "process should call 2 methods");
 }
 
@@ -146,7 +146,7 @@ fn process_internal() {
         .find(|f| f.name.contains("handle"))
         .expect("Should find handle method");
 
-    let handle_callees = call_graph.get_callees(&handle_fn);
+    let handle_callees = call_graph.get_callees(handle_fn);
     assert_eq!(handle_callees.len(), 3, "handle should call 3 functions");
 }
 
@@ -191,7 +191,7 @@ fn main() {
         .find(|f| f.name.contains("calculate"))
         .expect("Should find calculate function");
 
-    let calculate_callees = call_graph.get_callees(&calculate_fn);
+    let calculate_callees = call_graph.get_callees(calculate_fn);
     assert_eq!(
         calculate_callees.len(),
         2,
@@ -352,7 +352,7 @@ fn validate() {
     };
     let main_callees = call_graph.get_callees(&main_id);
     assert!(
-        main_callees.len() >= 1,
+        !main_callees.is_empty(),
         "Should detect at least some qualified calls"
     );
 }

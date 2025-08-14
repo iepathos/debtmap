@@ -1,6 +1,5 @@
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use debtmap::core::FunctionMetrics;
-use debtmap::priority::call_graph::FunctionId;
 use debtmap::priority::unified_scorer::create_unified_debt_item_enhanced;
 use std::path::PathBuf;
 
