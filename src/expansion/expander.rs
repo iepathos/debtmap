@@ -876,7 +876,7 @@ fn foo() {
         if let Ok(mut expander) = MacroExpander::new(config) {
             // Mock cargo-expand as unavailable to avoid slow subprocess call
             expander.set_cargo_expand_available(false);
-            
+
             // This should now return immediately with an empty HashMap
             let result = expander.expand_workspace();
             assert!(result.is_ok());

@@ -13,6 +13,7 @@ use crate::priority::{
 use crate::risk::evidence_calculator::EvidenceBasedRiskCalculator;
 use crate::risk::lcov::LcovData;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -246,6 +247,68 @@ pub fn create_unified_debt_item_enhanced(
     }
 }
 
+pub fn create_unified_debt_item_with_exclusions(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    coverage: Option<&LcovData>,
+    roi_score: f64,
+    framework_exclusions: &HashSet<FunctionId>,
+) -> UnifiedDebtItem {
+    let func_id = FunctionId {
+        file: func.file.clone(),
+        name: func.name.clone(),
+        line: func.line,
+    };
+
+    // Calculate transitive coverage if direct coverage is available
+    let transitive_coverage = coverage.and_then(|lcov| {
+        lcov.get_function_coverage_with_line(&func.file, &func.name, func.line)
+            .map(|_direct| calculate_transitive_coverage(&func_id, call_graph, lcov))
+    });
+
+    // Use the enhanced debt type classification with framework exclusions
+    let debt_type =
+        classify_debt_type_with_exclusions(func, call_graph, &func_id, framework_exclusions);
+
+    // Calculate unified score
+    let unified_score = calculate_unified_priority(func, call_graph, coverage, roi_score);
+
+    // Determine function role for more accurate analysis
+    let function_role = classify_function_role(func, &func_id, call_graph);
+
+    // Generate contextual recommendation based on debt type and metrics
+    let recommendation = generate_recommendation(func, &debt_type, function_role, &unified_score);
+
+    // Calculate expected impact
+    let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
+
+    // Get dependency information
+    let upstream = call_graph.get_callers(&func_id);
+    let downstream = call_graph.get_callees(&func_id);
+
+    UnifiedDebtItem {
+        location: Location {
+            file: func.file.clone(),
+            function: func.name.clone(),
+            line: func.line,
+        },
+        debt_type,
+        unified_score,
+        function_role,
+        recommendation,
+        expected_impact,
+        transitive_coverage,
+        upstream_dependencies: upstream.len(),
+        downstream_dependencies: downstream.len(),
+        upstream_callers: upstream.iter().map(|f| f.name.clone()).collect(),
+        downstream_callees: downstream.iter().map(|f| f.name.clone()).collect(),
+        nesting_depth: 0, // FunctionMetrics doesn't have nesting_depth field
+        function_length: func.length,
+        cyclomatic_complexity: func.cyclomatic,
+        cognitive_complexity: func.cognitive,
+    }
+}
+
 pub fn create_unified_debt_item(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
@@ -460,7 +523,29 @@ fn identify_risk_factors(
 }
 
 fn is_dead_code(func: &FunctionMetrics, call_graph: &CallGraph, func_id: &FunctionId) -> bool {
-    // Skip obvious false positives
+    // Check hardcoded exclusions (includes test functions, main, etc.)
+    if is_excluded_from_dead_code_analysis(func) {
+        return false;
+    }
+
+    // Check if function has incoming calls
+    let callers = call_graph.get_callers(func_id);
+    callers.is_empty()
+}
+
+/// Enhanced dead code detection that uses framework pattern exclusions
+pub fn is_dead_code_with_exclusions(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+    framework_exclusions: &std::collections::HashSet<FunctionId>,
+) -> bool {
+    // First check if this function is excluded by framework patterns
+    if framework_exclusions.contains(func_id) {
+        return false;
+    }
+
+    // Then check hardcoded exclusions for backward compatibility
     if is_excluded_from_dead_code_analysis(func) {
         return false;
     }
@@ -471,7 +556,120 @@ fn is_dead_code(func: &FunctionMetrics, call_graph: &CallGraph, func_id: &Functi
 }
 
 /// Enhanced dead code detection using the enhanced call graph
-/// Enhanced version of debt type classification
+/// Enhanced version of debt type classification with framework pattern exclusions
+pub fn classify_debt_type_with_exclusions(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+    framework_exclusions: &HashSet<FunctionId>,
+) -> DebtType {
+    // Test functions are special debt cases
+    if func.is_test {
+        return match () {
+            _ if func.cyclomatic > 15 || func.cognitive > 20 => DebtType::TestComplexityHotspot {
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
+                threshold: 15,
+            },
+            _ => DebtType::TestingGap {
+                coverage: 0.0, // Test functions don't have coverage themselves
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
+            },
+        };
+    }
+
+    // Check for complexity hotspots first
+    if func.cyclomatic > 10 || func.cognitive > 15 {
+        return DebtType::ComplexityHotspot {
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+        };
+    }
+
+    // Check for dead code with framework exclusions
+    if is_dead_code_with_exclusions(func, call_graph, func_id, framework_exclusions) {
+        return DebtType::DeadCode {
+            visibility: determine_visibility(func),
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+            usage_hints: generate_usage_hints(func, call_graph, func_id),
+        };
+    }
+
+    // Check if this is an orchestrator that doesn't need tests
+    let role = classify_function_role(func, func_id, call_graph);
+    if role == FunctionRole::Orchestrator {
+        let callees = call_graph.get_callees(func_id);
+        // Filter out standard library functions
+        let meaningful_callees: Vec<_> = callees
+            .iter()
+            .filter(|f| !is_std_or_utility_function(&f.name))
+            .collect();
+        // Only flag as orchestration if there are actual functions being orchestrated
+        if meaningful_callees.len() >= 2 {
+            return DebtType::Orchestration {
+                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
+            };
+        }
+    }
+
+    // Low complexity functions that are I/O wrappers or entry points
+    // should not be flagged as technical debt
+    if func.cyclomatic <= 3 && func.cognitive <= 5 {
+        // Check if it's an I/O wrapper or entry point
+        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+            // These are acceptable patterns, not debt
+            return DebtType::Risk {
+                risk_score: 0.0,
+                factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
+            };
+        }
+
+        // Pure logic functions that are very simple are not debt
+        if role == FunctionRole::PureLogic && func.length <= 10 {
+            // Simple pure functions like formatters don't need to be flagged
+            // Return minimal risk to indicate no real debt
+            return DebtType::Risk {
+                risk_score: 0.0,
+                factors: vec!["Trivial pure function - not technical debt".to_string()],
+            };
+        }
+    }
+
+    // Only flag as risk-based debt if there's actual complexity or other indicators
+    if func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50 {
+        DebtType::Risk {
+            risk_score: calculate_risk_score(func),
+            factors: identify_risk_factors(func, &None),
+        }
+    } else {
+        // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
+        // Check if they're calling other functions (true delegation)
+        let callees = call_graph.get_callees(func_id);
+        // Filter out standard library functions
+        let meaningful_callees: Vec<_> = callees
+            .iter()
+            .filter(|f| !is_std_or_utility_function(&f.name))
+            .collect();
+        if meaningful_callees.len() >= 2
+            && func.cyclomatic <= 2
+            && role == FunctionRole::Orchestrator
+        {
+            DebtType::Orchestration {
+                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
+            }
+        } else {
+            // Not debt - well-designed simple function
+            DebtType::Risk {
+                risk_score: 0.0,
+                factors: vec!["Well-designed simple function - not technical debt".to_string()],
+            }
+        }
+    }
+}
+
+/// Enhanced version of debt type classification (legacy - kept for compatibility)
 pub fn classify_debt_type_enhanced(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
