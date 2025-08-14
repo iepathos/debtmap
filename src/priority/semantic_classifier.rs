@@ -31,14 +31,14 @@ fn classify_by_rules(
         return Some(FunctionRole::EntryPoint);
     }
 
-    // Check orchestration patterns
-    if is_orchestrator(func, func_id, call_graph) {
-        return Some(FunctionRole::Orchestrator);
-    }
-
-    // Check I/O wrapper patterns
+    // Check I/O wrapper BEFORE orchestration
     if is_io_wrapper(func) {
         return Some(FunctionRole::IOWrapper);
+    }
+
+    // Only then check orchestration patterns
+    if is_orchestrator(func, func_id, call_graph) {
+        return Some(FunctionRole::Orchestrator);
     }
 
     None // Will default to PureLogic
@@ -51,6 +51,19 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
 
 // Pure function to check if a function is an orchestrator
 fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &CallGraph) -> bool {
+    // First check if there are meaningful callees to orchestrate
+    let callees = call_graph.get_callees(func_id);
+    let meaningful_callees: Vec<_> = callees
+        .iter()
+        .filter(|f| !is_std_or_utility_function(&f.name))
+        .collect();
+
+    // Can't be an orchestrator without functions to orchestrate
+    // Must have at least 2 meaningful callees to be considered an orchestrator
+    if meaningful_callees.len() < 2 {
+        return false;
+    }
+
     // Name-based orchestration with low complexity
     let name_suggests_orchestration =
         is_orchestrator_by_name(&func_id.name) && func.cyclomatic <= 3;
@@ -90,6 +103,21 @@ fn is_entry_point_by_name(name: &str) -> bool {
 }
 
 fn is_orchestrator_by_name(name: &str) -> bool {
+    let name_lower = name.to_lowercase();
+
+    // Exclude common non-orchestration patterns first
+    let exclude_patterns = [
+        "print", "format", "create", "build", "extract", "parse", "new", "from", "to", "into",
+        "write", "read", "display", "render", "emit",
+    ];
+
+    for pattern in &exclude_patterns {
+        if name_lower.starts_with(pattern) || name_lower.ends_with(pattern) {
+            return false;
+        }
+    }
+
+    // Then check for true orchestration patterns
     let orchestrator_patterns = [
         "orchestrate",
         "coordinate",
@@ -105,8 +133,6 @@ fn is_orchestrator_by_name(name: &str) -> bool {
         "delegate",
         "forward",
     ];
-
-    let name_lower = name.to_lowercase();
 
     // Check for conditional patterns like generate_report_if_requested
     if name_lower.contains("_if_") || name_lower.contains("_when_") {
@@ -134,9 +160,9 @@ fn delegates_to_tested_functions(
         .filter(|f| !is_std_or_utility_function(&f.name))
         .collect();
 
-    // Orchestrators should coordinate MULTIPLE functions, not just wrap a single one
-    // A function that calls only one other function is just a wrapper, not an orchestrator
-    meaningful_callees.len() >= 3 && call_graph.detect_delegation_pattern(func_id)
+    // Orchestrators should coordinate MULTIPLE functions (at least 2)
+    // This is now consistent with the check in is_orchestrator
+    meaningful_callees.len() >= 2 && call_graph.detect_delegation_pattern(func_id)
 }
 
 fn contains_io_patterns(func: &FunctionMetrics) -> bool {
