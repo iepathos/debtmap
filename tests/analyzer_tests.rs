@@ -487,9 +487,9 @@ class Person:
         assert_eq!(metrics.language, Language::Python);
         // Should detect the class methods
         assert_eq!(metrics.complexity.functions.len(), 3);
-        assert_eq!(metrics.complexity.functions[0].name, "__init__");
-        assert_eq!(metrics.complexity.functions[1].name, "get_age");
-        assert_eq!(metrics.complexity.functions[2].name, "set_age");
+        assert_eq!(metrics.complexity.functions[0].name, "Person.__init__");
+        assert_eq!(metrics.complexity.functions[1].name, "Person.get_age");
+        assert_eq!(metrics.complexity.functions[2].name, "Person.set_age");
     }
 
     #[test]
