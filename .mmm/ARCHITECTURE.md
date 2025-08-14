@@ -91,8 +91,8 @@ Macro expansion for perfect call graph analysis:
 - `source_map.rs`: Source location mapping
 
 ### Analysis (`src/analysis/`)
-Enhanced call graph analysis with multi-phase construction:
-- `call_graph/mod.rs`: Enhanced call graph builder and core types
+Rust-specific call graph analysis with multi-phase construction:
+- `call_graph/mod.rs`: Rust-specific call graph builder and core types (RustCallGraph, RustCallGraphBuilder)
 - `call_graph/trait_registry.rs`: Trait dispatch detection and resolution, Visit trait pattern detection
 - `call_graph/function_pointer.rs`: Function pointer and closure tracking
 - `call_graph/framework_patterns.rs`: Framework pattern recognition, Visit trait exclusion

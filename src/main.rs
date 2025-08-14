@@ -1,4 +1,4 @@
-use debtmap::analysis::call_graph::EnhancedCallGraphBuilder;
+use debtmap::analysis::call_graph::RustCallGraphBuilder;
 use debtmap::analysis_utils;
 use debtmap::cli;
 use debtmap::core;
@@ -896,8 +896,8 @@ fn process_rust_files_for_call_graph(
     // Clear cache if requested
     clear_expansion_cache_if_needed(clear_expansion_cache, expansion_config.as_ref());
 
-    // Create enhanced call graph builder from the base graph
-    let mut enhanced_builder = EnhancedCallGraphBuilder::from_base_graph(call_graph.clone());
+    // Create Rust-specific call graph builder from the base graph
+    let mut enhanced_builder = RustCallGraphBuilder::from_base_graph(call_graph.clone());
 
     // Collect all parsed files for cross-module analysis
     let mut workspace_files = Vec::new();
