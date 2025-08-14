@@ -215,6 +215,7 @@ struct FunctionVisitor {
     source_content: String,
     in_test_module: bool,
     current_function: Option<String>,
+    current_impl_type: Option<String>,
 }
 
 impl FunctionVisitor {
@@ -237,6 +238,7 @@ impl FunctionVisitor {
             source_content,
             in_test_module: is_test_file,
             current_function: None,
+            current_impl_type: None,
         }
     }
 
@@ -297,6 +299,26 @@ impl FunctionVisitor {
 }
 
 impl<'ast> Visit<'ast> for FunctionVisitor {
+    fn visit_item_impl(&mut self, item_impl: &'ast syn::ItemImpl) {
+        // Extract the type name from the impl block
+        let impl_type = if let syn::Type::Path(type_path) = &*item_impl.self_ty {
+            type_path.path.segments.last()
+                .map(|seg| seg.ident.to_string())
+        } else {
+            None
+        };
+
+        // Store the current impl type
+        let prev_impl_type = self.current_impl_type.clone();
+        self.current_impl_type = impl_type;
+
+        // Continue visiting the impl block
+        syn::visit::visit_item_impl(self, item_impl);
+
+        // Restore previous impl type
+        self.current_impl_type = prev_impl_type;
+    }
+
     fn visit_item_mod(&mut self, item_mod: &'ast syn::ItemMod) {
         // Check if this is a test module (has #[cfg(test)] attribute)
         let is_test_mod = item_mod.attrs.iter().any(|attr| {
@@ -332,7 +354,14 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     }
 
     fn visit_impl_item_fn(&mut self, impl_fn: &'ast syn::ImplItemFn) {
-        let name = impl_fn.sig.ident.to_string();
+        // Construct the full function name including the impl type
+        let method_name = impl_fn.sig.ident.to_string();
+        let name = if let Some(ref impl_type) = self.current_impl_type {
+            format!("{}::{}", impl_type, method_name)
+        } else {
+            method_name.clone()
+        };
+        
         let line = self.get_line_number(impl_fn.sig.ident.span());
         // Use the actual visibility from impl_fn
         let vis = impl_fn.vis.clone();

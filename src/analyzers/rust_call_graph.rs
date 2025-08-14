@@ -7,6 +7,7 @@ use syn::{Expr, ExprCall, ExprMethodCall, ImplItemFn, ItemFn};
 pub struct CallGraphExtractor {
     pub call_graph: CallGraph,
     current_function: Option<FunctionId>,
+    current_impl_type: Option<String>,
     current_file: PathBuf,
 }
 
@@ -15,6 +16,7 @@ impl CallGraphExtractor {
         Self {
             call_graph: CallGraph::new(),
             current_function: None,
+            current_impl_type: None,
             current_file: file,
         }
     }
@@ -108,6 +110,26 @@ impl CallGraphExtractor {
 }
 
 impl<'ast> Visit<'ast> for CallGraphExtractor {
+    fn visit_item_impl(&mut self, item_impl: &'ast syn::ItemImpl) {
+        // Extract the type name from the impl block
+        let impl_type = if let syn::Type::Path(type_path) = &*item_impl.self_ty {
+            type_path.path.segments.last()
+                .map(|seg| seg.ident.to_string())
+        } else {
+            None
+        };
+
+        // Store the current impl type
+        let prev_impl_type = self.current_impl_type.clone();
+        self.current_impl_type = impl_type;
+
+        // Continue visiting the impl block
+        syn::visit::visit_item_impl(self, item_impl);
+
+        // Restore previous impl type
+        self.current_impl_type = prev_impl_type;
+    }
+
     fn visit_item_fn(&mut self, item_fn: &'ast ItemFn) {
         let name = item_fn.sig.ident.to_string();
         let line = self.get_line_number(item_fn.sig.ident.span());
@@ -123,7 +145,14 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     }
 
     fn visit_impl_item_fn(&mut self, impl_fn: &'ast ImplItemFn) {
-        let name = impl_fn.sig.ident.to_string();
+        // Construct the full function name including the impl type
+        let method_name = impl_fn.sig.ident.to_string();
+        let name = if let Some(ref impl_type) = self.current_impl_type {
+            format!("{}::{}", impl_type, method_name)
+        } else {
+            method_name.clone()
+        };
+        
         let line = self.get_line_number(impl_fn.sig.ident.span());
 
         // Convert to ItemFn for consistency
@@ -170,7 +199,19 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 receiver,
                 ..
             }) => {
-                let name = method.to_string();
+                // Check if this is a self method call
+                let method_name = method.to_string();
+                let name = if matches!(receiver.as_ref(), Expr::Path(p) if p.path.is_ident("self")) {
+                    // This is a self method call, use the impl type if available
+                    if let Some(ref impl_type) = self.current_impl_type {
+                        format!("{}::{}", impl_type, method_name)
+                    } else {
+                        method_name.clone()
+                    }
+                } else {
+                    // Regular method call on another object
+                    method_name.clone()
+                };
                 self.add_call(name.clone(), Self::classify_call_type(&name));
 
                 // Check arguments for function references (e.g., .for_each(print_func))
