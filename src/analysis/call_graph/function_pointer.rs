@@ -348,56 +348,83 @@ impl FunctionPointerVisitor {
         }
     }
 
+    /// Extract direct function pointer call from expression
+    fn extract_direct_pointer_call(
+        &self,
+        call: &ExprCall,
+        caller: &FunctionId,
+        line: usize,
+    ) -> Option<FunctionPointerCall> {
+        if let Expr::Path(path) = &*call.func {
+            self.extract_function_name_from_path(path)
+                .map(|func_name| FunctionPointerCall {
+                    caller: caller.clone(),
+                    pointer_id: func_name,
+                    line,
+                })
+        } else {
+            None
+        }
+    }
+
+    /// Extract higher-order function call from expression
+    fn extract_hof_call(
+        &self,
+        call: &ExprCall,
+        caller: &FunctionId,
+        line: usize,
+    ) -> Option<HigherOrderFunctionCall> {
+        if let Expr::Path(path) = &*call.func {
+            if let Some(func_name) = self.extract_function_name_from_path(path) {
+                if self.is_higher_order_function(&func_name) {
+                    let function_arguments = self.extract_function_arguments(call);
+
+                    if !function_arguments.is_empty() {
+                        return Some(HigherOrderFunctionCall {
+                            caller: caller.clone(),
+                            hof_function: func_name,
+                            function_arguments,
+                            line,
+                        });
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Extract function arguments from call expression
+    fn extract_function_arguments(&self, call: &ExprCall) -> Vector<FunctionId> {
+        let mut function_arguments = Vector::new();
+
+        for arg in &call.args {
+            if let Expr::Path(arg_path) = arg {
+                if let Some(arg_func_name) = self.extract_function_name_from_path(arg_path) {
+                    let func_arg = FunctionId {
+                        file: self.file_path.clone(),
+                        name: arg_func_name,
+                        line: 0,
+                    };
+                    function_arguments.push_back(func_arg);
+                }
+            }
+        }
+
+        function_arguments
+    }
+
     fn analyze_call_expression(&mut self, call: &ExprCall) {
         if let Some(caller) = &self.current_function {
             let line = self.get_line_number(call.paren_token.span.open());
 
-            // Direct function pointer call: func_ptr(args)
-            if let Expr::Path(path) = &*call.func {
-                if let Some(func_name) = self.extract_function_name_from_path(path) {
-                    // Check if this might be a function pointer call
-                    let pointer_call = FunctionPointerCall {
-                        caller: caller.clone(),
-                        pointer_id: func_name,
-                        line,
-                    };
-                    self.pointer_calls.push(pointer_call);
-                }
+            // Extract and store direct function pointer call
+            if let Some(pointer_call) = self.extract_direct_pointer_call(call, caller, line) {
+                self.pointer_calls.push(pointer_call);
             }
 
-            // Check for higher-order function calls
-            if let Expr::Path(path) = &*call.func {
-                if let Some(func_name) = self.extract_function_name_from_path(path) {
-                    if self.is_higher_order_function(&func_name) {
-                        let mut function_arguments = Vector::new();
-
-                        // Analyze arguments for function references
-                        for arg in &call.args {
-                            if let Expr::Path(arg_path) = arg {
-                                if let Some(arg_func_name) =
-                                    self.extract_function_name_from_path(arg_path)
-                                {
-                                    let func_arg = FunctionId {
-                                        file: self.file_path.clone(),
-                                        name: arg_func_name,
-                                        line: 0,
-                                    };
-                                    function_arguments.push_back(func_arg);
-                                }
-                            }
-                        }
-
-                        if !function_arguments.is_empty() {
-                            let hof_call = HigherOrderFunctionCall {
-                                caller: caller.clone(),
-                                hof_function: func_name,
-                                function_arguments,
-                                line,
-                            };
-                            self.hof_calls.push(hof_call);
-                        }
-                    }
-                }
+            // Extract and store higher-order function call
+            if let Some(hof_call) = self.extract_hof_call(call, caller, line) {
+                self.hof_calls.push(hof_call);
             }
         }
     }
@@ -528,5 +555,199 @@ impl<'ast> Visit<'ast> for ClosureCallVisitor {
 impl Default for FunctionPointerTracker {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn test_extract_direct_pointer_call() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test direct function pointer call
+        let call: ExprCall = parse_quote! { func_ptr(42) };
+        let result = visitor.extract_direct_pointer_call(&call, &caller, 10);
+
+        assert!(result.is_some());
+        let pointer_call = result.unwrap();
+        assert_eq!(pointer_call.pointer_id, "func_ptr");
+        assert_eq!(pointer_call.line, 10);
+        assert_eq!(pointer_call.caller.name, "test_func");
+    }
+
+    #[test]
+    fn test_extract_direct_pointer_call_with_method_call() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test method call (not a direct pointer call)
+        // Using a different expression type that's not a Path
+        let call: ExprCall = parse_quote! { compute(42) };
+        // Manually change the func to something that's not a Path
+        let mut call = call;
+        call.func = Box::new(parse_quote! { 42 }); // Replace with a literal, not a path
+        let result = visitor.extract_direct_pointer_call(&call, &caller, 10);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_hof_call_map() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test higher-order function call with map
+        let call: ExprCall = parse_quote! { map(process_item) };
+        let result = visitor.extract_hof_call(&call, &caller, 15);
+
+        assert!(result.is_some());
+        let hof_call = result.unwrap();
+        assert_eq!(hof_call.hof_function, "map");
+        assert_eq!(hof_call.function_arguments.len(), 1);
+        assert_eq!(hof_call.function_arguments[0].name, "process_item");
+        assert_eq!(hof_call.line, 15);
+    }
+
+    #[test]
+    fn test_extract_hof_call_filter() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test higher-order function call with filter
+        let call: ExprCall = parse_quote! { filter(is_valid) };
+        let result = visitor.extract_hof_call(&call, &caller, 20);
+
+        assert!(result.is_some());
+        let hof_call = result.unwrap();
+        assert_eq!(hof_call.hof_function, "filter");
+        assert_eq!(hof_call.function_arguments.len(), 1);
+        assert_eq!(hof_call.function_arguments[0].name, "is_valid");
+    }
+
+    #[test]
+    fn test_extract_hof_call_non_hof() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test non-higher-order function call
+        let call: ExprCall = parse_quote! { regular_func(arg) };
+        let result = visitor.extract_hof_call(&call, &caller, 25);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_function_arguments() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test extracting multiple function arguments
+        let call: ExprCall = parse_quote! { fold(initial, combine_func) };
+        let args = visitor.extract_function_arguments(&call);
+
+        assert_eq!(args.len(), 2);
+        assert_eq!(args[0].name, "initial");
+        assert_eq!(args[1].name, "combine_func");
+    }
+
+    #[test]
+    fn test_extract_function_arguments_mixed() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test mixed arguments (functions and non-functions)
+        let call: ExprCall = parse_quote! { process(42, handler, "string") };
+        let args = visitor.extract_function_arguments(&call);
+
+        // Should only extract function references
+        assert_eq!(args.len(), 1);
+        assert_eq!(args[0].name, "handler");
+    }
+
+    #[test]
+    fn test_extract_function_arguments_empty() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test call with no function arguments
+        let call: ExprCall = parse_quote! { compute(42, "string", true) };
+        let args = visitor.extract_function_arguments(&call);
+
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn test_is_higher_order_function() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test HOF detection
+        assert!(visitor.is_higher_order_function("map"));
+        assert!(visitor.is_higher_order_function("filter"));
+        assert!(visitor.is_higher_order_function("fold"));
+        assert!(visitor.is_higher_order_function("for_each"));
+        assert!(visitor.is_higher_order_function("find"));
+        assert!(visitor.is_higher_order_function("any"));
+        assert!(visitor.is_higher_order_function("all"));
+
+        // Test non-HOF
+        assert!(!visitor.is_higher_order_function("process"));
+        assert!(!visitor.is_higher_order_function("compute"));
+        assert!(!visitor.is_higher_order_function("regular_func"));
+    }
+
+    #[test]
+    fn test_analyze_call_expression_integration() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        });
+
+        // Test direct pointer call
+        let call: ExprCall = parse_quote! { callback() };
+        visitor.analyze_call_expression(&call);
+        assert_eq!(visitor.pointer_calls.len(), 1);
+        assert_eq!(visitor.pointer_calls[0].pointer_id, "callback");
+
+        // Test HOF call
+        let hof_call: ExprCall = parse_quote! { map(transform) };
+        visitor.analyze_call_expression(&hof_call);
+        assert_eq!(visitor.hof_calls.len(), 1);
+        assert_eq!(visitor.hof_calls[0].hof_function, "map");
+    }
+
+    #[test]
+    fn test_analyze_call_expression_no_current_function() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        // No current function set
+
+        let call: ExprCall = parse_quote! { func() };
+        visitor.analyze_call_expression(&call);
+
+        // Should not record any calls without current function context
+        assert!(visitor.pointer_calls.is_empty());
+        assert!(visitor.hof_calls.is_empty());
     }
 }
