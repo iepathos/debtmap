@@ -3,17 +3,13 @@ use crate::refactoring::{
     Recommendation, RefactoringAnalysis, RefactoringExample, RefactoringOpportunity,
 };
 
+#[derive(Default)]
 pub struct RefactoringGuidanceGenerator;
 
-impl Default for RefactoringGuidanceGenerator {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 impl RefactoringGuidanceGenerator {
     pub fn new() -> Self {
-        Self::default()
+        Self
     }
 
     pub fn generate_guidance(&self, analysis: &RefactoringAnalysis) -> String {

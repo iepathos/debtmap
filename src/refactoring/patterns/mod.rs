@@ -1,8 +1,8 @@
 use crate::core::{FileMetrics, FunctionMetrics};
 use crate::refactoring::{
-    ConcernMixingPattern, DetectedPattern, FormattingDetector, FormattingInfo,
-    IoDetector, IoInfo, OrchestrationPattern, PatternAssessment, PatternEvidence, PatternMatcher,
-    PatternType, SeparationDifficulty, TraitAnalyzer, TraitInfo, Urgency,
+    ConcernMixingPattern, DetectedPattern, FormattingDetector, FormattingInfo, IoDetector, IoInfo,
+    OrchestrationPattern, PatternAssessment, PatternEvidence, PatternMatcher, PatternType,
+    SeparationDifficulty, TraitAnalyzer, TraitInfo, Urgency,
 };
 use std::sync::Arc;
 
