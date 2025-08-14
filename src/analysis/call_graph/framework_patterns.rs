@@ -509,3 +509,218 @@ impl Default for FrameworkPatternDetector {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use syn::parse_quote;
+
+    fn create_test_visitor() -> PatternVisitor {
+        let config = PatternConfig::default();
+        PatternVisitor::new(PathBuf::from("test.rs"), &config)
+    }
+
+    fn create_function_id() -> FunctionId {
+        FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        }
+    }
+
+    #[test]
+    fn test_analyze_attribute_test_function() {
+        let visitor = create_test_visitor();
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[test]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert_eq!(pattern.pattern_type, PatternType::TestFunction);
+        assert_eq!(pattern.function_id, Some(func_id));
+        assert_eq!(pattern.framework_name, Some("std".to_string()));
+        assert_eq!(pattern.confidence, 1.0);
+        assert!(pattern.triggering_attributes.contains(&"test".to_string()));
+    }
+
+    #[test]
+    fn test_analyze_attribute_tokio_test() {
+        let visitor = create_test_visitor();
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[tokio::test]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert_eq!(pattern.pattern_type, PatternType::TestFunction);
+        assert_eq!(pattern.framework_name, Some("tokio".to_string()));
+        assert!(pattern
+            .triggering_attributes
+            .contains(&"tokio::test".to_string()));
+    }
+
+    #[test]
+    fn test_analyze_attribute_benchmark() {
+        let visitor = create_test_visitor();
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[bench]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert_eq!(pattern.pattern_type, PatternType::BenchmarkFunction);
+        assert_eq!(pattern.framework_name, Some("criterion".to_string()));
+        assert_eq!(pattern.confidence, 1.0);
+    }
+
+    #[test]
+    fn test_analyze_attribute_web_handler_get() {
+        let visitor = create_test_visitor();
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[get]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert_eq!(pattern.pattern_type, PatternType::WebHandler);
+        assert_eq!(pattern.framework_name, Some("web_framework".to_string()));
+        assert_eq!(pattern.confidence, 0.9);
+    }
+
+    #[test]
+    fn test_analyze_attribute_serialization() {
+        let visitor = create_test_visitor();
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[serde]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert_eq!(pattern.pattern_type, PatternType::SerializationFunction);
+        assert_eq!(pattern.framework_name, Some("serde".to_string()));
+        assert_eq!(pattern.confidence, 0.8);
+    }
+
+    #[test]
+    fn test_analyze_attribute_macro_callback() {
+        let visitor = create_test_visitor();
+        let func_id = create_function_id();
+        // Use proc_macro instead of derive since derive is also a serialization attribute
+        let attr: Attribute = parse_quote!(#[proc_macro]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert_eq!(pattern.pattern_type, PatternType::MacroCallback);
+        assert_eq!(pattern.framework_name, None);
+        assert_eq!(pattern.confidence, 0.7);
+    }
+
+    #[test]
+    fn test_analyze_attribute_custom_pattern() {
+        let mut config = PatternConfig::default();
+        config.custom_patterns.insert(
+            "custom_attr".to_string(),
+            "Custom attribute description".to_string(),
+        );
+        let visitor = PatternVisitor::new(PathBuf::from("test.rs"), &config);
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[custom_attr]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        match pattern.pattern_type {
+            PatternType::CustomPattern { name } => {
+                assert_eq!(name, "custom_attr");
+            }
+            _ => panic!("Expected CustomPattern"),
+        }
+        assert_eq!(pattern.confidence, 0.6);
+        assert_eq!(
+            pattern.metadata.get("description"),
+            Some(&"Custom attribute description".to_string())
+        );
+    }
+
+    #[test]
+    fn test_analyze_attribute_unrecognized() {
+        let visitor = create_test_visitor();
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[unknown_attr]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_analyze_attribute_with_disabled_detection() {
+        let config = PatternConfig {
+            detect_tests: false,
+            ..Default::default()
+        };
+        let visitor = PatternVisitor::new(PathBuf::from("test.rs"), &config);
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[test]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_analyze_attribute_web_handler_disabled() {
+        let config = PatternConfig {
+            detect_web_handlers: false,
+            ..Default::default()
+        };
+        let visitor = PatternVisitor::new(PathBuf::from("test.rs"), &config);
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[get]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_analyze_attribute_serialization_disabled() {
+        let config = PatternConfig {
+            detect_serialization: false,
+            ..Default::default()
+        };
+        let visitor = PatternVisitor::new(PathBuf::from("test.rs"), &config);
+        let func_id = create_function_id();
+        let attr: Attribute = parse_quote!(#[serde]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_analyze_attribute_macro_callback_disabled() {
+        let config = PatternConfig {
+            detect_macro_callbacks: false,
+            ..Default::default()
+        };
+        let visitor = PatternVisitor::new(PathBuf::from("test.rs"), &config);
+        let func_id = create_function_id();
+        // Use proc_macro instead of derive since derive is also a serialization attribute
+        let attr: Attribute = parse_quote!(#[proc_macro]);
+
+        let result = visitor.analyze_attribute(&attr, &func_id);
+
+        assert!(result.is_none());
+    }
+}
