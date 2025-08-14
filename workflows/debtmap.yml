@@ -1,3 +1,7 @@
+- shell: "cargo build --release --bin debtmap"
+
+- shell: "cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage"
+
 - claude: "/debtmap"
   commit_required: true
 

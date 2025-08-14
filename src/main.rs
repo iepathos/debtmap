@@ -914,7 +914,7 @@ fn process_rust_files_for_call_graph(
                     .analyze_trait_dispatch(&file_path, &parsed)?
                     .analyze_function_pointers(&file_path, &parsed)?
                     .analyze_framework_patterns(&file_path, &parsed)?;
-                
+
                 // Collect for cross-module analysis
                 workspace_files.push((file_path.clone(), parsed));
             }

@@ -371,3 +371,28 @@ Implement evidence-based risk scoring methodology that:
 - ✅ Role-aware analysis reduces noise
 - ⚠️ Additional complexity in risk calculation
 - ⚠️ Requires baseline data maintenance
+
+---
+
+## ADR-018: Visit Trait Pattern Detection
+**Date**: 2025-08-14
+**Status**: Accepted
+
+### Context
+The dead code detection was incorrectly flagging Visit trait implementations as dead code, particularly methods like `PatternVisitor::analyze_attribute`. These methods are called through the visitor pattern infrastructure (e.g., syn's `visit_*` functions) using trait dispatch, which wasn't being tracked by the existing call graph analysis.
+
+### Decision
+Implement specialized detection for Visit trait patterns that:
+- Identifies `impl Visit for Type` and `impl<'ast> Visit<'ast> for Type` blocks
+- Tracks all methods within Visit trait implementations
+- Marks these methods as framework-managed to exclude from dead code detection
+- Integrates with the existing enhanced call graph builder and trait registry
+- Adjusts confidence scoring for Visit trait methods to 0.1x (very low confidence of being dead)
+
+### Consequences
+- ✅ Visit trait methods no longer incorrectly flagged as dead code
+- ✅ Visitor pattern properly recognized as framework-managed
+- ✅ Seamless integration with existing trait registry infrastructure
+- ✅ Extensible design for other visitor-like patterns
+- ⚠️ Slight increase in analysis complexity
+- ⚠️ May need updates for new visitor pattern libraries

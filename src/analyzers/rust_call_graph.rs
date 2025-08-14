@@ -113,7 +113,10 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     fn visit_item_impl(&mut self, item_impl: &'ast syn::ItemImpl) {
         // Extract the type name from the impl block
         let impl_type = if let syn::Type::Path(type_path) = &*item_impl.self_ty {
-            type_path.path.segments.last()
+            type_path
+                .path
+                .segments
+                .last()
                 .map(|seg| seg.ident.to_string())
         } else {
             None
@@ -152,7 +155,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         } else {
             method_name.clone()
         };
-        
+
         let line = self.get_line_number(impl_fn.sig.ident.span());
 
         // Convert to ItemFn for consistency
@@ -201,7 +204,8 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
             }) => {
                 // Check if this is a self method call
                 let method_name = method.to_string();
-                let name = if matches!(receiver.as_ref(), Expr::Path(p) if p.path.is_ident("self")) {
+                let name = if matches!(receiver.as_ref(), Expr::Path(p) if p.path.is_ident("self"))
+                {
                     // This is a self method call, use the impl type if available
                     if let Some(ref impl_type) = self.current_impl_type {
                         format!("{}::{}", impl_type, method_name)

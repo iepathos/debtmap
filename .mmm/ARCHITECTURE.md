@@ -93,9 +93,9 @@ Macro expansion for perfect call graph analysis:
 ### Analysis (`src/analysis/`)
 Enhanced call graph analysis with multi-phase construction:
 - `call_graph/mod.rs`: Enhanced call graph builder and core types
-- `call_graph/trait_registry.rs`: Trait dispatch detection and resolution
+- `call_graph/trait_registry.rs`: Trait dispatch detection and resolution, Visit trait pattern detection
 - `call_graph/function_pointer.rs`: Function pointer and closure tracking
-- `call_graph/framework_patterns.rs`: Framework pattern recognition
+- `call_graph/framework_patterns.rs`: Framework pattern recognition, Visit trait exclusion
 - `call_graph/cross_module.rs`: Cross-module dependency analysis
 
 ### IO (`src/io/`)

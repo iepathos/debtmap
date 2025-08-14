@@ -302,7 +302,10 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     fn visit_item_impl(&mut self, item_impl: &'ast syn::ItemImpl) {
         // Extract the type name from the impl block
         let impl_type = if let syn::Type::Path(type_path) = &*item_impl.self_ty {
-            type_path.path.segments.last()
+            type_path
+                .path
+                .segments
+                .last()
                 .map(|seg| seg.ident.to_string())
         } else {
             None
@@ -361,7 +364,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
         } else {
             method_name.clone()
         };
-        
+
         let line = self.get_line_number(impl_fn.sig.ident.span());
         // Use the actual visibility from impl_fn
         let vis = impl_fn.vis.clone();

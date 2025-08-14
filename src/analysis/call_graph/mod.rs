@@ -132,6 +132,7 @@ impl EnhancedCallGraphBuilder {
                 .trait_registry
                 .analyze_file(file_path, ast)?;
             self.resolve_trait_method_calls()?;
+            self.mark_visit_trait_methods()?;
         }
         Ok(self)
     }
@@ -290,6 +291,20 @@ impl EnhancedCallGraphBuilder {
 
         Ok(())
     }
+
+    /// Mark Visit trait methods as framework-managed
+    fn mark_visit_trait_methods(&mut self) -> Result<()> {
+        let visit_methods = self.enhanced_graph.trait_registry.get_visit_trait_methods();
+
+        for method_id in visit_methods {
+            // Add Visit trait methods to framework patterns
+            self.enhanced_graph
+                .framework_patterns
+                .add_visit_trait_function(method_id);
+        }
+
+        Ok(())
+    }
 }
 
 impl EnhancedCallGraph {
@@ -325,7 +340,8 @@ impl EnhancedCallGraph {
                     PatternType::TestFunction
                     | PatternType::WebHandler
                     | PatternType::EventHandler
-                    | PatternType::MacroCallback => {
+                    | PatternType::MacroCallback
+                    | PatternType::VisitTrait => {
                         live_functions.insert(func_id.clone());
                     }
                     _ => {}
@@ -404,6 +420,11 @@ impl EnhancedCallGraph {
             confidence *= 0.4;
         }
 
+        // Very low confidence for Visit trait methods (visitor pattern)
+        if self.trait_registry.is_visit_trait_method(func_id) {
+            confidence *= 0.1;
+        }
+
         // Reduce confidence if function might be used through function pointers
         if self
             .function_pointer_tracker
@@ -448,6 +469,10 @@ impl EnhancedCallGraph {
 
         if self.trait_registry.has_trait_implementations(func_id) {
             risks.push("Has trait implementations".to_string());
+        }
+
+        if self.trait_registry.is_visit_trait_method(func_id) {
+            risks.push("Visit trait method (visitor pattern)".to_string());
         }
 
         if self

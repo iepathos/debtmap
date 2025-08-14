@@ -109,8 +109,8 @@ mod rust_analyzer_tests {
         assert_eq!(metrics.language, Language::Rust);
         // Should detect the impl methods
         assert_eq!(metrics.complexity.functions.len(), 2);
-        assert_eq!(metrics.complexity.functions[0].name, "new");
-        assert_eq!(metrics.complexity.functions[1].name, "get_age");
+        assert_eq!(metrics.complexity.functions[0].name, "Person::new");
+        assert_eq!(metrics.complexity.functions[1].name, "Person::get_age");
     }
 
     #[test]
