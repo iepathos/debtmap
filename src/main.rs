@@ -924,9 +924,10 @@ fn process_rust_files_for_call_graph(
     // Run cross-module analysis with all files
     enhanced_builder.analyze_cross_module(&workspace_files)?;
 
-    // Build the enhanced graph and extract the enhanced base graph
+    // Build the enhanced graph and merge its calls into our existing graph
     let enhanced_graph = enhanced_builder.build();
-    *call_graph = enhanced_graph.base_graph;
+    // Merge the enhanced graph's calls into our existing call graph instead of replacing it
+    call_graph.merge(enhanced_graph.base_graph);
 
     // Resolve cross-file function calls after all files have been processed
     call_graph.resolve_cross_file_calls();
