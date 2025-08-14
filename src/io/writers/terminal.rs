@@ -167,6 +167,42 @@ fn print_summary(results: &AnalysisResults) {
     println!();
 }
 
+/// Classify complexity level based on cyclomatic complexity value
+fn classify_complexity_level(cyclomatic: u32) -> ComplexityLevel {
+    match cyclomatic {
+        0..=5 => ComplexityLevel::Low,
+        6..=10 => ComplexityLevel::Moderate,
+        11..=15 => ComplexityLevel::High,
+        _ => ComplexityLevel::Severe,
+    }
+}
+
+/// Get refactoring action message for a given complexity level
+fn get_refactoring_action_message(level: &ComplexityLevel) -> Option<&'static str> {
+    match level {
+        ComplexityLevel::Low => None,
+        ComplexityLevel::Moderate => {
+            Some("     ACTION: Extract 2-3 pure functions using direct functional transformation")
+        }
+        ComplexityLevel::High => {
+            Some("     ACTION: Extract 3-5 pure functions using decompose-then-transform strategy")
+        }
+        ComplexityLevel::Severe => {
+            Some("     ACTION: Extract 5+ pure functions into modules with functional core/imperative shell")
+        }
+    }
+}
+
+/// Get refactoring patterns for a given complexity level
+fn get_refactoring_patterns(level: &ComplexityLevel) -> &'static str {
+    match level {
+        ComplexityLevel::Low => "",
+        ComplexityLevel::Moderate => "Replace loops with map/filter/fold, extract predicates",
+        ComplexityLevel::High => "Decompose into logical units, then apply functional patterns",
+        ComplexityLevel::Severe => "Architectural refactoring with monadic patterns and pipelines",
+    }
+}
+
 fn print_complexity_hotspots(results: &AnalysisResults) {
     if results.complexity.metrics.is_empty() {
         return;
@@ -191,47 +227,19 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
 
         // Generate refactoring guidance for high complexity functions
         if func.cyclomatic > 5 {
-            let complexity_level = match func.cyclomatic {
-                0..=5 => ComplexityLevel::Low,
-                6..=10 => ComplexityLevel::Moderate,
-                11..=15 => ComplexityLevel::High,
-                _ => ComplexityLevel::Severe,
-            };
+            let complexity_level = classify_complexity_level(func.cyclomatic);
 
-            let action_msg = match complexity_level {
-                ComplexityLevel::Low => continue,
-                ComplexityLevel::Moderate => {
-                    "     ACTION: Extract 2-3 pure functions using direct functional transformation"
-                }
-                ComplexityLevel::High => {
-                    "     ACTION: Extract 3-5 pure functions using decompose-then-transform strategy"
-                }
-                ComplexityLevel::Severe => {
-                    "     ACTION: Extract 5+ pure functions into modules with functional core/imperative shell"
-                }
-            };
+            if let Some(action_msg) = get_refactoring_action_message(&complexity_level) {
+                println!("{}", action_msg.yellow());
 
-            println!("{}", action_msg.yellow());
+                // Add patterns to apply
+                let patterns = get_refactoring_patterns(&complexity_level);
+                if !patterns.is_empty() {
+                    println!("     PATTERNS: {}", patterns.cyan());
+                }
 
-            // Add patterns to apply
-            let patterns = match complexity_level {
-                ComplexityLevel::Moderate => {
-                    "Replace loops with map/filter/fold, extract predicates"
-                }
-                ComplexityLevel::High => {
-                    "Decompose into logical units, then apply functional patterns"
-                }
-                ComplexityLevel::Severe => {
-                    "Architectural refactoring with monadic patterns and pipelines"
-                }
-                _ => "",
-            };
-
-            if !patterns.is_empty() {
-                println!("     PATTERNS: {}", patterns.cyan());
+                println!("     BENEFIT: Pure functions are easily testable and composable");
             }
-
-            println!("     BENEFIT: Pure functions are easily testable and composable");
         }
     }
     println!();
