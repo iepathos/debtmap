@@ -1,14 +1,15 @@
 ---
 number: 25
-title: Intelligent Refactoring Guidance System
+title: Intelligent Refactoring Guidance System with Functional Programming Focus
 category: foundation
 priority: critical
 status: draft
 dependencies: [19, 23, 24]
 created: 2025-01-13
+updated: 2025-01-14
 ---
 
-# Specification 25: Intelligent Refactoring Guidance System
+# Specification 25: Intelligent Refactoring Guidance System with Functional Programming Focus
 
 **Category**: foundation
 **Priority**: critical
@@ -17,18 +18,27 @@ created: 2025-01-13
 
 ## Context
 
-Current debtmap analysis suffers from a fundamental flaw: it detects problems without understanding code patterns or providing actionable guidance. This leads to:
+Current debtmap analysis suffers from two fundamental flaws:
 
-1. **False Positives**: Valid patterns (I/O wrappers, trait implementations) flagged as "technical debt"
-2. **Generic Advice**: Vague recommendations like "address technical debt" or "reduce complexity"
-3. **No Refactoring Guidance**: Users know something is flagged but not how to improve it
-4. **Pattern Blindness**: Cannot distinguish between genuinely problematic code and well-structured code that could be enhanced
+1. **Confusing Terminology**: The distinction between "Extract sub-functions" (for ComplexityHotspot) and "Extract pure functions" (for Risk) creates unnecessary confusion. Both should emphasize extracting pure functions, with the difference being the depth of functional transformation applied.
 
-For example, `print_risk_function()` is correctly flagged as having improvement potential, but the current system doesn't recognize that the formatting logic is already properly extracted to `format_risk_function()` - making this a good example of clean architecture rather than a problem.
+2. **Lack of Pattern Understanding**: It detects problems without understanding code patterns or providing actionable guidance, leading to:
+   - Valid patterns (I/O wrappers, trait implementations) flagged as "technical debt"
+   - Generic advice like "address technical debt" or "reduce complexity"
+   - Users knowing something is flagged but not how to improve it
+   - Cannot distinguish between genuinely problematic code and well-structured code
+
+Additionally, the current system uses arbitrary complexity thresholds (e.g., cyclomatic > 10) to determine fundamentally different refactoring approaches, when the real distinction should be the depth of transformation needed, not the purity of extracted functions.
 
 ## Objective
 
-Transform debtmap from a generic "technical debt detector" into an **intelligent refactoring advisor** that recognizes code patterns, distinguishes between problems and valid designs, and provides specific, actionable guidance for code improvements with clear explanations of benefits.
+Transform debtmap from a generic "technical debt detector" into an **intelligent functional refactoring advisor** that:
+
+1. **Always recommends pure function extraction** regardless of complexity level
+2. **Adjusts transformation depth** based on complexity severity (not function purity)
+3. **Emphasizes functional programming patterns** over object-oriented approaches
+4. **Provides specific, actionable guidance** toward a functional core / imperative shell architecture
+5. **Educates developers** on functional programming benefits and techniques
 
 ## Requirements
 
@@ -36,34 +46,45 @@ Transform debtmap from a generic "technical debt detector" into an **intelligent
 
 1. **Pattern Recognition System**
    - Identify common code patterns (I/O orchestration, pure logic, formatting, etc.)
-   - Recognize valid architectural patterns vs. anti-patterns
-   - Distinguish between "working code" and "code that could be improved"
+   - Recognize functional vs imperative patterns
+   - Distinguish between "working code" and "code that could be functionally improved"
    - Classify function roles and expected characteristics
 
-2. **Refactoring Opportunity Detection**
-   - Extract formatting logic from I/O functions
-   - Identify complex logic mixed with side effects
-   - Detect untested business logic
-   - Find opportunities for pure function extraction
-   - Identify coupling reduction opportunities
+2. **Functional Refactoring Detection**
+   - **Always prioritize pure function extraction** for any complexity level
+   - Identify opportunities to convert imperative code to functional style
+   - Detect side effects that can be moved to boundaries
+   - Find opportunities for function composition and pipelines
+   - Recognize where monadic patterns could improve error handling
 
-3. **Specific Improvement Guidance**
-   - Provide concrete refactoring techniques for each issue
-   - Explain the benefits of suggested improvements
-   - Show before/after examples where helpful
-   - Estimate effort and impact of changes
+3. **Complexity-Based Transformation Guidance**
+   - **Low Complexity (≤5)**: No refactoring needed
+   - **Moderate Complexity (6-10)**: Direct functional transformation
+     - Extract 2-3 pure functions
+     - Apply map/filter/fold patterns
+     - Convert loops to functional operations
+   - **High Complexity (11-15)**: Decompose then transform
+     - Extract 3-5 pure functions
+     - Apply functional patterns after decomposition
+     - Create function composition pipelines
+   - **Severe Complexity (>15)**: Architectural refactoring
+     - Extract 5+ pure functions into modules
+     - Design functional core with imperative shell
+     - Consider introducing monadic patterns
 
-4. **Context-Aware Recommendations**
-   - Adjust recommendations based on function role
-   - Consider existing test coverage and architecture
-   - Factor in team practices and codebase conventions
-   - Prioritize improvements by impact and effort
+4. **Functional Programming Guidance**
+   - Always recommend pure functions (no side effects)
+   - Prefer immutable data transformations
+   - Suggest functional patterns (map, filter, fold, compose)
+   - Guide toward functional core / imperative shell architecture
+   - Recommend property-based testing for pure functions
 
-5. **Educational Insights**
-   - Explain why patterns are problematic or beneficial
-   - Link to refactoring techniques and best practices
-   - Help teams learn better patterns over time
-   - Provide examples of good patterns to follow
+5. **Educational Functional Insights**
+   - Explain benefits of pure functions (testability, composability, reasoning)
+   - Demonstrate functional refactoring techniques with examples
+   - Show how to identify and extract side effects
+   - Teach functional patterns incrementally
+   - Provide resources for learning functional programming
 
 ### Non-Functional Requirements
 
@@ -74,18 +95,35 @@ Transform debtmap from a generic "technical debt detector" into an **intelligent
 
 ## Acceptance Criteria
 
-- [ ] Pattern recognition correctly identifies I/O orchestration, pure logic, formatting, and mixed concern functions
-- [ ] Valid patterns (like trait implementations) no longer flagged as problems
-- [ ] Specific refactoring techniques suggested for each improvement opportunity
-- [ ] Clear explanations of why changes improve code quality
-- [ ] Integration with existing priority scoring and risk analysis
+- [ ] **All complexity-based recommendations suggest extracting pure functions** (no more "sub-functions" terminology)
+- [ ] Complexity thresholds determine transformation depth, not function purity
+- [ ] Pattern recognition identifies functional vs imperative code patterns
+- [ ] Valid functional patterns recognized and praised as good examples
+- [ ] Specific functional refactoring techniques suggested for each complexity level
+- [ ] Clear explanations of functional programming benefits (testability, composability, etc.)
+- [ ] Integration with existing scoring maintains functional programming preference
 - [ ] Reduced false positive rate by 85% compared to current system
-- [ ] Output includes concrete "before/after" guidance where helpful
-- [ ] Educational explanations help teams understand better patterns
+- [ ] Output includes functional "before/after" transformation examples
+- [ ] Educational content teaches functional programming incrementally
 - [ ] Performance impact under 15% of total analysis time
-- [ ] Comprehensive test suite with diverse code pattern examples
+- [ ] Comprehensive test suite validates functional refactoring recommendations
 
 ## Technical Details
+
+### Functional Programming Philosophy
+
+This specification establishes a **strong preference for functional programming** in all refactoring recommendations:
+
+1. **Pure Functions First**: Every extracted function should be pure (no side effects) unless handling I/O at boundaries
+2. **Immutability by Default**: Prefer immutable data transformations over in-place mutations
+3. **Composition Over Complexity**: Build complex behavior by composing simple, pure functions
+4. **Functional Core, Imperative Shell**: Keep business logic pure, isolate I/O at boundaries
+5. **Unified Terminology**: Always use "extract pure functions" regardless of complexity level
+
+The key insight is that **complexity level determines transformation depth, not function purity**:
+- Moderate complexity → Direct transformation to functional style
+- High complexity → Decompose first, then apply functional patterns
+- Severe complexity → Architectural refactoring toward functional core
 
 ### Implementation Approach
 
@@ -247,56 +285,117 @@ impl RefactoringDetector for SeparateConcernsDetector {
 }
 ```
 
-4. **Intelligent Guidance Generation**
+4. **Functional Refactoring Guidance Generation**
 ```rust
 pub enum RefactoringOpportunity {
-    ExtractFormattingLogic {
-        current_function: String,
-        suggested_pure_function: String,
+    ExtractPureFunctions {
+        source_function: String,
+        complexity_level: ComplexityLevel,
+        extraction_strategy: ExtractionStrategy,
+        suggested_functions: Vec<PureFunctionSpec>,
+        functional_patterns: Vec<FunctionalPattern>,
         benefits: Vec<&'static str>,
-        technique: RefactoringTechnique,
         effort_estimate: EffortEstimate,
-        example: Option<BeforeAfterExample>,
+        example: Option<FunctionalTransformExample>,
     },
-    SeparateConcerns {
+    ConvertToFunctionalStyle {
+        imperative_function: String,
+        current_patterns: Vec<ImperativePattern>,
+        target_patterns: Vec<FunctionalPattern>,
+        transformation_steps: Vec<TransformationStep>,
+        benefits: Vec<&'static str>,
+        effort_estimate: EffortEstimate,
+    },
+    ExtractSideEffects {
         mixed_function: String,
-        business_logic_blocks: Vec<LogicBlock>,
-        suggested_pure_functions: Vec<String>,
+        pure_core: PureFunctionSpec,
+        io_shell: IOShellSpec,
         benefits: Vec<&'static str>,
-        technique: RefactoringTechnique,
         effort_estimate: EffortEstimate,
     },
-    AddTestCoverage {
-        untested_function: String,
-        complexity_score: u32,
-        critical_paths: Vec<String>,
-        testing_strategy: TestingStrategy,
-        effort_estimate: EffortEstimate,
-    },
-    ReduceComplexity {
-        complex_function: String,
-        current_complexity: u32,
-        target_complexity: u32,
-        techniques: Vec<RefactoringTechnique>,
+    AddPropertyBasedTests {
+        pure_function: String,
+        properties_to_test: Vec<Property>,
+        generators_needed: Vec<Generator>,
         effort_estimate: EffortEstimate,
     },
 }
 
-pub struct BeforeAfterExample {
-    pub before_code: String,
-    pub after_code: String,
-    pub explanation: String,
+pub enum ComplexityLevel {
+    Low,       // ≤5 - No action needed
+    Moderate,  // 6-10 - Direct functional transformation
+    High,      // 11-15 - Decompose then transform
+    Severe,    // >15 - Architectural refactoring
+}
+
+pub enum ExtractionStrategy {
+    // For moderate complexity (6-10)
+    DirectFunctionalTransformation {
+        patterns_to_apply: Vec<FunctionalPattern>,
+        functions_to_extract: u32,
+    },
+    // For high complexity (11-15)
+    DecomposeAndTransform {
+        decomposition_steps: Vec<String>,
+        functions_to_extract: u32,
+        then_apply_patterns: Vec<FunctionalPattern>,
+    },
+    // For severe complexity (>15)
+    ArchitecturalRefactoring {
+        extract_modules: Vec<String>,
+        pure_core_functions: Vec<PureFunctionSpec>,
+        design_imperative_shell: IOShellSpec,
+    },
+}
+
+pub struct PureFunctionSpec {
+    pub name: String,
+    pub inputs: Vec<Type>,
+    pub output: Type,
+    pub purpose: String,
+    pub no_side_effects: bool,  // Always true for pure functions
+    pub testability: TestabilityLevel,
+}
+
+pub enum FunctionalPattern {
+    MapOverLoop,
+    FilterPredicate,
+    FoldAccumulation,
+    PatternMatchOverIfElse,
+    ComposeFunctions,
+    PartialApplication,
+    Monadic(MonadicPattern),
+    Pipeline,
+    Recursion,
+}
+
+pub enum MonadicPattern {
+    Option,
+    Result,
+    Future,
+    State,
+}
+
+pub struct FunctionalTransformExample {
+    pub before_imperative: String,
+    pub after_functional: String,
+    pub patterns_applied: Vec<FunctionalPattern>,
+    pub benefits_demonstrated: Vec<String>,
 }
 
 pub enum RefactoringTechnique {
-    ExtractMethod,
-    ExtractClass,
-    IntroduceParameterObject,
-    ReplaceConditionalWithPolymorphism,
-    DecomposeConditional,
-    ConsolidateConditionalExpression,
-    ExtractVariable,
-    RenameMethod,
+    // Functional techniques (preferred)
+    ExtractPureFunction,
+    ComposeSmallFunctions,
+    ReplaceLoopWithMap,
+    ReplaceLoopWithFold,
+    IntroduceMonad,
+    CreatePipeline,
+    PartiallyApplyFunction,
+    MemoizeFunction,
+    // Legacy OOP techniques (discouraged)
+    ExtractClass,  // Only when absolutely necessary
+    IntroduceParameterObject,  // Prefer function parameters
 }
 
 pub enum EffortEstimate {
@@ -480,6 +579,44 @@ pub struct QualityAssessment {
    - Incremental analysis for large codebases
    - Optimize for common pattern detection
 
+## Example: Old vs New Approach
+
+### Current System (Confusing)
+
+For a function with cyclomatic complexity 9:
+```
+RISK: function_name()
+ACTION: Extract 2 pure functions to reduce complexity from 9 to 3
+```
+
+For a function with cyclomatic complexity 11:
+```
+COMPLEXITY: function_name()
+ACTION: Extract 2 sub-functions to reduce complexity
+```
+
+**Problem**: Why are we extracting "pure functions" for complexity 9 but "sub-functions" for complexity 11?
+
+### New System (Clear and Consistent)
+
+For a function with cyclomatic complexity 9:
+```
+MODERATE COMPLEXITY: function_name()
+ACTION: Extract 3 pure functions using direct functional transformation
+PATTERNS: Replace loops with map/filter/fold, extract predicates, compose functions
+BENEFIT: Pure functions are easily testable and composable
+```
+
+For a function with cyclomatic complexity 11:
+```
+HIGH COMPLEXITY: function_name()
+ACTION: Extract 4 pure functions using decompose-then-transform strategy
+PATTERNS: First decompose into logical units, then apply functional patterns
+BENEFIT: Reduces complexity while maintaining functional purity
+```
+
+**Solution**: Always extract pure functions; complexity only affects the transformation strategy.
+
 ## Migration and Compatibility
 
 - **Non-Breaking Changes**:
@@ -499,10 +636,13 @@ pub struct QualityAssessment {
 
 ## Expected Impact
 
-1. **False Positive Reduction**: 85% fewer irrelevant warnings
-2. **Actionability**: Every recommendation includes specific steps
-3. **Educational Value**: Teams learn better patterns over time
-4. **Developer Satisfaction**: Useful guidance rather than noise
-5. **Code Quality**: Targeted improvements based on pattern understanding
+1. **Terminology Clarity**: 100% consistent use of "extract pure functions" terminology
+2. **False Positive Reduction**: 85% fewer irrelevant warnings
+3. **Functional Adoption**: Teams naturally adopt functional programming patterns
+4. **Code Testability**: Extracted pure functions are easily unit tested
+5. **Reduced Complexity**: Clear separation of pure logic from side effects
+6. **Developer Education**: Teams learn functional programming incrementally
+7. **Actionability**: Every recommendation includes specific functional transformation steps
+8. **Code Quality**: Measurable improvement toward functional core / imperative shell architecture
 
-This specification transforms debtmap from a problem detector into a refactoring mentor, providing the intelligent guidance that development teams need to continuously improve their codebase.
+This specification transforms debtmap from a problem detector into a **functional programming mentor**, guiding development teams to write more maintainable, testable, and composable code through consistent application of functional programming principles. The key innovation is recognizing that all functions should be pure by default, with complexity only determining how deep the functional transformation should go.
