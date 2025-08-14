@@ -180,41 +180,55 @@ impl TraitRegistry {
         self.type_to_traits.get(type_name)
     }
 
+    /// Extract method implementations matching a specific method name
+    fn extract_matching_methods(
+        method_name: &str,
+        implementations: &Vector<TraitImplementation>,
+        type_filter: Option<&str>,
+    ) -> Vector<FunctionId> {
+        implementations
+            .iter()
+            .filter(|impl_info| {
+                type_filter.is_none_or(|type_name| impl_info.implementing_type == type_name)
+            })
+            .flat_map(|impl_info| &impl_info.method_implementations)
+            .filter(|method| method.method_name == method_name)
+            .map(|method| method.method_id.clone())
+            .collect()
+    }
+
+    /// Collect implementations for known receiver type
+    fn collect_typed_implementations(
+        &self,
+        receiver_type: &str,
+        method_name: &str,
+        traits: &HashSet<String>,
+    ) -> Vector<FunctionId> {
+        traits
+            .iter()
+            .filter_map(|trait_name| self.trait_implementations.get(trait_name))
+            .flat_map(|impls| {
+                Self::extract_matching_methods(method_name, impls, Some(receiver_type))
+            })
+            .collect()
+    }
+
     /// Resolve a trait method call to possible implementations
     pub fn resolve_trait_call(&self, call: &TraitMethodCall) -> Vector<FunctionId> {
-        let mut implementations = Vector::new();
-
-        // If we know the receiver type, look for implementations on that type
         if let Some(receiver_type) = &call.receiver_type {
-            if let Some(traits) = self.find_implementations_for_type(receiver_type) {
-                for trait_name in traits {
-                    if let Some(impls) = self.trait_implementations.get(trait_name) {
-                        for impl_info in impls {
-                            if impl_info.implementing_type == *receiver_type {
-                                for method in &impl_info.method_implementations {
-                                    if method.method_name == call.method_name {
-                                        implementations.push_back(method.method_id.clone());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            // If we know the receiver type, look for implementations on that type
+            self.find_implementations_for_type(receiver_type)
+                .map(|traits| {
+                    self.collect_typed_implementations(receiver_type, &call.method_name, traits)
+                })
+                .unwrap_or_default()
         } else {
             // If we don't know the receiver type, find all implementations of this method
-            if let Some(impls) = self.trait_implementations.get(&call.trait_name) {
-                for impl_info in impls {
-                    for method in &impl_info.method_implementations {
-                        if method.method_name == call.method_name {
-                            implementations.push_back(method.method_id.clone());
-                        }
-                    }
-                }
-            }
+            self.trait_implementations
+                .get(&call.trait_name)
+                .map(|impls| Self::extract_matching_methods(&call.method_name, impls, None))
+                .unwrap_or_default()
         }
-
-        implementations
     }
 
     /// Get statistics about trait usage
@@ -306,6 +320,44 @@ impl TraitVisitor {
         }
     }
 
+    /// Extract method implementations from impl items
+    fn extract_method_implementations(
+        &mut self,
+        items: &[ImplItem],
+        implementing_type: &str,
+        is_visit_trait: bool,
+    ) -> Vector<TraitMethodImplementation> {
+        let mut method_implementations = Vector::new();
+
+        for impl_item in items {
+            if let ImplItem::Fn(method) = impl_item {
+                let method_name = method.sig.ident.to_string();
+                let line = self.get_line_number(method.sig.ident.span());
+
+                let method_id = FunctionId {
+                    file: self.file_path.clone(),
+                    name: format!("{implementing_type}::{method_name}"),
+                    line,
+                };
+
+                let implementation = TraitMethodImplementation {
+                    method_name,
+                    method_id: method_id.clone(),
+                    overrides_default: false, // We'd need more analysis to determine this
+                };
+
+                method_implementations.push_back(implementation);
+
+                // Special handling for Visit trait implementations
+                if is_visit_trait {
+                    self.visit_trait_methods.insert(method_id);
+                }
+            }
+        }
+
+        method_implementations
+    }
+
     fn get_line_number(&self, span: proc_macro2::Span) -> usize {
         span.start().line
     }
@@ -359,34 +411,14 @@ impl<'ast> Visit<'ast> for TraitVisitor {
         if let Some((_, trait_path, _)) = &item.trait_ {
             if let Some(trait_name) = self.extract_path_name(trait_path) {
                 if let Some(implementing_type) = self.extract_type_name(&item.self_ty) {
-                    let mut method_implementations = Vector::new();
                     let is_visit_trait = self.is_visit_trait(&trait_name);
 
-                    for impl_item in &item.items {
-                        if let ImplItem::Fn(method) = impl_item {
-                            let method_name = method.sig.ident.to_string();
-                            let line = self.get_line_number(method.sig.ident.span());
-
-                            let method_id = FunctionId {
-                                file: self.file_path.clone(),
-                                name: format!("{implementing_type}::{method_name}"),
-                                line,
-                            };
-
-                            let implementation = TraitMethodImplementation {
-                                method_name,
-                                method_id: method_id.clone(),
-                                overrides_default: false, // We'd need more analysis to determine this
-                            };
-
-                            method_implementations.push_back(implementation.clone());
-
-                            // Special handling for Visit trait implementations
-                            if is_visit_trait {
-                                self.visit_trait_methods.insert(method_id.clone());
-                            }
-                        }
-                    }
+                    // Extract method implementations
+                    let method_implementations = self.extract_method_implementations(
+                        &item.items,
+                        &implementing_type,
+                        is_visit_trait,
+                    );
 
                     // Store Visit implementations separately for special handling
                     if is_visit_trait {
