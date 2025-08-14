@@ -1,6 +1,6 @@
 - shell: "cargo build --release --bin debtmap"
 
-- shell: "cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage"
+- shell: "cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage --timeout 120"
 
 - claude: "/debtmap"
   commit_required: true
