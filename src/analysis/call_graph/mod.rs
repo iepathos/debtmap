@@ -1,8 +1,8 @@
-//! Enhanced Call Graph Analysis Module
+//! Rust-Specific Call Graph Analysis Module
 //!
-//! This module provides advanced call graph analysis that addresses the false positives
+//! This module provides Rust-specific call graph analysis that addresses the false positives
 //! in dead code detection by tracking trait implementations, function pointers, closures,
-//! framework patterns, and cross-module dependencies.
+//! framework patterns, and cross-module dependencies specific to the Rust language.
 //!
 //! The analysis is performed in multiple phases:
 //! 1. Basic call graph construction (existing functionality)
@@ -27,9 +27,9 @@ pub use framework_patterns::{FrameworkPattern, FrameworkPatternDetector, Pattern
 pub use function_pointer::{ClosureInfo, FunctionPointerInfo, FunctionPointerTracker};
 pub use trait_registry::{TraitImplementation, TraitMethod, TraitRegistry};
 
-/// Enhanced call graph that includes trait dispatch, function pointers, and framework patterns
+/// Rust-specific call graph that includes trait dispatch, function pointers, and framework patterns
 #[derive(Debug, Clone)]
-pub struct EnhancedCallGraph {
+pub struct RustCallGraph {
     /// Base call graph with direct function calls
     pub base_graph: CallGraph,
     /// Trait registry for tracking trait implementations and dispatch
@@ -42,7 +42,7 @@ pub struct EnhancedCallGraph {
     pub cross_module_tracker: CrossModuleTracker,
 }
 
-/// Configuration for enhanced call graph analysis
+/// Configuration for Rust-specific call graph analysis
 #[derive(Debug, Clone)]
 pub struct AnalysisConfig {
     /// Enable trait method resolution
@@ -69,18 +69,18 @@ impl Default for AnalysisConfig {
     }
 }
 
-/// Builder for enhanced call graph analysis
-pub struct EnhancedCallGraphBuilder {
+/// Builder for Rust-specific call graph analysis
+pub struct RustCallGraphBuilder {
     config: AnalysisConfig,
-    enhanced_graph: EnhancedCallGraph,
+    enhanced_graph: RustCallGraph,
 }
 
-impl EnhancedCallGraphBuilder {
+impl RustCallGraphBuilder {
     /// Create a new builder with default configuration
     pub fn new() -> Self {
         Self {
             config: AnalysisConfig::default(),
-            enhanced_graph: EnhancedCallGraph {
+            enhanced_graph: RustCallGraph {
                 base_graph: CallGraph::new(),
                 trait_registry: TraitRegistry::new(),
                 function_pointer_tracker: FunctionPointerTracker::new(),
@@ -94,7 +94,7 @@ impl EnhancedCallGraphBuilder {
     pub fn with_config(config: AnalysisConfig) -> Self {
         Self {
             config,
-            enhanced_graph: EnhancedCallGraph {
+            enhanced_graph: RustCallGraph {
                 base_graph: CallGraph::new(),
                 trait_registry: TraitRegistry::new(),
                 function_pointer_tracker: FunctionPointerTracker::new(),
@@ -108,7 +108,7 @@ impl EnhancedCallGraphBuilder {
     pub fn from_base_graph(base_graph: CallGraph) -> Self {
         Self {
             config: AnalysisConfig::default(),
-            enhanced_graph: EnhancedCallGraph {
+            enhanced_graph: RustCallGraph {
                 base_graph,
                 trait_registry: TraitRegistry::new(),
                 function_pointer_tracker: FunctionPointerTracker::new(),
@@ -177,8 +177,8 @@ impl EnhancedCallGraphBuilder {
         Ok(self)
     }
 
-    /// Complete the analysis and return the enhanced call graph
-    pub fn build(self) -> EnhancedCallGraph {
+    /// Complete the analysis and return the Rust-specific call graph
+    pub fn build(self) -> RustCallGraph {
         self.enhanced_graph
     }
 
@@ -307,7 +307,7 @@ impl EnhancedCallGraphBuilder {
     }
 }
 
-impl EnhancedCallGraph {
+impl RustCallGraph {
     /// Create a new enhanced call graph
     pub fn new() -> Self {
         Self {
@@ -401,7 +401,7 @@ impl EnhancedCallGraph {
             .collect()
     }
 
-    /// Get enhanced dead code analysis with context
+    /// Get Rust-specific dead code analysis with context
     pub fn analyze_dead_code(&self) -> Vec<DeadCodeAnalysis> {
         let potential_dead_code = self.get_potential_dead_code();
 
@@ -520,13 +520,13 @@ pub struct DeadCodeAnalysis {
     pub false_positive_risks: Vec<String>,
 }
 
-impl Default for EnhancedCallGraph {
+impl Default for RustCallGraph {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Default for EnhancedCallGraphBuilder {
+impl Default for RustCallGraphBuilder {
     fn default() -> Self {
         Self::new()
     }

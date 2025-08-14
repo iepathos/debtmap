@@ -113,14 +113,14 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Risk classification system (WellDesigned to Critical)
   - Confidence scoring for risk predictions
   - Module-type aware thresholds (Core, API, Util, Test, Infrastructure)
-- ✅ Visit Trait Pattern Detection (spec 26):
-  - Automatic detection of Visit and Visitor trait implementations
-  - Special handling for syn::visit::Visit and similar visitor patterns
-  - Visit trait methods marked as framework-managed
-  - Integration with trait registry for tracking implementations
-  - Dramatically reduced false positives for visitor pattern methods
-  - Confidence scoring adjusted for Visit trait methods (0.1x multiplier)
-  - False positive risk warnings for Visit trait methods
+- ✅ Language-Specific Call Graph Architecture (spec 26):
+  - Renamed EnhancedCallGraph to RustCallGraph for clarity
+  - Renamed EnhancedCallGraphBuilder to RustCallGraphBuilder
+  - Established clear pattern for language-specific implementations
+  - Improved code organization and discoverability
+  - Architecture ready for multi-language expansion (PythonCallGraph, JavaScriptCallGraph, etc.)
+  - Maintained all existing functionality including Visit trait pattern detection
+  - Zero functional changes - pure refactoring for better architecture
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -145,7 +145,7 @@ The project follows a functional core / imperative shell pattern:
 12. **Macro-Aware Analysis**: Perfect function call detection through macro expansion
 13. **Enhanced Call Graph**: Multi-phase analysis with trait dispatch and function pointer tracking
 14. **Evidence-Based Risk**: Statistical risk assessment with role-aware thresholds and remediation guidance
-15. **Visit Trait Pattern Detection**: Enhanced dead code detection for visitor pattern implementations
+15. **Language-Specific Call Graph**: Rust-specific call graph analysis with clear architecture for multi-language support
 
 ## Project Structure
 ```
