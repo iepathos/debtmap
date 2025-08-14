@@ -593,7 +593,50 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
         return true;
     }
 
+    // Trait method implementations - these are called through trait objects
+    // Check for common trait method patterns
+    if is_likely_trait_method(func) {
+        return true;
+    }
+
     false
+}
+
+fn is_likely_trait_method(func: &FunctionMetrics) -> bool {
+    // Check if this is likely a trait method implementation based on:
+    // 1. Public visibility + specific method names that are commonly trait methods
+    // 2. Methods that are part of common trait implementations
+
+    if func.visibility == Some("pub".to_string()) {
+        // Common trait methods that should not be flagged as dead code
+        let method_name = if let Some(pos) = func.name.rfind("::") {
+            &func.name[pos + 2..]
+        } else {
+            &func.name
+        };
+
+        matches!(
+            method_name,
+            // Common trait methods from std library traits
+            "write_results" | "write_risk_insights" |  // OutputWriter trait
+            "fmt" | "clone" | "default" | "from" | "into" |
+            "as_ref" | "as_mut" | "deref" | "deref_mut" |
+            "drop" | "eq" | "ne" | "cmp" | "partial_cmp" |
+            "hash" | "serialize" | "deserialize" |
+            "try_from" | "try_into" | "to_string" |
+            // Iterator trait methods
+            "next" | "size_hint" | "count" | "last" | "nth" |
+            // Async trait methods
+            "poll" | "poll_next" | "poll_ready" | "poll_flush" |
+            // Common custom trait methods
+            "execute" | "run" | "process" | "handle" |
+            "render" | "draw" | "update" | "tick" |
+            "validate" | "is_valid" | "check" |
+            "encode" | "decode" | "parse" | "format"
+        )
+    } else {
+        false
+    }
 }
 
 fn is_framework_callback(func: &FunctionMetrics) -> bool {
