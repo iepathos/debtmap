@@ -20,6 +20,7 @@ pub struct CallGraphExtractor {
     current_function: Option<FunctionId>,
     current_impl_type: Option<String>,
     current_file: PathBuf,
+    module_path: Vec<String>,
 }
 
 impl CallGraphExtractor {
@@ -30,6 +31,7 @@ impl CallGraphExtractor {
             current_function: None,
             current_impl_type: None,
             current_file: file,
+            module_path: Vec::new(),
         }
     }
 
@@ -66,19 +68,30 @@ impl CallGraphExtractor {
     ) -> Option<FunctionId> {
         let all_functions = self.call_graph.find_all_functions();
 
-        // If same_file_hint is true, prioritize same-file matches
+        // Handle special path prefixes
+        let resolved_name = if name.starts_with("crate::") {
+            // crate:: refers to the root of the current crate
+            name.strip_prefix("crate::").unwrap().to_string()
+        } else if name.starts_with("super::") {
+            // super:: refers to the parent module
+            // For simplicity, we'll just strip it and try to match
+            name.strip_prefix("super::").unwrap().to_string()
+        } else {
+            name.to_string()
+        };
+
+        // First try exact match in same file
         if same_file_hint {
-            // First try exact match in same file
             if let Some(func) = all_functions
                 .iter()
-                .find(|f| f.name == name && f.file == caller.file)
+                .find(|f| (f.name == resolved_name || f.name == name) && f.file == caller.file)
             {
                 return Some(func.clone());
             }
 
             // For method calls, try with type prefix
             if let Some(impl_type) = self.extract_impl_type_from_caller(&caller.name) {
-                let qualified_name = format!("{}::{}", impl_type, name);
+                let qualified_name = format!("{}::{}", impl_type, resolved_name);
                 if let Some(func) = all_functions
                     .iter()
                     .find(|f| f.name == qualified_name && f.file == caller.file)
@@ -88,8 +101,11 @@ impl CallGraphExtractor {
             }
         }
 
-        // Try cross-file resolution
-        let matches: Vec<_> = all_functions.iter().filter(|f| f.name == name).collect();
+        // Try to find by exact match or resolved name
+        let matches: Vec<_> = all_functions
+            .iter()
+            .filter(|f| f.name == resolved_name || f.name == name || f.name.ends_with(&format!("::{}", resolved_name)))
+            .collect();
 
         match matches.len() {
             1 => Some(matches[0].clone()), // Unique match across all files
@@ -285,9 +301,27 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         self.current_impl_type = prev_impl_type;
     }
 
+    fn visit_item_mod(&mut self, item_mod: &'ast syn::ItemMod) {
+        // Push module name to path
+        self.module_path.push(item_mod.ident.to_string());
+        
+        // Visit module contents
+        syn::visit::visit_item_mod(self, item_mod);
+        
+        // Pop module name from path
+        self.module_path.pop();
+    }
+
     fn visit_item_fn(&mut self, item_fn: &'ast ItemFn) {
-        let name = item_fn.sig.ident.to_string();
+        let base_name = item_fn.sig.ident.to_string();
         let line = self.get_line_number(item_fn.sig.ident.span());
+
+        // Build qualified name with module path
+        let name = if self.module_path.is_empty() {
+            base_name
+        } else {
+            format!("{}::{}", self.module_path.join("::"), base_name)
+        };
 
         // Add function to graph
         self.add_function_to_graph(name, line, item_fn);
