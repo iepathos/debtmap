@@ -29,6 +29,7 @@ pub struct MacroExpander {
     cache: ExpansionCache,
     cargo_path: PathBuf,
     workspace_root: Option<PathBuf>,
+    cargo_expand_available: Option<bool>,
 }
 
 impl MacroExpander {
@@ -48,17 +49,32 @@ impl MacroExpander {
             cache,
             cargo_path,
             workspace_root,
+            cargo_expand_available: None,
         })
     }
 
-    /// Check if cargo-expand is available
-    pub fn check_cargo_expand(&self) -> Result<bool> {
+    /// Check if cargo-expand is available (cached)
+    pub fn check_cargo_expand(&mut self) -> Result<bool> {
+        // Return cached result if available
+        if let Some(available) = self.cargo_expand_available {
+            return Ok(available);
+        }
+
+        // Check cargo-expand availability
         let output = Command::new(&self.cargo_path)
             .args(["expand", "--version"])
             .output()
             .context("Failed to run cargo expand")?;
 
-        Ok(output.status.success())
+        let available = output.status.success();
+        self.cargo_expand_available = Some(available);
+        Ok(available)
+    }
+
+    /// Set cargo-expand availability (for testing)
+    #[cfg(test)]
+    pub fn set_cargo_expand_available(&mut self, available: bool) {
+        self.cargo_expand_available = Some(available);
     }
 
     /// Find the Cargo.toml for a given file
@@ -858,10 +874,13 @@ fn foo() {
         };
 
         if let Ok(mut expander) = MacroExpander::new(config) {
-            // This test mocks the scenario where cargo-expand is not available
-            // The actual behavior depends on whether cargo-expand is installed
+            // Mock cargo-expand as unavailable to avoid slow subprocess call
+            expander.set_cargo_expand_available(false);
+            
+            // This should now return immediately with an empty HashMap
             let result = expander.expand_workspace();
             assert!(result.is_ok());
+            assert!(result.unwrap().is_empty());
         }
     }
 
