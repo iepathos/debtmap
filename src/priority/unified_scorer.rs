@@ -287,9 +287,15 @@ fn determine_debt_type(
     let role = classify_function_role(func, func_id, call_graph);
     if role == FunctionRole::Orchestrator {
         let callees = call_graph.get_callees(func_id);
-        if !callees.is_empty() {
+        // Filter out standard library functions
+        let meaningful_callees: Vec<_> = callees
+            .iter()
+            .filter(|f| !is_std_or_utility_function(&f.name))
+            .collect();
+        // Only flag as orchestration if there are actual functions being orchestrated
+        if meaningful_callees.len() >= 2 {
             return DebtType::Orchestration {
-                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
             };
         }
     }
@@ -327,10 +333,18 @@ fn determine_debt_type(
         // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
         // Check if they're calling other functions (true delegation)
         let callees = call_graph.get_callees(func_id);
-        if !callees.is_empty() && func.cyclomatic <= 2 && role == FunctionRole::Orchestrator {
+        // Filter out standard library functions
+        let meaningful_callees: Vec<_> = callees
+            .iter()
+            .filter(|f| !is_std_or_utility_function(&f.name))
+            .collect();
+        if meaningful_callees.len() >= 2
+            && func.cyclomatic <= 2
+            && role == FunctionRole::Orchestrator
+        {
             // This is a simple delegation function that was identified as an orchestrator
             DebtType::Orchestration {
-                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
             }
         } else if role == FunctionRole::PureLogic {
             // Simple pure functions are not debt - return minimal risk
@@ -446,9 +460,15 @@ pub fn classify_debt_type_enhanced(
     let role = classify_function_role(func, func_id, call_graph);
     if role == FunctionRole::Orchestrator {
         let callees = call_graph.get_callees(func_id);
-        if !callees.is_empty() {
+        // Filter out standard library functions
+        let meaningful_callees: Vec<_> = callees
+            .iter()
+            .filter(|f| !is_std_or_utility_function(&f.name))
+            .collect();
+        // Only flag as orchestration if there are actual functions being orchestrated
+        if meaningful_callees.len() >= 2 {
             return DebtType::Orchestration {
-                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
             };
         }
     }
@@ -486,10 +506,18 @@ pub fn classify_debt_type_enhanced(
         // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
         // Check if they're calling other functions (true delegation)
         let callees = call_graph.get_callees(func_id);
-        if !callees.is_empty() && func.cyclomatic <= 2 && role == FunctionRole::Orchestrator {
+        // Filter out standard library functions
+        let meaningful_callees: Vec<_> = callees
+            .iter()
+            .filter(|f| !is_std_or_utility_function(&f.name))
+            .collect();
+        if meaningful_callees.len() >= 2
+            && func.cyclomatic <= 2
+            && role == FunctionRole::Orchestrator
+        {
             // This is a simple delegation function that was identified as an orchestrator
             DebtType::Orchestration {
-                delegates_to: callees.iter().map(|f| f.name.clone()).collect(),
+                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
             }
         } else if role == FunctionRole::PureLogic {
             // Simple pure functions are not debt - return minimal risk
@@ -554,6 +582,26 @@ fn is_framework_callback(func: &FunctionMetrics) -> bool {
     func.name == "fmt" ||
     func.name == "drop" ||
     func.name == "clone"
+}
+
+// Helper to identify standard library and utility functions that shouldn't count as delegation targets
+fn is_std_or_utility_function(name: &str) -> bool {
+    // Standard library functions from macro expansion
+    if name == "format" || name == "write" || name == "print" || name == "println" {
+        return true;
+    }
+
+    // Functions that are clearly from std library based on path
+    if name.starts_with("std::") || name.starts_with("core::") || name.starts_with("alloc::") {
+        return true;
+    }
+
+    // Common utility functions that are too generic
+    if name == "clone" || name == "to_string" || name == "into" || name == "from" {
+        return true;
+    }
+
+    false
 }
 
 fn determine_visibility(func: &FunctionMetrics) -> FunctionVisibility {
