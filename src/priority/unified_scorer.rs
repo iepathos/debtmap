@@ -61,6 +61,36 @@ pub fn calculate_unified_priority(
         line: func.line,
     };
 
+    // Check if this function is actually technical debt
+    // Simple I/O wrappers, entry points, and trivial pure functions with low complexity
+    // are not technical debt UNLESS they're untested and non-trivial
+    let role = classify_function_role(func, &func_id, call_graph);
+    let is_trivial = (func.cyclomatic <= 3 && func.cognitive <= 5) &&
+        (role == FunctionRole::IOWrapper || 
+         role == FunctionRole::EntryPoint || 
+         (role == FunctionRole::PureLogic && func.length <= 10));
+
+    // Check actual test coverage if we have lcov data
+    let has_coverage = if let Some(cov) = coverage {
+        cov.get_function_coverage(&func.file, &func.name)
+            .map(|coverage_pct| coverage_pct > 0.0)
+            .unwrap_or(false)
+    } else {
+        false // No coverage data means assume untested
+    };
+
+    // If it's trivial AND tested, it's definitely not technical debt
+    if is_trivial && has_coverage {
+        return UnifiedScore {
+            complexity_factor: 0.0,
+            coverage_factor: 0.0,
+            roi_factor: 0.0,
+            semantic_factor: 0.0,
+            role_multiplier: 1.0,
+            final_score: 0.0,
+        };
+    }
+
     // Calculate complexity factor (normalized to 0-10)
     let complexity_factor = normalize_complexity(func.cyclomatic, func.cognitive);
 
@@ -78,8 +108,7 @@ pub fn calculate_unified_priority(
     // Calculate ROI factor (normalized to 0-10)
     let roi_factor = normalize_roi(roi_score);
 
-    // Classify function role and calculate semantic priority
-    let role = classify_function_role(func, &func_id, call_graph);
+    // Calculate semantic priority
     let semantic_factor = calculate_semantic_priority(func, role, &func_id, call_graph);
     let role_multiplier = get_role_multiplier(role);
 
@@ -1165,6 +1194,127 @@ mod tests {
         if let DebtType::DeadCode { .. } = debt_type {
             panic!("Main function should not be flagged as dead code")
         }
+    }
+
+    #[test]
+    fn test_simple_io_wrapper_with_coverage_zero_score() {
+        // Create a simple I/O wrapper function with test coverage
+        let mut func = create_test_metrics();
+        func.name = "extract_module_from_import".to_string();
+        func.cyclomatic = 1;
+        func.cognitive = 1;
+        func.length = 3;
+        func.nesting = 1;
+
+        let call_graph = CallGraph::new();
+        
+        // Create mock coverage data showing function is tested
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            func.file.clone(),
+            vec![crate::risk::lcov::FunctionCoverage {
+                name: func.name.clone(),
+                start_line: func.line,
+                execution_count: 18,
+                coverage_percentage: 100.0,
+            }],
+        );
+        
+        // Calculate priority score with coverage
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0);
+        
+        // Tested simple I/O wrapper should have zero score (not technical debt)
+        assert_eq!(score.final_score, 0.0);
+        assert_eq!(score.complexity_factor, 0.0);
+        assert_eq!(score.coverage_factor, 0.0);
+        assert_eq!(score.roi_factor, 0.0);
+        assert_eq!(score.semantic_factor, 0.0);
+    }
+
+    #[test]
+    fn test_simple_io_wrapper_without_coverage_has_score() {
+        // Create a simple I/O wrapper function without test coverage
+        let mut func = create_test_metrics();
+        func.name = "print_risk_function".to_string();
+        func.cyclomatic = 1;
+        func.cognitive = 0;
+        func.length = 4;
+        func.nesting = 1;
+
+        let call_graph = CallGraph::new();
+        
+        // Calculate priority score without coverage (assume untested)
+        let score = calculate_unified_priority(&func, &call_graph, None, 0.0);
+        
+        // Untested simple I/O wrapper should have a non-zero score (testing gap)
+        assert!(score.final_score > 0.0, "Untested I/O wrapper should have non-zero score");
+    }
+
+    #[test]
+    fn test_simple_entry_point_with_coverage_zero_score() {
+        // Create a simple entry point function with coverage
+        let mut func = create_test_metrics();
+        func.name = "main".to_string();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        func.length = 8;
+        
+        let call_graph = CallGraph::new();
+        
+        // Create mock coverage data
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            func.file.clone(),
+            vec![crate::risk::lcov::FunctionCoverage {
+                name: func.name.clone(),
+                start_line: func.line,
+                execution_count: 1,
+                coverage_percentage: 100.0,
+            }],
+        );
+        
+        // Calculate priority score with coverage
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0);
+        
+        // Tested simple entry point should have zero score (not technical debt)
+        assert_eq!(score.final_score, 0.0);
+    }
+
+    #[test]
+    fn test_simple_pure_function_without_coverage_has_score() {
+        // Create a simple pure logic function without coverage
+        let mut func = create_test_metrics();
+        func.name = "format_string".to_string();
+        func.cyclomatic = 1;
+        func.cognitive = 2;
+        func.length = 5;
+        
+        let call_graph = CallGraph::new();
+        
+        // Calculate priority score without coverage
+        let score = calculate_unified_priority(&func, &call_graph, None, 0.0);
+        
+        // Untested pure function should have non-zero score (testing gap)
+        assert!(score.final_score > 0.0, "Untested pure function should have non-zero score");
+    }
+
+    #[test]
+    fn test_complex_function_has_score() {
+        // Create a complex function that should have a non-zero score
+        let mut func = create_test_metrics();
+        func.name = "complex_logic".to_string();
+        func.cyclomatic = 8;
+        func.cognitive = 12;
+        func.length = 50;
+        
+        let call_graph = CallGraph::new();
+        
+        // Calculate priority score
+        let score = calculate_unified_priority(&func, &call_graph, None, 5.0);
+        
+        // Complex function should have non-zero score (is technical debt)
+        assert!(score.final_score > 0.0);
+        assert!(score.complexity_factor > 0.0);
     }
 
     #[test]
