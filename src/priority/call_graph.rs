@@ -149,6 +149,10 @@ impl CallGraph {
             .unwrap_or_default()
     }
 
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
     pub fn get_callers(&self, func_id: &FunctionId) -> Vec<FunctionId> {
         self.caller_index
             .get(func_id)
