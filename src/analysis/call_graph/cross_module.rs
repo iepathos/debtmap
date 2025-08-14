@@ -387,30 +387,37 @@ impl ModuleVisitor {
     fn extract_visibility(&self, vis: &Visibility) -> VisibilityLevel {
         match vis {
             Visibility::Public(_) => VisibilityLevel::Public,
-            // In newer syn versions, handle Restricted visibility
-            Visibility::Restricted(restricted) => {
-                if restricted.in_token.is_some() {
-                    // pub(in path)
-                    if let Some(path) = restricted.path.get_ident() {
-                        VisibilityLevel::PublicIn(path.to_string())
-                    } else {
-                        VisibilityLevel::Crate
-                    }
-                } else {
-                    // pub(super) or pub(crate)
-                    if let Some(ident) = restricted.path.get_ident() {
-                        match ident.to_string().as_str() {
-                            "super" => VisibilityLevel::PublicSuper,
-                            "crate" => VisibilityLevel::Crate,
-                            _ => VisibilityLevel::Crate,
-                        }
-                    } else {
-                        VisibilityLevel::Crate
-                    }
-                }
-            }
+            Visibility::Restricted(restricted) => Self::classify_restricted_visibility(restricted),
             Visibility::Inherited => VisibilityLevel::Private,
         }
+    }
+
+    fn classify_restricted_visibility(restricted: &syn::VisRestricted) -> VisibilityLevel {
+        if restricted.in_token.is_some() {
+            Self::extract_public_in_visibility(restricted)
+        } else {
+            Self::extract_scope_visibility(restricted)
+        }
+    }
+
+    fn extract_public_in_visibility(restricted: &syn::VisRestricted) -> VisibilityLevel {
+        restricted
+            .path
+            .get_ident()
+            .map(|path| VisibilityLevel::PublicIn(path.to_string()))
+            .unwrap_or(VisibilityLevel::Crate)
+    }
+
+    fn extract_scope_visibility(restricted: &syn::VisRestricted) -> VisibilityLevel {
+        restricted
+            .path
+            .get_ident()
+            .and_then(|ident| match ident.to_string().as_str() {
+                "super" => Some(VisibilityLevel::PublicSuper),
+                "crate" => Some(VisibilityLevel::Crate),
+                _ => None,
+            })
+            .unwrap_or(VisibilityLevel::Crate)
     }
 }
 
