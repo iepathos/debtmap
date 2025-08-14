@@ -22,7 +22,7 @@ ls -la target/coverage/lcov.info
 ### Step 2: Initial Analysis
 Run debtmap to analyze the current tech debt and get the top recommendation:
 ```
-debtmap analyze . --lcov target/coverage/lcov.info --top 1
+target/release/debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
 - **CRITICAL**: Record the BASELINE values shown at the bottom:
   - TOTAL DEBT SCORE (e.g., "TOTAL DEBT SCORE: 3735")
@@ -217,7 +217,7 @@ cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage
 ### Step 8: Final Analysis
 Run debtmap again to verify improvement:
 ```
-debtmap analyze . --lcov target/coverage/lcov.info --top 1
+target/release/debtmap analyze . --lcov target/coverage/lcov.info --top 1
 ```
 - **CRITICAL**: Record the NEW values:
   - TOTAL DEBT SCORE
