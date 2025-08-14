@@ -336,7 +336,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                             || self
                                 .current_impl_type
                                 .as_ref()
-                                .map_or(false, |t| name.starts_with(t));
+                                .is_some_and(|t| name.starts_with(t));
                         self.add_unresolved_call(
                             name.clone(),
                             Self::classify_call_type(&name),

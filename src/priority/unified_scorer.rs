@@ -36,6 +36,8 @@ pub struct UnifiedDebtItem {
     pub transitive_coverage: Option<TransitiveCoverage>,
     pub upstream_dependencies: usize,
     pub downstream_dependencies: usize,
+    pub upstream_callers: Vec<String>, // List of function names that call this function
+    pub downstream_callees: Vec<String>, // List of functions that this function calls
     pub nesting_depth: u32,
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
@@ -210,6 +212,17 @@ pub fn create_unified_debt_item_enhanced(
     let recommendation = generate_recommendation(func, &debt_type, role, &unified_score);
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
+    // Get caller and callee names
+    let upstream_callers = call_graph.get_callers(&func_id);
+    let downstream_callees = call_graph.get_callees(&func_id);
+
+    let upstream_caller_names: Vec<String> =
+        upstream_callers.iter().map(|id| id.name.clone()).collect();
+    let downstream_callee_names: Vec<String> = downstream_callees
+        .iter()
+        .map(|id| id.name.clone())
+        .collect();
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -222,8 +235,10 @@ pub fn create_unified_debt_item_enhanced(
         recommendation,
         expected_impact,
         transitive_coverage,
-        upstream_dependencies: call_graph.get_callers(&func_id).len(),
-        downstream_dependencies: call_graph.get_callees(&func_id).len(),
+        upstream_dependencies: upstream_callers.len(),
+        downstream_dependencies: downstream_callees.len(),
+        upstream_callers: upstream_caller_names,
+        downstream_callees: downstream_callee_names,
         nesting_depth: 0,   // Would need to be calculated from AST
         function_length: 0, // Would need to be calculated from AST or additional metadata
         cyclomatic_complexity: func.cyclomatic,
@@ -253,9 +268,16 @@ pub fn create_unified_debt_item(
     let recommendation = generate_recommendation(func, &debt_type, role, &unified_score);
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-    // Get dependency counts from call graph
-    let upstream_dependencies = call_graph.get_callers(&func_id).len();
-    let downstream_dependencies = call_graph.get_callees(&func_id).len();
+    // Get dependency counts and names from call graph
+    let upstream_callers = call_graph.get_callers(&func_id);
+    let downstream_callees = call_graph.get_callees(&func_id);
+
+    let upstream_caller_names: Vec<String> =
+        upstream_callers.iter().map(|id| id.name.clone()).collect();
+    let downstream_callee_names: Vec<String> = downstream_callees
+        .iter()
+        .map(|id| id.name.clone())
+        .collect();
 
     UnifiedDebtItem {
         location: Location {
@@ -269,8 +291,10 @@ pub fn create_unified_debt_item(
         recommendation,
         expected_impact,
         transitive_coverage,
-        upstream_dependencies,
-        downstream_dependencies,
+        upstream_dependencies: upstream_callers.len(),
+        downstream_dependencies: downstream_callees.len(),
+        upstream_callers: upstream_caller_names,
+        downstream_callees: downstream_callee_names,
         nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,

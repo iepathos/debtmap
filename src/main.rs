@@ -847,9 +847,11 @@ fn clear_expansion_cache_if_needed(
 ) {
     use debtmap::expansion::{MacroExpander, MacroExpansion};
 
-    if clear_cache && expansion_config.is_some() {
-        if let Ok(mut expander) = MacroExpander::new(expansion_config.unwrap().clone()) {
-            let _ = expander.clear_cache();
+    if clear_cache {
+        if let Some(config) = expansion_config {
+            if let Ok(mut expander) = MacroExpander::new(config.clone()) {
+                let _ = expander.clear_cache();
+            }
         }
     }
 }
