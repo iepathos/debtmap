@@ -65,10 +65,10 @@ pub fn calculate_unified_priority(
     // Simple I/O wrappers, entry points, and trivial pure functions with low complexity
     // are not technical debt UNLESS they're untested and non-trivial
     let role = classify_function_role(func, &func_id, call_graph);
-    let is_trivial = (func.cyclomatic <= 3 && func.cognitive <= 5) &&
-        (role == FunctionRole::IOWrapper || 
-         role == FunctionRole::EntryPoint || 
-         (role == FunctionRole::PureLogic && func.length <= 10));
+    let is_trivial = (func.cyclomatic <= 3 && func.cognitive <= 5)
+        && (role == FunctionRole::IOWrapper
+            || role == FunctionRole::EntryPoint
+            || (role == FunctionRole::PureLogic && func.length <= 10));
 
     // Check actual test coverage if we have lcov data
     let has_coverage = if let Some(cov) = coverage {
@@ -1207,7 +1207,7 @@ mod tests {
         func.nesting = 1;
 
         let call_graph = CallGraph::new();
-        
+
         // Create mock coverage data showing function is tested
         let mut lcov = LcovData::default();
         lcov.functions.insert(
@@ -1219,10 +1219,10 @@ mod tests {
                 coverage_percentage: 100.0,
             }],
         );
-        
+
         // Calculate priority score with coverage
         let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0);
-        
+
         // Tested simple I/O wrapper should have zero score (not technical debt)
         assert_eq!(score.final_score, 0.0);
         assert_eq!(score.complexity_factor, 0.0);
@@ -1242,12 +1242,15 @@ mod tests {
         func.nesting = 1;
 
         let call_graph = CallGraph::new();
-        
+
         // Calculate priority score without coverage (assume untested)
         let score = calculate_unified_priority(&func, &call_graph, None, 0.0);
-        
+
         // Untested simple I/O wrapper should have a non-zero score (testing gap)
-        assert!(score.final_score > 0.0, "Untested I/O wrapper should have non-zero score");
+        assert!(
+            score.final_score > 0.0,
+            "Untested I/O wrapper should have non-zero score"
+        );
     }
 
     #[test]
@@ -1258,9 +1261,9 @@ mod tests {
         func.cyclomatic = 2;
         func.cognitive = 3;
         func.length = 8;
-        
+
         let call_graph = CallGraph::new();
-        
+
         // Create mock coverage data
         let mut lcov = LcovData::default();
         lcov.functions.insert(
@@ -1272,10 +1275,10 @@ mod tests {
                 coverage_percentage: 100.0,
             }],
         );
-        
+
         // Calculate priority score with coverage
         let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0);
-        
+
         // Tested simple entry point should have zero score (not technical debt)
         assert_eq!(score.final_score, 0.0);
     }
@@ -1288,14 +1291,17 @@ mod tests {
         func.cyclomatic = 1;
         func.cognitive = 2;
         func.length = 5;
-        
+
         let call_graph = CallGraph::new();
-        
+
         // Calculate priority score without coverage
         let score = calculate_unified_priority(&func, &call_graph, None, 0.0);
-        
+
         // Untested pure function should have non-zero score (testing gap)
-        assert!(score.final_score > 0.0, "Untested pure function should have non-zero score");
+        assert!(
+            score.final_score > 0.0,
+            "Untested pure function should have non-zero score"
+        );
     }
 
     #[test]
@@ -1306,12 +1312,12 @@ mod tests {
         func.cyclomatic = 8;
         func.cognitive = 12;
         func.length = 50;
-        
+
         let call_graph = CallGraph::new();
-        
+
         // Calculate priority score
         let score = calculate_unified_priority(&func, &call_graph, None, 5.0);
-        
+
         // Complex function should have non-zero score (is technical debt)
         assert!(score.final_score > 0.0);
         assert!(score.complexity_factor > 0.0);

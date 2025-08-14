@@ -149,15 +149,15 @@ fn test_extract_call_graph_with_complex_structure() {
 
     let functions = call_graph.find_all_functions();
 
-    // Should find the add method
+    // Should find the add method (now as Calculator::add)
     assert!(
-        functions.iter().any(|f| f.name == "add"),
+        functions.iter().any(|f| f.name == "Calculator::add"),
         "Should find add method"
     );
 
-    // Should find the validate method
+    // Should find the validate method (now as Calculator::validate)
     assert!(
-        functions.iter().any(|f| f.name == "validate"),
+        functions.iter().any(|f| f.name == "Calculator::validate"),
         "Should find validate method"
     );
 

@@ -73,6 +73,10 @@ pub struct TraitRegistry {
     unresolved_calls: Vector<TraitMethodCall>,
     /// Type to trait mapping (for quick lookup)
     type_to_traits: HashMap<String, HashSet<String>>,
+    /// Visit trait implementations (special handling for visitor pattern)
+    visit_implementations: HashMap<String, Vector<TraitMethodImplementation>>,
+    /// Functions that are Visit trait methods
+    visit_trait_methods: HashSet<FunctionId>,
 }
 
 impl TraitRegistry {
@@ -83,6 +87,8 @@ impl TraitRegistry {
             trait_implementations: HashMap::new(),
             unresolved_calls: Vector::new(),
             type_to_traits: HashMap::new(),
+            visit_implementations: HashMap::new(),
+            visit_trait_methods: HashSet::new(),
         }
     }
 
@@ -118,6 +124,16 @@ impl TraitRegistry {
         // Add unresolved calls
         for call in visitor.trait_method_calls {
             self.unresolved_calls.push_back(call);
+        }
+
+        // Add Visit trait methods
+        for method_id in visitor.visit_trait_methods {
+            self.visit_trait_methods.insert(method_id);
+        }
+
+        // Add Visit implementations
+        for (type_name, methods) in visitor.visit_implementations {
+            self.visit_implementations.insert(type_name, methods);
         }
 
         Ok(())
@@ -217,6 +233,24 @@ impl TraitRegistry {
             total_unresolved_calls,
         }
     }
+
+    /// Check if a function is a Visit trait method
+    pub fn is_visit_trait_method(&self, func_id: &FunctionId) -> bool {
+        self.visit_trait_methods.contains(func_id)
+    }
+
+    /// Get all Visit trait methods
+    pub fn get_visit_trait_methods(&self) -> HashSet<FunctionId> {
+        self.visit_trait_methods.clone()
+    }
+
+    /// Get Visit implementations for a specific type
+    pub fn get_visit_implementations(
+        &self,
+        type_name: &str,
+    ) -> Option<&Vector<TraitMethodImplementation>> {
+        self.visit_implementations.get(type_name)
+    }
 }
 
 /// Statistics about trait usage in the codebase
@@ -234,6 +268,8 @@ struct TraitVisitor {
     trait_implementations: Vec<TraitImplementation>,
     trait_method_calls: Vec<TraitMethodCall>,
     current_function: Option<FunctionId>,
+    visit_trait_methods: HashSet<FunctionId>,
+    visit_implementations: HashMap<String, Vector<TraitMethodImplementation>>,
 }
 
 impl TraitVisitor {
@@ -244,6 +280,8 @@ impl TraitVisitor {
             trait_implementations: Vec::new(),
             trait_method_calls: Vec::new(),
             current_function: None,
+            visit_trait_methods: HashSet::new(),
+            visit_implementations: HashMap::new(),
         }
     }
 
@@ -270,6 +308,16 @@ impl TraitVisitor {
 
     fn get_line_number(&self, span: proc_macro2::Span) -> usize {
         span.start().line
+    }
+
+    fn is_visit_trait(&self, trait_name: &str) -> bool {
+        // Detect various visitor pattern trait names
+        trait_name == "Visit"
+            || trait_name == "Visitor"
+            || trait_name.starts_with("Visit<")
+            || trait_name.starts_with("Visitor<")
+            || trait_name == "syn::visit::Visit"
+            || trait_name == "quote::visit::Visit"
     }
 }
 
@@ -312,6 +360,7 @@ impl<'ast> Visit<'ast> for TraitVisitor {
             if let Some(trait_name) = self.extract_path_name(trait_path) {
                 if let Some(implementing_type) = self.extract_type_name(&item.self_ty) {
                     let mut method_implementations = Vector::new();
+                    let is_visit_trait = self.is_visit_trait(&trait_name);
 
                     for impl_item in &item.items {
                         if let ImplItem::Fn(method) = impl_item {
@@ -326,12 +375,25 @@ impl<'ast> Visit<'ast> for TraitVisitor {
 
                             let implementation = TraitMethodImplementation {
                                 method_name,
-                                method_id,
+                                method_id: method_id.clone(),
                                 overrides_default: false, // We'd need more analysis to determine this
                             };
 
-                            method_implementations.push_back(implementation);
+                            method_implementations.push_back(implementation.clone());
+
+                            // Special handling for Visit trait implementations
+                            if is_visit_trait {
+                                self.visit_trait_methods.insert(method_id.clone());
+                            }
                         }
+                    }
+
+                    // Store Visit implementations separately for special handling
+                    if is_visit_trait {
+                        self.visit_implementations
+                            .entry(implementing_type.clone())
+                            .or_default()
+                            .extend(method_implementations.clone());
                     }
 
                     let trait_impl = TraitImplementation {

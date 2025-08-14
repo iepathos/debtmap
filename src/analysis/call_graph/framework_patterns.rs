@@ -31,6 +31,8 @@ pub enum PatternType {
     FfiFunction,
     /// Main function entry points
     MainFunction,
+    /// Visit trait pattern (visitor pattern implementations)
+    VisitTrait,
     /// Custom framework pattern
     CustomPattern { name: String },
 }
@@ -196,7 +198,8 @@ impl FrameworkPatternDetector {
                     | PatternType::EventHandler
                     | PatternType::MacroCallback
                     | PatternType::MainFunction
-                    | PatternType::FfiFunction => {
+                    | PatternType::FfiFunction
+                    | PatternType::VisitTrait => {
                         exclusions.insert(func_id.clone());
                     }
                     PatternType::SerializationFunction | PatternType::ConstructorFunction => {
@@ -216,6 +219,25 @@ impl FrameworkPatternDetector {
         }
 
         exclusions
+    }
+
+    /// Mark a function as a Visit trait implementation
+    pub fn add_visit_trait_function(&mut self, func_id: FunctionId) {
+        let pattern = FrameworkPattern {
+            pattern_type: PatternType::VisitTrait,
+            function_id: Some(func_id.clone()),
+            triggering_attributes: Vector::new(),
+            framework_name: Some("visitor_pattern".to_string()),
+            confidence: 1.0,
+            metadata: HashMap::new(),
+        };
+
+        self.function_to_patterns
+            .entry(func_id.clone())
+            .or_default()
+            .push_back(PatternType::VisitTrait);
+
+        self.detected_patterns.push_back(pattern);
     }
 }
 
