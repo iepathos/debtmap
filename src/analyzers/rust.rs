@@ -216,6 +216,7 @@ struct FunctionVisitor {
     in_test_module: bool,
     current_function: Option<String>,
     current_impl_type: Option<String>,
+    current_impl_is_trait: bool,
 }
 
 impl FunctionVisitor {
@@ -239,6 +240,7 @@ impl FunctionVisitor {
             in_test_module: is_test_file,
             current_function: None,
             current_impl_type: None,
+            current_impl_is_trait: false,
         }
     }
 
@@ -311,15 +313,21 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             None
         };
 
-        // Store the current impl type
+        // Check if this is a trait implementation
+        let is_trait_impl = item_impl.trait_.is_some();
+
+        // Store the current impl type and trait status
         let prev_impl_type = self.current_impl_type.clone();
+        let prev_impl_is_trait = self.current_impl_is_trait;
         self.current_impl_type = impl_type;
+        self.current_impl_is_trait = is_trait_impl;
 
         // Continue visiting the impl block
         syn::visit::visit_item_impl(self, item_impl);
 
-        // Restore previous impl type
+        // Restore previous impl type and trait status
         self.current_impl_type = prev_impl_type;
+        self.current_impl_is_trait = prev_impl_is_trait;
     }
 
     fn visit_item_mod(&mut self, item_mod: &'ast syn::ItemMod) {
@@ -366,8 +374,17 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
         };
 
         let line = self.get_line_number(impl_fn.sig.ident.span());
-        // Use the actual visibility from impl_fn
-        let vis = impl_fn.vis.clone();
+
+        // For trait implementations, methods inherit the trait's visibility
+        // Trait methods are effectively public (accessible through the trait)
+        let vis = if self.current_impl_is_trait {
+            // Trait methods are effectively public
+            syn::Visibility::Public(syn::Token![pub](impl_fn.sig.ident.span()))
+        } else {
+            // Use the actual visibility from impl_fn for inherent impls
+            impl_fn.vis.clone()
+        };
+
         let item_fn = syn::ItemFn {
             attrs: impl_fn.attrs.clone(),
             vis,
