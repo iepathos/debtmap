@@ -175,21 +175,28 @@ impl PatternMatcher for MutableStateMatcher {
 
 struct SideEffectMatcher;
 
+impl SideEffectMatcher {
+    /// Pure function to detect I/O operation patterns in function names
+    fn has_io_pattern(name: &str) -> bool {
+        const IO_PATTERNS: &[&str] = &["write", "read", "print", "save", "load", "fetch"];
+        IO_PATTERNS.iter().any(|pattern| name.contains(pattern))
+    }
+
+    /// Pure function to determine if function has mixed concerns
+    fn has_mixed_concerns(has_io: bool, complexity: u32) -> bool {
+        has_io && complexity > 3
+    }
+}
+
 impl PatternMatcher for SideEffectMatcher {
     fn match_pattern(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<DetectedPattern> {
-        // Functions with I/O operations in their names
-        let has_io_patterns = function.name.contains("write")
-            || function.name.contains("read")
-            || function.name.contains("print")
-            || function.name.contains("save")
-            || function.name.contains("load")
-            || function.name.contains("fetch");
+        let has_io = Self::has_io_pattern(&function.name);
 
-        if has_io_patterns && function.cyclomatic > 3 {
+        if Self::has_mixed_concerns(has_io, function.cyclomatic) {
             Some(DetectedPattern {
                 pattern_type: PatternType::SideEffects,
                 confidence: 0.7,
