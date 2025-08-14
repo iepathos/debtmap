@@ -182,8 +182,8 @@ fn extract_function_metrics(
     let lines: Vec<&str> = source_content.lines().collect();
     let mut functions = Vec::new();
 
-    // Recursively extract functions from the module
-    extract_functions_from_stmts(&module.body, path, &lines, &mut functions, 0);
+    // Recursively extract functions from the module with no class context
+    extract_functions_from_stmts(&module.body, path, &lines, &mut functions, 0, None);
 
     functions
 }
@@ -194,14 +194,23 @@ fn extract_functions_from_stmts(
     lines: &[&str],
     functions: &mut Vec<FunctionMetrics>,
     stmt_offset: usize,
+    class_context: Option<&str>,
 ) {
     for (idx, stmt) in stmts.iter().enumerate() {
         match stmt {
             ast::Stmt::FunctionDef(func_def) => {
                 let line_number =
                     estimate_line_number(lines, func_def.name.as_ref(), stmt_offset + idx);
+
+                // Include class context in function name if inside a class
+                let function_name = if let Some(class_name) = class_context {
+                    format!("{}.{}", class_name, func_def.name)
+                } else {
+                    func_def.name.to_string()
+                };
+
                 functions.push(FunctionMetrics {
-                    name: func_def.name.to_string(),
+                    name: function_name,
                     file: path.to_path_buf(),
                     line: line_number,
                     cyclomatic: calculate_cyclomatic_python(&func_def.body),
@@ -219,13 +228,22 @@ fn extract_functions_from_stmts(
                     lines,
                     functions,
                     stmt_offset + idx,
+                    class_context,
                 );
             }
             ast::Stmt::AsyncFunctionDef(func_def) => {
                 let line_number =
                     estimate_line_number(lines, func_def.name.as_ref(), stmt_offset + idx);
+
+                // Include class context in function name if inside a class
+                let function_name = if let Some(class_name) = class_context {
+                    format!("{}.async {}", class_name, func_def.name)
+                } else {
+                    format!("async {}", func_def.name)
+                };
+
                 functions.push(FunctionMetrics {
-                    name: format!("async {}", func_def.name),
+                    name: function_name,
                     file: path.to_path_buf(),
                     line: line_number,
                     cyclomatic: calculate_cyclomatic_python(&func_def.body),
@@ -243,16 +261,18 @@ fn extract_functions_from_stmts(
                     lines,
                     functions,
                     stmt_offset + idx,
+                    class_context,
                 );
             }
             ast::Stmt::ClassDef(class_def) => {
-                // Look for methods in classes
+                // Look for methods in classes - pass the class name as context
                 extract_functions_from_stmts(
                     &class_def.body,
                     path,
                     lines,
                     functions,
                     stmt_offset + idx,
+                    Some(class_def.name.as_ref()),
                 );
             }
             _ => {}

@@ -1,4 +1,5 @@
 use debtmap::analysis::call_graph::RustCallGraphBuilder;
+use debtmap::analysis::python_call_graph::PythonCallGraphAnalyzer;
 use debtmap::analysis_utils;
 use debtmap::cli;
 use debtmap::core;
@@ -956,6 +957,38 @@ fn extract_regular_call_graph(file_path: &Path) -> Result<priority::CallGraph> {
     }
 }
 
+/// Process Python files to extract method call relationships
+fn process_python_files_for_call_graph(
+    project_path: &Path,
+    call_graph: &mut priority::CallGraph,
+) -> Result<()> {
+    let python_files = io::walker::find_project_files(project_path, vec![Language::Python])
+        .context("Failed to find Python files for call graph")?;
+
+    let mut analyzer = PythonCallGraphAnalyzer::new();
+
+    for file_path in &python_files {
+        if let Ok(content) = io::read_file(file_path) {
+            // Parse Python file using rustpython_parser
+            if let Ok(module) =
+                rustpython_parser::parse(&content, rustpython_parser::Mode::Module, "<module>")
+            {
+                // Analyze the module and extract method calls with source for accurate line numbers
+                if let Err(e) =
+                    analyzer.analyze_module_with_source(&module, file_path, &content, call_graph)
+                {
+                    eprintln!(
+                        "Warning: Failed to analyze Python file {:?}: {}",
+                        file_path, e
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Create unified analysis from metrics and call graph with framework exclusions
 fn create_unified_analysis_with_exclusions(
     metrics: &[debtmap::FunctionMetrics],
@@ -1112,6 +1145,9 @@ fn perform_unified_analysis(
         expand_macros,
         clear_expansion_cache,
     )?;
+
+    // Process Python files to extract method call relationships
+    process_python_files_for_call_graph(project_path, &mut call_graph)?;
 
     // Load coverage data if available
     let coverage_data = match coverage_file {

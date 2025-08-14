@@ -1,0 +1,290 @@
+use debtmap::analysis::python_call_graph::PythonCallGraphAnalyzer;
+use debtmap::analyzers::python::PythonAnalyzer;
+use debtmap::analyzers::Analyzer;
+use debtmap::priority::call_graph::{CallGraph, FunctionId};
+use debtmap::priority::unified_scorer::{
+    classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
+};
+use debtmap::priority::DebtType;
+use im::HashSet;
+use std::path::PathBuf;
+
+#[test]
+fn test_python_instance_method_not_dead_code() {
+    // Test that private methods called by other methods are not marked as dead code
+    let python_code = r#"
+class FileManager:
+    """Manages file operations over network."""
+    
+    def _get_connection(self, server_name: str):
+        """Create connection to remote server."""
+        server = server_registry.get_server_by_name(server_name)
+        if not server:
+            raise ValueError(f"Server {server_name} not found")
+        
+        config_path = server_registry.get_config_path()
+        
+        # Get credentials from config.yml for Worker servers
+        credentials = None
+        if server.server_type == "Worker":
+            try:
+                config_data = utils.load_yaml("config.yml")
+                if server_name in config_data:
+                    server_config = config_data[server_name]
+                    if isinstance(server_config, dict) and "auth" in server_config:
+                        auth_data = server_config["auth"]
+                        if isinstance(auth_data, dict) and "admin" in auth_data:
+                            credentials = auth_data["admin"]
+                            logger.info(f"Found credentials for admin user in config.yml")
+            except Exception as e:
+                logger.warning(f"Could not load credentials from config.yml: {str(e)}")
+        
+        # For Controller, use config with default user
+        if server.server_type == "Controller":
+            return create_connection(
+                server_name=server_name,
+                username="default",
+                config_path=config_path,
+                server_type=server.server_type,
+            )
+        else:
+            # For Worker, use admin user
+            username = server.username or "admin"
+            return create_connection(
+                server_name=server_name,
+                username=username,
+                credentials=credentials,
+                config_path=config_path,
+                server_type=server.server_type,
+            )
+    
+    def list_files(self, server_name: str):
+        """
+        List all files and their metadata.
+        """
+        files = {}
+        file_paths = self._get_file_paths(server_name)
+        
+        with self._get_connection(server_name) as connection:  # CALLS _get_connection
+            for file_type, file_path in file_paths.items():
+                # ... rest of implementation
+                pass
+        return files
+    
+    def read_file(self, server_name: str, file_type: str):
+        """
+        Read file content.
+        """
+        file_paths = self._get_file_paths(server_name)
+        
+        if file_type not in file_paths:
+            raise ValueError(f"Invalid file type: {file_type}")
+        
+        file_path = file_paths[file_type]
+        
+        with self._get_connection(server_name) as connection:  # CALLS _get_connection
+            # ... rest of implementation
+            pass
+    
+    def update_file(self, server_name: str, file_type: str, content: str):
+        """
+        Update file content.
+        """
+        file_paths = self._get_file_paths(server_name)
+        
+        if file_type not in file_paths:
+            return False, f"Invalid file type: {file_type}"
+        
+        file_path = file_paths[file_type]
+        
+        try:
+            with self._get_connection(server_name) as connection:  # CALLS _get_connection
+                # ... rest of implementation
+                pass
+        except Exception as e:
+            return False, str(e)
+"#;
+
+    // Parse and analyze the Python code
+    let analyzer = PythonAnalyzer::new();
+    let path = PathBuf::from("file_manager.py");
+    let ast = analyzer.parse(python_code, path.clone()).unwrap();
+    let metrics = analyzer.analyze(&ast);
+
+    // Build call graph with Python method calls
+    let mut call_graph = CallGraph::new();
+
+    // Parse the Python code and extract method calls
+    let module =
+        rustpython_parser::parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+
+    // Use Python call graph analyzer to populate the call graph
+    let mut python_analyzer = PythonCallGraphAnalyzer::new();
+    python_analyzer
+        .analyze_module(&module, &path, &mut call_graph)
+        .unwrap();
+
+    // Find the _get_connection function in metrics
+    let connection_func = metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|f| f.name.contains("_get_connection"))
+        .expect("Should find _get_connection function");
+
+    // Create function ID for the method
+    let func_id = FunctionId {
+        file: path.clone(),
+        name: "FileManager._get_connection".to_string(),
+        line: 0, // We're not tracking exact line numbers yet
+    };
+
+    // Check if it's marked as dead code
+    let framework_exclusions_im = HashSet::new();
+    let framework_exclusions_std: std::collections::HashSet<FunctionId> =
+        framework_exclusions_im.clone().into_iter().collect();
+    let is_dead = is_dead_code_with_exclusions(
+        connection_func,
+        &call_graph,
+        &func_id,
+        &framework_exclusions_std,
+    );
+
+    // Should NOT be marked as dead code because it has 3 callers
+    assert!(
+        !is_dead,
+        "_get_connection should NOT be marked as dead code because it has 3 callers"
+    );
+
+    // Also check the debt type classification
+    let debt_type = classify_debt_type_with_exclusions(
+        connection_func,
+        &call_graph,
+        &func_id,
+        &framework_exclusions_std,
+    );
+
+    // It should NOT be classified as DeadCode
+    match debt_type {
+        DebtType::DeadCode { .. } => {
+            panic!("_get_connection should not be classified as DeadCode!");
+        }
+        _ => {
+            // Good - it's not dead code
+        }
+    }
+}
+
+#[test]
+fn test_python_truly_dead_private_method() {
+    // This method is actually dead code - no callers
+    let python_code = r#"
+class MyClass:
+    def _unused_method(self):
+        """This method is never called."""
+        return 42
+    
+    def public_method(self):
+        """This method doesn't call _unused_method."""
+        return 100
+"#;
+
+    let analyzer = PythonAnalyzer::new();
+    let path = PathBuf::from("test.py");
+    let ast = analyzer.parse(python_code, path.clone()).unwrap();
+    let metrics = analyzer.analyze(&ast);
+
+    let mut call_graph = CallGraph::new();
+
+    // Parse and analyze Python method calls
+    let module =
+        rustpython_parser::parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+    let mut python_analyzer = PythonCallGraphAnalyzer::new();
+    python_analyzer
+        .analyze_module(&module, &path, &mut call_graph)
+        .unwrap();
+
+    let unused_func = metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|f| f.name.contains("_unused_method"))
+        .expect("Should find _unused_method function");
+
+    let func_id = FunctionId {
+        file: path.clone(),
+        name: "MyClass._unused_method".to_string(),
+        line: 0,
+    };
+
+    let framework_exclusions_std: std::collections::HashSet<FunctionId> =
+        HashSet::new().into_iter().collect();
+    let is_dead = is_dead_code_with_exclusions(
+        unused_func,
+        &call_graph,
+        &func_id,
+        &framework_exclusions_std,
+    );
+
+    // This SHOULD be marked as dead code
+    assert!(
+        is_dead,
+        "_unused_method should be marked as dead code because it has no callers"
+    );
+}
+
+#[test]
+fn test_python_context_manager_pattern() {
+    let python_code = r#"
+class ResourceManager:
+    def _get_resource(self):
+        """Get a resource for use in context manager."""
+        return Resource()
+    
+    def process_data(self):
+        with self._get_resource() as resource:
+            resource.do_work()
+"#;
+
+    let analyzer = PythonAnalyzer::new();
+    let path = PathBuf::from("resource.py");
+    let ast = analyzer.parse(python_code, path.clone()).unwrap();
+    let metrics = analyzer.analyze(&ast);
+
+    let mut call_graph = CallGraph::new();
+
+    // Parse and analyze Python method calls
+    let module =
+        rustpython_parser::parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+    let mut python_analyzer = PythonCallGraphAnalyzer::new();
+    python_analyzer
+        .analyze_module(&module, &path, &mut call_graph)
+        .unwrap();
+
+    let resource_func = metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|f| f.name.contains("_get_resource"))
+        .expect("Should find _get_resource function");
+
+    let func_id = FunctionId {
+        file: path.clone(),
+        name: "ResourceManager._get_resource".to_string(),
+        line: 0,
+    };
+
+    let framework_exclusions_std: std::collections::HashSet<FunctionId> =
+        HashSet::new().into_iter().collect();
+    let is_dead = is_dead_code_with_exclusions(
+        resource_func,
+        &call_graph,
+        &func_id,
+        &framework_exclusions_std,
+    );
+
+    assert!(
+        !is_dead,
+        "_get_resource should NOT be dead code - it's used in a context manager"
+    );
+}
