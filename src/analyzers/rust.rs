@@ -360,7 +360,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
         // Construct the full function name including the impl type
         let method_name = impl_fn.sig.ident.to_string();
         let name = if let Some(ref impl_type) = self.current_impl_type {
-            format!("{}::{}", impl_type, method_name)
+            format!("{impl_type}::{method_name}")
         } else {
             method_name.clone()
         };
