@@ -49,6 +49,6 @@ pub use crate::risk::{
 };
 
 pub use crate::analysis::{
-    AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, EnhancedCallGraph,
-    EnhancedCallGraphBuilder, FrameworkPatternDetector, FunctionPointerTracker, TraitRegistry,
+    AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
+    FunctionPointerTracker, RustCallGraph, RustCallGraphBuilder, TraitRegistry,
 };

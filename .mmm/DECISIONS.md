@@ -396,3 +396,23 @@ Implement specialized detection for Visit trait patterns that:
 - ✅ Extensible design for other visitor-like patterns
 - ⚠️ Slight increase in analysis complexity
 - ⚠️ May need updates for new visitor pattern libraries
+
+---
+
+## ADR-019: Language-Specific Call Graph Architecture
+**Date**: 2025-08-14
+**Status**: Accepted
+
+### Context
+The `EnhancedCallGraph` was misnamed as it contained Rust-specific analysis features like trait dispatch, function pointers, and Rust framework patterns. As the project expands to support multiple languages (Python already supported, more planned), a clearer architecture was needed that separates language-agnostic call graph functionality from language-specific enhancements.
+
+### Decision
+Rename `EnhancedCallGraph` to `RustCallGraph` and `EnhancedCallGraphBuilder` to `RustCallGraphBuilder` to accurately reflect their language-specific nature. This establishes a clear architectural pattern for language-specific call graph implementations that will scale as more languages are added to the project.
+
+### Consequences
+- ✅ Clear naming that immediately conveys language-specific purpose
+- ✅ Established pattern for future language-specific implementations (PythonCallGraph, JavaScriptCallGraph, etc.)
+- ✅ Better code organization and discoverability
+- ✅ Easier to understand and modify language-specific logic
+- ✅ Architecture ready for multi-language expansion
+- ⚠️ Breaking change for any external code using the library (mitigated by being early in project lifecycle)

@@ -125,12 +125,12 @@ We have completed the initial implementation with core functionality for analyzi
   - Confidence scoring for risk predictions
   - Module-type aware thresholds for different code contexts
 
-- [x] **Spec 26**: Enhanced Dead Code Detection for Visit Trait and Advanced Rust Patterns
-  - Automatic detection of Visit trait implementations
-  - Special handling for visitor pattern methods
-  - Integration with trait registry and framework patterns
-  - Reduced false positives for visitor pattern code
-  - Confidence scoring adjustments for Visit trait methods
+- [x] **Spec 26**: Language-Specific Call Graph Architecture
+  - Renamed EnhancedCallGraph to RustCallGraph for clarity
+  - Renamed EnhancedCallGraphBuilder to RustCallGraphBuilder
+  - Established clear pattern for language-specific implementations
+  - Architecture ready for multi-language expansion
+  - Zero functional changes - pure refactoring
 
 ## Pending Specs
 
