@@ -45,11 +45,11 @@ exceptions = [
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "linux-raw-sys" },
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "rustix" },
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "wasi" },
-    { allow = ["LGPL-3.0"], name = "malachite" },
-    { allow = ["LGPL-3.0"], name = "malachite-base" },
-    { allow = ["LGPL-3.0"], name = "malachite-bigint" },
-    { allow = ["LGPL-3.0"], name = "malachite-nz" },
-    { allow = ["LGPL-3.0"], name = "malachite-q" },
+    { allow = ["LGPL-3.0"], name = "malachite", version = "*" },
+    { allow = ["LGPL-3.0"], name = "malachite-base", version = "*" },
+    { allow = ["LGPL-3.0"], name = "malachite-bigint", version = "*" },
+    { allow = ["LGPL-3.0"], name = "malachite-nz", version = "*" },
+    { allow = ["LGPL-3.0"], name = "malachite-q", version = "*" },
     { allow = ["Unicode-DFS-2016"], name = "unicode_names2" },
 ]
 confidence-threshold = 0.8
