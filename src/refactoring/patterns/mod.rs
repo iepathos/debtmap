@@ -175,21 +175,28 @@ impl PatternMatcher for MutableStateMatcher {
 
 struct SideEffectMatcher;
 
+impl SideEffectMatcher {
+    /// Pure function to detect I/O operation patterns in function names
+    fn has_io_pattern(name: &str) -> bool {
+        const IO_PATTERNS: &[&str] = &["write", "read", "print", "save", "load", "fetch"];
+        IO_PATTERNS.iter().any(|pattern| name.contains(pattern))
+    }
+
+    /// Pure function to determine if function has mixed concerns
+    fn has_mixed_concerns(has_io: bool, complexity: u32) -> bool {
+        has_io && complexity > 3
+    }
+}
+
 impl PatternMatcher for SideEffectMatcher {
     fn match_pattern(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<DetectedPattern> {
-        // Functions with I/O operations in their names
-        let has_io_patterns = function.name.contains("write")
-            || function.name.contains("read")
-            || function.name.contains("print")
-            || function.name.contains("save")
-            || function.name.contains("load")
-            || function.name.contains("fetch");
+        let has_io = Self::has_io_pattern(&function.name);
 
-        if has_io_patterns && function.cyclomatic > 3 {
+        if Self::has_mixed_concerns(has_io, function.cyclomatic) {
             Some(DetectedPattern {
                 pattern_type: PatternType::SideEffects,
                 confidence: 0.7,
@@ -222,40 +229,76 @@ impl PatternMatcher for SideEffectMatcher {
 
 struct MixedConcernsMatcher;
 
+impl MixedConcernsMatcher {
+    /// Classifies the concerns present in a function based on its name and metrics
+    fn classify_concerns(function: &FunctionMetrics) -> Vec<String> {
+        let mut concerns = vec![];
+
+        // Check for I/O operations
+        if Self::has_io_operations(&function.name) {
+            concerns.push("I/O Operations".to_string());
+        }
+
+        // Check for business logic
+        if function.cyclomatic > 5 {
+            concerns.push("Business Logic".to_string());
+        }
+
+        // Check for formatting
+        if Self::has_formatting_operations(&function.name) {
+            concerns.push("Formatting".to_string());
+        }
+
+        concerns
+    }
+
+    /// Determines if a function name indicates I/O operations
+    fn has_io_operations(name: &str) -> bool {
+        name.contains("write")
+            || name.contains("read")
+            || name.contains("print")
+            || name.contains("save")
+    }
+
+    /// Determines if a function name indicates formatting operations
+    fn has_formatting_operations(name: &str) -> bool {
+        name.contains("format") || name.contains("display")
+    }
+
+    /// Classifies the difficulty of separating concerns based on complexity
+    fn classify_separation_difficulty(cyclomatic: u32) -> SeparationDifficulty {
+        if cyclomatic > 10 {
+            SeparationDifficulty::High
+        } else {
+            SeparationDifficulty::Medium
+        }
+    }
+
+    /// Determines the urgency of refactoring based on complexity
+    fn classify_urgency(cyclomatic: u32) -> Urgency {
+        if cyclomatic > 15 {
+            Urgency::High
+        } else {
+            Urgency::Medium
+        }
+    }
+}
+
 impl PatternMatcher for MixedConcernsMatcher {
     fn match_pattern(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<DetectedPattern> {
-        // High complexity with I/O patterns suggests mixed concerns
-        let has_io = function.name.contains("write")
-            || function.name.contains("read")
-            || function.name.contains("print")
-            || function.name.contains("save");
-        let has_logic = function.cyclomatic > 5;
-        let has_formatting = function.name.contains("format") || function.name.contains("display");
-
-        let mut concerns = vec![];
-        if has_io {
-            concerns.push("I/O Operations".to_string());
-        }
-        if has_logic {
-            concerns.push("Business Logic".to_string());
-        }
-        if has_formatting {
-            concerns.push("Formatting".to_string());
-        }
+        let concerns = Self::classify_concerns(function);
 
         if concerns.len() > 1 {
             Some(DetectedPattern {
                 pattern_type: PatternType::MixedConcerns(ConcernMixingPattern {
                     concerns: concerns.clone(),
-                    separation_difficulty: if function.cyclomatic > 10 {
-                        SeparationDifficulty::High
-                    } else {
-                        SeparationDifficulty::Medium
-                    },
+                    separation_difficulty: Self::classify_separation_difficulty(
+                        function.cyclomatic,
+                    ),
                 }),
                 confidence: 0.8,
                 evidence: PatternEvidence {
@@ -273,11 +316,7 @@ impl PatternMatcher for MixedConcernsMatcher {
                         "Changes to one concern affect others".to_string(),
                     ],
                     recommended_patterns: vec![PatternType::FunctionalComposition],
-                    urgency: if function.cyclomatic > 15 {
-                        Urgency::High
-                    } else {
-                        Urgency::Medium
-                    },
+                    urgency: Self::classify_urgency(function.cyclomatic),
                 },
             })
         } else {
@@ -434,38 +473,32 @@ impl FormattingDetector for MarkdownFormattingDetector {
 // Trait analyzers
 struct StandardTraitAnalyzer;
 
+impl StandardTraitAnalyzer {
+    // Pure function to classify trait method names
+    fn classify_trait_method(method_name: &str) -> Option<&'static str> {
+        match method_name {
+            "fmt" => Some("Display/Debug"),
+            "clone" => Some("Clone"),
+            "eq" => Some("PartialEq"),
+            "hash" => Some("Hash"),
+            "default" => Some("Default"),
+            "from" => Some("From"),
+            "try_from" => Some("TryFrom"),
+            _ => None,
+        }
+    }
+}
+
 impl TraitAnalyzer for StandardTraitAnalyzer {
     fn detect_trait_implementation(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<TraitInfo> {
-        // Check for common trait method names
-        if function.name == "fmt"
-            || function.name == "clone"
-            || function.name == "eq"
-            || function.name == "hash"
-            || function.name == "default"
-            || function.name == "from"
-            || function.name == "try_from"
-        {
-            Some(TraitInfo {
-                trait_name: match function.name.as_str() {
-                    "fmt" => "Display/Debug",
-                    "clone" => "Clone",
-                    "eq" => "PartialEq",
-                    "hash" => "Hash",
-                    "default" => "Default",
-                    "from" => "From",
-                    "try_from" => "TryFrom",
-                    _ => "Unknown",
-                }
-                .to_string(),
-                method_name: function.name.clone(),
-            })
-        } else {
-            None
-        }
+        Self::classify_trait_method(&function.name).map(|trait_name| TraitInfo {
+            trait_name: trait_name.to_string(),
+            method_name: function.name.clone(),
+        })
     }
 }
 

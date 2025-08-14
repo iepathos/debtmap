@@ -63,29 +63,41 @@ impl RefactoringDetector for SideEffectExtractionDetector {
     }
 }
 
-fn detect_io_operations(patterns: &[DetectedPattern]) -> Vec<String> {
-    let mut operations = Vec::new();
-
-    for pattern in patterns {
-        if let PatternType::MixedConcerns(ref mixing) = pattern.pattern_type {
-            for concern in &mixing.concerns {
-                if concern.contains("I/O") {
-                    operations.push("File or network I/O".to_string());
-                }
-                if concern.contains("Database") {
-                    operations.push("Database operations".to_string());
-                }
-            }
-        } else if matches!(pattern.pattern_type, PatternType::SideEffects) {
-            operations.push("Side effects (I/O or state mutation)".to_string());
-        }
+/// Classifies a concern string into an operation type
+fn classify_concern(concern: &str) -> Option<String> {
+    match () {
+        _ if concern.contains("I/O") => Some("File or network I/O".to_string()),
+        _ if concern.contains("Database") => Some("Database operations".to_string()),
+        _ => None,
     }
+}
+
+/// Extracts operations from a single pattern
+fn extract_pattern_operations(pattern: &DetectedPattern) -> Vec<String> {
+    match &pattern.pattern_type {
+        PatternType::MixedConcerns(mixing) => mixing
+            .concerns
+            .iter()
+            .filter_map(|concern| classify_concern(concern))
+            .collect(),
+        PatternType::SideEffects => {
+            vec!["Side effects (I/O or state mutation)".to_string()]
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn detect_io_operations(patterns: &[DetectedPattern]) -> Vec<String> {
+    let operations: Vec<String> = patterns
+        .iter()
+        .flat_map(extract_pattern_operations)
+        .collect();
 
     if operations.is_empty() {
-        operations.push("Unspecified side effects".to_string());
+        vec!["Unspecified side effects".to_string()]
+    } else {
+        operations
     }
-
-    operations
 }
 
 pub struct MixedLogicDetector;
