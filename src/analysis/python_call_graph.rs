@@ -14,6 +14,7 @@ use rustpython_parser::ast;
 use std::path::Path;
 
 /// Python-specific call graph analyzer
+#[derive(Default)]
 pub struct PythonCallGraphAnalyzer {
     current_class: Option<String>,
     current_function: Option<String>,
@@ -22,11 +23,7 @@ pub struct PythonCallGraphAnalyzer {
 
 impl PythonCallGraphAnalyzer {
     pub fn new() -> Self {
-        Self {
-            current_class: None,
-            current_function: None,
-            function_lines: std::collections::HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Analyze a Python module and extract method calls with source text for line numbers
@@ -454,7 +451,7 @@ class MyClass:
         };
 
         assert!(
-            call_graph.get_callers(&private_method_id).len() > 0,
+            !call_graph.get_callers(&private_method_id).is_empty(),
             "Private method should have callers"
         );
     }
@@ -486,7 +483,7 @@ class Manager:
         };
 
         assert!(
-            call_graph.get_callers(&connection_method_id).len() > 0,
+            !call_graph.get_callers(&connection_method_id).is_empty(),
             "Connection method used in with statement should have callers"
         );
     }

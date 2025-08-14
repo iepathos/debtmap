@@ -1149,15 +1149,95 @@ fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, Stri
         DebtType::Risk {
             risk_score,
             factors,
-        } => (
-            "Address technical debt".to_string(),
-            format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
-            vec![
-                "Review and refactor problematic areas".to_string(),
-                "Add missing tests".to_string(),
-                "Update documentation".to_string(),
-            ],
-        ),
+        } => {
+            // Check if any factor mentions complexity to provide more specific recommendations
+            let has_complexity_issue = factors.iter().any(|f|
+                f.contains("complexity") || f.contains("cyclomatic") || f.contains("cognitive")
+            );
+
+            if has_complexity_issue {
+                // Extract complexity values from factors string if present
+                let cyclo_match = factors.iter()
+                    .find(|f| f.contains("cyclomatic"))
+                    .and_then(|f| {
+                        f.split(':').nth(1)?.trim().strip_suffix(')')?.parse::<u32>().ok()
+                    });
+
+                let _cognitive_match = factors.iter()
+                    .find(|f| f.contains("Cognitive complexity"))
+                    .and_then(|f| {
+                        f.split(':').nth(1)?.trim().parse::<u32>().ok()
+                    });
+
+                let cyclo = cyclo_match.unwrap_or(0);
+                let _cognitive = _cognitive_match.unwrap_or(0);
+                let is_moderate = cyclo > 5 && cyclo <= 10;
+
+                if is_moderate {
+                    // Calculate how many functions to extract based on complexity
+                    let functions_to_extract = (cyclo / 3).max(2);
+                    let target_complexity = 3;
+
+                    (
+                        format!("Extract {} pure functions to reduce complexity from {} to {}", 
+                                functions_to_extract, cyclo, target_complexity),
+                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
+                        vec![
+                            format!("Identify {} logical sections in the function", functions_to_extract),
+                            "Extract each section as a pure function (no side effects)".to_string(),
+                            "Replace nested if/else with pattern matching or early returns".to_string(),
+                            "Convert imperative loops to .map(), .filter(), .fold()".to_string(),
+                            "Move all I/O operations to a single orchestrator function".to_string(),
+                            format!("Write {} unit tests for the extracted functions", functions_to_extract),
+                            format!("Goal: Reduce cyclomatic complexity from {} to <={}", cyclo, target_complexity),
+                        ],
+                    )
+                } else if cyclo > 10 {
+                    // High complexity - needs more aggressive refactoring
+                    let functions_to_extract = (cyclo / 4).max(3);
+                    let target_complexity = 5;
+
+                    (
+                        format!("Decompose into {} focused functions (complexity {} → {})", 
+                                functions_to_extract, cyclo, target_complexity),
+                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
+                        vec![
+                            "Map each conditional branch to its core responsibility".to_string(),
+                            format!("Create {} pure functions, one per responsibility", functions_to_extract),
+                            "Replace complex conditionals with function dispatch table".to_string(),
+                            "Extract validation logic into composable predicates".to_string(),
+                            "Transform data mutations into immutable transformations".to_string(),
+                            "Isolate side effects in a thin orchestration layer".to_string(),
+                            format!("Add property-based tests for {} pure functions", functions_to_extract),
+                            format!("Target: Each function ≤{} cyclomatic complexity", target_complexity),
+                        ],
+                    )
+                } else {
+                    // Low complexity but still flagged - likely other issues
+                    (
+                        "Simplify function structure and improve testability".to_string(),
+                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
+                        vec![
+                            "Extract helper functions for clarity".to_string(),
+                            "Remove unnecessary branching".to_string(),
+                            "Consolidate similar code paths".to_string(),
+                            "Add unit tests for edge cases".to_string(),
+                        ],
+                    )
+                }
+            } else {
+                // Non-complexity related risk
+                (
+                    "Address identified risk factors".to_string(),
+                    format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
+                    vec![
+                        "Review and refactor problematic areas".to_string(),
+                        "Add missing tests if coverage is low".to_string(),
+                        "Update documentation".to_string(),
+                    ],
+                )
+            }
+        }
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
@@ -2018,6 +2098,83 @@ mod tests {
             threshold: 10,
         };
         assert!((calculate_complexity_reduction(&test_complexity, false) - 3.6).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_risk_debt_recommendation_with_moderate_complexity() {
+        let func = create_test_metrics();
+        let debt_type = DebtType::Risk {
+            risk_score: 5.0,
+            factors: vec!["Moderate complexity (cyclomatic: 9)".to_string()],
+        };
+        let score = UnifiedScore {
+            complexity_factor: 5.0,
+            coverage_factor: 3.0,
+            roi_factor: 2.0,
+            semantic_factor: 1.0,
+            role_multiplier: 1.0,
+            final_score: 3.0,
+        };
+
+        let rec = generate_recommendation(&func, &debt_type, FunctionRole::PureLogic, &score);
+        assert!(rec.primary_action.contains("Extract 3 pure functions"));
+        assert!(rec.primary_action.contains("reduce complexity from 9 to 3"));
+        assert!(rec.rationale.contains("Risk score 5.0"));
+        assert!(rec.rationale.contains("Moderate complexity"));
+        assert_eq!(rec.implementation_steps.len(), 7);
+        assert!(rec.implementation_steps[0].contains("3 logical sections"));
+        assert!(rec.implementation_steps[2].contains("pattern matching"));
+        assert!(rec.implementation_steps[3].contains(".map(), .filter(), .fold()"));
+        assert!(rec.implementation_steps[6].contains("Reduce cyclomatic complexity from 9"));
+    }
+
+    #[test]
+    fn test_risk_debt_recommendation_with_high_complexity() {
+        let func = create_test_metrics();
+        let debt_type = DebtType::Risk {
+            risk_score: 7.0,
+            factors: vec!["High complexity (cyclomatic: 15)".to_string()],
+        };
+        let score = UnifiedScore {
+            complexity_factor: 7.0,
+            coverage_factor: 5.0,
+            roi_factor: 3.0,
+            semantic_factor: 2.0,
+            role_multiplier: 1.0,
+            final_score: 5.0,
+        };
+
+        let rec = generate_recommendation(&func, &debt_type, FunctionRole::Unknown, &score);
+        assert!(rec.primary_action.contains("Decompose into"));
+        assert!(rec.primary_action.contains("focused functions"));
+        assert!(rec.primary_action.contains("complexity 15"));
+        assert!(rec.rationale.contains("Risk score 7.0"));
+        assert_eq!(rec.implementation_steps.len(), 8);
+        assert!(rec.implementation_steps[0].contains("conditional branch"));
+        assert!(rec.implementation_steps[2].contains("function dispatch table"));
+    }
+
+    #[test]
+    fn test_risk_debt_recommendation_without_complexity() {
+        let func = create_test_metrics();
+        let debt_type = DebtType::Risk {
+            risk_score: 2.0,
+            factors: vec!["Low coverage: 30%".to_string()],
+        };
+        let score = UnifiedScore {
+            complexity_factor: 1.0,
+            coverage_factor: 6.0,
+            roi_factor: 2.0,
+            semantic_factor: 1.0,
+            role_multiplier: 1.0,
+            final_score: 3.0,
+        };
+
+        let rec = generate_recommendation(&func, &debt_type, FunctionRole::Unknown, &score);
+        assert_eq!(rec.primary_action, "Address identified risk factors");
+        assert!(rec.rationale.contains("Low coverage"));
+        assert_eq!(rec.implementation_steps.len(), 3);
+        assert!(rec.implementation_steps[1].contains("missing tests"));
     }
 
     #[test]
