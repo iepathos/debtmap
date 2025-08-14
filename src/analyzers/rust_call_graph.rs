@@ -104,7 +104,11 @@ impl CallGraphExtractor {
         // Try to find by exact match or resolved name
         let matches: Vec<_> = all_functions
             .iter()
-            .filter(|f| f.name == resolved_name || f.name == name || f.name.ends_with(&format!("::{}", resolved_name)))
+            .filter(|f| {
+                f.name == resolved_name
+                    || f.name == name
+                    || f.name.ends_with(&format!("::{}", resolved_name))
+            })
             .collect();
 
         match matches.len() {
@@ -304,10 +308,10 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     fn visit_item_mod(&mut self, item_mod: &'ast syn::ItemMod) {
         // Push module name to path
         self.module_path.push(item_mod.ident.to_string());
-        
+
         // Visit module contents
         syn::visit::visit_item_mod(self, item_mod);
-        
+
         // Pop module name from path
         self.module_path.pop();
     }

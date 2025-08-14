@@ -886,7 +886,7 @@ fn process_rust_files_for_call_graph(
     call_graph: &mut priority::CallGraph,
     expand_macros: bool,
     clear_expansion_cache: bool,
-) -> Result<()> {
+) -> Result<std::collections::HashSet<priority::call_graph::FunctionId>> {
     let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
         .context("Failed to find Rust files for call graph")?;
 
@@ -928,13 +928,18 @@ fn process_rust_files_for_call_graph(
 
     // Build the enhanced graph and merge its calls into our existing graph
     let enhanced_graph = enhanced_builder.build();
+    // Get framework pattern exclusions for dead code detection
+    let framework_exclusions = enhanced_graph.framework_patterns.get_exclusions();
+    // Convert from im::HashSet to std::collections::HashSet
+    let framework_exclusions_std: std::collections::HashSet<priority::call_graph::FunctionId> =
+        framework_exclusions.into_iter().collect();
     // Merge the enhanced graph's calls into our existing call graph instead of replacing it
     call_graph.merge(enhanced_graph.base_graph);
 
     // Resolve cross-file function calls after all files have been processed
     call_graph.resolve_cross_file_calls();
 
-    Ok(())
+    Ok(framework_exclusions_std)
 }
 
 /// Extract call graph from a file without expansion
@@ -951,7 +956,82 @@ fn extract_regular_call_graph(file_path: &Path) -> Result<priority::CallGraph> {
     }
 }
 
-/// Create unified analysis from metrics and call graph
+/// Create unified analysis from metrics and call graph with framework exclusions
+fn create_unified_analysis_with_exclusions(
+    metrics: &[debtmap::FunctionMetrics],
+    call_graph: &priority::CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    framework_exclusions: &std::collections::HashSet<priority::call_graph::FunctionId>,
+) -> priority::UnifiedAnalysis {
+    use priority::{unified_scorer, UnifiedAnalysis};
+
+    let mut unified = UnifiedAnalysis::new(call_graph.clone());
+
+    for metric in metrics {
+        // Skip test functions from debt score calculation
+        // Test functions are analyzed separately to avoid inflating debt scores
+        if metric.is_test {
+            continue;
+        }
+
+        // Skip closures - they're part of their parent function's implementation
+        // Their complexity already contributes to the parent function's metrics
+        if metric.name.contains("<closure@") {
+            continue;
+        }
+
+        // Skip test helper functions (functions only called by test functions)
+        // based on the call graph analysis
+        let func_id = priority::call_graph::FunctionId {
+            file: metric.file.clone(),
+            name: metric.name.clone(),
+            line: metric.line,
+        };
+
+        let callers = call_graph.get_callers(&func_id);
+        if !callers.is_empty()
+            && callers
+                .iter()
+                .all(|caller| caller.name.starts_with("test_"))
+        {
+            continue;
+        }
+
+        // Skip trivial wrappers that only delegate to a single function
+        // Unless they have high complexity (cyclomatic > 3)
+        if metric.cyclomatic <= 3 {
+            let callees = call_graph.get_callees(&func_id);
+            if callees.len() <= 1 {
+                // This is either a trivial wrapper or a simple getter/setter
+                // Not worth tracking as technical debt
+                continue;
+            }
+        }
+
+        let roi_score = 5.0; // Default ROI
+        let item = unified_scorer::create_unified_debt_item_with_exclusions(
+            metric,
+            call_graph,
+            coverage_data,
+            roi_score,
+            framework_exclusions,
+        );
+        unified.add_item(item);
+    }
+
+    unified.sort_by_priority();
+    unified.calculate_total_impact();
+
+    // Set overall coverage if lcov data is available
+    if let Some(lcov) = coverage_data {
+        unified.overall_coverage = Some(lcov.get_overall_coverage());
+    }
+
+    unified
+}
+
+/// Create unified analysis from metrics and call graph (legacy - kept for compatibility)
+#[allow(dead_code)]
 fn create_unified_analysis(
     metrics: &[debtmap::FunctionMetrics],
     call_graph: &priority::CallGraph,
@@ -1025,8 +1105,8 @@ fn perform_unified_analysis(
     // Build initial call graph from complexity metrics
     let mut call_graph = build_initial_call_graph(&results.complexity.metrics);
 
-    // Process Rust files to extract call relationships
-    process_rust_files_for_call_graph(
+    // Process Rust files to extract call relationships and get framework exclusions
+    let framework_exclusions = process_rust_files_for_call_graph(
         project_path,
         &mut call_graph,
         expand_macros,
@@ -1041,11 +1121,12 @@ fn perform_unified_analysis(
         None => None,
     };
 
-    // Create and return unified analysis
-    Ok(create_unified_analysis(
+    // Create and return unified analysis with framework exclusions
+    Ok(create_unified_analysis_with_exclusions(
         &results.complexity.metrics,
         &call_graph,
         coverage_data.as_ref(),
+        &framework_exclusions,
     ))
 }
 
