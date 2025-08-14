@@ -319,40 +319,61 @@ impl EnhancedCallGraph {
         }
     }
 
-    /// Get functions that are definitely used (not dead code)
-    pub fn get_live_functions(&self) -> HashSet<FunctionId> {
+    /// Determine if a framework pattern represents a live function
+    fn is_live_pattern(pattern_type: &PatternType) -> bool {
+        matches!(
+            pattern_type,
+            PatternType::TestFunction
+                | PatternType::WebHandler
+                | PatternType::EventHandler
+                | PatternType::MacroCallback
+                | PatternType::VisitTrait
+        )
+    }
+
+    /// Collect framework-managed live functions
+    fn collect_framework_functions(&self) -> impl Iterator<Item = FunctionId> + '_ {
+        self.framework_patterns
+            .get_detected_patterns()
+            .into_iter()
+            .filter_map(|pattern| {
+                pattern.function_id.as_ref().and_then(|func_id| {
+                    if Self::is_live_pattern(&pattern.pattern_type) {
+                        Some(func_id.clone())
+                    } else {
+                        None
+                    }
+                })
+            })
+    }
+
+    /// Collect all initially live functions (entry points, tests, framework, public API)
+    fn collect_initial_live_functions(&self) -> HashSet<FunctionId> {
         let mut live_functions = HashSet::new();
 
-        // Start with entry points
-        for entry_point in self.base_graph.find_entry_points() {
-            live_functions.insert(entry_point);
-        }
+        // Entry points
+        live_functions.extend(self.base_graph.find_entry_points());
 
-        // Add test functions
-        for test_function in self.base_graph.find_test_functions() {
-            live_functions.insert(test_function);
-        }
+        // Test functions
+        live_functions.extend(self.base_graph.find_test_functions());
 
-        // Add framework-managed functions
-        for pattern in self.framework_patterns.get_detected_patterns() {
-            if let Some(func_id) = &pattern.function_id {
-                match pattern.pattern_type {
-                    PatternType::TestFunction
-                    | PatternType::WebHandler
-                    | PatternType::EventHandler
-                    | PatternType::MacroCallback
-                    | PatternType::VisitTrait => {
-                        live_functions.insert(func_id.clone());
-                    }
-                    _ => {}
-                }
-            }
-        }
+        // Framework-managed functions
+        live_functions.extend(self.collect_framework_functions());
 
-        // Add public API functions
-        for api_info in self.cross_module_tracker.get_public_apis() {
-            live_functions.insert(api_info.function_id.clone());
-        }
+        // Public API functions
+        live_functions.extend(
+            self.cross_module_tracker
+                .get_public_apis()
+                .into_iter()
+                .map(|api| api.function_id),
+        );
+
+        live_functions
+    }
+
+    /// Get functions that are definitely used (not dead code)
+    pub fn get_live_functions(&self) -> HashSet<FunctionId> {
+        let mut live_functions = self.collect_initial_live_functions();
 
         // Add all functions reachable from live functions
         let mut to_visit: Vec<FunctionId> = live_functions.iter().cloned().collect();
