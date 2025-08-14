@@ -286,7 +286,9 @@ fn determine_debt_type(
 ) -> DebtType {
     // Determine primary debt type based on metrics
     if let Some(cov) = coverage {
-        if cov.direct < 0.2 && func.cyclomatic > 3 {
+        // Any untested function (< 20% coverage) that isn't a test itself is a testing gap
+        // Even simple functions need basic tests
+        if cov.direct < 0.2 && !func.is_test {
             return DebtType::TestingGap {
                 coverage: cov.direct,
                 cyclomatic: func.cyclomatic,
