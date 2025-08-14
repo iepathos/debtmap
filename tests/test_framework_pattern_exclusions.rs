@@ -19,6 +19,7 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         cognitive: 10,
         is_test: true,
         visibility: Some("pub".to_string()),
+        is_trait_method: false,
         length: 20,
         nesting: 2,
     };
@@ -66,6 +67,7 @@ fn test_visit_trait_pattern_exclusion() {
         cognitive: 15,
         is_test: false,
         visibility: Some("pub".to_string()),
+        is_trait_method: false,
         length: 30,
         nesting: 3,
     };

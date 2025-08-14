@@ -90,6 +90,7 @@ impl EvidenceBasedRiskCalculator {
             nesting: function.nesting_depth,
             is_test: function.is_test,
             visibility: Some(self.visibility_to_string(&function.visibility)),
+            is_trait_method: false, // Default to false, can be updated if needed
         };
 
         classify_function_role(&func_metrics, &func_id, call_graph)

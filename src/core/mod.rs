@@ -44,6 +44,7 @@ pub struct FunctionMetrics {
     pub length: usize,
     pub is_test: bool,
     pub visibility: Option<String>, // "pub", "pub(crate)", or None for private
+    pub is_trait_method: bool,      // Whether this is a trait method implementation
 }
 
 impl FunctionMetrics {
@@ -58,6 +59,7 @@ impl FunctionMetrics {
             length: 0,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         }
     }
 

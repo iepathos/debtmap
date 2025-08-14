@@ -18,6 +18,7 @@ fn test_complexity_calculator_new() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(!calc.is_complex(&metrics));
 }
@@ -35,6 +36,7 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -55,6 +57,7 @@ fn test_complexity_calculator_is_complex_cognitive() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -75,6 +78,7 @@ fn test_complexity_calculator_is_complex_both() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -95,6 +99,7 @@ fn test_complexity_calculator_is_not_complex() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(
         !calc.is_complex(&metrics),
@@ -115,6 +120,7 @@ fn test_complexity_calculator_calculate_score_low() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -136,6 +142,7 @@ fn test_complexity_calculator_calculate_score_medium() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -157,6 +164,7 @@ fn test_complexity_calculator_calculate_score_high() {
         length: 10,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -178,6 +186,7 @@ fn test_complexity_calculator_calculate_score_zero() {
         length: 0,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(score, 0, "Score should be 0 when metrics are 0");
@@ -278,6 +287,7 @@ fn test_complexity_calculator_boundary_values() {
         length: 0,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(!calc.is_complex(&metrics_zero));
 
@@ -291,6 +301,7 @@ fn test_complexity_calculator_boundary_values() {
         length: 0,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(!calc.is_complex(&metrics_one));
 
@@ -304,6 +315,7 @@ fn test_complexity_calculator_boundary_values() {
         length: 0,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     assert!(calc.is_complex(&metrics_two));
 }
@@ -322,6 +334,7 @@ fn test_complexity_score_proportions() {
         length: 0,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
     assert_eq!(
@@ -339,6 +352,7 @@ fn test_complexity_score_proportions() {
         length: 0,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
     assert_eq!(

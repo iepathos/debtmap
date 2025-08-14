@@ -818,7 +818,12 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
     }
 
     // Trait method implementations - these are called through trait objects
-    // Check for common trait method patterns
+    // Use the new is_trait_method field for accurate detection
+    if func.is_trait_method {
+        return true;
+    }
+
+    // Also check for common trait method patterns as fallback
     if is_likely_trait_method(func) {
         return true;
     }
@@ -1417,6 +1422,7 @@ mod tests {
             nesting: 0,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         }
     }
 

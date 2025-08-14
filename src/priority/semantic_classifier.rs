@@ -315,6 +315,7 @@ mod tests {
             nesting: 0,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         }
     }
 

@@ -13,6 +13,7 @@ fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> Function
         nesting: 2,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     }
 }
 

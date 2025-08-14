@@ -156,6 +156,7 @@ mod tests {
             length: 25,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         }];
 
         AnalysisResults {

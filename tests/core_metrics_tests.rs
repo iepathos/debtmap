@@ -214,6 +214,7 @@ fn test_complexity_metrics_from_function() {
         length: 30,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -246,6 +247,7 @@ fn test_complexity_metrics_from_function_zero_values() {
         length: 1,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -270,6 +272,7 @@ fn test_complexity_metrics_from_function_high_values() {
         length: 500,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -297,6 +300,7 @@ fn test_complexity_metrics_from_function_preserves_path() {
         length: 15,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);

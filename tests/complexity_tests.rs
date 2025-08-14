@@ -14,6 +14,7 @@ fn test_complexity_metrics() {
             length: 10,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         },
         FunctionMetrics {
             name: "complex".to_string(),
@@ -25,6 +26,7 @@ fn test_complexity_metrics() {
             length: 50,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         },
         FunctionMetrics {
             name: "medium".to_string(),
@@ -36,6 +38,7 @@ fn test_complexity_metrics() {
             length: 30,
             is_test: false,
             visibility: None,
+            is_trait_method: false,
         },
     ];
 
@@ -67,6 +70,7 @@ fn test_function_is_complex() {
         length: 30,
         is_test: false,
         visibility: None,
+        is_trait_method: false,
     };
 
     assert!(
