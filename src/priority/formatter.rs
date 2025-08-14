@@ -264,7 +264,7 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         .unwrap();
     }
 
-    // Add dependency information if available
+    // Add dependency information with caller/callee names
     let (upstream, downstream) = extract_dependency_info(item);
     if upstream > 0 || downstream > 0 {
         writeln!(
@@ -274,6 +274,34 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
             downstream.to_string().dimmed()
         )
         .unwrap();
+
+        // Add upstream callers if present
+        if !item.upstream_callers.is_empty() {
+            let callers_display = if item.upstream_callers.len() <= 3 {
+                item.upstream_callers.join(", ")
+            } else {
+                format!(
+                    "{}, ... ({} more)",
+                    item.upstream_callers[..3].join(", "),
+                    item.upstream_callers.len() - 3
+                )
+            };
+            writeln!(output, "│  ├─ CALLERS: {}", callers_display.bright_blue()).unwrap();
+        }
+
+        // Add downstream callees if present
+        if !item.downstream_callees.is_empty() {
+            let callees_display = if item.downstream_callees.len() <= 3 {
+                item.downstream_callees.join(", ")
+            } else {
+                format!(
+                    "{}, ... ({} more)",
+                    item.downstream_callees[..3].join(", "),
+                    item.downstream_callees.len() - 3
+                )
+            };
+            writeln!(output, "│  └─ CALLS: {}", callees_display.bright_green()).unwrap();
+        }
     }
 
     // Add dead code specific information
@@ -586,6 +614,12 @@ mod tests {
             transitive_coverage: None,
             upstream_dependencies: 2,
             downstream_dependencies: 3,
+            upstream_callers: vec!["main".to_string(), "process_data".to_string()],
+            downstream_callees: vec![
+                "validate".to_string(),
+                "transform".to_string(),
+                "save".to_string(),
+            ],
             nesting_depth: 1,
             function_length: 15,
             cyclomatic_complexity: 5,
