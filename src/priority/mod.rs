@@ -124,7 +124,10 @@ impl UnifiedAnalysis {
     }
 
     pub fn add_item(&mut self, item: UnifiedDebtItem) {
-        self.items.push_back(item);
+        // Only add items that have a non-zero score (actual technical debt)
+        if item.unified_score.final_score > 0.0 {
+            self.items.push_back(item);
+        }
     }
 
     pub fn sort_by_priority(&mut self) {
