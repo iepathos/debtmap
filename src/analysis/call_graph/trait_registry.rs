@@ -412,7 +412,7 @@ impl<'ast> Visit<'ast> for TraitVisitor {
             if let Some(trait_name) = self.extract_path_name(trait_path) {
                 if let Some(implementing_type) = self.extract_type_name(&item.self_ty) {
                     let is_visit_trait = self.is_visit_trait(&trait_name);
-                    
+
                     // Extract method implementations
                     let method_implementations = self.extract_method_implementations(
                         &item.items,
