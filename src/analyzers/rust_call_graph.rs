@@ -33,6 +33,38 @@ impl CallGraphExtractor {
         }
     }
 
+    /// Constructs a method name, qualifying it with the impl type if it's a self method
+    fn construct_method_name(
+        method: &syn::Ident,
+        receiver: &Expr,
+        current_impl_type: &Option<String>,
+    ) -> String {
+        let method_name = method.to_string();
+        if matches!(receiver, Expr::Path(p) if p.path.is_ident("self")) {
+            // This is a self method call, use the impl type if available
+            if let Some(ref impl_type) = current_impl_type {
+                format!("{}::{}", impl_type, method_name)
+            } else {
+                method_name
+            }
+        } else {
+            // Regular method call on another object
+            method_name
+        }
+    }
+
+    /// Process arguments to check for function references and visit nested expressions
+    fn process_arguments(&mut self, args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>) {
+        // First pass: check for function references
+        for arg in args {
+            self.check_for_function_reference(arg);
+        }
+        // Second pass: visit nested expressions
+        for arg in args {
+            self.visit_expr(arg);
+        }
+    }
+
     fn get_line_number(&self, span: proc_macro2::Span) -> usize {
         span.start().line
     }
@@ -185,14 +217,8 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                         self.add_call(name.clone(), Self::classify_call_type(&name));
                     }
                 }
-                // Also check arguments for function references
-                for arg in args {
-                    self.check_for_function_reference(arg);
-                }
-                // Visit arguments to find nested calls
-                for arg in args {
-                    self.visit_expr(arg);
-                }
+                // Process arguments for references and nested calls
+                self.process_arguments(args);
                 return; // Early return to avoid visiting children
             }
             // Handle method calls: obj.method()
@@ -202,31 +228,12 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 receiver,
                 ..
             }) => {
-                // Check if this is a self method call
-                let method_name = method.to_string();
-                let name = if matches!(receiver.as_ref(), Expr::Path(p) if p.path.is_ident("self"))
-                {
-                    // This is a self method call, use the impl type if available
-                    if let Some(ref impl_type) = self.current_impl_type {
-                        format!("{}::{}", impl_type, method_name)
-                    } else {
-                        method_name.clone()
-                    }
-                } else {
-                    // Regular method call on another object
-                    method_name.clone()
-                };
+                let name = Self::construct_method_name(method, receiver, &self.current_impl_type);
                 self.add_call(name.clone(), Self::classify_call_type(&name));
 
-                // Check arguments for function references (e.g., .for_each(print_func))
-                for arg in args {
-                    self.check_for_function_reference(arg);
-                }
-                // Visit receiver and arguments but not the method itself
+                // Process arguments and visit receiver
+                self.process_arguments(args);
                 self.visit_expr(receiver);
-                for arg in args {
-                    self.visit_expr(arg);
-                }
                 return; // Early return to avoid visiting children
             }
             // Handle closures that might be callbacks
@@ -409,7 +416,235 @@ mod tests {
     }
 
     #[test]
-    fn test_visit_expr_function_call() {
+    fn test_construct_method_name_self_method() {
+        let method: syn::Ident = parse_quote!(foo);
+        let receiver: Expr = parse_quote!(self);
+        let impl_type = Some("MyStruct".to_string());
+        
+        assert_eq!(
+            CallGraphExtractor::construct_method_name(&method, &receiver, &impl_type),
+            "MyStruct::foo"
+        );
+    }
+
+    #[test]
+    fn test_construct_method_name_self_method_no_impl() {
+        let method: syn::Ident = parse_quote!(foo);
+        let receiver: Expr = parse_quote!(self);
+        let impl_type = None;
+        
+        assert_eq!(
+            CallGraphExtractor::construct_method_name(&method, &receiver, &impl_type),
+            "foo"
+        );
+    }
+
+    #[test]
+    fn test_construct_method_name_regular_method() {
+        let method: syn::Ident = parse_quote!(bar);
+        let receiver: Expr = parse_quote!(obj);
+        let impl_type = Some("MyStruct".to_string());
+        
+        assert_eq!(
+            CallGraphExtractor::construct_method_name(&method, &receiver, &impl_type),
+            "bar"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_simple_function_call() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(foo());
+        extractor.visit_expr(&expr);
+        
+        // Check that the call was recorded
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].callee.name, "foo");
+        assert_eq!(calls[0].call_type, CallType::Direct);
+    }
+
+    #[test]
+    fn test_visit_expr_simple_method_call() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        extractor.current_impl_type = Some("MyStruct".to_string());
+        
+        let expr: Expr = parse_quote!(self.process());
+        extractor.visit_expr(&expr);
+        
+        // Check that the call was recorded with impl type
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].callee.name, "MyStruct::process");
+        assert_eq!(calls[0].call_type, CallType::Direct);
+    }
+
+    #[test]
+    fn test_visit_expr_async_method_call() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(obj.async_fetch());
+        extractor.visit_expr(&expr);
+        
+        // Check that the call was recorded as async
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].callee.name, "async_fetch");
+        assert_eq!(calls[0].call_type, CallType::Async);
+    }
+
+    #[test]
+    fn test_visit_expr_delegate_call() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(handle_request());
+        extractor.visit_expr(&expr);
+        
+        // Check that the call was recorded as delegate
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].callee.name, "handle_request");
+        assert_eq!(calls[0].call_type, CallType::Delegate);
+    }
+
+    #[test]
+    fn test_visit_expr_pipeline_call() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(result.map(|x| x + 1));
+        extractor.visit_expr(&expr);
+        
+        // Check that map was recorded as pipeline
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 2); // map and closure
+        assert_eq!(calls[0].callee.name, "map");
+        assert_eq!(calls[0].call_type, CallType::Pipeline);
+    }
+
+    #[test]
+    fn test_visit_expr_closure() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(|x| x + 1);
+        extractor.visit_expr(&expr);
+        
+        // Check that closure was recorded
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].callee.name.starts_with("<closure@"));
+        assert_eq!(calls[0].call_type, CallType::Callback);
+    }
+
+    #[test]
+    fn test_visit_expr_nested_calls() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(foo(bar(), baz()));
+        extractor.visit_expr(&expr);
+        
+        // Check that all calls were recorded
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 3); // foo, bar, baz
+        let names: Vec<String> = calls.iter().map(|c| c.callee.name.clone()).collect();
+        assert!(names.contains(&"foo".to_string()));
+        assert!(names.contains(&"bar".to_string()));
+        assert!(names.contains(&"baz".to_string()));
+    }
+
+    #[test]
+    fn test_visit_expr_module_path_call() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(std::fs::read_to_string("file.txt"));
+        extractor.visit_expr(&expr);
+        
+        // Check that the function name was extracted properly
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].callee.name, "read_to_string");
+    }
+
+    #[test]
+    fn test_visit_expr_callback_as_argument() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.current_function = Some(FunctionId {
+            name: "test_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+        });
+        
+        let expr: Expr = parse_quote!(vec.iter().for_each(print_item));
+        extractor.visit_expr(&expr);
+        
+        // Check that print_item was recorded as callback
+        let func_id = extractor.current_function.as_ref().unwrap();
+        let calls = extractor.call_graph.get_function_calls(func_id);
+        let callback_calls: Vec<_> = calls.iter()
+            .filter(|c| c.callee.name == "print_item" && c.call_type == CallType::Callback)
+            .collect();
+        assert_eq!(callback_calls.len(), 1);
+    }
+
+    #[test]
+    fn test_extract_function_name_from_path() {
+        let path: syn::Path = parse_quote!(foo);
+        assert_eq!(CallGraphExtractor::extract_function_name_from_path(&path), Some("foo".to_string()));
+        
+        let path: syn::Path = parse_quote!(module::submodule::bar);
+        assert_eq!(CallGraphExtractor::extract_function_name_from_path(&path), Some("bar".to_string()));
+    }
+
+    #[test]
+    fn test_visit_expr_function_call_with_call_graph() {
         let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
         extractor.current_function = Some(FunctionId {
             name: "test_fn".to_string(),
@@ -455,7 +690,7 @@ mod tests {
     }
 
     #[test]
-    fn test_visit_expr_method_call() {
+    fn test_visit_expr_method_call_with_call_graph() {
         let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
         extractor.current_function = Some(FunctionId {
             name: "test_fn".to_string(),
@@ -497,7 +732,7 @@ mod tests {
     }
 
     #[test]
-    fn test_visit_expr_closure() {
+    fn test_visit_expr_closure_with_map() {
         let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
         extractor.current_function = Some(FunctionId {
             name: "test_fn".to_string(),
