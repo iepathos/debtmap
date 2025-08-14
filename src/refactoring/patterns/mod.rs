@@ -229,40 +229,76 @@ impl PatternMatcher for SideEffectMatcher {
 
 struct MixedConcernsMatcher;
 
+impl MixedConcernsMatcher {
+    /// Classifies the concerns present in a function based on its name and metrics
+    fn classify_concerns(function: &FunctionMetrics) -> Vec<String> {
+        let mut concerns = vec![];
+
+        // Check for I/O operations
+        if Self::has_io_operations(&function.name) {
+            concerns.push("I/O Operations".to_string());
+        }
+
+        // Check for business logic
+        if function.cyclomatic > 5 {
+            concerns.push("Business Logic".to_string());
+        }
+
+        // Check for formatting
+        if Self::has_formatting_operations(&function.name) {
+            concerns.push("Formatting".to_string());
+        }
+
+        concerns
+    }
+
+    /// Determines if a function name indicates I/O operations
+    fn has_io_operations(name: &str) -> bool {
+        name.contains("write")
+            || name.contains("read")
+            || name.contains("print")
+            || name.contains("save")
+    }
+
+    /// Determines if a function name indicates formatting operations
+    fn has_formatting_operations(name: &str) -> bool {
+        name.contains("format") || name.contains("display")
+    }
+
+    /// Classifies the difficulty of separating concerns based on complexity
+    fn classify_separation_difficulty(cyclomatic: u32) -> SeparationDifficulty {
+        if cyclomatic > 10 {
+            SeparationDifficulty::High
+        } else {
+            SeparationDifficulty::Medium
+        }
+    }
+
+    /// Determines the urgency of refactoring based on complexity
+    fn classify_urgency(cyclomatic: u32) -> Urgency {
+        if cyclomatic > 15 {
+            Urgency::High
+        } else {
+            Urgency::Medium
+        }
+    }
+}
+
 impl PatternMatcher for MixedConcernsMatcher {
     fn match_pattern(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<DetectedPattern> {
-        // High complexity with I/O patterns suggests mixed concerns
-        let has_io = function.name.contains("write")
-            || function.name.contains("read")
-            || function.name.contains("print")
-            || function.name.contains("save");
-        let has_logic = function.cyclomatic > 5;
-        let has_formatting = function.name.contains("format") || function.name.contains("display");
-
-        let mut concerns = vec![];
-        if has_io {
-            concerns.push("I/O Operations".to_string());
-        }
-        if has_logic {
-            concerns.push("Business Logic".to_string());
-        }
-        if has_formatting {
-            concerns.push("Formatting".to_string());
-        }
+        let concerns = Self::classify_concerns(function);
 
         if concerns.len() > 1 {
             Some(DetectedPattern {
                 pattern_type: PatternType::MixedConcerns(ConcernMixingPattern {
                     concerns: concerns.clone(),
-                    separation_difficulty: if function.cyclomatic > 10 {
-                        SeparationDifficulty::High
-                    } else {
-                        SeparationDifficulty::Medium
-                    },
+                    separation_difficulty: Self::classify_separation_difficulty(
+                        function.cyclomatic,
+                    ),
                 }),
                 confidence: 0.8,
                 evidence: PatternEvidence {
@@ -280,11 +316,7 @@ impl PatternMatcher for MixedConcernsMatcher {
                         "Changes to one concern affect others".to_string(),
                     ],
                     recommended_patterns: vec![PatternType::FunctionalComposition],
-                    urgency: if function.cyclomatic > 15 {
-                        Urgency::High
-                    } else {
-                        Urgency::Medium
-                    },
+                    urgency: Self::classify_urgency(function.cyclomatic),
                 },
             })
         } else {
