@@ -41,6 +41,25 @@ impl RefactoringGuidanceGenerator {
         }
     }
 
+    fn get_priority_icon(priority: &Priority) -> &'static str {
+        match priority {
+            Priority::Critical => "🔴",
+            Priority::High => "🟠",
+            Priority::Medium => "🟡",
+            Priority::Low => "🟢",
+        }
+    }
+
+    fn get_effort_string(effort: &EffortEstimate) -> &'static str {
+        match effort {
+            EffortEstimate::Trivial => "< 15 min",
+            EffortEstimate::Low => "15-60 min",
+            EffortEstimate::Medium => "1-4 hours",
+            EffortEstimate::High => "4-8 hours",
+            EffortEstimate::Significant => "> 8 hours",
+        }
+    }
+
     pub fn generate_guidance(&self, analysis: &RefactoringAnalysis) -> String {
         let mut output = String::new();
 
@@ -153,20 +172,8 @@ impl RefactoringGuidanceGenerator {
     fn format_recommendation(&self, rec: &Recommendation) -> String {
         let mut output = String::new();
 
-        let priority_icon = match rec.priority {
-            Priority::Critical => "🔴",
-            Priority::High => "🟠",
-            Priority::Medium => "🟡",
-            Priority::Low => "🟢",
-        };
-
-        let effort_str = match rec.effort_estimate {
-            EffortEstimate::Trivial => "< 15 min",
-            EffortEstimate::Low => "15-60 min",
-            EffortEstimate::Medium => "1-4 hours",
-            EffortEstimate::High => "4-8 hours",
-            EffortEstimate::Significant => "> 8 hours",
-        };
+        let priority_icon = Self::get_priority_icon(&rec.priority);
+        let effort_str = Self::get_effort_string(&rec.effort_estimate);
 
         output.push_str(&format!(
             "{} {} [Effort: {}]\n",
