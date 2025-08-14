@@ -208,6 +208,15 @@ impl RefactoringGuidanceGenerator {
         output
     }
 
+    fn monadic_pattern_to_str(pattern: &crate::refactoring::MonadicPattern) -> &'static str {
+        match pattern {
+            crate::refactoring::MonadicPattern::Option => "Option monad",
+            crate::refactoring::MonadicPattern::Result => "Result monad",
+            crate::refactoring::MonadicPattern::Future => "Future monad",
+            crate::refactoring::MonadicPattern::State => "State monad",
+        }
+    }
+
     fn pattern_to_string(&self, pattern: &FunctionalPattern) -> String {
         match pattern {
             FunctionalPattern::MapOverLoop => "Replace loops with map",
@@ -216,12 +225,7 @@ impl RefactoringGuidanceGenerator {
             FunctionalPattern::PatternMatchOverIfElse => "Pattern matching",
             FunctionalPattern::ComposeFunctions => "Compose functions",
             FunctionalPattern::PartialApplication => "Partial application",
-            FunctionalPattern::Monadic(m) => match m {
-                crate::refactoring::MonadicPattern::Option => "Option monad",
-                crate::refactoring::MonadicPattern::Result => "Result monad",
-                crate::refactoring::MonadicPattern::Future => "Future monad",
-                crate::refactoring::MonadicPattern::State => "State monad",
-            },
+            FunctionalPattern::Monadic(m) => Self::monadic_pattern_to_str(m),
             FunctionalPattern::Pipeline => "Function pipeline",
             FunctionalPattern::Recursion => "Recursion",
         }
