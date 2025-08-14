@@ -43,7 +43,7 @@ impl CallGraphExtractor {
         if matches!(receiver, Expr::Path(p) if p.path.is_ident("self")) {
             // This is a self method call, use the impl type if available
             if let Some(ref impl_type) = current_impl_type {
-                format!("{}::{}", impl_type, method_name)
+                format!("{impl_type}::{method_name}")
             } else {
                 method_name
             }
@@ -183,7 +183,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         // Construct the full function name including the impl type
         let method_name = impl_fn.sig.ident.to_string();
         let name = if let Some(ref impl_type) = self.current_impl_type {
-            format!("{}::{}", impl_type, method_name)
+            format!("{impl_type}::{method_name}")
         } else {
             method_name.clone()
         };
@@ -420,7 +420,7 @@ mod tests {
         let method: syn::Ident = parse_quote!(foo);
         let receiver: Expr = parse_quote!(self);
         let impl_type = Some("MyStruct".to_string());
-        
+
         assert_eq!(
             CallGraphExtractor::construct_method_name(&method, &receiver, &impl_type),
             "MyStruct::foo"
@@ -432,7 +432,7 @@ mod tests {
         let method: syn::Ident = parse_quote!(foo);
         let receiver: Expr = parse_quote!(self);
         let impl_type = None;
-        
+
         assert_eq!(
             CallGraphExtractor::construct_method_name(&method, &receiver, &impl_type),
             "foo"
@@ -444,7 +444,7 @@ mod tests {
         let method: syn::Ident = parse_quote!(bar);
         let receiver: Expr = parse_quote!(obj);
         let impl_type = Some("MyStruct".to_string());
-        
+
         assert_eq!(
             CallGraphExtractor::construct_method_name(&method, &receiver, &impl_type),
             "bar"
@@ -459,10 +459,10 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(foo());
         extractor.visit_expr(&expr);
-        
+
         // Check that the call was recorded
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -480,10 +480,10 @@ mod tests {
             line: 1,
         });
         extractor.current_impl_type = Some("MyStruct".to_string());
-        
+
         let expr: Expr = parse_quote!(self.process());
         extractor.visit_expr(&expr);
-        
+
         // Check that the call was recorded with impl type
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -500,10 +500,10 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(obj.async_fetch());
         extractor.visit_expr(&expr);
-        
+
         // Check that the call was recorded as async
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -520,10 +520,10 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(handle_request());
         extractor.visit_expr(&expr);
-        
+
         // Check that the call was recorded as delegate
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -540,10 +540,10 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(result.map(|x| x + 1));
         extractor.visit_expr(&expr);
-        
+
         // Check that map was recorded as pipeline
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -560,10 +560,10 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(|x| x + 1);
         extractor.visit_expr(&expr);
-        
+
         // Check that closure was recorded
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -580,10 +580,10 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(foo(bar(), baz()));
         extractor.visit_expr(&expr);
-        
+
         // Check that all calls were recorded
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -602,10 +602,10 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(std::fs::read_to_string("file.txt"));
         extractor.visit_expr(&expr);
-        
+
         // Check that the function name was extracted properly
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
@@ -621,14 +621,15 @@ mod tests {
             file: PathBuf::from("test.rs"),
             line: 1,
         });
-        
+
         let expr: Expr = parse_quote!(vec.iter().for_each(print_item));
         extractor.visit_expr(&expr);
-        
+
         // Check that print_item was recorded as callback
         let func_id = extractor.current_function.as_ref().unwrap();
         let calls = extractor.call_graph.get_function_calls(func_id);
-        let callback_calls: Vec<_> = calls.iter()
+        let callback_calls: Vec<_> = calls
+            .iter()
             .filter(|c| c.callee.name == "print_item" && c.call_type == CallType::Callback)
             .collect();
         assert_eq!(callback_calls.len(), 1);
@@ -637,10 +638,16 @@ mod tests {
     #[test]
     fn test_extract_function_name_from_path() {
         let path: syn::Path = parse_quote!(foo);
-        assert_eq!(CallGraphExtractor::extract_function_name_from_path(&path), Some("foo".to_string()));
-        
+        assert_eq!(
+            CallGraphExtractor::extract_function_name_from_path(&path),
+            Some("foo".to_string())
+        );
+
         let path: syn::Path = parse_quote!(module::submodule::bar);
-        assert_eq!(CallGraphExtractor::extract_function_name_from_path(&path), Some("bar".to_string()));
+        assert_eq!(
+            CallGraphExtractor::extract_function_name_from_path(&path),
+            Some("bar".to_string())
+        );
     }
 
     #[test]
