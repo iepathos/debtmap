@@ -200,6 +200,28 @@ impl CrossModuleTracker {
         self.public_apis.contains_key(func_id)
     }
 
+    /// Find a function export in a module boundary
+    fn find_function_export(boundary: &ModuleBoundary, function_name: &str) -> Option<FunctionId> {
+        boundary
+            .public_exports
+            .iter()
+            .find(|export| {
+                export.name == function_name && export.export_type == ExportType::Function
+            })
+            .and_then(|export| export.function_id.clone())
+    }
+
+    /// Resolve function through re-exports
+    fn resolve_through_reexports(
+        &self,
+        reexported_modules: &Vector<String>,
+        function_name: &str,
+    ) -> Option<FunctionId> {
+        reexported_modules
+            .iter()
+            .find_map(|module| self.resolve_module_call(module, function_name))
+    }
+
     /// Resolve a cross-module call to a specific function
     pub fn resolve_module_call(
         &self,
@@ -208,20 +230,14 @@ impl CrossModuleTracker {
     ) -> Option<FunctionId> {
         // Look for the function in the target module
         if let Some(boundary) = self.module_boundaries.get(module_path) {
-            for export in &boundary.public_exports {
-                if export.name == function_name && export.export_type == ExportType::Function {
-                    return export.function_id.clone();
-                }
+            if let Some(func_id) = Self::find_function_export(boundary, function_name) {
+                return Some(func_id);
             }
         }
 
         // Check re-exports
         if let Some(reexported_modules) = self.reexports.get(module_path) {
-            for reexported_module in reexported_modules {
-                if let Some(func_id) = self.resolve_module_call(reexported_module, function_name) {
-                    return Some(func_id);
-                }
-            }
+            return self.resolve_through_reexports(reexported_modules, function_name);
         }
 
         None
@@ -371,30 +387,37 @@ impl ModuleVisitor {
     fn extract_visibility(&self, vis: &Visibility) -> VisibilityLevel {
         match vis {
             Visibility::Public(_) => VisibilityLevel::Public,
-            // In newer syn versions, handle Restricted visibility
-            Visibility::Restricted(restricted) => {
-                if restricted.in_token.is_some() {
-                    // pub(in path)
-                    if let Some(path) = restricted.path.get_ident() {
-                        VisibilityLevel::PublicIn(path.to_string())
-                    } else {
-                        VisibilityLevel::Crate
-                    }
-                } else {
-                    // pub(super) or pub(crate)
-                    if let Some(ident) = restricted.path.get_ident() {
-                        match ident.to_string().as_str() {
-                            "super" => VisibilityLevel::PublicSuper,
-                            "crate" => VisibilityLevel::Crate,
-                            _ => VisibilityLevel::Crate,
-                        }
-                    } else {
-                        VisibilityLevel::Crate
-                    }
-                }
-            }
+            Visibility::Restricted(restricted) => Self::classify_restricted_visibility(restricted),
             Visibility::Inherited => VisibilityLevel::Private,
         }
+    }
+
+    fn classify_restricted_visibility(restricted: &syn::VisRestricted) -> VisibilityLevel {
+        if restricted.in_token.is_some() {
+            Self::extract_public_in_visibility(restricted)
+        } else {
+            Self::extract_scope_visibility(restricted)
+        }
+    }
+
+    fn extract_public_in_visibility(restricted: &syn::VisRestricted) -> VisibilityLevel {
+        restricted
+            .path
+            .get_ident()
+            .map(|path| VisibilityLevel::PublicIn(path.to_string()))
+            .unwrap_or(VisibilityLevel::Crate)
+    }
+
+    fn extract_scope_visibility(restricted: &syn::VisRestricted) -> VisibilityLevel {
+        restricted
+            .path
+            .get_ident()
+            .and_then(|ident| match ident.to_string().as_str() {
+                "super" => Some(VisibilityLevel::PublicSuper),
+                "crate" => Some(VisibilityLevel::Crate),
+                _ => None,
+            })
+            .unwrap_or(VisibilityLevel::Crate)
     }
 }
 
@@ -583,5 +606,232 @@ impl<'ast> Visit<'ast> for CrossModuleCallVisitor {
 impl Default for CrossModuleTracker {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_export(
+        name: &str,
+        export_type: ExportType,
+        func_id: Option<FunctionId>,
+    ) -> PublicExport {
+        PublicExport {
+            name: name.to_string(),
+            export_type,
+            function_id: func_id,
+            visibility: VisibilityLevel::Public,
+            line: 1,
+        }
+    }
+
+    fn create_test_function_id(name: &str) -> FunctionId {
+        FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: name.to_string(),
+            line: 10,
+        }
+    }
+
+    #[test]
+    fn test_find_function_export_found() {
+        let func_id = create_test_function_id("test_func");
+        let exports = vec![
+            create_test_export(
+                "other_func",
+                ExportType::Function,
+                Some(create_test_function_id("other")),
+            ),
+            create_test_export("test_func", ExportType::Function, Some(func_id.clone())),
+            create_test_export("test_type", ExportType::Type, None),
+        ]
+        .into_iter()
+        .collect();
+
+        let boundary = ModuleBoundary {
+            module_path: "test::module".to_string(),
+            file_path: PathBuf::from("test.rs"),
+            parent_module: None,
+            submodules: HashSet::new(),
+            public_exports: exports,
+        };
+
+        let result = CrossModuleTracker::find_function_export(&boundary, "test_func");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "test_func");
+    }
+
+    #[test]
+    fn test_find_function_export_not_found() {
+        let exports = vec![
+            create_test_export(
+                "func1",
+                ExportType::Function,
+                Some(create_test_function_id("func1")),
+            ),
+            create_test_export(
+                "func2",
+                ExportType::Function,
+                Some(create_test_function_id("func2")),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        let boundary = ModuleBoundary {
+            module_path: "test::module".to_string(),
+            file_path: PathBuf::from("test.rs"),
+            parent_module: None,
+            submodules: HashSet::new(),
+            public_exports: exports,
+        };
+
+        let result = CrossModuleTracker::find_function_export(&boundary, "non_existent");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_find_function_export_wrong_type() {
+        let exports = vec![
+            create_test_export("test_name", ExportType::Type, None),
+            create_test_export("test_const", ExportType::Constant, None),
+        ]
+        .into_iter()
+        .collect();
+
+        let boundary = ModuleBoundary {
+            module_path: "test::module".to_string(),
+            file_path: PathBuf::from("test.rs"),
+            parent_module: None,
+            submodules: HashSet::new(),
+            public_exports: exports,
+        };
+
+        let result = CrossModuleTracker::find_function_export(&boundary, "test_name");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_resolve_through_reexports_found() {
+        let mut tracker = CrossModuleTracker::new();
+
+        // Set up a module with a function
+        let func_id = create_test_function_id("target_func");
+        let exports = vec![create_test_export(
+            "target_func",
+            ExportType::Function,
+            Some(func_id.clone()),
+        )]
+        .into_iter()
+        .collect();
+
+        let boundary = ModuleBoundary {
+            module_path: "target::module".to_string(),
+            file_path: PathBuf::from("target.rs"),
+            parent_module: None,
+            submodules: HashSet::new(),
+            public_exports: exports,
+        };
+
+        tracker
+            .module_boundaries
+            .insert("target::module".to_string(), boundary);
+
+        // Test resolving through re-exports
+        let reexported_modules = vec!["target::module".to_string()].into_iter().collect();
+        let result = tracker.resolve_through_reexports(&reexported_modules, "target_func");
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "target_func");
+    }
+
+    #[test]
+    fn test_resolve_through_reexports_not_found() {
+        let tracker = CrossModuleTracker::new();
+        let reexported_modules = vec!["module1".to_string(), "module2".to_string()]
+            .into_iter()
+            .collect();
+
+        let result = tracker.resolve_through_reexports(&reexported_modules, "non_existent");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_resolve_through_reexports_empty_list() {
+        let tracker = CrossModuleTracker::new();
+        let reexported_modules = Vector::new();
+
+        let result = tracker.resolve_through_reexports(&reexported_modules, "any_func");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_resolve_module_call_direct() {
+        let mut tracker = CrossModuleTracker::new();
+
+        // Set up a module with a function
+        let func_id = create_test_function_id("direct_func");
+        let exports = vec![create_test_export(
+            "direct_func",
+            ExportType::Function,
+            Some(func_id.clone()),
+        )]
+        .into_iter()
+        .collect();
+
+        let boundary = ModuleBoundary {
+            module_path: "direct::module".to_string(),
+            file_path: PathBuf::from("direct.rs"),
+            parent_module: None,
+            submodules: HashSet::new(),
+            public_exports: exports,
+        };
+
+        tracker
+            .module_boundaries
+            .insert("direct::module".to_string(), boundary);
+
+        let result = tracker.resolve_module_call("direct::module", "direct_func");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "direct_func");
+    }
+
+    #[test]
+    fn test_resolve_module_call_via_reexport() {
+        let mut tracker = CrossModuleTracker::new();
+
+        // Set up target module with function
+        let func_id = create_test_function_id("reexported_func");
+        let exports = vec![create_test_export(
+            "reexported_func",
+            ExportType::Function,
+            Some(func_id.clone()),
+        )]
+        .into_iter()
+        .collect();
+
+        let boundary = ModuleBoundary {
+            module_path: "original::module".to_string(),
+            file_path: PathBuf::from("original.rs"),
+            parent_module: None,
+            submodules: HashSet::new(),
+            public_exports: exports,
+        };
+
+        tracker
+            .module_boundaries
+            .insert("original::module".to_string(), boundary);
+
+        // Set up re-export
+        tracker.reexports.insert(
+            "facade::module".to_string(),
+            vec!["original::module".to_string()].into_iter().collect(),
+        );
+
+        let result = tracker.resolve_module_call("facade::module", "reexported_func");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "reexported_func");
     }
 }

@@ -61,6 +61,25 @@ impl PythonCallGraphAnalyzer {
         Ok(())
     }
 
+    /// Build a fully qualified function name given optional class context
+    fn build_function_name(func_name: &str, class_context: Option<&str>) -> String {
+        match class_context {
+            Some(class_name) => format!("{}.{}", class_name, func_name),
+            None => func_name.to_string(),
+        }
+    }
+
+    /// Find the line number of a function definition in source code
+    fn find_function_line(func_name: &str, prefix: &str, lines: &[&str]) -> usize {
+        let def_pattern = format!("{} {}", prefix, func_name);
+        lines
+            .iter()
+            .enumerate()
+            .find(|(_, line)| line.trim_start().starts_with(&def_pattern))
+            .map(|(idx, _)| idx + 1) // Line numbers are 1-based
+            .unwrap_or(1)
+    }
+
     /// Collect line numbers for all functions in the module using text search
     fn collect_function_lines(
         &mut self,
@@ -73,47 +92,18 @@ impl PythonCallGraphAnalyzer {
         for stmt in stmts {
             match stmt {
                 ast::Stmt::FunctionDef(func_def) => {
-                    let func_name = if let Some(class_name) = class_context {
-                        format!("{}.{}", class_name, func_def.name)
-                    } else {
-                        func_def.name.to_string()
-                    };
-
-                    // Use text search to find the line number (same as Python analyzer)
-                    let def_pattern = format!("def {}", func_def.name);
-                    let line = lines
-                        .iter()
-                        .enumerate()
-                        .find(|(_, line)| line.trim_start().starts_with(&def_pattern))
-                        .map(|(idx, _)| idx + 1) // Line numbers are 1-based
-                        .unwrap_or(1);
-
-                    self.function_lines.insert(func_name.clone(), line);
-
-                    // Recursively collect nested functions
+                    let func_name = Self::build_function_name(&func_def.name, class_context);
+                    let line = Self::find_function_line(&func_def.name, "def", &lines);
+                    self.function_lines.insert(func_name, line);
                     self.collect_function_lines(&func_def.body, source, class_context);
                 }
                 ast::Stmt::AsyncFunctionDef(func_def) => {
-                    let func_name = if let Some(class_name) = class_context {
-                        format!("{}.{}", class_name, func_def.name)
-                    } else {
-                        func_def.name.to_string()
-                    };
-
-                    // Use text search for async functions
-                    let def_pattern = format!("async def {}", func_def.name);
-                    let line = lines
-                        .iter()
-                        .enumerate()
-                        .find(|(_, line)| line.trim_start().starts_with(&def_pattern))
-                        .map(|(idx, _)| idx + 1)
-                        .unwrap_or(1);
-
+                    let func_name = Self::build_function_name(&func_def.name, class_context);
+                    let line = Self::find_function_line(&func_def.name, "async def", &lines);
                     self.function_lines.insert(func_name, line);
                     self.collect_function_lines(&func_def.body, source, class_context);
                 }
                 ast::Stmt::ClassDef(class_def) => {
-                    // Collect methods within the class
                     self.collect_function_lines(
                         &class_def.body,
                         source,
