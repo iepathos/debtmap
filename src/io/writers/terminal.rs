@@ -1,6 +1,7 @@
 use crate::core::{AnalysisResults, FunctionMetrics, Priority};
 use crate::debt::total_debt_score;
 use crate::io::output::OutputWriter;
+use crate::refactoring::{ComplexityLevel, PatternRecognitionEngine};
 use crate::risk::RiskInsight;
 use colored::*;
 
@@ -175,6 +176,8 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
     println!("───────────────────────────────────────────");
     let top_complex = get_top_complex_functions(&results.complexity.metrics, 5);
 
+    let _refactoring_engine = PatternRecognitionEngine::new();
+
     for (i, func) in top_complex.iter().enumerate() {
         println!(
             "  {}. {}:{} {}() - Cyclomatic: {}, Cognitive: {}",
@@ -185,6 +188,51 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
             func.cyclomatic,
             func.cognitive
         );
+
+        // Generate refactoring guidance for high complexity functions
+        if func.cyclomatic > 5 {
+            let complexity_level = match func.cyclomatic {
+                0..=5 => ComplexityLevel::Low,
+                6..=10 => ComplexityLevel::Moderate,
+                11..=15 => ComplexityLevel::High,
+                _ => ComplexityLevel::Severe,
+            };
+
+            let action_msg = match complexity_level {
+                ComplexityLevel::Low => continue,
+                ComplexityLevel::Moderate => {
+                    "     ACTION: Extract 2-3 pure functions using direct functional transformation"
+                }
+                ComplexityLevel::High => {
+                    "     ACTION: Extract 3-5 pure functions using decompose-then-transform strategy"
+                }
+                ComplexityLevel::Severe => {
+                    "     ACTION: Extract 5+ pure functions into modules with functional core/imperative shell"
+                }
+            };
+
+            println!("{}", action_msg.yellow());
+
+            // Add patterns to apply
+            let patterns = match complexity_level {
+                ComplexityLevel::Moderate => {
+                    "Replace loops with map/filter/fold, extract predicates"
+                }
+                ComplexityLevel::High => {
+                    "Decompose into logical units, then apply functional patterns"
+                }
+                ComplexityLevel::Severe => {
+                    "Architectural refactoring with monadic patterns and pipelines"
+                }
+                _ => "",
+            };
+
+            if !patterns.is_empty() {
+                println!("     PATTERNS: {}", patterns.cyan());
+            }
+
+            println!("     BENEFIT: Pure functions are easily testable and composable");
+        }
     }
     println!();
 }
