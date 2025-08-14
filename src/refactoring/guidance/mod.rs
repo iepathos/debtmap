@@ -11,6 +11,36 @@ impl RefactoringGuidanceGenerator {
         Self
     }
 
+    fn format_complexity_level(level: &ComplexityLevel) -> &'static str {
+        match level {
+            ComplexityLevel::Low => "LOW",
+            ComplexityLevel::Moderate => "MODERATE",
+            ComplexityLevel::High => "HIGH",
+            ComplexityLevel::Severe => "SEVERE",
+        }
+    }
+
+    fn format_refactoring_strategy(level: &ComplexityLevel) -> &'static str {
+        match level {
+            ComplexityLevel::Moderate => "direct functional transformation",
+            ComplexityLevel::High => "decompose-then-transform",
+            ComplexityLevel::Severe => "architectural refactoring",
+            _ => "no",
+        }
+    }
+
+    fn format_benefits_list(benefits: &[String]) -> String {
+        if benefits.is_empty() {
+            String::new()
+        } else {
+            let mut output = String::from("BENEFITS:\n");
+            for benefit in benefits {
+                output.push_str(&format!("  • {}\n", benefit));
+            }
+            output
+        }
+    }
+
     pub fn generate_guidance(&self, analysis: &RefactoringAnalysis) -> String {
         let mut output = String::new();
 
@@ -64,23 +94,13 @@ impl RefactoringGuidanceGenerator {
                 } => {
                     output.push_str(&format!(
                         "\n{} Complexity Detected\n",
-                        match complexity_level {
-                            ComplexityLevel::Low => "LOW",
-                            ComplexityLevel::Moderate => "MODERATE",
-                            ComplexityLevel::High => "HIGH",
-                            ComplexityLevel::Severe => "SEVERE",
-                        }
+                        Self::format_complexity_level(complexity_level)
                     ));
 
                     output.push_str(&format!(
                         "ACTION: Extract {} pure functions using {} strategy\n",
                         suggested_functions.len(),
-                        match complexity_level {
-                            ComplexityLevel::Moderate => "direct functional transformation",
-                            ComplexityLevel::High => "decompose-then-transform",
-                            ComplexityLevel::Severe => "architectural refactoring",
-                            _ => "no",
-                        }
+                        Self::format_refactoring_strategy(complexity_level)
                     ));
 
                     if !functional_patterns.is_empty() {
@@ -93,12 +113,7 @@ impl RefactoringGuidanceGenerator {
                         output.push('\n');
                     }
 
-                    if !benefits.is_empty() {
-                        output.push_str("BENEFITS:\n");
-                        for benefit in benefits {
-                            output.push_str(&format!("  • {}\n", benefit));
-                        }
-                    }
+                    output.push_str(&Self::format_benefits_list(benefits));
                 }
                 RefactoringOpportunity::ConvertToFunctionalStyle {
                     target_patterns,
@@ -114,12 +129,7 @@ impl RefactoringGuidanceGenerator {
                     output.push_str(&patterns.join(", "));
                     output.push('\n');
 
-                    if !benefits.is_empty() {
-                        output.push_str("BENEFITS:\n");
-                        for benefit in benefits {
-                            output.push_str(&format!("  • {}\n", benefit));
-                        }
-                    }
+                    output.push_str(&Self::format_benefits_list(benefits));
                 }
                 RefactoringOpportunity::ExtractSideEffects {
                     pure_core,
@@ -132,12 +142,7 @@ impl RefactoringGuidanceGenerator {
                         pure_core.name
                     ));
 
-                    if !benefits.is_empty() {
-                        output.push_str("BENEFITS:\n");
-                        for benefit in benefits {
-                            output.push_str(&format!("  • {}\n", benefit));
-                        }
-                    }
+                    output.push_str(&Self::format_benefits_list(benefits));
                 }
             }
         }
