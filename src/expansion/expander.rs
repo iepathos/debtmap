@@ -747,13 +747,12 @@ edition = "2021"
             // First expansion should work (if cargo-expand is available)
             let first_result = expander.expand_file(&rust_file);
 
-            if first_result.is_ok() {
+            if let Ok(first) = first_result {
                 // Second expansion should use cache
                 let second_result = expander.expand_file(&rust_file);
                 assert!(second_result.is_ok());
 
                 // Both results should be the same
-                let first = first_result.unwrap();
                 let second = second_result.unwrap();
                 assert_eq!(first.expanded_content, second.expanded_content);
             }

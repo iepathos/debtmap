@@ -1,5 +1,4 @@
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
-use debtmap::priority::call_graph::FunctionId;
 use std::path::PathBuf;
 
 #[test]
@@ -31,8 +30,8 @@ fn validate() {
     println!("\n=== Functions and their relationships ===");
     let functions = call_graph.find_all_functions();
     for func in &functions {
-        let callers = call_graph.get_callers(&func);
-        let callees = call_graph.get_callees(&func);
+        let callers = call_graph.get_callers(func);
+        let callees = call_graph.get_callees(func);
         println!("Function: {} (line {})", func.name, func.line);
         println!(
             "  Callers: {:?}",
@@ -54,7 +53,7 @@ fn validate() {
         .expect("Should find helper function");
 
     // Check helper's callers
-    let helper_callers = call_graph.get_callers(&helper);
+    let helper_callers = call_graph.get_callers(helper);
     assert_eq!(helper_callers.len(), 1, "helper should have 1 caller");
     assert_eq!(
         helper_callers[0].name, "main",
@@ -67,7 +66,7 @@ fn validate() {
         .find(|f| f.name == "main")
         .expect("Should find main function");
 
-    let main_callees = call_graph.get_callees(&main_func);
+    let main_callees = call_graph.get_callees(main_func);
     assert_eq!(main_callees.len(), 2, "main should call 2 functions");
     assert!(
         main_callees.iter().any(|f| f.name == "helper"),
@@ -130,7 +129,7 @@ impl Processor {
         .find(|f| f.name == "Processor::process")
         .expect("Should find process method");
 
-    let process_callees = call_graph.get_callees(&process_fn);
+    let process_callees = call_graph.get_callees(process_fn);
     assert_eq!(process_callees.len(), 2, "process should call 2 methods");
     assert!(
         process_callees
@@ -335,7 +334,7 @@ fn process_internal() {
         .find(|f| f.name.contains("handle"))
         .expect("Should find handle method");
 
-    let handle_callees = call_graph.get_callees(&handle_fn);
+    let handle_callees = call_graph.get_callees(handle_fn);
     println!("\n=== Calls from handle ===");
     for callee in &handle_callees {
         println!("  {}", callee.name);
