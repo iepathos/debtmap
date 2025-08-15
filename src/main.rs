@@ -1121,7 +1121,7 @@ fn calculate_roi_for_metric(
     // Adjust ROI for dead code: easy to remove but not critical
     // Dead code (0 callers) gets a bonus for being easy to remove,
     // but a penalty for not being on critical path
-    let adjusted_roi = if callers.is_empty() && !metric.is_test {
+    if callers.is_empty() && !metric.is_test {
         // Dead code: boost ROI if complex (easy win), reduce if trivial
         if metric.cyclomatic > 10 || metric.cognitive > 15 {
             roi.value * 1.5 // Complex dead code is a good ROI (easy to remove, reduces complexity)
@@ -1130,9 +1130,7 @@ fn calculate_roi_for_metric(
         }
     } else {
         roi.value
-    };
-
-    adjusted_roi
+    }
 }
 
 /// Calculate risk score based on complexity and coverage with better scaling
