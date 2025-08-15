@@ -11,6 +11,35 @@ impl RefactoringGuidanceGenerator {
         Self
     }
 
+    /// Classify pattern category for collection transformations
+    fn is_collection_pattern(pattern: &FunctionalPattern) -> Option<&'static str> {
+        match pattern {
+            FunctionalPattern::MapOverLoop => Some("Replace loops with map"),
+            FunctionalPattern::FilterPredicate => Some("Extract filter predicates"),
+            FunctionalPattern::FoldAccumulation => Some("Use fold for aggregation"),
+            _ => None,
+        }
+    }
+
+    /// Classify pattern category for control flow patterns
+    fn is_control_flow_pattern(pattern: &FunctionalPattern) -> Option<&'static str> {
+        match pattern {
+            FunctionalPattern::PatternMatchOverIfElse => Some("Pattern matching"),
+            FunctionalPattern::Recursion => Some("Recursion"),
+            _ => None,
+        }
+    }
+
+    /// Classify pattern category for composition patterns
+    fn is_composition_pattern(pattern: &FunctionalPattern) -> Option<&'static str> {
+        match pattern {
+            FunctionalPattern::ComposeFunctions => Some("Compose functions"),
+            FunctionalPattern::PartialApplication => Some("Partial application"),
+            FunctionalPattern::Pipeline => Some("Function pipeline"),
+            _ => None,
+        }
+    }
+
     fn format_complexity_level(level: &ComplexityLevel) -> &'static str {
         match level {
             ComplexityLevel::Low => "LOW",
@@ -218,18 +247,19 @@ impl RefactoringGuidanceGenerator {
     }
 
     fn pattern_to_string(&self, pattern: &FunctionalPattern) -> String {
-        match pattern {
-            FunctionalPattern::MapOverLoop => "Replace loops with map",
-            FunctionalPattern::FilterPredicate => "Extract filter predicates",
-            FunctionalPattern::FoldAccumulation => "Use fold for aggregation",
-            FunctionalPattern::PatternMatchOverIfElse => "Pattern matching",
-            FunctionalPattern::ComposeFunctions => "Compose functions",
-            FunctionalPattern::PartialApplication => "Partial application",
-            FunctionalPattern::Monadic(m) => Self::monadic_pattern_to_str(m),
-            FunctionalPattern::Pipeline => "Function pipeline",
-            FunctionalPattern::Recursion => "Recursion",
+        if let Some(desc) = Self::is_collection_pattern(pattern) {
+            return desc.to_string();
         }
-        .to_string()
+        if let Some(desc) = Self::is_control_flow_pattern(pattern) {
+            return desc.to_string();
+        }
+        if let Some(desc) = Self::is_composition_pattern(pattern) {
+            return desc.to_string();
+        }
+        if let FunctionalPattern::Monadic(m) = pattern {
+            return Self::monadic_pattern_to_str(m).to_string();
+        }
+        "Unknown pattern".to_string()
     }
 }
 
