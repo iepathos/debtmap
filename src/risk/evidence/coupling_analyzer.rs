@@ -136,24 +136,41 @@ impl CouplingRiskAnalyzer {
         depth: u32,
         max_depth: u32,
     ) -> bool {
-        if depth > max_depth {
-            return false;
+        // Check termination conditions
+        if Self::should_terminate_search(from, to, visited, depth, max_depth) {
+            return from == to;
         }
 
-        if from == to {
-            return true;
-        }
+        // Recursively check all callees
+        Self::check_callees_for_path(self, from, to, call_graph, visited, depth, max_depth)
+    }
 
-        if !visited.insert(from.clone()) {
-            return false;
-        }
+    /// Determines if the graph traversal should terminate
+    fn should_terminate_search(
+        from: &crate::priority::call_graph::FunctionId,
+        to: &crate::priority::call_graph::FunctionId,
+        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        depth: u32,
+        max_depth: u32,
+    ) -> bool {
+        depth > max_depth || from == to || !visited.insert(from.clone())
+    }
 
+    /// Recursively checks all callees for a path to the target
+    fn check_callees_for_path(
+        analyzer: &CouplingRiskAnalyzer,
+        from: &crate::priority::call_graph::FunctionId,
+        to: &crate::priority::call_graph::FunctionId,
+        call_graph: &CallGraph,
+        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        depth: u32,
+        max_depth: u32,
+    ) -> bool {
         for callee in call_graph.get_callees(from) {
-            if self.has_path_back(&callee, to, call_graph, visited, depth + 1, max_depth) {
+            if analyzer.has_path_back(&callee, to, call_graph, visited, depth + 1, max_depth) {
                 return true;
             }
         }
-
         false
     }
 
