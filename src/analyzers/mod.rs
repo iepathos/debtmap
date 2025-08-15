@@ -7,6 +7,8 @@ pub mod python;
 pub mod rust;
 pub mod rust_call_graph;
 pub mod signature_extractor;
+pub mod trait_implementation_tracker;
+pub mod trait_resolver;
 pub mod type_registry;
 pub mod type_tracker;
 
