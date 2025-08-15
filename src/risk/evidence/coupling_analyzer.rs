@@ -136,24 +136,41 @@ impl CouplingRiskAnalyzer {
         depth: u32,
         max_depth: u32,
     ) -> bool {
-        if depth > max_depth {
-            return false;
+        // Check termination conditions
+        if Self::should_terminate_search(from, to, visited, depth, max_depth) {
+            return from == to;
         }
 
-        if from == to {
-            return true;
-        }
+        // Recursively check all callees
+        Self::check_callees_for_path(self, from, to, call_graph, visited, depth, max_depth)
+    }
 
-        if !visited.insert(from.clone()) {
-            return false;
-        }
+    /// Determines if the graph traversal should terminate
+    fn should_terminate_search(
+        from: &crate::priority::call_graph::FunctionId,
+        to: &crate::priority::call_graph::FunctionId,
+        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        depth: u32,
+        max_depth: u32,
+    ) -> bool {
+        depth > max_depth || from == to || !visited.insert(from.clone())
+    }
 
+    /// Recursively checks all callees for a path to the target
+    fn check_callees_for_path(
+        analyzer: &CouplingRiskAnalyzer,
+        from: &crate::priority::call_graph::FunctionId,
+        to: &crate::priority::call_graph::FunctionId,
+        call_graph: &CallGraph,
+        visited: &mut std::collections::HashSet<crate::priority::call_graph::FunctionId>,
+        depth: u32,
+        max_depth: u32,
+    ) -> bool {
         for callee in call_graph.get_callees(from) {
-            if self.has_path_back(&callee, to, call_graph, visited, depth + 1, max_depth) {
+            if analyzer.has_path_back(&callee, to, call_graph, visited, depth + 1, max_depth) {
                 return true;
             }
         }
-
         false
     }
 
@@ -405,17 +422,18 @@ impl CouplingRiskAnalyzer {
         }
     }
 
-    fn calculate_confidence(&self, total_coupling: u32) -> f64 {
-        // More connections means more confidence in the analysis
-        if total_coupling == 0 {
-            0.5 // Low confidence for isolated functions
-        } else if total_coupling < 5 {
-            0.7
-        } else if total_coupling < 15 {
-            0.85
-        } else {
-            0.95
+    /// Classify coupling confidence level based on total connections
+    fn classify_confidence_level(total_coupling: u32) -> f64 {
+        match total_coupling {
+            0 => 0.5,       // Low confidence for isolated functions
+            1..=4 => 0.7,   // Moderate confidence for lightly coupled
+            5..=14 => 0.85, // High confidence for moderately coupled
+            _ => 0.95,      // Very high confidence for highly coupled
         }
+    }
+
+    fn calculate_confidence(&self, total_coupling: u32) -> f64 {
+        Self::classify_confidence_level(total_coupling)
     }
 }
 

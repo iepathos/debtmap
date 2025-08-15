@@ -193,16 +193,15 @@ impl EvidenceBasedRiskCalculator {
         (base_score * role_multiplier).min(10.0)
     }
 
-    fn classify_risk_level(&self, score: f64, role: &FunctionRole) -> RiskClassification {
-        // Adjust thresholds based on role
-        let adjustment = match role {
+    fn calculate_role_adjustment(role: &FunctionRole) -> f64 {
+        match role {
             FunctionRole::IOWrapper => 1.0,    // More lenient for I/O
             FunctionRole::Orchestrator => 0.5, // Slightly more lenient
             _ => 0.0,                          // Standard thresholds
-        };
+        }
+    }
 
-        let adjusted_score = (score - adjustment).max(0.0);
-
+    fn classify_by_score(adjusted_score: f64) -> RiskClassification {
         match adjusted_score {
             s if s <= 2.0 => RiskClassification::WellDesigned,
             s if s <= 4.0 => RiskClassification::Acceptable,
@@ -210,6 +209,12 @@ impl EvidenceBasedRiskCalculator {
             s if s <= 9.0 => RiskClassification::Risky,
             _ => RiskClassification::Critical,
         }
+    }
+
+    fn classify_risk_level(&self, score: f64, role: &FunctionRole) -> RiskClassification {
+        let adjustment = Self::calculate_role_adjustment(role);
+        let adjusted_score = (score - adjustment).max(0.0);
+        Self::classify_by_score(adjusted_score)
     }
 
     fn generate_recommendations(

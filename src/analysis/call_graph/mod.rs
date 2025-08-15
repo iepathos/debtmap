@@ -319,6 +319,40 @@ impl RustCallGraph {
         }
     }
 
+    /// Classify function usage patterns and determine confidence adjustment factors
+    fn get_confidence_adjustments(
+        is_framework_managed: bool,
+        is_public_api: bool,
+        has_trait_implementations: bool,
+        is_visit_trait_method: bool,
+        might_be_called_through_pointer: bool,
+    ) -> Vec<(bool, f64)> {
+        vec![
+            (is_framework_managed, 0.3),
+            (is_public_api, 0.2),
+            (has_trait_implementations, 0.4),
+            (is_visit_trait_method, 0.1),
+            (might_be_called_through_pointer, 0.5),
+        ]
+    }
+
+    /// Apply confidence adjustments based on multiple factors
+    fn apply_confidence_adjustments(
+        base_confidence: f64,
+        factors: impl Iterator<Item = (bool, f64)>,
+    ) -> f64 {
+        factors.fold(
+            base_confidence,
+            |conf, (applies, factor)| {
+                if applies {
+                    conf * factor
+                } else {
+                    conf
+                }
+            },
+        )
+    }
+
     /// Determine if a framework pattern represents a live function
     fn is_live_pattern(pattern_type: &PatternType) -> bool {
         matches!(
@@ -424,37 +458,16 @@ impl RustCallGraph {
 
     /// Calculate confidence that a function is actually dead code
     fn calculate_dead_code_confidence(&self, func_id: &FunctionId) -> f64 {
-        let mut confidence = 1.0;
+        let adjustments = Self::get_confidence_adjustments(
+            self.framework_patterns.might_be_framework_managed(func_id),
+            self.cross_module_tracker.is_public_api(func_id),
+            self.trait_registry.has_trait_implementations(func_id),
+            self.trait_registry.is_visit_trait_method(func_id),
+            self.function_pointer_tracker
+                .might_be_called_through_pointer(func_id),
+        );
 
-        // Reduce confidence for functions that might be used by frameworks
-        if self.framework_patterns.might_be_framework_managed(func_id) {
-            confidence *= 0.3;
-        }
-
-        // Reduce confidence for public functions
-        if self.cross_module_tracker.is_public_api(func_id) {
-            confidence *= 0.2;
-        }
-
-        // Reduce confidence if function has trait implementations
-        if self.trait_registry.has_trait_implementations(func_id) {
-            confidence *= 0.4;
-        }
-
-        // Very low confidence for Visit trait methods (visitor pattern)
-        if self.trait_registry.is_visit_trait_method(func_id) {
-            confidence *= 0.1;
-        }
-
-        // Reduce confidence if function might be used through function pointers
-        if self
-            .function_pointer_tracker
-            .might_be_called_through_pointer(func_id)
-        {
-            confidence *= 0.5;
-        }
-
-        confidence
+        Self::apply_confidence_adjustments(1.0, adjustments.into_iter())
     }
 
     /// Get reasons why a function is considered dead code
@@ -476,34 +489,52 @@ impl RustCallGraph {
         reasons
     }
 
+    /// Classify framework and pointer-related risks
+    fn classify_framework_risks(
+        framework_managed: bool,
+        public_api: bool,
+        function_pointer: bool,
+    ) -> Vec<&'static str> {
+        [
+            (framework_managed, "Might be managed by framework"),
+            (public_api, "Public API function"),
+            (function_pointer, "Might be called through function pointer"),
+        ]
+        .into_iter()
+        .filter_map(|(applies, risk)| if applies { Some(risk) } else { None })
+        .collect()
+    }
+
+    /// Classify trait-related risks
+    fn classify_trait_risks(has_implementations: bool, is_visit_method: bool) -> Vec<&'static str> {
+        [
+            (has_implementations, "Has trait implementations"),
+            (is_visit_method, "Visit trait method (visitor pattern)"),
+        ]
+        .into_iter()
+        .filter_map(|(applies, risk)| if applies { Some(risk) } else { None })
+        .collect()
+    }
+
     /// Get potential false positive risks
     fn get_false_positive_risks(&self, func_id: &FunctionId) -> Vec<String> {
-        let mut risks = Vec::new();
+        let framework_risks = Self::classify_framework_risks(
+            self.framework_patterns.might_be_framework_managed(func_id),
+            self.cross_module_tracker.is_public_api(func_id),
+            self.function_pointer_tracker
+                .might_be_called_through_pointer(func_id),
+        );
 
-        if self.framework_patterns.might_be_framework_managed(func_id) {
-            risks.push("Might be managed by framework".to_string());
-        }
+        let trait_risks = Self::classify_trait_risks(
+            self.trait_registry.has_trait_implementations(func_id),
+            self.trait_registry.is_visit_trait_method(func_id),
+        );
 
-        if self.cross_module_tracker.is_public_api(func_id) {
-            risks.push("Public API function".to_string());
-        }
-
-        if self.trait_registry.has_trait_implementations(func_id) {
-            risks.push("Has trait implementations".to_string());
-        }
-
-        if self.trait_registry.is_visit_trait_method(func_id) {
-            risks.push("Visit trait method (visitor pattern)".to_string());
-        }
-
-        if self
-            .function_pointer_tracker
-            .might_be_called_through_pointer(func_id)
-        {
-            risks.push("Might be called through function pointer".to_string());
-        }
-
-        risks
+        framework_risks
+            .into_iter()
+            .chain(trait_risks)
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 

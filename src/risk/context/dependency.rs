@@ -251,26 +251,38 @@ impl ContextProvider for DependencyRiskProvider {
                 propagated_risk,
                 dependents,
                 blast_radius,
-            } => match *blast_radius {
-                r if r > 10 => format!(
-                    "Critical dependency with blast radius {} affecting {} modules",
-                    blast_radius,
-                    dependents.len()
-                ),
-                r if r > 5 => format!(
-                    "Important dependency with {} dependents (risk: {:.1})",
-                    dependents.len(),
-                    propagated_risk
-                ),
-                r if r > 0 => format!("Dependency depth {depth} with limited impact"),
-                _ => "Isolated component with no dependencies".to_string(),
-            },
+            } => Self::classify_blast_radius_impact(
+                *blast_radius,
+                *depth,
+                *propagated_risk,
+                dependents.len(),
+            ),
             _ => "No dependency information".to_string(),
         }
     }
 }
 
 impl DependencyRiskProvider {
+    fn classify_blast_radius_impact(
+        blast_radius: usize,
+        depth: usize,
+        propagated_risk: f64,
+        dependents_count: usize,
+    ) -> String {
+        match blast_radius {
+            r if r > 10 => format!(
+                "Critical dependency with blast radius {} affecting {} modules",
+                blast_radius, dependents_count
+            ),
+            r if r > 5 => format!(
+                "Important dependency with {} dependents (risk: {:.1})",
+                dependents_count, propagated_risk
+            ),
+            r if r > 0 => format!("Dependency depth {} with limited impact", depth),
+            _ => "Isolated component with no dependencies".to_string(),
+        }
+    }
+
     fn calculate_dependency_depth(&self, function_name: &str) -> usize {
         if let Some(module) = self.calculator.find_module_for_function(function_name) {
             self.calculate_module_depth(&module.name, &mut HashSet::new())
@@ -785,5 +797,48 @@ mod tests {
             }
             _ => panic!("Expected DependencyChain details"),
         }
+    }
+
+    #[test]
+    fn test_classify_blast_radius_critical() {
+        // Test classification for critical dependencies (blast_radius > 10)
+        let result = DependencyRiskProvider::classify_blast_radius_impact(15, 3, 8.5, 12);
+        assert_eq!(
+            result,
+            "Critical dependency with blast radius 15 affecting 12 modules"
+        );
+
+        let result = DependencyRiskProvider::classify_blast_radius_impact(11, 2, 7.0, 8);
+        assert_eq!(
+            result,
+            "Critical dependency with blast radius 11 affecting 8 modules"
+        );
+    }
+
+    #[test]
+    fn test_classify_blast_radius_important() {
+        // Test classification for important dependencies (blast_radius 6-10)
+        let result = DependencyRiskProvider::classify_blast_radius_impact(6, 2, 5.5, 4);
+        assert_eq!(result, "Important dependency with 4 dependents (risk: 5.5)");
+
+        let result = DependencyRiskProvider::classify_blast_radius_impact(10, 3, 7.2, 7);
+        assert_eq!(result, "Important dependency with 7 dependents (risk: 7.2)");
+    }
+
+    #[test]
+    fn test_classify_blast_radius_limited() {
+        // Test classification for limited impact dependencies (blast_radius 1-5)
+        let result = DependencyRiskProvider::classify_blast_radius_impact(1, 5, 2.0, 1);
+        assert_eq!(result, "Dependency depth 5 with limited impact");
+
+        let result = DependencyRiskProvider::classify_blast_radius_impact(5, 3, 3.5, 3);
+        assert_eq!(result, "Dependency depth 3 with limited impact");
+    }
+
+    #[test]
+    fn test_classify_blast_radius_isolated() {
+        // Test classification for isolated components (blast_radius = 0)
+        let result = DependencyRiskProvider::classify_blast_radius_impact(0, 0, 0.0, 0);
+        assert_eq!(result, "Isolated component with no dependencies");
     }
 }
