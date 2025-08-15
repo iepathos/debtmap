@@ -595,6 +595,7 @@ mod tests {
                 coverage_factor: 8.0,
                 roi_factor: 6.0,
                 semantic_factor: 7.0,
+                dependency_factor: 3.0,
                 role_multiplier: 1.0,
                 final_score: score,
             },

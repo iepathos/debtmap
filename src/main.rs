@@ -1038,6 +1038,127 @@ fn should_skip_metric_for_debt_analysis(
     false
 }
 
+/// Calculate ROI score for a function metric
+fn calculate_roi_for_metric(
+    metric: &debtmap::FunctionMetrics,
+    call_graph: &priority::CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+) -> f64 {
+    use debtmap::core::ComplexityMetrics;
+    use risk::priority::{determine_module_type, infer_module_relationships, TestTarget};
+
+    // Convert FunctionMetrics to TestTarget for ROI calculation
+    let func_id = priority::call_graph::FunctionId {
+        file: metric.file.clone(),
+        name: metric.name.clone(),
+        line: metric.line,
+    };
+
+    let module_type = determine_module_type(&metric.file);
+    let (dependencies, dependents) = infer_module_relationships(&metric.file, &module_type);
+
+    // Get actual function dependencies from call graph
+    let callees = call_graph.get_callees(&func_id);
+    let callers = call_graph.get_callers(&func_id);
+
+    let actual_dependencies: Vec<String> = callees.iter().map(|f| f.name.clone()).collect();
+    let actual_dependents: Vec<String> = callers.iter().map(|f| f.name.clone()).collect();
+
+    // Get coverage percentage
+    let coverage_pct = if let Some(lcov) = coverage_data {
+        lcov.get_function_coverage(&metric.file, &metric.name)
+            .unwrap_or(0.0)
+    } else {
+        0.0
+    };
+
+    // Estimate risk score based on complexity and coverage
+    let risk_score = calculate_risk_score(metric.cyclomatic, metric.cognitive, coverage_pct);
+
+    let target = TestTarget {
+        id: format!("{}::{}", metric.file.display(), metric.name),
+        path: metric.file.clone(),
+        function: Some(metric.name.clone()),
+        line: metric.line,
+        module_type,
+        current_coverage: coverage_pct,
+        current_risk: risk_score,
+        complexity: ComplexityMetrics {
+            functions: vec![],
+            cyclomatic_complexity: metric.cyclomatic,
+            cognitive_complexity: metric.cognitive,
+        },
+        dependencies: if !actual_dependencies.is_empty() {
+            actual_dependencies
+        } else {
+            dependencies
+        },
+        dependents: if !actual_dependents.is_empty() {
+            actual_dependents
+        } else {
+            dependents
+        },
+        lines: metric.length,
+        priority_score: 0.0,
+        debt_items: 0,
+    };
+
+    // Create ROI calculator and context
+    let risk_analyzer = risk::RiskAnalyzer::default();
+    let roi_calculator = risk::roi::ROICalculator::new(risk_analyzer);
+    let context = risk::roi::Context {
+        dependency_graph: risk::roi::DependencyGraph {
+            nodes: im::HashMap::new(),
+            edges: im::Vector::new(),
+        },
+        critical_paths: vec![],
+        historical_data: None,
+    };
+
+    // Calculate base ROI
+    let roi = roi_calculator.calculate(&target, &context);
+
+    // Adjust ROI for dead code: easy to remove but not critical
+    // Dead code (0 callers) gets a bonus for being easy to remove,
+    // but a penalty for not being on critical path
+    let adjusted_roi = if callers.is_empty() && !metric.is_test {
+        // Dead code: boost ROI if complex (easy win), reduce if trivial
+        if metric.cyclomatic > 10 || metric.cognitive > 15 {
+            roi.value * 1.5 // Complex dead code is a good ROI (easy to remove, reduces complexity)
+        } else {
+            roi.value * 0.7 // Simple dead code is lower priority
+        }
+    } else {
+        roi.value
+    };
+
+    adjusted_roi
+}
+
+/// Calculate risk score based on complexity and coverage with better scaling
+fn calculate_risk_score(cyclomatic: u32, cognitive: u32, coverage_pct: f64) -> f64 {
+    // Better scaling for complexity risk (0-1 range)
+    // Cyclomatic 10 = 0.33, 20 = 0.67, 30+ = 1.0
+    let cyclo_risk = (cyclomatic as f64 / 30.0).min(1.0);
+
+    // Cognitive complexity tends to be higher, so scale differently
+    // Cognitive 15 = 0.33, 30 = 0.67, 45+ = 1.0
+    let cognitive_risk = (cognitive as f64 / 45.0).min(1.0);
+
+    // Average the two complexity metrics
+    let complexity_risk = (cyclo_risk + cognitive_risk) / 2.0;
+
+    // Coverage risk (0-1 range, where 0% coverage = 1.0 risk)
+    let coverage_risk = (100.0 - coverage_pct) / 100.0;
+
+    // Balanced 50/50 split between coverage and complexity
+    // This ensures both untested simple code and tested complex code get appropriate scores
+    let combined_risk = coverage_risk * 0.5 + complexity_risk * 0.5;
+
+    // Scale to 0-10 range for final risk score
+    combined_risk * 10.0
+}
+
 /// Create a debt item from a metric with framework exclusions
 fn create_debt_item_from_metric(
     metric: &debtmap::FunctionMetrics,
@@ -1047,7 +1168,7 @@ fn create_debt_item_from_metric(
 ) -> priority::UnifiedDebtItem {
     use priority::unified_scorer;
 
-    let roi_score = 5.0; // Default ROI
+    let roi_score = calculate_roi_for_metric(metric, call_graph, coverage_data);
     unified_scorer::create_unified_debt_item_with_exclusions(
         metric,
         call_graph,
@@ -1136,7 +1257,7 @@ fn create_unified_analysis(
             }
         }
 
-        let roi_score = 5.0; // Default ROI
+        let roi_score = calculate_roi_for_metric(metric, call_graph, coverage_data);
         let item =
             unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data, roi_score);
         unified.add_item(item);
