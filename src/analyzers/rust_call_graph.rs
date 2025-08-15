@@ -163,8 +163,24 @@ impl CallGraphExtractor {
             0 => None,                     // No match found
             _ => {
                 // Multiple matches - use sophisticated disambiguation
+                
+                // For unqualified method names (like "calculate_coupling_metrics"),
+                // prefer qualified matches (like "Type::calculate_coupling_metrics")
+                // over standalone functions with the same name.
+                // This helps resolve method calls correctly.
+                
+                // 1. If the name doesn't contain "::" (unqualified), prefer qualified matches
+                if !name.contains("::") {
+                    // Look for qualified matches first (Type::method)
+                    if let Some(qualified_match) = matches
+                        .iter()
+                        .find(|f| f.name.contains("::") && f.name.ends_with(&format!("::{}", name)))
+                    {
+                        return Some((*qualified_match).clone());
+                    }
+                }
 
-                // 1. Prefer exact name match
+                // 2. Prefer exact name match
                 if let Some(exact_match) = matches
                     .iter()
                     .find(|f| f.name == name || f.name == resolved_name)
@@ -172,19 +188,19 @@ impl CallGraphExtractor {
                     return Some((*exact_match).clone());
                 }
 
-                // 2. Prefer same file if available
+                // 3. Prefer same file if available
                 if let Some(same_file_match) = matches.iter().find(|f| f.file == caller.file) {
                     return Some((*same_file_match).clone());
                 }
 
-                // 3. For associated function calls (Type::method), prefer the match that looks most like an impl
+                // 4. For associated function calls (Type::method), prefer the match that looks most like an impl
                 if name.contains("::") {
                     if let Some(impl_match) = matches.iter().find(|f| f.name == name) {
                         return Some((*impl_match).clone());
                     }
                 }
 
-                // 4. Fall back to the first match
+                // 5. Fall back to the first match (after sorting)
                 matches.first().map(|f| (*f).clone())
             }
         }
@@ -239,8 +255,8 @@ impl CallGraphExtractor {
             }
         } else {
             // Regular method call on another object
-            // For now, return just the method name - proper type inference 
-            // should be implemented via AST analysis of variable assignments
+            // Return unqualified name, but the resolver will try to match
+            // against qualified names when there are multiple candidates
             method_name
         }
     }
