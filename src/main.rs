@@ -779,6 +779,119 @@ fn print_validation_success(details: &ValidationDetails, verbosity: u8) {
     }
 }
 
+/// Generate a failure message for a metric that exceeds its threshold
+fn format_threshold_failure(
+    metric_name: &str,
+    actual: &str,
+    threshold: &str,
+    comparison: &str,
+) -> String {
+    format!(
+        "    ❌ {}: {} {} {}",
+        metric_name, actual, comparison, threshold
+    )
+}
+
+/// Check if a numeric metric exceeds its maximum threshold
+fn exceeds_max_threshold<T: PartialOrd>(actual: T, threshold: T) -> bool {
+    actual > threshold
+}
+
+/// Check if a numeric metric is below its minimum threshold  
+fn below_min_threshold<T: PartialOrd>(actual: T, threshold: T) -> bool {
+    actual < threshold
+}
+
+/// Print all failed validation checks for the given details
+fn print_failed_validation_checks(details: &ValidationDetails) {
+    if exceeds_max_threshold(details.average_complexity, details.max_average_complexity) {
+        println!(
+            "{}",
+            format_threshold_failure(
+                "Average complexity",
+                &format!("{:.1}", details.average_complexity),
+                &format!("{:.1}", details.max_average_complexity),
+                ">"
+            )
+        );
+    }
+    if exceeds_max_threshold(
+        details.high_complexity_count,
+        details.max_high_complexity_count,
+    ) {
+        println!(
+            "{}",
+            format_threshold_failure(
+                "High complexity functions",
+                &details.high_complexity_count.to_string(),
+                &details.max_high_complexity_count.to_string(),
+                ">"
+            )
+        );
+    }
+    if exceeds_max_threshold(details.debt_items, details.max_debt_items) {
+        println!(
+            "{}",
+            format_threshold_failure(
+                "Technical debt items",
+                &details.debt_items.to_string(),
+                &details.max_debt_items.to_string(),
+                ">"
+            )
+        );
+    }
+    if exceeds_max_threshold(details.total_debt_score, details.max_total_debt_score) {
+        println!(
+            "{}",
+            format_threshold_failure(
+                "Total debt score",
+                &details.total_debt_score.to_string(),
+                &details.max_total_debt_score.to_string(),
+                ">"
+            )
+        );
+    }
+    if details.max_codebase_risk_score > 0.0
+        && exceeds_max_threshold(details.codebase_risk_score, details.max_codebase_risk_score)
+    {
+        println!(
+            "{}",
+            format_threshold_failure(
+                "Codebase risk score",
+                &format!("{:.1}", details.codebase_risk_score),
+                &format!("{:.1}", details.max_codebase_risk_score),
+                ">"
+            )
+        );
+    }
+    if details.max_high_risk_functions > 0
+        && exceeds_max_threshold(details.high_risk_functions, details.max_high_risk_functions)
+    {
+        println!(
+            "{}",
+            format_threshold_failure(
+                "High-risk functions",
+                &details.high_risk_functions.to_string(),
+                &details.max_high_risk_functions.to_string(),
+                ">"
+            )
+        );
+    }
+    if details.min_coverage_percentage > 0.0
+        && below_min_threshold(details.coverage_percentage, details.min_coverage_percentage)
+    {
+        println!(
+            "{}",
+            format_threshold_failure(
+                "Code coverage",
+                &format!("{:.1}%", details.coverage_percentage),
+                &format!("{:.1}%", details.min_coverage_percentage),
+                "<"
+            )
+        );
+    }
+}
+
 fn print_validation_failure_with_details(
     details: &ValidationDetails,
     risk_insights: &Option<risk::RiskInsight>,
@@ -792,54 +905,7 @@ fn print_validation_failure_with_details(
 
     // Show which checks failed
     println!("\n  Failed checks:");
-    if details.average_complexity > details.max_average_complexity {
-        println!(
-            "    ❌ Average complexity: {:.1} > {:.1}",
-            details.average_complexity, details.max_average_complexity
-        );
-    }
-    if details.high_complexity_count > details.max_high_complexity_count {
-        println!(
-            "    ❌ High complexity functions: {} > {}",
-            details.high_complexity_count, details.max_high_complexity_count
-        );
-    }
-    if details.debt_items > details.max_debt_items {
-        println!(
-            "    ❌ Technical debt items: {} > {}",
-            details.debt_items, details.max_debt_items
-        );
-    }
-    if details.total_debt_score > details.max_total_debt_score {
-        println!(
-            "    ❌ Total debt score: {} > {}",
-            details.total_debt_score, details.max_total_debt_score
-        );
-    }
-    if details.codebase_risk_score > details.max_codebase_risk_score
-        && details.max_codebase_risk_score > 0.0
-    {
-        println!(
-            "    ❌ Codebase risk score: {:.1} > {:.1}",
-            details.codebase_risk_score, details.max_codebase_risk_score
-        );
-    }
-    if details.high_risk_functions > details.max_high_risk_functions
-        && details.max_high_risk_functions > 0
-    {
-        println!(
-            "    ❌ High-risk functions: {} > {}",
-            details.high_risk_functions, details.max_high_risk_functions
-        );
-    }
-    if details.coverage_percentage < details.min_coverage_percentage
-        && details.min_coverage_percentage > 0.0
-    {
-        println!(
-            "    ❌ Code coverage: {:.1}% < {:.1}%",
-            details.coverage_percentage, details.min_coverage_percentage
-        );
-    }
+    print_failed_validation_checks(details);
 
     if verbosity > 1 && risk_insights.is_some() {
         if let Some(insights) = risk_insights {
@@ -3638,5 +3704,78 @@ end_of_record
         let call_graph = result.unwrap();
         let functions = call_graph.find_all_functions();
         assert!(functions.iter().any(|f| f.name == "another_function"));
+    }
+
+    #[test]
+    fn test_format_threshold_failure() {
+        let result = format_threshold_failure("Test Metric", "10.5", "5.0", ">");
+        assert_eq!(result, "    ❌ Test Metric: 10.5 > 5.0");
+
+        let result = format_threshold_failure("Coverage", "45.2%", "80.0%", "<");
+        assert_eq!(result, "    ❌ Coverage: 45.2% < 80.0%");
+    }
+
+    #[test]
+    fn test_exceeds_max_threshold() {
+        assert!(exceeds_max_threshold(10, 5));
+        assert!(exceeds_max_threshold(10.5, 10.0));
+        assert!(!exceeds_max_threshold(5, 10));
+        assert!(!exceeds_max_threshold(10, 10));
+        assert!(!exceeds_max_threshold(9.9, 10.0));
+    }
+
+    #[test]
+    fn test_below_min_threshold() {
+        assert!(below_min_threshold(5, 10));
+        assert!(below_min_threshold(9.9, 10.0));
+        assert!(!below_min_threshold(10, 5));
+        assert!(!below_min_threshold(10, 10));
+        assert!(!below_min_threshold(10.1, 10.0));
+    }
+
+    #[test]
+    fn test_print_failed_validation_checks() {
+        // This function prints to stdout, so we'd need to capture stdout to test it properly
+        // For now, we'll test that it doesn't panic with various inputs
+        let details = ValidationDetails {
+            average_complexity: 15.0,
+            max_average_complexity: 10.0,
+            high_complexity_count: 5,
+            max_high_complexity_count: 3,
+            debt_items: 100,
+            max_debt_items: 50,
+            total_debt_score: 1000,
+            max_total_debt_score: 500,
+            codebase_risk_score: 8.0,
+            max_codebase_risk_score: 5.0,
+            high_risk_functions: 10,
+            max_high_risk_functions: 5,
+            coverage_percentage: 40.0,
+            min_coverage_percentage: 80.0,
+        };
+
+        // Should not panic
+        print_failed_validation_checks(&details);
+
+        // Test with thresholds that won't trigger failures
+        let details_passing = ValidationDetails {
+            average_complexity: 5.0,
+            max_average_complexity: 10.0,
+            high_complexity_count: 1,
+            max_high_complexity_count: 3,
+            debt_items: 10,
+            max_debt_items: 50,
+            total_debt_score: 100,
+            max_total_debt_score: 500,
+            codebase_risk_score: 2.0,
+            max_codebase_risk_score: 5.0,
+            high_risk_functions: 2,
+            max_high_risk_functions: 5,
+            coverage_percentage: 90.0,
+            min_coverage_percentage: 80.0,
+        };
+
+        // Should not panic with passing thresholds
+        print_failed_validation_checks(&details_passing);
     }
 }
