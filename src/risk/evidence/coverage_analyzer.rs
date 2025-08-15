@@ -50,6 +50,25 @@ impl CoverageRiskAnalyzer {
         }
     }
 
+    fn classify_confidence_from_coverage(coverage: f64) -> f64 {
+        match () {
+            _ if coverage == 0.0 => 0.9, // High confidence that uncovered code is risky
+            _ if coverage < 50.0 => 0.85,
+            _ if coverage < 80.0 => 0.8,
+            _ => 0.95, // Very high confidence for well-covered code
+        }
+    }
+
+    fn classify_role_weight(role: &FunctionRole) -> f64 {
+        match role {
+            FunctionRole::PureLogic => 1.0,    // Full weight for business logic
+            FunctionRole::EntryPoint => 0.9,   // High weight for entry points
+            FunctionRole::Orchestrator => 0.6, // Moderate weight for orchestration
+            FunctionRole::IOWrapper => 0.4,    // Lower weight for I/O
+            FunctionRole::Unknown => 0.8,      // Default weight
+        }
+    }
+
     pub fn analyze(
         &self,
         function: &FunctionAnalysis,
@@ -107,8 +126,8 @@ impl CoverageRiskAnalyzer {
             severity,
             evidence: RiskEvidence::Coverage(evidence),
             remediation_actions,
-            weight: self.get_weight_for_role(&context.role),
-            confidence: self.calculate_confidence(coverage_percentage),
+            weight: Self::classify_role_weight(&context.role),
+            confidence: Self::classify_confidence_from_coverage(coverage_percentage),
         }
     }
 
@@ -378,27 +397,5 @@ impl CoverageRiskAnalyzer {
         }
 
         paths
-    }
-
-    fn get_weight_for_role(&self, role: &FunctionRole) -> f64 {
-        match role {
-            FunctionRole::PureLogic => 1.0,    // Full weight for business logic
-            FunctionRole::EntryPoint => 0.9,   // High weight for entry points
-            FunctionRole::Orchestrator => 0.6, // Moderate weight for orchestration
-            FunctionRole::IOWrapper => 0.4,    // Lower weight for I/O
-            FunctionRole::Unknown => 0.8,      // Default weight
-        }
-    }
-
-    fn calculate_confidence(&self, coverage: f64) -> f64 {
-        if coverage == 0.0 {
-            0.9 // High confidence that uncovered code is risky
-        } else if coverage < 50.0 {
-            0.85
-        } else if coverage < 80.0 {
-            0.8
-        } else {
-            0.95 // Very high confidence for well-covered code
-        }
     }
 }
