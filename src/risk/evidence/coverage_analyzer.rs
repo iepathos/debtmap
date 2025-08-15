@@ -663,4 +663,215 @@ mod tests {
             2
         );
     }
+
+    #[test]
+    fn test_determine_coverage_tier_excellent() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        // Coverage >= 90% should be in excellent tier
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(95.0, &thresholds);
+        assert_eq!(base, 10.0);
+        assert_eq!(range, 2.0);
+        assert_eq!(lower, 90.0);
+        assert_eq!(upper, 100.0);
+
+        // Exactly at threshold
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(90.0, &thresholds);
+        assert_eq!(base, 10.0);
+        assert_eq!(range, 2.0);
+        assert_eq!(lower, 90.0);
+        assert_eq!(upper, 100.0);
+    }
+
+    #[test]
+    fn test_determine_coverage_tier_good() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        // Coverage >= 80% but < 90% should be in good tier
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(85.0, &thresholds);
+        assert_eq!(base, 7.5);
+        assert_eq!(range, 2.5);
+        assert_eq!(lower, 80.0);
+        assert_eq!(upper, 90.0);
+
+        // Just below excellent threshold
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(89.9, &thresholds);
+        assert_eq!(base, 7.5);
+        assert_eq!(range, 2.5);
+        assert_eq!(lower, 80.0);
+        assert_eq!(upper, 90.0);
+    }
+
+    #[test]
+    fn test_determine_coverage_tier_moderate() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        // Coverage >= 60% but < 80% should be in moderate tier
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(70.0, &thresholds);
+        assert_eq!(base, 5.0);
+        assert_eq!(range, 2.5);
+        assert_eq!(lower, 60.0);
+        assert_eq!(upper, 80.0);
+
+        // Exactly at moderate threshold
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(60.0, &thresholds);
+        assert_eq!(base, 5.0);
+        assert_eq!(range, 2.5);
+        assert_eq!(lower, 60.0);
+        assert_eq!(upper, 80.0);
+    }
+
+    #[test]
+    fn test_determine_coverage_tier_poor() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        // Coverage >= 30% but < 60% should be in poor tier
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(45.0, &thresholds);
+        assert_eq!(base, 2.5);
+        assert_eq!(range, 2.0);
+        assert_eq!(lower, 30.0);
+        assert_eq!(upper, 60.0);
+
+        // Exactly at poor threshold
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(30.0, &thresholds);
+        assert_eq!(base, 2.5);
+        assert_eq!(range, 2.0);
+        assert_eq!(lower, 30.0);
+        assert_eq!(upper, 60.0);
+    }
+
+    #[test]
+    fn test_determine_coverage_tier_very_poor() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        // Coverage > 0% but < 30% should be in very poor tier
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(15.0, &thresholds);
+        assert_eq!(base, 0.5);
+        assert_eq!(range, 1.0);
+        assert_eq!(lower, 0.0);
+        assert_eq!(upper, 30.0);
+
+        // Just above zero
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(0.1, &thresholds);
+        assert_eq!(base, 0.5);
+        assert_eq!(range, 1.0);
+        assert_eq!(lower, 0.0);
+        assert_eq!(upper, 30.0);
+    }
+
+    #[test]
+    fn test_determine_coverage_tier_zero() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        // Zero coverage should get maximum risk score
+        let (base, range, lower, upper) =
+            CoverageRiskAnalyzer::determine_coverage_tier(0.0, &thresholds);
+        assert_eq!(base, 10.0);
+        assert_eq!(range, 0.0);
+        assert_eq!(lower, 0.0);
+        assert_eq!(upper, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_tier_score_normal_case() {
+        // Test normal tier calculation
+        // Coverage at 85% in 80-90% tier
+        // Position = (85-80)/(90-80) = 0.5
+        // Score = 7.5 - 0.5 * 2.5 = 6.25
+        let score = CoverageRiskAnalyzer::calculate_tier_score(
+            85.0, // coverage
+            7.5,  // base_score
+            2.5,  // range_score
+            80.0, // lower_bound
+            90.0, // upper_bound
+        );
+        assert_eq!(score, 6.25);
+    }
+
+    #[test]
+    fn test_calculate_tier_score_at_lower_bound() {
+        // Coverage exactly at lower bound
+        // Position = 0, so score = base_score
+        let score = CoverageRiskAnalyzer::calculate_tier_score(
+            80.0, // coverage
+            7.5,  // base_score
+            2.5,  // range_score
+            80.0, // lower_bound
+            90.0, // upper_bound
+        );
+        assert_eq!(score, 7.5);
+    }
+
+    #[test]
+    fn test_calculate_tier_score_at_upper_bound() {
+        // Coverage exactly at upper bound
+        // Position = 1, so score = base_score - range_score
+        let score = CoverageRiskAnalyzer::calculate_tier_score(
+            90.0, // coverage
+            7.5,  // base_score
+            2.5,  // range_score
+            80.0, // lower_bound
+            90.0, // upper_bound
+        );
+        assert_eq!(score, 5.0);
+    }
+
+    #[test]
+    fn test_calculate_tier_score_zero_range() {
+        // Special case for zero coverage (range_score = 0)
+        let score = CoverageRiskAnalyzer::calculate_tier_score(
+            0.0,  // coverage
+            10.0, // base_score
+            0.0,  // range_score
+            0.0,  // lower_bound
+            0.0,  // upper_bound
+        );
+        assert_eq!(score, 10.0);
+    }
 }
