@@ -216,22 +216,47 @@ impl CoverageRiskAnalyzer {
     }
 
     fn score_coverage(&self, coverage: f64, thresholds: &CoverageThresholds) -> f64 {
-        if coverage >= thresholds.excellent {
-            10.0 - (coverage - thresholds.excellent) / (100.0 - thresholds.excellent) * 2.0
-        // 0-2 for excellent
-        } else if coverage >= thresholds.good {
-            7.5 - (coverage - thresholds.good) / (thresholds.excellent - thresholds.good) * 2.5
-        // 2-4.5 for good
-        } else if coverage >= thresholds.moderate {
-            5.0 - (coverage - thresholds.moderate) / (thresholds.good - thresholds.moderate) * 2.5
-        // 4.5-7 for moderate
-        } else if coverage >= thresholds.poor {
-            2.5 - (coverage - thresholds.poor) / (thresholds.moderate - thresholds.poor) * 2.0
-        // 7-9 for poor
-        } else if coverage > 0.0 {
-            0.5 - coverage / thresholds.poor * 1.0 // 9-10 for critical
+        Self::classify_coverage_risk(coverage, thresholds)
+    }
+
+    /// Pure function to classify coverage into risk score based on thresholds
+    fn classify_coverage_risk(coverage: f64, thresholds: &CoverageThresholds) -> f64 {
+        let (base_score, range_score, lower_bound, upper_bound) =
+            Self::determine_coverage_tier(coverage, thresholds);
+
+        Self::calculate_tier_score(coverage, base_score, range_score, lower_bound, upper_bound)
+    }
+
+    /// Determine which coverage tier the value falls into
+    fn determine_coverage_tier(
+        coverage: f64,
+        thresholds: &CoverageThresholds,
+    ) -> (f64, f64, f64, f64) {
+        match () {
+            _ if coverage >= thresholds.excellent => (10.0, 2.0, thresholds.excellent, 100.0),
+            _ if coverage >= thresholds.good => (7.5, 2.5, thresholds.good, thresholds.excellent),
+            _ if coverage >= thresholds.moderate => {
+                (5.0, 2.5, thresholds.moderate, thresholds.good)
+            }
+            _ if coverage >= thresholds.poor => (2.5, 2.0, thresholds.poor, thresholds.moderate),
+            _ if coverage > 0.0 => (0.5, 1.0, 0.0, thresholds.poor),
+            _ => (10.0, 0.0, 0.0, 0.0), // Zero coverage = maximum risk
+        }
+    }
+
+    /// Calculate the final score within a tier
+    fn calculate_tier_score(
+        coverage: f64,
+        base_score: f64,
+        range_score: f64,
+        lower_bound: f64,
+        upper_bound: f64,
+    ) -> f64 {
+        if range_score == 0.0 {
+            base_score // Special case for zero coverage
         } else {
-            10.0 // Maximum risk for zero coverage
+            let position_in_tier = (coverage - lower_bound) / (upper_bound - lower_bound);
+            base_score - position_in_tier * range_score
         }
     }
 
