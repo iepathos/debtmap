@@ -1,3 +1,4 @@
+use crate::config;
 use crate::core::FunctionMetrics;
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
@@ -18,10 +19,11 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
-    pub complexity_factor: f64, // 0-10, weighted 25%
-    pub coverage_factor: f64,   // 0-10, weighted 35%
-    pub roi_factor: f64,        // 0-10, weighted 25%
-    pub semantic_factor: f64,   // 0-10, weighted 15%
+    pub complexity_factor: f64, // 0-10, configurable weight (default 15%)
+    pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
+    pub roi_factor: f64,        // 0-10, configurable weight (default 25%)
+    pub semantic_factor: f64,   // 0-10, configurable weight (default 5%)
+    pub dependency_factor: f64, // 0-10, configurable weight (default 15%)
     pub role_multiplier: f64,   // 0.1-1.5x based on function role
     pub final_score: f64,       // Computed composite score
 }
@@ -89,6 +91,7 @@ pub fn calculate_unified_priority(
             coverage_factor: 0.0,
             roi_factor: 0.0,
             semantic_factor: 0.0,
+            dependency_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
         };
@@ -115,11 +118,19 @@ pub fn calculate_unified_priority(
     let semantic_factor = calculate_semantic_priority(func, role, &func_id, call_graph);
     let role_multiplier = get_role_multiplier(role);
 
-    // Calculate weighted composite score
-    let base_score = complexity_factor * 0.25
-        + coverage_factor * 0.35
-        + roi_factor * 0.25
-        + semantic_factor * 0.15;
+    // Calculate dependency factor based on upstream dependencies (functions that call this one)
+    let upstream_count = call_graph.get_callers(&func_id).len();
+    let dependency_factor = calculate_dependency_factor(upstream_count);
+
+    // Get configurable weights
+    let weights = config::get_scoring_weights();
+
+    // Calculate weighted composite score using configurable weights
+    let base_score = complexity_factor * weights.complexity
+        + coverage_factor * weights.coverage
+        + roi_factor * weights.roi
+        + semantic_factor * weights.semantic
+        + dependency_factor * weights.dependency;
 
     // Apply role multiplier
     let final_score = (base_score * role_multiplier).min(10.0);
@@ -129,6 +140,7 @@ pub fn calculate_unified_priority(
         coverage_factor,
         roi_factor,
         semantic_factor,
+        dependency_factor,
         role_multiplier,
         final_score,
     }
@@ -160,6 +172,29 @@ fn normalize_roi(roi: f64) -> f64 {
         3.0 + (roi - 1.0) * 1.0
     } else {
         7.0 + ((roi - 5.0) * 0.6).min(3.0)
+    }
+}
+
+fn calculate_dependency_factor(upstream_count: usize) -> f64 {
+    // Calculate criticality based on number of upstream dependencies (callers)
+    // Functions with many callers are on critical paths and should be prioritized
+    // 0 callers = 0 (dead code)
+    // 1-2 callers = 2-4 (low criticality)
+    // 3-5 callers = 4-7 (medium criticality)
+    // 6-10 callers = 7-9 (high criticality)
+    // 10+ callers = 9-10 (critical path)
+
+    match upstream_count {
+        0 => 0.0, // Dead code - low priority unless it's complex
+        1 => 2.0,
+        2 => 3.0,
+        3 => 4.0,
+        4 => 5.0,
+        5 => 6.0,
+        6..=7 => 7.0,
+        8..=9 => 8.0,
+        10..=14 => 9.0,
+        _ => 10.0, // 15+ callers = critical path function
     }
 }
 
@@ -481,11 +516,24 @@ fn determine_debt_type(
 }
 
 fn calculate_risk_score(func: &FunctionMetrics) -> f64 {
-    // Calculate a risk score based on complexity metrics
-    let complexity_score = (func.cyclomatic as f64 + func.cognitive as f64) / 2.0;
-    let length_factor = (func.length as f64 / 50.0).min(2.0);
+    // Better scaling for complexity risk (0-1 range)
+    // Cyclomatic 10 = 0.33, 20 = 0.67, 30+ = 1.0
+    let cyclo_risk = (func.cyclomatic as f64 / 30.0).min(1.0);
 
-    (complexity_score * 0.7 + length_factor * 3.0).min(10.0)
+    // Cognitive complexity tends to be higher, so scale differently
+    // Cognitive 15 = 0.33, 30 = 0.67, 45+ = 1.0
+    let cognitive_risk = (func.cognitive as f64 / 45.0).min(1.0);
+
+    // Length risk - functions over 100 lines are definitely risky
+    let length_risk = (func.length as f64 / 100.0).min(1.0);
+
+    // Average the three risk factors
+    // Complexity is most important, then cognitive, then length
+    let weighted_risk = cyclo_risk * 0.4 + cognitive_risk * 0.4 + length_risk * 0.2;
+
+    // Scale to 0-10 range for final risk score
+    // Note: Coverage is handled separately in the unified scoring system
+    weighted_risk * 10.0
 }
 
 fn identify_risk_factors(
@@ -1493,6 +1541,7 @@ mod tests {
             coverage_factor: 7.0,
             roi_factor: 6.0,
             semantic_factor: 5.0,
+            dependency_factor: 4.0,
             role_multiplier: 1.0,
             final_score: 6.5,
         };
@@ -1691,6 +1740,7 @@ mod tests {
             coverage_factor: 0.0,
             roi_factor: 0.0,
             semantic_factor: 1.0,
+            dependency_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };
@@ -2118,6 +2168,7 @@ mod tests {
             coverage_factor: 3.0,
             roi_factor: 2.0,
             semantic_factor: 1.0,
+            dependency_factor: 2.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -2146,6 +2197,7 @@ mod tests {
             coverage_factor: 5.0,
             roi_factor: 3.0,
             semantic_factor: 2.0,
+            dependency_factor: 3.0,
             role_multiplier: 1.0,
             final_score: 5.0,
         };
@@ -2172,6 +2224,7 @@ mod tests {
             coverage_factor: 6.0,
             roi_factor: 2.0,
             semantic_factor: 1.0,
+            dependency_factor: 1.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -2199,6 +2252,7 @@ mod tests {
             coverage_factor: 6.0,
             roi_factor: 4.0,
             semantic_factor: 3.0,
+            dependency_factor: 2.0,
             role_multiplier: 1.0,
             final_score: 7.5,
         };

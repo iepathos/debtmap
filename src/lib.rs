@@ -4,6 +4,7 @@ pub mod analysis_utils;
 pub mod analyzers;
 pub mod cli;
 pub mod complexity;
+pub mod config;
 pub mod core;
 pub mod debt;
 pub mod expansion;

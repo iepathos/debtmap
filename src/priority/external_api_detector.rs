@@ -1,7 +1,7 @@
+use crate::config;
 use crate::core::FunctionMetrics;
 use crate::priority::FunctionVisibility;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -28,41 +28,14 @@ fn default_true() -> bool {
 /// Cache the configuration
 static CONFIG: OnceLock<ExternalApiConfig> = OnceLock::new();
 
-/// Load configuration from .debtmap.toml if it exists
-fn load_config() -> ExternalApiConfig {
-    // Try to find .debtmap.toml in current directory or parent directories
-    let current = std::env::current_dir().ok();
-    if let Some(mut dir) = current {
-        loop {
-            let config_path = dir.join(".debtmap.toml");
-            if config_path.exists() {
-                if let Ok(contents) = fs::read_to_string(&config_path) {
-                    if let Ok(config) = toml::from_str::<DebtmapConfig>(&contents) {
-                        return config.external_api.unwrap_or_default();
-                    }
-                }
-            }
-
-            if !dir.pop() {
-                break;
-            }
-        }
-    }
-
-    // Default configuration
-    ExternalApiConfig::default()
-}
-
-/// Root configuration structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct DebtmapConfig {
-    /// External API detection configuration
-    external_api: Option<ExternalApiConfig>,
-}
-
 /// Get the cached configuration
 fn get_config() -> &'static ExternalApiConfig {
-    CONFIG.get_or_init(load_config)
+    CONFIG.get_or_init(|| {
+        config::get_config()
+            .external_api
+            .clone()
+            .unwrap_or_default()
+    })
 }
 
 /// Check if a function is explicitly marked as an external API
