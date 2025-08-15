@@ -405,17 +405,18 @@ impl CouplingRiskAnalyzer {
         }
     }
 
-    fn calculate_confidence(&self, total_coupling: u32) -> f64 {
-        // More connections means more confidence in the analysis
-        if total_coupling == 0 {
-            0.5 // Low confidence for isolated functions
-        } else if total_coupling < 5 {
-            0.7
-        } else if total_coupling < 15 {
-            0.85
-        } else {
-            0.95
+    /// Classify coupling confidence level based on total connections
+    fn classify_confidence_level(total_coupling: u32) -> f64 {
+        match total_coupling {
+            0 => 0.5,       // Low confidence for isolated functions
+            1..=4 => 0.7,   // Moderate confidence for lightly coupled
+            5..=14 => 0.85, // High confidence for moderately coupled
+            _ => 0.95,      // Very high confidence for highly coupled
         }
+    }
+
+    fn calculate_confidence(&self, total_coupling: u32) -> f64 {
+        Self::classify_confidence_level(total_coupling)
     }
 }
 
