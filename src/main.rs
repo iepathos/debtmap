@@ -1182,28 +1182,51 @@ fn process_rust_files_for_call_graph(
     // Create Rust-specific call graph builder from the base graph
     let mut enhanced_builder = RustCallGraphBuilder::from_base_graph(call_graph.clone());
 
-    // Collect all parsed files for cross-module analysis
+    // NEW APPROACH: Collect all parsed files first, then extract call graph globally
     let mut workspace_files = Vec::new();
+    let mut expanded_files = Vec::new();
 
+    // First pass: collect all parsed files
     for file_path in rust_files {
-        // First extract basic call graph
-        let file_call_graph = process_file_with_expansion(&file_path, expansion_config.as_ref())?;
-        call_graph.merge(file_call_graph);
-
-        // Then perform enhanced analysis if we can parse the file
         if let Ok(content) = io::read_file(&file_path) {
-            if let Ok(parsed) = syn::parse_file(&content) {
-                // Run per-file enhanced analysis phases
-                enhanced_builder
-                    .analyze_basic_calls(&file_path, &parsed)?
-                    .analyze_trait_dispatch(&file_path, &parsed)?
-                    .analyze_function_pointers(&file_path, &parsed)?
-                    .analyze_framework_patterns(&file_path, &parsed)?;
+            // Try to get expanded content if macro expansion is enabled
+            let file_content = if let Some(config) = expansion_config.as_ref() {
+                use debtmap::expansion::{MacroExpander, MacroExpansion};
+                if let Ok(mut expander) = MacroExpander::new(config.clone()) {
+                    if let Ok(expanded) = expander.expand_file(&file_path) {
+                        expanded.expanded_content
+                    } else {
+                        content
+                    }
+                } else {
+                    content
+                }
+            } else {
+                content
+            };
 
-                // Collect for cross-module analysis
+            // Parse the content (expanded or original)
+            if let Ok(parsed) = syn::parse_file(&file_content) {
+                expanded_files.push((parsed.clone(), file_path.clone()));
                 workspace_files.push((file_path.clone(), parsed));
             }
         }
+    }
+
+    // Second pass: extract call graph from all files with cross-module resolution
+    if !expanded_files.is_empty() {
+        use debtmap::analyzers::rust_call_graph::extract_call_graph_multi_file;
+        let multi_file_call_graph = extract_call_graph_multi_file(&expanded_files);
+        call_graph.merge(multi_file_call_graph);
+    }
+
+    // Third pass: run enhanced analysis on all parsed files
+    for (file_path, parsed) in &workspace_files {
+        enhanced_builder
+            .analyze_basic_calls(file_path, parsed)?
+            .analyze_trait_dispatch(file_path, parsed)?
+            .analyze_function_pointers(file_path, parsed)?
+            .analyze_framework_patterns(file_path, parsed)?;
     }
 
     // Run cross-module analysis with all files

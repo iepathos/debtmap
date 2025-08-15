@@ -55,7 +55,7 @@ impl CallGraphExtractor {
                     call_type: call.call_type,
                 });
             }
-            // If resolution fails, the call is simply not added (could log this)
+            // If resolution fails, the call is simply not added
         }
     }
 
@@ -101,13 +101,48 @@ impl CallGraphExtractor {
             }
         }
 
-        // Try to find by exact match or resolved name
+        // Enhanced cross-module resolution
         let matches: Vec<_> = all_functions
             .iter()
             .filter(|f| {
-                f.name == resolved_name
-                    || f.name == name
-                    || f.name.ends_with(&format!("::{}", resolved_name))
+                // Exact match (highest priority)
+                if f.name == resolved_name || f.name == name {
+                    return true;
+                }
+
+                // Function name ends with the target (e.g., "SomeType::new" matches "new")
+                if f.name.ends_with(&format!("::{}", resolved_name)) {
+                    return true;
+                }
+
+                // Cross-module associated function call resolution:
+                // For calls like "ContextualRisk::new", match against functions with exactly that name
+                // even if they're in different files
+                if name.contains("::") && f.name == name {
+                    return true;
+                }
+
+                // Module-qualified match: strip common module prefixes and try to match
+                // BUT only if the type names also match to avoid false matches
+                if let Some(base_name) = name.split("::").last() {
+                    if let Some(func_base_name) = f.name.split("::").last() {
+                        if base_name == func_base_name {
+                            // Additional check: if both have type prefixes, they should match
+                            let name_parts: Vec<&str> = name.split("::").collect();
+                            let func_parts: Vec<&str> = f.name.split("::").collect();
+
+                            if name_parts.len() >= 2 && func_parts.len() >= 2 {
+                                // Both have type::method format, check if types match
+                                return name_parts[0] == func_parts[0];
+                            } else {
+                                // At least one is unqualified, allow the match
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                false
             })
             .collect();
 
@@ -115,13 +150,30 @@ impl CallGraphExtractor {
             1 => Some(matches[0].clone()), // Unique match across all files
             0 => None,                     // No match found
             _ => {
-                // Multiple matches - try to pick the best one
-                // Prefer same file if available
-                matches
+                // Multiple matches - use sophisticated disambiguation
+
+                // 1. Prefer exact name match
+                if let Some(exact_match) = matches
                     .iter()
-                    .find(|f| f.file == caller.file)
-                    .or_else(|| matches.first())
-                    .map(|f| (*f).clone())
+                    .find(|f| f.name == name || f.name == resolved_name)
+                {
+                    return Some((*exact_match).clone());
+                }
+
+                // 2. Prefer same file if available
+                if let Some(same_file_match) = matches.iter().find(|f| f.file == caller.file) {
+                    return Some((*same_file_match).clone());
+                }
+
+                // 3. For associated function calls (Type::method), prefer the match that looks most like an impl
+                if name.contains("::") {
+                    if let Some(impl_match) = matches.iter().find(|f| f.name == name) {
+                        return Some((*impl_match).clone());
+                    }
+                }
+
+                // 4. Fall back to the first match
+                matches.first().map(|f| (*f).clone())
             }
         }
     }
@@ -477,4 +529,28 @@ pub fn extract_call_graph(file: &syn::File, path: &Path) -> CallGraph {
 /// Merge a file's call graph into the main call graph (placeholder for compatibility)
 pub fn merge_call_graphs(_main: &mut CallGraph, _file_graph: CallGraph) {
     // This is handled by CallGraph::merge method now
+}
+
+/// Extract call graph from multiple files with cross-file resolution
+pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGraph {
+    let mut combined_extractor = CallGraphExtractor::new(PathBuf::from("multi_file"));
+
+    // Phase 1: Extract all functions from all files and collect all unresolved calls
+    for (file, path) in files {
+        let mut file_extractor = CallGraphExtractor::new(path.clone());
+        file_extractor.extract_phase1(file);
+
+        // Merge the functions and unresolved calls into the combined extractor
+        combined_extractor
+            .call_graph
+            .merge(file_extractor.call_graph);
+        combined_extractor
+            .unresolved_calls
+            .extend(file_extractor.unresolved_calls);
+    }
+
+    // Phase 2: Resolve all calls now that we know ALL functions from ALL files
+    combined_extractor.resolve_phase2();
+
+    combined_extractor.call_graph
 }
