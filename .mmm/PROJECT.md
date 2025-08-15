@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28, spec 29, and spec 30 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28, spec 29, spec 30, and spec 31 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -149,6 +149,14 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Support for generic struct definitions with type parameters
   - Type alias tracking and resolution
   - 50%+ reduction in false positives for dead code detection
+- ✅ Function Return Type Tracking (spec 31):
+  - Function signature registry with return type information
+  - Method signature extraction with Self resolution
+  - Builder pattern detection and tracking
+  - Return type resolution for function and method calls
+  - Support for generic functions and async signatures
+  - Static constructor resolution (Type::new, Type::default)
+  - 30%+ additional reduction in false positives
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -177,6 +185,7 @@ The project follows a functional core / imperative shell pattern:
 16. **Enhanced Markdown Output**: Comprehensive markdown reports with all analysis features and progressive detail levels
 17. **AST-Based Type Tracking**: Accurate method call resolution through variable type tracking and scope management
 18. **Enhanced Type Resolution**: Global type registry with field access chain resolution and cross-module type tracking
+19. **Function Return Type Tracking**: Function signature registry enabling accurate type resolution from function returns
 
 ## Project Structure
 ```

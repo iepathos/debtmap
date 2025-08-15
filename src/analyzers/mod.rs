@@ -1,10 +1,12 @@
 use crate::core::{ast::Ast, FileMetrics};
 use anyhow::Result;
 
+pub mod function_registry;
 pub mod javascript;
 pub mod python;
 pub mod rust;
 pub mod rust_call_graph;
+pub mod signature_extractor;
 pub mod type_registry;
 pub mod type_tracker;
 

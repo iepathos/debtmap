@@ -1,4 +1,6 @@
 /// Two-pass call graph extraction for accurate call resolution
+use crate::analyzers::function_registry::FunctionSignatureRegistry;
+use crate::analyzers::signature_extractor::SignatureExtractor;
 use crate::analyzers::type_registry::GlobalTypeRegistry;
 use crate::analyzers::type_tracker::{extract_type_from_pattern, ScopeKind, TypeTracker};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
@@ -29,6 +31,9 @@ pub struct CallGraphExtractor {
     /// Global type registry (optional)
     #[allow(dead_code)]
     type_registry: Option<Arc<GlobalTypeRegistry>>,
+    /// Function signature registry for return type resolution
+    #[allow(dead_code)]
+    function_registry: Option<Arc<FunctionSignatureRegistry>>,
 }
 
 impl CallGraphExtractor {
@@ -42,6 +47,7 @@ impl CallGraphExtractor {
             module_path: Vec::new(),
             type_tracker: TypeTracker::new(),
             type_registry: None,
+            function_registry: None,
         }
     }
 
@@ -59,7 +65,14 @@ impl CallGraphExtractor {
             module_path: Vec::new(),
             type_tracker: tracker,
             type_registry: Some(registry),
+            function_registry: None,
         }
+    }
+
+    /// Set the function signature registry
+    pub fn set_function_registry(&mut self, registry: Arc<FunctionSignatureRegistry>) {
+        self.type_tracker.set_function_registry(registry.clone());
+        self.function_registry = Some(registry);
     }
 
     /// Phase 1: Extract all functions and collect unresolved calls
@@ -641,6 +654,30 @@ pub fn extract_call_graph_with_types(
     extractor.resolve_phase2();
 
     extractor.call_graph
+}
+
+/// Extract call graph with function signatures for enhanced return type resolution
+pub fn extract_call_graph_with_signatures(
+    file: &syn::File,
+    path: &Path,
+    registry: Arc<GlobalTypeRegistry>,
+) -> (CallGraph, Arc<FunctionSignatureRegistry>) {
+    // First extract function signatures
+    let mut sig_extractor = SignatureExtractor::new();
+    sig_extractor.extract_from_file(file);
+    let function_registry = Arc::new(sig_extractor.registry);
+
+    // Create call graph extractor with both registries
+    let mut extractor = CallGraphExtractor::with_registry(path.to_path_buf(), registry);
+    extractor.set_function_registry(function_registry.clone());
+
+    // Phase 1: Extract functions and collect unresolved calls
+    extractor.extract_phase1(file);
+
+    // Phase 2: Resolve all calls
+    extractor.resolve_phase2();
+
+    (extractor.call_graph, function_registry)
 }
 
 /// Merge a file's call graph into the main call graph (placeholder for compatibility)
