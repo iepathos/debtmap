@@ -92,6 +92,7 @@ fn format_default_with_verbosity(
     output
 }
 
+#[allow(dead_code)]
 fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     format_default_with_verbosity(analysis, limit, 0)
 }
@@ -150,6 +151,7 @@ fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u
     output
 }
 
+#[allow(dead_code)]
 fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     let mut output = String::new();
 
@@ -255,6 +257,7 @@ fn format_priorities_only(analysis: &UnifiedAnalysis, limit: usize) -> String {
     output
 }
 
+#[allow(dead_code)]
 fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     let mut output = String::new();
 
@@ -276,6 +279,7 @@ fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     output
 }
 
+#[allow(dead_code)]
 fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
     let severity = get_severity_label(item.unified_score.final_score);
     let severity_color = get_severity_color(item.unified_score.final_score);
@@ -390,6 +394,7 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     writeln!(output, "└─ WHY: {}", item.recommendation.rationale.dimmed()).unwrap();
 }
 
+#[allow(dead_code)]
 fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
     writeln!(
         output,
@@ -553,6 +558,7 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
     }
 }
 
+#[allow(dead_code)]
 fn format_role(role: FunctionRole) -> &'static str {
     match role {
         FunctionRole::PureLogic => "PureLogic",
@@ -620,6 +626,7 @@ pub fn extract_dependency_info(item: &UnifiedDebtItem) -> (usize, usize) {
     (item.upstream_dependencies, item.downstream_dependencies)
 }
 
+#[allow(dead_code)]
 fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
     match visibility {
         FunctionVisibility::Private => "private",
