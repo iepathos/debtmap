@@ -379,7 +379,10 @@ impl TraitExtractor {
         }
     }
 
-    fn extract_supertraits(&self, supertraits: &syn::punctuated::Punctuated<syn::TypeParamBound, syn::token::Plus>) -> Vector<String> {
+    fn extract_supertraits(
+        &self,
+        supertraits: &syn::punctuated::Punctuated<syn::TypeParamBound, syn::token::Plus>,
+    ) -> Vector<String> {
         supertraits
             .iter()
             .filter_map(|bound| match bound {
