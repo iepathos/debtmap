@@ -157,6 +157,16 @@ We have completed the initial implementation with core functionality for analyzi
   - Type alias tracking and resolution
   - 50%+ reduction in false positives
 
+- [x] **Spec 31**: Function Return Type Tracking for Enhanced Type Resolution
+  - Function signature registry with return types
+  - Method signature extraction with Self resolution
+  - Builder pattern detection and tracking
+  - Return type resolution for function and method calls
+  - Support for generic functions and async signatures
+  - Static constructor resolution (Type::new, Type::default)
+  - Integration with existing type tracking system
+  - 30%+ additional reduction in false positives
+
 ## Pending Specs
 
 ### Enhancements

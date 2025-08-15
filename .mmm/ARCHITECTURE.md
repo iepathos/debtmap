@@ -25,7 +25,9 @@ Language-specific analysis implementations:
 - `python.rs`: Python AST parsing with rustpython-parser
 - `type_tracker.rs`: AST-based type tracking for accurate method resolution
 - `type_registry.rs`: Global type registry for struct definitions and field tracking
-- `rust_call_graph.rs`: Two-pass call graph extraction with type-aware resolution
+- `function_registry.rs`: Function signature registry for return type tracking
+- `signature_extractor.rs`: AST visitor for extracting function and method signatures
+- `rust_call_graph.rs`: Two-pass call graph extraction with type-aware and signature-aware resolution
 
 ### Complexity (`src/complexity/`)
 Complexity metric calculations:
@@ -100,7 +102,7 @@ Rust-specific call graph analysis with multi-phase construction:
 - `call_graph/function_pointer.rs`: Function pointer and closure tracking
 - `call_graph/framework_patterns.rs`: Framework pattern recognition, Visit trait exclusion
 - `call_graph/cross_module.rs`: Cross-module dependency analysis
-- Type tracking integration: Uses TypeTracker and GlobalTypeRegistry for accurate method call resolution based on variable types and field access chains
+- Type tracking integration: Uses TypeTracker, GlobalTypeRegistry, and FunctionSignatureRegistry for accurate method call resolution based on variable types, field access chains, and function return types
 
 ### IO (`src/io/`)
 Side-effectful operations:

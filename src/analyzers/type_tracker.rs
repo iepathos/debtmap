@@ -1,3 +1,4 @@
+use crate::analyzers::function_registry::FunctionSignatureRegistry;
 use crate::analyzers::type_registry::GlobalTypeRegistry;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -19,6 +20,8 @@ pub struct TypeTracker {
     type_definitions: HashMap<String, TypeInfo>,
     /// Global type registry for struct field resolution
     type_registry: Option<Arc<GlobalTypeRegistry>>,
+    /// Function signature registry for return type resolution
+    function_registry: Option<Arc<FunctionSignatureRegistry>>,
     /// Current file path for import resolution
     current_file: Option<PathBuf>,
 }
@@ -96,6 +99,7 @@ impl TypeTracker {
             module_path: Vec::new(),
             type_definitions: HashMap::new(),
             type_registry: None,
+            function_registry: None,
             current_file: None,
         }
     }
@@ -111,8 +115,14 @@ impl TypeTracker {
             module_path: Vec::new(),
             type_definitions: HashMap::new(),
             type_registry: Some(registry),
+            function_registry: None,
             current_file: None,
         }
+    }
+
+    /// Set the function registry for return type resolution
+    pub fn set_function_registry(&mut self, registry: Arc<FunctionSignatureRegistry>) {
+        self.function_registry = Some(registry);
     }
 
     /// Set the current file path for import resolution
@@ -182,13 +192,17 @@ impl TypeTracker {
                     None
                 }
             }
-            Expr::MethodCall(ExprMethodCall { receiver, .. }) => {
-                // Recursively resolve the receiver's type
-                self.resolve_expr_type(receiver)
+            Expr::MethodCall(method_call) => {
+                // Resolve method call return type
+                self.resolve_method_call_type(method_call)
             }
             Expr::Field(field_expr) => {
                 // Resolve field access through type registry
                 self.resolve_field_access(field_expr)
+            }
+            Expr::Call(call_expr) => {
+                // Resolve function call return type
+                self.resolve_function_call_type(call_expr)
             }
             _ => None,
         }
@@ -248,6 +262,128 @@ impl TypeTracker {
                 return scope.impl_type.clone();
             }
         }
+        None
+    }
+
+    /// Resolve function call return type
+    fn resolve_function_call_type(&self, call_expr: &ExprCall) -> Option<ResolvedType> {
+        if let Some(registry) = &self.function_registry {
+            // Extract function path
+            if let Expr::Path(path_expr) = &*call_expr.func {
+                let func_path = path_expr
+                    .path
+                    .segments
+                    .iter()
+                    .map(|seg| seg.ident.to_string())
+                    .collect::<Vec<_>>()
+                    .join("::");
+
+                // Try to resolve the function
+                if let Some(return_info) = registry.resolve_function_return(&func_path, &[]) {
+                    // Handle special cases like Result and Option
+                    let type_name = if return_info.is_self {
+                        // If return type is Self, we need context
+                        self.current_impl_type()
+                            .unwrap_or_else(|| return_info.type_name.clone())
+                    } else {
+                        return_info.type_name.clone()
+                    };
+
+                    return Some(ResolvedType {
+                        type_name,
+                        source: TypeSource::FunctionReturn,
+                        generics: return_info.generic_args.clone(),
+                    });
+                }
+
+                // Check if it's a constructor pattern (Type::new, Type::default, etc.)
+                if func_path.contains("::") {
+                    let parts: Vec<&str> = func_path.split("::").collect();
+                    if parts.len() >= 2 {
+                        let type_name = parts[..parts.len() - 1].join("::");
+                        let method_name = parts.last().unwrap();
+
+                        // Common constructor patterns
+                        if matches!(
+                            *method_name,
+                            "new" | "default" | "from" | "create" | "builder"
+                        ) {
+                            // Check if this is a known method
+                            if let Some(return_info) =
+                                registry.resolve_method_return(&type_name, method_name)
+                            {
+                                let resolved_type_name = if return_info.is_self {
+                                    type_name.clone()
+                                } else {
+                                    return_info.type_name.clone()
+                                };
+
+                                return Some(ResolvedType {
+                                    type_name: resolved_type_name,
+                                    source: TypeSource::Constructor,
+                                    generics: return_info.generic_args.clone(),
+                                });
+                            } else if matches!(*method_name, "new" | "default") {
+                                // Assume it returns the type itself for common constructors
+                                return Some(ResolvedType {
+                                    type_name,
+                                    source: TypeSource::Constructor,
+                                    generics: Vec::new(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Resolve method call return type
+    fn resolve_method_call_type(&self, method_call: &ExprMethodCall) -> Option<ResolvedType> {
+        // First resolve the receiver type
+        let receiver_type = self.resolve_expr_type(&method_call.receiver)?;
+        let method_name = method_call.method.to_string();
+
+        if let Some(registry) = &self.function_registry {
+            // Try to get the method's return type
+            if let Some(return_info) =
+                registry.resolve_method_return(&receiver_type.type_name, &method_name)
+            {
+                let type_name = if return_info.is_self {
+                    // Method returns Self, so it returns the receiver type
+                    receiver_type.type_name.clone()
+                } else {
+                    return_info.type_name.clone()
+                };
+
+                return Some(ResolvedType {
+                    type_name,
+                    source: TypeSource::FunctionReturn,
+                    generics: return_info.generic_args.clone(),
+                });
+            }
+
+            // Check if this is a builder pattern
+            if registry.is_builder(&receiver_type.type_name) {
+                if let Some(builder_info) = registry.get_builder(&receiver_type.type_name) {
+                    if method_name == builder_info.build_method {
+                        // This is the terminal build method
+                        return Some(ResolvedType {
+                            type_name: builder_info.target_type.clone(),
+                            source: TypeSource::FunctionReturn,
+                            generics: Vec::new(),
+                        });
+                    } else if builder_info.chain_methods.contains(&method_name) {
+                        // This is a chaining method, returns the builder itself
+                        return Some(receiver_type);
+                    }
+                }
+            }
+        }
+
+        // Default: method calls typically don't change the type
+        // unless we have specific information
         None
     }
 
