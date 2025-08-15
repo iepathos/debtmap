@@ -296,15 +296,16 @@ impl ComplexityRiskAnalyzer {
     fn calculate_confidence(&self, cyclomatic: u32, cognitive: u32) -> f64 {
         // Higher confidence for more complex functions (more data points)
         let complexity_points = cyclomatic + cognitive;
+        Self::classify_confidence_level(complexity_points)
+    }
 
-        if complexity_points < 5 {
-            0.6 // Low confidence for very simple functions
-        } else if complexity_points < 15 {
-            0.8 // Moderate confidence
-        } else if complexity_points < 30 {
-            0.9 // High confidence
-        } else {
-            0.95 // Very high confidence for complex functions
+    // Pure function for classifying confidence level based on complexity points
+    fn classify_confidence_level(complexity_points: u32) -> f64 {
+        match complexity_points {
+            0..=4 => 0.6,   // Low confidence for very simple functions
+            5..=14 => 0.8,  // Moderate confidence
+            15..=29 => 0.9, // High confidence
+            _ => 0.95,      // Very high confidence for complex functions
         }
     }
 }
