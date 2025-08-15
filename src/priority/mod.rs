@@ -2,6 +2,7 @@ pub mod call_graph;
 pub mod coverage_propagation;
 pub mod external_api_detector;
 pub mod formatter;
+pub mod formatter_markdown;
 pub mod semantic_classifier;
 pub mod unified_scorer;
 
@@ -10,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub use call_graph::{CallGraph, FunctionCall};
 pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage};
 pub use formatter::{format_priorities, OutputFormat};
+pub use formatter_markdown::format_priorities_markdown;
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use unified_scorer::{calculate_unified_priority, UnifiedDebtItem, UnifiedScore};
 
