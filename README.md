@@ -735,7 +735,6 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 - [x] Python - Full support via rustpython-parser
 - [x] JavaScript/TypeScript - Full support via tree-sitter
 - [ ] Go - In development (Q4 2025)
-- [ ] Java - Planned (Q4 2025)
 - [ ] C/C++ - Planned (Q4 2025)
 - [ ] C# - Planned (Q1 2026)
 - [ ] Java - Planned (Q2 2026)
