@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, and spec 26 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, and spec 28 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -121,6 +121,17 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Architecture ready for multi-language expansion (PythonCallGraph, JavaScriptCallGraph, etc.)
   - Maintained all existing functionality including Visit trait pattern detection
   - Zero functional changes - pure refactoring for better architecture
+- ✅ Enhanced Markdown Output Formatting (spec 28):
+  - Full feature parity with terminal output
+  - Unified priority scoring visualization with tables
+  - Evidence-based risk analysis details in markdown
+  - Dead code detection results with visibility recommendations
+  - Semantic function classification information
+  - ROI-based testing recommendations with coverage gaps
+  - Call graph dependency insights (with verbosity)
+  - Progressive detail levels with collapsible sections
+  - Valid CommonMark specification compliance
+  - GitHub Flavored Markdown support
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -146,6 +157,7 @@ The project follows a functional core / imperative shell pattern:
 13. **Enhanced Call Graph**: Multi-phase analysis with trait dispatch and function pointer tracking
 14. **Evidence-Based Risk**: Statistical risk assessment with role-aware thresholds and remediation guidance
 15. **Language-Specific Call Graph**: Rust-specific call graph analysis with clear architecture for multi-language support
+16. **Enhanced Markdown Output**: Comprehensive markdown reports with all analysis features and progressive detail levels
 
 ## Project Structure
 ```
