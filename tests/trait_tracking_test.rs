@@ -185,7 +185,7 @@ fn test_associated_type_tracking() {
 
 #[test]
 fn test_method_resolution_order() {
-    let mut tracker = TraitImplementationTracker::new();
+    let tracker = TraitImplementationTracker::new();
     let mut resolver = TraitResolver::new(Arc::new(tracker.clone()));
 
     // Register an inherent method
@@ -308,17 +308,17 @@ fn test_cache_functionality() {
 
     // First call - should cache
     let _ = resolver.resolve_method_call("Type", "method", &traits_in_scope);
-    let (hits1, total1) = resolver.cache_stats();
+    let (_hits1, total1) = resolver.cache_stats();
 
     // Second call - should hit cache
     let _ = resolver.resolve_method_call("Type", "method", &traits_in_scope);
-    let (hits2, total2) = resolver.cache_stats();
+    let (_hits2, total2) = resolver.cache_stats();
 
     assert_eq!(total1, 1);
     assert_eq!(total2, 1); // Same total, means it used cache
 
     // Clear cache
     resolver.clear_cache();
-    let (hits3, total3) = resolver.cache_stats();
+    let (_hits3, total3) = resolver.cache_stats();
     assert_eq!(total3, 0);
 }

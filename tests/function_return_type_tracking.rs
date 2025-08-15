@@ -1,8 +1,7 @@
-use debtmap::analyzers::function_registry::{FunctionSignatureRegistry, ReturnTypeInfo};
 use debtmap::analyzers::rust_call_graph::extract_call_graph_with_signatures;
 use debtmap::analyzers::signature_extractor::SignatureExtractor;
 use debtmap::analyzers::type_registry::GlobalTypeRegistry;
-use debtmap::analyzers::type_tracker::{ResolvedType, TypeSource, TypeTracker};
+use debtmap::analyzers::type_tracker::TypeTracker;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -308,7 +307,7 @@ fn test_call_graph_with_signatures() {
     let path = PathBuf::from("test.rs");
     let type_registry = Arc::new(GlobalTypeRegistry::new());
 
-    let (call_graph, function_registry) =
+    let (_call_graph, function_registry) =
         extract_call_graph_with_signatures(&syntax, &path, type_registry);
 
     // Verify function signatures were extracted

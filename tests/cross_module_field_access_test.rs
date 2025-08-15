@@ -1,7 +1,4 @@
 use debtmap::analyzers::rust_call_graph::extract_call_graph_multi_file;
-use debtmap::priority::call_graph::FunctionId;
-use debtmap::priority::unified_scorer::is_dead_code_with_exclusions;
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[test]
