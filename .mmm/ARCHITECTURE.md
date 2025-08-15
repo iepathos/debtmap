@@ -28,6 +28,8 @@ Language-specific analysis implementations:
 - `function_registry.rs`: Function signature registry for return type tracking
 - `signature_extractor.rs`: AST visitor for extracting function and method signatures
 - `rust_call_graph.rs`: Two-pass call graph extraction with type-aware and signature-aware resolution
+- `trait_implementation_tracker.rs`: Comprehensive trait definition and implementation tracking
+- `trait_resolver.rs`: Dynamic dispatch resolution with method resolution order
 
 ### Complexity (`src/complexity/`)
 Complexity metric calculations:
@@ -98,11 +100,11 @@ Macro expansion for perfect call graph analysis:
 ### Analysis (`src/analysis/`)
 Rust-specific call graph analysis with multi-phase construction:
 - `call_graph/mod.rs`: Rust-specific call graph builder and core types (RustCallGraph, RustCallGraphBuilder)
-- `call_graph/trait_registry.rs`: Trait dispatch detection and resolution, Visit trait pattern detection
+- `call_graph/trait_registry.rs`: Enhanced trait dispatch detection and resolution, Visit trait pattern detection, integration with trait_implementation_tracker
 - `call_graph/function_pointer.rs`: Function pointer and closure tracking
 - `call_graph/framework_patterns.rs`: Framework pattern recognition, Visit trait exclusion
 - `call_graph/cross_module.rs`: Cross-module dependency analysis
-- Type tracking integration: Uses TypeTracker, GlobalTypeRegistry, and FunctionSignatureRegistry for accurate method call resolution based on variable types, field access chains, and function return types
+- Type tracking integration: Uses TypeTracker, GlobalTypeRegistry, FunctionSignatureRegistry, and TraitImplementationTracker for accurate method call resolution based on variable types, field access chains, function return types, and trait implementations
 
 ### IO (`src/io/`)
 Side-effectful operations:

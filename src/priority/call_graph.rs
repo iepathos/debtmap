@@ -164,6 +164,29 @@ impl CallGraph {
         self.get_callers(func_id).len()
     }
 
+    /// Mark a function as being reachable through trait dispatch
+    /// This helps reduce false positives in dead code detection
+    pub fn mark_as_trait_dispatch(&mut self, func_id: FunctionId) {
+        // Ensure the function exists in the graph
+        if !self.nodes.contains_key(&func_id) {
+            self.nodes.insert(
+                func_id.clone(),
+                FunctionNode {
+                    id: func_id.clone(),
+                    is_entry_point: false,
+                    is_test: false,
+                    complexity: 0,
+                    _lines: 0,
+                },
+            );
+        }
+
+        // Mark it as an entry point to prevent dead code false positives
+        if let Some(node) = self.nodes.get_mut(&func_id) {
+            node.is_entry_point = true;
+        }
+    }
+
     pub fn is_entry_point(&self, func_id: &FunctionId) -> bool {
         self.nodes
             .get(func_id)
