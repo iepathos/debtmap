@@ -1,0 +1,77 @@
+# Example debtmap configuration file
+# Copy this to .debtmap.toml and adjust thresholds as needed
+
+[thresholds]
+# Basic complexity thresholds
+complexity = 10
+duplication = 50
+max_file_length = 500
+max_function_length = 100
+
+# Minimum thresholds for debt analysis
+minimum_debt_score = 1.0
+minimum_cyclomatic_complexity = 2
+minimum_cognitive_complexity = 3
+minimum_risk_score = 1.0
+
+# Validation thresholds for 'debtmap validate' command
+[thresholds.validation]
+# Maximum allowed average complexity (default: 10.0)
+max_average_complexity = 10.0
+
+# Maximum allowed high complexity function count (default: 100)
+max_high_complexity_count = 100
+
+# Maximum allowed technical debt items (default: 2000)
+max_debt_items = 2500
+
+# Maximum allowed total debt score (default: 10000)
+max_total_debt_score = 20000
+
+# Maximum allowed codebase risk score (default: 7.0)
+max_codebase_risk_score = 7.0
+
+# Maximum allowed high-risk function count (default: 50)
+max_high_risk_functions = 50
+
+# Minimum required code coverage percentage (default: 0.0 - no minimum)
+min_coverage_percentage = 60.0
+
+# Scoring weights for priority calculation
+[scoring]
+coverage = 0.40
+complexity = 0.15
+roi = 0.25
+semantic = 0.05
+dependency = 0.15
+
+# External API detection configuration
+[external_api]
+domains = [
+    "api.github.com",
+    "api.openai.com",
+    "*.amazonaws.com"
+]
+keywords = [
+    "http_client",
+    "fetch",
+    "request",
+    "api_call"
+]
+
+# Languages to analyze
+[languages]
+enabled = ["rust", "python", "javascript", "typescript"]
+
+# Patterns to ignore during analysis
+[ignore]
+patterns = [
+    "target/**",
+    "node_modules/**",
+    "*.generated.rs",
+    "*.pb.rs"
+]
+
+# Default output format
+[output]
+default_format = "terminal"
