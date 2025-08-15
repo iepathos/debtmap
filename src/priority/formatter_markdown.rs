@@ -200,9 +200,7 @@ fn format_priority_item_markdown(
                     item.upstream_callers.len() - 3
                 )
             } else {
-                item.upstream_callers
-                    .to_vec()
-                    .join(", ")
+                item.upstream_callers.to_vec().join(", ")
             };
             writeln!(output, "- **Called by:** {}", caller_list).unwrap();
         }
@@ -220,9 +218,7 @@ fn format_priority_item_markdown(
                     item.downstream_callees.len() - 3
                 )
             } else {
-                item.downstream_callees
-                    .to_vec()
-                    .join(", ")
+                item.downstream_callees.to_vec().join(", ")
             };
             writeln!(output, "- **Calls:** {}", callee_list).unwrap();
         }
