@@ -137,7 +137,7 @@ impl EvidenceBasedRiskCalculator {
         }
     }
 
-    fn aggregate_risk_factors(&self, factors: &[RiskFactor], role: &FunctionRole) -> f64 {
+    fn calculate_weighted_average(factors: &[RiskFactor]) -> f64 {
         let mut total_score = 0.0;
         let mut total_weight = 0.0;
 
@@ -153,17 +153,22 @@ impl EvidenceBasedRiskCalculator {
             return 0.0;
         }
 
-        let base_score = total_score / total_weight;
+        total_score / total_weight
+    }
 
-        // Apply role-based adjustments
-        let role_multiplier = match role {
+    fn get_role_multiplier(role: &FunctionRole) -> f64 {
+        match role {
             FunctionRole::PureLogic => 1.2,    // Business logic is more critical
             FunctionRole::EntryPoint => 1.1,   // Entry points are important
             FunctionRole::Orchestrator => 0.9, // Orchestration is less risky
             FunctionRole::IOWrapper => 0.7,    // I/O wrappers are expected to be simple
             FunctionRole::Unknown => 1.0,      // Default multiplier
-        };
+        }
+    }
 
+    fn aggregate_risk_factors(&self, factors: &[RiskFactor], role: &FunctionRole) -> f64 {
+        let base_score = Self::calculate_weighted_average(factors);
+        let role_multiplier = Self::get_role_multiplier(role);
         (base_score * role_multiplier).min(10.0)
     }
 
