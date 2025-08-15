@@ -596,7 +596,8 @@ fn validate_with_risk(
         .filter(|f| f.risk_score > risk_threshold)
         .count();
 
-    let total_debt_score = debt::total_debt_score(&results.technical_debt.items);
+    // Use unified scoring system for consistency with analyze command
+    let total_debt_score = calculate_unified_debt_score(results, lcov_data);
     let coverage_percentage = lcov_data
         .map(|lcov| lcov.get_overall_coverage())
         .unwrap_or(0.0);
@@ -736,9 +737,49 @@ fn validate_and_report(
     }
 }
 
+/// Calculate unified debt score using the same scoring system as the analyze command
+fn calculate_unified_debt_score(
+    results: &AnalysisResults,
+    lcov_data: Option<&risk::lcov::LcovData>,
+) -> u32 {
+    // This is a simplified version that may produce slightly higher scores than analyze
+    // because it doesn't perform full framework detection and macro expansion.
+    // The analyze command does additional processing to exclude framework-generated code.
+
+    // Build call graph from complexity metrics
+    let mut call_graph = build_initial_call_graph(&results.complexity.metrics);
+
+    // Get project path from results
+    let project_path = &results.project_path;
+
+    // Process Rust files to get framework exclusions (with macro expansion disabled for speed)
+    let framework_exclusions = process_rust_files_for_call_graph(
+        project_path,
+        &mut call_graph,
+        false, // expand_macros = false for validation (faster)
+        false, // clear_expansion_cache = false
+    )
+    .unwrap_or_default();
+
+    // Process Python files as well
+    let _ = process_python_files_for_call_graph(project_path, &mut call_graph);
+
+    // Create unified analysis using the same approach as analyze command
+    let unified = create_unified_analysis_with_exclusions(
+        &results.complexity.metrics,
+        &call_graph,
+        lcov_data,
+        &framework_exclusions,
+    );
+
+    // Return the unified debt score as u32 for compatibility with validation thresholds
+    unified.total_debt_score as u32
+}
+
 fn validate_basic(results: &AnalysisResults) -> (bool, ValidationDetails) {
     let thresholds = debtmap::config::get_validation_thresholds();
-    let total_debt_score = debt::total_debt_score(&results.technical_debt.items);
+    // Use unified scoring system for consistency with analyze command
+    let total_debt_score = calculate_unified_debt_score(results, None);
 
     // Check each threshold
     let avg_complexity_pass =
