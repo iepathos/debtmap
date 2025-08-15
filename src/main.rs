@@ -1140,6 +1140,7 @@ fn clear_expansion_cache_if_needed(
 }
 
 /// Process a single Rust file with optional macro expansion
+#[allow(dead_code)]
 fn process_file_with_expansion(
     file_path: &Path,
     expansion_config: Option<&debtmap::expansion::ExpansionConfig>,
@@ -1249,6 +1250,7 @@ fn process_rust_files_for_call_graph(
 }
 
 /// Extract call graph from a file without expansion
+#[allow(dead_code)]
 fn extract_regular_call_graph(file_path: &Path) -> Result<priority::CallGraph> {
     if let Ok(content) = io::read_file(file_path) {
         if let Ok(parsed) = syn::parse_file(&content) {

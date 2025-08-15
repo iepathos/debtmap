@@ -198,14 +198,15 @@ impl TypeTracker {
     fn resolve_field_access(&self, field_expr: &ExprField) -> Option<ResolvedType> {
         // First resolve the base expression type
         let base_type = self.resolve_expr_type(&field_expr.base)?;
-        
+
         // Get the field name
         let field_name = match &field_expr.member {
             syn::Member::Named(ident) => ident.to_string(),
             syn::Member::Unnamed(index) => {
                 // Handle tuple field access
                 if let Some(registry) = &self.type_registry {
-                    let field_type = registry.resolve_tuple_field(&base_type.type_name, index.index as usize)?;
+                    let field_type =
+                        registry.resolve_tuple_field(&base_type.type_name, index.index as usize)?;
                     return Some(ResolvedType {
                         type_name: field_type.type_name,
                         source: TypeSource::FieldAccess,
@@ -220,7 +221,8 @@ impl TypeTracker {
         if let Some(registry) = &self.type_registry {
             // Try to resolve the type with imports if needed
             let resolved_type_name = if let Some(file) = &self.current_file {
-                registry.resolve_type_with_imports(file, &base_type.type_name)
+                registry
+                    .resolve_type_with_imports(file, &base_type.type_name)
                     .unwrap_or_else(|| base_type.type_name.clone())
             } else {
                 base_type.type_name.clone()

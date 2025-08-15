@@ -49,7 +49,7 @@ impl CallGraphExtractor {
     pub fn with_registry(file: PathBuf, registry: Arc<GlobalTypeRegistry>) -> Self {
         let mut tracker = TypeTracker::with_registry(registry.clone());
         tracker.set_current_file(file.clone());
-        
+
         Self {
             call_graph: CallGraph::new(),
             unresolved_calls: Vec::new(),

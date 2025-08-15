@@ -135,7 +135,7 @@ impl GlobalTypeRegistry {
         // Update module exports
         self.module_exports
             .entry(module_path)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(name);
     }
 
@@ -146,7 +146,7 @@ impl GlobalTypeRegistry {
                 let mut named = HashMap::new();
                 for field in &named_fields.named {
                     if let Some(ident) = &field.ident {
-                        let field_type = self.extract_field_type(&field);
+                        let field_type = self.extract_field_type(field);
                         named.insert(ident.to_string(), field_type);
                     }
                 }
