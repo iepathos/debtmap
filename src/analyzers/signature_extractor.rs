@@ -12,6 +12,12 @@ pub struct SignatureExtractor {
     current_impl_type: Option<String>,
 }
 
+impl Default for SignatureExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SignatureExtractor {
     pub fn new() -> Self {
         Self {
@@ -130,17 +136,18 @@ impl SignatureExtractor {
                 .iter()
                 .find(|m| m.name == "build" || m.name == "finish" || m.name == "complete");
 
-            if !chain_methods.is_empty() && build_method.is_some() {
-                let build_method = build_method.unwrap();
-                let target_type = build_method.return_type.type_name.clone();
+            if !chain_methods.is_empty() {
+                if let Some(build_method) = build_method {
+                    let target_type = build_method.return_type.type_name.clone();
 
-                if target_type != *type_name && target_type != "Self" {
-                    builders.push(BuilderInfo {
-                        builder_type: type_name.clone(),
-                        target_type,
-                        build_method: build_method.name.clone(),
-                        chain_methods,
-                    });
+                    if target_type != *type_name && target_type != "Self" {
+                        builders.push(BuilderInfo {
+                            builder_type: type_name.clone(),
+                            target_type,
+                            build_method: build_method.name.clone(),
+                            chain_methods,
+                        });
+                    }
                 }
             }
         }
