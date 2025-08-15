@@ -178,28 +178,26 @@ impl CoverageRiskAnalyzer {
             return 0;
         }
 
-        let uncovered_paths = Self::calculate_uncovered_paths(
-            function.cyclomatic_complexity,
-            coverage_percentage,
-        );
-        
+        let uncovered_paths =
+            Self::calculate_uncovered_paths(function.cyclomatic_complexity, coverage_percentage);
+
         let multiplier = Self::get_role_criticality_multiplier(role);
         (uncovered_paths as f64 * multiplier) as u32
     }
-    
+
     /// Calculate the number of uncovered paths based on complexity and coverage
     fn calculate_uncovered_paths(complexity: u32, coverage_percentage: f64) -> u32 {
         let uncovered_ratio = 1.0 - (coverage_percentage / 100.0);
         (complexity as f64 * uncovered_ratio) as u32
     }
-    
+
     /// Get the criticality multiplier for a given function role
     fn get_role_criticality_multiplier(role: FunctionRole) -> f64 {
         match role {
-            FunctionRole::PureLogic => 2.0,    // All paths critical in business logic
-            FunctionRole::EntryPoint => 2.0,   // Entry points are critical  
+            FunctionRole::PureLogic => 2.0, // All paths critical in business logic
+            FunctionRole::EntryPoint => 2.0, // Entry points are critical
             FunctionRole::Orchestrator => 1.0, // Normal criticality
-            FunctionRole::IOWrapper => 0.5,    // Less critical paths
+            FunctionRole::IOWrapper => 0.5, // Less critical paths
             FunctionRole::Unknown => 1.0,
         }
     }
@@ -415,8 +413,8 @@ impl CoverageRiskAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::priority::FunctionVisibility;
+    use std::path::PathBuf;
 
     #[test]
     fn test_classify_test_quality_excellent() {
@@ -544,22 +542,13 @@ mod tests {
 
     #[test]
     fn test_calculate_uncovered_paths_zero_coverage() {
-        assert_eq!(
-            CoverageRiskAnalyzer::calculate_uncovered_paths(10, 0.0),
-            10
-        );
+        assert_eq!(CoverageRiskAnalyzer::calculate_uncovered_paths(10, 0.0), 10);
     }
 
     #[test]
     fn test_calculate_uncovered_paths_partial_coverage() {
-        assert_eq!(
-            CoverageRiskAnalyzer::calculate_uncovered_paths(10, 50.0),
-            5
-        );
-        assert_eq!(
-            CoverageRiskAnalyzer::calculate_uncovered_paths(10, 75.0),
-            2
-        );
+        assert_eq!(CoverageRiskAnalyzer::calculate_uncovered_paths(10, 50.0), 5);
+        assert_eq!(CoverageRiskAnalyzer::calculate_uncovered_paths(10, 75.0), 2);
     }
 
     #[test]
@@ -624,7 +613,7 @@ mod tests {
             is_test: false,
             visibility: FunctionVisibility::Private,
         };
-        
+
         assert_eq!(
             analyzer.count_uncovered_critical_paths(&function, 100.0, FunctionRole::PureLogic),
             0
@@ -645,7 +634,7 @@ mod tests {
             is_test: false,
             visibility: FunctionVisibility::Private,
         };
-        
+
         // 50% coverage means 5 uncovered paths, times 2.0 multiplier = 10
         assert_eq!(
             analyzer.count_uncovered_critical_paths(&function, 50.0, FunctionRole::PureLogic),
@@ -667,7 +656,7 @@ mod tests {
             is_test: false,
             visibility: FunctionVisibility::Private,
         };
-        
+
         // 50% coverage means 5 uncovered paths, times 0.5 multiplier = 2
         assert_eq!(
             analyzer.count_uncovered_critical_paths(&function, 50.0, FunctionRole::IOWrapper),
