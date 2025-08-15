@@ -147,6 +147,79 @@ pub struct ThresholdsConfig {
     /// Minimum risk score for including items (0.0-10.0)
     #[serde(default)]
     pub minimum_risk_score: Option<f64>,
+
+    /// Validation thresholds - used by `debtmap validate` command
+    #[serde(default)]
+    pub validation: Option<ValidationThresholds>,
+}
+
+/// Validation thresholds for the validate command
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationThresholds {
+    /// Maximum allowed average complexity (default: 10.0)
+    #[serde(default = "default_max_avg_complexity")]
+    pub max_average_complexity: f64,
+
+    /// Maximum allowed high complexity function count (default: 100)
+    #[serde(default = "default_max_high_complexity_count")]
+    pub max_high_complexity_count: usize,
+
+    /// Maximum allowed technical debt items (default: 2000)
+    #[serde(default = "default_max_debt_items")]
+    pub max_debt_items: usize,
+
+    /// Maximum allowed total debt score (default: 10000)
+    #[serde(default = "default_max_total_debt_score")]
+    pub max_total_debt_score: u32,
+
+    /// Maximum allowed codebase risk score (default: 7.0)
+    #[serde(default = "default_max_codebase_risk")]
+    pub max_codebase_risk_score: f64,
+
+    /// Maximum allowed high-risk function count (default: 50)
+    #[serde(default = "default_max_high_risk_count")]
+    pub max_high_risk_functions: usize,
+
+    /// Minimum required code coverage percentage (default: 0.0 - no minimum)
+    #[serde(default = "default_min_coverage")]
+    pub min_coverage_percentage: f64,
+}
+
+impl Default for ValidationThresholds {
+    fn default() -> Self {
+        Self {
+            max_average_complexity: default_max_avg_complexity(),
+            max_high_complexity_count: default_max_high_complexity_count(),
+            max_debt_items: default_max_debt_items(),
+            max_total_debt_score: default_max_total_debt_score(),
+            max_codebase_risk_score: default_max_codebase_risk(),
+            max_high_risk_functions: default_max_high_risk_count(),
+            min_coverage_percentage: default_min_coverage(),
+        }
+    }
+}
+
+// Default validation threshold values
+fn default_max_avg_complexity() -> f64 {
+    10.0
+}
+fn default_max_high_complexity_count() -> usize {
+    100
+}
+fn default_max_debt_items() -> usize {
+    2000
+}
+fn default_max_total_debt_score() -> u32 {
+    10000
+}
+fn default_max_codebase_risk() -> f64 {
+    7.0
+}
+fn default_max_high_risk_count() -> usize {
+    50
+}
+fn default_min_coverage() -> f64 {
+    0.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -258,4 +331,13 @@ pub fn get_minimum_risk_score() -> f64 {
         .as_ref()
         .and_then(|t| t.minimum_risk_score)
         .unwrap_or(1.0)
+}
+
+/// Get validation thresholds (with defaults)
+pub fn get_validation_thresholds() -> ValidationThresholds {
+    get_config()
+        .thresholds
+        .as_ref()
+        .and_then(|t| t.validation.clone())
+        .unwrap_or_default()
 }

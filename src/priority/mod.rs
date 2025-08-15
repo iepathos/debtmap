@@ -149,16 +149,15 @@ impl UnifiedAnalysis {
             DebtType::TestComplexityHotspot { .. }
                 | DebtType::TestTodo { .. }
                 | DebtType::TestDuplication { .. }
-        )
-            && item.cyclomatic_complexity <= min_cyclomatic
-                && item.cognitive_complexity <= min_cognitive
-            {
-                // Skip trivial functions unless they have other significant issues
-                // (like being completely untested critical paths)
-                if item.unified_score.coverage_factor < 8.0 {
-                    return;
-                }
+        ) && item.cyclomatic_complexity <= min_cyclomatic
+            && item.cognitive_complexity <= min_cognitive
+        {
+            // Skip trivial functions unless they have other significant issues
+            // (like being completely untested critical paths)
+            if item.unified_score.coverage_factor < 8.0 {
+                return;
             }
+        }
 
         self.items.push_back(item);
     }
