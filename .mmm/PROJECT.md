@@ -191,6 +191,7 @@ src/
 - Spec 12: Improve ROI calculations
 - Spec 13: Add risk categorization system
 - Spec 20: Priority Index Flag for Parallel Processing (NEW - enables extracting specific priority items by index for distributed processing with mmm's --map-args feature)
+- Spec 30: Enhanced Type Tracking for Field Access and Cross-Module Resolution (NEW - reduces false positives in dead code detection by 50%+)
 
 ### Long-term Goals
 - Add more language support via tree-sitter
