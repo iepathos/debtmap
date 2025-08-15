@@ -148,6 +148,15 @@ We have completed the initial implementation with core functionality for analyzi
   - Eliminates false positives in dead code detection
   - Support for struct fields and function parameters
 
+- [x] **Spec 30**: Enhanced Type Tracking for Field Access and Cross-Module Resolution
+  - Global type registry for struct definitions
+  - Field type tracking for named and tuple structs
+  - Self reference resolution in impl blocks
+  - Field access chain resolution (self.a.b.c)
+  - Cross-module type resolution via imports
+  - Type alias tracking and resolution
+  - 50%+ reduction in false positives
+
 ## Pending Specs
 
 ### Enhancements

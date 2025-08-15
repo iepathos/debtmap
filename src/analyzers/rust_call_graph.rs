@@ -1,7 +1,9 @@
 /// Two-pass call graph extraction for accurate call resolution
+use crate::analyzers::type_registry::GlobalTypeRegistry;
 use crate::analyzers::type_tracker::{extract_type_from_pattern, ScopeKind, TypeTracker};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMethodCall, ImplItemFn, ItemFn, Local, Pat};
 
@@ -24,6 +26,9 @@ pub struct CallGraphExtractor {
     module_path: Vec<String>,
     /// Type tracker for accurate method resolution
     type_tracker: TypeTracker,
+    /// Global type registry (optional)
+    #[allow(dead_code)]
+    type_registry: Option<Arc<GlobalTypeRegistry>>,
 }
 
 impl CallGraphExtractor {
@@ -33,9 +38,27 @@ impl CallGraphExtractor {
             unresolved_calls: Vec::new(),
             current_function: None,
             current_impl_type: None,
-            current_file: file,
+            current_file: file.clone(),
             module_path: Vec::new(),
             type_tracker: TypeTracker::new(),
+            type_registry: None,
+        }
+    }
+
+    /// Create a new extractor with a shared type registry
+    pub fn with_registry(file: PathBuf, registry: Arc<GlobalTypeRegistry>) -> Self {
+        let mut tracker = TypeTracker::with_registry(registry.clone());
+        tracker.set_current_file(file.clone());
+        
+        Self {
+            call_graph: CallGraph::new(),
+            unresolved_calls: Vec::new(),
+            current_function: None,
+            current_impl_type: None,
+            current_file: file,
+            module_path: Vec::new(),
+            type_tracker: tracker,
+            type_registry: Some(registry),
         }
     }
 
@@ -444,6 +467,9 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         // Enter function scope
         self.type_tracker.enter_scope(ScopeKind::Function, None);
 
+        // Track self parameter if present
+        self.type_tracker.track_self_param(Some(item_fn), None);
+
         // Visit the function body to extract calls
         syn::visit::visit_item_fn(self, item_fn);
 
@@ -470,6 +496,9 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
 
         // Enter function scope
         self.type_tracker.enter_scope(ScopeKind::Function, None);
+
+        // Track self parameter if present
+        self.type_tracker.track_self_param(None, Some(impl_fn));
 
         // Visit the function body to extract calls
         syn::visit::visit_impl_item_fn(self, impl_fn);
@@ -587,6 +616,23 @@ fn count_lines(block: &syn::Block) -> usize {
 /// Extract call graph from a parsed Rust file using two-pass resolution
 pub fn extract_call_graph(file: &syn::File, path: &Path) -> CallGraph {
     let mut extractor = CallGraphExtractor::new(path.to_path_buf());
+
+    // Phase 1: Extract functions and collect unresolved calls
+    extractor.extract_phase1(file);
+
+    // Phase 2: Resolve all calls
+    extractor.resolve_phase2();
+
+    extractor.call_graph
+}
+
+/// Extract call graph with enhanced type tracking using a global type registry
+pub fn extract_call_graph_with_types(
+    file: &syn::File,
+    path: &Path,
+    registry: Arc<GlobalTypeRegistry>,
+) -> CallGraph {
+    let mut extractor = CallGraphExtractor::with_registry(path.to_path_buf(), registry);
 
     // Phase 1: Extract functions and collect unresolved calls
     extractor.extract_phase1(file);

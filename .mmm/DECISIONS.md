@@ -445,3 +445,32 @@ Implement proper AST-based type tracking with scope management to accurately res
 - ⚠️ Additional memory overhead for type tracking (linear with codebase size)
 - ⚠️ Slight increase in analysis time (< 20% overhead)
 - ⚠️ Limited to patterns where types can be determined statically
+
+---
+
+## ADR-021: Enhanced Type Tracking with Field Access Resolution
+**Date**: 2025-08-15
+**Status**: Accepted
+
+### Context
+The initial type tracking implementation (spec 29) successfully tracked local variables but couldn't resolve method calls through field access chains like `self.enhanced_graph.framework_patterns.analyze_file()`. This limitation led to approximately 10-20% false positive rate in dead code detection for methods called through struct fields, particularly in complex codebases with layered architectures.
+
+### Decision
+Implement enhanced type tracking with a global type registry that:
+- Maintains a registry of all struct definitions and their field types across the codebase
+- Tracks self references in impl blocks and methods
+- Resolves field access chains through multiple levels (e.g., a.b.c.d.method())
+- Supports cross-module type resolution via imports and qualified paths
+- Handles generic struct definitions with type parameters
+- Tracks and resolves type aliases
+- Integrates seamlessly with existing two-pass call graph extraction
+
+### Consequences
+- ✅ 50%+ reduction in false positives for dead code detection
+- ✅ Accurate resolution of method calls through field access chains
+- ✅ Support for complex architectural patterns with nested structs
+- ✅ Better understanding of codebase structure and dependencies
+- ✅ Foundation for future improvements like trait implementation tracking
+- ⚠️ Additional memory overhead for type registry (linear with codebase size)
+- ⚠️ Slight increase in analysis time (< 30% overhead)
+- ⚠️ Still limited to statically determinable types

@@ -5,6 +5,7 @@ pub mod javascript;
 pub mod python;
 pub mod rust;
 pub mod rust_call_graph;
+pub mod type_registry;
 pub mod type_tracker;
 
 pub trait Analyzer: Send + Sync {

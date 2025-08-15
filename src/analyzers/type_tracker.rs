@@ -1,6 +1,10 @@
+use crate::analyzers::type_registry::GlobalTypeRegistry;
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 use syn::{
-    Expr, ExprCall, ExprMethodCall, ExprPath, ExprStruct, Pat, PatIdent, PatType, Type, TypePath,
+    Expr, ExprCall, ExprField, ExprMethodCall, ExprPath, ExprStruct, FnArg, ImplItemFn, ItemFn,
+    Pat, PatIdent, PatType, Type, TypePath,
 };
 
 /// Tracks variable types within the current analysis scope
@@ -9,11 +13,14 @@ pub struct TypeTracker {
     /// Stack of scopes, innermost last
     scopes: Vec<Scope>,
     /// Current module path for resolving imports
-    #[allow(dead_code)]
     module_path: Vec<String>,
     /// Type definitions found in the file
     #[allow(dead_code)]
     type_definitions: HashMap<String, TypeInfo>,
+    /// Global type registry for struct field resolution
+    type_registry: Option<Arc<GlobalTypeRegistry>>,
+    /// Current file path for import resolution
+    current_file: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -88,7 +95,34 @@ impl TypeTracker {
             }],
             module_path: Vec::new(),
             type_definitions: HashMap::new(),
+            type_registry: None,
+            current_file: None,
         }
+    }
+
+    /// Create a TypeTracker with a shared type registry
+    pub fn with_registry(registry: Arc<GlobalTypeRegistry>) -> Self {
+        Self {
+            scopes: vec![Scope {
+                variables: HashMap::new(),
+                kind: ScopeKind::Module,
+                impl_type: None,
+            }],
+            module_path: Vec::new(),
+            type_definitions: HashMap::new(),
+            type_registry: Some(registry),
+            current_file: None,
+        }
+    }
+
+    /// Set the current file path for import resolution
+    pub fn set_current_file(&mut self, file: PathBuf) {
+        self.current_file = Some(file);
+    }
+
+    /// Set the module path
+    pub fn set_module_path(&mut self, path: Vec<String>) {
+        self.module_path = path;
     }
 
     /// Enter a new scope
@@ -132,6 +166,16 @@ impl TypeTracker {
                 // Check if it's a variable reference
                 if path.segments.len() == 1 {
                     let ident = path.segments.first()?.ident.to_string();
+                    // Special handling for "self"
+                    if ident == "self" {
+                        if let Some(impl_type) = self.current_impl_type() {
+                            return Some(ResolvedType {
+                                type_name: impl_type,
+                                source: TypeSource::Annotation,
+                                generics: Vec::new(),
+                            });
+                        }
+                    }
                     self.resolve_variable_type(&ident)
                 } else {
                     // It's a path to a type or function
@@ -143,12 +187,56 @@ impl TypeTracker {
                 self.resolve_expr_type(receiver)
             }
             Expr::Field(field_expr) => {
-                // For field access, we'd need more info about struct fields
-                // For now, just try to resolve the base expression
-                self.resolve_expr_type(&field_expr.base)
+                // Resolve field access through type registry
+                self.resolve_field_access(field_expr)
             }
             _ => None,
         }
+    }
+
+    /// Resolve field access using the type registry
+    fn resolve_field_access(&self, field_expr: &ExprField) -> Option<ResolvedType> {
+        // First resolve the base expression type
+        let base_type = self.resolve_expr_type(&field_expr.base)?;
+        
+        // Get the field name
+        let field_name = match &field_expr.member {
+            syn::Member::Named(ident) => ident.to_string(),
+            syn::Member::Unnamed(index) => {
+                // Handle tuple field access
+                if let Some(registry) = &self.type_registry {
+                    let field_type = registry.resolve_tuple_field(&base_type.type_name, index.index as usize)?;
+                    return Some(ResolvedType {
+                        type_name: field_type.type_name,
+                        source: TypeSource::FieldAccess,
+                        generics: Vec::new(),
+                    });
+                }
+                return None;
+            }
+        };
+
+        // Look up the field type in the registry
+        if let Some(registry) = &self.type_registry {
+            // Try to resolve the type with imports if needed
+            let resolved_type_name = if let Some(file) = &self.current_file {
+                registry.resolve_type_with_imports(file, &base_type.type_name)
+                    .unwrap_or_else(|| base_type.type_name.clone())
+            } else {
+                base_type.type_name.clone()
+            };
+
+            // Now resolve the field
+            if let Some(field_type) = registry.resolve_field(&resolved_type_name, &field_name) {
+                return Some(ResolvedType {
+                    type_name: field_type.type_name,
+                    source: TypeSource::FieldAccess,
+                    generics: field_type.generic_args,
+                });
+            }
+        }
+
+        None
     }
 
     /// Get the current impl type if in an impl block
@@ -160,6 +248,55 @@ impl TypeTracker {
         }
         None
     }
+
+    /// Track self parameter in a function
+    pub fn track_self_param(&mut self, fn_item: Option<&ItemFn>, impl_fn: Option<&ImplItemFn>) {
+        // Handle impl method
+        if let Some(impl_fn) = impl_fn {
+            if let Some(_self_param) = extract_self_param(&impl_fn.sig) {
+                if let Some(impl_type) = self.current_impl_type() {
+                    let resolved_type = ResolvedType {
+                        type_name: impl_type,
+                        source: TypeSource::Annotation,
+                        generics: Vec::new(),
+                    };
+                    self.record_variable("self".to_string(), resolved_type);
+                }
+            }
+        }
+        // Handle regular function (shouldn't have self, but check anyway)
+        if let Some(fn_item) = fn_item {
+            if let Some(_self_param) = extract_self_param(&fn_item.sig) {
+                if let Some(impl_type) = self.current_impl_type() {
+                    let resolved_type = ResolvedType {
+                        type_name: impl_type,
+                        source: TypeSource::Annotation,
+                        generics: Vec::new(),
+                    };
+                    self.record_variable("self".to_string(), resolved_type);
+                }
+            }
+        }
+    }
+}
+
+/// Extract self parameter information from a function signature
+pub fn extract_self_param(sig: &syn::Signature) -> Option<SelfParam> {
+    if let Some(FnArg::Receiver(receiver)) = sig.inputs.first() {
+        Some(SelfParam {
+            is_reference: receiver.reference.is_some(),
+            is_mutable: receiver.mutability.is_some(),
+        })
+    } else {
+        None
+    }
+}
+
+/// Information about a self parameter
+#[derive(Debug, Clone)]
+pub struct SelfParam {
+    pub is_reference: bool,
+    pub is_mutable: bool,
 }
 
 /// Extract type from various AST patterns
