@@ -249,6 +249,63 @@ impl EvidenceBasedRiskCalculator {
         total_confidence / total_weight
     }
 
+    fn format_risk_type(risk_type: &crate::risk::evidence::RiskType) -> String {
+        match risk_type {
+            crate::risk::evidence::RiskType::Complexity {
+                cyclomatic,
+                cognitive,
+                ..
+            } => {
+                format!("High complexity (cyclomatic: {cyclomatic}, cognitive: {cognitive})")
+            }
+            crate::risk::evidence::RiskType::Coverage {
+                coverage_percentage,
+                ..
+            } => {
+                format!("Low test coverage ({coverage_percentage:.0}%)")
+            }
+            crate::risk::evidence::RiskType::Coupling {
+                afferent_coupling,
+                efferent_coupling,
+                ..
+            } => {
+                format!(
+                    "High coupling (incoming: {afferent_coupling}, outgoing: {efferent_coupling})"
+                )
+            }
+            crate::risk::evidence::RiskType::ChangeFrequency {
+                commits_last_month, ..
+            } => {
+                format!("Frequent changes ({commits_last_month} commits last month)")
+            }
+            crate::risk::evidence::RiskType::Architecture { .. } => {
+                "Architectural issues detected".to_string()
+            }
+        }
+    }
+
+    fn format_risk_severity(severity: crate::risk::evidence::RiskSeverity) -> &'static str {
+        match severity {
+            crate::risk::evidence::RiskSeverity::None => "no significant issues",
+            crate::risk::evidence::RiskSeverity::Low => "minor issues",
+            crate::risk::evidence::RiskSeverity::Moderate => "moderate issues requiring attention",
+            crate::risk::evidence::RiskSeverity::High => {
+                "significant issues requiring prompt action"
+            }
+            crate::risk::evidence::RiskSeverity::Critical => {
+                "critical issues requiring immediate attention"
+            }
+        }
+    }
+
+    fn find_highest_risk_factor(factors: &[RiskFactor]) -> Option<&RiskFactor> {
+        factors.iter().filter(|f| f.weight > 0.0).max_by(|a, b| {
+            (a.score * a.weight)
+                .partial_cmp(&(b.score * b.weight))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+    }
+
     fn generate_explanation(
         &self,
         factors: &[RiskFactor],
@@ -261,52 +318,9 @@ impl EvidenceBasedRiskCalculator {
             self.role_to_string(role)
         );
 
-        // Find the most significant risk factor
-        if let Some(highest) = factors.iter().filter(|f| f.weight > 0.0).max_by(|a, b| {
-            (a.score * a.weight)
-                .partial_cmp(&(b.score * b.weight))
-                .unwrap()
-        }) {
-            use crate::risk::evidence::{RiskSeverity, RiskType};
-
-            let factor_desc = match &highest.risk_type {
-                RiskType::Complexity {
-                    cyclomatic,
-                    cognitive,
-                    ..
-                } => {
-                    format!("High complexity (cyclomatic: {cyclomatic}, cognitive: {cognitive})")
-                }
-                RiskType::Coverage {
-                    coverage_percentage,
-                    ..
-                } => {
-                    format!("Low test coverage ({coverage_percentage:.0}%)")
-                }
-                RiskType::Coupling {
-                    afferent_coupling,
-                    efferent_coupling,
-                    ..
-                } => {
-                    format!(
-                        "High coupling (incoming: {afferent_coupling}, outgoing: {efferent_coupling})"
-                    )
-                }
-                RiskType::ChangeFrequency {
-                    commits_last_month, ..
-                } => {
-                    format!("Frequent changes ({commits_last_month} commits last month)")
-                }
-                RiskType::Architecture { .. } => "Architectural issues detected".to_string(),
-            };
-
-            let severity_desc = match highest.severity {
-                RiskSeverity::None => "no significant issues",
-                RiskSeverity::Low => "minor issues",
-                RiskSeverity::Moderate => "moderate issues requiring attention",
-                RiskSeverity::High => "significant issues requiring prompt action",
-                RiskSeverity::Critical => "critical issues requiring immediate attention",
-            };
+        if let Some(highest) = Self::find_highest_risk_factor(factors) {
+            let factor_desc = Self::format_risk_type(&highest.risk_type);
+            let severity_desc = Self::format_risk_severity(highest.severity);
 
             explanation.push_str(&format!(
                 "Primary factor: {factor_desc} with {severity_desc}."
