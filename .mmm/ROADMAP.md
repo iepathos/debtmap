@@ -132,6 +132,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Architecture ready for multi-language expansion
   - Zero functional changes - pure refactoring
 
+- [x] **Spec 28**: Enhanced Markdown Output Formatting
+  - Full feature parity with terminal output
+  - Unified priority scoring visualization
+  - Dead code detection results
+  - Testing recommendations with ROI
+  - Call graph insights with verbosity levels
+  - Collapsible sections for detailed analysis
+
 ## Pending Specs
 
 ### Enhancements
