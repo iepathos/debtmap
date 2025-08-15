@@ -1,7 +1,7 @@
 use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use debtmap::analyzers::Analyzer;
-use debtmap::priority::call_graph::{CallGraph, FunctionId};
+use debtmap::priority::call_graph::FunctionId;
 use debtmap::priority::unified_scorer::{
     classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
 };
@@ -84,12 +84,9 @@ mod tests {
     let ast = analyzer.parse(rust_code, path.clone()).unwrap();
     let metrics = analyzer.analyze(&ast);
 
-    // Build call graph with Rust method calls
-    let mut call_graph = CallGraph::new();
-
     // Parse the Rust code and extract call graph
     let syntax_tree = syn::parse_file(rust_code).unwrap();
-    call_graph = extract_call_graph(&syntax_tree, &path);
+    let call_graph = extract_call_graph(&syntax_tree, &path);
 
     // Find the calculate_coupling_metrics METHOD (not the standalone function)
     let method_func = metrics
@@ -177,9 +174,8 @@ pub fn use_calculator() -> i32 {
     let ast = analyzer.parse(rust_code, path.clone()).unwrap();
     let metrics = analyzer.analyze(&ast);
 
-    let mut call_graph = CallGraph::new();
     let syntax_tree = syn::parse_file(rust_code).unwrap();
-    call_graph = extract_call_graph(&syntax_tree, &path);
+    let call_graph = extract_call_graph(&syntax_tree, &path);
 
     // Find the standalone function
     let standalone_func = metrics
