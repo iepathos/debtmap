@@ -489,34 +489,52 @@ impl RustCallGraph {
         reasons
     }
 
+    /// Classify framework and pointer-related risks
+    fn classify_framework_risks(
+        framework_managed: bool,
+        public_api: bool,
+        function_pointer: bool,
+    ) -> Vec<&'static str> {
+        [
+            (framework_managed, "Might be managed by framework"),
+            (public_api, "Public API function"),
+            (function_pointer, "Might be called through function pointer"),
+        ]
+        .into_iter()
+        .filter_map(|(applies, risk)| if applies { Some(risk) } else { None })
+        .collect()
+    }
+
+    /// Classify trait-related risks
+    fn classify_trait_risks(has_implementations: bool, is_visit_method: bool) -> Vec<&'static str> {
+        [
+            (has_implementations, "Has trait implementations"),
+            (is_visit_method, "Visit trait method (visitor pattern)"),
+        ]
+        .into_iter()
+        .filter_map(|(applies, risk)| if applies { Some(risk) } else { None })
+        .collect()
+    }
+
     /// Get potential false positive risks
     fn get_false_positive_risks(&self, func_id: &FunctionId) -> Vec<String> {
-        let mut risks = Vec::new();
+        let framework_risks = Self::classify_framework_risks(
+            self.framework_patterns.might_be_framework_managed(func_id),
+            self.cross_module_tracker.is_public_api(func_id),
+            self.function_pointer_tracker
+                .might_be_called_through_pointer(func_id),
+        );
 
-        if self.framework_patterns.might_be_framework_managed(func_id) {
-            risks.push("Might be managed by framework".to_string());
-        }
+        let trait_risks = Self::classify_trait_risks(
+            self.trait_registry.has_trait_implementations(func_id),
+            self.trait_registry.is_visit_trait_method(func_id),
+        );
 
-        if self.cross_module_tracker.is_public_api(func_id) {
-            risks.push("Public API function".to_string());
-        }
-
-        if self.trait_registry.has_trait_implementations(func_id) {
-            risks.push("Has trait implementations".to_string());
-        }
-
-        if self.trait_registry.is_visit_trait_method(func_id) {
-            risks.push("Visit trait method (visitor pattern)".to_string());
-        }
-
-        if self
-            .function_pointer_tracker
-            .might_be_called_through_pointer(func_id)
-        {
-            risks.push("Might be called through function pointer".to_string());
-        }
-
-        risks
+        framework_risks
+            .into_iter()
+            .chain(trait_risks)
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 
