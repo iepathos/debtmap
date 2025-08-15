@@ -1,4 +1,4 @@
-use crate::analyzers::function_registry::FunctionSignatureRegistry;
+use crate::analyzers::function_registry::{FunctionSignatureRegistry, ReturnTypeInfo};
 use crate::analyzers::type_registry::GlobalTypeRegistry;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -46,7 +46,7 @@ pub struct ResolvedType {
     pub generics: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypeSource {
     /// Explicit type annotation
     Annotation,
@@ -265,77 +265,109 @@ impl TypeTracker {
         None
     }
 
-    /// Resolve function call return type
-    fn resolve_function_call_type(&self, call_expr: &ExprCall) -> Option<ResolvedType> {
-        if let Some(registry) = &self.function_registry {
-            // Extract function path
-            if let Expr::Path(path_expr) = &*call_expr.func {
-                let func_path = path_expr
+    /// Check if a method name is a constructor pattern
+    fn is_constructor_method(method_name: &str) -> bool {
+        matches!(
+            method_name,
+            "new" | "default" | "from" | "create" | "builder"
+        )
+    }
+
+    /// Extract function path from an expression
+    fn extract_function_path(func_expr: &Expr) -> Option<String> {
+        if let Expr::Path(path_expr) = func_expr {
+            Some(
+                path_expr
                     .path
                     .segments
                     .iter()
                     .map(|seg| seg.ident.to_string())
                     .collect::<Vec<_>>()
-                    .join("::");
+                    .join("::"),
+            )
+        } else {
+            None
+        }
+    }
 
-                // Try to resolve the function
-                if let Some(return_info) = registry.resolve_function_return(&func_path, &[]) {
-                    // Handle special cases like Result and Option
-                    let type_name = if return_info.is_self {
-                        // If return type is Self, we need context
-                        self.current_impl_type()
-                            .unwrap_or_else(|| return_info.type_name.clone())
+    /// Parse a function path into type and method components
+    fn parse_function_path(func_path: &str) -> Option<(String, String)> {
+        if func_path.contains("::") {
+            let parts: Vec<&str> = func_path.split("::").collect();
+            if parts.len() >= 2 {
+                let type_name = parts[..parts.len() - 1].join("::");
+                let method_name = parts.last().unwrap().to_string();
+                return Some((type_name, method_name));
+            }
+        }
+        None
+    }
+
+    /// Resolve the actual type name considering Self references
+    fn resolve_type_name(&self, return_info: &ReturnTypeInfo) -> String {
+        if return_info.is_self {
+            self.current_impl_type()
+                .unwrap_or_else(|| return_info.type_name.clone())
+        } else {
+            return_info.type_name.clone()
+        }
+    }
+
+    /// Create a resolved type from return information
+    fn create_resolved_type(
+        type_name: String,
+        source: TypeSource,
+        generics: Vec<String>,
+    ) -> ResolvedType {
+        ResolvedType {
+            type_name,
+            source,
+            generics,
+        }
+    }
+
+    /// Resolve function call return type
+    fn resolve_function_call_type(&self, call_expr: &ExprCall) -> Option<ResolvedType> {
+        let registry = self.function_registry.as_ref()?;
+        let func_path = Self::extract_function_path(&call_expr.func)?;
+
+        // Try to resolve the function
+        if let Some(return_info) = registry.resolve_function_return(&func_path, &[]) {
+            let type_name = self.resolve_type_name(&return_info);
+            return Some(Self::create_resolved_type(
+                type_name,
+                TypeSource::FunctionReturn,
+                return_info.generic_args.clone(),
+            ));
+        }
+
+        // Check if it's a constructor pattern (Type::new, Type::default, etc.)
+        if let Some((type_name, method_name)) = Self::parse_function_path(&func_path) {
+            if Self::is_constructor_method(&method_name) {
+                // Check if this is a known method
+                if let Some(return_info) = registry.resolve_method_return(&type_name, &method_name)
+                {
+                    let resolved_type_name = if return_info.is_self {
+                        type_name
                     } else {
                         return_info.type_name.clone()
                     };
-
-                    return Some(ResolvedType {
+                    return Some(Self::create_resolved_type(
+                        resolved_type_name,
+                        TypeSource::Constructor,
+                        return_info.generic_args.clone(),
+                    ));
+                } else if matches!(method_name.as_str(), "new" | "default") {
+                    // Assume it returns the type itself for common constructors
+                    return Some(Self::create_resolved_type(
                         type_name,
-                        source: TypeSource::FunctionReturn,
-                        generics: return_info.generic_args.clone(),
-                    });
-                }
-
-                // Check if it's a constructor pattern (Type::new, Type::default, etc.)
-                if func_path.contains("::") {
-                    let parts: Vec<&str> = func_path.split("::").collect();
-                    if parts.len() >= 2 {
-                        let type_name = parts[..parts.len() - 1].join("::");
-                        let method_name = parts.last().unwrap();
-
-                        // Common constructor patterns
-                        if matches!(
-                            *method_name,
-                            "new" | "default" | "from" | "create" | "builder"
-                        ) {
-                            // Check if this is a known method
-                            if let Some(return_info) =
-                                registry.resolve_method_return(&type_name, method_name)
-                            {
-                                let resolved_type_name = if return_info.is_self {
-                                    type_name.clone()
-                                } else {
-                                    return_info.type_name.clone()
-                                };
-
-                                return Some(ResolvedType {
-                                    type_name: resolved_type_name,
-                                    source: TypeSource::Constructor,
-                                    generics: return_info.generic_args.clone(),
-                                });
-                            } else if matches!(*method_name, "new" | "default") {
-                                // Assume it returns the type itself for common constructors
-                                return Some(ResolvedType {
-                                    type_name,
-                                    source: TypeSource::Constructor,
-                                    generics: Vec::new(),
-                                });
-                            }
-                        }
-                    }
+                        TypeSource::Constructor,
+                        Vec::new(),
+                    ));
                 }
             }
         }
+
         None
     }
 
@@ -532,5 +564,262 @@ fn extract_type_from_path(path: &syn::Path) -> ResolvedType {
         type_name,
         source: TypeSource::StructLiteral,
         generics: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analyzers::function_registry::{FunctionSignature, MethodSignature, VisibilityInfo};
+
+    #[test]
+    fn test_is_constructor_method() {
+        // Test common constructor methods
+        assert!(TypeTracker::is_constructor_method("new"));
+        assert!(TypeTracker::is_constructor_method("default"));
+        assert!(TypeTracker::is_constructor_method("from"));
+        assert!(TypeTracker::is_constructor_method("create"));
+        assert!(TypeTracker::is_constructor_method("builder"));
+
+        // Test non-constructor methods
+        assert!(!TypeTracker::is_constructor_method("get"));
+        assert!(!TypeTracker::is_constructor_method("set"));
+        assert!(!TypeTracker::is_constructor_method("update"));
+        assert!(!TypeTracker::is_constructor_method("delete"));
+        assert!(!TypeTracker::is_constructor_method("process"));
+    }
+
+    #[test]
+    fn test_extract_function_path() {
+        // Test path expression
+        let code = "MyType::new()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let path = TypeTracker::extract_function_path(&call.func);
+            assert_eq!(path, Some("MyType::new".to_string()));
+        }
+
+        // Test simple function call
+        let code = "process_data()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let path = TypeTracker::extract_function_path(&call.func);
+            assert_eq!(path, Some("process_data".to_string()));
+        }
+
+        // Test nested module path
+        let code = "std::collections::HashMap::new()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let path = TypeTracker::extract_function_path(&call.func);
+            assert_eq!(path, Some("std::collections::HashMap::new".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_parse_function_path() {
+        // Test simple type::method pattern
+        let result = TypeTracker::parse_function_path("MyType::new");
+        assert_eq!(result, Some(("MyType".to_string(), "new".to_string())));
+
+        // Test nested module path
+        let result = TypeTracker::parse_function_path("std::collections::HashMap::new");
+        assert_eq!(
+            result,
+            Some(("std::collections::HashMap".to_string(), "new".to_string()))
+        );
+
+        // Test single name (no ::)
+        let result = TypeTracker::parse_function_path("simple_function");
+        assert_eq!(result, None);
+
+        // Test multiple levels
+        let result = TypeTracker::parse_function_path("crate::module::Type::method");
+        assert_eq!(
+            result,
+            Some(("crate::module::Type".to_string(), "method".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_resolve_type_name() {
+        let tracker = TypeTracker::new();
+
+        // Test non-self type
+        let return_info = ReturnTypeInfo {
+            type_name: "String".to_string(),
+            is_self: false,
+            is_result: false,
+            is_option: false,
+            generic_args: vec![],
+        };
+        assert_eq!(tracker.resolve_type_name(&return_info), "String");
+
+        // Test self type without impl context
+        let return_info = ReturnTypeInfo {
+            type_name: "MyType".to_string(),
+            is_self: true,
+            is_result: false,
+            is_option: false,
+            generic_args: vec![],
+        };
+        assert_eq!(tracker.resolve_type_name(&return_info), "MyType");
+    }
+
+    #[test]
+    fn test_resolve_type_name_with_impl_context() {
+        let mut tracker = TypeTracker::new();
+
+        // Manually add an impl scope
+        tracker.scopes.push(Scope {
+            variables: HashMap::new(),
+            kind: ScopeKind::Impl,
+            impl_type: Some("ActualType".to_string()),
+        });
+
+        // Test self type with impl context
+        let return_info = ReturnTypeInfo {
+            type_name: "FallbackType".to_string(),
+            is_self: true,
+            is_result: false,
+            is_option: false,
+            generic_args: vec![],
+        };
+        assert_eq!(tracker.resolve_type_name(&return_info), "ActualType");
+    }
+
+    #[test]
+    fn test_create_resolved_type() {
+        let resolved = TypeTracker::create_resolved_type(
+            "HashMap".to_string(),
+            TypeSource::FunctionReturn,
+            vec!["String".to_string(), "i32".to_string()],
+        );
+
+        assert_eq!(resolved.type_name, "HashMap");
+        assert_eq!(resolved.source, TypeSource::FunctionReturn);
+        assert_eq!(resolved.generics, vec!["String", "i32"]);
+    }
+
+    #[test]
+    fn test_resolve_function_call_type_simple_function() {
+        let mut tracker = TypeTracker::new();
+        let mut registry = FunctionSignatureRegistry::new();
+
+        // Register a simple function
+        registry.register_function(FunctionSignature {
+            name: "get_string".to_string(),
+            module_path: vec![],
+            return_type: ReturnTypeInfo {
+                type_name: "String".to_string(),
+                is_self: false,
+                is_result: false,
+                is_option: false,
+                generic_args: vec![],
+            },
+            is_async: false,
+            visibility: VisibilityInfo::Public,
+            generic_params: vec![],
+        });
+
+        tracker.function_registry = Some(Arc::new(registry));
+
+        // Parse a function call
+        let code = "get_string()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let result = tracker.resolve_function_call_type(&call);
+            assert!(result.is_some());
+            let resolved = result.unwrap();
+            assert_eq!(resolved.type_name, "String");
+            assert_eq!(resolved.source, TypeSource::FunctionReturn);
+        }
+    }
+
+    #[test]
+    fn test_resolve_function_call_type_constructor() {
+        let mut tracker = TypeTracker::new();
+        let mut registry = FunctionSignatureRegistry::new();
+
+        // Register a constructor method
+        registry.register_method(
+            "MyType".to_string(),
+            MethodSignature {
+                name: "new".to_string(),
+                return_type: ReturnTypeInfo {
+                    type_name: "MyType".to_string(),
+                    is_self: true,
+                    is_result: false,
+                    is_option: false,
+                    generic_args: vec![],
+                },
+                is_async: false,
+                takes_self: false,
+                takes_mut_self: false,
+                visibility: VisibilityInfo::Public,
+                generic_params: vec![],
+            },
+        );
+
+        tracker.function_registry = Some(Arc::new(registry));
+
+        // Parse a constructor call
+        let code = "MyType::new()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let result = tracker.resolve_function_call_type(&call);
+            assert!(result.is_some());
+            let resolved = result.unwrap();
+            assert_eq!(resolved.type_name, "MyType");
+            assert_eq!(resolved.source, TypeSource::Constructor);
+        }
+    }
+
+    #[test]
+    fn test_resolve_function_call_type_default_constructor() {
+        let mut tracker = TypeTracker::new();
+        let registry = FunctionSignatureRegistry::new();
+
+        // Don't register anything - test fallback behavior
+        tracker.function_registry = Some(Arc::new(registry));
+
+        // Parse a default constructor call
+        let code = "HashMap::default()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let result = tracker.resolve_function_call_type(&call);
+            assert!(result.is_some());
+            let resolved = result.unwrap();
+            assert_eq!(resolved.type_name, "HashMap");
+            assert_eq!(resolved.source, TypeSource::Constructor);
+        }
+    }
+
+    #[test]
+    fn test_resolve_function_call_type_no_registry() {
+        let tracker = TypeTracker::new();
+
+        // No registry set
+        let code = "some_function()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let result = tracker.resolve_function_call_type(&call);
+            assert!(result.is_none());
+        }
+    }
+
+    #[test]
+    fn test_resolve_function_call_type_unknown_function() {
+        let mut tracker = TypeTracker::new();
+        let registry = FunctionSignatureRegistry::new();
+        tracker.function_registry = Some(Arc::new(registry));
+
+        // Call to unregistered function
+        let code = "unknown_function()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        if let Expr::Call(call) = expr {
+            let result = tracker.resolve_function_call_type(&call);
+            assert!(result.is_none());
+        }
     }
 }

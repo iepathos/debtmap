@@ -492,36 +492,36 @@ impl CrossModuleCallVisitor {
             .join("::")
     }
 
+    /// Create a ModuleImport with standard defaults
+    fn create_module_import(
+        importing_module: String,
+        imported_items: Vec<String>,
+        is_glob_import: bool,
+        line: usize,
+    ) -> ModuleImport {
+        ModuleImport {
+            importing_module,
+            imported_module: "unknown".to_string(),
+            imported_items: imported_items.into_iter().collect(),
+            is_glob_import,
+            line,
+        }
+    }
+
+    /// Extract the imported item name from different UseTree types
+    fn extract_import_name(use_tree: &UseTree) -> Option<String> {
+        match use_tree {
+            UseTree::Name(use_name) => Some(use_name.ident.to_string()),
+            UseTree::Rename(use_rename) => Some(use_rename.ident.to_string()),
+            _ => None,
+        }
+    }
+
     fn analyze_use_tree(&mut self, use_tree: &UseTree, line: usize) {
         match use_tree {
             UseTree::Path(use_path) => {
-                let _path_segment = use_path.ident.to_string();
                 // Recursively analyze the rest of the path
                 self.analyze_use_tree(&use_path.tree, line);
-            }
-            UseTree::Name(use_name) => {
-                let imported_item = use_name.ident.to_string();
-
-                let import = ModuleImport {
-                    importing_module: self.current_module.clone(),
-                    imported_module: "unknown".to_string(), // Would need full path resolution
-                    imported_items: vec![imported_item].into_iter().collect(),
-                    is_glob_import: false,
-                    line,
-                };
-
-                self.module_imports.push(import);
-            }
-            UseTree::Glob(_) => {
-                let import = ModuleImport {
-                    importing_module: self.current_module.clone(),
-                    imported_module: "unknown".to_string(),
-                    imported_items: Vector::new(),
-                    is_glob_import: true,
-                    line,
-                };
-
-                self.module_imports.push(import);
             }
             UseTree::Group(use_group) => {
                 // Analyze each item in the group
@@ -529,18 +529,22 @@ impl CrossModuleCallVisitor {
                     self.analyze_use_tree(item, line);
                 }
             }
-            UseTree::Rename(use_rename) => {
-                let imported_item = use_rename.ident.to_string();
-
-                let import = ModuleImport {
-                    importing_module: self.current_module.clone(),
-                    imported_module: "unknown".to_string(),
-                    imported_items: vec![imported_item].into_iter().collect(),
-                    is_glob_import: false,
-                    line,
-                };
-
+            UseTree::Glob(_) => {
+                let import =
+                    Self::create_module_import(self.current_module.clone(), vec![], true, line);
                 self.module_imports.push(import);
+            }
+            _ => {
+                // Handle Name and Rename cases
+                if let Some(imported_item) = Self::extract_import_name(use_tree) {
+                    let import = Self::create_module_import(
+                        self.current_module.clone(),
+                        vec![imported_item],
+                        false,
+                        line,
+                    );
+                    self.module_imports.push(import);
+                }
             }
         }
     }
@@ -612,6 +616,7 @@ impl Default for CrossModuleTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use syn::UseGlob;
 
     fn create_test_export(
         name: &str,
@@ -833,5 +838,101 @@ mod tests {
         let result = tracker.resolve_module_call("facade::module", "reexported_func");
         assert!(result.is_some());
         assert_eq!(result.unwrap().name, "reexported_func");
+    }
+
+    #[test]
+    fn test_create_module_import_with_items() {
+        let import = CrossModuleCallVisitor::create_module_import(
+            "test_module".to_string(),
+            vec!["func1".to_string(), "func2".to_string()],
+            false,
+            42,
+        );
+
+        assert_eq!(import.importing_module, "test_module");
+        assert_eq!(import.imported_module, "unknown");
+        assert_eq!(import.imported_items.len(), 2);
+        assert!(import.imported_items.contains(&"func1".to_string()));
+        assert!(import.imported_items.contains(&"func2".to_string()));
+        assert!(!import.is_glob_import);
+        assert_eq!(import.line, 42);
+    }
+
+    #[test]
+    fn test_create_module_import_glob() {
+        let import = CrossModuleCallVisitor::create_module_import(
+            "glob_module".to_string(),
+            vec![],
+            true,
+            100,
+        );
+
+        assert_eq!(import.importing_module, "glob_module");
+        assert_eq!(import.imported_module, "unknown");
+        assert_eq!(import.imported_items.len(), 0);
+        assert!(import.is_glob_import);
+        assert_eq!(import.line, 100);
+    }
+
+    #[test]
+    fn test_extract_import_name_from_use_name() {
+        use syn::{Ident, UseName, UseTree};
+
+        let ident = Ident::new("test_func", proc_macro2::Span::call_site());
+        let use_name = UseName { ident };
+        let use_tree = UseTree::Name(use_name);
+
+        let result = CrossModuleCallVisitor::extract_import_name(&use_tree);
+        assert_eq!(result, Some("test_func".to_string()));
+    }
+
+    #[test]
+    fn test_extract_import_name_from_use_rename() {
+        use syn::{Ident, UseRename, UseTree};
+
+        let ident = Ident::new("original_name", proc_macro2::Span::call_site());
+        let as_token = syn::Token![as](proc_macro2::Span::call_site());
+        let rename = Ident::new("new_name", proc_macro2::Span::call_site());
+        let use_rename = UseRename {
+            ident,
+            as_token,
+            rename,
+        };
+        let use_tree = UseTree::Rename(use_rename);
+
+        let result = CrossModuleCallVisitor::extract_import_name(&use_tree);
+        assert_eq!(result, Some("original_name".to_string()));
+    }
+
+    #[test]
+    fn test_extract_import_name_from_glob() {
+        use syn::{UseGlob, UseTree};
+
+        let star_token = syn::Token![*](proc_macro2::Span::call_site());
+        let use_glob = UseGlob { star_token };
+        let use_tree = UseTree::Glob(use_glob);
+
+        let result = CrossModuleCallVisitor::extract_import_name(&use_tree);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_import_name_from_path() {
+        use syn::{Ident, UsePath, UseTree};
+
+        let ident = Ident::new("path", proc_macro2::Span::call_site());
+        let colon2_token = syn::Token![::](proc_macro2::Span::call_site());
+        let tree = Box::new(UseTree::Glob(UseGlob {
+            star_token: syn::Token![*](proc_macro2::Span::call_site()),
+        }));
+        let use_path = UsePath {
+            ident,
+            colon2_token,
+            tree,
+        };
+        let use_tree = UseTree::Path(use_path);
+
+        let result = CrossModuleCallVisitor::extract_import_name(&use_tree);
+        assert_eq!(result, None);
     }
 }

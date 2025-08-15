@@ -412,13 +412,24 @@ impl TraitVisitor {
     }
 
     fn is_visit_trait(&self, trait_name: &str) -> bool {
-        // Detect various visitor pattern trait names
-        trait_name == "Visit"
-            || trait_name == "Visitor"
+        Self::is_visitor_pattern_trait(trait_name)
+    }
+
+    /// Pure function to classify if a trait name represents a visitor pattern trait
+    fn is_visitor_pattern_trait(trait_name: &str) -> bool {
+        Self::is_generic_visitor_trait(trait_name) || Self::is_qualified_visitor_trait(trait_name)
+    }
+
+    /// Checks if the trait name is a generic visitor pattern (Visit, Visitor, or generic variants)
+    fn is_generic_visitor_trait(trait_name: &str) -> bool {
+        matches!(trait_name, "Visit" | "Visitor")
             || trait_name.starts_with("Visit<")
             || trait_name.starts_with("Visitor<")
-            || trait_name == "syn::visit::Visit"
-            || trait_name == "quote::visit::Visit"
+    }
+
+    /// Checks if the trait name is a fully qualified visitor trait from known libraries
+    fn is_qualified_visitor_trait(trait_name: &str) -> bool {
+        matches!(trait_name, "syn::visit::Visit" | "quote::visit::Visit")
     }
 }
 
@@ -536,5 +547,75 @@ impl<'ast> Visit<'ast> for TraitVisitor {
 impl Default for TraitRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_generic_visitor_trait_simple_names() {
+        assert!(TraitVisitor::is_generic_visitor_trait("Visit"));
+        assert!(TraitVisitor::is_generic_visitor_trait("Visitor"));
+    }
+
+    #[test]
+    fn test_is_generic_visitor_trait_with_generics() {
+        assert!(TraitVisitor::is_generic_visitor_trait("Visit<T>"));
+        assert!(TraitVisitor::is_generic_visitor_trait("Visitor<'a>"));
+        assert!(TraitVisitor::is_generic_visitor_trait("Visit<T, U>"));
+        assert!(TraitVisitor::is_generic_visitor_trait("Visitor<'a, T>"));
+    }
+
+    #[test]
+    fn test_is_generic_visitor_trait_negative_cases() {
+        assert!(!TraitVisitor::is_generic_visitor_trait(""));
+        assert!(!TraitVisitor::is_generic_visitor_trait("MyTrait"));
+        assert!(!TraitVisitor::is_generic_visitor_trait("VisitData"));
+        assert!(!TraitVisitor::is_generic_visitor_trait("VisitorPattern"));
+        assert!(!TraitVisitor::is_generic_visitor_trait("syn::visit::Visit"));
+    }
+
+    #[test]
+    fn test_is_qualified_visitor_trait_known_libraries() {
+        assert!(TraitVisitor::is_qualified_visitor_trait(
+            "syn::visit::Visit"
+        ));
+        assert!(TraitVisitor::is_qualified_visitor_trait(
+            "quote::visit::Visit"
+        ));
+    }
+
+    #[test]
+    fn test_is_qualified_visitor_trait_negative_cases() {
+        assert!(!TraitVisitor::is_qualified_visitor_trait("Visit"));
+        assert!(!TraitVisitor::is_qualified_visitor_trait(
+            "other::visit::Visit"
+        ));
+        assert!(!TraitVisitor::is_qualified_visitor_trait("custom::Visitor"));
+        assert!(!TraitVisitor::is_qualified_visitor_trait(""));
+    }
+
+    #[test]
+    fn test_is_visitor_pattern_trait_comprehensive() {
+        // Generic visitor traits
+        assert!(TraitVisitor::is_visitor_pattern_trait("Visit"));
+        assert!(TraitVisitor::is_visitor_pattern_trait("Visitor"));
+        assert!(TraitVisitor::is_visitor_pattern_trait("Visit<T>"));
+        assert!(TraitVisitor::is_visitor_pattern_trait("Visitor<'a>"));
+
+        // Qualified visitor traits
+        assert!(TraitVisitor::is_visitor_pattern_trait("syn::visit::Visit"));
+        assert!(TraitVisitor::is_visitor_pattern_trait(
+            "quote::visit::Visit"
+        ));
+
+        // Non-visitor traits
+        assert!(!TraitVisitor::is_visitor_pattern_trait("Debug"));
+        assert!(!TraitVisitor::is_visitor_pattern_trait("Clone"));
+        assert!(!TraitVisitor::is_visitor_pattern_trait("VisitData"));
+        assert!(!TraitVisitor::is_visitor_pattern_trait("MyVisitor"));
+        assert!(!TraitVisitor::is_visitor_pattern_trait(""));
     }
 }

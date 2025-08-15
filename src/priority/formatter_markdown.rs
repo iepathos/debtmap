@@ -60,96 +60,10 @@ fn format_priority_item_markdown(
 
     // Show score breakdown for verbosity >= 2
     if verbosity >= 2 {
-        let weights = crate::config::get_scoring_weights();
-        writeln!(output, "\n#### Score Calculation\n").unwrap();
-        writeln!(output, "| Component | Value | Weight | Contribution |").unwrap();
-        writeln!(output, "|-----------|-------|--------|--------------|").unwrap();
-        writeln!(
-            output,
-            "| Complexity | {:.1} | {:.0}% | {:.2} |",
-            item.unified_score.complexity_factor,
-            weights.complexity * 100.0,
-            item.unified_score.complexity_factor * weights.complexity
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "| Coverage | {:.1} | {:.0}% | {:.2} |",
-            item.unified_score.coverage_factor,
-            weights.coverage * 100.0,
-            item.unified_score.coverage_factor * weights.coverage
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "| ROI | {:.1} | {:.0}% | {:.2} |",
-            item.unified_score.roi_factor,
-            weights.roi * 100.0,
-            item.unified_score.roi_factor * weights.roi
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "| Semantic | {:.1} | {:.0}% | {:.2} |",
-            item.unified_score.semantic_factor,
-            weights.semantic * 100.0,
-            item.unified_score.semantic_factor * weights.semantic
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "| Dependency | {:.1} | {:.0}% | {:.2} |",
-            item.unified_score.dependency_factor,
-            weights.dependency * 100.0,
-            item.unified_score.dependency_factor * weights.dependency
-        )
-        .unwrap();
-
-        let base_score = item.unified_score.complexity_factor * weights.complexity
-            + item.unified_score.coverage_factor * weights.coverage
-            + item.unified_score.roi_factor * weights.roi
-            + item.unified_score.semantic_factor * weights.semantic
-            + item.unified_score.dependency_factor * weights.dependency;
-
-        writeln!(output).unwrap();
-        writeln!(output, "- **Base Score:** {:.2}", base_score).unwrap();
-        writeln!(
-            output,
-            "- **Role Adjustment:** ×{:.2}",
-            item.unified_score.role_multiplier
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "- **Final Score:** {:.2}",
-            item.unified_score.final_score
-        )
-        .unwrap();
-        writeln!(output).unwrap();
+        output.push_str(&format_score_breakdown(&item.unified_score));
     } else if verbosity >= 1 {
         // Show main contributing factors for verbosity >= 1
-        let weights = crate::config::get_scoring_weights();
-        let mut factors = vec![];
-
-        if item.unified_score.coverage_factor > 3.0 {
-            factors.push(format!("Coverage gap ({:.0}%)", weights.coverage * 100.0));
-        }
-        if item.unified_score.roi_factor > 7.0 {
-            factors.push(format!("High ROI ({:.0}%)", weights.roi * 100.0));
-        }
-        if item.unified_score.dependency_factor > 5.0 {
-            factors.push(format!(
-                "Critical path ({:.0}%)",
-                weights.dependency * 100.0
-            ));
-        }
-        if item.unified_score.complexity_factor > 5.0 {
-            factors.push(format!("Complexity ({:.0}%)", weights.complexity * 100.0));
-        }
-
-        if !factors.is_empty() {
-            writeln!(output, "*Main factors: {}*\n", factors.join(", ")).unwrap();
-        }
+        output.push_str(&format_main_factors(&item.unified_score));
     }
 
     // Location and type
@@ -188,39 +102,17 @@ fn format_priority_item_markdown(
         .unwrap();
 
         if !item.upstream_callers.is_empty() && verbosity >= 2 {
-            let caller_list = if item.upstream_callers.len() > 3 {
-                format!(
-                    "{}, ... ({} more)",
-                    item.upstream_callers
-                        .iter()
-                        .take(3)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    item.upstream_callers.len() - 3
-                )
-            } else {
-                item.upstream_callers.to_vec().join(", ")
-            };
-            writeln!(output, "- **Called by:** {}", caller_list).unwrap();
+            let caller_info = format_dependency_list(&item.upstream_callers, 3, "Called by");
+            if !caller_info.is_empty() {
+                writeln!(output, "{}", caller_info).unwrap();
+            }
         }
 
         if !item.downstream_callees.is_empty() && verbosity >= 2 {
-            let callee_list = if item.downstream_callees.len() > 3 {
-                format!(
-                    "{}, ... ({} more)",
-                    item.downstream_callees
-                        .iter()
-                        .take(3)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    item.downstream_callees.len() - 3
-                )
-            } else {
-                item.downstream_callees.to_vec().join(", ")
-            };
-            writeln!(output, "- **Calls:** {}", callee_list).unwrap();
+            let callee_info = format_dependency_list(&item.downstream_callees, 3, "Calls");
+            if !callee_info.is_empty() {
+                writeln!(output, "{}", callee_info).unwrap();
+            }
         }
     }
 
@@ -298,7 +190,378 @@ fn extract_complexity_info(debt_type: &DebtType) -> Option<String> {
             cyclomatic, cognitive
         )),
         DebtType::Risk { .. } => None,
-        DebtType::DeadCode { cyclomatic, .. } => Some(format!("cyclomatic={}", cyclomatic)),
+        DebtType::DeadCode {
+            cyclomatic,
+            cognitive,
+            ..
+        } => Some(format!(
+            "cyclomatic={}, cognitive={}",
+            cyclomatic, cognitive
+        )),
         _ => None,
+    }
+}
+
+fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> String {
+    let weights = crate::config::get_scoring_weights();
+    let mut output = String::new();
+
+    writeln!(&mut output, "\n#### Score Calculation\n").unwrap();
+    writeln!(&mut output, "| Component | Value | Weight | Contribution |").unwrap();
+    writeln!(&mut output, "|-----------|-------|--------|--------------|").unwrap();
+    writeln!(
+        &mut output,
+        "| Complexity | {:.1} | {:.0}% | {:.2} |",
+        unified_score.complexity_factor,
+        weights.complexity * 100.0,
+        unified_score.complexity_factor * weights.complexity
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "| Coverage | {:.1} | {:.0}% | {:.2} |",
+        unified_score.coverage_factor,
+        weights.coverage * 100.0,
+        unified_score.coverage_factor * weights.coverage
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "| ROI | {:.1} | {:.0}% | {:.2} |",
+        unified_score.roi_factor,
+        weights.roi * 100.0,
+        unified_score.roi_factor * weights.roi
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "| Semantic | {:.1} | {:.0}% | {:.2} |",
+        unified_score.semantic_factor,
+        weights.semantic * 100.0,
+        unified_score.semantic_factor * weights.semantic
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "| Dependency | {:.1} | {:.0}% | {:.2} |",
+        unified_score.dependency_factor,
+        weights.dependency * 100.0,
+        unified_score.dependency_factor * weights.dependency
+    )
+    .unwrap();
+
+    let base_score = unified_score.complexity_factor * weights.complexity
+        + unified_score.coverage_factor * weights.coverage
+        + unified_score.roi_factor * weights.roi
+        + unified_score.semantic_factor * weights.semantic
+        + unified_score.dependency_factor * weights.dependency;
+
+    writeln!(&mut output).unwrap();
+    writeln!(&mut output, "- **Base Score:** {:.2}", base_score).unwrap();
+    writeln!(
+        &mut output,
+        "- **Role Adjustment:** ×{:.2}",
+        unified_score.role_multiplier
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "- **Final Score:** {:.2}",
+        unified_score.final_score
+    )
+    .unwrap();
+    writeln!(&mut output).unwrap();
+
+    output
+}
+
+fn format_main_factors(unified_score: &crate::priority::UnifiedScore) -> String {
+    let weights = crate::config::get_scoring_weights();
+    let mut factors = vec![];
+
+    if unified_score.coverage_factor > 3.0 {
+        factors.push(format!("Coverage gap ({:.0}%)", weights.coverage * 100.0));
+    }
+    if unified_score.roi_factor > 7.0 {
+        factors.push(format!("High ROI ({:.0}%)", weights.roi * 100.0));
+    }
+    if unified_score.dependency_factor > 5.0 {
+        factors.push(format!(
+            "Critical path ({:.0}%)",
+            weights.dependency * 100.0
+        ));
+    }
+    if unified_score.complexity_factor > 5.0 {
+        factors.push(format!("Complexity ({:.0}%)", weights.complexity * 100.0));
+    }
+
+    if !factors.is_empty() {
+        format!("*Main factors: {}*\n", factors.join(", "))
+    } else {
+        String::new()
+    }
+}
+
+fn format_dependency_list(items: &[String], max_shown: usize, list_type: &str) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+
+    let list = if items.len() > max_shown {
+        format!(
+            "{}, ... ({} more)",
+            items
+                .iter()
+                .take(max_shown)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", "),
+            items.len() - max_shown
+        )
+    } else {
+        items.to_vec().join(", ")
+    };
+
+    format!("- **{}:** {}", list_type, list)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::{FunctionVisibility, ImpactMetrics, UnifiedScore};
+
+    #[test]
+    fn test_get_severity_label() {
+        assert_eq!(get_severity_label(10.0), "CRITICAL");
+        assert_eq!(get_severity_label(9.5), "CRITICAL");
+        assert_eq!(get_severity_label(9.0), "CRITICAL");
+        assert_eq!(get_severity_label(8.0), "HIGH");
+        assert_eq!(get_severity_label(7.0), "HIGH");
+        assert_eq!(get_severity_label(6.0), "MEDIUM");
+        assert_eq!(get_severity_label(5.0), "MEDIUM");
+        assert_eq!(get_severity_label(4.0), "LOW");
+        assert_eq!(get_severity_label(3.0), "LOW");
+        assert_eq!(get_severity_label(2.0), "MINIMAL");
+        assert_eq!(get_severity_label(0.5), "MINIMAL");
+    }
+
+    #[test]
+    fn test_format_debt_type() {
+        let test_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 10,
+            cognitive: 20,
+        };
+        assert_eq!(format_debt_type(&test_gap), "Testing Gap");
+
+        let complexity = DebtType::ComplexityHotspot {
+            cyclomatic: 15,
+            cognitive: 30,
+        };
+        assert_eq!(format_debt_type(&complexity), "Complexity");
+
+        let dead_code = DebtType::DeadCode {
+            visibility: FunctionVisibility::Private,
+            cyclomatic: 5,
+            cognitive: 10,
+            usage_hints: vec![],
+        };
+        assert_eq!(format_debt_type(&dead_code), "Dead Code");
+
+        let orchestration = DebtType::Orchestration {
+            delegates_to: vec!["func1".to_string(), "func2".to_string()],
+        };
+        assert_eq!(format_debt_type(&orchestration), "Orchestration");
+    }
+
+    #[test]
+    fn test_format_impact_with_all_metrics() {
+        let impact = ImpactMetrics {
+            complexity_reduction: 5.5,
+            risk_reduction: 0.3,
+            coverage_improvement: 15.5,
+            lines_reduction: 25,
+        };
+
+        let result = format_impact(&impact);
+        assert!(result.contains("-5.5 complexity"));
+        assert!(result.contains("-0.3 risk"));
+        // 15.5 rounds to 16 with {:.0} formatting
+        assert!(result.contains("+16% coverage"));
+        assert!(result.contains("-25 lines"));
+    }
+
+    #[test]
+    fn test_format_impact_with_no_metrics() {
+        let impact = ImpactMetrics {
+            complexity_reduction: 0.0,
+            risk_reduction: 0.0,
+            coverage_improvement: 0.0,
+            lines_reduction: 0,
+        };
+
+        let result = format_impact(&impact);
+        assert_eq!(result, "No measurable impact");
+    }
+
+    #[test]
+    fn test_format_impact_with_partial_metrics() {
+        let impact = ImpactMetrics {
+            complexity_reduction: 3.0,
+            risk_reduction: 0.05,        // Below threshold
+            coverage_improvement: 0.005, // Below threshold
+            lines_reduction: 10,
+        };
+
+        let result = format_impact(&impact);
+        assert!(result.contains("-3.0 complexity"));
+        assert!(!result.contains("risk"));
+        assert!(!result.contains("coverage"));
+        assert!(result.contains("-10 lines"));
+    }
+
+    #[test]
+    fn test_extract_complexity_info() {
+        let complexity_hotspot = DebtType::ComplexityHotspot {
+            cyclomatic: 15,
+            cognitive: 30,
+        };
+        assert_eq!(
+            extract_complexity_info(&complexity_hotspot),
+            Some("cyclomatic=15, cognitive=30".to_string())
+        );
+
+        let test_gap = DebtType::TestingGap {
+            coverage: 0.0,
+            cyclomatic: 10,
+            cognitive: 20,
+        };
+        assert_eq!(
+            extract_complexity_info(&test_gap),
+            Some("cyclomatic=10, cognitive=20".to_string())
+        );
+
+        let dead_code = DebtType::DeadCode {
+            visibility: FunctionVisibility::Private,
+            cyclomatic: 5,
+            cognitive: 10,
+            usage_hints: vec![],
+        };
+        assert_eq!(
+            extract_complexity_info(&dead_code),
+            Some("cyclomatic=5, cognitive=10".to_string())
+        );
+
+        let risk = DebtType::Risk {
+            risk_score: 8.5,
+            factors: vec!["complex".to_string()],
+        };
+        assert_eq!(extract_complexity_info(&risk), None);
+    }
+
+    #[test]
+    fn test_format_score_breakdown() {
+        let score = UnifiedScore {
+            complexity_factor: 5.0,
+            coverage_factor: 8.0,
+            roi_factor: 7.5,
+            semantic_factor: 3.0,
+            dependency_factor: 4.0,
+            role_multiplier: 1.2,
+            final_score: 8.5,
+        };
+
+        let result = format_score_breakdown(&score);
+
+        // Check for table headers
+        assert!(result.contains("Score Calculation"));
+        assert!(result.contains("| Component | Value | Weight | Contribution |"));
+
+        // Check for component rows
+        assert!(result.contains("| Complexity | 5.0"));
+        assert!(result.contains("| Coverage | 8.0"));
+        assert!(result.contains("| ROI | 7.5"));
+        assert!(result.contains("| Semantic | 3.0"));
+        assert!(result.contains("| Dependency | 4.0"));
+
+        // Check for summary lines (with markdown formatting)
+        assert!(result.contains("**Base Score:**"));
+        assert!(result.contains("**Role Adjustment:** ×1.20"));
+        assert!(result.contains("**Final Score:** 8.50"));
+    }
+
+    #[test]
+    fn test_format_main_factors_with_multiple_factors() {
+        let score = UnifiedScore {
+            complexity_factor: 6.0, // Above threshold
+            coverage_factor: 4.0,   // Above threshold
+            roi_factor: 8.0,        // Above threshold
+            semantic_factor: 2.0,
+            dependency_factor: 6.0, // Above threshold
+            role_multiplier: 1.0,
+            final_score: 7.0,
+        };
+
+        let result = format_main_factors(&score);
+
+        assert!(result.contains("Main factors:"));
+        assert!(result.contains("Coverage gap"));
+        assert!(result.contains("High ROI"));
+        assert!(result.contains("Critical path"));
+        assert!(result.contains("Complexity"));
+    }
+
+    #[test]
+    fn test_format_main_factors_with_no_factors() {
+        let score = UnifiedScore {
+            complexity_factor: 2.0, // Below all thresholds
+            coverage_factor: 2.0,
+            roi_factor: 3.0,
+            semantic_factor: 1.0,
+            dependency_factor: 2.0,
+            role_multiplier: 1.0,
+            final_score: 2.0,
+        };
+
+        let result = format_main_factors(&score);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_format_dependency_list_empty() {
+        let items: Vec<String> = vec![];
+        let result = format_dependency_list(&items, 3, "Called by");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_format_dependency_list_few_items() {
+        let items = vec!["func1".to_string(), "func2".to_string()];
+        let result = format_dependency_list(&items, 3, "Called by");
+        assert_eq!(result, "- **Called by:** func1, func2");
+    }
+
+    #[test]
+    fn test_format_dependency_list_many_items() {
+        let items = vec![
+            "func1".to_string(),
+            "func2".to_string(),
+            "func3".to_string(),
+            "func4".to_string(),
+            "func5".to_string(),
+        ];
+        let result = format_dependency_list(&items, 3, "Calls");
+        assert_eq!(result, "- **Calls:** func1, func2, func3, ... (2 more)");
+    }
+
+    #[test]
+    fn test_format_dependency_list_exactly_max() {
+        let items = vec![
+            "func1".to_string(),
+            "func2".to_string(),
+            "func3".to_string(),
+        ];
+        let result = format_dependency_list(&items, 3, "Dependencies");
+        assert_eq!(result, "- **Dependencies:** func1, func2, func3");
     }
 }

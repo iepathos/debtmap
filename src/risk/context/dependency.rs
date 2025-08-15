@@ -190,17 +190,22 @@ impl DependencyRiskProvider {
     }
 }
 
-impl ContextProvider for DependencyRiskProvider {
-    fn name(&self) -> &str {
-        "dependency_risk"
+impl DependencyRiskProvider {
+    /// Classifies the contribution level based on the blast radius of a module.
+    /// Higher blast radius indicates more modules would be affected by changes.
+    fn classify_contribution_by_blast_radius(blast_radius: usize) -> f64 {
+        match blast_radius {
+            r if r > 10 => 1.5,
+            r if r > 5 => 1.0,
+            r if r > 2 => 0.5,
+            _ => 0.2,
+        }
     }
 
-    fn gather(&self, target: &AnalysisTarget) -> Result<Context> {
-        let module = self
-            .calculator
-            .find_module_for_function(&target.function_name);
-
-        let (propagated_risk, blast_radius, dependents) = if let Some(module) = module {
+    /// Extracts risk metrics for a module including propagated risk, blast radius, and dependents.
+    /// Returns default values if the module is not found.
+    fn extract_module_metrics(&self, module: Option<&Module>) -> (f64, usize, Vec<String>) {
+        if let Some(module) = module {
             let risk = self.calculator.get_risk(&module.name);
             let radius = self.calculator.calculate_blast_radius(&module.name);
             let deps: Vec<String> = self
@@ -214,18 +219,27 @@ impl ContextProvider for DependencyRiskProvider {
             (risk, radius, deps)
         } else {
             (0.0, 0, vec![])
-        };
+        }
+    }
+}
+
+impl ContextProvider for DependencyRiskProvider {
+    fn name(&self) -> &str {
+        "dependency_risk"
+    }
+
+    fn gather(&self, target: &AnalysisTarget) -> Result<Context> {
+        let module = self
+            .calculator
+            .find_module_for_function(&target.function_name);
+
+        let (propagated_risk, blast_radius, dependents) = self.extract_module_metrics(module);
 
         // Calculate depth in dependency tree
         let depth = self.calculate_dependency_depth(&target.function_name);
 
         // Higher contribution for functions with large blast radius or many dependents
-        let contribution = match blast_radius {
-            r if r > 10 => 1.5,
-            r if r > 5 => 1.0,
-            r if r > 2 => 0.5,
-            _ => 0.2,
-        };
+        let contribution = Self::classify_contribution_by_blast_radius(blast_radius);
 
         Ok(Context {
             provider: self.name().to_string(),
@@ -756,6 +770,125 @@ mod tests {
             }
             _ => panic!("Expected DependencyChain details"),
         }
+    }
+
+    #[test]
+    fn test_classify_contribution_critical_blast_radius() {
+        // Test with blast radius > 10 (critical)
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(15),
+            1.5
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(11),
+            1.5
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(100),
+            1.5
+        );
+    }
+
+    #[test]
+    fn test_classify_contribution_high_blast_radius() {
+        // Test with blast radius between 6-10 (high)
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(6),
+            1.0
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(8),
+            1.0
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(10),
+            1.0
+        );
+    }
+
+    #[test]
+    fn test_classify_contribution_medium_blast_radius() {
+        // Test with blast radius between 3-5 (medium)
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(3),
+            0.5
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(4),
+            0.5
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(5),
+            0.5
+        );
+    }
+
+    #[test]
+    fn test_classify_contribution_low_blast_radius() {
+        // Test with blast radius <= 2 (low)
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(0),
+            0.2
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(1),
+            0.2
+        );
+        assert_eq!(
+            DependencyRiskProvider::classify_contribution_by_blast_radius(2),
+            0.2
+        );
+    }
+
+    #[test]
+    fn test_extract_module_metrics_with_module() {
+        // Test extracting metrics when module exists
+        let mut graph = DependencyGraph::new();
+
+        graph.add_module(Module {
+            name: "test_module".to_string(),
+            path: PathBuf::from("src/test"),
+            intrinsic_risk: 5.0,
+            functions: vector!["test_func".to_string()],
+        });
+
+        // Add dependents
+        for i in 0..3 {
+            graph.add_module(Module {
+                name: format!("dependent_{i}"),
+                path: PathBuf::from(format!("src/dep{i}")),
+                intrinsic_risk: 2.0,
+                functions: vector![format!("func_{i}")],
+            });
+            graph.add_dependency(format!("dependent_{i}"), "test_module".to_string(), 0.5);
+        }
+
+        let calculator = DependencyRiskCalculator::new(graph.clone());
+        let provider = DependencyRiskProvider { calculator };
+
+        let module = graph.modules.get("test_module");
+        let (risk, radius, deps) = provider.extract_module_metrics(module);
+
+        assert_eq!(risk, 5.0); // Intrinsic risk
+        assert_eq!(radius, 4); // Module itself + 3 dependents
+        assert_eq!(deps.len(), 3); // 3 modules depend on test_module
+        assert!(deps.contains(&"dependent_0".to_string()));
+        assert!(deps.contains(&"dependent_1".to_string()));
+        assert!(deps.contains(&"dependent_2".to_string()));
+    }
+
+    #[test]
+    fn test_extract_module_metrics_without_module() {
+        // Test extracting metrics when module is None
+        let graph = DependencyGraph::new();
+        let calculator = DependencyRiskCalculator::new(graph);
+        let provider = DependencyRiskProvider { calculator };
+
+        let (risk, radius, deps) = provider.extract_module_metrics(None);
+
+        assert_eq!(risk, 0.0);
+        assert_eq!(radius, 0);
+        assert!(deps.is_empty());
     }
 
     #[test]

@@ -250,48 +250,48 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
 
 impl<W: Write> MarkdownWriter<W> {
     fn write_score_breakdown(&mut self, items: &[UnifiedDebtItem]) -> anyhow::Result<()> {
-        writeln!(self.writer, "<details>")?;
-        writeln!(
-            self.writer,
-            "<summary>Score Breakdown (click to expand)</summary>"
-        )?;
-        writeln!(self.writer)?;
-
-        for (idx, item) in items.iter().enumerate().take(3) {
-            writeln!(self.writer, "#### {}. {}", idx + 1, item.location.function)?;
-            writeln!(self.writer)?;
-            writeln!(
-                self.writer,
-                "- **Priority Score**: {:.2}",
-                item.unified_score.final_score
-            )?;
-            writeln!(
-                self.writer,
-                "- **Complexity Factor**: {:.2}",
-                item.unified_score.complexity_factor
-            )?;
-            writeln!(
-                self.writer,
-                "- **Coverage Factor**: {:.2}",
-                item.unified_score.coverage_factor
-            )?;
-            writeln!(
-                self.writer,
-                "- **ROI Factor**: {:.2}",
-                item.unified_score.roi_factor
-            )?;
-            writeln!(
-                self.writer,
-                "- **Semantic Factor**: {:.2}",
-                item.unified_score.semantic_factor
-            )?;
-            writeln!(self.writer)?;
-        }
-
-        writeln!(self.writer, "</details>")?;
-        writeln!(self.writer)?;
+        let breakdown = format_score_breakdown(items);
+        write!(self.writer, "{}", breakdown)?;
         Ok(())
     }
+}
+
+// Pure functions for formatting score breakdown
+fn format_score_breakdown(items: &[UnifiedDebtItem]) -> String {
+    let mut output = String::new();
+    output.push_str("<details>\n");
+    output.push_str("<summary>Score Breakdown (click to expand)</summary>\n\n");
+
+    for (idx, item) in items.iter().enumerate().take(3) {
+        output.push_str(&format_item_breakdown(idx + 1, item));
+    }
+
+    output.push_str("</details>\n\n");
+    output
+}
+
+fn format_item_breakdown(number: usize, item: &UnifiedDebtItem) -> String {
+    format!(
+        "#### {}. {}\n\n{}\n",
+        number,
+        item.location.function,
+        format_score_factors(&item.unified_score)
+    )
+}
+
+fn format_score_factors(score: &crate::priority::unified_scorer::UnifiedScore) -> String {
+    format!(
+        "- **Priority Score**: {:.2}\n\
+         - **Complexity Factor**: {:.2}\n\
+         - **Coverage Factor**: {:.2}\n\
+         - **ROI Factor**: {:.2}\n\
+         - **Semantic Factor**: {:.2}\n",
+        score.final_score,
+        score.complexity_factor,
+        score.coverage_factor,
+        score.roi_factor,
+        score.semantic_factor
+    )
 }
 
 impl<W: Write> MarkdownWriter<W> {
@@ -607,4 +607,176 @@ fn calculate_roi(item: &crate::priority::UnifiedDebtItem) -> f64 {
 fn estimate_risk_reduction(coverage: f64) -> f64 {
     // Estimate risk reduction from improving coverage
     (1.0 - coverage) * 0.3
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
+    use crate::priority::{ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics};
+
+    fn create_test_item(function_name: &str, final_score: f64) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: std::path::PathBuf::from("test.rs"),
+                line: 10,
+                function: function_name.to_string(),
+            },
+            unified_score: UnifiedScore {
+                final_score,
+                complexity_factor: 0.8,
+                coverage_factor: 0.6,
+                roi_factor: 0.7,
+                semantic_factor: 0.5,
+                dependency_factor: 0.5,
+                role_multiplier: 1.0,
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 20,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Refactor to reduce complexity".to_string(),
+                rationale: "Test recommendation".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 5.0,
+                coverage_improvement: 0.1,
+                lines_reduction: 10,
+                risk_reduction: 0.2,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 1,
+            downstream_dependencies: 2,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 0,
+            function_length: 50,
+            cyclomatic_complexity: 15,
+            cognitive_complexity: 20,
+        }
+    }
+
+    #[test]
+    fn test_format_score_factors() {
+        let score = UnifiedScore {
+            final_score: 7.89,
+            complexity_factor: 0.85,
+            coverage_factor: 0.65,
+            roi_factor: 0.75,
+            semantic_factor: 0.55,
+            dependency_factor: 0.45,
+            role_multiplier: 1.0,
+        };
+
+        let result = format_score_factors(&score);
+
+        assert!(result.contains("Priority Score**: 7.89"));
+        assert!(result.contains("Complexity Factor**: 0.85"));
+        assert!(result.contains("Coverage Factor**: 0.65"));
+        assert!(result.contains("ROI Factor**: 0.75"));
+        assert!(result.contains("Semantic Factor**: 0.55"));
+    }
+
+    #[test]
+    fn test_format_item_breakdown() {
+        let item = create_test_item("test_function", 8.5);
+        let result = format_item_breakdown(1, &item);
+
+        assert!(result.starts_with("#### 1. test_function\n"));
+        assert!(result.contains("Priority Score**: 8.50"));
+        assert!(result.contains("Complexity Factor**: 0.80"));
+    }
+
+    #[test]
+    fn test_format_score_breakdown_empty() {
+        let items: Vec<UnifiedDebtItem> = vec![];
+        let result = format_score_breakdown(&items);
+
+        assert!(result.starts_with("<details>\n"));
+        assert!(result.contains("<summary>Score Breakdown (click to expand)</summary>"));
+        assert!(result.ends_with("</details>\n\n"));
+    }
+
+    #[test]
+    fn test_format_score_breakdown_single_item() {
+        let items = vec![create_test_item("function_one", 9.0)];
+        let result = format_score_breakdown(&items);
+
+        assert!(result.contains("#### 1. function_one"));
+        assert!(result.contains("Priority Score**: 9.00"));
+        assert!(result.contains("<details>"));
+        assert!(result.contains("</details>"));
+    }
+
+    #[test]
+    fn test_format_score_breakdown_multiple_items() {
+        let items = vec![
+            create_test_item("function_one", 9.0),
+            create_test_item("function_two", 7.5),
+            create_test_item("function_three", 6.0),
+        ];
+        let result = format_score_breakdown(&items);
+
+        assert!(result.contains("#### 1. function_one"));
+        assert!(result.contains("#### 2. function_two"));
+        assert!(result.contains("#### 3. function_three"));
+        assert!(result.contains("Priority Score**: 9.00"));
+        assert!(result.contains("Priority Score**: 7.50"));
+        assert!(result.contains("Priority Score**: 6.00"));
+    }
+
+    #[test]
+    fn test_format_score_breakdown_limits_to_three() {
+        let items = vec![
+            create_test_item("function_one", 9.0),
+            create_test_item("function_two", 7.5),
+            create_test_item("function_three", 6.0),
+            create_test_item("function_four", 5.0),
+            create_test_item("function_five", 4.0),
+        ];
+        let result = format_score_breakdown(&items);
+
+        // Should only include first three
+        assert!(result.contains("#### 1. function_one"));
+        assert!(result.contains("#### 2. function_two"));
+        assert!(result.contains("#### 3. function_three"));
+        assert!(!result.contains("#### 4. function_four"));
+        assert!(!result.contains("#### 5. function_five"));
+    }
+
+    #[test]
+    fn test_format_score_factors_precision() {
+        let score = UnifiedScore {
+            final_score: 7.899999,
+            complexity_factor: 0.855555,
+            coverage_factor: 0.654321,
+            roi_factor: 0.751234,
+            semantic_factor: 0.559876,
+            dependency_factor: 0.456789,
+            role_multiplier: 1.0,
+        };
+
+        let result = format_score_factors(&score);
+
+        // Check that all values are rounded to 2 decimal places
+        assert!(result.contains("Priority Score**: 7.90"));
+        assert!(result.contains("Complexity Factor**: 0.86"));
+        assert!(result.contains("Coverage Factor**: 0.65"));
+        assert!(result.contains("ROI Factor**: 0.75"));
+        assert!(result.contains("Semantic Factor**: 0.56"));
+    }
+
+    #[test]
+    fn test_format_item_breakdown_escapes_special_chars() {
+        let mut item = create_test_item("test_function_with_<special>&_chars", 8.5);
+        item.location.function = "test_function_with_<special>&_chars".to_string();
+        let result = format_item_breakdown(1, &item);
+
+        // The function name should be included as-is in markdown
+        assert!(result.contains("test_function_with_<special>&_chars"));
+    }
 }

@@ -1640,6 +1640,90 @@ fn determine_priority_output_format(
     }
 }
 
+/// Determines if the output file has a markdown extension
+fn is_markdown_file(output_file: &Option<PathBuf>) -> bool {
+    output_file
+        .as_ref()
+        .and_then(|p| p.extension())
+        .map(|ext| ext == "md")
+        .unwrap_or(false)
+}
+
+/// Calculates the limit for markdown output based on top/tail parameters
+fn calculate_markdown_limit(top: Option<usize>, tail: Option<usize>) -> usize {
+    if let Some(n) = top {
+        n
+    } else if tail.is_some() {
+        // For tail, we'll handle it differently in markdown
+        10
+    } else {
+        10
+    }
+}
+
+/// Handles JSON format output
+fn output_json(analysis: &priority::UnifiedAnalysis, output_file: Option<PathBuf>) -> Result<()> {
+    use std::fs;
+    use std::io::Write;
+
+    let json = serde_json::to_string_pretty(analysis)?;
+    if let Some(path) = output_file {
+        let mut file = fs::File::create(path)?;
+        file.write_all(json.as_bytes())?;
+    } else {
+        println!("{json}");
+    }
+    Ok(())
+}
+
+/// Handles markdown format output
+fn output_markdown(
+    analysis: &priority::UnifiedAnalysis,
+    top: Option<usize>,
+    tail: Option<usize>,
+    verbosity: u8,
+    output_file: Option<PathBuf>,
+) -> Result<()> {
+    use std::fs;
+    use std::io::Write;
+
+    let limit = calculate_markdown_limit(top, tail);
+    let output = priority::format_priorities_markdown(analysis, limit, verbosity);
+
+    if let Some(path) = output_file {
+        let mut file = fs::File::create(path)?;
+        file.write_all(output.as_bytes())?;
+    } else {
+        println!("{output}");
+    }
+    Ok(())
+}
+
+/// Handles terminal format output
+fn output_terminal(
+    analysis: &priority::UnifiedAnalysis,
+    priorities_only: bool,
+    detailed: bool,
+    top: Option<usize>,
+    tail: Option<usize>,
+    verbosity: u8,
+    output_file: Option<PathBuf>,
+) -> Result<()> {
+    use std::fs;
+    use std::io::Write;
+
+    let format = determine_priority_output_format(priorities_only, detailed, top, tail);
+    let output = priority::formatter::format_priorities_with_verbosity(analysis, format, verbosity);
+
+    if let Some(path) = output_file {
+        let mut file = fs::File::create(path)?;
+        file.write_all(output.as_bytes())?;
+    } else {
+        println!("{output}");
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn output_unified_priorities(
     analysis: priority::UnifiedAnalysis,
@@ -1651,62 +1735,22 @@ fn output_unified_priorities(
     output_file: Option<PathBuf>,
     output_format: Option<cli::OutputFormat>,
 ) -> Result<()> {
-    use std::fs;
-    use std::io::Write;
-
     // Check if JSON format is requested
     if let Some(cli::OutputFormat::Json) = output_format {
-        // For JSON, serialize the analysis directly
-        let json = serde_json::to_string_pretty(&analysis)?;
-        if let Some(path) = output_file {
-            let mut file = fs::File::create(path)?;
-            file.write_all(json.as_bytes())?;
-        } else {
-            println!("{json}");
-        }
+        output_json(&analysis, output_file)
+    } else if is_markdown_file(&output_file) {
+        output_markdown(&analysis, top, tail, verbosity, output_file)
     } else {
-        // Check if output file is markdown
-        let is_markdown = output_file
-            .as_ref()
-            .and_then(|p| p.extension())
-            .map(|ext| ext == "md")
-            .unwrap_or(false);
-
-        if is_markdown {
-            // Use markdown formatter for .md files
-            let limit = if let Some(n) = top {
-                n
-            } else if tail.is_some() {
-                // For tail, we'll handle it differently in markdown
-                10
-            } else {
-                10
-            };
-
-            let output = priority::format_priorities_markdown(&analysis, limit, verbosity);
-
-            if let Some(path) = output_file {
-                let mut file = fs::File::create(path)?;
-                file.write_all(output.as_bytes())?;
-            } else {
-                println!("{output}");
-            }
-        } else {
-            // For terminal output, use the existing formatter with colors
-            let format = determine_priority_output_format(priorities_only, detailed, top, tail);
-            let output =
-                priority::formatter::format_priorities_with_verbosity(&analysis, format, verbosity);
-
-            if let Some(path) = output_file {
-                let mut file = fs::File::create(path)?;
-                file.write_all(output.as_bytes())?;
-            } else {
-                println!("{output}");
-            }
-        }
+        output_terminal(
+            &analysis,
+            priorities_only,
+            detailed,
+            top,
+            tail,
+            verbosity,
+            output_file,
+        )
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -1719,6 +1763,7 @@ mod tests {
     };
     use debtmap::risk::{Difficulty, FunctionRisk, RiskCategory, RiskDistribution, TestEffort};
     use im::Vector;
+    use std::fs;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -3871,5 +3916,314 @@ end_of_record
 
         // Should not panic with passing thresholds
         print_failed_validation_checks(&details_passing);
+    }
+
+    #[test]
+    fn test_is_markdown_file_with_md_extension() {
+        let path = Some(PathBuf::from("report.md"));
+        assert!(is_markdown_file(&path));
+    }
+
+    #[test]
+    fn test_is_markdown_file_with_other_extension() {
+        let path = Some(PathBuf::from("report.txt"));
+        assert!(!is_markdown_file(&path));
+    }
+
+    #[test]
+    fn test_is_markdown_file_with_no_extension() {
+        let path = Some(PathBuf::from("report"));
+        assert!(!is_markdown_file(&path));
+    }
+
+    #[test]
+    fn test_is_markdown_file_with_none() {
+        assert!(!is_markdown_file(&None));
+    }
+
+    #[test]
+    fn test_is_markdown_file_case_sensitive() {
+        // Test that comparison is case-sensitive
+        let path = Some(PathBuf::from("report.MD"));
+        assert!(!is_markdown_file(&path));
+    }
+
+    #[test]
+    fn test_calculate_markdown_limit_with_top() {
+        assert_eq!(calculate_markdown_limit(Some(15), None), 15);
+        assert_eq!(calculate_markdown_limit(Some(5), Some(20)), 5);
+    }
+
+    #[test]
+    fn test_calculate_markdown_limit_with_tail() {
+        assert_eq!(calculate_markdown_limit(None, Some(20)), 10);
+    }
+
+    #[test]
+    fn test_calculate_markdown_limit_with_neither() {
+        assert_eq!(calculate_markdown_limit(None, None), 10);
+    }
+
+    #[test]
+    fn test_output_json_to_stdout() {
+        // Create a minimal UnifiedAnalysis for testing
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        // Test JSON output without error (can't easily test stdout)
+        let result = output_json(&analysis, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_output_json_to_file() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let output_path = temp_dir.path().join("output.json");
+
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        let result = output_json(&analysis, Some(output_path.clone()));
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        // Verify the file contains valid JSON
+        let contents = fs::read_to_string(output_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
+        assert_eq!(parsed["total_debt_score"], 100.0);
+    }
+
+    #[test]
+    fn test_output_markdown_to_stdout() {
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        // Test that markdown output works without error
+        let result = output_markdown(&analysis, Some(5), None, 0, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_output_markdown_to_file() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let output_path = temp_dir.path().join("output.md");
+
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        let result = output_markdown(&analysis, Some(10), None, 1, Some(output_path.clone()));
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        // Verify the file contains markdown content
+        let contents = fs::read_to_string(output_path).unwrap();
+        assert!(contents.contains("# Priority Technical Debt Fixes"));
+    }
+
+    #[test]
+    fn test_output_terminal_to_stdout() {
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        // Test terminal output without error
+        let result = output_terminal(&analysis, false, false, Some(5), None, 0, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_output_terminal_to_file() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let output_path = temp_dir.path().join("output.txt");
+
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        let result = output_terminal(
+            &analysis,
+            true,
+            false,
+            None,
+            Some(5),
+            2,
+            Some(output_path.clone()),
+        );
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+    }
+
+    #[test]
+    fn test_output_unified_priorities_json_format() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let output_path = temp_dir.path().join("output.json");
+
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        let result = output_unified_priorities(
+            analysis,
+            None,
+            None,
+            false,
+            false,
+            0,
+            Some(output_path.clone()),
+            Some(cli::OutputFormat::Json),
+        );
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        // Verify JSON format
+        let contents = fs::read_to_string(output_path).unwrap();
+        let _parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
+    }
+
+    #[test]
+    fn test_output_unified_priorities_markdown_file() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let output_path = temp_dir.path().join("output.md");
+
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        let result = output_unified_priorities(
+            analysis,
+            Some(5),
+            None,
+            false,
+            false,
+            1,
+            Some(output_path.clone()),
+            None,
+        );
+        assert!(result.is_ok());
+        assert!(output_path.exists());
+
+        // Verify markdown content
+        let contents = fs::read_to_string(output_path).unwrap();
+        assert!(contents.contains("# Priority Technical Debt Fixes"));
+    }
+
+    #[test]
+    fn test_output_unified_priorities_terminal_format() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let output_path = temp_dir.path().join("output.txt");
+
+        let analysis = priority::UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: priority::call_graph::CallGraph::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        let result = output_unified_priorities(
+            analysis,
+            None,
+            Some(3),
+            false,
+            true,
+            2,
+            Some(output_path.clone()),
+            None,
+        );
+        assert!(result.is_ok());
+        assert!(output_path.exists());
     }
 }
