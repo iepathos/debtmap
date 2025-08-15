@@ -152,17 +152,16 @@ pub fn format_priority_item_with_verbosity(
     .unwrap();
 
     // Add complexity details
-    let (cyclomatic, cognitive, branch_count, nesting, length) =
+    let (cyclomatic, cognitive, branch_count, nesting, _length) =
         crate::priority::formatter::extract_complexity_info(item);
     if cyclomatic > 0 || cognitive > 0 {
         writeln!(
             output,
-            "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}, lines={}",
+            "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}",
             cyclomatic.to_string().dimmed(),
             branch_count.to_string().dimmed(),
             cognitive.to_string().dimmed(),
-            nesting.to_string().dimmed(),
-            length.to_string().dimmed()
+            nesting.to_string().dimmed()
         )
         .unwrap();
     }

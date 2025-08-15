@@ -318,16 +318,15 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     .unwrap();
 
     // Add complexity details with branch information
-    let (cyclomatic, cognitive, branch_count, nesting, length) = extract_complexity_info(item);
+    let (cyclomatic, cognitive, branch_count, nesting, _length) = extract_complexity_info(item);
     if cyclomatic > 0 || cognitive > 0 {
         writeln!(
             output,
-            "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}, lines={}",
+            "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}",
             cyclomatic.to_string().dimmed(),
             branch_count.to_string().dimmed(),
             cognitive.to_string().dimmed(),
-            nesting.to_string().dimmed(),
-            length.to_string().dimmed()
+            nesting.to_string().dimmed()
         )
         .unwrap();
     }

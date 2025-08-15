@@ -1640,16 +1640,44 @@ fn output_unified_priorities(
             println!("{json}");
         }
     } else {
-        // For other formats, use the existing formatter
-        let format = determine_priority_output_format(priorities_only, detailed, top, tail);
-        let output =
-            priority::formatter::format_priorities_with_verbosity(&analysis, format, verbosity);
+        // Check if output file is markdown
+        let is_markdown = output_file
+            .as_ref()
+            .and_then(|p| p.extension())
+            .map(|ext| ext == "md")
+            .unwrap_or(false);
 
-        if let Some(path) = output_file {
-            let mut file = fs::File::create(path)?;
-            file.write_all(output.as_bytes())?;
+        if is_markdown {
+            // Use markdown formatter for .md files
+            let limit = if let Some(n) = top {
+                n
+            } else if tail.is_some() {
+                // For tail, we'll handle it differently in markdown
+                10
+            } else {
+                10
+            };
+
+            let output = priority::format_priorities_markdown(&analysis, limit, verbosity);
+
+            if let Some(path) = output_file {
+                let mut file = fs::File::create(path)?;
+                file.write_all(output.as_bytes())?;
+            } else {
+                println!("{output}");
+            }
         } else {
-            println!("{output}");
+            // For terminal output, use the existing formatter with colors
+            let format = determine_priority_output_format(priorities_only, detailed, top, tail);
+            let output =
+                priority::formatter::format_priorities_with_verbosity(&analysis, format, verbosity);
+
+            if let Some(path) = output_file {
+                let mut file = fs::File::create(path)?;
+                file.write_all(output.as_bytes())?;
+            } else {
+                println!("{output}");
+            }
         }
     }
 
