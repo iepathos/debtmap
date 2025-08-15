@@ -51,19 +51,19 @@ impl ScoringWeights {
 
         // Check each weight is between 0 and 1
         if self.coverage < 0.0 || self.coverage > 1.0 {
-            return Err(format!("Coverage weight must be between 0.0 and 1.0"));
+            return Err("Coverage weight must be between 0.0 and 1.0".to_string());
         }
         if self.complexity < 0.0 || self.complexity > 1.0 {
-            return Err(format!("Complexity weight must be between 0.0 and 1.0"));
+            return Err("Complexity weight must be between 0.0 and 1.0".to_string());
         }
         if self.roi < 0.0 || self.roi > 1.0 {
-            return Err(format!("ROI weight must be between 0.0 and 1.0"));
+            return Err("ROI weight must be between 0.0 and 1.0".to_string());
         }
         if self.semantic < 0.0 || self.semantic > 1.0 {
-            return Err(format!("Semantic weight must be between 0.0 and 1.0"));
+            return Err("Semantic weight must be between 0.0 and 1.0".to_string());
         }
         if self.dependency < 0.0 || self.dependency > 1.0 {
-            return Err(format!("Dependency weight must be between 0.0 and 1.0"));
+            return Err("Dependency weight must be between 0.0 and 1.0".to_string());
         }
 
         Ok(())
