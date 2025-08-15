@@ -62,11 +62,12 @@ get_target() {
     
     case "${OS}-${ARCH}" in
         linux-x86_64)
-            # Check if musl or gnu
-            if ldd /bin/ls 2>&1 | grep -q musl; then
-                TARGET="x86_64-unknown-linux-musl"
-            else
+            # Prefer musl for better compatibility across different GLIBC versions
+            # Users can override with DEBTMAP_USE_GNU=1 if they prefer the gnu build
+            if [ "${DEBTMAP_USE_GNU}" = "1" ]; then
                 TARGET="x86_64-unknown-linux-gnu"
+            else
+                TARGET="x86_64-unknown-linux-musl"
             fi
             ;;
         linux-aarch64)
@@ -183,7 +184,8 @@ check_path() {
                 ;;
         esac
         
-        if [ -n "$SHELL_CONFIG" ]; then
+        # Check if we're running interactively (not piped)
+        if [ -t 0 ] && [ -n "$SHELL_CONFIG" ]; then
             echo ""
             echo "Would you like to add ${INSTALL_DIR} to your PATH automatically?"
             echo "This will add the following line to ${SHELL_CONFIG}:"
