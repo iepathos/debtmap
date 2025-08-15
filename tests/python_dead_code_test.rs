@@ -288,3 +288,112 @@ class ResourceManager:
         "_get_resource should NOT be dead code - it's used in a context manager"
     );
 }
+
+#[test]
+fn test_wxpython_event_handler_not_dead_code() {
+    // Test that wxPython event handlers bound with Bind() are not marked as dead code
+    let python_code = r#"
+import wx
+
+class ConversationPanel:
+    def on_paint(self, event):
+        """
+        Handle paint events to draw the drag-and-drop indicator line.
+        
+        Custom paint handler that draws a blue horizontal line to indicate where
+        a dragged message will be inserted. The line position is determined by
+        the drop_indicator_pos value and appears only during active drag operations.
+        
+        :param event: The paint event
+        :type event: wx.PaintEvent
+        """
+        dc = wx.PaintDC(self.message_container)
+
+        # If we're showing a drop indicator
+        if self.drop_indicator_pos is not None:
+            # Draw a horizontal line at the insertion point
+            width, _ = self.message_container.GetSize()
+            y_pos = 0
+
+            if self.drop_indicator_pos == 0:
+                # At the beginning
+                y_pos = 0
+            elif self.drop_indicator_pos >= len(self.messages):
+                # At the end
+                if self.messages:
+                    last_msg = self.messages[-1]
+                    y_pos = last_msg.GetPosition().y + last_msg.GetSize().height
+            else:
+                # Between two messages
+                y_pos = self.messages[self.drop_indicator_pos].GetPosition().y
+
+            pen = wx.Pen(wx.BLUE, 3)
+            dc.SetPen(pen)
+            dc.DrawLine(0, y_pos, width, y_pos)
+
+    def __init__(self):
+        # Event handler binding
+        self.message_container.Bind(wx.EVT_PAINT, self.on_paint)
+"#;
+
+    let analyzer = PythonAnalyzer::new();
+    let path = PathBuf::from("conversation_panel.py");
+    let ast = analyzer.parse(python_code, path.clone()).unwrap();
+    let metrics = analyzer.analyze(&ast);
+
+    let mut call_graph = CallGraph::new();
+
+    // Parse and analyze Python method calls
+    let module =
+        rustpython_parser::parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+    let mut python_analyzer = PythonCallGraphAnalyzer::new();
+    python_analyzer
+        .analyze_module(&module, &path, &mut call_graph)
+        .unwrap();
+
+    let on_paint_func = metrics
+        .complexity
+        .functions
+        .iter()
+        .find(|f| f.name.contains("on_paint"))
+        .expect("Should find on_paint function");
+
+    let func_id = FunctionId {
+        file: path.clone(),
+        name: "ConversationPanel.on_paint".to_string(),
+        line: 0,
+    };
+
+    let framework_exclusions_std: std::collections::HashSet<FunctionId> =
+        HashSet::new().into_iter().collect();
+    let is_dead = is_dead_code_with_exclusions(
+        on_paint_func,
+        &call_graph,
+        &func_id,
+        &framework_exclusions_std,
+    );
+
+    // Should NOT be marked as dead code because it's bound as an event handler
+    assert!(
+        !is_dead,
+        "on_paint should NOT be marked as dead code because it's bound with Bind()"
+    );
+
+    // Also check the debt type classification
+    let debt_type = classify_debt_type_with_exclusions(
+        on_paint_func,
+        &call_graph,
+        &func_id,
+        &framework_exclusions_std,
+    );
+
+    // It should NOT be classified as DeadCode
+    match debt_type {
+        DebtType::DeadCode { .. } => {
+            panic!("on_paint should not be classified as DeadCode!");
+        }
+        _ => {
+            // Good - it's not dead code
+        }
+    }
+}

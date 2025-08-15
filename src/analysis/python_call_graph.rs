@@ -273,9 +273,98 @@ impl PythonCallGraphAnalyzer {
             }
         }
 
+        // Check for event handler binding patterns like obj.Bind(event, self.method)
+        self.check_for_event_binding(call_expr, file_path, call_graph)?;
+
         // Recursively analyze arguments
         for arg in &call_expr.args {
             self.analyze_expr_for_calls(arg, file_path, call_graph)?;
+        }
+
+        Ok(())
+    }
+
+    fn check_for_event_binding(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        file_path: &Path,
+        call_graph: &mut CallGraph,
+    ) -> Result<()> {
+        // Check if this is a method call like obj.Bind(...)
+        if let ast::Expr::Attribute(attr_expr) = &*call_expr.func {
+            let method_name = &attr_expr.attr;
+
+            // Look for common event binding methods
+            if self.is_event_binding_method(method_name) {
+                // Check all arguments for method references like self.on_paint
+                for arg in &call_expr.args {
+                    if let ast::Expr::Attribute(handler_attr) = arg {
+                        if let ast::Expr::Name(obj_name) = &*handler_attr.value {
+                            if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" {
+                                // This is a method reference passed as event handler
+                                self.add_event_handler_reference(
+                                    &handler_attr.attr,
+                                    file_path,
+                                    call_graph,
+                                )?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn is_event_binding_method(&self, method_name: &str) -> bool {
+        matches!(
+            method_name,
+            "Bind" |           // wxPython: obj.Bind(wx.EVT_PAINT, self.on_paint)
+            "bind" |           // Tkinter: widget.bind("<Button-1>", self.on_click)
+            "connect" |        // PyQt/PySide: signal.connect(self.slot)
+            "on" |             // Some frameworks
+            "addEventListener" | // Web frameworks
+            "addListener" |    // Event systems
+            "subscribe" |      // Observer patterns
+            "observe" |        // Observer patterns
+            "listen" // Event systems
+        )
+    }
+
+    fn add_event_handler_reference(
+        &mut self,
+        method_name: &str,
+        file_path: &Path,
+        call_graph: &mut CallGraph,
+    ) -> Result<()> {
+        if let (Some(class_name), Some(caller_name)) = (&self.current_class, &self.current_function)
+        {
+            let handler_name = format!("{}.{}", class_name, method_name);
+
+            // Use the actual line numbers we collected, or fall back to 0
+            let caller_line = self.function_lines.get(caller_name).copied().unwrap_or(0);
+            let handler_line = self.function_lines.get(&handler_name).copied().unwrap_or(0);
+
+            let caller_id = FunctionId {
+                name: caller_name.clone(),
+                file: file_path.to_path_buf(),
+                line: caller_line,
+            };
+
+            let handler_id = FunctionId {
+                name: handler_name,
+                file: file_path.to_path_buf(),
+                line: handler_line,
+            };
+
+            // Add the call edge to indicate the handler is referenced by the caller
+            let call = FunctionCall {
+                caller: caller_id,
+                callee: handler_id,
+                call_type: CallType::Direct, // Event binding is a direct reference
+            };
+
+            call_graph.add_call(call);
         }
 
         Ok(())
@@ -476,5 +565,100 @@ class Manager:
             !call_graph.get_callers(&connection_method_id).is_empty(),
             "Connection method used in with statement should have callers"
         );
+    }
+
+    #[test]
+    fn test_event_handler_binding_detection() {
+        let python_code = r#"
+class ConversationPanel:
+    def on_paint(self, event):
+        """Handle paint events to draw the drag-and-drop indicator line."""
+        dc = wx.PaintDC(self.message_container)
+        # ... drawing logic ...
+    
+    def setup_event_handlers(self):
+        """Setup event handlers for the panel."""
+        self.message_container.Bind(wx.EVT_PAINT, self.on_paint)
+        self.widget.bind("<Button-1>", self.on_click)
+        self.signal.connect(self.on_signal)
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        analyzer
+            .analyze_module(&module, Path::new("conversation_panel.py"), &mut call_graph)
+            .unwrap();
+
+        let on_paint_id = FunctionId {
+            name: "ConversationPanel.on_paint".to_string(),
+            file: Path::new("conversation_panel.py").to_path_buf(),
+            line: 0,
+        };
+
+        // on_paint should have callers because it's bound as an event handler
+        assert!(
+            !call_graph.get_callers(&on_paint_id).is_empty(),
+            "on_paint should have callers because it's bound as an event handler"
+        );
+    }
+
+    #[test]
+    fn test_multiple_event_binding_frameworks() {
+        let python_code = r#"
+class EventPanel:
+    def on_click(self, event):
+        """Handle click events."""
+        pass
+    
+    def on_signal(self):
+        """Handle signal events."""
+        pass
+        
+    def on_custom(self):
+        """Handle custom events."""
+        pass
+    
+    def setup_events(self):
+        """Setup various event bindings."""
+        # wxPython style
+        self.widget.Bind(wx.EVT_CLICK, self.on_click)
+        # PyQt/PySide style  
+        self.signal.connect(self.on_signal)
+        # Tkinter style
+        self.frame.bind("<Button>", self.on_click)
+        # Custom event system
+        self.emitter.subscribe("custom", self.on_custom)
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        analyzer
+            .analyze_module(&module, Path::new("event_panel.py"), &mut call_graph)
+            .unwrap();
+
+        // Check that all event handlers have callers
+        let handlers = [
+            "EventPanel.on_click",
+            "EventPanel.on_signal",
+            "EventPanel.on_custom",
+        ];
+
+        for handler_name in &handlers {
+            let handler_id = FunctionId {
+                name: handler_name.to_string(),
+                file: Path::new("event_panel.py").to_path_buf(),
+                line: 0,
+            };
+
+            assert!(
+                !call_graph.get_callers(&handler_id).is_empty(),
+                "{} should have callers because it's bound as an event handler",
+                handler_name
+            );
+        }
     }
 }
