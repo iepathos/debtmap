@@ -15,6 +15,13 @@ duplication = 50
 max_file_length = 500
 max_function_length = 50
 
+# Minimum thresholds for including items in debt analysis
+# These help filter out trivial functions that aren't really technical debt
+minimum_debt_score = 1.0              # Minimum unified score to include (0.0-10.0)
+minimum_cyclomatic_complexity = 1     # Skip functions with cyclomatic <= this value
+minimum_cognitive_complexity = 1      # Skip functions with cognitive <= this value  
+minimum_risk_score = 1.0              # Minimum risk score for Risk debt types
+
 [languages]
 enabled = ["rust"]
 

@@ -511,6 +511,13 @@ max_file_lines = 500
 max_function_lines = 50
 max_nesting_depth = 4
 
+# Minimum thresholds for including items in debt analysis
+# These help filter out trivial functions that aren't really technical debt
+minimum_debt_score = 1.0              # Minimum unified score to include (0.0-10.0, default: 1.0)
+minimum_cyclomatic_complexity = 2     # Skip functions with cyclomatic <= this value (default: 2)
+minimum_cognitive_complexity = 3      # Skip functions with cognitive <= this value (default: 3)
+minimum_risk_score = 1.0              # Minimum risk score for Risk debt types (default: 1.0)
+
 [ignore]
 # Paths to completely ignore during analysis
 paths = ["target/", "node_modules/", "vendor/"]

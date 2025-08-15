@@ -73,9 +73,16 @@ pub enum Commands {
         #[arg(long = "semantic-off")]
         semantic_off: bool,
 
-        /// Show score breakdown for debugging
-        #[arg(long = "explain-score")]
+        /// Show score breakdown for debugging (deprecated: use -v instead)
+        #[arg(long = "explain-score", hide = true)]
         explain_score: bool,
+
+        /// Increase verbosity level (can be repeated: -v, -vv, -vvv)
+        /// -v: Show main score factors
+        /// -vv: Show detailed calculations
+        /// -vvv: Show all debug information
+        #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
+        verbosity: u8,
 
         /// Disable macro expansion (enabled by default for accuracy)
         #[arg(long = "no-expand-macros")]
@@ -146,9 +153,16 @@ pub enum Commands {
         #[arg(long = "semantic-off")]
         semantic_off: bool,
 
-        /// Show score breakdown for debugging
-        #[arg(long = "explain-score")]
+        /// Show score breakdown for debugging (deprecated: use -v instead)
+        #[arg(long = "explain-score", hide = true)]
         explain_score: bool,
+
+        /// Increase verbosity level (can be repeated: -v, -vv, -vvv)
+        /// -v: Show main score factors
+        /// -vv: Show detailed calculations
+        /// -vvv: Show all debug information
+        #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
+        verbosity: u8,
     },
 }
 

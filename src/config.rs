@@ -133,6 +133,20 @@ pub struct ThresholdsConfig {
     pub duplication: Option<u32>,
     pub max_file_length: Option<usize>,
     pub max_function_length: Option<usize>,
+
+    /// Minimum thresholds for including items in debt analysis
+    #[serde(default)]
+    pub minimum_debt_score: Option<f64>,
+
+    /// Minimum complexity thresholds for considering something as debt
+    #[serde(default)]
+    pub minimum_cyclomatic_complexity: Option<u32>,
+    #[serde(default)]
+    pub minimum_cognitive_complexity: Option<u32>,
+
+    /// Minimum risk score for including items (0.0-10.0)
+    #[serde(default)]
+    pub minimum_risk_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,4 +222,40 @@ pub fn get_config() -> &'static DebtmapConfig {
 /// Get the scoring weights (with defaults if not configured)
 pub fn get_scoring_weights() -> &'static ScoringWeights {
     SCORING_WEIGHTS.get_or_init(|| get_config().scoring.clone().unwrap_or_default())
+}
+
+/// Get minimum debt score threshold (default: 1.0)
+pub fn get_minimum_debt_score() -> f64 {
+    get_config()
+        .thresholds
+        .as_ref()
+        .and_then(|t| t.minimum_debt_score)
+        .unwrap_or(1.0)
+}
+
+/// Get minimum cyclomatic complexity threshold (default: 2)
+pub fn get_minimum_cyclomatic_complexity() -> u32 {
+    get_config()
+        .thresholds
+        .as_ref()
+        .and_then(|t| t.minimum_cyclomatic_complexity)
+        .unwrap_or(2)
+}
+
+/// Get minimum cognitive complexity threshold (default: 3)
+pub fn get_minimum_cognitive_complexity() -> u32 {
+    get_config()
+        .thresholds
+        .as_ref()
+        .and_then(|t| t.minimum_cognitive_complexity)
+        .unwrap_or(3)
+}
+
+/// Get minimum risk score threshold (default: 1.0)
+pub fn get_minimum_risk_score() -> f64 {
+    get_config()
+        .thresholds
+        .as_ref()
+        .and_then(|t| t.minimum_risk_score)
+        .unwrap_or(1.0)
 }
