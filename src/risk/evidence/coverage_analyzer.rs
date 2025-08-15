@@ -28,6 +28,28 @@ impl CoverageRiskAnalyzer {
         Self::default()
     }
 
+    /// Pure function to classify coverage level against thresholds
+    fn classify_coverage_level(coverage: f64, thresholds: &CoverageThresholds) -> ComparisonResult {
+        match () {
+            _ if coverage >= thresholds.excellent => ComparisonResult::BelowMedian, // Better than median (inverted for coverage)
+            _ if coverage >= thresholds.good => ComparisonResult::AboveMedian,
+            _ if coverage >= thresholds.moderate => ComparisonResult::AboveP75,
+            _ if coverage >= thresholds.poor => ComparisonResult::AboveP90,
+            _ => ComparisonResult::AboveP95,
+        }
+    }
+
+    /// Pure function to classify test quality based on coverage and complexity
+    fn classify_test_quality(coverage: f64, complexity: u32) -> TestQuality {
+        match () {
+            _ if coverage >= 90.0 && complexity <= 5 => TestQuality::Excellent,
+            _ if coverage >= 80.0 => TestQuality::Good,
+            _ if coverage >= 60.0 => TestQuality::Adequate,
+            _ if coverage > 0.0 => TestQuality::Poor,
+            _ => TestQuality::Missing,
+        }
+    }
+
     pub fn analyze(
         &self,
         function: &FunctionAnalysis,
@@ -152,17 +174,7 @@ impl CoverageRiskAnalyzer {
     }
 
     fn assess_test_quality(&self, coverage: f64, complexity: u32) -> TestQuality {
-        if coverage >= 90.0 && complexity <= 5 {
-            TestQuality::Excellent
-        } else if coverage >= 80.0 {
-            TestQuality::Good
-        } else if coverage >= 60.0 {
-            TestQuality::Adequate
-        } else if coverage > 0.0 {
-            TestQuality::Poor
-        } else {
-            TestQuality::Missing
-        }
+        Self::classify_test_quality(coverage, complexity)
     }
 
     fn estimate_test_count(&self, coverage: f64, complexity: u32) -> u32 {
@@ -296,18 +308,7 @@ impl CoverageRiskAnalyzer {
 
     fn compare_to_baseline(&self, coverage: f64, role: &FunctionRole) -> ComparisonResult {
         let baseline = self.threshold_provider.get_coverage_thresholds(role);
-
-        if coverage >= baseline.excellent {
-            ComparisonResult::BelowMedian // Better than median (inverted for coverage)
-        } else if coverage >= baseline.good {
-            ComparisonResult::AboveMedian
-        } else if coverage >= baseline.moderate {
-            ComparisonResult::AboveP75
-        } else if coverage >= baseline.poor {
-            ComparisonResult::AboveP90
-        } else {
-            ComparisonResult::AboveP95
-        }
+        Self::classify_coverage_level(coverage, &baseline)
     }
 
     fn get_coverage_actions(
