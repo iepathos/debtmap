@@ -115,29 +115,50 @@ impl EvidenceBasedRiskCalculator {
     fn determine_module_type(&self, file: &Path) -> ModuleType {
         let path_str = file.to_string_lossy();
 
-        if path_str.contains("/tests/") || path_str.contains("_test.rs") {
+        // Use pure classification functions
+        if Self::is_test_module(&path_str) {
             ModuleType::Test
-        } else if path_str.contains("/core/") || path_str.contains("/domain/") {
-            ModuleType::Core
-        } else if path_str.contains("/api/") || path_str.contains("/handlers/") {
-            ModuleType::Api
-        } else if path_str.contains("/utils/") || path_str.contains("/helpers/") {
-            ModuleType::Util
-        } else if path_str.contains("/infra/") || path_str.contains("/db/") {
-            ModuleType::Infrastructure
+        } else if let Some(module_type) = Self::classify_by_directory(&path_str) {
+            module_type
         } else {
-            // Try to infer from filename
-            if path_str.ends_with("mod.rs") || path_str.ends_with("lib.rs") {
-                ModuleType::Core
-            } else if path_str.contains("main.rs") {
-                ModuleType::Infrastructure
-            } else {
-                ModuleType::Util
-            }
+            Self::classify_by_filename(&path_str)
         }
     }
 
-    fn aggregate_risk_factors(&self, factors: &[RiskFactor], role: &FunctionRole) -> f64 {
+    // Pure function to check if path is a test module
+    fn is_test_module(path_str: &str) -> bool {
+        path_str.contains("/tests/") || path_str.contains("_test.rs")
+    }
+
+    // Pure function to classify module by directory structure
+    fn classify_by_directory(path_str: &str) -> Option<ModuleType> {
+        match () {
+            _ if path_str.contains("/core/") || path_str.contains("/domain/") => {
+                Some(ModuleType::Core)
+            }
+            _ if path_str.contains("/api/") || path_str.contains("/handlers/") => {
+                Some(ModuleType::Api)
+            }
+            _ if path_str.contains("/utils/") || path_str.contains("/helpers/") => {
+                Some(ModuleType::Util)
+            }
+            _ if path_str.contains("/infra/") || path_str.contains("/db/") => {
+                Some(ModuleType::Infrastructure)
+            }
+            _ => None,
+        }
+    }
+
+    // Pure function to classify module by filename
+    fn classify_by_filename(path_str: &str) -> ModuleType {
+        match () {
+            _ if path_str.ends_with("mod.rs") || path_str.ends_with("lib.rs") => ModuleType::Core,
+            _ if path_str.contains("main.rs") => ModuleType::Infrastructure,
+            _ => ModuleType::Util,
+        }
+    }
+
+    fn calculate_weighted_average(factors: &[RiskFactor]) -> f64 {
         let mut total_score = 0.0;
         let mut total_weight = 0.0;
 
@@ -153,17 +174,22 @@ impl EvidenceBasedRiskCalculator {
             return 0.0;
         }
 
-        let base_score = total_score / total_weight;
+        total_score / total_weight
+    }
 
-        // Apply role-based adjustments
-        let role_multiplier = match role {
+    fn get_role_multiplier(role: &FunctionRole) -> f64 {
+        match role {
             FunctionRole::PureLogic => 1.2,    // Business logic is more critical
             FunctionRole::EntryPoint => 1.1,   // Entry points are important
             FunctionRole::Orchestrator => 0.9, // Orchestration is less risky
             FunctionRole::IOWrapper => 0.7,    // I/O wrappers are expected to be simple
             FunctionRole::Unknown => 1.0,      // Default multiplier
-        };
+        }
+    }
 
+    fn aggregate_risk_factors(&self, factors: &[RiskFactor], role: &FunctionRole) -> f64 {
+        let base_score = Self::calculate_weighted_average(factors);
+        let role_multiplier = Self::get_role_multiplier(role);
         (base_score * role_multiplier).min(10.0)
     }
 
@@ -249,6 +275,63 @@ impl EvidenceBasedRiskCalculator {
         total_confidence / total_weight
     }
 
+    fn format_risk_type(risk_type: &crate::risk::evidence::RiskType) -> String {
+        match risk_type {
+            crate::risk::evidence::RiskType::Complexity {
+                cyclomatic,
+                cognitive,
+                ..
+            } => {
+                format!("High complexity (cyclomatic: {cyclomatic}, cognitive: {cognitive})")
+            }
+            crate::risk::evidence::RiskType::Coverage {
+                coverage_percentage,
+                ..
+            } => {
+                format!("Low test coverage ({coverage_percentage:.0}%)")
+            }
+            crate::risk::evidence::RiskType::Coupling {
+                afferent_coupling,
+                efferent_coupling,
+                ..
+            } => {
+                format!(
+                    "High coupling (incoming: {afferent_coupling}, outgoing: {efferent_coupling})"
+                )
+            }
+            crate::risk::evidence::RiskType::ChangeFrequency {
+                commits_last_month, ..
+            } => {
+                format!("Frequent changes ({commits_last_month} commits last month)")
+            }
+            crate::risk::evidence::RiskType::Architecture { .. } => {
+                "Architectural issues detected".to_string()
+            }
+        }
+    }
+
+    fn format_risk_severity(severity: crate::risk::evidence::RiskSeverity) -> &'static str {
+        match severity {
+            crate::risk::evidence::RiskSeverity::None => "no significant issues",
+            crate::risk::evidence::RiskSeverity::Low => "minor issues",
+            crate::risk::evidence::RiskSeverity::Moderate => "moderate issues requiring attention",
+            crate::risk::evidence::RiskSeverity::High => {
+                "significant issues requiring prompt action"
+            }
+            crate::risk::evidence::RiskSeverity::Critical => {
+                "critical issues requiring immediate attention"
+            }
+        }
+    }
+
+    fn find_highest_risk_factor(factors: &[RiskFactor]) -> Option<&RiskFactor> {
+        factors.iter().filter(|f| f.weight > 0.0).max_by(|a, b| {
+            (a.score * a.weight)
+                .partial_cmp(&(b.score * b.weight))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+    }
+
     fn generate_explanation(
         &self,
         factors: &[RiskFactor],
@@ -261,52 +344,9 @@ impl EvidenceBasedRiskCalculator {
             self.role_to_string(role)
         );
 
-        // Find the most significant risk factor
-        if let Some(highest) = factors.iter().filter(|f| f.weight > 0.0).max_by(|a, b| {
-            (a.score * a.weight)
-                .partial_cmp(&(b.score * b.weight))
-                .unwrap()
-        }) {
-            use crate::risk::evidence::{RiskSeverity, RiskType};
-
-            let factor_desc = match &highest.risk_type {
-                RiskType::Complexity {
-                    cyclomatic,
-                    cognitive,
-                    ..
-                } => {
-                    format!("High complexity (cyclomatic: {cyclomatic}, cognitive: {cognitive})")
-                }
-                RiskType::Coverage {
-                    coverage_percentage,
-                    ..
-                } => {
-                    format!("Low test coverage ({coverage_percentage:.0}%)")
-                }
-                RiskType::Coupling {
-                    afferent_coupling,
-                    efferent_coupling,
-                    ..
-                } => {
-                    format!(
-                        "High coupling (incoming: {afferent_coupling}, outgoing: {efferent_coupling})"
-                    )
-                }
-                RiskType::ChangeFrequency {
-                    commits_last_month, ..
-                } => {
-                    format!("Frequent changes ({commits_last_month} commits last month)")
-                }
-                RiskType::Architecture { .. } => "Architectural issues detected".to_string(),
-            };
-
-            let severity_desc = match highest.severity {
-                RiskSeverity::None => "no significant issues",
-                RiskSeverity::Low => "minor issues",
-                RiskSeverity::Moderate => "moderate issues requiring attention",
-                RiskSeverity::High => "significant issues requiring prompt action",
-                RiskSeverity::Critical => "critical issues requiring immediate attention",
-            };
+        if let Some(highest) = Self::find_highest_risk_factor(factors) {
+            let factor_desc = Self::format_risk_type(&highest.risk_type);
+            let severity_desc = Self::format_risk_severity(highest.severity);
 
             explanation.push_str(&format!(
                 "Primary factor: {factor_desc} with {severity_desc}."
@@ -324,5 +364,126 @@ impl EvidenceBasedRiskCalculator {
             FunctionRole::EntryPoint => "entry point",
             FunctionRole::Unknown => "general",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_test_module() {
+        assert!(EvidenceBasedRiskCalculator::is_test_module(
+            "src/tests/foo.rs"
+        ));
+        assert!(EvidenceBasedRiskCalculator::is_test_module(
+            "src/module_test.rs"
+        ));
+        assert!(EvidenceBasedRiskCalculator::is_test_module(
+            "path/to/tests/bar.rs"
+        ));
+        assert!(!EvidenceBasedRiskCalculator::is_test_module("src/main.rs"));
+        assert!(!EvidenceBasedRiskCalculator::is_test_module("src/lib.rs"));
+    }
+
+    #[test]
+    fn test_classify_by_directory() {
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/core/logic.rs"),
+            Some(ModuleType::Core)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/domain/model.rs"),
+            Some(ModuleType::Core)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/api/handler.rs"),
+            Some(ModuleType::Api)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/handlers/route.rs"),
+            Some(ModuleType::Api)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/utils/helper.rs"),
+            Some(ModuleType::Util)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/helpers/format.rs"),
+            Some(ModuleType::Util)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/infra/db.rs"),
+            Some(ModuleType::Infrastructure)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/db/connection.rs"),
+            Some(ModuleType::Infrastructure)
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_directory("src/other/file.rs"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_classify_by_filename() {
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_filename("src/mod.rs"),
+            ModuleType::Core
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_filename("src/lib.rs"),
+            ModuleType::Core
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_filename("src/main.rs"),
+            ModuleType::Infrastructure
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_filename("src/foo/main.rs"),
+            ModuleType::Infrastructure
+        );
+        assert_eq!(
+            EvidenceBasedRiskCalculator::classify_by_filename("src/something.rs"),
+            ModuleType::Util
+        );
+    }
+
+    #[test]
+    fn test_determine_module_type_integration() {
+        use std::path::PathBuf;
+
+        let calculator = EvidenceBasedRiskCalculator::new();
+
+        // Test modules should be identified
+        assert_eq!(
+            calculator.determine_module_type(&PathBuf::from("src/tests/test.rs")),
+            ModuleType::Test
+        );
+
+        // Core modules from directory
+        assert_eq!(
+            calculator.determine_module_type(&PathBuf::from("src/core/engine.rs")),
+            ModuleType::Core
+        );
+
+        // API modules
+        assert_eq!(
+            calculator.determine_module_type(&PathBuf::from("src/api/routes.rs")),
+            ModuleType::Api
+        );
+
+        // Fallback to filename classification
+        assert_eq!(
+            calculator.determine_module_type(&PathBuf::from("src/main.rs")),
+            ModuleType::Infrastructure
+        );
+
+        // Default to Util for unknown patterns
+        assert_eq!(
+            calculator.determine_module_type(&PathBuf::from("src/random/file.rs")),
+            ModuleType::Util
+        );
     }
 }
