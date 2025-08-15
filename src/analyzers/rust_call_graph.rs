@@ -101,8 +101,8 @@ impl CallGraphExtractor {
             }
         }
 
-        // Enhanced cross-module resolution
-        let matches: Vec<_> = all_functions
+        // Enhanced cross-module resolution with prioritization
+        let mut matches: Vec<_> = all_functions
             .iter()
             .filter(|f| {
                 // Exact match (highest priority)
@@ -145,6 +145,18 @@ impl CallGraphExtractor {
                 false
             })
             .collect();
+
+        // Sort matches to prioritize qualified names over unqualified ones
+        // This helps resolve ambiguity between "method_name" and "Type::method_name"
+        matches.sort_by(|a, b| {
+            let a_qualified = a.name.contains("::");
+            let b_qualified = b.name.contains("::");
+            match (a_qualified, b_qualified) {
+                (true, false) => std::cmp::Ordering::Less,  // Prefer qualified names
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => std::cmp::Ordering::Equal,
+            }
+        });
 
         match matches.len() {
             1 => Some(matches[0].clone()), // Unique match across all files
@@ -227,9 +239,12 @@ impl CallGraphExtractor {
             }
         } else {
             // Regular method call on another object
+            // For now, return just the method name - proper type inference 
+            // should be implemented via AST analysis of variable assignments
             method_name
         }
     }
+
 
     /// Extract function name from a path expression
     fn extract_function_name_from_path(path: &syn::Path) -> Option<String> {
