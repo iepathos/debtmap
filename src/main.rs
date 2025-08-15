@@ -2760,7 +2760,6 @@ end_of_record
     }
 
     #[test]
-    #[ignore] // Test depends on configuration values
     fn test_validate_with_risk_all_passing() {
         // Test case 1: All metrics are well within acceptable limits
         let results = AnalysisResults {
@@ -2832,7 +2831,6 @@ end_of_record
     }
 
     #[test]
-    #[ignore] // Test depends on configuration values
     fn test_validate_with_risk_high_complexity_fails() {
         // Test case 2: High average complexity causes failure
         let results = AnalysisResults {
@@ -2880,9 +2878,8 @@ end_of_record
     }
 
     #[test]
-    #[ignore] // Test depends on configuration values
     fn test_validate_with_risk_too_many_high_risk_functions() {
-        // Test case 3: Too many high-risk functions (5 or more)
+        // Test case 3: Too many high-risk functions (more than default threshold of 50)
         let results = AnalysisResults {
             project_path: PathBuf::from("/test"),
             timestamp: Utc::now(),
@@ -2909,7 +2906,7 @@ end_of_record
         };
 
         let mut high_risk_functions = vec![];
-        for i in 0..5 {
+        for i in 0..51 {
             high_risk_functions.push(FunctionRisk {
                 function_name: format!("high_risk_func_{i}"),
                 file: PathBuf::from("test.rs"),
@@ -2936,11 +2933,11 @@ end_of_record
             complexity_coverage_correlation: None,
             risk_distribution: RiskDistribution {
                 critical_count: 0,
-                high_count: 5,
+                high_count: 51,
                 medium_count: 0,
                 low_count: 0,
                 well_tested_count: 0,
-                total_functions: 5,
+                total_functions: 51,
             },
         };
 
@@ -2949,9 +2946,8 @@ end_of_record
     }
 
     #[test]
-    #[ignore] // Test depends on configuration values
     fn test_validate_with_risk_excessive_technical_debt() {
-        // Test case 4: Too many technical debt items (150 or more)
+        // Test case 4: Too many technical debt items (more than default threshold of 2000)
         let results = AnalysisResults {
             project_path: PathBuf::from("/test"),
             timestamp: Utc::now(),
@@ -2965,7 +2961,7 @@ end_of_record
                 },
             },
             technical_debt: TechnicalDebtReport {
-                items: (0..150)
+                items: (0..10001)
                     .map(|i| DebtItem {
                         id: format!("debt-{i}"),
                         debt_type: DebtType::Todo,
@@ -2975,7 +2971,7 @@ end_of_record
                         message: format!("TODO: Item {i}"),
                         context: None,
                     })
-                    .collect(), // Exactly 150 items
+                    .collect(), // Exactly 10001 items to exceed debt score threshold
                 by_type: std::collections::HashMap::new(),
                 priorities: vec![Priority::Low],
                 duplications: vec![],
