@@ -399,3 +399,132 @@ impl CoverageRiskAnalyzer {
         paths
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_test_quality_excellent() {
+        // Coverage >= 90% and complexity <= 5 should be Excellent
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(90.0, 5),
+            TestQuality::Excellent
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(95.0, 3),
+            TestQuality::Excellent
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(100.0, 1),
+            TestQuality::Excellent
+        );
+        // Edge case: exactly at boundaries
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(90.0, 5),
+            TestQuality::Excellent
+        );
+    }
+
+    #[test]
+    fn test_classify_test_quality_good() {
+        // Coverage >= 80% should be Good (when not Excellent)
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(80.0, 10),
+            TestQuality::Good
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(85.0, 6),
+            TestQuality::Good
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(89.9, 6),
+            TestQuality::Good
+        );
+        // High coverage with high complexity is still Good
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(95.0, 20),
+            TestQuality::Good
+        );
+    }
+
+    #[test]
+    fn test_classify_test_quality_adequate() {
+        // Coverage >= 60% but < 80% should be Adequate
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(60.0, 5),
+            TestQuality::Adequate
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(70.0, 10),
+            TestQuality::Adequate
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(79.9, 15),
+            TestQuality::Adequate
+        );
+    }
+
+    #[test]
+    fn test_classify_test_quality_poor() {
+        // Coverage > 0% but < 60% should be Poor
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(0.1, 5),
+            TestQuality::Poor
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(30.0, 10),
+            TestQuality::Poor
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(59.9, 20),
+            TestQuality::Poor
+        );
+    }
+
+    #[test]
+    fn test_classify_test_quality_missing() {
+        // Coverage == 0% should be Missing
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(0.0, 1),
+            TestQuality::Missing
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(0.0, 10),
+            TestQuality::Missing
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(0.0, 100),
+            TestQuality::Missing
+        );
+    }
+
+    #[test]
+    fn test_classify_test_quality_boundary_conditions() {
+        // Test exact boundary values
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(89.99, 5),
+            TestQuality::Good
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(90.01, 5),
+            TestQuality::Excellent
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(79.99, 10),
+            TestQuality::Adequate
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(80.01, 10),
+            TestQuality::Good
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(59.99, 10),
+            TestQuality::Poor
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_test_quality(60.01, 10),
+            TestQuality::Adequate
+        );
+    }
+}
