@@ -114,21 +114,38 @@ impl ComplexityRiskAnalyzer {
     }
 
     fn score_metric(&self, value: f64, thresholds: &ComplexityThresholds) -> f64 {
-        if value <= thresholds.low {
-            value / thresholds.low * 2.5 // 0-2.5 for low complexity
-        } else if value <= thresholds.moderate {
-            2.5 + (value - thresholds.low) / (thresholds.moderate - thresholds.low) * 2.5
-        // 2.5-5.0
-        } else if value <= thresholds.high {
-            5.0 + (value - thresholds.moderate) / (thresholds.high - thresholds.moderate) * 2.5
-        // 5.0-7.5
-        } else if value <= thresholds.critical {
-            7.5 + (value - thresholds.high) / (thresholds.critical - thresholds.high) * 2.0
-        // 7.5-9.5
-        } else {
-            9.5 + ((value - thresholds.critical) / thresholds.critical * 0.5).min(0.5)
-            // 9.5-10.0
+        Self::calculate_score_for_value(value, thresholds)
+    }
+
+    /// Pure function to calculate score based on value and thresholds
+    /// Maps values to a 0-10 scale based on threshold ranges
+    fn calculate_score_for_value(value: f64, thresholds: &ComplexityThresholds) -> f64 {
+        match () {
+            _ if value <= thresholds.low => {
+                Self::score_in_range(value, 0.0, thresholds.low, 0.0, 2.5)
+            }
+            _ if value <= thresholds.moderate => {
+                Self::score_in_range(value, thresholds.low, thresholds.moderate, 2.5, 5.0)
+            }
+            _ if value <= thresholds.high => {
+                Self::score_in_range(value, thresholds.moderate, thresholds.high, 5.0, 7.5)
+            }
+            _ if value <= thresholds.critical => {
+                Self::score_in_range(value, thresholds.high, thresholds.critical, 7.5, 9.5)
+            }
+            _ => 9.5 + ((value - thresholds.critical) / thresholds.critical * 0.5).min(0.5),
         }
+    }
+
+    /// Linear interpolation helper for scoring within a range
+    fn score_in_range(
+        value: f64,
+        min_val: f64,
+        max_val: f64,
+        min_score: f64,
+        max_score: f64,
+    ) -> f64 {
+        min_score + (value - min_val) / (max_val - min_val) * (max_score - min_score)
     }
 
     fn score_lines(&self, lines: u32) -> f64 {
@@ -300,5 +317,134 @@ impl ComplexityRiskAnalyzer {
         } else {
             0.95 // Very high confidence for complex functions
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::risk::thresholds::ComplexityThresholds;
+
+    fn test_thresholds() -> ComplexityThresholds {
+        ComplexityThresholds {
+            low: 5.0,
+            moderate: 10.0,
+            high: 20.0,
+            critical: 30.0,
+        }
+    }
+
+    #[test]
+    fn test_calculate_score_for_value_low_range() {
+        let thresholds = test_thresholds();
+
+        // Test values in low range (0-5 -> 0.0-2.5)
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(0.0, &thresholds),
+            0.0
+        );
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(2.5, &thresholds),
+            1.25
+        );
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(5.0, &thresholds),
+            2.5
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_for_value_moderate_range() {
+        let thresholds = test_thresholds();
+
+        // Test values in moderate range (5-10 -> 2.5-5.0)
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(7.5, &thresholds),
+            3.75
+        );
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(10.0, &thresholds),
+            5.0
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_for_value_high_range() {
+        let thresholds = test_thresholds();
+
+        // Test values in high range (10-20 -> 5.0-7.5)
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(15.0, &thresholds),
+            6.25
+        );
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(20.0, &thresholds),
+            7.5
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_for_value_critical_range() {
+        let thresholds = test_thresholds();
+
+        // Test values in critical range (20-30 -> 7.5-9.5)
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(25.0, &thresholds),
+            8.5
+        );
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(30.0, &thresholds),
+            9.5
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_for_value_beyond_critical() {
+        let thresholds = test_thresholds();
+
+        // Test values beyond critical (>30 -> 9.5-10.0, capped)
+        assert!(ComplexityRiskAnalyzer::calculate_score_for_value(35.0, &thresholds) > 9.5);
+        assert!(ComplexityRiskAnalyzer::calculate_score_for_value(35.0, &thresholds) <= 10.0);
+
+        // Very high value should cap at 10.0
+        assert_eq!(
+            ComplexityRiskAnalyzer::calculate_score_for_value(60.0, &thresholds),
+            10.0
+        );
+    }
+
+    #[test]
+    fn test_score_in_range() {
+        // Test linear interpolation
+        assert_eq!(
+            ComplexityRiskAnalyzer::score_in_range(0.0, 0.0, 10.0, 0.0, 100.0),
+            0.0
+        );
+        assert_eq!(
+            ComplexityRiskAnalyzer::score_in_range(5.0, 0.0, 10.0, 0.0, 100.0),
+            50.0
+        );
+        assert_eq!(
+            ComplexityRiskAnalyzer::score_in_range(10.0, 0.0, 10.0, 0.0, 100.0),
+            100.0
+        );
+
+        // Test with different ranges
+        assert_eq!(
+            ComplexityRiskAnalyzer::score_in_range(15.0, 10.0, 20.0, 5.0, 7.5),
+            6.25
+        );
+    }
+
+    #[test]
+    fn test_score_metric_delegates_correctly() {
+        let analyzer = ComplexityRiskAnalyzer::default();
+        let thresholds = test_thresholds();
+
+        // Test that score_metric correctly delegates to calculate_score_for_value
+        let direct_score = ComplexityRiskAnalyzer::calculate_score_for_value(15.0, &thresholds);
+        let method_score = analyzer.score_metric(15.0, &thresholds);
+
+        assert_eq!(direct_score, method_score);
     }
 }
