@@ -1,8 +1,7 @@
 use debtmap::io::writers::markdown::{EnhancedMarkdownWriter, MarkdownWriter};
 use debtmap::priority::{
     unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
-    CallGraph, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics,
-    UnifiedAnalysis,
+    CallGraph, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, UnifiedAnalysis,
 };
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -57,31 +56,31 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
 fn test_enhanced_markdown_priority_section() {
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
-    
+
     // Add a sample item
     let item = create_sample_unified_item();
     analysis.add_item(item);
     analysis.sort_by_priority();
-    
+
     let mut output = Vec::new();
     let mut writer = MarkdownWriter::new(Cursor::new(&mut output));
-    
+
     // Write priority section
     writer.write_priority_section(&analysis).unwrap();
-    
+
     let markdown = String::from_utf8(output).unwrap();
-    
+
     // Print for debugging if needed
     if !markdown.contains("process_data") {
         println!("Markdown output:\n{}", markdown);
     }
-    
+
     // Verify the output contains expected sections
     assert!(markdown.contains("## Priority Technical Debt"));
     if !markdown.contains("_No priority items found._") {
         assert!(markdown.contains("### Top"));
         assert!(markdown.contains("| Rank | Score | Function | Type | Issue |"));
-        assert!(markdown.contains("src/main.rs:42"));  // Check for location instead
+        assert!(markdown.contains("src/main.rs:42")); // Check for location instead
         assert!(markdown.contains("Testing Gap"));
     }
 }
@@ -90,7 +89,7 @@ fn test_enhanced_markdown_priority_section() {
 fn test_enhanced_markdown_dead_code_section() {
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
-    
+
     // Add a dead code item
     let mut item = create_sample_unified_item();
     item.debt_type = DebtType::DeadCode {
@@ -100,15 +99,15 @@ fn test_enhanced_markdown_dead_code_section() {
         usage_hints: vec![],
     };
     analysis.add_item(item);
-    
+
     let mut output = Vec::new();
     let mut writer = MarkdownWriter::new(Cursor::new(&mut output));
-    
+
     // Write dead code section
     writer.write_dead_code_section(&analysis).unwrap();
-    
+
     let markdown = String::from_utf8(output).unwrap();
-    
+
     // Verify the output
     assert!(markdown.contains("## Dead Code Detection"));
     assert!(markdown.contains("### Unused Functions"));
@@ -121,19 +120,19 @@ fn test_enhanced_markdown_dead_code_section() {
 fn test_enhanced_markdown_testing_recommendations() {
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
-    
+
     // Add a testing gap item
     let item = create_sample_unified_item();
     analysis.add_item(item);
-    
+
     let mut output = Vec::new();
     let mut writer = MarkdownWriter::new(Cursor::new(&mut output));
-    
+
     // Write testing recommendations
     writer.write_testing_recommendations(&analysis).unwrap();
-    
+
     let markdown = String::from_utf8(output).unwrap();
-    
+
     // Verify the output
     assert!(markdown.contains("## Testing Recommendations"));
     assert!(markdown.contains("### ROI-Based Testing Priorities"));
@@ -146,7 +145,7 @@ fn test_enhanced_markdown_testing_recommendations() {
 fn test_enhanced_markdown_with_verbosity() {
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
-    
+
     // Add multiple items
     for i in 0..3 {
         let mut item = create_sample_unified_item();
@@ -155,15 +154,15 @@ fn test_enhanced_markdown_with_verbosity() {
         analysis.add_item(item);
     }
     analysis.sort_by_priority();
-    
+
     let mut output = Vec::new();
     let mut writer = MarkdownWriter::with_verbosity(Cursor::new(&mut output), 2);
-    
+
     // Write full analysis
     writer.write_unified_analysis(&analysis).unwrap();
-    
+
     let markdown = String::from_utf8(output).unwrap();
-    
+
     // Verify verbosity features
     assert!(markdown.contains("<details>"));
     assert!(markdown.contains("Score Breakdown"));
@@ -175,12 +174,12 @@ fn test_enhanced_markdown_with_verbosity() {
 fn test_enhanced_markdown_full_report() {
     let call_graph = CallGraph::new();
     let mut analysis = UnifiedAnalysis::new(call_graph);
-    
+
     // Add various types of debt items
     let mut item1 = create_sample_unified_item();
     item1.location.function = "untested_function".to_string();
     analysis.add_item(item1);
-    
+
     let mut item2 = create_sample_unified_item();
     item2.location.function = "dead_function".to_string();
     item2.debt_type = DebtType::DeadCode {
@@ -190,7 +189,7 @@ fn test_enhanced_markdown_full_report() {
         usage_hints: vec!["Consider removing".to_string()],
     };
     analysis.add_item(item2);
-    
+
     let mut item3 = create_sample_unified_item();
     item3.location.function = "complex_function".to_string();
     item3.debt_type = DebtType::ComplexityHotspot {
@@ -198,23 +197,23 @@ fn test_enhanced_markdown_full_report() {
         cognitive: 30,
     };
     analysis.add_item(item3);
-    
+
     analysis.sort_by_priority();
-    
+
     let mut output = Vec::new();
     let mut writer = MarkdownWriter::with_verbosity(Cursor::new(&mut output), 1);
-    
+
     // Write full analysis
     writer.write_unified_analysis(&analysis).unwrap();
-    
+
     let markdown = String::from_utf8(output).unwrap();
-    
+
     // Verify all sections are present
     assert!(markdown.contains("## Priority Technical Debt"));
     assert!(markdown.contains("## Dead Code Detection"));
     assert!(markdown.contains("## Testing Recommendations"));
     assert!(markdown.contains("Top 3 Priority Items"));
-    
+
     // Verify specific items appear
     assert!(markdown.contains("untested_function"));
     assert!(markdown.contains("dead_function"));
