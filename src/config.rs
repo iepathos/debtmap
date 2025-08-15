@@ -168,7 +168,8 @@ pub struct ValidationThresholds {
     #[serde(default = "default_max_debt_items")]
     pub max_debt_items: usize,
 
-    /// Maximum allowed total debt score (default: 10000)
+    /// Maximum allowed total debt score (default: 1000)
+    /// Note: Uses unified scoring where each item is capped at 10.0
     #[serde(default = "default_max_total_debt_score")]
     pub max_total_debt_score: u32,
 
@@ -210,7 +211,7 @@ fn default_max_debt_items() -> usize {
     2000
 }
 fn default_max_total_debt_score() -> u32 {
-    10000
+    1000 // Unified scoring: each item capped at 10.0, so ~100 high-priority items
 }
 fn default_max_codebase_risk() -> f64 {
     7.0
