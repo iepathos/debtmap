@@ -84,7 +84,7 @@ fn format_default_with_verbosity(
         writeln!(
             output,
             "📈 {}",
-            format!("OVERALL COVERAGE: {:.2}%", coverage * 100.0).bright_green()
+            format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
         )
         .unwrap();
     }
