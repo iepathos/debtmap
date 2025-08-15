@@ -36,8 +36,8 @@ allow = [
     "Unicode-3.0", 
     "MPL-2.0", 
     "BSL-1.0", 
-    "Unlicense", 
-    "LGPL-3.0",
+    "Unlicense",
+    "LGPL-3.0-only",  # For malachite crates
 ]
 exceptions = [
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "linux-raw-sys" },
