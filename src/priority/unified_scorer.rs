@@ -125,12 +125,19 @@ pub fn calculate_unified_priority(
     // Get configurable weights
     let weights = config::get_scoring_weights();
 
-    // Calculate weighted composite score using configurable weights
-    let base_score = complexity_factor * weights.complexity
-        + coverage_factor * weights.coverage
-        + roi_factor * weights.roi
-        + semantic_factor * weights.semantic
-        + dependency_factor * weights.dependency;
+    // Calculate weighted components for transparency
+    let weighted_complexity = complexity_factor * weights.complexity;
+    let weighted_coverage = coverage_factor * weights.coverage;
+    let weighted_roi = roi_factor * weights.roi;
+    let weighted_semantic = semantic_factor * weights.semantic;
+    let weighted_dependency = dependency_factor * weights.dependency;
+
+    // Calculate weighted composite score
+    let base_score = weighted_complexity
+        + weighted_coverage
+        + weighted_roi
+        + weighted_semantic
+        + weighted_dependency;
 
     // Apply role multiplier
     let final_score = (base_score * role_multiplier).min(10.0);

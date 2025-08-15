@@ -33,7 +33,7 @@ struct AnalyzeConfig {
     priorities_only: bool,
     detailed: bool,
     semantic_off: bool,
-    explain_score: bool,
+    verbosity: u8,
     no_expand_macros: bool,
     clear_expansion_cache: bool,
 }
@@ -59,7 +59,7 @@ struct ValidateConfig {
     #[allow(dead_code)]
     semantic_off: bool,
     #[allow(dead_code)]
-    explain_score: bool,
+    verbosity: u8,
 }
 
 fn main() -> Result<()> {
@@ -83,6 +83,7 @@ fn main() -> Result<()> {
             detailed,
             semantic_off,
             explain_score,
+            verbosity,
             no_expand_macros,
             clear_expansion_cache,
         } => {
@@ -102,7 +103,7 @@ fn main() -> Result<()> {
                 priorities_only,
                 detailed,
                 semantic_off,
-                explain_score,
+                verbosity,
                 no_expand_macros,
                 clear_expansion_cache,
             };
@@ -124,6 +125,7 @@ fn main() -> Result<()> {
             detailed,
             semantic_off,
             explain_score,
+            verbosity,
         } => {
             let config = ValidateConfig {
                 path,
@@ -139,7 +141,7 @@ fn main() -> Result<()> {
                 priorities_only,
                 detailed,
                 semantic_off,
-                explain_score,
+                verbosity,
             };
             validate_project(config)
         }
@@ -182,7 +184,7 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.tail,
         config.priorities_only,
         config.detailed,
-        config.explain_score,
+        config.verbosity,
         config.output,
         Some(config.format),
     )?;
@@ -1340,7 +1342,7 @@ fn output_unified_priorities(
     tail: Option<usize>,
     priorities_only: bool,
     detailed: bool,
-    _explain_score: bool,
+    verbosity: u8,
     output_file: Option<PathBuf>,
     output_format: Option<cli::OutputFormat>,
 ) -> Result<()> {
@@ -1361,7 +1363,8 @@ fn output_unified_priorities(
     } else {
         // For other formats, use the existing formatter
         let format = determine_priority_output_format(priorities_only, detailed, top, tail);
-        let output = format_priorities(&analysis, format);
+        let output =
+            priority::formatter::format_priorities_with_verbosity(&analysis, format, verbosity);
 
         if let Some(path) = output_file {
             let mut file = fs::File::create(path)?;

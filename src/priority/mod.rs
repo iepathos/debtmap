@@ -124,10 +124,44 @@ impl UnifiedAnalysis {
     }
 
     pub fn add_item(&mut self, item: UnifiedDebtItem) {
-        // Only add items that have a non-zero score (actual technical debt)
-        if item.unified_score.final_score > 0.0 {
-            self.items.push_back(item);
+        // Get configurable thresholds
+        let min_score = crate::config::get_minimum_debt_score();
+        let min_cyclomatic = crate::config::get_minimum_cyclomatic_complexity();
+        let min_cognitive = crate::config::get_minimum_cognitive_complexity();
+        let min_risk = crate::config::get_minimum_risk_score();
+
+        // Filter out items below minimum thresholds
+        if item.unified_score.final_score < min_score {
+            return;
         }
+
+        // Check risk score threshold for Risk debt types
+        if let DebtType::Risk { risk_score, .. } = &item.debt_type {
+            if *risk_score < min_risk {
+                return;
+            }
+        }
+
+        // For non-test items, also check complexity thresholds
+        // This helps filter out trivial functions that aren't really debt
+        if !matches!(
+            item.debt_type,
+            DebtType::TestComplexityHotspot { .. }
+                | DebtType::TestTodo { .. }
+                | DebtType::TestDuplication { .. }
+        ) {
+            if item.cyclomatic_complexity <= min_cyclomatic
+                && item.cognitive_complexity <= min_cognitive
+            {
+                // Skip trivial functions unless they have other significant issues
+                // (like being completely untested critical paths)
+                if item.unified_score.coverage_factor < 8.0 {
+                    return;
+                }
+            }
+        }
+
+        self.items.push_back(item);
     }
 
     pub fn sort_by_priority(&mut self) {

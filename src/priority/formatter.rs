@@ -4,6 +4,10 @@ use crate::priority::{
 use colored::*;
 use std::fmt::Write;
 
+#[path = "formatter_verbosity.rs"]
+mod verbosity;
+use self::verbosity::format_priority_item_with_verbosity;
+
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
     Default,        // Top 10 with clean formatting
@@ -14,16 +18,30 @@ pub enum OutputFormat {
 }
 
 pub fn format_priorities(analysis: &UnifiedAnalysis, format: OutputFormat) -> String {
+    format_priorities_with_verbosity(analysis, format, 0)
+}
+
+pub fn format_priorities_with_verbosity(
+    analysis: &UnifiedAnalysis,
+    format: OutputFormat,
+    verbosity: u8,
+) -> String {
     match format {
-        OutputFormat::Default => format_default(analysis, 10),
-        OutputFormat::PrioritiesOnly => format_priorities_only(analysis, 10),
-        OutputFormat::Detailed => format_detailed(analysis),
-        OutputFormat::Top(n) => format_default(analysis, n),
-        OutputFormat::Tail(n) => format_tail(analysis, n),
+        OutputFormat::Default => format_default_with_verbosity(analysis, 10, verbosity),
+        OutputFormat::PrioritiesOnly => {
+            format_priorities_only_with_verbosity(analysis, 10, verbosity)
+        }
+        OutputFormat::Detailed => format_detailed_with_verbosity(analysis, verbosity),
+        OutputFormat::Top(n) => format_default_with_verbosity(analysis, n, verbosity),
+        OutputFormat::Tail(n) => format_tail_with_verbosity(analysis, n, verbosity),
     }
 }
 
-fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
+fn format_default_with_verbosity(
+    analysis: &UnifiedAnalysis,
+    limit: usize,
+    verbosity: u8,
+) -> String {
     let mut output = String::new();
 
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
@@ -50,38 +68,84 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     writeln!(output).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
-        if idx >= limit {
-            break;
-        }
-        format_priority_item(&mut output, idx + 1, item);
+        format_priority_item_with_verbosity(&mut output, idx + 1, item, verbosity);
         writeln!(output).unwrap();
     }
 
-    // Add total debt score
-    writeln!(output).unwrap();
+    // Add summary
     writeln!(
         output,
         "📊 {}",
-        format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score)
-            .bright_cyan()
-            .bold()
+        format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
     )
     .unwrap();
 
-    // Add overall coverage if available
     if let Some(coverage) = analysis.overall_coverage {
         writeln!(
             output,
             "📈 {}",
-            format!("OVERALL COVERAGE: {coverage:.2}%")
-                .bright_green()
-                .bold()
+            format!("OVERALL COVERAGE: {:.2}%", coverage * 100.0).bright_green()
         )
         .unwrap();
     }
 
-    // Add total impact summary
-    // _format_total_impact(&mut output, analysis);
+    output
+}
+
+fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
+    format_default_with_verbosity(analysis, limit, 0)
+}
+
+fn format_priorities_only_with_verbosity(
+    analysis: &UnifiedAnalysis,
+    limit: usize,
+    _verbosity: u8,
+) -> String {
+    // Use the original format_priorities_only for backward compatibility
+    format_priorities_only(analysis, limit)
+}
+
+fn format_detailed_with_verbosity(analysis: &UnifiedAnalysis, verbosity: u8) -> String {
+    let mut output = String::new();
+
+    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(
+        output,
+        "    {}",
+        "UNIFIED PRIORITY ANALYSIS".bright_white().bold()
+    )
+    .unwrap();
+    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(output).unwrap();
+
+    for (idx, item) in analysis.items.iter().enumerate() {
+        format_priority_item_with_verbosity(&mut output, idx + 1, item, verbosity);
+        writeln!(output).unwrap();
+    }
+
+    output
+}
+
+fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u8) -> String {
+    let mut output = String::new();
+
+    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(
+        output,
+        "    {}",
+        "LOWEST PRIORITY ITEMS".bright_white().bold()
+    )
+    .unwrap();
+    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(output).unwrap();
+
+    let tail_items = analysis.get_bottom_priorities(n);
+    let start_rank = (analysis.items.len() - tail_items.len()) + 1;
+
+    for (idx, item) in tail_items.iter().enumerate() {
+        format_priority_item_with_verbosity(&mut output, start_rank + idx, item, verbosity);
+        writeln!(output).unwrap();
+    }
 
     output
 }
@@ -435,7 +499,7 @@ pub(crate) fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalys
     .unwrap();
 }
 
-fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
+pub fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
     let mut parts = Vec::new();
 
     if impact.coverage_improvement > 0.0 {
@@ -475,7 +539,7 @@ fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
     }
 }
 
-fn format_debt_type(debt_type: &DebtType) -> &'static str {
+pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
     match debt_type {
         DebtType::TestingGap { .. } => "TEST GAP",
         DebtType::ComplexityHotspot { .. } => "COMPLEXITY",
@@ -513,7 +577,7 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
     }
 }
 
-fn get_severity_label(score: f64) -> &'static str {
+pub fn get_severity_label(score: f64) -> &'static str {
     if score >= 8.0 {
         "CRITICAL"
     } else if score >= 6.0 {
@@ -525,7 +589,7 @@ fn get_severity_label(score: f64) -> &'static str {
     }
 }
 
-fn get_severity_color(score: f64) -> colored::Color {
+pub fn get_severity_color(score: f64) -> colored::Color {
     if score >= 8.0 {
         Color::Red
     } else if score >= 6.0 {
@@ -537,7 +601,7 @@ fn get_severity_color(score: f64) -> colored::Color {
     }
 }
 
-fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize) {
+pub fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize) {
     // Always show complexity metrics from the item itself, regardless of debt type
     let cyclomatic = item.cyclomatic_complexity;
     let cognitive = item.cognitive_complexity;
@@ -552,7 +616,7 @@ fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize
     )
 }
 
-fn extract_dependency_info(item: &UnifiedDebtItem) -> (usize, usize) {
+pub fn extract_dependency_info(item: &UnifiedDebtItem) -> (usize, usize) {
     (item.upstream_dependencies, item.downstream_dependencies)
 }
 
