@@ -164,16 +164,12 @@ impl ComplexityRiskAnalyzer {
         score: f64,
         thresholds: &ComplexityThresholds,
     ) -> RiskSeverity {
-        if score <= thresholds.low / 2.0 {
-            RiskSeverity::None
-        } else if score <= thresholds.low {
-            RiskSeverity::Low
-        } else if score <= thresholds.moderate {
-            RiskSeverity::Moderate
-        } else if score <= thresholds.high {
-            RiskSeverity::High
-        } else {
-            RiskSeverity::Critical
+        match score {
+            s if s <= thresholds.low / 2.0 => RiskSeverity::None,
+            s if s <= thresholds.low => RiskSeverity::Low,
+            s if s <= thresholds.moderate => RiskSeverity::Moderate,
+            s if s <= thresholds.high => RiskSeverity::High,
+            _ => RiskSeverity::Critical,
         }
     }
 
@@ -182,14 +178,11 @@ impl ComplexityRiskAnalyzer {
         score: f64,
         thresholds: &ComplexityThresholds,
     ) -> ComplexityThreshold {
-        if score <= thresholds.low {
-            ComplexityThreshold::Low
-        } else if score <= thresholds.moderate {
-            ComplexityThreshold::Moderate
-        } else if score <= thresholds.high {
-            ComplexityThreshold::High
-        } else {
-            ComplexityThreshold::Critical
+        match score {
+            s if s <= thresholds.low => ComplexityThreshold::Low,
+            s if s <= thresholds.moderate => ComplexityThreshold::Moderate,
+            s if s <= thresholds.high => ComplexityThreshold::High,
+            _ => ComplexityThreshold::Critical,
         }
     }
 
@@ -202,16 +195,12 @@ impl ComplexityRiskAnalyzer {
         let baseline = self.threshold_provider.get_complexity_thresholds(role);
         let avg_complexity = (cyclomatic + cognitive) as f64 / 2.0;
 
-        if avg_complexity <= baseline.low {
-            ComparisonResult::BelowMedian
-        } else if avg_complexity <= baseline.moderate {
-            ComparisonResult::AboveMedian
-        } else if avg_complexity <= baseline.high {
-            ComparisonResult::AboveP75
-        } else if avg_complexity <= baseline.critical {
-            ComparisonResult::AboveP90
-        } else {
-            ComparisonResult::AboveP95
+        match avg_complexity {
+            c if c <= baseline.low => ComparisonResult::BelowMedian,
+            c if c <= baseline.moderate => ComparisonResult::AboveMedian,
+            c if c <= baseline.high => ComparisonResult::AboveP75,
+            c if c <= baseline.critical => ComparisonResult::AboveP90,
+            _ => ComparisonResult::AboveP95,
         }
     }
 
