@@ -149,8 +149,8 @@ impl UnifiedAnalysis {
             DebtType::TestComplexityHotspot { .. }
                 | DebtType::TestTodo { .. }
                 | DebtType::TestDuplication { .. }
-        ) {
-            if item.cyclomatic_complexity <= min_cyclomatic
+        )
+            && item.cyclomatic_complexity <= min_cyclomatic
                 && item.cognitive_complexity <= min_cognitive
             {
                 // Skip trivial functions unless they have other significant issues
@@ -159,7 +159,6 @@ impl UnifiedAnalysis {
                     return;
                 }
             }
-        }
 
         self.items.push_back(item);
     }

@@ -82,7 +82,7 @@ fn main() -> Result<()> {
             priorities_only,
             detailed,
             semantic_off,
-            explain_score,
+            explain_score: _,
             verbosity,
             no_expand_macros,
             clear_expansion_cache,
@@ -124,13 +124,14 @@ fn main() -> Result<()> {
             priorities_only,
             detailed,
             semantic_off,
-            explain_score,
+            explain_score: _,
             verbosity,
         } => {
             let config = ValidateConfig {
                 path,
                 config,
                 coverage_file,
+                verbosity,
                 format,
                 output,
                 enable_context,
@@ -141,7 +142,6 @@ fn main() -> Result<()> {
                 priorities_only,
                 detailed,
                 semantic_off,
-                verbosity,
             };
             validate_project(config)
         }
@@ -1346,7 +1346,7 @@ fn output_unified_priorities(
     output_file: Option<PathBuf>,
     output_format: Option<cli::OutputFormat>,
 ) -> Result<()> {
-    use priority::formatter::format_priorities;
+    
     use std::fs;
     use std::io::Write;
 
@@ -2223,6 +2223,7 @@ end_of_record
             path: PathBuf::from("."),
             config: None,
             coverage_file: None,
+            verbosity: 0,
             format: Some(cli::OutputFormat::Json),
             output: None,
             enable_context: false,
@@ -2233,7 +2234,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -2247,6 +2247,7 @@ end_of_record
             path: PathBuf::from("."),
             config: None,
             coverage_file: None,
+            verbosity: 0,
             format: None,
             output: Some(PathBuf::from("output.txt")),
             enable_context: false,
@@ -2257,7 +2258,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
         assert_eq!(
             determine_output_format(&config),
@@ -2271,6 +2271,7 @@ end_of_record
             path: PathBuf::from("."),
             config: None,
             coverage_file: None,
+            verbosity: 0,
             format: Some(cli::OutputFormat::Markdown),
             output: Some(PathBuf::from("output.md")),
             enable_context: false,
@@ -2281,7 +2282,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
         // Format takes precedence over output
         assert_eq!(
@@ -2296,6 +2296,7 @@ end_of_record
             path: PathBuf::from("."),
             config: None,
             coverage_file: None,
+            verbosity: 0,
             format: None,
             output: None,
             enable_context: false,
@@ -2306,7 +2307,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
         assert_eq!(determine_output_format(&config), None);
     }
@@ -3074,6 +3074,7 @@ end_of_record
             path: temp_dir.path().to_path_buf(),
             config: None,
             coverage_file: None,
+            verbosity: 0,
             format: None,
             output: None,
             enable_context: false,
@@ -3084,7 +3085,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
 
         // Run validation - should succeed
@@ -3119,6 +3119,7 @@ end_of_record
             path: temp_dir.path().to_path_buf(),
             config: None,
             coverage_file: Some(lcov_file),
+            verbosity: 0,
             format: None,
             output: None,
             enable_context: false,
@@ -3129,7 +3130,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
 
         // Run validation with coverage
@@ -3155,6 +3155,7 @@ end_of_record
             path: temp_dir.path().to_path_buf(),
             config: None,
             coverage_file: None,
+            verbosity: 0,
             format: Some(cli::OutputFormat::Json),
             output: Some(output_file.clone()),
             enable_context: false,
@@ -3165,7 +3166,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
 
         // Run validation with output format
@@ -3224,6 +3224,7 @@ end_of_record
             path: temp_dir.path().to_path_buf(),
             config: None,
             coverage_file: None,
+            verbosity: 0,
             format: None,
             output: None,
             enable_context: true,
@@ -3234,7 +3235,6 @@ end_of_record
             priorities_only: false,
             detailed: false,
             semantic_off: false,
-            explain_score: false,
         };
 
         // Run validation with context
