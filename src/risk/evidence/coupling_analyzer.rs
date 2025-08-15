@@ -291,17 +291,17 @@ impl CouplingRiskAnalyzer {
 
     fn compare_to_baseline(&self, avg_coupling: u32, module_type: &ModuleType) -> ComparisonResult {
         let baseline = self.threshold_provider.get_coupling_thresholds(module_type);
+        Self::classify_coupling_level(avg_coupling, &baseline)
+    }
 
-        if avg_coupling <= baseline.low {
-            ComparisonResult::BelowMedian
-        } else if avg_coupling <= baseline.moderate {
-            ComparisonResult::AboveMedian
-        } else if avg_coupling <= baseline.high {
-            ComparisonResult::AboveP75
-        } else if avg_coupling <= baseline.critical {
-            ComparisonResult::AboveP90
-        } else {
-            ComparisonResult::AboveP95
+    /// Classify coupling level based on thresholds
+    fn classify_coupling_level(value: u32, thresholds: &CouplingThresholds) -> ComparisonResult {
+        match value {
+            v if v <= thresholds.low => ComparisonResult::BelowMedian,
+            v if v <= thresholds.moderate => ComparisonResult::AboveMedian,
+            v if v <= thresholds.high => ComparisonResult::AboveP75,
+            v if v <= thresholds.critical => ComparisonResult::AboveP90,
+            _ => ComparisonResult::AboveP95,
         }
     }
 
@@ -416,5 +416,139 @@ impl CouplingRiskAnalyzer {
         } else {
             0.95
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_coupling_level_below_median() {
+        let thresholds = CouplingThresholds {
+            low: 5,
+            moderate: 10,
+            high: 15,
+            critical: 20,
+        };
+
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(3, &thresholds),
+            ComparisonResult::BelowMedian
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(5, &thresholds),
+            ComparisonResult::BelowMedian
+        );
+    }
+
+    #[test]
+    fn test_classify_coupling_level_above_median() {
+        let thresholds = CouplingThresholds {
+            low: 5,
+            moderate: 10,
+            high: 15,
+            critical: 20,
+        };
+
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(6, &thresholds),
+            ComparisonResult::AboveMedian
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(10, &thresholds),
+            ComparisonResult::AboveMedian
+        );
+    }
+
+    #[test]
+    fn test_classify_coupling_level_above_p75() {
+        let thresholds = CouplingThresholds {
+            low: 5,
+            moderate: 10,
+            high: 15,
+            critical: 20,
+        };
+
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(11, &thresholds),
+            ComparisonResult::AboveP75
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(15, &thresholds),
+            ComparisonResult::AboveP75
+        );
+    }
+
+    #[test]
+    fn test_classify_coupling_level_above_p90() {
+        let thresholds = CouplingThresholds {
+            low: 5,
+            moderate: 10,
+            high: 15,
+            critical: 20,
+        };
+
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(16, &thresholds),
+            ComparisonResult::AboveP90
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(20, &thresholds),
+            ComparisonResult::AboveP90
+        );
+    }
+
+    #[test]
+    fn test_classify_coupling_level_above_p95() {
+        let thresholds = CouplingThresholds {
+            low: 5,
+            moderate: 10,
+            high: 15,
+            critical: 20,
+        };
+
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(21, &thresholds),
+            ComparisonResult::AboveP95
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(100, &thresholds),
+            ComparisonResult::AboveP95
+        );
+    }
+
+    #[test]
+    fn test_classify_coupling_level_edge_cases() {
+        let thresholds = CouplingThresholds {
+            low: 5,
+            moderate: 10,
+            high: 15,
+            critical: 20,
+        };
+
+        // Test zero value
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(0, &thresholds),
+            ComparisonResult::BelowMedian
+        );
+
+        // Test exact boundary values
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(5, &thresholds),
+            ComparisonResult::BelowMedian
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(10, &thresholds),
+            ComparisonResult::AboveMedian
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(15, &thresholds),
+            ComparisonResult::AboveP75
+        );
+        assert_eq!(
+            CouplingRiskAnalyzer::classify_coupling_level(20, &thresholds),
+            ComparisonResult::AboveP90
+        );
     }
 }
