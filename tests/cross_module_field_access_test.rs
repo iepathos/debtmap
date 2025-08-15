@@ -122,38 +122,21 @@ fn main() {
 
     let call_graph = extract_call_graph_multi_file(&files);
 
-    // Find the analyze_file function from framework_patterns
-    let analyze_file_id = FunctionId {
-        file: PathBuf::from("framework_patterns.rs"),
-        name: "FrameworkPatternDetector::analyze_file".to_string(),
-        line: 13, // Approximate line number
-    };
-
-    // Check if it's marked as dead code
-    // First, get all functions in the call graph
+    // Get all functions in the call graph
     let all_functions = call_graph.find_all_functions();
-    let analyze_file_exists = all_functions.iter().any(|f| {
-        f.name.contains("analyze_file") && f.file.to_str().unwrap().contains("framework_patterns")
-    });
 
-    assert!(
-        analyze_file_exists,
-        "FrameworkPatternDetector::analyze_file should be found in the call graph"
-    );
+    // Find the analyze_file function from framework_patterns
+    let analyze_file = all_functions
+        .iter()
+        .find(|f| f.name.contains("analyze_file"))
+        .expect("Should find analyze_file function");
 
-    // Now check if it has any callers
-    let callers = call_graph.get_callers(&analyze_file_id);
+    // Check for callers
+    let callers = call_graph.get_callers(analyze_file);
+
     assert!(
         !callers.is_empty(),
         "FrameworkPatternDetector::analyze_file should have callers from RustCallGraphBuilder::analyze_framework_patterns"
-    );
-
-    // Additional check: verify it's not marked as dead code
-    // This would require the FunctionMetrics, but we can at least check the call graph
-    let has_incoming_calls = !call_graph.get_callers(&analyze_file_id).is_empty();
-    assert!(
-        has_incoming_calls,
-        "FrameworkPatternDetector::analyze_file should have incoming calls in the call graph"
     );
 }
 
