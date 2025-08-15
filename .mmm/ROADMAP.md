@@ -140,6 +140,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Call graph insights with verbosity levels
   - Collapsible sections for detailed analysis
 
+- [x] **Spec 29**: AST-Based Type Tracking for Accurate Method Call Resolution
+  - Variable type tracking with explicit annotations
+  - Type inference from struct literals and constructors
+  - Nested scope management for variable resolution
+  - Method call resolution using type information
+  - Eliminates false positives in dead code detection
+  - Support for struct fields and function parameters
+
 ## Pending Specs
 
 ### Enhancements

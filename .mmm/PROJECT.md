@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, and spec 28 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28, and spec 29 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -132,6 +132,14 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Progressive detail levels with collapsible sections
   - Valid CommonMark specification compliance
   - GitHub Flavored Markdown support
+- ✅ AST-Based Type Tracking for Accurate Method Call Resolution (spec 29):
+  - Variable type tracking with explicit type annotations
+  - Type inference from struct literals and constructors
+  - Nested scope management for accurate variable resolution
+  - Method call resolution using tracked type information
+  - Eliminates false positives in dead code detection for methods
+  - Support for struct field types and function parameters
+  - Handles variable shadowing within inner scopes
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -158,6 +166,7 @@ The project follows a functional core / imperative shell pattern:
 14. **Evidence-Based Risk**: Statistical risk assessment with role-aware thresholds and remediation guidance
 15. **Language-Specific Call Graph**: Rust-specific call graph analysis with clear architecture for multi-language support
 16. **Enhanced Markdown Output**: Comprehensive markdown reports with all analysis features and progressive detail levels
+17. **AST-Based Type Tracking**: Accurate method call resolution through variable type tracking and scope management
 
 ## Project Structure
 ```

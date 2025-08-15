@@ -1,8 +1,9 @@
 /// Two-pass call graph extraction for accurate call resolution
+use crate::analyzers::type_tracker::{extract_type_from_pattern, ScopeKind, TypeTracker};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprMethodCall, ImplItemFn, ItemFn};
+use syn::{Expr, ExprCall, ExprMethodCall, ImplItemFn, ItemFn, Local, Pat};
 
 /// Represents an unresolved function call that needs to be resolved in phase 2
 #[derive(Debug, Clone)]
@@ -21,6 +22,8 @@ pub struct CallGraphExtractor {
     current_impl_type: Option<String>,
     current_file: PathBuf,
     module_path: Vec<String>,
+    /// Type tracker for accurate method resolution
+    type_tracker: TypeTracker,
 }
 
 impl CallGraphExtractor {
@@ -32,6 +35,7 @@ impl CallGraphExtractor {
             current_impl_type: None,
             current_file: file,
             module_path: Vec::new(),
+            type_tracker: TypeTracker::new(),
         }
     }
 
@@ -152,7 +156,7 @@ impl CallGraphExtractor {
             let a_qualified = a.name.contains("::");
             let b_qualified = b.name.contains("::");
             match (a_qualified, b_qualified) {
-                (true, false) => std::cmp::Ordering::Less,  // Prefer qualified names
+                (true, false) => std::cmp::Ordering::Less, // Prefer qualified names
                 (false, true) => std::cmp::Ordering::Greater,
                 _ => std::cmp::Ordering::Equal,
             }
@@ -163,12 +167,12 @@ impl CallGraphExtractor {
             0 => None,                     // No match found
             _ => {
                 // Multiple matches - use sophisticated disambiguation
-                
+
                 // For unqualified method names (like "calculate_coupling_metrics"),
                 // prefer qualified matches (like "Type::calculate_coupling_metrics")
                 // over standalone functions with the same name.
                 // This helps resolve method calls correctly.
-                
+
                 // 1. If the name doesn't contain "::" (unqualified), prefer qualified matches
                 if !name.contains("::") {
                     // Look for qualified matches first (Type::method)
@@ -239,28 +243,31 @@ impl CallGraphExtractor {
         }
     }
 
-    /// Constructs a method name, qualifying it with the impl type if it's a self method
+    /// Constructs a method name, qualifying it with the type information when available
     fn construct_method_name(
+        &self,
         method: &syn::Ident,
         receiver: &Expr,
         current_impl_type: &Option<String>,
     ) -> String {
         let method_name = method.to_string();
+
+        // First check if it's a self method call
         if matches!(receiver, Expr::Path(p) if p.path.is_ident("self")) {
             // This is a self method call, use the impl type if available
             if let Some(ref impl_type) = current_impl_type {
-                format!("{impl_type}::{method_name}")
-            } else {
-                method_name
+                return format!("{impl_type}::{method_name}");
             }
         } else {
-            // Regular method call on another object
-            // Return unqualified name, but the resolver will try to match
-            // against qualified names when there are multiple candidates
-            method_name
+            // Try to resolve the receiver's type using the type tracker
+            if let Some(resolved_type) = self.type_tracker.resolve_expr_type(receiver) {
+                return format!("{}::{}", resolved_type.type_name, method_name);
+            }
         }
-    }
 
+        // Fallback to unqualified name
+        method_name
+    }
 
     /// Extract function name from a path expression
     fn extract_function_name_from_path(path: &syn::Path) -> Option<String> {
@@ -365,6 +372,21 @@ impl CallGraphExtractor {
 }
 
 impl<'ast> Visit<'ast> for CallGraphExtractor {
+    fn visit_local(&mut self, local: &'ast Local) {
+        // Track type when visiting variable declarations
+        if let Pat::Ident(pat_ident) = &local.pat {
+            let var_name = pat_ident.ident.to_string();
+            // Convert LocalInit to Option<Box<Expr>>
+            let init_expr = local.init.as_ref().map(|init| init.expr.clone());
+            if let Some(ty) = extract_type_from_pattern(&local.pat, &init_expr) {
+                self.type_tracker.record_variable(var_name, ty);
+            }
+        }
+
+        // Continue visiting
+        syn::visit::visit_local(self, local);
+    }
+
     fn visit_item_impl(&mut self, item_impl: &'ast syn::ItemImpl) {
         // Extract the type name from the impl block
         let impl_type = if let syn::Type::Path(type_path) = &*item_impl.self_ty {
@@ -379,10 +401,16 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
 
         // Store the current impl type
         let prev_impl_type = self.current_impl_type.clone();
-        self.current_impl_type = impl_type;
+        self.current_impl_type = impl_type.clone();
+
+        // Enter impl scope in type tracker
+        self.type_tracker.enter_scope(ScopeKind::Impl, impl_type);
 
         // Continue visiting the impl block
         syn::visit::visit_item_impl(self, item_impl);
+
+        // Exit impl scope
+        self.type_tracker.exit_scope();
 
         // Restore previous impl type
         self.current_impl_type = prev_impl_type;
@@ -413,8 +441,14 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         // Add function to graph
         self.add_function_to_graph(name, line, item_fn);
 
+        // Enter function scope
+        self.type_tracker.enter_scope(ScopeKind::Function, None);
+
         // Visit the function body to extract calls
         syn::visit::visit_item_fn(self, item_fn);
+
+        // Exit function scope
+        self.type_tracker.exit_scope();
 
         // Clear current function after visiting
         self.current_function = None;
@@ -434,8 +468,14 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         // Add function to graph
         self.add_impl_method_to_graph(name, line, impl_fn);
 
+        // Enter function scope
+        self.type_tracker.enter_scope(ScopeKind::Function, None);
+
         // Visit the function body to extract calls
         syn::visit::visit_impl_item_fn(self, impl_fn);
+
+        // Exit function scope
+        self.type_tracker.exit_scope();
 
         // Clear current function after visiting
         self.current_function = None;
@@ -476,7 +516,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 receiver,
                 ..
             }) => {
-                let name = Self::construct_method_name(method, receiver, &self.current_impl_type);
+                let name = self.construct_method_name(method, receiver, &self.current_impl_type);
                 let same_file_hint =
                     matches!(&**receiver, Expr::Path(p) if p.path.is_ident("self"));
                 self.add_unresolved_call(

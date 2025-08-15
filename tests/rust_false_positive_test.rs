@@ -210,7 +210,7 @@ pub fn use_calculator() -> i32 {
     let standalone_func_id = FunctionId {
         file: path.clone(),
         name: "calculate".to_string(),
-        line: 0,
+        line: standalone_func.line, // Use the actual line number from the analyzed function
     };
     let standalone_is_dead = is_dead_code_with_exclusions(
         standalone_func,
@@ -223,7 +223,7 @@ pub fn use_calculator() -> i32 {
     let method_func_id = FunctionId {
         file: path.clone(),
         name: "Calculator::calculate".to_string(),
-        line: 0,
+        line: method_func.line, // Use the actual line number from the analyzed function
     };
     let method_is_dead = is_dead_code_with_exclusions(
         method_func,
@@ -236,6 +236,7 @@ pub fn use_calculator() -> i32 {
         standalone_is_dead,
         "Standalone calculate function should be marked as dead code"
     );
+
     assert!(
         !method_is_dead,
         "Calculator::calculate method should NOT be marked as dead code"

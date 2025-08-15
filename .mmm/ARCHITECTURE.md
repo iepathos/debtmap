@@ -23,6 +23,7 @@ Language-specific analysis implementations:
 - `mod.rs`: Analyzer trait and composition functions
 - `rust.rs`: Rust AST parsing with syn
 - `python.rs`: Python AST parsing with rustpython-parser
+- `type_tracker.rs`: AST-based type tracking for accurate method resolution
 
 ### Complexity (`src/complexity/`)
 Complexity metric calculations:
@@ -97,6 +98,7 @@ Rust-specific call graph analysis with multi-phase construction:
 - `call_graph/function_pointer.rs`: Function pointer and closure tracking
 - `call_graph/framework_patterns.rs`: Framework pattern recognition, Visit trait exclusion
 - `call_graph/cross_module.rs`: Cross-module dependency analysis
+- Type tracking integration: Uses TypeTracker for accurate method call resolution based on variable types
 
 ### IO (`src/io/`)
 Side-effectful operations:
