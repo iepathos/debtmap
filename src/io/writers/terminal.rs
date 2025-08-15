@@ -2,7 +2,7 @@ use crate::core::{AnalysisResults, FunctionMetrics, Priority};
 use crate::debt::total_debt_score;
 use crate::io::output::OutputWriter;
 use crate::refactoring::{ComplexityLevel, PatternRecognitionEngine};
-use crate::risk::RiskInsight;
+use crate::risk::{RiskDistribution, RiskInsight};
 use colored::*;
 
 pub struct TerminalWriter;
@@ -38,62 +38,9 @@ impl OutputWriter for TerminalWriter {
             format_actionable_insights, format_critical_risks, format_recommendations,
         };
 
-        // Print risk header
-        println!();
-        let divider = "═══════════════════════════════════════════".cyan();
-        let title = "           RISK ANALYSIS REPORT".bold().cyan();
-        println!("{divider}");
-        println!("{title}");
-        println!("{divider}");
-        println!();
-
-        // Print risk summary
-        println!("📈 {} Summary", "RISK".bold());
-        println!("───────────────────────────────────────────");
-        println!(
-            "Codebase Risk Score: {:.1} ({})",
-            insights.codebase_risk_score,
-            if insights.codebase_risk_score < 30.0 {
-                "LOW".green()
-            } else if insights.codebase_risk_score < 60.0 {
-                "MEDIUM".yellow()
-            } else {
-                "HIGH".red()
-            }
-        );
-
-        if let Some(correlation) = insights.complexity_coverage_correlation {
-            println!("Complexity-Coverage Correlation: {correlation:.2}");
-        }
-        println!();
-
-        // Print risk distribution
-        println!("Risk Distribution:");
-        println!(
-            "  Critical: {} functions",
-            insights.risk_distribution.critical_count.to_string().red()
-        );
-        println!(
-            "  High: {} functions",
-            insights.risk_distribution.high_count.to_string().yellow()
-        );
-        println!(
-            "  Medium: {} functions",
-            insights.risk_distribution.medium_count
-        );
-        println!(
-            "  Low: {} functions",
-            insights.risk_distribution.low_count.to_string().green()
-        );
-        println!(
-            "  Well Tested: {} functions",
-            insights
-                .risk_distribution
-                .well_tested_count
-                .to_string()
-                .cyan()
-        );
-        println!();
+        print_risk_header();
+        print_risk_summary(insights);
+        print_risk_distribution(&insights.risk_distribution);
 
         // Print critical risks
         let critical_risks_output = format_critical_risks(&insights.top_risks);
@@ -124,6 +71,61 @@ fn print_header() {
     println!("{divider}");
     println!("{title}");
     println!("{divider}");
+    println!();
+}
+
+fn print_risk_header() {
+    println!();
+    let divider = "═══════════════════════════════════════════".cyan();
+    let title = "           RISK ANALYSIS REPORT".bold().cyan();
+    println!("{divider}");
+    println!("{title}");
+    println!("{divider}");
+    println!();
+}
+
+fn classify_risk_level(score: f64) -> ColoredString {
+    match score {
+        s if s < 30.0 => "LOW".green(),
+        s if s < 60.0 => "MEDIUM".yellow(),
+        _ => "HIGH".red(),
+    }
+}
+
+fn print_risk_summary(insights: &RiskInsight) {
+    println!("📈 {} Summary", "RISK".bold());
+    println!("───────────────────────────────────────────");
+    println!(
+        "Codebase Risk Score: {:.1} ({})",
+        insights.codebase_risk_score,
+        classify_risk_level(insights.codebase_risk_score)
+    );
+
+    if let Some(correlation) = insights.complexity_coverage_correlation {
+        println!("Complexity-Coverage Correlation: {correlation:.2}");
+    }
+    println!();
+}
+
+fn print_risk_distribution(distribution: &RiskDistribution) {
+    println!("Risk Distribution:");
+    println!(
+        "  Critical: {} functions",
+        distribution.critical_count.to_string().red()
+    );
+    println!(
+        "  High: {} functions",
+        distribution.high_count.to_string().yellow()
+    );
+    println!("  Medium: {} functions", distribution.medium_count);
+    println!(
+        "  Low: {} functions",
+        distribution.low_count.to_string().green()
+    );
+    println!(
+        "  Well Tested: {} functions",
+        distribution.well_tested_count.to_string().cyan()
+    );
     println!();
 }
 
