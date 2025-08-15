@@ -211,23 +211,51 @@ impl CouplingRiskAnalyzer {
     }
 
     fn score_coupling(&self, coupling: u32, thresholds: &CouplingThresholds) -> f64 {
-        if coupling <= thresholds.low {
-            coupling as f64 / thresholds.low as f64 * 2.5
-        } else if coupling <= thresholds.moderate {
-            2.5 + (coupling - thresholds.low) as f64 / (thresholds.moderate - thresholds.low) as f64
-                * 2.5
-        } else if coupling <= thresholds.high {
-            5.0 + (coupling - thresholds.moderate) as f64
-                / (thresholds.high - thresholds.moderate) as f64
-                * 2.5
-        } else if coupling <= thresholds.critical {
-            7.5 + (coupling - thresholds.high) as f64
-                / (thresholds.critical - thresholds.high) as f64
-                * 2.0
-        } else {
-            9.5 + ((coupling - thresholds.critical) as f64 / thresholds.critical as f64 * 0.5)
-                .min(0.5)
+        Self::classify_coupling_risk(coupling, thresholds)
+    }
+
+    /// Pure function to classify coupling into risk score based on thresholds
+    fn classify_coupling_risk(coupling: u32, thresholds: &CouplingThresholds) -> f64 {
+        let (base_score, range_score, lower_bound, upper_bound) =
+            Self::determine_coupling_tier(coupling, thresholds);
+        Self::calculate_tier_score(coupling, base_score, range_score, lower_bound, upper_bound)
+    }
+
+    /// Determine which coupling tier the value falls into
+    fn determine_coupling_tier(
+        coupling: u32,
+        thresholds: &CouplingThresholds,
+    ) -> (f64, f64, u32, u32) {
+        match coupling {
+            c if c <= thresholds.low => (0.0, 2.5, 0, thresholds.low),
+            c if c <= thresholds.moderate => (2.5, 2.5, thresholds.low, thresholds.moderate),
+            c if c <= thresholds.high => (5.0, 2.5, thresholds.moderate, thresholds.high),
+            c if c <= thresholds.critical => (7.5, 2.0, thresholds.high, thresholds.critical),
+            _ => Self::calculate_overflow_score(coupling, thresholds.critical),
         }
+    }
+
+    /// Calculate the score within a tier
+    fn calculate_tier_score(
+        value: u32,
+        base_score: f64,
+        range_score: f64,
+        lower_bound: u32,
+        upper_bound: u32,
+    ) -> f64 {
+        if upper_bound == lower_bound {
+            base_score
+        } else {
+            let progress = (value - lower_bound) as f64 / (upper_bound - lower_bound) as f64;
+            base_score + progress * range_score
+        }
+    }
+
+    /// Calculate score for values exceeding the critical threshold
+    fn calculate_overflow_score(coupling: u32, critical_threshold: u32) -> (f64, f64, u32, u32) {
+        let overflow_ratio = (coupling - critical_threshold) as f64 / critical_threshold as f64;
+        let overflow_score = (overflow_ratio * 0.5).min(0.5);
+        (9.5 + overflow_score, 0.0, 0, 0) // Return computed score directly
     }
 
     fn score_instability(&self, instability: f64) -> f64 {
