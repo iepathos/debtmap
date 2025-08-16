@@ -262,6 +262,32 @@ impl CriticalPathProvider {
     }
 }
 
+impl CriticalPathProvider {
+    /// Calculate contribution based on path weight and user-facing status
+    fn calculate_contribution(max_weight: f64, is_user_facing: bool) -> f64 {
+        let base_contribution = max_weight / 10.0;
+        if is_user_facing {
+            base_contribution * 2.0 // Double contribution for user-facing paths
+        } else {
+            base_contribution
+        }
+    }
+
+    /// Build context for empty entry points
+    fn build_empty_context(&self) -> Context {
+        Context {
+            provider: self.name().to_string(),
+            weight: self.weight(),
+            contribution: 0.0,
+            details: ContextDetails::CriticalPath {
+                entry_points: vec![],
+                path_weight: 0.0,
+                is_user_facing: false,
+            },
+        }
+    }
+}
+
 impl ContextProvider for CriticalPathProvider {
     fn name(&self) -> &str {
         "critical_path"
@@ -271,16 +297,7 @@ impl ContextProvider for CriticalPathProvider {
         let entry_points = self.analyzer.get_entry_points_for(&target.function_name);
 
         if entry_points.is_empty() {
-            return Ok(Context {
-                provider: self.name().to_string(),
-                weight: self.weight(),
-                contribution: 0.0,
-                details: ContextDetails::CriticalPath {
-                    entry_points: vec![],
-                    path_weight: 0.0,
-                    is_user_facing: false,
-                },
-            });
+            return Ok(self.build_empty_context());
         }
 
         let is_user_facing = entry_points.iter().any(|e| e.is_user_facing);
@@ -289,11 +306,7 @@ impl ContextProvider for CriticalPathProvider {
             .map(|e| self.analyzer.calculate_path_weight(e))
             .fold(0.0, f64::max);
 
-        let contribution = if is_user_facing {
-            (max_weight / 10.0) * 2.0 // Double contribution for user-facing paths
-        } else {
-            max_weight / 10.0
-        };
+        let contribution = Self::calculate_contribution(max_weight, is_user_facing);
 
         Ok(Context {
             provider: self.name().to_string(),
@@ -497,6 +510,29 @@ mod tests {
 
         let weight = analyzer.calculate_path_weight(&entry);
         assert_eq!(weight, 2.0);
+    }
+
+    #[test]
+    fn test_calculate_contribution_non_user_facing() {
+        let max_weight = 5.0;
+        let contribution = CriticalPathProvider::calculate_contribution(max_weight, false);
+        assert_eq!(contribution, 0.5);
+    }
+
+    #[test]
+    fn test_calculate_contribution_user_facing() {
+        let max_weight = 5.0;
+        let contribution = CriticalPathProvider::calculate_contribution(max_weight, true);
+        assert_eq!(contribution, 1.0);
+    }
+
+    #[test]
+    fn test_calculate_contribution_zero_weight() {
+        assert_eq!(
+            CriticalPathProvider::calculate_contribution(0.0, false),
+            0.0
+        );
+        assert_eq!(CriticalPathProvider::calculate_contribution(0.0, true), 0.0);
     }
 
     #[test]
