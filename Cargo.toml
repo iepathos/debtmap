@@ -73,6 +73,9 @@ once_cell = "1.21.3"
 log = "0.4"
 env_logger = "0.11"
 
+# Graph algorithms for taint analysis
+petgraph = "0.6"
+
 [dev-dependencies]
 # Testing
 proptest = "1.4"

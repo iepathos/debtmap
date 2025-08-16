@@ -41,6 +41,8 @@ struct AnalyzeConfig {
     #[allow(dead_code)]
     security_only: bool,
     #[allow(dead_code)]
+    security_enhanced: bool,
+    #[allow(dead_code)]
     performance_only: bool,
     #[allow(dead_code)]
     organization_only: bool,
@@ -122,6 +124,7 @@ fn main() -> Result<()> {
             show_macro_stats,
             comprehensive,
             security_only,
+            security_enhanced,
             performance_only,
             organization_only,
             testing_only,
@@ -151,6 +154,7 @@ fn main() -> Result<()> {
                 show_macro_stats,
                 comprehensive,
                 security_only,
+                security_enhanced,
                 performance_only,
                 organization_only,
                 testing_only,

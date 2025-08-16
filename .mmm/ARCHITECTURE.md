@@ -46,6 +46,19 @@ Technical debt detection:
 - `circular.rs`: Circular dependency detection
 - `error_swallowing.rs`: Error swallowing anti-pattern detection
 
+### Security (`src/security/`)
+Security pattern detection and vulnerability analysis:
+- `types.rs`: Core security types (SecurityVulnerability, Severity, etc.)
+- `enhanced_secret_detector.rs`: Advanced hardcoded secret detection with entropy analysis
+- `enhanced_sql_detector.rs`: SQL injection detection with taint tracking
+- `taint_analysis.rs`: Graph-based taint analysis for input validation gaps
+- `tool_integration.rs`: Framework for integrating external security tools
+- `hardcoded_secret_detector.rs`: Basic secret detection (legacy)
+- `sql_injection_detector.rs`: Basic SQL injection detection (legacy)
+- `crypto_detector.rs`: Cryptographic misuse detection
+- `unsafe_detector.rs`: Unsafe code block detection
+- `input_validation_detector.rs`: Input validation gap detection
+
 ### Transformers (`src/transformers/`)
 Functional data transformations:
 - `mod.rs`: Transformation composition
