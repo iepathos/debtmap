@@ -156,6 +156,7 @@ impl NestedLoopVisitor {
         }
     }
 
+    #[allow(dead_code)]
     fn analyze_parallelization_potential(&self, block: &Block) -> bool {
         let mut dep_visitor = DependencyVisitor {
             has_mutable_state: false,
@@ -322,6 +323,7 @@ impl<'ast> Visit<'ast> for OperationVisitor {
     }
 }
 
+#[allow(dead_code)]
 struct DependencyVisitor {
     has_mutable_state: bool,
     has_dependencies: bool,

@@ -25,6 +25,7 @@ impl GodObjectDetector {
         Self::default()
     }
 
+    #[allow(dead_code)]
     fn analyze_type(&self, item_struct: &syn::ItemStruct) -> TypeAnalysis {
         TypeAnalysis {
             name: item_struct.ident.to_string(),
@@ -37,6 +38,7 @@ impl GodObjectDetector {
         }
     }
 
+    #[allow(dead_code)]
     fn count_fields(&self, fields: &syn::Fields) -> usize {
         match fields {
             syn::Fields::Named(fields) => fields.named.len(),
@@ -45,6 +47,7 @@ impl GodObjectDetector {
         }
     }
 
+    #[allow(dead_code)]
     fn extract_field_names(&self, fields: &syn::Fields) -> Vec<String> {
         match fields {
             syn::Fields::Named(fields) => fields

@@ -123,6 +123,7 @@ impl OrganizationDetector for FeatureEnvyDetector {
 }
 
 struct MethodCallAnalysis {
+    #[allow(dead_code)]
     method_name: String,
     internal_calls: usize,
     external_calls: HashMap<String, usize>,

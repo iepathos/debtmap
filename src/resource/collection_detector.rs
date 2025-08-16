@@ -361,12 +361,15 @@ struct CollectionUsage {
     collection_type: String,
     is_unbounded: bool,
     growth_pattern: GrowthPattern,
+    #[allow(dead_code)]
     insert_sites: Vec<SourceLocation>,
+    #[allow(dead_code)]
     remove_sites: Vec<SourceLocation>,
 }
 
 #[derive(Debug, Clone)]
 struct MethodCall {
+    #[allow(dead_code)]
     method_name: String,
     receiver: String,
     line: usize,

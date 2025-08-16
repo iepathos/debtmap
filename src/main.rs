@@ -36,14 +36,23 @@ struct AnalyzeConfig {
     verbosity: u8,
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
+    #[allow(dead_code)]
     comprehensive: bool,
+    #[allow(dead_code)]
     security_only: bool,
+    #[allow(dead_code)]
     performance_only: bool,
+    #[allow(dead_code)]
     organization_only: bool,
+    #[allow(dead_code)]
     testing_only: bool,
+    #[allow(dead_code)]
     resource_only: bool,
+    #[allow(dead_code)]
     group_by_category: bool,
+    #[allow(dead_code)]
     min_priority: Option<String>,
+    #[allow(dead_code)]
     filter_categories: Option<Vec<String>>,
 }
 

@@ -412,21 +412,25 @@ struct AsyncResourceIssueInfo {
     issue_type: AsyncResourceIssueType,
     cancellation_safety: CancellationSafety,
     mitigation_strategy: String,
+    #[allow(dead_code)]
     location: SourceLocation,
 }
 
 #[derive(Debug)]
-struct AwaitPoint {
+pub(super) struct AwaitPoint {
     location: SourceLocation,
+    #[allow(dead_code)]
     expression: String,
+    #[allow(dead_code)]
     is_resource_operation: bool,
 }
 
 #[derive(Debug)]
-struct ResourceOperation {
+pub(super) struct ResourceOperation {
     operation_type: ResourceOperationType,
     resource_type: ResourceType,
     location: SourceLocation,
+    #[allow(dead_code)]
     variable_name: Option<String>,
 }
 

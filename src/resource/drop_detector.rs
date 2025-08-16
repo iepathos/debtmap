@@ -6,7 +6,9 @@ use std::path::Path;
 use syn::{visit::Visit, ImplItem, ItemImpl, ItemStruct, Type};
 
 pub struct DropDetector {
+    #[allow(dead_code)]
     resource_type_patterns: HashMap<String, ResourcePattern>,
+    #[allow(dead_code)]
     known_resource_types: HashSet<String>,
 }
 
@@ -333,7 +335,9 @@ struct ResourceAnalysis {
 
 #[derive(Debug, Clone)]
 struct ResourcePattern {
+    #[allow(dead_code)]
     pattern: String,
+    #[allow(dead_code)]
     is_critical: bool,
 }
 
