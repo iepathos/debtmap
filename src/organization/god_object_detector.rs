@@ -26,7 +26,9 @@ impl GodObjectDetector {
     }
 
     fn analyze_type(&self, item_struct: &syn::ItemStruct) -> TypeAnalysis {
-        let analysis = TypeAnalysis {
+        
+
+        TypeAnalysis {
             name: item_struct.ident.to_string(),
             method_count: 0,
             field_count: self.count_fields(&item_struct.fields),
@@ -34,9 +36,7 @@ impl GodObjectDetector {
             fields: self.extract_field_names(&item_struct.fields),
             responsibilities: Vec::new(),
             trait_implementations: 0,
-        };
-
-        analysis
+        }
     }
 
     fn count_fields(&self, fields: &syn::Fields) -> usize {

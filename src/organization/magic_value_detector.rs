@@ -195,24 +195,21 @@ impl LiteralVisitor {
 
 impl<'ast> Visit<'ast> for LiteralVisitor {
     fn visit_expr(&mut self, node: &'ast syn::Expr) {
-        match node {
-            syn::Expr::Lit(expr_lit) => match &expr_lit.lit {
-                syn::Lit::Int(lit_int) => {
-                    let value = lit_int.base10_digits().to_string();
-                    self.numeric_literals.push((value, "numeric".to_string()));
-                }
-                syn::Lit::Float(lit_float) => {
-                    let value = lit_float.base10_digits().to_string();
-                    self.numeric_literals.push((value, "numeric".to_string()));
-                }
-                syn::Lit::Str(lit_str) => {
-                    let value = lit_str.value();
-                    self.string_literals.push((value, "string".to_string()));
-                }
-                _ => {}
-            },
+        if let syn::Expr::Lit(expr_lit) = node { match &expr_lit.lit {
+            syn::Lit::Int(lit_int) => {
+                let value = lit_int.base10_digits().to_string();
+                self.numeric_literals.push((value, "numeric".to_string()));
+            }
+            syn::Lit::Float(lit_float) => {
+                let value = lit_float.base10_digits().to_string();
+                self.numeric_literals.push((value, "numeric".to_string()));
+            }
+            syn::Lit::Str(lit_str) => {
+                let value = lit_str.value();
+                self.string_literals.push((value, "string".to_string()));
+            }
             _ => {}
-        }
+        } }
 
         syn::visit::visit_expr(self, node);
     }

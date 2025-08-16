@@ -29,14 +29,13 @@ impl PrimitiveObsessionDetector {
         let name_lower = type_usage.context.to_lowercase();
 
         // Check for identifier patterns
-        if self.track_string_identifiers && type_usage.type_name == "String" {
-            if name_lower.contains("id")
+        if self.track_string_identifiers && type_usage.type_name == "String"
+            && (name_lower.contains("id")
                 || name_lower.contains("key")
-                || name_lower.contains("code")
+                || name_lower.contains("code"))
             {
                 return Some(PrimitiveUsageContext::Identifier);
             }
-        }
 
         // Check for measurement patterns
         if self.track_numeric_measurements
@@ -44,38 +43,34 @@ impl PrimitiveObsessionDetector {
                 || type_usage.type_name == "f32"
                 || type_usage.type_name == "i32"
                 || type_usage.type_name == "u32")
-        {
-            if name_lower.contains("distance")
+            && (name_lower.contains("distance")
                 || name_lower.contains("weight")
                 || name_lower.contains("height")
                 || name_lower.contains("temperature")
                 || name_lower.contains("price")
-                || name_lower.contains("amount")
+                || name_lower.contains("amount"))
             {
                 return Some(PrimitiveUsageContext::Measurement);
             }
-        }
 
         // Check for status patterns
-        if type_usage.type_name == "bool" {
-            if name_lower.contains("status")
+        if type_usage.type_name == "bool"
+            && (name_lower.contains("status")
                 || name_lower.contains("state")
-                || name_lower.contains("flag")
+                || name_lower.contains("flag"))
             {
                 return Some(PrimitiveUsageContext::Status);
             }
-        }
 
         // Check for category patterns
-        if type_usage.type_name == "String" || type_usage.type_name == "i32" {
-            if name_lower.contains("type")
+        if (type_usage.type_name == "String" || type_usage.type_name == "i32")
+            && (name_lower.contains("type")
                 || name_lower.contains("category")
                 || name_lower.contains("kind")
-                || name_lower.contains("mode")
+                || name_lower.contains("mode"))
             {
                 return Some(PrimitiveUsageContext::Category);
             }
-        }
 
         None
     }
