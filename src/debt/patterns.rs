@@ -40,6 +40,7 @@ pub fn find_todos_and_fixmes_with_suppression(
                     priority,
                     file: file.to_path_buf(),
                     line: line_number,
+                    column: None,
                     message: format!("{marker}: {message}"),
                     context: Some(line.trim().to_string()),
                 })
@@ -115,6 +116,7 @@ fn check_line_length(
         priority: Priority::Low,
         file: file_path.to_path_buf(),
         line: line_number,
+        column: None,
         message: format!("Line exceeds {} characters ({})", threshold, line.len()),
         context: None,
     })
@@ -134,6 +136,7 @@ fn check_nesting_level(
         priority: Priority::Medium,
         file: file_path.to_path_buf(),
         line: line_number,
+        column: None,
         message: format!("Deep nesting level: {indent_count}"),
         context: Some(line.trim().to_string()),
     })
@@ -194,6 +197,7 @@ fn create_duplicate_string_item(string: &str, lines: &[usize], file: &Path) -> D
         priority: Priority::Low,
         file: file.to_path_buf(),
         line: lines[0],
+        column: None,
         message: format!(
             "String '{}' appears {} times",
             truncated_string,

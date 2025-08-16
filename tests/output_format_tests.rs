@@ -36,6 +36,7 @@ fn test_output_json_format() {
                 priority: Priority::Medium,
                 file: PathBuf::from("test.rs"),
                 line: 5,
+                column: None,
                 message: "TODO: Implement feature".to_string(), // debtmap:ignore -- Test fixture
                 context: None,
             }],

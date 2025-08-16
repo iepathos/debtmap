@@ -17,6 +17,10 @@ use crate::organization::{
     FeatureEnvyDetector, GodObjectDetector, MagicValueDetector, MaintainabilityImpact,
     OrganizationAntiPattern, OrganizationDetector, ParameterAnalyzer, PrimitiveObsessionDetector,
 };
+use crate::performance::{
+    convert_performance_pattern_to_debt_item, AllocationDetector, DataStructureDetector,
+    IOPerformanceDetector, NestedLoopDetector, PerformanceDetector, StringPerformanceDetector,
+};
 use crate::priority::call_graph::CallGraph;
 use crate::testing;
 use anyhow::Result;
@@ -146,6 +150,7 @@ fn collect_all_rust_debt_items(
         detect_error_swallowing(file, path, Some(suppression_context)),
         analyze_resource_patterns(file, path),
         analyze_organization_patterns(file, path),
+        analyze_performance_patterns(file, path),
         testing::analyze_testing_patterns(file, &path.to_path_buf()),
     ]
     .into_iter()
@@ -511,6 +516,32 @@ fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
     }
 }
 
+fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
+    let detectors: Vec<Box<dyn PerformanceDetector>> = vec![
+        Box::new(NestedLoopDetector::new()),
+        Box::new(DataStructureDetector::new()),
+        Box::new(AllocationDetector::new()),
+        Box::new(IOPerformanceDetector::new()),
+        Box::new(StringPerformanceDetector::new()),
+    ];
+
+    let mut performance_items = Vec::new();
+
+    for detector in detectors {
+        let anti_patterns = detector.detect_anti_patterns(file, path);
+
+        for (idx, pattern) in anti_patterns.into_iter().enumerate() {
+            let impact = detector.estimate_impact(&pattern);
+            // Use a placeholder line number since we don't have exact positions yet
+            let line = idx + 1;
+            let debt_item = convert_performance_pattern_to_debt_item(pattern, impact, path, line);
+            performance_items.push(debt_item);
+        }
+    }
+
+    performance_items
+}
+
 fn extract_debt_items(
     _file: &syn::File,
     _path: &Path,
@@ -535,6 +566,7 @@ fn create_complexity_debt_item(func: &FunctionMetrics, threshold: u32) -> DebtIt
         },
         file: func.file.clone(),
         line: func.line,
+        column: None,
         message: format!(
             "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
             func.name, func.cyclomatic, func.cognitive

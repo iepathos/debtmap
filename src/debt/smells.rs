@@ -37,6 +37,7 @@ impl CodeSmell {
             priority: self.severity,
             file: self.location.clone(),
             line: self.line,
+            column: None,
             message: self.message.clone(),
             context: None,
         }

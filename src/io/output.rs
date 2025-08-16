@@ -142,6 +142,7 @@ mod tests {
             priority: Priority::Medium,
             file: PathBuf::from("test.rs"),
             line: 5,
+            column: None,
             message: "TODO: Implement feature".to_string(),
             context: None,
         }];

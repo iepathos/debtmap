@@ -51,6 +51,7 @@ fn test_debt_item_creation() {
         priority: Priority::High,
         file: PathBuf::from("complex.rs"),
         line: 42,
+        column: None,
         message: "Function has high complexity".to_string(),
         context: Some("fn complex_function() { ... }".to_string()),
     };

@@ -49,6 +49,7 @@ impl<'a> ErrorSwallowingDetector<'a> {
             priority,
             file: self.current_file.to_path_buf(),
             line,
+            column: None,
             message,
             context: Some(context.to_string()),
         });

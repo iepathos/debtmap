@@ -85,6 +85,7 @@ pub struct DebtItem {
     pub priority: Priority,
     pub file: PathBuf,
     pub line: usize,
+    pub column: Option<usize>,
     pub message: String,
     pub context: Option<String>,
 }
@@ -100,6 +101,7 @@ pub enum DebtType {
     ErrorSwallowing,
     ResourceManagement,
     CodeOrganization,
+    Performance,
     // Test-specific debt types
     TestComplexity,
     TestTodo,
@@ -119,6 +121,7 @@ impl std::fmt::Display for DebtType {
             (DebtType::ErrorSwallowing, "Error Swallowing"),
             (DebtType::ResourceManagement, "Resource Management"),
             (DebtType::CodeOrganization, "Code Organization"),
+            (DebtType::Performance, "Performance"),
             (DebtType::TestComplexity, "Test Complexity"),
             (DebtType::TestTodo, "Test TODO"),
             (DebtType::TestDuplication, "Test Duplication"),

@@ -86,11 +86,18 @@ pub trait TestingDetector {
 
 pub fn is_test_function(function: &ItemFn) -> bool {
     function.attrs.iter().any(|attr| {
-        attr.path()
-            .segments
-            .last()
-            .map(|seg| seg.ident == "test" || seg.ident == "tokio_test" || seg.ident == "bench")
-            .unwrap_or(false)
+        // Check if it's a test attribute
+        let path_str = attr.path().segments.iter()
+            .map(|seg| seg.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::");
+        
+        // Match common test attributes
+        path_str == "test" 
+            || path_str == "tokio::test"
+            || path_str == "async_std::test" 
+            || path_str == "bench"
+            || path_str.ends_with("::test")
     }) || function.sig.ident.to_string().starts_with("test_")
         || function.sig.ident.to_string().ends_with("_test")
 }

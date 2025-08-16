@@ -9,6 +9,7 @@ pub mod core;
 pub mod debt;
 pub mod io;
 pub mod organization;
+pub mod performance;
 pub mod priority;
 pub mod refactoring;
 pub mod resource;
