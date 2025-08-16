@@ -11,6 +11,7 @@ pub mod io;
 pub mod priority;
 pub mod refactoring;
 pub mod risk;
+pub mod testing;
 pub mod transformers;
 
 // Re-export commonly used types

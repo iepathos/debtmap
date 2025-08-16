@@ -157,15 +157,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Type alias tracking and resolution
   - 50%+ reduction in false positives
 
-- [x] **Spec 31**: Function Return Type Tracking for Enhanced Type Resolution
-  - Function signature registry with return types
-  - Method signature extraction with Self resolution
-  - Builder pattern detection and tracking
-  - Return type resolution for function and method calls
-  - Support for generic functions and async signatures
-  - Static constructor resolution (Type::new, Type::default)
-  - Integration with existing type tracking system
-  - 30%+ additional reduction in false positives
+- [x] **Spec 31**: Testing Quality Patterns Detection
+  - Test functions without assertions detection
+  - Overly complex test identification with complexity scoring
+  - Flaky test pattern detection (timing dependencies, random values, external services)
+  - Framework-aware test function recognition (#[test], test_, _test patterns)
+  - Test simplification suggestions (reduce mocking, extract helpers, parameterize)
+  - Integration with existing debt tracking system
+  - New DebtType::TestQuality for test-specific issues
 
 - [x] **Spec 32**: Trait Implementation Tracking for Dynamic Dispatch Resolution
   - Comprehensive trait definition extraction

@@ -98,6 +98,13 @@ Macro expansion for perfect call graph analysis:
 - `cache.rs`: Expansion caching system
 - `source_map.rs`: Source location mapping
 
+### Testing (`src/testing/`)
+Testing quality pattern detection:
+- `mod.rs`: Core types and trait for testing anti-patterns
+- `assertion_detector.rs`: Detects tests without assertions
+- `complexity_detector.rs`: Identifies overly complex tests
+- `flaky_detector.rs`: Finds flaky test patterns (timing, randomness, external deps)
+
 ### Analysis (`src/analysis/`)
 Rust-specific call graph analysis with multi-phase construction:
 - `call_graph/mod.rs`: Rust-specific call graph builder and core types (RustCallGraph, RustCallGraphBuilder)
