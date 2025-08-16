@@ -50,29 +50,36 @@ pub fn create_trait_analyzers() -> Vec<Arc<dyn TraitAnalyzer>> {
 // Pattern matcher implementations
 struct FunctionalCompositionMatcher;
 
+impl FunctionalCompositionMatcher {
+    /// Pure function to detect functional composition patterns in function names
+    fn has_functional_patterns(name: &str) -> bool {
+        const FUNCTIONAL_PATTERNS: &[&str] = &["map", "filter", "fold", "compose"];
+        FUNCTIONAL_PATTERNS
+            .iter()
+            .any(|pattern| name.contains(pattern))
+    }
+
+    /// Pure function to create pattern evidence for functional composition
+    fn create_pattern_evidence(function_line: usize) -> PatternEvidence {
+        PatternEvidence {
+            code_snippets: vec![],
+            line_numbers: vec![function_line as u32],
+            confidence_factors: vec!["Function name suggests functional pattern".to_string()],
+        }
+    }
+}
+
 impl PatternMatcher for FunctionalCompositionMatcher {
     fn match_pattern(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<DetectedPattern> {
-        // Look for functional composition patterns like map, filter, fold
-        let has_functional_patterns = function.name.contains("map")
-            || function.name.contains("filter")
-            || function.name.contains("fold")
-            || function.name.contains("compose");
-
-        if has_functional_patterns {
+        if Self::has_functional_patterns(&function.name) {
             Some(DetectedPattern {
                 pattern_type: PatternType::FunctionalComposition,
                 confidence: 0.8,
-                evidence: PatternEvidence {
-                    code_snippets: vec![],
-                    line_numbers: vec![function.line as u32],
-                    confidence_factors: vec![
-                        "Function name suggests functional pattern".to_string()
-                    ],
-                },
+                evidence: Self::create_pattern_evidence(function.line),
                 assessment: PatternAssessment::GoodExample {
                     strengths: vec![
                         "Uses functional composition patterns".to_string(),
@@ -519,5 +526,163 @@ impl TraitAnalyzer for VisitorTraitAnalyzer {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{ComplexityMetrics, Language};
+    use std::path::PathBuf;
+
+    fn create_test_function(name: &str, cyclomatic: u32) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 42,
+            cyclomatic,
+            cognitive: 0,
+            nesting: 0,
+            length: 10,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+        }
+    }
+
+    fn create_test_file() -> FileMetrics {
+        FileMetrics {
+            path: PathBuf::from("test.rs"),
+            language: Language::Rust,
+            complexity: ComplexityMetrics {
+                functions: vec![],
+                cyclomatic_complexity: 10,
+                cognitive_complexity: 5,
+            },
+            debt_items: vec![],
+            dependencies: vec![],
+            duplications: vec![],
+        }
+    }
+
+    #[test]
+    fn test_functional_composition_matcher_detects_map() {
+        let matcher = FunctionalCompositionMatcher;
+        let function = create_test_function("map_values", 3);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+
+        let pattern = result.unwrap();
+        assert_eq!(pattern.confidence, 0.8);
+        assert!(matches!(
+            pattern.pattern_type,
+            PatternType::FunctionalComposition
+        ));
+        assert!(matches!(
+            pattern.assessment,
+            PatternAssessment::GoodExample { .. }
+        ));
+    }
+
+    #[test]
+    fn test_functional_composition_matcher_detects_filter() {
+        let matcher = FunctionalCompositionMatcher;
+        let function = create_test_function("filter_items", 2);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+
+        let pattern = result.unwrap();
+        assert!(matches!(
+            pattern.pattern_type,
+            PatternType::FunctionalComposition
+        ));
+        assert_eq!(pattern.evidence.line_numbers, vec![42]);
+    }
+
+    #[test]
+    fn test_functional_composition_matcher_detects_fold() {
+        let matcher = FunctionalCompositionMatcher;
+        let function = create_test_function("fold_results", 4);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+
+        let pattern = result.unwrap();
+        assert_eq!(pattern.confidence, 0.8);
+        assert!(!pattern.evidence.confidence_factors.is_empty());
+    }
+
+    #[test]
+    fn test_functional_composition_matcher_detects_compose() {
+        let matcher = FunctionalCompositionMatcher;
+        let function = create_test_function("compose_functions", 5);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+
+        let pattern = result.unwrap();
+        if let PatternAssessment::GoodExample { strengths, .. } = pattern.assessment {
+            assert_eq!(strengths.len(), 2);
+            assert!(strengths[0].contains("functional composition"));
+        } else {
+            panic!("Expected GoodExample assessment");
+        }
+    }
+
+    #[test]
+    fn test_functional_composition_matcher_rejects_non_functional() {
+        let matcher = FunctionalCompositionMatcher;
+        let function = create_test_function("process_data", 6);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_functional_composition_matcher_rejects_imperative_loop() {
+        let matcher = FunctionalCompositionMatcher;
+        let function = create_test_function("update_records", 8);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_has_functional_patterns_helper() {
+        assert!(FunctionalCompositionMatcher::has_functional_patterns(
+            "map_values"
+        ));
+        assert!(FunctionalCompositionMatcher::has_functional_patterns(
+            "filter_items"
+        ));
+        assert!(FunctionalCompositionMatcher::has_functional_patterns(
+            "fold_sum"
+        ));
+        assert!(FunctionalCompositionMatcher::has_functional_patterns(
+            "compose_transforms"
+        ));
+        assert!(!FunctionalCompositionMatcher::has_functional_patterns(
+            "calculate_total"
+        ));
+        assert!(!FunctionalCompositionMatcher::has_functional_patterns(
+            "update_state"
+        ));
+    }
+
+    #[test]
+    fn test_create_pattern_evidence_helper() {
+        let evidence = FunctionalCompositionMatcher::create_pattern_evidence(100);
+        assert_eq!(evidence.line_numbers, vec![100]);
+        assert_eq!(evidence.code_snippets.len(), 0);
+        assert_eq!(evidence.confidence_factors.len(), 1);
+        assert!(evidence.confidence_factors[0].contains("functional pattern"));
     }
 }
