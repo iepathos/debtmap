@@ -1842,4 +1842,366 @@ mod tests {
         // The method processes expressions by visiting them
         // which may or may not add to the call graph depending on the expressions
     }
+
+    #[test]
+    fn test_visit_expr_closure_handling() {
+        let code = r#"
+            fn process_with_closure() {
+                let numbers = vec![1, 2, 3];
+                
+                // Closure with function calls inside
+                let result = numbers.iter().map(|x| {
+                    let doubled = double(*x);
+                    let formatted = format_number(doubled);
+                    formatted
+                }).collect::<Vec<_>>();
+                
+                // Closure with method calls
+                let processor = |value: i32| {
+                    helper_function(value);
+                    value.to_string()
+                };
+            }
+            
+            fn double(x: i32) -> i32 { x * 2 }
+            fn format_number(x: i32) -> String { x.to_string() }
+            fn helper_function(x: i32) {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the process_with_closure function
+        let process_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "process_with_closure")
+            .expect("process_with_closure should exist");
+
+        let callees = graph.get_callees(&process_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls inside closures
+        assert!(
+            callee_names.contains(&"double"),
+            "Should detect double() call inside closure"
+        );
+        assert!(
+            callee_names.contains(&"format_number"),
+            "Should detect format_number() call inside closure"
+        );
+        assert!(
+            callee_names.contains(&"helper_function"),
+            "Should detect helper_function() call inside closure"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_async_block_handling() {
+        let code = r#"
+            async fn async_processor() {
+                // Async block with function calls
+                let future = async {
+                    prepare_data().await;
+                    let result = compute_async().await;
+                    finalize(result);
+                    result
+                };
+                
+                // Another async block
+                let another = async move {
+                    validate_input();
+                    process_item().await;
+                };
+            }
+            
+            async fn prepare_data() {}
+            async fn compute_async() -> i32 { 42 }
+            fn finalize(x: i32) {}
+            fn validate_input() {}
+            async fn process_item() {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the async_processor function
+        let async_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "async_processor")
+            .expect("async_processor should exist");
+
+        let callees = graph.get_callees(&async_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls inside async blocks
+        assert!(
+            callee_names.contains(&"prepare_data"),
+            "Should detect prepare_data() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"compute_async"),
+            "Should detect compute_async() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"finalize"),
+            "Should detect finalize() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"validate_input"),
+            "Should detect validate_input() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"process_item"),
+            "Should detect process_item() call inside async block"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_await_handling() {
+        let code = r#"
+            async fn await_handler() {
+                // Simple await expression
+                let result = fetch_data().await;
+                
+                // Chained await expressions
+                let processed = fetch_data()
+                    .await
+                    .transform()
+                    .await;
+                
+                // Await with method call on result
+                let final_result = compute()
+                    .await
+                    .finalize();
+            }
+            
+            async fn fetch_data() -> DataWrapper { DataWrapper }
+            async fn compute() -> Processor { Processor }
+            
+            struct DataWrapper;
+            impl DataWrapper {
+                async fn transform(self) -> ProcessedData { ProcessedData }
+            }
+            
+            struct ProcessedData;
+            struct Processor;
+            impl Processor {
+                fn finalize(self) -> i32 { 42 }
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the await_handler function
+        let await_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "await_handler")
+            .expect("await_handler should exist");
+
+        let callees = graph.get_callees(&await_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls with await expressions
+        assert!(
+            callee_names.contains(&"fetch_data"),
+            "Should detect fetch_data() call with await"
+        );
+        assert!(
+            callee_names.contains(&"compute"),
+            "Should detect compute() call with await"
+        );
+        // Method calls on awaited results
+        assert!(
+            callee_names.iter().any(|n| n.contains("transform")),
+            "Should detect transform() method call"
+        );
+        assert!(
+            callee_names.iter().any(|n| n.contains("finalize")),
+            "Should detect finalize() method call"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_struct_literal_handling() {
+        let code = r#"
+            struct Config {
+                name: String,
+                value: i32,
+                processor: fn(i32) -> i32,
+            }
+            
+            struct Nested {
+                config: Config,
+                data: Vec<i32>,
+            }
+            
+            fn create_config() {
+                // Struct literal with function calls in field values
+                let config = Config {
+                    name: generate_name(),
+                    value: calculate_value(),
+                    processor: get_processor(),
+                };
+                
+                // Nested struct literal
+                let nested = Nested {
+                    config: Config {
+                        name: format_string("test"),
+                        value: compute_default(),
+                        processor: default_processor,
+                    },
+                    data: generate_data(),
+                };
+                
+                // Struct with base
+                let updated = Config {
+                    name: new_name(),
+                    ..get_base_config()
+                };
+            }
+            
+            fn generate_name() -> String { String::new() }
+            fn calculate_value() -> i32 { 42 }
+            fn get_processor() -> fn(i32) -> i32 { |x| x }
+            fn format_string(s: &str) -> String { s.to_string() }
+            fn compute_default() -> i32 { 0 }
+            fn default_processor(x: i32) -> i32 { x }
+            fn generate_data() -> Vec<i32> { vec![] }
+            fn new_name() -> String { String::new() }
+            fn get_base_config() -> Config { 
+                Config { 
+                    name: String::new(), 
+                    value: 0, 
+                    processor: |x| x 
+                } 
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the create_config function
+        let create_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "create_config")
+            .expect("create_config should exist");
+
+        let callees = graph.get_callees(&create_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls in struct field values
+        assert!(
+            callee_names.contains(&"generate_name"),
+            "Should detect generate_name() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"calculate_value"),
+            "Should detect calculate_value() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"get_processor"),
+            "Should detect get_processor() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"format_string"),
+            "Should detect format_string() in nested struct"
+        );
+        assert!(
+            callee_names.contains(&"compute_default"),
+            "Should detect compute_default() in nested struct"
+        );
+        assert!(
+            callee_names.contains(&"generate_data"),
+            "Should detect generate_data() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"new_name"),
+            "Should detect new_name() in struct update"
+        );
+        assert!(
+            callee_names.contains(&"get_base_config"),
+            "Should detect get_base_config() in struct base"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_complex_nested_calls() {
+        let code = r#"
+            fn complex_nested() {
+                // Deeply nested function calls in various expression types
+                let result = async {
+                    let closure = |x| {
+                        let config = Config {
+                            value: process(x),
+                            data: transform(fetch().await),
+                        };
+                        config
+                    };
+                    
+                    closure(compute())
+                }.await;
+            }
+            
+            struct Config {
+                value: i32,
+                data: String,
+            }
+            
+            fn process(x: i32) -> i32 { x }
+            fn transform(s: String) -> String { s }
+            async fn fetch() -> String { String::new() }
+            fn compute() -> i32 { 42 }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the complex_nested function
+        let complex_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "complex_nested")
+            .expect("complex_nested should exist");
+
+        let callees = graph.get_callees(&complex_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect all nested function calls
+        assert!(
+            callee_names.contains(&"process"),
+            "Should detect process() in nested context"
+        );
+        assert!(
+            callee_names.contains(&"transform"),
+            "Should detect transform() in nested context"
+        );
+        assert!(
+            callee_names.contains(&"fetch"),
+            "Should detect fetch() in nested context"
+        );
+        assert!(
+            callee_names.contains(&"compute"),
+            "Should detect compute() in nested context"
+        );
+    }
 }
