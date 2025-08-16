@@ -4,7 +4,7 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprMethodCall, File, Local, Pat, PatIdent};
+use syn::{Expr, ExprMethodCall, File, Local, Pat, PatIdent};
 
 #[derive(Debug, Clone)]
 pub struct TaintNode {
@@ -99,7 +99,11 @@ impl TaintAnalyzer {
         }
     }
 
-    pub fn analyze_data_flow(&mut self, file: &File, file_path: &Path) -> Vec<SecurityVulnerability> {
+    pub fn analyze_data_flow(
+        &mut self,
+        file: &File,
+        file_path: &Path,
+    ) -> Vec<SecurityVulnerability> {
         // Build taint propagation graph
         self.build_taint_graph(file, file_path);
 

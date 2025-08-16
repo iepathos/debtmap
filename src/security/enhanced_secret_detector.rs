@@ -1,4 +1,4 @@
-use crate::security::types::{SecretType, SecurityDetector, SecurityVulnerability, Severity};
+use crate::security::types::{SecretType, SecurityDetector, SecurityVulnerability};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::Path;
@@ -123,7 +123,7 @@ impl EnhancedSecretDetector {
     }
 
     fn calculate_confidence(&self, value: &str, secret_type: &SecretType) -> f64 {
-        let mut confidence = 0.5; // Base confidence
+        let mut confidence: f64 = 0.5; // Base confidence
 
         // Increase confidence based on string characteristics
         if value.len() > 30 {

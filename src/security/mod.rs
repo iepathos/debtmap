@@ -16,7 +16,6 @@ use syn::File;
 use self::enhanced_secret_detector::EnhancedSecretDetector;
 use self::enhanced_sql_detector::EnhancedSqlInjectionDetector;
 use self::taint_analysis::TaintAnalyzer;
-use self::tool_integration::ToolIntegrationManager;
 use self::types::{SecurityDetector, SecurityVulnerability};
 
 /// Analyzes security patterns in the given file
@@ -70,7 +69,7 @@ fn convert_vulnerabilities_to_debt_items(
 ) -> Vec<DebtItem> {
     vulnerabilities
         .into_iter()
-        .map(|vuln| convert_vulnerability_to_debt_item(vuln))
+        .map(convert_vulnerability_to_debt_item)
         .collect()
 }
 

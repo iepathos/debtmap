@@ -28,7 +28,7 @@ pub struct ClippyAdapter;
 impl SecurityToolAdapter for ClippyAdapter {
     fn run_tool(&self, path: &Path) -> Result<Vec<ToolFinding>> {
         let output = Command::new("cargo")
-            .args(&[
+            .args([
                 "clippy",
                 "--message-format=json",
                 "--",
@@ -125,7 +125,7 @@ pub struct BanditAdapter;
 impl SecurityToolAdapter for BanditAdapter {
     fn run_tool(&self, path: &Path) -> Result<Vec<ToolFinding>> {
         let output = Command::new("bandit")
-            .args(&["-r", path.to_str().unwrap(), "-f", "json"])
+            .args(["-r", path.to_str().unwrap(), "-f", "json"])
             .output()
             .context("Failed to run bandit")?;
 
@@ -279,8 +279,8 @@ impl ToolIntegrationManager {
             {
                 let key = format!("{:?}:{}:{}", file, line, description);
 
-                if !seen.contains_key(&key) {
-                    seen.insert(key, true);
+                if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
+                    e.insert(true);
                     deduplicated.push(finding);
                 }
             } else {

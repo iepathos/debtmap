@@ -51,7 +51,7 @@ pub enum SecurityVulnerability {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, Serialize, Deserialize)]
 pub enum SecretType {
     ApiKey,
     Password,

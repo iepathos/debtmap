@@ -4,7 +4,7 @@ use crate::security::types::{
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprLit, ExprMethodCall, File, Lit, Local, Pat, PatIdent};
+use syn::{Expr, ExprCall, ExprMethodCall, File, Local, Pat, PatIdent};
 
 pub struct EnhancedSqlInjectionDetector {
     sql_keywords: HashSet<String>,
@@ -30,19 +30,17 @@ impl EnhancedSqlInjectionDetector {
         .collect();
 
         let dangerous_functions: HashSet<String> =
-            vec!["format", "push_str", "concat", "join", "replace"]
+            ["format", "push_str", "concat", "join", "replace"]
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
 
-        let safe_functions: HashSet<String> = vec![
-            "bind",
+        let safe_functions: HashSet<String> = ["bind",
             "prepare",
             "query_as",
             "query_scalar",
             "fetch_one",
-            "fetch_all",
-        ]
+            "fetch_all"]
         .iter()
         .map(|s| s.to_string())
         .collect();
