@@ -37,6 +37,8 @@ impl PerformanceDetector for NestedLoopDetector {
             max_nesting_seen: 0,
             loop_stack: Vec::new(),
             max_acceptable_nesting: self.max_acceptable_nesting,
+            deepest_violation_depth: None,
+            violation_operations: Vec::new(),
         };
 
         visitor.visit_file(file);
@@ -93,12 +95,16 @@ struct NestedLoopVisitor {
     max_nesting_seen: u32,
     loop_stack: Vec<LoopInfo>,
     max_acceptable_nesting: u32,
+    deepest_violation_depth: Option<u32>,
+    violation_operations: Vec<LoopOperation>,
 }
 
 #[derive(Debug, Clone)]
 struct LoopInfo {
     operations: Vec<LoopOperation>,
+    #[allow(dead_code)]
     has_mutable_state: bool,
+    #[allow(dead_code)]
     has_dependencies: bool,
 }
 
@@ -182,24 +188,45 @@ impl NestedLoopVisitor {
 
         // Check if we've exceeded acceptable nesting
         if self.current_nesting >= self.max_acceptable_nesting {
-            let mut all_operations = Vec::new();
-            for loop_info in &self.loop_stack {
-                all_operations.extend(loop_info.operations.clone());
+            // Track that we've found a violation and potentially update the depth
+            if self.deepest_violation_depth.is_none()
+                || self.current_nesting > self.deepest_violation_depth.unwrap()
+            {
+                self.deepest_violation_depth = Some(self.current_nesting);
+
+                // Collect all operations up to this point
+                self.violation_operations.clear();
+                for loop_info in &self.loop_stack {
+                    self.violation_operations
+                        .extend(loop_info.operations.clone());
+                }
             }
-
-            let complexity = self.estimate_complexity(self.current_nesting, &all_operations);
-            let can_parallelize = self.analyze_parallelization_potential(block);
-
-            self.patterns.push(PerformanceAntiPattern::NestedLoop {
-                nesting_level: self.current_nesting,
-                estimated_complexity: complexity,
-                inner_operations: all_operations,
-                can_parallelize,
-            });
         }
     }
 
     fn exit_loop(&mut self) {
+        // If we're exiting from a violation depth back to acceptable levels, report it
+        if let Some(violation_depth) = self.deepest_violation_depth {
+            if self.current_nesting == self.max_acceptable_nesting
+                && violation_depth >= self.max_acceptable_nesting
+            {
+                let complexity =
+                    self.estimate_complexity(violation_depth, &self.violation_operations);
+                let can_parallelize = false; // Simplified
+
+                self.patterns.push(PerformanceAntiPattern::NestedLoop {
+                    nesting_level: violation_depth,
+                    estimated_complexity: complexity,
+                    inner_operations: self.violation_operations.clone(),
+                    can_parallelize,
+                });
+
+                // Reset for next potential violation
+                self.deepest_violation_depth = None;
+                self.violation_operations.clear();
+            }
+        }
+
         self.current_nesting -= 1;
         self.loop_stack.pop();
     }

@@ -139,7 +139,7 @@ pub fn convert_performance_pattern_to_debt_item(
                 ComplexityClass::Quadratic => Priority::Medium,
                 _ => Priority::Low,
             };
-            let mut rec = format!("Consider algorithm optimization or caching");
+            let mut rec = "Consider algorithm optimization or caching".to_string();
             if can_parallelize {
                 rec.push_str(" (parallelization possible)");
             }
