@@ -29,23 +29,24 @@ These patterns represent high-priority technical debt as they directly impact ap
 
 ## Objective
 
-Implement security-focused pattern detection that identifies common security anti-patterns and vulnerabilities by:
+Implement security-focused pattern detection that identifies common security anti-patterns and vulnerabilities not caught by existing language tooling:
 
-1. **Unsafe Block Detection**: Flag all unsafe blocks for manual security review
-2. **Secret Detection**: Identify hardcoded credentials, API keys, and sensitive data
-3. **SQL Injection Analysis**: Detect dangerous string concatenation in SQL contexts
-4. **Cryptographic Pattern Analysis**: Find weak or deprecated cryptographic usage
-5. **Input Validation Analysis**: Identify missing validation on external inputs
+1. **Secret Detection**: Identify hardcoded credentials, API keys, and sensitive data (not detected by rustc/clippy)
+2. **SQL Injection Analysis**: Detect dangerous string concatenation in SQL contexts (not detected by any Rust tooling)
+3. **Input Validation Analysis**: Identify missing validation on external inputs (limited detection in existing tools)
+4. **Language-Specific Security Patterns**:
+   - **Rust**: Focus only on patterns not caught by clippy (e.g., TOCTOU races, custom unsafe patterns)
+   - **Python**: Include all security patterns (limited built-in tooling)
+   - **JavaScript/TypeScript**: Include all security patterns (no built-in security analysis)
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Unsafe Block Detection**
-   - Detect all `unsafe` blocks in Rust code
-   - Report location, size, and complexity of unsafe operations
-   - Classify unsafe operations by risk level (memory access, FFI, transmute, etc.)
-   - Track unsafe propagation through function call chains
+1. **Language-Aware Detection**
+   - For Rust: Skip patterns caught by `clippy::unwrap_used`, `clippy::expect_used`, `#[warn(unsafe_code)]`
+   - For Python/JS/TS: Detect all security patterns including unsafe operations
+   - Maintain language-specific pattern databases
 
 2. **Hardcoded Secret Detection**
    - Pattern matching for common secret formats (API keys, passwords, tokens)

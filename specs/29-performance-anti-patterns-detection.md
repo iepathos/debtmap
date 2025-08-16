@@ -29,25 +29,31 @@ These patterns represent high-impact technical debt as they directly affect appl
 
 ## Objective
 
-Implement performance-focused pattern detection that identifies common performance anti-patterns by:
+Implement performance-focused pattern detection that identifies algorithmic and structural performance issues not caught by existing language tooling:
 
-1. **Nested Loop Analysis**: Detect O(n²) and higher complexity patterns
-2. **Inefficient Data Structure Usage**: Identify suboptimal algorithm choices
-3. **Memory Allocation Analysis**: Find excessive allocation patterns
-4. **I/O Performance Patterns**: Detect inefficient I/O usage
-5. **String Processing Anti-Patterns**: Identify inefficient string operations
+1. **Algorithmic Complexity Analysis**: Detect O(n²) and higher complexity patterns (not detected by any existing tools)
+2. **Data Structure Misuse**: Identify algorithmic inefficiencies beyond basic clippy checks
+3. **Language-Specific Performance Patterns**:
+   - **Rust**: Skip patterns caught by clippy (`needless_collect`, `inefficient_to_string`, `string_add_assign`)
+   - **Python**: Detect all patterns including list comprehension abuse, repeated sorting, global access in loops
+   - **JavaScript/TypeScript**: Detect DOM manipulation in loops, synchronous operations in async contexts
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Nested Loop Detection**
-   - Identify nested loops with potential O(n²) or higher complexity
-   - Detect collection iteration within loops (nested .iter(), .for_each())
-   - Analyze loop dependencies and identify independent loops
-   - Calculate estimated time complexity for nested operations
+1. **Language-Aware Performance Detection**
+   - For Rust: Focus on algorithmic complexity not caught by clippy
+   - For Python/JS/TS: Detect all performance anti-patterns
+   - Maintain language-specific performance pattern databases
 
-2. **Inefficient Data Structure Detection**
+2. **Algorithmic Complexity Detection**
+   - Identify nested loops with O(n²) or higher complexity
+   - Detect collection operations within loops that increase complexity
+   - Calculate estimated time complexity for nested operations
+   - Flag algorithms that could use better data structures (e.g., Vec search → HashSet)
+
+3. **Data Structure Efficiency Detection** (Focus on patterns not caught by clippy)
    - Vec::contains() usage in loops (O(n) per iteration)
    - Linear search patterns on large collections
    - Inappropriate data structure choices (Vec vs. HashSet/HashMap)

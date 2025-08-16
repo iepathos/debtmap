@@ -30,13 +30,14 @@ These patterns represent technical debt that can lead to resource exhaustion and
 
 ## Objective
 
-Implement resource management analysis that identifies patterns affecting resource safety and efficiency by:
+Implement resource management analysis focused on patterns not caught by existing language tooling:
 
-1. **Resource Lifecycle Analysis**: Track resource acquisition and release patterns
-2. **Drop Implementation Detection**: Identify types that need cleanup but lack Drop implementations
-3. **Async Resource Management**: Detect resource handling issues in async code
-4. **Collection Growth Analysis**: Find unbounded collection growth patterns
-5. **Handle Leak Detection**: Identify file, network, and system resource leaks
+1. **Custom Resource Types**: Identify types holding resources that need Drop but lack it (beyond rustc's `#[must_use]`)
+2. **Unbounded Growth Detection**: Find collections without size limits (not detected by any tools)
+3. **Language-Specific Resource Issues**:
+   - **Rust**: Custom types with resources but no Drop (rustc only warns for `#[must_use]`)
+   - **Python**: Missing context managers, unclosed files/connections
+   - **JavaScript/TypeScript**: Event listener leaks, timer leaks, unclosed WebSockets
 
 ## Requirements
 

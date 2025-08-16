@@ -30,14 +30,16 @@ These testing anti-patterns represent technical debt that reduces the value of t
 
 ## Objective
 
-Implement testing quality analysis that identifies test-specific anti-patterns affecting test effectiveness by:
+Implement testing quality analysis that identifies test-specific anti-patterns not caught by existing test frameworks or language tooling:
 
-1. **Test Structure Analysis**: Detect tests without proper assertions or verification
-2. **Test Complexity Assessment**: Identify overly complex test implementations
-3. **Coverage Gap Detection**: Find missing test scenarios and edge cases
-4. **Test Duplication Analysis**: Identify repeated test setup and data patterns
-5. **Flaky Test Detection**: Find tests with non-deterministic behavior patterns
-6. **Test Isolation Analysis**: Detect tests with external dependencies or poor mocking
+1. **Test Structure Analysis**: Detect tests without assertions (not caught by any tools)
+2. **Test Complexity Assessment**: Identify overly complex tests (unique metric)
+3. **Test Duplication Analysis**: Find repeated test logic (not detected by frameworks)
+4. **Language-Agnostic Patterns**: These issues exist across all languages and aren't caught by any existing tools
+5. **Focus Areas**:
+   - Tests that compile/run but don't actually test anything
+   - Test code that's harder to understand than the code it tests
+   - Test suites with poor maintainability characteristics
 
 ## Requirements
 
