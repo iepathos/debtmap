@@ -194,55 +194,13 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
         writeln!(self.writer)?;
 
         // Get top untested functions with high ROI
-        let testing_gaps: Vec<&UnifiedDebtItem> = analysis
-            .items
-            .iter()
-            .filter(|item| matches!(item.debt_type, crate::priority::DebtType::TestingGap { .. }))
-            .take(10)
-            .collect();
+        // Convert im::Vector to slice for compatibility
+        let items_vec: Vec<UnifiedDebtItem> = analysis.items.iter().cloned().collect();
+        let testing_gaps = collect_testing_gaps(&items_vec);
 
-        if testing_gaps.is_empty() {
-            writeln!(
-                self.writer,
-                "_All critical functions have adequate test coverage._"
-            )?;
-            writeln!(self.writer)?;
-            return Ok(());
-        }
-
-        writeln!(self.writer, "### ROI-Based Testing Priorities")?;
-        writeln!(self.writer)?;
-        writeln!(
-            self.writer,
-            "| Function | ROI | Complexity | Coverage | Risk Reduction |"
-        )?;
-        writeln!(
-            self.writer,
-            "|----------|-----|------------|----------|----------------|"
-        )?;
-
-        for item in testing_gaps {
-            if let crate::priority::DebtType::TestingGap {
-                coverage,
-                cyclomatic,
-                cognitive: _,
-            } = &item.debt_type
-            {
-                let roi = calculate_roi(item);
-                let risk_reduction = estimate_risk_reduction(*coverage);
-
-                writeln!(
-                    self.writer,
-                    "| `{}` | {:.1} | {} | {:.0}% | {:.0}% |",
-                    item.location.function,
-                    roi,
-                    cyclomatic,
-                    coverage * 100.0,
-                    risk_reduction * 100.0
-                )?;
-            }
-        }
-        writeln!(self.writer)?;
+        // Format and write the recommendations
+        let recommendations = format_testing_recommendations(&testing_gaps);
+        write!(self.writer, "{}", recommendations)?;
 
         Ok(())
     }
@@ -609,6 +567,61 @@ fn estimate_risk_reduction(coverage: f64) -> f64 {
     (1.0 - coverage) * 0.3
 }
 
+// Pure functions for testing recommendations
+fn collect_testing_gaps(items: &[UnifiedDebtItem]) -> Vec<&UnifiedDebtItem> {
+    items
+        .iter()
+        .filter(|item| matches!(item.debt_type, crate::priority::DebtType::TestingGap { .. }))
+        .take(10)
+        .collect()
+}
+
+fn format_testing_table_header() -> String {
+    "### ROI-Based Testing Priorities\n\n\
+     | Function | ROI | Complexity | Coverage | Risk Reduction |\n\
+     |----------|-----|------------|----------|----------------|\n"
+        .to_string()
+}
+
+fn format_testing_gap_row(item: &UnifiedDebtItem) -> Option<String> {
+    if let crate::priority::DebtType::TestingGap {
+        coverage,
+        cyclomatic,
+        cognitive: _,
+    } = &item.debt_type
+    {
+        let roi = calculate_roi(item);
+        let risk_reduction = estimate_risk_reduction(*coverage);
+
+        Some(format!(
+            "| `{}` | {:.1} | {} | {:.0}% | {:.0}% |\n",
+            item.location.function,
+            roi,
+            cyclomatic,
+            coverage * 100.0,
+            risk_reduction * 100.0
+        ))
+    } else {
+        None
+    }
+}
+
+fn format_testing_recommendations(testing_gaps: &[&UnifiedDebtItem]) -> String {
+    if testing_gaps.is_empty() {
+        return "_All critical functions have adequate test coverage._\n\n".to_string();
+    }
+
+    let mut output = format_testing_table_header();
+
+    for item in testing_gaps {
+        if let Some(row) = format_testing_gap_row(item) {
+            output.push_str(&row);
+        }
+    }
+    output.push('\n');
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -778,5 +791,244 @@ mod tests {
 
         // The function name should be included as-is in markdown
         assert!(result.contains("test_function_with_<special>&_chars"));
+    }
+
+    fn create_testing_gap_item(
+        function_name: &str,
+        coverage: f64,
+        cyclomatic: u32,
+    ) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: std::path::PathBuf::from("test.rs"),
+                line: 10,
+                function: function_name.to_string(),
+            },
+            unified_score: UnifiedScore {
+                final_score: 8.0,
+                complexity_factor: 0.8,
+                coverage_factor: 0.6,
+                roi_factor: 0.7,
+                semantic_factor: 0.5,
+                dependency_factor: 0.5,
+                role_multiplier: 1.0,
+            },
+            debt_type: DebtType::TestingGap {
+                coverage,
+                cyclomatic,
+                cognitive: 20,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Add unit tests".to_string(),
+                rationale: "Increase test coverage".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.5,
+                lines_reduction: 0,
+                risk_reduction: 0.3,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 1,
+            downstream_dependencies: 2,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 0,
+            function_length: 50,
+            cyclomatic_complexity: cyclomatic,
+            cognitive_complexity: 20,
+        }
+    }
+
+    #[test]
+    fn test_collect_testing_gaps() {
+        let items = vec![
+            create_testing_gap_item("func1", 0.2, 10),
+            create_test_item("func2", 7.0), // Not a testing gap
+            create_testing_gap_item("func3", 0.4, 15),
+            create_testing_gap_item("func4", 0.1, 20),
+        ];
+
+        let gaps = collect_testing_gaps(&items);
+
+        assert_eq!(gaps.len(), 3);
+        assert_eq!(gaps[0].location.function, "func1");
+        assert_eq!(gaps[1].location.function, "func3");
+        assert_eq!(gaps[2].location.function, "func4");
+    }
+
+    #[test]
+    fn test_collect_testing_gaps_empty() {
+        let items = vec![
+            create_test_item("func1", 7.0),
+            create_test_item("func2", 8.0),
+        ];
+
+        let gaps = collect_testing_gaps(&items);
+
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn test_collect_testing_gaps_limits_to_ten() {
+        let mut items = Vec::new();
+        for i in 0..15 {
+            items.push(create_testing_gap_item(&format!("func{}", i), 0.2, 10));
+        }
+
+        let gaps = collect_testing_gaps(&items);
+
+        assert_eq!(gaps.len(), 10);
+    }
+
+    #[test]
+    fn test_format_testing_table_header() {
+        let header = format_testing_table_header();
+
+        assert!(header.contains("### ROI-Based Testing Priorities"));
+        assert!(header.contains("| Function | ROI | Complexity | Coverage | Risk Reduction |"));
+        assert!(header.contains("|----------|-----|------------|----------|----------------|"));
+    }
+
+    #[test]
+    fn test_format_testing_gap_row() {
+        let item = create_testing_gap_item("test_function", 0.3, 12);
+
+        let row = format_testing_gap_row(&item).unwrap();
+
+        assert!(row.contains("`test_function`"));
+        assert!(row.contains("| 7.0 |")); // ROI = roi_factor * 10
+        assert!(row.contains("| 12 |")); // Cyclomatic complexity
+        assert!(row.contains("| 30% |")); // Coverage
+        assert!(row.contains("| 21% |")); // Risk reduction = (1-0.3)*0.3
+    }
+
+    #[test]
+    fn test_format_testing_gap_row_non_testing_gap() {
+        let item = create_test_item("test_function", 8.0);
+
+        let row = format_testing_gap_row(&item);
+
+        assert!(row.is_none());
+    }
+
+    #[test]
+    fn test_format_testing_recommendations_empty() {
+        let gaps: Vec<&UnifiedDebtItem> = vec![];
+
+        let result = format_testing_recommendations(&gaps);
+
+        assert!(result.contains("_All critical functions have adequate test coverage._"));
+    }
+
+    #[test]
+    fn test_format_testing_recommendations_with_gaps() {
+        let items = vec![
+            create_testing_gap_item("func1", 0.2, 10),
+            create_testing_gap_item("func2", 0.5, 15),
+        ];
+        let gaps: Vec<&UnifiedDebtItem> = items.iter().collect();
+
+        let result = format_testing_recommendations(&gaps);
+
+        assert!(result.contains("### ROI-Based Testing Priorities"));
+        assert!(result.contains("`func1`"));
+        assert!(result.contains("`func2`"));
+        assert!(result.contains("| 10 |")); // func1 complexity
+        assert!(result.contains("| 15 |")); // func2 complexity
+    }
+
+    #[test]
+    fn test_calculate_roi() {
+        let item = create_testing_gap_item("test", 0.3, 10);
+
+        let roi = calculate_roi(&item);
+
+        assert_eq!(roi, 7.0); // roi_factor (0.7) * 10
+    }
+
+    #[test]
+    fn test_estimate_risk_reduction() {
+        assert_eq!(estimate_risk_reduction(0.0), 0.3); // (1.0 - 0.0) * 0.3
+        assert_eq!(estimate_risk_reduction(0.5), 0.15); // (1.0 - 0.5) * 0.3
+        assert_eq!(estimate_risk_reduction(1.0), 0.0); // (1.0 - 1.0) * 0.3
+    }
+
+    #[test]
+    fn test_write_testing_recommendations_with_gaps() {
+        use crate::priority::{CallGraph, ImpactMetrics, UnifiedAnalysis};
+        use im::Vector;
+
+        let items = vec![
+            create_testing_gap_item("critical_func", 0.1, 20),
+            create_testing_gap_item("important_func", 0.3, 15),
+            create_test_item("other_func", 5.0),
+        ];
+
+        let analysis = UnifiedAnalysis {
+            items: Vector::from(items),
+            total_impact: ImpactMetrics {
+                complexity_reduction: 10.0,
+                coverage_improvement: 0.2,
+                lines_reduction: 20,
+                risk_reduction: 0.3,
+            },
+            total_debt_score: 100.0,
+            call_graph: CallGraph::new(),
+            overall_coverage: Some(0.75),
+        };
+
+        let mut buffer = Vec::new();
+        let mut writer = MarkdownWriter::new(&mut buffer);
+
+        writer.write_testing_recommendations(&analysis).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        assert!(output.contains("## Testing Recommendations"));
+        assert!(output.contains("### ROI-Based Testing Priorities"));
+        assert!(output.contains("`critical_func`"));
+        assert!(output.contains("`important_func`"));
+        assert!(!output.contains("`other_func`")); // Not a testing gap
+        assert!(output.contains("| 20 |")); // critical_func complexity
+        assert!(output.contains("| 15 |")); // important_func complexity
+    }
+
+    #[test]
+    fn test_write_testing_recommendations_no_gaps() {
+        use crate::priority::{CallGraph, ImpactMetrics, UnifiedAnalysis};
+        use im::Vector;
+
+        let items = vec![
+            create_test_item("func1", 5.0),
+            create_test_item("func2", 6.0),
+        ];
+
+        let analysis = UnifiedAnalysis {
+            items: Vector::from(items),
+            total_impact: ImpactMetrics {
+                complexity_reduction: 5.0,
+                coverage_improvement: 0.1,
+                lines_reduction: 10,
+                risk_reduction: 0.2,
+            },
+            total_debt_score: 50.0,
+            call_graph: CallGraph::new(),
+            overall_coverage: Some(0.85),
+        };
+
+        let mut buffer = Vec::new();
+        let mut writer = MarkdownWriter::new(&mut buffer);
+
+        writer.write_testing_recommendations(&analysis).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        assert!(output.contains("## Testing Recommendations"));
+        assert!(output.contains("_All critical functions have adequate test coverage._"));
+        assert!(!output.contains("### ROI-Based Testing Priorities"));
     }
 }
