@@ -108,32 +108,10 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
     }
 
     fn write_dead_code_section(&mut self, analysis: &UnifiedAnalysis) -> anyhow::Result<()> {
-        let dead_code_items = filter_dead_code_items(analysis);
-
-        if dead_code_items.is_empty() {
-            return Ok(());
+        let content = format_dead_code_section(analysis);
+        if !content.is_empty() {
+            write!(self.writer, "{}", content)?;
         }
-
-        writeln!(self.writer, "## Dead Code Detection")?;
-        writeln!(self.writer)?;
-        writeln!(
-            self.writer,
-            "### Unused Functions ({} found)",
-            dead_code_items.len()
-        )?;
-        writeln!(self.writer)?;
-
-        let (header, separator) = get_dead_code_table_headers();
-        writeln!(self.writer, "{}", header)?;
-        writeln!(self.writer, "{}", separator)?;
-
-        for item in dead_code_items.iter().take(20) {
-            if let Some(row) = format_dead_code_row(item) {
-                writeln!(self.writer, "{}", row)?;
-            }
-        }
-        writeln!(self.writer)?;
-
         Ok(())
     }
 
@@ -586,6 +564,49 @@ fn calculate_roi(item: &crate::priority::UnifiedDebtItem) -> f64 {
 fn estimate_risk_reduction(coverage: f64) -> f64 {
     // Estimate risk reduction from improving coverage
     (1.0 - coverage) * 0.3
+}
+
+/// Format the entire dead code section as a string
+fn format_dead_code_section(analysis: &UnifiedAnalysis) -> String {
+    let dead_code_items = filter_dead_code_items(analysis);
+
+    if dead_code_items.is_empty() {
+        return String::new();
+    }
+
+    let mut output = String::new();
+    output.push_str("## Dead Code Detection\n\n");
+    output.push_str(&format!(
+        "### Unused Functions ({} found)\n\n",
+        dead_code_items.len()
+    ));
+
+    // Format the table
+    let table_content = format_dead_code_table(&dead_code_items);
+    output.push_str(&table_content);
+    output.push('\n');
+
+    output
+}
+
+/// Format the dead code table with headers and rows
+fn format_dead_code_table(items: &[&UnifiedDebtItem]) -> String {
+    let mut output = String::new();
+    let (header, separator) = get_dead_code_table_headers();
+
+    output.push_str(header);
+    output.push('\n');
+    output.push_str(separator);
+    output.push('\n');
+
+    for item in items.iter().take(20) {
+        if let Some(row) = format_dead_code_row(item) {
+            output.push_str(&row);
+            output.push('\n');
+        }
+    }
+
+    output
 }
 
 // Pure functions for testing recommendations
@@ -1522,5 +1543,177 @@ mod tests {
         assert!(output.contains("### Unused Functions (1 found)"));
         assert!(output.contains("unused_func"));
         assert!(!output.contains("test_func"));
+    }
+
+    #[test]
+    fn test_format_dead_code_section_empty() {
+        use crate::priority::ImpactMetrics;
+        let analysis = UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 0.0,
+            call_graph: Default::default(),
+            overall_coverage: Some(100.0),
+        };
+
+        let result = format_dead_code_section(&analysis);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_format_dead_code_section_with_items() {
+        use crate::priority::{FunctionVisibility, ImpactMetrics};
+        let mut analysis = UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: Default::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        // Add a dead code item
+        let dead_item = UnifiedDebtItem {
+            location: Location {
+                file: std::path::PathBuf::from("test.rs"),
+                line: 20,
+                function: "dead_function".to_string(),
+            },
+            debt_type: DebtType::DeadCode {
+                visibility: FunctionVisibility::Public,
+                cyclomatic: 5,
+                cognitive: 8,
+                usage_hints: vec![],
+            },
+            ..create_test_item("dead_function", 3.0)
+        };
+        analysis.items.push_back(dead_item);
+
+        let result = format_dead_code_section(&analysis);
+
+        assert!(result.contains("## Dead Code Detection"));
+        assert!(result.contains("### Unused Functions (1 found)"));
+        assert!(result.contains("| Function | Visibility | Complexity | Recommendation |"));
+        assert!(result.contains("dead_function"));
+    }
+
+    #[test]
+    fn test_format_dead_code_table() {
+        use crate::priority::FunctionVisibility;
+        let dead_item = UnifiedDebtItem {
+            location: Location {
+                file: std::path::PathBuf::from("test.rs"),
+                line: 20,
+                function: "unused_func1".to_string(),
+            },
+            debt_type: DebtType::DeadCode {
+                visibility: FunctionVisibility::Public,
+                cyclomatic: 5,
+                cognitive: 8,
+                usage_hints: vec![],
+            },
+            ..create_test_item("unused_func1", 3.0)
+        };
+
+        let items = vec![&dead_item];
+        let result = format_dead_code_table(&items);
+
+        assert!(result.contains("| Function | Visibility | Complexity | Recommendation |"));
+        assert!(result.contains("|----------|------------|------------|----------------|"));
+        assert!(result.contains("unused_func1"));
+        assert!(result.contains("public"));
+    }
+
+    #[test]
+    fn test_format_dead_code_table_multiple_items() {
+        use crate::priority::FunctionVisibility;
+        let mut items = Vec::new();
+
+        for i in 0..25 {
+            let item = Box::leak(Box::new(UnifiedDebtItem {
+                location: Location {
+                    file: std::path::PathBuf::from("test.rs"),
+                    line: 20 + i as usize,
+                    function: format!("unused_func_{}", i),
+                },
+                debt_type: DebtType::DeadCode {
+                    visibility: if i % 2 == 0 {
+                        FunctionVisibility::Public
+                    } else {
+                        FunctionVisibility::Crate
+                    },
+                    cyclomatic: 5 + i as u32,
+                    cognitive: 8 + i as u32,
+                    usage_hints: vec![],
+                },
+                ..create_test_item(&format!("unused_func_{}", i), 3.0)
+            }));
+            items.push(item as &UnifiedDebtItem);
+        }
+
+        let result = format_dead_code_table(&items);
+
+        // Should only show first 20 items
+        assert!(result.contains("unused_func_0"));
+        assert!(result.contains("unused_func_19"));
+        assert!(!result.contains("unused_func_20"));
+
+        // Check table structure
+        assert!(result.contains("| Function | Visibility | Complexity | Recommendation |"));
+        assert!(result.contains("|----------|------------|------------|----------------|"));
+    }
+
+    #[test]
+    fn test_format_dead_code_section_filters_non_dead_code() {
+        use crate::priority::{FunctionVisibility, ImpactMetrics};
+        let mut analysis = UnifiedAnalysis {
+            items: im::Vector::new(),
+            total_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 100.0,
+            call_graph: Default::default(),
+            overall_coverage: Some(75.0),
+        };
+
+        // Add a non-dead code item
+        let normal_item = create_test_item("normal_func", 5.0);
+        analysis.items.push_back(normal_item);
+
+        // Add a dead code item
+        let dead_item = UnifiedDebtItem {
+            location: Location {
+                file: std::path::PathBuf::from("test.rs"),
+                line: 20,
+                function: "dead_func".to_string(),
+            },
+            debt_type: DebtType::DeadCode {
+                visibility: FunctionVisibility::Public,
+                cyclomatic: 5,
+                cognitive: 8,
+                usage_hints: vec![],
+            },
+            ..create_test_item("dead_func", 3.0)
+        };
+        analysis.items.push_back(dead_item);
+
+        let result = format_dead_code_section(&analysis);
+
+        // Should only include dead code item
+        assert!(result.contains("dead_func"));
+        assert!(!result.contains("normal_func"));
+        assert!(result.contains("### Unused Functions (1 found)"));
     }
 }

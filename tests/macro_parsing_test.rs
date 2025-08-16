@@ -1,4 +1,3 @@
-use syn;
 use syn::visit::Visit;
 
 #[test]

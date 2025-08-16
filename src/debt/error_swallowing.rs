@@ -68,33 +68,49 @@ impl<'a> ErrorSwallowingDetector<'a> {
     }
 
     fn check_if_let_ok(&mut self, expr_if: &ExprIf) {
-        if let Expr::Let(ExprLet { pat, expr: _, .. }) = &*expr_if.cond {
-            if let Pat::TupleStruct(pat_tuple) = &**pat {
-                if let Some(path) = pat_tuple.path.get_ident() {
-                    if path == "Ok" {
-                        // Use a placeholder line number since we can't get it from span easily
-                        let line = 1;
+        if !Self::is_if_let_ok_pattern(&expr_if.cond) {
+            return;
+        }
 
-                        // Check if there's an else branch
-                        if let Some(else_branch) = &expr_if.else_branch {
-                            // Check if else branch is empty
-                            if is_empty_block(&else_branch.1) {
-                                self.add_debt_item(
-                                    line,
-                                    ErrorSwallowingPattern::IfLetOkEmptyElse,
-                                    "Empty else branch for Result handling",
-                                );
-                            }
-                        } else {
-                            self.add_debt_item(
-                                line,
-                                ErrorSwallowingPattern::IfLetOkNoElse,
-                                "No error handling for Result",
-                            );
-                        }
-                    }
-                }
-            }
+        let line = 1; // Placeholder line number
+        if let Some((pattern, description)) = Self::classify_error_handling(&expr_if.else_branch) {
+            self.add_debt_item(line, pattern, description);
+        }
+    }
+
+    // Pure function to check if expression is an if-let Ok pattern
+    fn is_if_let_ok_pattern(cond: &Expr) -> bool {
+        match cond {
+            Expr::Let(ExprLet { pat, .. }) => Self::is_ok_pattern(pat),
+            _ => false,
+        }
+    }
+
+    // Pure function to check if pattern matches Ok(...)
+    fn is_ok_pattern(pat: &Pat) -> bool {
+        match pat {
+            Pat::TupleStruct(pat_tuple) => pat_tuple
+                .path
+                .get_ident()
+                .is_some_and(|ident| ident == "Ok"),
+            _ => false,
+        }
+    }
+
+    // Pure function to classify error handling pattern based on else branch
+    fn classify_error_handling(
+        else_branch: &Option<(syn::token::Else, Box<Expr>)>,
+    ) -> Option<(ErrorSwallowingPattern, &'static str)> {
+        match else_branch {
+            Some((_, expr)) if is_empty_block(expr) => Some((
+                ErrorSwallowingPattern::IfLetOkEmptyElse,
+                "Empty else branch for Result handling",
+            )),
+            None => Some((
+                ErrorSwallowingPattern::IfLetOkNoElse,
+                "No error handling for Result",
+            )),
+            _ => None, // Proper error handling, no debt
         }
     }
 
@@ -203,7 +219,7 @@ impl<'a> Visit<'_> for ErrorSwallowingDetector<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ErrorSwallowingPattern {
     IfLetOkNoElse,
     IfLetOkEmptyElse,
@@ -286,7 +302,7 @@ pub fn detect_error_swallowing(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::parse_str;
+    use syn::{parse_quote, parse_str, Pat};
 
     #[test]
     fn test_if_let_ok_no_else() {
@@ -370,6 +386,144 @@ mod tests {
         assert!(!items.is_empty());
         assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
         assert!(items[0].message.contains("unwrap_or"));
+    }
+
+    #[test]
+    fn test_is_if_let_ok_pattern() {
+        // Test positive case: if let Ok pattern
+        let code = "if let Ok(value) = some_function() { }";
+        let expr: syn::Expr = parse_str(code).expect("Failed to parse");
+        if let syn::Expr::If(expr_if) = expr {
+            assert!(
+                ErrorSwallowingDetector::is_if_let_ok_pattern(&expr_if.cond),
+                "Should recognize if let Ok pattern"
+            );
+        }
+
+        // Test negative case: regular if condition
+        let code = "if true { }";
+        let expr: syn::Expr = parse_str(code).expect("Failed to parse");
+        if let syn::Expr::If(expr_if) = expr {
+            assert!(
+                !ErrorSwallowingDetector::is_if_let_ok_pattern(&expr_if.cond),
+                "Should not recognize regular if as Ok pattern"
+            );
+        }
+
+        // Test negative case: if let Err pattern
+        let code = "if let Err(e) = some_function() { }";
+        let expr: syn::Expr = parse_str(code).expect("Failed to parse");
+        if let syn::Expr::If(expr_if) = expr {
+            assert!(
+                !ErrorSwallowingDetector::is_if_let_ok_pattern(&expr_if.cond),
+                "Should not recognize if let Err as Ok pattern"
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_ok_pattern() {
+        // Test positive case: Ok pattern
+        let pat: Pat = parse_quote!(Ok(value));
+        assert!(
+            ErrorSwallowingDetector::is_ok_pattern(&pat),
+            "Should recognize Ok pattern"
+        );
+
+        // Test negative case: Err pattern
+        let pat: Pat = parse_quote!(Err(e));
+        assert!(
+            !ErrorSwallowingDetector::is_ok_pattern(&pat),
+            "Should not recognize Err as Ok pattern"
+        );
+
+        // Test negative case: Some pattern
+        let pat: Pat = parse_quote!(Some(x));
+        assert!(
+            !ErrorSwallowingDetector::is_ok_pattern(&pat),
+            "Should not recognize Some as Ok pattern"
+        );
+
+        // Test negative case: wildcard pattern
+        let pat: Pat = parse_quote!(_);
+        assert!(
+            !ErrorSwallowingDetector::is_ok_pattern(&pat),
+            "Should not recognize wildcard as Ok pattern"
+        );
+    }
+
+    #[test]
+    fn test_classify_error_handling() {
+        use syn::{parse_quote, Expr};
+
+        // Test case: No else branch
+        let else_branch = None;
+        let result = ErrorSwallowingDetector::classify_error_handling(&else_branch);
+        assert!(result.is_some());
+        let (pattern, desc) = result.unwrap();
+        assert_eq!(pattern, ErrorSwallowingPattern::IfLetOkNoElse);
+        assert_eq!(desc, "No error handling for Result");
+
+        // Test case: Empty else block
+        let empty_block: Expr = parse_quote! { {} };
+        let else_branch = Some((syn::token::Else::default(), Box::new(empty_block)));
+        let result = ErrorSwallowingDetector::classify_error_handling(&else_branch);
+        assert!(result.is_some());
+        let (pattern, desc) = result.unwrap();
+        assert_eq!(pattern, ErrorSwallowingPattern::IfLetOkEmptyElse);
+        assert_eq!(desc, "Empty else branch for Result handling");
+
+        // Test case: Non-empty else block (proper handling)
+        let non_empty_block: Expr = parse_quote! { { println!("error"); } };
+        let else_branch = Some((syn::token::Else::default(), Box::new(non_empty_block)));
+        let result = ErrorSwallowingDetector::classify_error_handling(&else_branch);
+        assert!(
+            result.is_none(),
+            "Should not flag debt for proper error handling"
+        );
+    }
+
+    #[test]
+    fn test_if_let_ok_with_empty_else() {
+        let code = r#"
+            fn example() {
+                if let Ok(value) = some_function() {
+                    println!("{}", value);
+                } else {
+                    // Empty else block
+                }
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+        assert!(items[0].message.contains("empty else branch"));
+    }
+
+    #[test]
+    fn test_if_let_ok_with_proper_handling() {
+        let code = r#"
+            fn example() {
+                if let Ok(value) = some_function() {
+                    println!("{}", value);
+                } else {
+                    eprintln!("Error occurred");
+                }
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
+
+        // Should not detect debt when else branch has proper handling
+        assert_eq!(
+            items.len(),
+            0,
+            "Should not detect debt for proper error handling"
+        );
     }
 
     #[test]

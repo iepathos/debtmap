@@ -14,7 +14,7 @@ use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use tree_sitter::Parser;
+use tree_sitter::{Parser, Tree};
 
 pub struct JavaScriptAnalyzer {
     parser: Mutex<Parser>,
@@ -167,6 +167,39 @@ impl JavaScriptAnalyzer {
     }
 }
 
+impl JavaScriptAnalyzer {
+    /// Analyzes a JavaScript or TypeScript AST to extract metrics
+    fn analyze_js_ts_ast(
+        &self,
+        tree: &Tree,
+        source: &str,
+        path: &Path,
+        language: Language,
+    ) -> FileMetrics {
+        let root_node = tree.root_node();
+        let functions = complexity::extract_functions(root_node, source, path);
+        let dependencies = dependencies::extract_dependencies(root_node, source);
+        let debt_items = self.create_debt_items(tree, source, path, &functions);
+
+        let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
+            (cyc + f.cyclomatic, cog + f.cognitive)
+        });
+
+        FileMetrics {
+            path: path.to_path_buf(),
+            language,
+            complexity: ComplexityMetrics {
+                functions,
+                cyclomatic_complexity: cyclomatic,
+                cognitive_complexity: cognitive,
+            },
+            debt_items,
+            dependencies,
+            duplications: vec![],
+        }
+    }
+}
+
 impl Analyzer for JavaScriptAnalyzer {
     fn parse(&self, content: &str, path: PathBuf) -> Result<Ast> {
         // Parse the content directly using the already configured parser
@@ -179,56 +212,18 @@ impl Analyzer for JavaScriptAnalyzer {
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
         match ast {
-            Ast::JavaScript(js_ast) => {
-                let root_node = js_ast.tree.root_node();
-                let functions =
-                    complexity::extract_functions(root_node, &js_ast.source, &js_ast.path);
-                let dependencies = dependencies::extract_dependencies(root_node, &js_ast.source);
-                let debt_items =
-                    self.create_debt_items(&js_ast.tree, &js_ast.source, &js_ast.path, &functions);
-
-                let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
-                    (cyc + f.cyclomatic, cog + f.cognitive)
-                });
-
-                FileMetrics {
-                    path: js_ast.path.clone(),
-                    language: Language::JavaScript,
-                    complexity: ComplexityMetrics {
-                        functions,
-                        cyclomatic_complexity: cyclomatic,
-                        cognitive_complexity: cognitive,
-                    },
-                    debt_items,
-                    dependencies,
-                    duplications: vec![],
-                }
-            }
-            Ast::TypeScript(ts_ast) => {
-                let root_node = ts_ast.tree.root_node();
-                let functions =
-                    complexity::extract_functions(root_node, &ts_ast.source, &ts_ast.path);
-                let dependencies = dependencies::extract_dependencies(root_node, &ts_ast.source);
-                let debt_items =
-                    self.create_debt_items(&ts_ast.tree, &ts_ast.source, &ts_ast.path, &functions);
-
-                let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
-                    (cyc + f.cyclomatic, cog + f.cognitive)
-                });
-
-                FileMetrics {
-                    path: ts_ast.path.clone(),
-                    language: Language::TypeScript,
-                    complexity: ComplexityMetrics {
-                        functions,
-                        cyclomatic_complexity: cyclomatic,
-                        cognitive_complexity: cognitive,
-                    },
-                    debt_items,
-                    dependencies,
-                    duplications: vec![],
-                }
-            }
+            Ast::JavaScript(js_ast) => self.analyze_js_ts_ast(
+                &js_ast.tree,
+                &js_ast.source,
+                &js_ast.path,
+                Language::JavaScript,
+            ),
+            Ast::TypeScript(ts_ast) => self.analyze_js_ts_ast(
+                &ts_ast.tree,
+                &ts_ast.source,
+                &ts_ast.path,
+                Language::TypeScript,
+            ),
             _ => FileMetrics {
                 path: PathBuf::new(),
                 language: self.language,

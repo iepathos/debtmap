@@ -81,18 +81,33 @@ impl RefactoringDetector for HighComplexityDetector {
     }
 }
 
+fn create_validation_spec(base_name: &str) -> PureFunctionSpec {
+    PureFunctionSpec {
+        name: format!("{}_validate", base_name),
+        inputs: vec!["input: &Input".to_string()],
+        output: "Result<ValidInput, Error>".to_string(),
+        purpose: "Validate input data".to_string(),
+        no_side_effects: true,
+        testability: TestabilityLevel::Easy,
+    }
+}
+
+fn create_step_spec(base_name: &str, step_num: u32) -> PureFunctionSpec {
+    PureFunctionSpec {
+        name: format!("{}_step_{}", base_name, step_num),
+        inputs: vec!["data: &Data".to_string()],
+        output: "StepResult".to_string(),
+        purpose: format!("Processing step {}", step_num),
+        no_side_effects: true,
+        testability: TestabilityLevel::Easy,
+    }
+}
+
 fn generate_suggested_functions(base_name: &str, count: u32) -> Vec<PureFunctionSpec> {
     let mut functions = Vec::new();
 
     if count > 0 {
-        functions.push(PureFunctionSpec {
-            name: format!("{}_validate", base_name),
-            inputs: vec!["input: &Input".to_string()],
-            output: "Result<ValidInput, Error>".to_string(),
-            purpose: "Validate input data".to_string(),
-            no_side_effects: true,
-            testability: TestabilityLevel::Easy,
-        });
+        functions.push(create_validation_spec(base_name));
     }
 
     if count > 1 {
@@ -119,16 +134,70 @@ fn generate_suggested_functions(base_name: &str, count: u32) -> Vec<PureFunction
 
     if count > 3 {
         for i in 4..=count {
-            functions.push(PureFunctionSpec {
-                name: format!("{}_step_{}", base_name, i),
-                inputs: vec!["data: &Data".to_string()],
-                output: "StepResult".to_string(),
-                purpose: format!("Processing step {}", i),
-                no_side_effects: true,
-                testability: TestabilityLevel::Easy,
-            });
+            functions.push(create_step_spec(base_name, i));
         }
     }
 
     functions
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_validation_spec() {
+        let spec = create_validation_spec("my_function");
+        assert_eq!(spec.name, "my_function_validate");
+        assert_eq!(spec.inputs, vec!["input: &Input".to_string()]);
+        assert_eq!(spec.output, "Result<ValidInput, Error>");
+        assert_eq!(spec.purpose, "Validate input data");
+        assert!(spec.no_side_effects);
+        assert!(matches!(spec.testability, TestabilityLevel::Easy));
+    }
+
+    #[test]
+    fn test_create_step_spec() {
+        let spec = create_step_spec("process", 5);
+        assert_eq!(spec.name, "process_step_5");
+        assert_eq!(spec.inputs, vec!["data: &Data".to_string()]);
+        assert_eq!(spec.output, "StepResult");
+        assert_eq!(spec.purpose, "Processing step 5");
+        assert!(spec.no_side_effects);
+        assert!(matches!(spec.testability, TestabilityLevel::Easy));
+    }
+
+    #[test]
+    fn test_generate_suggested_functions_zero_count() {
+        let functions = generate_suggested_functions("base", 0);
+        assert!(functions.is_empty());
+    }
+
+    #[test]
+    fn test_generate_suggested_functions_one_count() {
+        let functions = generate_suggested_functions("handler", 1);
+        assert_eq!(functions.len(), 1);
+        assert_eq!(functions[0].name, "handler_validate");
+    }
+
+    #[test]
+    fn test_generate_suggested_functions_three_count() {
+        let functions = generate_suggested_functions("processor", 3);
+        assert_eq!(functions.len(), 3);
+        assert_eq!(functions[0].name, "processor_validate");
+        assert_eq!(functions[1].name, "processor_transform");
+        assert_eq!(functions[2].name, "processor_process");
+    }
+
+    #[test]
+    fn test_generate_suggested_functions_many_count() {
+        let functions = generate_suggested_functions("complex", 6);
+        assert_eq!(functions.len(), 6);
+        assert_eq!(functions[0].name, "complex_validate");
+        assert_eq!(functions[1].name, "complex_transform");
+        assert_eq!(functions[2].name, "complex_process");
+        assert_eq!(functions[3].name, "complex_step_4");
+        assert_eq!(functions[4].name, "complex_step_5");
+        assert_eq!(functions[5].name, "complex_step_6");
+    }
 }

@@ -316,6 +316,38 @@ impl CallGraphExtractor {
         }
     }
 
+    /// Resolves Self:: references to the actual impl type
+    fn resolve_self_type(name: &str, current_impl_type: &Option<String>) -> String {
+        if name.starts_with("Self::") {
+            if let Some(ref impl_type) = current_impl_type {
+                return name.replace("Self::", &format!("{}::", impl_type));
+            }
+        }
+        name.to_string()
+    }
+
+    /// Determines if a function call is likely in the same file
+    fn is_same_file_call(name: &str, current_impl_type: &Option<String>) -> bool {
+        !name.contains("::")
+            || current_impl_type
+                .as_ref()
+                .is_some_and(|t| name.starts_with(t))
+    }
+
+    /// Determines if a method call receiver is self
+    fn is_self_receiver(receiver: &Expr) -> bool {
+        matches!(receiver, Expr::Path(p) if p.path.is_ident("self"))
+    }
+
+    /// Process a function or method call, adding it to unresolved calls
+    fn process_call(&mut self, name: String, same_file_hint: bool) {
+        self.add_unresolved_call(
+            name.clone(),
+            Self::classify_call_type(&name),
+            same_file_hint,
+        );
+    }
+
     /// Constructs a method name, qualifying it with the type information when available
     fn construct_method_name(
         &self,
@@ -413,19 +445,29 @@ impl CallGraphExtractor {
         }
     }
 
+    /// Attempt to parse tokens as a single expression
+    fn try_parse_single_expr(tokens: &proc_macro2::TokenStream) -> syn::Result<Expr> {
+        syn::parse2::<Expr>(tokens.clone())
+    }
+
+    /// Process parsed expressions by visiting each one
+    fn process_parsed_exprs(&mut self, exprs: Vec<Expr>) {
+        for expr in exprs {
+            self.visit_expr(&expr);
+        }
+    }
+
     /// Parse assertion macros
     fn parse_assert_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
         // First try to parse as a single expression (for assert!)
-        if let Ok(expr) = syn::parse2::<Expr>(tokens.clone()) {
+        if let Ok(expr) = Self::try_parse_single_expr(tokens) {
             self.macro_stats.successfully_parsed += 1;
             self.visit_expr(&expr);
         }
         // Then try to parse as comma-separated expressions (for assert_eq!, assert_ne!)
         else if let Ok(exprs) = self.parse_comma_separated_exprs(tokens) {
             self.macro_stats.successfully_parsed += 1;
-            for expr in exprs {
-                self.visit_expr(&expr);
-            }
+            self.process_parsed_exprs(exprs);
         } else {
             self.log_unexpandable_macro(macro_name);
         }
@@ -462,32 +504,53 @@ impl CallGraphExtractor {
         ))
     }
 
+    /// Check if content is braced (starts with '{' and ends with '}')
+    fn is_braced_content(content: &str) -> bool {
+        content.starts_with('{') && content.ends_with('}')
+    }
+
+    /// Extract inner content from braced string
+    fn extract_braced_inner(content: &str) -> &str {
+        &content[1..content.len() - 1]
+    }
+
+    /// Parse a single expression from a string
+    fn parse_expression_from_str(expr_str: &str) -> Option<Expr> {
+        expr_str
+            .parse::<proc_macro2::TokenStream>()
+            .ok()
+            .and_then(|tokens| syn::parse2::<Expr>(tokens).ok())
+    }
+
+    /// Parse a key-value pair separated by "=>"
+    fn parse_key_value_pair(pair: &str) -> Vec<Expr> {
+        let mut exprs = Vec::new();
+
+        if let Some(arrow_pos) = pair.find("=>") {
+            let key_str = pair[..arrow_pos].trim();
+            let val_str = pair[arrow_pos + 2..].trim();
+
+            if let Some(key_expr) = Self::parse_expression_from_str(key_str) {
+                exprs.push(key_expr);
+            }
+            if let Some(val_expr) = Self::parse_expression_from_str(val_str) {
+                exprs.push(val_expr);
+            }
+        }
+
+        exprs
+    }
+
     /// Parse braced expressions for map-like macros
     fn parse_braced_exprs(&self, tokens: &proc_macro2::TokenStream) -> syn::Result<Vec<Expr>> {
-        let mut exprs = Vec::new();
         let content = tokens.to_string();
 
-        if content.starts_with('{') && content.ends_with('}') {
-            let inner = &content[1..content.len() - 1];
-            // Split by commas and parse each key-value pair
-            for pair in inner.split(',') {
-                // For key => value pairs, we want to visit both key and value
-                if let Some(arrow_pos) = pair.find("=>") {
-                    let key_str = &pair[..arrow_pos].trim();
-                    let val_str = &pair[arrow_pos + 2..].trim();
-
-                    if let Ok(key_tokens) = key_str.parse::<proc_macro2::TokenStream>() {
-                        if let Ok(key_expr) = syn::parse2::<Expr>(key_tokens) {
-                            exprs.push(key_expr);
-                        }
-                    }
-                    if let Ok(val_tokens) = val_str.parse::<proc_macro2::TokenStream>() {
-                        if let Ok(val_expr) = syn::parse2::<Expr>(val_tokens) {
-                            exprs.push(val_expr);
-                        }
-                    }
-                }
-            }
+        if Self::is_braced_content(&content) {
+            let inner = Self::extract_braced_inner(&content);
+            let exprs: Vec<Expr> = inner
+                .split(',')
+                .flat_map(Self::parse_key_value_pair)
+                .collect();
 
             if !exprs.is_empty() {
                 return Ok(exprs);
@@ -791,23 +854,11 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
             // Handle regular function calls: foo(), module::foo(), Self::method()
             Expr::Call(ExprCall { func, args, .. }) => {
                 if let Expr::Path(expr_path) = &**func {
-                    if let Some(mut name) = Self::extract_function_name_from_path(&expr_path.path) {
-                        // Handle Self:: calls by replacing with the current impl type
-                        if name.starts_with("Self::") {
-                            if let Some(ref impl_type) = self.current_impl_type {
-                                name = name.replace("Self::", &format!("{}::", impl_type));
-                            }
-                        }
-                        let same_file_hint = !name.contains("::")
-                            || self
-                                .current_impl_type
-                                .as_ref()
-                                .is_some_and(|t| name.starts_with(t));
-                        self.add_unresolved_call(
-                            name.clone(),
-                            Self::classify_call_type(&name),
-                            same_file_hint,
-                        );
+                    if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
+                        let resolved_name = Self::resolve_self_type(&name, &self.current_impl_type);
+                        let same_file_hint =
+                            Self::is_same_file_call(&resolved_name, &self.current_impl_type);
+                        self.process_call(resolved_name, same_file_hint);
                     }
                 }
                 // Process arguments for references and nested calls
@@ -822,13 +873,8 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 ..
             }) => {
                 let name = self.construct_method_name(method, receiver, &self.current_impl_type);
-                let same_file_hint =
-                    matches!(&**receiver, Expr::Path(p) if p.path.is_ident("self"));
-                self.add_unresolved_call(
-                    name.clone(),
-                    Self::classify_call_type(&name),
-                    same_file_hint,
-                );
+                let same_file_hint = Self::is_self_receiver(receiver);
+                self.process_call(name, same_file_hint);
 
                 // Process arguments and visit receiver
                 self.process_arguments(args);
@@ -1044,6 +1090,257 @@ mod tests {
 
     fn parse_rust_code(code: &str) -> syn::File {
         syn::parse_str(code).expect("Failed to parse code")
+    }
+
+    #[test]
+    fn test_resolve_self_type() {
+        let impl_type = Some("MyStruct".to_string());
+        let no_impl_type = None;
+
+        // Test with Self:: and impl type present
+        assert_eq!(
+            CallGraphExtractor::resolve_self_type("Self::new", &impl_type),
+            "MyStruct::new"
+        );
+
+        // Test with Self:: but no impl type
+        assert_eq!(
+            CallGraphExtractor::resolve_self_type("Self::new", &no_impl_type),
+            "Self::new"
+        );
+
+        // Test with regular function name
+        assert_eq!(
+            CallGraphExtractor::resolve_self_type("foo::bar", &impl_type),
+            "foo::bar"
+        );
+
+        // Test with no prefix
+        assert_eq!(
+            CallGraphExtractor::resolve_self_type("simple_func", &impl_type),
+            "simple_func"
+        );
+    }
+
+    #[test]
+    fn test_is_same_file_call() {
+        let impl_type = Some("MyStruct".to_string());
+        let no_impl_type = None;
+
+        // Test local function (no ::)
+        assert!(CallGraphExtractor::is_same_file_call(
+            "local_func",
+            &impl_type
+        ));
+        assert!(CallGraphExtractor::is_same_file_call(
+            "local_func",
+            &no_impl_type
+        ));
+
+        // Test external function
+        assert!(!CallGraphExtractor::is_same_file_call(
+            "std::vec::Vec",
+            &impl_type
+        ));
+        assert!(!CallGraphExtractor::is_same_file_call(
+            "other::module",
+            &no_impl_type
+        ));
+
+        // Test impl type method
+        assert!(CallGraphExtractor::is_same_file_call(
+            "MyStruct::method",
+            &impl_type
+        ));
+        assert!(!CallGraphExtractor::is_same_file_call(
+            "OtherStruct::method",
+            &impl_type
+        ));
+    }
+
+    #[test]
+    fn test_is_self_receiver() {
+        use syn::parse_quote;
+
+        // Test self receiver
+        let self_expr: Expr = parse_quote!(self);
+        assert!(CallGraphExtractor::is_self_receiver(&self_expr));
+
+        // Test non-self receiver
+        let other_expr: Expr = parse_quote!(other);
+        assert!(!CallGraphExtractor::is_self_receiver(&other_expr));
+
+        // Test field access
+        let field_expr: Expr = parse_quote!(self.field);
+        assert!(!CallGraphExtractor::is_self_receiver(&field_expr));
+
+        // Test method call receiver
+        let method_expr: Expr = parse_quote!(obj);
+        assert!(!CallGraphExtractor::is_self_receiver(&method_expr));
+    }
+
+    #[test]
+    fn test_classify_call_type() {
+        // Test async calls
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("await"),
+            CallType::Async
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("async_func"),
+            CallType::Async
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("run_await"),
+            CallType::Async
+        );
+
+        // Test delegate calls
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("handle_request"),
+            CallType::Delegate
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("process_data"),
+            CallType::Delegate
+        );
+
+        // Test pipeline calls
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("map"),
+            CallType::Pipeline
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("and_then"),
+            CallType::Pipeline
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("map_values"),
+            CallType::Pipeline
+        );
+
+        // Test direct calls
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("regular_func"),
+            CallType::Direct
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("compute"),
+            CallType::Direct
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_call_processing() {
+        let code = r#"
+            struct MyStruct;
+            
+            impl MyStruct {
+                fn new() -> Self {
+                    Self
+                }
+                
+                fn method(&self) {
+                    Self::new();
+                    other_func();
+                    module::external_func();
+                }
+            }
+            
+            fn other_func() {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the method function
+        let method_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "MyStruct::method")
+            .expect("MyStruct::method should exist");
+
+        let callees = graph.get_callees(&method_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should have resolved Self::new to MyStruct::new
+        assert!(
+            callee_names.contains(&"MyStruct::new"),
+            "Should contain MyStruct::new"
+        );
+        assert!(
+            callee_names.contains(&"other_func"),
+            "Should contain other_func"
+        );
+        // module::external_func might not resolve in all cases since it's external
+        // Just verify we have at least the local calls
+        assert!(callees.len() >= 2, "Should have at least 2 callees");
+    }
+
+    #[test]
+    fn test_visit_expr_method_call_processing() {
+        let code = r#"
+            struct Foo {
+                value: i32,
+            }
+            
+            impl Foo {
+                fn process(&self) -> i32 {
+                    self.compute()
+                }
+                
+                fn compute(&self) -> i32 {
+                    self.value * 2
+                }
+            }
+            
+            fn use_foo() {
+                let foo = Foo { value: 42 };
+                foo.process();
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the process function
+        let process_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "Foo::process")
+            .expect("Foo::process should exist");
+
+        let callees = graph.get_callees(&process_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should have detected self.compute() as Foo::compute
+        assert!(
+            callee_names.contains(&"Foo::compute"),
+            "Should contain Foo::compute"
+        );
+
+        // Find use_foo function
+        let use_foo_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "use_foo")
+            .expect("use_foo should exist");
+
+        let use_foo_callees = graph.get_callees(&use_foo_fn);
+        let use_foo_callee_names: Vec<_> =
+            use_foo_callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should have detected foo.process()
+        assert!(
+            use_foo_callee_names.contains(&"Foo::process"),
+            "Should contain Foo::process"
+        );
     }
 
     #[test]
@@ -1330,5 +1627,219 @@ mod tests {
             .filter(|callee| callee.name == "get_debug_info")
             .count();
         assert!(debug_calls >= 2);
+    }
+
+    #[test]
+    fn test_is_braced_content() {
+        // Positive cases
+        assert!(CallGraphExtractor::is_braced_content("{}"));
+        assert!(CallGraphExtractor::is_braced_content("{foo}"));
+        assert!(CallGraphExtractor::is_braced_content("{key => value}"));
+        assert!(CallGraphExtractor::is_braced_content(
+            "{ nested { braces } }"
+        ));
+
+        // Negative cases
+        assert!(!CallGraphExtractor::is_braced_content(""));
+        assert!(!CallGraphExtractor::is_braced_content("foo"));
+        assert!(!CallGraphExtractor::is_braced_content("{"));
+        assert!(!CallGraphExtractor::is_braced_content("}"));
+        assert!(!CallGraphExtractor::is_braced_content("[foo]"));
+        assert!(!CallGraphExtractor::is_braced_content("(foo)"));
+        assert!(!CallGraphExtractor::is_braced_content("{foo"));
+        assert!(!CallGraphExtractor::is_braced_content("foo}"));
+    }
+
+    #[test]
+    fn test_extract_braced_inner() {
+        assert_eq!(CallGraphExtractor::extract_braced_inner("{}"), "");
+        assert_eq!(CallGraphExtractor::extract_braced_inner("{foo}"), "foo");
+        assert_eq!(
+            CallGraphExtractor::extract_braced_inner("{a, b, c}"),
+            "a, b, c"
+        );
+        assert_eq!(
+            CallGraphExtractor::extract_braced_inner("{ spaced }"),
+            " spaced "
+        );
+        assert_eq!(
+            CallGraphExtractor::extract_braced_inner("{key => value}"),
+            "key => value"
+        );
+    }
+
+    #[test]
+    fn test_parse_expression_from_str() {
+        // Valid expressions
+        assert!(CallGraphExtractor::parse_expression_from_str("42").is_some());
+        assert!(CallGraphExtractor::parse_expression_from_str("foo").is_some());
+        assert!(CallGraphExtractor::parse_expression_from_str("foo()").is_some());
+        assert!(CallGraphExtractor::parse_expression_from_str("a + b").is_some());
+        assert!(CallGraphExtractor::parse_expression_from_str("vec![1, 2, 3]").is_some());
+
+        // Invalid expressions
+        assert!(CallGraphExtractor::parse_expression_from_str("").is_none());
+        assert!(CallGraphExtractor::parse_expression_from_str("struct Foo").is_none());
+        assert!(CallGraphExtractor::parse_expression_from_str("fn bar()").is_none());
+        assert!(CallGraphExtractor::parse_expression_from_str(";;;").is_none());
+    }
+
+    #[test]
+    fn test_parse_key_value_pair() {
+        // Valid key-value pairs
+        let exprs = CallGraphExtractor::parse_key_value_pair("key => value");
+        assert_eq!(exprs.len(), 2);
+
+        let exprs = CallGraphExtractor::parse_key_value_pair("1 => foo()");
+        assert_eq!(exprs.len(), 2);
+
+        let exprs = CallGraphExtractor::parse_key_value_pair("get_key() => compute_value()");
+        assert_eq!(exprs.len(), 2);
+
+        // With spaces
+        let exprs = CallGraphExtractor::parse_key_value_pair("  key  =>  value  ");
+        assert_eq!(exprs.len(), 2);
+
+        // No arrow separator
+        let exprs = CallGraphExtractor::parse_key_value_pair("just_value");
+        assert_eq!(exprs.len(), 0);
+
+        let exprs = CallGraphExtractor::parse_key_value_pair("no arrow here");
+        assert_eq!(exprs.len(), 0);
+
+        // Invalid expressions
+        let exprs = CallGraphExtractor::parse_key_value_pair("=> value");
+        assert_eq!(exprs.len(), 1); // Only value is valid
+
+        let exprs = CallGraphExtractor::parse_key_value_pair("key =>");
+        assert_eq!(exprs.len(), 1); // Only key is valid
+
+        let exprs = CallGraphExtractor::parse_key_value_pair("=>");
+        assert_eq!(exprs.len(), 0); // Neither is valid
+    }
+
+    #[test]
+    fn test_parse_braced_exprs_integration() {
+        let extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Valid braced expressions with key-value pairs
+        let tokens: proc_macro2::TokenStream = "{ key => value, foo => bar }".parse().unwrap();
+        let result = extractor.parse_braced_exprs(&tokens);
+        assert!(result.is_ok());
+        let exprs = result.unwrap();
+        assert_eq!(exprs.len(), 4); // 2 keys + 2 values
+
+        // Empty braces
+        let tokens: proc_macro2::TokenStream = "{}".parse().unwrap();
+        let result = extractor.parse_braced_exprs(&tokens);
+        assert!(result.is_err());
+
+        // Not braced
+        let tokens: proc_macro2::TokenStream = "foo, bar".parse().unwrap();
+        let result = extractor.parse_braced_exprs(&tokens);
+        assert!(result.is_err());
+
+        // Single expression in braces (no key-value pairs)
+        let tokens: proc_macro2::TokenStream = "{ single_expr }".parse().unwrap();
+        let result = extractor.parse_braced_exprs(&tokens);
+        assert!(result.is_err()); // No valid expressions parsed from "single_expr" as key-value
+
+        // Multiple key-value pairs with function calls
+        let tokens: proc_macro2::TokenStream = "{ get_key() => compute(), 42 => process() }"
+            .parse()
+            .unwrap();
+        let result = extractor.parse_braced_exprs(&tokens);
+        assert!(result.is_ok());
+        let exprs = result.unwrap();
+        assert_eq!(exprs.len(), 4); // 2 keys + 2 values
+    }
+
+    #[test]
+    fn test_try_parse_single_expr() {
+        // Test valid single expression
+        let tokens: proc_macro2::TokenStream = "42".parse().unwrap();
+        let result = CallGraphExtractor::try_parse_single_expr(&tokens);
+        assert!(result.is_ok());
+
+        // Test complex expression
+        let tokens: proc_macro2::TokenStream = "foo + bar * 2".parse().unwrap();
+        let result = CallGraphExtractor::try_parse_single_expr(&tokens);
+        assert!(result.is_ok());
+
+        // Test invalid expression (malformed syntax)
+        let tokens: proc_macro2::TokenStream = ":::: invalid".parse().unwrap();
+        let result = CallGraphExtractor::try_parse_single_expr(&tokens);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_assert_macro_single_expr() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert! with simple expression
+        let tokens: proc_macro2::TokenStream = "x > 0".parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_comma_separated() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert_eq! with comma-separated expressions
+        let tokens: proc_macro2::TokenStream = "a, b".parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert_eq");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_with_message() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert! with condition and message
+        let tokens: proc_macro2::TokenStream = r#"x > 0, "x must be positive""#.parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_complex_condition() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert! with complex boolean expression
+        let tokens: proc_macro2::TokenStream = "(x > 0 && y < 10) || z == 5".parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_unparseable() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test with unparseable tokens
+        let tokens: proc_macro2::TokenStream = ";;;".parse().unwrap();
+        let initial_parsed = extractor.macro_stats.successfully_parsed;
+        let initial_failed = extractor.macro_stats.failed_macros.len();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, initial_parsed);
+        assert!(extractor.macro_stats.failed_macros.len() > initial_failed);
+    }
+
+    #[test]
+    fn test_process_parsed_exprs() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        use syn::parse_quote;
+
+        // Test processing multiple expressions
+        let exprs = vec![
+            parse_quote!(foo()),
+            parse_quote!(bar()),
+            parse_quote!(baz()),
+        ];
+
+        // Simply test that the method runs without panicking
+        extractor.process_parsed_exprs(exprs);
+        // The method processes expressions by visiting them
+        // which may or may not add to the call graph depending on the expressions
     }
 }

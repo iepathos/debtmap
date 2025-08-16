@@ -55,7 +55,7 @@ fn function_returning_result() -> Result<(), std::io::Error> {
 
     // Run debtmap on the test file
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "analyze",
@@ -164,7 +164,7 @@ fn another_function() -> Result<(), std::io::Error> {
 
     // Run debtmap on the test file
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "analyze",
