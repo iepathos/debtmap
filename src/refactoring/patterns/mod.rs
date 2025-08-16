@@ -140,40 +140,47 @@ impl PatternMatcher for ImperativeLoopMatcher {
 
 struct MutableStateMatcher;
 
+impl MutableStateMatcher {
+    /// Pure function to detect mutation patterns in function names
+    fn has_mutation_patterns(name: &str) -> bool {
+        const MUTATION_PATTERNS: &[&str] = &["update", "modify", "set_", "mut"];
+        MUTATION_PATTERNS.iter().any(|pattern| name.contains(pattern))
+    }
+
+    /// Pure function to create a mutable state pattern detection
+    fn create_mutable_state_pattern(line: usize) -> DetectedPattern {
+        DetectedPattern {
+            pattern_type: PatternType::MutableState,
+            confidence: 0.6,
+            evidence: PatternEvidence {
+                code_snippets: vec![],
+                line_numbers: vec![line as u32],
+                confidence_factors: vec!["Function name suggests state mutation".to_string()],
+            },
+            assessment: PatternAssessment::ImprovementOpportunity {
+                current_issues: vec![
+                    "Mutable state makes code harder to reason about".to_string(),
+                    "Difficult to test and parallelize".to_string(),
+                ],
+                potential_benefits: vec![
+                    "Immutable transformations are safer".to_string(),
+                    "Pure functions are easier to test".to_string(),
+                    "Thread-safe by default".to_string(),
+                ],
+                refactoring_suggestions: vec![],
+            },
+        }
+    }
+}
+
 impl PatternMatcher for MutableStateMatcher {
     fn match_pattern(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<DetectedPattern> {
-        // Functions with "update", "modify", "set" often mutate state
-        let has_mutation_patterns = function.name.contains("update")
-            || function.name.contains("modify")
-            || function.name.contains("set_")
-            || function.name.contains("mut");
-
-        if has_mutation_patterns {
-            Some(DetectedPattern {
-                pattern_type: PatternType::MutableState,
-                confidence: 0.6,
-                evidence: PatternEvidence {
-                    code_snippets: vec![],
-                    line_numbers: vec![function.line as u32],
-                    confidence_factors: vec!["Function name suggests state mutation".to_string()],
-                },
-                assessment: PatternAssessment::ImprovementOpportunity {
-                    current_issues: vec![
-                        "Mutable state makes code harder to reason about".to_string(),
-                        "Difficult to test and parallelize".to_string(),
-                    ],
-                    potential_benefits: vec![
-                        "Immutable transformations are safer".to_string(),
-                        "Pure functions are easier to test".to_string(),
-                        "Thread-safe by default".to_string(),
-                    ],
-                    refactoring_suggestions: vec![],
-                },
-            })
+        if Self::has_mutation_patterns(&function.name) {
+            Some(Self::create_mutable_state_pattern(function.line))
         } else {
             None
         }
@@ -684,5 +691,105 @@ mod tests {
         assert_eq!(evidence.code_snippets.len(), 0);
         assert_eq!(evidence.confidence_factors.len(), 1);
         assert!(evidence.confidence_factors[0].contains("functional pattern"));
+    }
+
+    #[test]
+    fn test_mutable_state_matcher_detects_update() {
+        let matcher = MutableStateMatcher;
+        let function = create_test_function("update_user", 3);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert!(matches!(pattern.pattern_type, PatternType::MutableState));
+        assert_eq!(pattern.confidence, 0.6);
+    }
+
+    #[test]
+    fn test_mutable_state_matcher_detects_modify() {
+        let matcher = MutableStateMatcher;
+        let function = create_test_function("modify_state", 5);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert!(matches!(pattern.pattern_type, PatternType::MutableState));
+        assert_eq!(pattern.evidence.line_numbers, vec![42]);
+    }
+
+    #[test]
+    fn test_mutable_state_matcher_detects_set() {
+        let matcher = MutableStateMatcher;
+        let function = create_test_function("set_value", 2);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+        let pattern = result.unwrap();
+        assert!(matches!(pattern.pattern_type, PatternType::MutableState));
+        assert!(matches!(
+            pattern.assessment,
+            PatternAssessment::ImprovementOpportunity { .. }
+        ));
+    }
+
+    #[test]
+    fn test_mutable_state_matcher_detects_mut() {
+        let matcher = MutableStateMatcher;
+        let function = create_test_function("get_mut_ref", 4);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+        assert!(matches!(
+            result.unwrap().pattern_type,
+            PatternType::MutableState
+        ));
+    }
+
+    #[test]
+    fn test_mutable_state_matcher_rejects_pure_functions() {
+        let matcher = MutableStateMatcher;
+        let function = create_test_function("calculate_sum", 3);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_has_mutation_patterns_helper() {
+        assert!(MutableStateMatcher::has_mutation_patterns("update_user"));
+        assert!(MutableStateMatcher::has_mutation_patterns("modify_state"));
+        assert!(MutableStateMatcher::has_mutation_patterns("set_value"));
+        assert!(MutableStateMatcher::has_mutation_patterns("get_mut"));
+        assert!(!MutableStateMatcher::has_mutation_patterns("calculate"));
+        assert!(!MutableStateMatcher::has_mutation_patterns("get_value"));
+        assert!(!MutableStateMatcher::has_mutation_patterns("filter_items"));
+    }
+
+    #[test]
+    fn test_create_mutable_state_pattern_helper() {
+        let pattern = MutableStateMatcher::create_mutable_state_pattern(250);
+        assert!(matches!(pattern.pattern_type, PatternType::MutableState));
+        assert_eq!(pattern.confidence, 0.6);
+        assert_eq!(pattern.evidence.line_numbers, vec![250]);
+        assert!(pattern.evidence.confidence_factors[0].contains("mutation"));
+        
+        if let PatternAssessment::ImprovementOpportunity {
+            current_issues,
+            potential_benefits,
+            ..
+        } = pattern.assessment
+        {
+            assert_eq!(current_issues.len(), 2);
+            assert_eq!(potential_benefits.len(), 3);
+            assert!(current_issues[0].contains("Mutable state"));
+            assert!(potential_benefits[0].contains("Immutable"));
+        } else {
+            panic!("Expected ImprovementOpportunity assessment");
+        }
     }
 }
