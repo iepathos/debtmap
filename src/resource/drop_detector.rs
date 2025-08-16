@@ -103,7 +103,9 @@ impl DropDetector {
         for field in &analysis.resource_fields {
             match field.field_type.as_str() {
                 t if t.contains("File") => {
-                    drop_impl.push_str(&"        // File handles are automatically closed\n".to_string());
+                    drop_impl.push_str(
+                        "        // File handles are automatically closed\n",
+                    );
                 }
                 t if t.contains("Thread") || t.contains("JoinHandle") => {
                     drop_impl.push_str(&format!(
@@ -124,7 +126,9 @@ impl DropDetector {
                     drop_impl.push_str("        });\n");
                 }
                 t if t.contains("TcpStream") || t.contains("Socket") => {
-                    drop_impl.push_str(&"        // Network streams are automatically closed\n".to_string());
+                    drop_impl.push_str(
+                        "        // Network streams are automatically closed\n",
+                    );
                 }
                 _ => {
                     drop_impl.push_str(&format!(
