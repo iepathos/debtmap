@@ -36,6 +36,15 @@ struct AnalyzeConfig {
     verbosity: u8,
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
+    comprehensive: bool,
+    security_only: bool,
+    performance_only: bool,
+    organization_only: bool,
+    testing_only: bool,
+    resource_only: bool,
+    group_by_category: bool,
+    min_priority: Option<String>,
+    filter_categories: Option<Vec<String>>,
 }
 
 struct ValidateConfig {
@@ -102,6 +111,15 @@ fn main() -> Result<()> {
             verbosity,
             verbose_macro_warnings,
             show_macro_stats,
+            comprehensive,
+            security_only,
+            performance_only,
+            organization_only,
+            testing_only,
+            resource_only,
+            group_by_category,
+            min_priority,
+            filter_categories,
         } => {
             let config = AnalyzeConfig {
                 path,
@@ -122,6 +140,15 @@ fn main() -> Result<()> {
                 verbosity,
                 verbose_macro_warnings,
                 show_macro_stats,
+                comprehensive,
+                security_only,
+                performance_only,
+                organization_only,
+                testing_only,
+                resource_only,
+                group_by_category,
+                min_priority,
+                filter_categories,
             };
             handle_analyze(config)
         }

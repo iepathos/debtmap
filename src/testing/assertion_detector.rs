@@ -205,13 +205,10 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
     }
 
     fn visit_stmt(&mut self, node: &'ast Stmt) {
-        match node {
-            Stmt::Local(_) => {
-                if !self.analysis.has_setup {
-                    self.analysis.has_setup = true;
-                }
+        if let Stmt::Local(_) = node {
+            if !self.analysis.has_setup {
+                self.analysis.has_setup = true;
             }
-            _ => {}
         }
 
         syn::visit::visit_stmt(self, node);
