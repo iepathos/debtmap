@@ -35,7 +35,12 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 ## Features
 
 - **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript with Go support coming soon
-- **Comprehensive metrics** - Analyzes cyclomatic and cognitive complexity, code duplication, and various code smells
+- **Comprehensive debt detection** - Identifies 20+ types of technical debt across security, performance, organization, testing, and resource management
+- **Security vulnerability detection** - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns
+- **Performance anti-pattern detection** - Identifies inefficient allocations, string operations, nested loops, and blocking I/O
+- **Code organization analysis** - Detects god objects, feature envy, primitive obsession, and magic values
+- **Testing quality assessment** - Analyzes test complexity, flaky patterns, and assertion quality
+- **Resource management review** - Finds async/await misuse, resource leaks, and collection inefficiencies
 - **Coverage-based risk analysis** - Uniquely correlates complexity with test coverage to identify truly risky code
 - **ROI-driven testing recommendations** - Prioritizes testing efforts by calculating risk reduction per test case
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
@@ -405,11 +410,43 @@ Measures how difficult code is to understand. Unlike cyclomatic complexity, it c
 Identifies similar code blocks that could be refactored into shared functions.
 
 ### Technical Debt Patterns
+
+#### Core Patterns
 - **Long methods/functions**: Functions exceeding recommended line counts
 - **Deep nesting**: Code with excessive indentation levels
 - **Large files**: Files that have grown too large to maintain easily
 - **Circular dependencies**: Modules that depend on each other
 - **High coupling**: Excessive dependencies between modules
+
+#### Security Anti-patterns
+- **Hardcoded secrets**: API keys, passwords, and tokens in source code
+- **Weak cryptography**: Use of deprecated or insecure cryptographic algorithms
+- **SQL injection risks**: Unsafe dynamic SQL query construction
+- **Unsafe code blocks**: Unnecessary or poorly justified unsafe operations
+- **Input validation gaps**: Missing validation for user inputs and external data
+
+#### Performance Anti-patterns
+- **Inefficient allocations**: Unnecessary heap allocations and memory waste
+- **String concatenation**: Inefficient string building in loops
+- **Nested loops**: O(n²) and higher complexity patterns
+- **Blocking I/O**: Synchronous operations in async contexts
+- **Suboptimal data structures**: Using wrong collections for access patterns
+
+#### Code Organization Issues
+- **God objects**: Classes/modules with too many responsibilities
+- **Feature envy**: Methods using more data from other classes than their own
+- **Primitive obsession**: Overuse of basic types instead of domain objects
+- **Magic numbers/strings**: Unexplained literal values throughout code
+
+#### Testing Quality Issues
+- **Complex test assertions**: Tests that are hard to understand or maintain
+- **Flaky test patterns**: Non-deterministic test behaviors
+- **Excessive test complexity**: Tests with high cyclomatic complexity
+
+#### Resource Management Issues
+- **Async/await misuse**: Improper handling of asynchronous operations
+- **Resource leaks**: Missing cleanup for files, connections, or memory
+- **Collection inefficiencies**: Suboptimal use of data collections
 
 ### Risk Analysis (With Coverage Data)
 
@@ -618,6 +655,36 @@ Debtmap is built with a functional, modular architecture designed for extensibil
   - Complexity-based debt identification
   - Suppression comment handling
 
+- **`security/`** - Security vulnerability detection
+  - Hardcoded secret detection
+  - Weak cryptography identification  
+  - SQL injection risk analysis
+  - Unsafe code block assessment
+  - Input validation gap detection
+
+- **`performance/`** - Performance anti-pattern detection
+  - Memory allocation inefficiencies
+  - String concatenation issues
+  - Nested loop complexity
+  - Blocking I/O operations
+  - Suboptimal data structure usage
+
+- **`organization/`** - Code organization analysis
+  - God object detection
+  - Feature envy identification
+  - Primitive obsession patterns
+  - Magic value detection
+
+- **`testing/`** - Testing quality assessment
+  - Test assertion complexity
+  - Flaky test pattern detection
+  - Test complexity analysis
+
+- **`resource/`** - Resource management review
+  - Async/await pattern analysis
+  - Resource leak detection
+  - Collection usage efficiency
+
 - **`core/`** - Core data structures and traits
   - Language-agnostic metrics types
   - Shared analysis results structures
@@ -743,6 +810,12 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 - [x] Inline suppression comments
 - [x] LCOV coverage integration with risk analysis
 - [x] ROI-based testing prioritization
+- [x] Comprehensive debt detection (20+ pattern types)
+- [x] Security vulnerability detection
+- [x] Performance anti-pattern analysis
+- [x] Code organization assessment
+- [x] Testing quality evaluation
+- [x] Resource management review
 - [ ] Historical trend tracking
 - [ ] Automated refactoring suggestions
 
