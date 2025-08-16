@@ -37,6 +37,19 @@ pub struct MacroHandlingConfig {
     pub show_statistics: bool,
 }
 
+/// Classification of expression handling types
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExprHandling {
+    Call,
+    MethodCall,
+    Closure,
+    Async,
+    Await,
+    Struct,
+    Macro,
+    Default,
+}
+
 /// Call graph extractor that uses two-pass resolution for accurate call tracking
 pub struct CallGraphExtractor {
     pub call_graph: CallGraph,
@@ -372,6 +385,20 @@ impl CallGraphExtractor {
 
         // Fallback to unqualified name
         method_name
+    }
+
+    /// Classify expression for appropriate handling strategy
+    fn classify_expr_handling(expr: &Expr) -> ExprHandling {
+        match expr {
+            Expr::Call(_) => ExprHandling::Call,
+            Expr::MethodCall(_) => ExprHandling::MethodCall,
+            Expr::Closure(_) => ExprHandling::Closure,
+            Expr::Async(_) => ExprHandling::Async,
+            Expr::Await(_) => ExprHandling::Await,
+            Expr::Struct(_) => ExprHandling::Struct,
+            Expr::Macro(_) => ExprHandling::Macro,
+            _ => ExprHandling::Default,
+        }
     }
 
     /// Enhanced macro handling with pattern recognition and logging
@@ -895,55 +922,58 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        match expr {
-            // Handle regular function calls: foo(), module::foo(), Self::method()
-            Expr::Call(ExprCall { func, args, .. }) => {
-                self.handle_call_expr(func, args);
-                return; // Early return to avoid visiting children
-            }
-            // Handle method calls: obj.method()
-            Expr::MethodCall(ExprMethodCall {
-                method,
-                args,
-                receiver,
-                ..
-            }) => {
-                self.handle_method_call_expr(method, args, receiver);
-                return; // Early return to avoid visiting children
-            }
-            // Handle closures that might contain calls
-            Expr::Closure(closure) => {
-                // Visit the closure body to detect calls inside
-                self.visit_expr(&closure.body);
-                return;
-            }
-            // Handle async blocks
-            Expr::Async(async_block) => {
-                for stmt in &async_block.block.stmts {
-                    self.visit_stmt(stmt);
-                }
-                return;
-            }
-            // Handle await expressions
-            Expr::Await(await_expr) => {
-                self.visit_expr(&await_expr.base);
-                return;
-            }
-            // Handle struct literals to find function calls in field values
-            Expr::Struct(expr_struct) => {
-                self.handle_struct_expr(expr_struct);
-                return;
-            }
-            // Handle macros like vec![] that might contain function calls
-            Expr::Macro(expr_macro) => {
-                self.handle_macro_expression(expr_macro);
-                return;
-            }
-            _ => {}
-        }
+        // Use classification to determine handling
+        let handling = Self::classify_expr_handling(expr);
 
-        // Continue visiting for other expression types
-        syn::visit::visit_expr(self, expr);
+        match handling {
+            ExprHandling::Call => {
+                if let Expr::Call(ExprCall { func, args, .. }) = expr {
+                    self.handle_call_expr(func, args);
+                }
+            }
+            ExprHandling::MethodCall => {
+                if let Expr::MethodCall(ExprMethodCall {
+                    method,
+                    args,
+                    receiver,
+                    ..
+                }) = expr
+                {
+                    self.handle_method_call_expr(method, args, receiver);
+                }
+            }
+            ExprHandling::Closure => {
+                if let Expr::Closure(closure) = expr {
+                    self.visit_expr(&closure.body);
+                }
+            }
+            ExprHandling::Async => {
+                if let Expr::Async(async_block) = expr {
+                    for stmt in &async_block.block.stmts {
+                        self.visit_stmt(stmt);
+                    }
+                }
+            }
+            ExprHandling::Await => {
+                if let Expr::Await(await_expr) = expr {
+                    self.visit_expr(&await_expr.base);
+                }
+            }
+            ExprHandling::Struct => {
+                if let Expr::Struct(expr_struct) = expr {
+                    self.handle_struct_expr(expr_struct);
+                }
+            }
+            ExprHandling::Macro => {
+                if let Expr::Macro(expr_macro) = expr {
+                    self.handle_macro_expression(expr_macro);
+                }
+            }
+            ExprHandling::Default => {
+                // Continue visiting for other expression types
+                syn::visit::visit_expr(self, expr);
+            }
+        }
     }
 }
 
@@ -2226,5 +2256,137 @@ mod tests {
             callee_names.contains(&"compute"),
             "Should detect compute() in nested context"
         );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_call() {
+        let code = "foo()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::Call
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_method_call() {
+        let code = "obj.method()";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::MethodCall
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_closure() {
+        let code = "|x| x + 1";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::Closure
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_async() {
+        let code = "async { fetch().await }";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::Async
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_await() {
+        let code = "fetch().await";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::Await
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_struct() {
+        let code = "Point { x: 1, y: 2 }";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::Struct
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_macro() {
+        let code = "vec![1, 2, 3]";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::Macro
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_handling_default() {
+        let code = "42";
+        let expr: Expr = syn::parse_str(code).unwrap();
+        assert_eq!(
+            CallGraphExtractor::classify_expr_handling(&expr),
+            ExprHandling::Default
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_integration() {
+        // Test that visit_expr correctly handles different expression types
+        let code = r#"
+            fn test_function() {
+                // Function call
+                foo();
+                
+                // Method call
+                obj.method();
+                
+                // Closure
+                let c = |x| x + 1;
+                
+                // Async block
+                async {
+                    fetch().await;
+                };
+                
+                // Struct literal
+                let p = Point { x: 1, y: 2 };
+                
+                // Macro
+                let v = vec![1, 2, 3];
+                
+                // Regular expression (should use default handling)
+                let x = 42;
+            }
+            
+            fn foo() {}
+            struct Point { x: i32, y: i32 }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+
+        // Verify that the function was found and processed
+        let test_fn = extractor
+            .call_graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "test_function")
+            .expect("test_function should exist");
+
+        // Verify that foo() call was detected
+        let callees = extractor.call_graph.get_callees(&test_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+        assert!(callee_names.contains(&"foo"), "Should detect foo() call");
     }
 }
