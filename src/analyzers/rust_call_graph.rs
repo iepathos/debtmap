@@ -898,7 +898,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         // Classify the expression type for processing
         let expr_category = Self::classify_expr_category(expr);
-        
+
         // Process based on category
         match expr_category {
             ExprCategory::Call => {
@@ -972,13 +972,13 @@ impl CallGraphExtractor {
             _ => ExprCategory::Other,
         }
     }
-    
+
     /// Pure function to determine if expression needs special handling
     #[allow(dead_code)]
     fn needs_special_handling(category: ExprCategory) -> bool {
         !matches!(category, ExprCategory::Other)
     }
-    
+
     fn process_closure_expr(&mut self, closure: &syn::ExprClosure) {
         self.visit_expr(&closure.body);
     }
@@ -3101,12 +3101,12 @@ mod tests {
         "#;
 
         let file = parse_rust_code(code);
-        
+
         // Extract expressions and classify them
         struct ExprCollector {
             categories: Vec<ExprCategory>,
         }
-        
+
         impl<'ast> Visit<'ast> for ExprCollector {
             fn visit_expr(&mut self, expr: &'ast Expr) {
                 let category = CallGraphExtractor::classify_expr_category(expr);
@@ -3114,11 +3114,11 @@ mod tests {
                 syn::visit::visit_expr(self, expr);
             }
         }
-        
+
         let mut collector = ExprCollector {
             categories: Vec::new(),
         };
-        
+
         for item in &file.items {
             if let syn::Item::Fn(func) = item {
                 if func.sig.ident == "test_exprs" {
@@ -3128,30 +3128,67 @@ mod tests {
                 }
             }
         }
-        
+
         // Verify classifications
-        assert!(collector.categories.contains(&ExprCategory::Call), "Should classify Call");
-        assert!(collector.categories.contains(&ExprCategory::MethodCall), "Should classify MethodCall");
-        assert!(collector.categories.contains(&ExprCategory::Closure), "Should classify Closure");
-        assert!(collector.categories.contains(&ExprCategory::Async), "Should classify Async");
-        assert!(collector.categories.contains(&ExprCategory::Await), "Should classify Await");
-        assert!(collector.categories.contains(&ExprCategory::Struct), "Should classify Struct");
-        // Note: Macros like vec! and format! get expanded before parsing, 
+        assert!(
+            collector.categories.contains(&ExprCategory::Call),
+            "Should classify Call"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::MethodCall),
+            "Should classify MethodCall"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Closure),
+            "Should classify Closure"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Async),
+            "Should classify Async"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Await),
+            "Should classify Await"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Struct),
+            "Should classify Struct"
+        );
+        // Note: Macros like vec! and format! get expanded before parsing,
         // so they don't appear as Expr::Macro in the AST
-        assert!(collector.categories.contains(&ExprCategory::Other), "Should classify Other");
+        assert!(
+            collector.categories.contains(&ExprCategory::Other),
+            "Should classify Other"
+        );
     }
 
     #[test]
     fn test_needs_special_handling() {
         // Test the needs_special_handling pure function
-        assert!(CallGraphExtractor::needs_special_handling(ExprCategory::Call));
-        assert!(CallGraphExtractor::needs_special_handling(ExprCategory::MethodCall));
-        assert!(CallGraphExtractor::needs_special_handling(ExprCategory::Closure));
-        assert!(CallGraphExtractor::needs_special_handling(ExprCategory::Async));
-        assert!(CallGraphExtractor::needs_special_handling(ExprCategory::Await));
-        assert!(CallGraphExtractor::needs_special_handling(ExprCategory::Struct));
-        assert!(CallGraphExtractor::needs_special_handling(ExprCategory::Macro));
-        assert!(!CallGraphExtractor::needs_special_handling(ExprCategory::Other));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Call
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::MethodCall
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Closure
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Async
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Await
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Struct
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Macro
+        ));
+        assert!(!CallGraphExtractor::needs_special_handling(
+            ExprCategory::Other
+        ));
     }
 
     #[test]
@@ -3193,11 +3230,11 @@ mod tests {
         "#;
 
         let file = parse_rust_code(code);
-        
+
         struct CategoryCollector {
             categories: Vec<ExprCategory>,
         }
-        
+
         impl<'ast> Visit<'ast> for CategoryCollector {
             fn visit_expr(&mut self, expr: &'ast Expr) {
                 let category = CallGraphExtractor::classify_expr_category(expr);
@@ -3205,11 +3242,11 @@ mod tests {
                 syn::visit::visit_expr(self, expr);
             }
         }
-        
+
         let mut collector = CategoryCollector {
             categories: Vec::new(),
         };
-        
+
         for item in &file.items {
             if let syn::Item::Fn(func) = item {
                 if func.sig.ident == "edge_case_exprs" {
@@ -3219,37 +3256,39 @@ mod tests {
                 }
             }
         }
-        
+
         // All these should be classified as Other
-        let other_count = collector.categories.iter()
+        let other_count = collector
+            .categories
+            .iter()
             .filter(|&&c| c == ExprCategory::Other)
             .count();
-        
-        assert!(other_count > 10, "Should have many Other category expressions");
+
+        assert!(
+            other_count > 10,
+            "Should have many Other category expressions"
+        );
     }
 
     #[test]
     fn test_expr_category_exhaustiveness() {
         // Test that all ExprCategory variants are covered
         use ExprCategory::*;
-        
+
         let all_categories = vec![
-            Call,
-            MethodCall,
-            Closure,
-            Async,
-            Await,
-            Struct,
-            Macro,
-            Other,
+            Call, MethodCall, Closure, Async, Await, Struct, Macro, Other,
         ];
-        
+
         // Ensure all categories have corresponding needs_special_handling behavior
         for category in all_categories {
             let needs_handling = CallGraphExtractor::needs_special_handling(category);
             match category {
                 Other => assert!(!needs_handling, "Other should not need special handling"),
-                _ => assert!(needs_handling, "{:?} should need special handling", category),
+                _ => assert!(
+                    needs_handling,
+                    "{:?} should need special handling",
+                    category
+                ),
             }
         }
     }
@@ -3293,12 +3332,12 @@ mod tests {
         "#;
 
         let file = parse_rust_code(code);
-        
+
         struct NestedCollector {
             categories: Vec<(ExprCategory, usize)>, // category and depth
             depth: usize,
         }
-        
+
         impl<'ast> Visit<'ast> for NestedCollector {
             fn visit_expr(&mut self, expr: &'ast Expr) {
                 let category = CallGraphExtractor::classify_expr_category(expr);
@@ -3308,12 +3347,12 @@ mod tests {
                 self.depth -= 1;
             }
         }
-        
+
         let mut collector = NestedCollector {
             categories: Vec::new(),
             depth: 0,
         };
-        
+
         for item in &file.items {
             if let syn::Item::Fn(func) = item {
                 if func.sig.ident == "nested_exprs" {
@@ -3323,21 +3362,31 @@ mod tests {
                 }
             }
         }
-        
+
         // Verify nested classifications
-        let call_depths: Vec<usize> = collector.categories.iter()
+        let call_depths: Vec<usize> = collector
+            .categories
+            .iter()
             .filter(|(cat, _)| *cat == ExprCategory::Call)
             .map(|(_, depth)| *depth)
             .collect();
-        
+
         assert!(!call_depths.is_empty(), "Should have Call expressions");
-        assert!(call_depths.iter().any(|&d| d > 0), "Should have nested Call expressions");
-        
-        let method_depths: Vec<usize> = collector.categories.iter()
+        assert!(
+            call_depths.iter().any(|&d| d > 0),
+            "Should have nested Call expressions"
+        );
+
+        let method_depths: Vec<usize> = collector
+            .categories
+            .iter()
             .filter(|(cat, _)| *cat == ExprCategory::MethodCall)
             .map(|(_, depth)| *depth)
             .collect();
-        
-        assert!(!method_depths.is_empty(), "Should have MethodCall expressions");
+
+        assert!(
+            !method_depths.is_empty(),
+            "Should have MethodCall expressions"
+        );
     }
 }
