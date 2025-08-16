@@ -25,7 +25,7 @@ fn some_function() -> i32 {
                 syn::Expr::Macro(m) => {
                     println!("Found macro: {}", quote::quote!(#m));
                 }
-                syn::Expr::Struct(s) => {
+                syn::Expr::Struct(_s) => {
                     println!("Found struct literal");
                 }
                 syn::Expr::Call(c) => {
