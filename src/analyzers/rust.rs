@@ -602,7 +602,6 @@ fn analyze_resource_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
     resource_items
 }
 
-
 fn analyze_organization_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
     let detectors: Vec<Box<dyn OrganizationDetector>> = vec![
         Box::new(GodObjectDetector::new()),

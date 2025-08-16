@@ -115,7 +115,6 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
             .map(|seg| seg.ident.to_string())
             .unwrap_or_default();
 
-
         if is_assertion_macro(&macro_name) {
             self.analysis.has_assertions = true;
             self.analysis.assertion_count += 1;
@@ -127,7 +126,7 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
 
         syn::visit::visit_macro(self, node);
     }
-    
+
     fn visit_expr_macro(&mut self, node: &'ast ExprMacro) {
         let macro_name = node
             .mac
@@ -136,7 +135,6 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
             .last()
             .map(|seg| seg.ident.to_string())
             .unwrap_or_default();
-
 
         if is_assertion_macro(&macro_name) {
             self.analysis.has_assertions = true;
@@ -222,10 +220,10 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
 
 fn analyze_test_structure(function: &ItemFn) -> TestStructureAnalysis {
     let mut analyzer = TestAnalyzer::new();
-    
+
     // Use the visitor trait to properly visit the entire function
     syn::visit::visit_item_fn(&mut analyzer, function);
-    
+
     analyzer.analysis
 }
 

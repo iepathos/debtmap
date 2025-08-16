@@ -26,8 +26,6 @@ impl GodObjectDetector {
     }
 
     fn analyze_type(&self, item_struct: &syn::ItemStruct) -> TypeAnalysis {
-        
-
         TypeAnalysis {
             name: item_struct.ident.to_string(),
             method_count: 0,
