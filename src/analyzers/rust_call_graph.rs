@@ -445,19 +445,29 @@ impl CallGraphExtractor {
         }
     }
 
+    /// Attempt to parse tokens as a single expression
+    fn try_parse_single_expr(tokens: &proc_macro2::TokenStream) -> syn::Result<Expr> {
+        syn::parse2::<Expr>(tokens.clone())
+    }
+
+    /// Process parsed expressions by visiting each one
+    fn process_parsed_exprs(&mut self, exprs: Vec<Expr>) {
+        for expr in exprs {
+            self.visit_expr(&expr);
+        }
+    }
+
     /// Parse assertion macros
     fn parse_assert_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
         // First try to parse as a single expression (for assert!)
-        if let Ok(expr) = syn::parse2::<Expr>(tokens.clone()) {
+        if let Ok(expr) = Self::try_parse_single_expr(tokens) {
             self.macro_stats.successfully_parsed += 1;
             self.visit_expr(&expr);
         }
         // Then try to parse as comma-separated expressions (for assert_eq!, assert_ne!)
         else if let Ok(exprs) = self.parse_comma_separated_exprs(tokens) {
             self.macro_stats.successfully_parsed += 1;
-            for expr in exprs {
-                self.visit_expr(&expr);
-            }
+            self.process_parsed_exprs(exprs);
         } else {
             self.log_unexpandable_macro(macro_name);
         }
@@ -1742,5 +1752,94 @@ mod tests {
         assert!(result.is_ok());
         let exprs = result.unwrap();
         assert_eq!(exprs.len(), 4); // 2 keys + 2 values
+    }
+
+    #[test]
+    fn test_try_parse_single_expr() {
+        // Test valid single expression
+        let tokens: proc_macro2::TokenStream = "42".parse().unwrap();
+        let result = CallGraphExtractor::try_parse_single_expr(&tokens);
+        assert!(result.is_ok());
+
+        // Test complex expression
+        let tokens: proc_macro2::TokenStream = "foo + bar * 2".parse().unwrap();
+        let result = CallGraphExtractor::try_parse_single_expr(&tokens);
+        assert!(result.is_ok());
+
+        // Test invalid expression (malformed syntax)
+        let tokens: proc_macro2::TokenStream = ":::: invalid".parse().unwrap();
+        let result = CallGraphExtractor::try_parse_single_expr(&tokens);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_assert_macro_single_expr() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert! with simple expression
+        let tokens: proc_macro2::TokenStream = "x > 0".parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_comma_separated() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert_eq! with comma-separated expressions
+        let tokens: proc_macro2::TokenStream = "a, b".parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert_eq");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_with_message() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert! with condition and message
+        let tokens: proc_macro2::TokenStream = r#"x > 0, "x must be positive""#.parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_complex_condition() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test assert! with complex boolean expression
+        let tokens: proc_macro2::TokenStream = "(x > 0 && y < 10) || z == 5".parse().unwrap();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, 1);
+    }
+
+    #[test]
+    fn test_parse_assert_macro_unparseable() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+
+        // Test with unparseable tokens
+        let tokens: proc_macro2::TokenStream = ";;;".parse().unwrap();
+        let initial_parsed = extractor.macro_stats.successfully_parsed;
+        let initial_failed = extractor.macro_stats.failed_macros.len();
+        extractor.parse_assert_macro(&tokens, "assert");
+        assert_eq!(extractor.macro_stats.successfully_parsed, initial_parsed);
+        assert!(extractor.macro_stats.failed_macros.len() > initial_failed);
+    }
+
+    #[test]
+    fn test_process_parsed_exprs() {
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        use syn::parse_quote;
+
+        // Test processing multiple expressions
+        let exprs = vec![
+            parse_quote!(foo()),
+            parse_quote!(bar()),
+            parse_quote!(baz()),
+        ];
+
+        // Simply test that the method runs without panicking
+        extractor.process_parsed_exprs(exprs);
+        // The method processes expressions by visiting them
+        // which may or may not add to the call graph depending on the expressions
     }
 }
