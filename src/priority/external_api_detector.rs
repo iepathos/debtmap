@@ -57,9 +57,17 @@ fn is_explicitly_marked_api(func: &FunctionMetrics, config: &ExternalApiConfig) 
         if api_file.contains('*') {
             // Simple glob pattern matching
             let pattern = api_file.replace("**", ".*").replace('*', "[^/]*");
-            regex::Regex::new(&pattern)
-                .ok()
-                .is_some_and(|re| re.is_match(&file_path_str))
+            match regex::Regex::new(&pattern) {
+                Ok(re) => re.is_match(&file_path_str),
+                Err(e) => {
+                    log::warn!(
+                        "Invalid regex pattern for API file glob '{}': {}",
+                        api_file,
+                        e
+                    );
+                    false
+                }
+            }
         } else {
             // Exact file match or suffix match
             file_path_str.ends_with(api_file) || &file_path_str == api_file
