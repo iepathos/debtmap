@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28, spec 29, spec 30, spec 31 (Testing Quality Patterns), spec 32, spec 33, and spec 34 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28 (Security Patterns Detection), spec 29, spec 30, spec 31 (Testing Quality Patterns), spec 32, spec 33, and spec 34 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -121,17 +121,15 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Architecture ready for multi-language expansion (PythonCallGraph, JavaScriptCallGraph, etc.)
   - Maintained all existing functionality including Visit trait pattern detection
   - Zero functional changes - pure refactoring for better architecture
-- ✅ Enhanced Markdown Output Formatting (spec 28):
-  - Full feature parity with terminal output
-  - Unified priority scoring visualization with tables
-  - Evidence-based risk analysis details in markdown
-  - Dead code detection results with visibility recommendations
-  - Semantic function classification information
-  - ROI-based testing recommendations with coverage gaps
-  - Call graph dependency insights (with verbosity)
-  - Progressive detail levels with collapsible sections
-  - Valid CommonMark specification compliance
-  - GitHub Flavored Markdown support
+- ✅ Security Patterns Detection (spec 28):
+  - Enhanced secret detection with entropy analysis and pattern matching
+  - SQL injection detection with taint analysis
+  - Input validation gap analysis with data flow tracking
+  - Tool integration framework for external security tools (clippy, bandit)
+  - Taint analysis with graph-based data flow tracking
+  - SecurityVulnerability enum with comprehensive security issue types
+  - Support for multiple severity levels and confidence scoring
+  - Integration with existing debt detection system
 - ✅ AST-Based Type Tracking for Accurate Method Call Resolution (spec 29):
   - Variable type tracking with explicit type annotations
   - Type inference from struct literals and constructors

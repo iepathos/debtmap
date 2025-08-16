@@ -100,6 +100,10 @@ pub enum Commands {
         #[arg(long = "security-only")]
         security_only: bool,
 
+        /// Enable enhanced security analysis with additional detectors
+        #[arg(long = "security-enhanced")]
+        security_enhanced: bool,
+
         /// Enable performance analysis only
         #[arg(long = "performance-only")]
         performance_only: bool,
