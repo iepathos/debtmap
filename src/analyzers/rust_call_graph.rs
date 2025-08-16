@@ -734,8 +734,12 @@ impl CallGraphExtractor {
 }
 
 impl CallGraphExtractor {
-    fn handle_call_expr(&mut self, func: &Box<Expr>, args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>) {
-        if let Expr::Path(expr_path) = &**func {
+    fn handle_call_expr(
+        &mut self,
+        func: &Expr,
+        args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
+    ) {
+        if let Expr::Path(expr_path) = func {
             if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
                 let resolved_name = Self::resolve_self_type(&name, &self.current_impl_type);
                 let same_file_hint =
@@ -747,7 +751,12 @@ impl CallGraphExtractor {
         self.process_arguments(args);
     }
 
-    fn handle_method_call_expr(&mut self, method: &syn::Ident, args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>, receiver: &Box<Expr>) {
+    fn handle_method_call_expr(
+        &mut self,
+        method: &syn::Ident,
+        args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
+        receiver: &Expr,
+    ) {
         let name = self.construct_method_name(method, receiver, &self.current_impl_type);
         let same_file_hint = Self::is_self_receiver(receiver);
         self.process_call(name, same_file_hint);
