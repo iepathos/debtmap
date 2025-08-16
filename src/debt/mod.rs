@@ -1,6 +1,7 @@
 pub mod circular;
 pub mod coupling;
 pub mod duplication;
+pub mod error_swallowing;
 pub mod patterns;
 pub mod smells;
 pub mod suppression;
@@ -66,6 +67,7 @@ fn type_weight(debt_type: &DebtType) -> u32 {
         (DebtType::Duplication, 4),
         (DebtType::Complexity, 5),
         (DebtType::Dependency, 3),
+        (DebtType::ErrorSwallowing, 4),
     ];
 
     WEIGHTS

@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28, spec 29, spec 30, spec 31, spec 32, and spec 33 implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28, spec 29, spec 30, spec 31, spec 32, spec 33, and spec 34 implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -174,6 +174,16 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Improved debugging capabilities with detailed error messages
   - Maintained backwards compatibility with existing CLI behavior
   - Updated tests to reflect new error handling semantics
+- ✅ Error Swallowing Debt Detection (spec 34):
+  - Added new DebtType::ErrorSwallowing variant
+  - Detects `if let Ok(...)` patterns without error handling
+  - Detects `let _ = ` assignments discarding Result types
+  - Detects `.ok()` usage that discards error information
+  - Detects `match` expressions with ignored Err variants
+  - Detects `.unwrap_or()` and `.unwrap_or_default()` without logging
+  - Priority classification based on context and criticality
+  - Integration with suppression comment system
+  - Lower priority for test functions
 
 ## Architecture Overview
 The project follows a functional core / imperative shell pattern:
@@ -205,6 +215,7 @@ The project follows a functional core / imperative shell pattern:
 19. **Function Return Type Tracking**: Function signature registry enabling accurate type resolution from function returns
 20. **Trait Implementation Tracking**: Dynamic dispatch resolution through comprehensive trait tracking and method resolution
 21. **Functional Error Handling**: Proper error propagation and logging instead of silent failures
+22. **Error Swallowing Detection**: Identifies anti-patterns where errors are silently discarded without proper handling
 
 ## Project Structure
 ```

@@ -7,6 +7,7 @@ use crate::core::{
     ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
     FunctionMetrics, Language, Priority,
 };
+use crate::debt::error_swallowing::detect_error_swallowing;
 use crate::debt::patterns::{
     find_code_smells_with_suppression, find_todos_and_fixmes_with_suppression,
 };
@@ -137,6 +138,7 @@ fn collect_all_rust_debt_items(
         find_code_smells_with_suppression(source_content, path, Some(suppression_context)),
         extract_rust_module_smell_items(path, source_content, suppression_context),
         extract_rust_function_smell_items(functions, suppression_context),
+        detect_error_swallowing(file, path, Some(suppression_context)),
     ]
     .into_iter()
     .flatten()

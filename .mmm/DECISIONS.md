@@ -564,3 +564,30 @@ Implement proper functional error handling patterns throughout the codebase:
 - ✅ Test failures are now visible and actionable
 - ⚠️ Some functions that previously returned default values now propagate errors (breaking change for tests)
 - ⚠️ Slightly more verbose code in some places due to explicit error handling
+
+---
+
+## ADR-025: Error Swallowing Debt Detection
+**Date**: 2025-08-16
+**Status**: Accepted
+
+### Context
+Error swallowing through patterns like `if let Ok(...)` without proper error handling is a common anti-pattern in Rust that violates functional programming principles. This pattern hides failures, makes debugging difficult, and can lead to incorrect program behavior when errors are silently ignored. Following the functional error handling refactor (spec 33), it was natural to add detection for these anti-patterns to help teams systematically identify and address poor error handling practices.
+
+### Decision
+Implement error swallowing detection as a new debt type that:
+- Detects common error swallowing patterns through AST analysis
+- Classifies priority based on context (critical in main flow, lower in tests)
+- Integrates with existing suppression comment system
+- Provides actionable remediation suggestions for each pattern
+- Uses visitor pattern for efficient AST traversal
+
+### Consequences
+- ✅ Teams can systematically identify error swallowing anti-patterns
+- ✅ Contextual priority helps focus on critical issues first
+- ✅ Suppression support allows for intentional error ignoring
+- ✅ Actionable remediation guidance for each pattern type
+- ✅ Lower priority for test functions reduces noise
+- ⚠️ Detection is currently functional but not integrated with priority output system
+- ⚠️ Line number detection uses placeholder values due to syn limitations
+- ⚠️ Some false positives possible without full type inference
