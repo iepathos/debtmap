@@ -602,6 +602,17 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 }
                 return;
             }
+            // Handle macros like vec![] that might contain function calls
+            Expr::Macro(expr_macro) => {
+                // Try to parse the macro tokens as expressions
+                // This handles common cases like vec![...] where the content is valid expressions
+                if let Ok(parsed_expr) = syn::parse2::<Expr>(expr_macro.mac.tokens.clone()) {
+                    self.visit_expr(&parsed_expr);
+                }
+                // Also continue with default visiting in case there's more to process
+                syn::visit::visit_expr(self, expr);
+                return;
+            }
             _ => {}
         }
 
