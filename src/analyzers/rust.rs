@@ -139,6 +139,7 @@ fn collect_all_rust_debt_items(
         extract_rust_module_smell_items(path, source_content, suppression_context),
         extract_rust_function_smell_items(functions, suppression_context),
         detect_error_swallowing(file, path, Some(suppression_context)),
+        analyze_resource_patterns(file, path),
     ]
     .into_iter()
     .flatten()
@@ -533,6 +534,33 @@ fn create_complexity_debt_item(func: &FunctionMetrics, threshold: u32) -> DebtIt
         ),
         context: None,
     }
+}
+
+fn analyze_resource_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
+    use crate::resource::{
+        convert_resource_issue_to_debt_item, AsyncResourceDetector, DropDetector, ResourceDetector,
+        UnboundedCollectionDetector,
+    };
+
+    let detectors: Vec<Box<dyn ResourceDetector>> = vec![
+        Box::new(DropDetector::new()),
+        Box::new(AsyncResourceDetector::new()),
+        Box::new(UnboundedCollectionDetector::new()),
+    ];
+
+    let mut resource_items = Vec::new();
+
+    for detector in detectors {
+        let issues = detector.detect_issues(file, path);
+
+        for issue in issues {
+            let impact = detector.assess_resource_impact(&issue);
+            let debt_item = convert_resource_issue_to_debt_item(issue, impact, path);
+            resource_items.push(debt_item);
+        }
+    }
+
+    resource_items
 }
 
 fn extract_dependencies(file: &syn::File) -> Vec<Dependency> {

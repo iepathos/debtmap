@@ -10,6 +10,7 @@ pub mod debt;
 pub mod io;
 pub mod priority;
 pub mod refactoring;
+pub mod resource;
 pub mod risk;
 pub mod transformers;
 
