@@ -106,6 +106,12 @@ impl MacroExpander {
     fn run_cargo_expand(&self, module_path: &str, manifest_path: &Path) -> Result<String> {
         let _timeout = Duration::from_secs(self.config.timeout_secs);
 
+        eprintln!(
+            "  Running: cargo expand --lib {} --manifest-path={}",
+            module_path,
+            manifest_path.display()
+        );
+
         let output = Command::new(&self.cargo_path)
             .args([
                 "expand",
@@ -120,6 +126,7 @@ impl MacroExpander {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
+            eprintln!("  cargo expand stderr: {}", stderr);
             bail!("cargo expand failed: {}", stderr);
         }
 
@@ -157,6 +164,8 @@ impl MacroExpander {
             .trim_start_matches("src\\")
             .trim_end_matches(".rs")
             .replace(['/', '\\'], "::");
+
+        eprintln!("  Module path for {}: {}", file_path.display(), module_path);
 
         Ok(module_path)
     }

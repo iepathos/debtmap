@@ -1193,14 +1193,34 @@ fn process_rust_files_for_call_graph(
             // Try to get expanded content if macro expansion is enabled
             let file_content = if let Some(config) = expansion_config.as_ref() {
                 use debtmap::expansion::{MacroExpander, MacroExpansion};
-                if let Ok(mut expander) = MacroExpander::new(config.clone()) {
-                    if let Ok(expanded) = expander.expand_file(&file_path) {
-                        expanded.expanded_content
-                    } else {
+                match MacroExpander::new(config.clone()) {
+                    Ok(mut expander) => {
+                        match expander.expand_file(&file_path) {
+                            Ok(expanded) => {
+                                // Only log success if content actually changed
+                                if expanded.expanded_content != content {
+                                    eprintln!("✓ Successfully expanded: {}", file_path.display());
+                                    expanded.expanded_content
+                                } else {
+                                    eprintln!("ℹ No macros to expand in: {}", file_path.display());
+                                    content
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "⚠ Macro expansion failed for {}: {}",
+                                    file_path.display(),
+                                    e
+                                );
+                                eprintln!("  Using fallback: parsing macro tokens directly");
+                                content
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠ Failed to create macro expander: {}", e);
                         content
                     }
-                } else {
-                    content
                 }
             } else {
                 content
