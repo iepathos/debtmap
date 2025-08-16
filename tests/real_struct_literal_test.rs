@@ -1,6 +1,5 @@
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use std::path::PathBuf;
-use syn;
 
 #[test]
 fn test_real_complexity_refactoring_struct_literal() {
@@ -67,7 +66,7 @@ fn generate_suggested_functions(base_name: &str, count: u32) -> Vec<PureFunction
         .expect("generate_suggested_functions should be in the graph");
 
     // Check that it has callers
-    let callers = call_graph.get_callers(&generate_id);
+    let callers = call_graph.get_callers(generate_id);
     println!("Callers of generate_suggested_functions: {:?}", callers);
 
     assert!(

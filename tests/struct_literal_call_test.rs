@@ -1,6 +1,5 @@
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use std::path::PathBuf;
-use syn;
 
 #[test]
 fn test_function_calls_in_struct_literals_are_tracked() {
