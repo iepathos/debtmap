@@ -63,38 +63,39 @@ impl CryptoVisitor {
 
     fn check_insecure_random(&mut self, expr_str: &str, line: usize) {
         if (expr_str.contains("rand()") || expr_str.contains("random()"))
-            && !expr_str.contains("cryptographically_secure") && !expr_str.contains("OsRng") {
-                self.debt_items.push(DebtItem {
-                    id: format!("security-random-{}-{}", self.path.display(), line),
-                    debt_type: DebtType::Security,
-                    priority: Priority::High,
-                    file: self.path.clone(),
-                    line,
-                    column: None,
-                    message: "Insecure random number generation for cryptographic use".to_string(),
-                    context: Some(
-                        "Use a cryptographically secure random number generator".to_string(),
-                    ),
-                });
-            }
+            && !expr_str.contains("cryptographically_secure")
+            && !expr_str.contains("OsRng")
+        {
+            self.debt_items.push(DebtItem {
+                id: format!("security-random-{}-{}", self.path.display(), line),
+                debt_type: DebtType::Security,
+                priority: Priority::High,
+                file: self.path.clone(),
+                line,
+                column: None,
+                message: "Insecure random number generation for cryptographic use".to_string(),
+                context: Some("Use a cryptographically secure random number generator".to_string()),
+            });
+        }
     }
 
     fn check_hardcoded_iv(&mut self, expr_str: &str, line: usize) {
         if (expr_str.contains("iv") || expr_str.contains("nonce"))
-            && (expr_str.contains("[0u8") || expr_str.contains("[0x")) {
-                self.debt_items.push(DebtItem {
-                    id: format!("security-iv-{}-{}", self.path.display(), line),
-                    debt_type: DebtType::Security,
-                    priority: Priority::High,
-                    file: self.path.clone(),
-                    line,
-                    column: None,
-                    message: "Hardcoded IV/nonce detected".to_string(),
-                    context: Some(
-                        "Use a randomly generated IV for each encryption operation".to_string(),
-                    ),
-                });
-            }
+            && (expr_str.contains("[0u8") || expr_str.contains("[0x"))
+        {
+            self.debt_items.push(DebtItem {
+                id: format!("security-iv-{}-{}", self.path.display(), line),
+                debt_type: DebtType::Security,
+                priority: Priority::High,
+                file: self.path.clone(),
+                line,
+                column: None,
+                message: "Hardcoded IV/nonce detected".to_string(),
+                context: Some(
+                    "Use a randomly generated IV for each encryption operation".to_string(),
+                ),
+            });
+        }
     }
 }
 
