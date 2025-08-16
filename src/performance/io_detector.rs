@@ -99,8 +99,6 @@ impl IOVisitor {
                 let (io_pattern, can_batch) =
                     if method_name.contains("query") || method_name.contains("execute") {
                         (IOPattern::UnbatchedQueries, true)
-                    } else if method_name.contains("read") || method_name.contains("write") {
-                        (IOPattern::SyncInLoop, false)
                     } else {
                         (IOPattern::SyncInLoop, false)
                     };

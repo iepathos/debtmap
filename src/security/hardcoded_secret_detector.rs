@@ -105,12 +105,14 @@ impl SecretVisitor {
 
 impl<'ast> Visit<'ast> for SecretVisitor {
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        if let Expr::Lit(ExprLit { lit, .. }) = expr {
-            if let Lit::Str(lit_str) = lit {
-                let value = lit_str.value();
-                // Use a placeholder line number since syn doesn't provide it directly
-                self.check_string_for_secrets(&value, 0);
-            }
+        if let Expr::Lit(ExprLit {
+            lit: Lit::Str(lit_str),
+            ..
+        }) = expr
+        {
+            let value = lit_str.value();
+            // Use a placeholder line number since syn doesn't provide it directly
+            self.check_string_for_secrets(&value, 0);
         }
         syn::visit::visit_expr(self, expr);
     }

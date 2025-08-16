@@ -196,9 +196,9 @@ fn format_pattern_message(pattern: &PerformanceAntiPattern) -> String {
         PerformanceAntiPattern::InefficientIO { io_pattern, .. } => {
             format!("Inefficient I/O pattern: {:?}", io_pattern)
         }
-        PerformanceAntiPattern::StringProcessingAntiPattern {
-            pattern_type, ..
-        } => format!("Inefficient string processing: {:?}", pattern_type),
+        PerformanceAntiPattern::StringProcessingAntiPattern { pattern_type, .. } => {
+            format!("Inefficient string processing: {:?}", pattern_type)
+        }
     }
 }
 
@@ -283,10 +283,7 @@ mod tests {
             impact_to_priority(PerformanceImpact::Critical),
             Priority::Critical
         );
-        assert_eq!(
-            impact_to_priority(PerformanceImpact::High),
-            Priority::High
-        );
+        assert_eq!(impact_to_priority(PerformanceImpact::High), Priority::High);
         assert_eq!(
             impact_to_priority(PerformanceImpact::Medium),
             Priority::Medium
@@ -476,8 +473,7 @@ mod tests {
         assert_eq!(
             debt.context,
             Some(
-                "Consider algorithm optimization or caching (parallelization possible)"
-                    .to_string()
+                "Consider algorithm optimization or caching (parallelization possible)".to_string()
             )
         );
         assert_eq!(debt.line, 100);
@@ -492,19 +488,12 @@ mod tests {
             async_opportunity: false,
         };
         let path = PathBuf::from("src/io.rs");
-        let debt = convert_performance_pattern_to_debt_item(
-            pattern,
-            PerformanceImpact::Medium,
-            &path,
-            50,
-        );
+        let debt =
+            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Medium, &path, 50);
 
         assert_eq!(debt.priority, Priority::High); // IO always gets High priority
         assert_eq!(debt.debt_type, DebtType::Performance);
-        assert_eq!(
-            debt.message,
-            "Inefficient I/O pattern: UnbufferedIO"
-        );
+        assert_eq!(debt.message, "Inefficient I/O pattern: UnbufferedIO");
         assert_eq!(debt.context, Some("Consider: batch operations".to_string()));
         assert_eq!(debt.line, 50);
     }
@@ -517,12 +506,8 @@ mod tests {
             suggested_optimization: "Use String::with_capacity()".to_string(),
         };
         let path = PathBuf::from("src/alloc.rs");
-        let debt = convert_performance_pattern_to_debt_item(
-            pattern,
-            PerformanceImpact::Medium,
-            &path,
-            75,
-        );
+        let debt =
+            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Medium, &path, 75);
 
         assert_eq!(debt.priority, Priority::Medium); // Uses impact_to_priority
         assert_eq!(debt.debt_type, DebtType::Performance);
