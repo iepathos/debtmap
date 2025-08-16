@@ -29,13 +29,14 @@ impl PrimitiveObsessionDetector {
         let name_lower = type_usage.context.to_lowercase();
 
         // Check for identifier patterns
-        if self.track_string_identifiers && type_usage.type_name == "String"
+        if self.track_string_identifiers
+            && type_usage.type_name == "String"
             && (name_lower.contains("id")
                 || name_lower.contains("key")
                 || name_lower.contains("code"))
-            {
-                return Some(PrimitiveUsageContext::Identifier);
-            }
+        {
+            return Some(PrimitiveUsageContext::Identifier);
+        }
 
         // Check for measurement patterns
         if self.track_numeric_measurements
@@ -49,18 +50,18 @@ impl PrimitiveObsessionDetector {
                 || name_lower.contains("temperature")
                 || name_lower.contains("price")
                 || name_lower.contains("amount"))
-            {
-                return Some(PrimitiveUsageContext::Measurement);
-            }
+        {
+            return Some(PrimitiveUsageContext::Measurement);
+        }
 
         // Check for status patterns
         if type_usage.type_name == "bool"
             && (name_lower.contains("status")
                 || name_lower.contains("state")
                 || name_lower.contains("flag"))
-            {
-                return Some(PrimitiveUsageContext::Status);
-            }
+        {
+            return Some(PrimitiveUsageContext::Status);
+        }
 
         // Check for category patterns
         if (type_usage.type_name == "String" || type_usage.type_name == "i32")
@@ -68,9 +69,9 @@ impl PrimitiveObsessionDetector {
                 || name_lower.contains("category")
                 || name_lower.contains("kind")
                 || name_lower.contains("mode"))
-            {
-                return Some(PrimitiveUsageContext::Category);
-            }
+        {
+            return Some(PrimitiveUsageContext::Category);
+        }
 
         None
     }

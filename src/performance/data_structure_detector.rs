@@ -84,45 +84,47 @@ impl DataStructureVisitor {
         }
 
         // Check for linear search patterns (iter().find())
-        if self.in_loop && (method_name == "find" || method_name == "position")
-            && self.is_preceded_by_iter(&method_call.receiver) {
-                self.patterns
-                    .push(PerformanceAntiPattern::InefficientDataStructure {
-                        operation: DataStructureOperation::LinearSearch,
-                        collection_type: "Iterator".to_string(),
-                        recommended_alternative: "Consider using HashMap for key-based lookups or BTreeMap for ordered access".to_string(),
-                        performance_impact: PerformanceImpact::Medium,
-                    });
-            }
+        if self.in_loop
+            && (method_name == "find" || method_name == "position")
+            && self.is_preceded_by_iter(&method_call.receiver)
+        {
+            self.patterns
+                .push(PerformanceAntiPattern::InefficientDataStructure {
+                operation: DataStructureOperation::LinearSearch,
+                collection_type: "Iterator".to_string(),
+                recommended_alternative:
+                    "Consider using HashMap for key-based lookups or BTreeMap for ordered access"
+                        .to_string(),
+                performance_impact: PerformanceImpact::Medium,
+            });
+        }
 
         // Check for Vec::insert(0, _) or Vec::remove(0) patterns
-        if self.in_loop
-            && (method_name == "insert" || method_name == "remove") {
-                if let Some(collection_type) = self.infer_collection_type(&method_call.receiver) {
-                    if collection_type == "Vec" {
-                        // Check if operating at beginning of Vec
-                        if let Some(first_arg) = method_call.args.first() {
-                            if self.is_zero_literal(first_arg) {
-                                let operation = if method_name == "insert" {
-                                    DataStructureOperation::FrequentInsertion
-                                } else {
-                                    DataStructureOperation::FrequentDeletion
-                                };
+        if self.in_loop && (method_name == "insert" || method_name == "remove") {
+            if let Some(collection_type) = self.infer_collection_type(&method_call.receiver) {
+                if collection_type == "Vec" {
+                    // Check if operating at beginning of Vec
+                    if let Some(first_arg) = method_call.args.first() {
+                        if self.is_zero_literal(first_arg) {
+                            let operation = if method_name == "insert" {
+                                DataStructureOperation::FrequentInsertion
+                            } else {
+                                DataStructureOperation::FrequentDeletion
+                            };
 
-                                self.patterns.push(
-                                    PerformanceAntiPattern::InefficientDataStructure {
-                                        operation,
-                                        collection_type: "Vec".to_string(),
-                                        recommended_alternative:
-                                            "VecDeque for O(1) front operations".to_string(),
-                                        performance_impact: PerformanceImpact::High,
-                                    },
-                                );
-                            }
+                            self.patterns
+                                .push(PerformanceAntiPattern::InefficientDataStructure {
+                                    operation,
+                                    collection_type: "Vec".to_string(),
+                                    recommended_alternative: "VecDeque for O(1) front operations"
+                                        .to_string(),
+                                    performance_impact: PerformanceImpact::High,
+                                });
                         }
                     }
                 }
             }
+        }
 
         // Check for Vec used as a queue pattern (push + remove(0))
         if method_name == "push" || method_name == "push_back" {

@@ -91,6 +91,42 @@ pub enum Commands {
         /// Show macro expansion statistics at the end of analysis
         #[arg(long = "show-macro-stats")]
         show_macro_stats: bool,
+
+        /// Enable comprehensive debt analysis (all categories)
+        #[arg(long = "comprehensive")]
+        comprehensive: bool,
+
+        /// Enable security analysis only
+        #[arg(long = "security-only")]
+        security_only: bool,
+
+        /// Enable performance analysis only
+        #[arg(long = "performance-only")]
+        performance_only: bool,
+
+        /// Enable organization analysis only
+        #[arg(long = "organization-only")]
+        organization_only: bool,
+
+        /// Enable testing quality analysis only
+        #[arg(long = "testing-only")]
+        testing_only: bool,
+
+        /// Enable resource management analysis only
+        #[arg(long = "resource-only")]
+        resource_only: bool,
+
+        /// Group output by debt category
+        #[arg(long = "group-by-category")]
+        group_by_category: bool,
+
+        /// Minimum priority to display (low, medium, high, critical)
+        #[arg(long = "min-priority")]
+        min_priority: Option<String>,
+
+        /// Filter by debt categories (comma-separated)
+        #[arg(long = "filter", value_delimiter = ',')]
+        filter_categories: Option<Vec<String>>,
     },
 
     /// Initialize configuration file
