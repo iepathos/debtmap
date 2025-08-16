@@ -223,9 +223,64 @@ fn default_min_coverage() -> f64 {
     0.0
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LanguagesConfig {
     pub enabled: Vec<String>,
+
+    /// Rust-specific configuration
+    #[serde(default)]
+    pub rust: Option<LanguageFeatures>,
+
+    /// Python-specific configuration
+    #[serde(default)]
+    pub python: Option<LanguageFeatures>,
+
+    /// JavaScript-specific configuration
+    #[serde(default)]
+    pub javascript: Option<LanguageFeatures>,
+
+    /// TypeScript-specific configuration
+    #[serde(default)]
+    pub typescript: Option<LanguageFeatures>,
+}
+
+/// Language-specific feature configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanguageFeatures {
+    /// Whether to detect dead code for this language
+    #[serde(default = "default_detect_dead_code")]
+    pub detect_dead_code: bool,
+
+    /// Whether to detect complexity issues for this language
+    #[serde(default = "default_detect_complexity")]
+    pub detect_complexity: bool,
+
+    /// Whether to detect duplication for this language
+    #[serde(default = "default_detect_duplication")]
+    pub detect_duplication: bool,
+}
+
+impl Default for LanguageFeatures {
+    fn default() -> Self {
+        Self {
+            detect_dead_code: default_detect_dead_code(),
+            detect_complexity: default_detect_complexity(),
+            detect_duplication: default_detect_duplication(),
+        }
+    }
+}
+
+// Default feature flags - all enabled except Rust dead code detection
+fn default_detect_dead_code() -> bool {
+    true // Will be overridden for Rust
+}
+
+fn default_detect_complexity() -> bool {
+    true
+}
+
+fn default_detect_duplication() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -360,4 +415,34 @@ pub fn get_validation_thresholds() -> ValidationThresholds {
         .as_ref()
         .and_then(|t| t.validation.clone())
         .unwrap_or_default()
+}
+
+/// Get language-specific feature configuration
+pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatures {
+    use crate::core::Language;
+
+    let config = get_config();
+    let languages_config = config.languages.as_ref();
+
+    match language {
+        Language::Rust => {
+            languages_config
+                .and_then(|lc| lc.rust.clone())
+                .unwrap_or(LanguageFeatures {
+                    detect_dead_code: false, // Rust dead code detection disabled by default
+                    detect_complexity: true,
+                    detect_duplication: true,
+                })
+        }
+        Language::Python => languages_config
+            .and_then(|lc| lc.python.clone())
+            .unwrap_or_default(),
+        Language::JavaScript => languages_config
+            .and_then(|lc| lc.javascript.clone())
+            .unwrap_or_default(),
+        Language::TypeScript => languages_config
+            .and_then(|lc| lc.typescript.clone())
+            .unwrap_or_default(),
+        Language::Unknown => LanguageFeatures::default(),
+    }
 }

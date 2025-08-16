@@ -614,6 +614,15 @@ pub fn is_dead_code_with_exclusions(
     framework_exclusions: &std::collections::HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> bool {
+    // Check if dead code detection is enabled for this file's language
+    let language = crate::core::Language::from_path(&func.file);
+    let language_features = crate::config::get_language_features(&language);
+
+    if !language_features.detect_dead_code {
+        // Dead code detection disabled for this language
+        return false;
+    }
+
     // First check if this function is excluded by framework patterns
     if framework_exclusions.contains(func_id) {
         return false;

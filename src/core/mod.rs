@@ -263,6 +263,13 @@ impl Language {
             .map(|(_, lang)| *lang)
             .unwrap_or(Language::Unknown)
     }
+
+    pub fn from_path(path: &std::path::Path) -> Self {
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(Self::from_extension)
+            .unwrap_or(Language::Unknown)
+    }
 }
 
 impl std::fmt::Display for Language {
