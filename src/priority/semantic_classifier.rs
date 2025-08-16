@@ -242,22 +242,15 @@ fn is_io_orchestration(func: &FunctionMetrics) -> bool {
 
 // Helper to identify standard library and utility functions that shouldn't count as delegation targets
 fn is_std_or_utility_function(name: &str) -> bool {
-    // Standard library functions from macro expansion
-    if name == "format" || name == "write" || name == "print" || name == "println" {
-        return true;
-    }
-
-    // Functions that are clearly from std library based on path
-    if name.starts_with("std::") || name.starts_with("core::") || name.starts_with("alloc::") {
-        return true;
-    }
-
-    // Common utility functions that are too generic
-    if name == "clone" || name == "to_string" || name == "into" || name == "from" {
-        return true;
-    }
-
-    false
+    matches!(
+        name,
+        // Standard library functions from macro expansion
+        "format" | "write" | "print" | "println" |
+        // Common utility functions that are too generic
+        "clone" | "to_string" | "into" | "from"
+    ) || name.starts_with("std::")
+        || name.starts_with("core::")
+        || name.starts_with("alloc::")
 }
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
