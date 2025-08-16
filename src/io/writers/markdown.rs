@@ -450,6 +450,7 @@ fn format_debt_type(debt_type: &crate::priority::DebtType) -> &'static str {
         DebtType::TestComplexityHotspot { .. } => "Test Complexity",
         DebtType::TestTodo { .. } => "Test TODO",
         DebtType::TestDuplication { .. } => "Test Duplication",
+        DebtType::ErrorSwallowing { .. } => "Error Swallowing",
     }
 }
 
@@ -510,6 +511,10 @@ fn format_debt_issue(debt_type: &crate::priority::DebtType) -> String {
                 similarity * 100.0
             )
         }
+        DebtType::ErrorSwallowing { pattern, context } => match context {
+            Some(ctx) => format!("{}: {}", pattern, ctx),
+            None => pattern.to_string(),
+        },
     }
 }
 

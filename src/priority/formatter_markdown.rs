@@ -141,6 +141,7 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::TestComplexityHotspot { .. } => "Test Complexity",
         DebtType::TestTodo { .. } => "Test TODO",
         DebtType::TestDuplication { .. } => "Test Duplication",
+        DebtType::ErrorSwallowing { .. } => "Error Swallowing",
     }
 }
 

@@ -100,6 +100,10 @@ pub enum DebtType {
         total_lines: u32,
         similarity: f64,
     },
+    ErrorSwallowing {
+        pattern: String,
+        context: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

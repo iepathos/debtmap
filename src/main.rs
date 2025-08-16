@@ -779,6 +779,7 @@ fn calculate_unified_debt_score(
         &call_graph,
         lcov_data,
         &framework_exclusions,
+        Some(&results.technical_debt.items),
     );
 
     // Return the unified debt score as u32 for compatibility with validation thresholds
@@ -1428,12 +1429,84 @@ fn create_debt_item_from_metric(
     )
 }
 
+/// Convert error swallowing debt items to unified debt items
+fn convert_error_swallowing_to_unified(
+    debt_items: &[core::DebtItem],
+    _call_graph: &priority::CallGraph,
+) -> Vec<priority::UnifiedDebtItem> {
+    use priority::{
+        unified_scorer::Location, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
+        UnifiedDebtItem, UnifiedScore,
+    };
+
+    debt_items
+        .iter()
+        .filter(|item| item.debt_type == core::DebtType::ErrorSwallowing)
+        .map(|item| {
+            // Create a basic unified score for error swallowing
+            // These aren't function-based, so we use moderate scores
+            let unified_score = UnifiedScore {
+                complexity_factor: 3.0, // Moderate complexity - error handling adds complexity
+                coverage_factor: 5.0,   // Important to test error paths
+                roi_factor: 6.0,        // High ROI - prevents production failures
+                semantic_factor: 7.0,   // High semantic importance - affects reliability
+                dependency_factor: 4.0, // Moderate dependency impact
+                role_multiplier: 1.2,   // Slightly elevated importance
+                final_score: 5.5,       // Above average priority
+            };
+
+            let pattern = item.message.split(':').next().unwrap_or("Error swallowing");
+            let context = item.context.clone();
+
+            UnifiedDebtItem {
+                location: Location {
+                    file: item.file.clone(),
+                    function: format!("line_{}", item.line), // Use line number as pseudo-function
+                    line: item.line,
+                },
+                debt_type: DebtType::ErrorSwallowing {
+                    pattern: pattern.to_string(),
+                    context,
+                },
+                unified_score,
+                function_role: FunctionRole::Unknown,
+                recommendation: ActionableRecommendation {
+                    primary_action: format!("Fix error swallowing at line {}", item.line),
+                    rationale: item.message.clone(),
+                    implementation_steps: vec![
+                        "Replace error swallowing with proper error handling".to_string(),
+                        "Log errors at minimum, even if they can't be handled".to_string(),
+                        "Consider propagating errors to caller with ?".to_string(),
+                    ],
+                    related_items: vec![],
+                },
+                expected_impact: ImpactMetrics {
+                    coverage_improvement: 0.0,
+                    lines_reduction: 0,
+                    complexity_reduction: 0.0,
+                    risk_reduction: 3.5, // Significant risk reduction
+                },
+                transitive_coverage: None,
+                upstream_dependencies: 0,
+                downstream_dependencies: 0,
+                upstream_callers: vec![],
+                downstream_callees: vec![],
+                nesting_depth: 0,
+                function_length: 0,
+                cyclomatic_complexity: 0,
+                cognitive_complexity: 0,
+            }
+        })
+        .collect()
+}
+
 /// Create unified analysis from metrics and call graph with framework exclusions
 fn create_unified_analysis_with_exclusions(
     metrics: &[debtmap::FunctionMetrics],
     call_graph: &priority::CallGraph,
     coverage_data: Option<&risk::lcov::LcovData>,
     framework_exclusions: &std::collections::HashSet<priority::call_graph::FunctionId>,
+    debt_items: Option<&[core::DebtItem]>,
 ) -> priority::UnifiedAnalysis {
     use priority::UnifiedAnalysis;
 
@@ -1447,6 +1520,14 @@ fn create_unified_analysis_with_exclusions(
         let item =
             create_debt_item_from_metric(metric, call_graph, coverage_data, framework_exclusions);
         unified.add_item(item);
+    }
+
+    // Add error swallowing debt items if provided
+    if let Some(debt_items) = debt_items {
+        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
+        for item in error_swallowing_items {
+            unified.add_item(item);
+        }
     }
 
     unified.sort_by_priority();
@@ -1560,6 +1641,7 @@ fn perform_unified_analysis(
         &call_graph,
         coverage_data.as_ref(),
         &framework_exclusions,
+        Some(&results.technical_debt.items),
     ))
 }
 

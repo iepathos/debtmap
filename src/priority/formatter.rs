@@ -554,6 +554,7 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::TestComplexityHotspot { .. } => "TEST COMPLEXITY",
         DebtType::TestTodo { .. } => "TEST TODO",
         DebtType::TestDuplication { .. } => "TEST DUPLICATION",
+        DebtType::ErrorSwallowing { .. } => "ERROR SWALLOWING",
     }
 }
 
@@ -579,6 +580,7 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
         DebtType::TestComplexityHotspot { .. } => "Simplify test",
         DebtType::TestTodo { .. } => "Complete TODO",
         DebtType::TestDuplication { .. } => "Remove test duplication",
+        DebtType::ErrorSwallowing { .. } => "Fix error swallowing",
     }
 }
 

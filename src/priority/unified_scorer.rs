@@ -1173,6 +1173,29 @@ fn generate_dead_code_recommendation(
     (action, rationale, steps)
 }
 
+/// Generate recommendation for error swallowing debt
+fn generate_error_swallowing_recommendation(
+    pattern: &str,
+    context: &Option<String>,
+) -> (String, String, Vec<String>) {
+    let primary_action = format!("Fix error swallowing: {}", pattern);
+
+    let rationale = match context {
+        Some(ctx) => format!("Error being silently ignored using '{}' pattern. Context: {}", pattern, ctx),
+        None => format!("Error being silently ignored using '{}' pattern. This can hide critical failures in production", pattern),
+    };
+
+    let steps = vec![
+        "Replace error swallowing with proper error handling".to_string(),
+        "Log errors at minimum, even if they can't be handled".to_string(),
+        "Consider propagating errors to caller with ?".to_string(),
+        "Add context to errors using .context() or .with_context()".to_string(),
+        "Test error paths explicitly".to_string(),
+    ];
+
+    (primary_action, rationale, steps)
+}
+
 /// Generate recommendation for test-specific debt types
 fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
     match debt_type {
@@ -1458,6 +1481,9 @@ fn generate_recommendation(
         DebtType::TestComplexityHotspot { .. }
         | DebtType::TestTodo { .. }
         | DebtType::TestDuplication { .. } => generate_test_debt_recommendation(debt_type),
+        DebtType::ErrorSwallowing { pattern, context } => {
+            generate_error_swallowing_recommendation(pattern, context)
+        }
     };
 
     ActionableRecommendation {
@@ -1478,6 +1504,7 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
     match debt_type {
         DebtType::TestingGap { .. } => 0.42,
         DebtType::ComplexityHotspot { .. } => 0.35,
+        DebtType::ErrorSwallowing { .. } => 0.35, // High risk - can hide critical failures
         DebtType::DeadCode { .. } => 0.3,
         DebtType::Duplication { .. } => 0.25,
         DebtType::Risk { .. } => 0.2,
