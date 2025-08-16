@@ -1,5 +1,5 @@
 use debtmap::testing::{
-    analyze_testing_patterns, FlakinessType, TestingAntiPattern, TestSimplification,
+    analyze_testing_patterns, FlakinessType, TestSimplification, TestingAntiPattern,
 };
 use std::path::PathBuf;
 use syn;
@@ -30,12 +30,18 @@ fn test_detects_test_without_assertions() {
     for pattern in &patterns {
         eprintln!("Pattern: {}", pattern.message);
     }
-    
+
     // Should only detect test_without_assertions
-    let no_assertion_patterns: Vec<_> = patterns.iter()
+    let no_assertion_patterns: Vec<_> = patterns
+        .iter()
         .filter(|p| p.message.contains("no assertions"))
         .collect();
-    assert_eq!(no_assertion_patterns.len(), 1, "Expected 1 no-assertion pattern, found {}", no_assertion_patterns.len());
+    assert_eq!(
+        no_assertion_patterns.len(),
+        1,
+        "Expected 1 no-assertion pattern, found {}",
+        no_assertion_patterns.len()
+    );
     assert!(matches!(
         &no_assertion_patterns[0].debt_type,
         debtmap::core::DebtType::TestQuality
@@ -78,12 +84,9 @@ fn test_detects_overly_complex_test() {
     let path = PathBuf::from("test.rs");
     let patterns = analyze_testing_patterns(&file, &path);
 
-    let complex_pattern = patterns.iter().find(|p| {
-        matches!(
-            p.debt_type,
-            debtmap::core::DebtType::TestComplexity
-        )
-    });
+    let complex_pattern = patterns
+        .iter()
+        .find(|p| matches!(p.debt_type, debtmap::core::DebtType::TestComplexity));
 
     assert!(complex_pattern.is_some());
     assert!(complex_pattern.unwrap().message.contains("overly complex"));
@@ -105,9 +108,9 @@ fn test_detects_flaky_timing_test() {
     let path = PathBuf::from("test.rs");
     let patterns = analyze_testing_patterns(&file, &path);
 
-    let timing_pattern = patterns.iter().find(|p| {
-        p.message.contains("flaky pattern")
-    });
+    let timing_pattern = patterns
+        .iter()
+        .find(|p| p.message.contains("flaky pattern"));
 
     assert!(timing_pattern.is_some());
     assert!(timing_pattern.unwrap().message.contains("TimingDependency"));
@@ -130,9 +133,7 @@ fn test_detects_random_value_usage() {
     let path = PathBuf::from("test.rs");
     let patterns = analyze_testing_patterns(&file, &path);
 
-    let random_pattern = patterns.iter().find(|p| {
-        p.message.contains("RandomValues")
-    });
+    let random_pattern = patterns.iter().find(|p| p.message.contains("RandomValues"));
 
     assert!(random_pattern.is_some());
 }
@@ -154,9 +155,9 @@ fn test_detects_external_service_call() {
     let path = PathBuf::from("test.rs");
     let patterns = analyze_testing_patterns(&file, &path);
 
-    let external_pattern = patterns.iter().find(|p| {
-        p.message.contains("ExternalDependency")
-    });
+    let external_pattern = patterns
+        .iter()
+        .find(|p| p.message.contains("ExternalDependency"));
 
     assert!(external_pattern.is_some());
 }
@@ -175,9 +176,9 @@ fn test_detects_filesystem_dependency() {
     let path = PathBuf::from("test.rs");
     let patterns = analyze_testing_patterns(&file, &path);
 
-    let fs_pattern = patterns.iter().find(|p| {
-        p.message.contains("FilesystemDependency")
-    });
+    let fs_pattern = patterns
+        .iter()
+        .find(|p| p.message.contains("FilesystemDependency"));
 
     assert!(fs_pattern.is_some());
 }
@@ -205,7 +206,8 @@ fn test_detects_test_functions_by_attribute() {
     let patterns = analyze_testing_patterns(&file, &path);
 
     // Both tests have assertions so should not report issues
-    let no_assertion_patterns: Vec<_> = patterns.iter()
+    let no_assertion_patterns: Vec<_> = patterns
+        .iter()
         .filter(|p| p.message.contains("no assertions"))
         .collect();
     assert_eq!(no_assertion_patterns.len(), 0);
@@ -289,10 +291,10 @@ fn test_detects_multiple_anti_patterns_in_single_test() {
 
     // Should detect multiple issues
     assert!(patterns.len() >= 3);
-    
+
     // Should have no assertions issue
     assert!(patterns.iter().any(|p| p.message.contains("no assertions")));
-    
+
     // Should have flakiness issues
     assert!(patterns.iter().any(|p| p.message.contains("flaky pattern")));
 }

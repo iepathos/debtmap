@@ -1,6 +1,6 @@
 use super::{
-    is_test_function, ComplexitySource, TestQualityImpact,
-    TestSimplification, TestingAntiPattern, TestingDetector,
+    is_test_function, ComplexitySource, TestQualityImpact, TestSimplification, TestingAntiPattern,
+    TestingDetector,
 };
 use std::path::PathBuf;
 use syn::visit::Visit;
@@ -10,6 +10,12 @@ pub struct TestComplexityDetector {
     max_test_complexity: u32,
     max_mock_setups: usize,
     max_test_length: usize,
+}
+
+impl Default for TestComplexityDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestComplexityDetector {
@@ -32,12 +38,7 @@ impl TestingDetector for TestComplexityDetector {
                     let analysis = analyze_test_complexity(function);
 
                     if is_overly_complex(&analysis, self) {
-                        let line = function
-                            .sig
-                            .ident
-                            .span()
-                            .start()
-                            .line;
+                        let line = function.sig.ident.span().start().line;
 
                         patterns.push(TestingAntiPattern::OverlyComplexTest {
                             test_name: function.sig.ident.to_string(),
@@ -60,12 +61,7 @@ impl TestingDetector for TestComplexityDetector {
                                 let analysis = analyze_test_complexity(function);
 
                                 if is_overly_complex(&analysis, self) {
-                                    let line = function
-                                        .sig
-                                        .ident
-                                        .span()
-                                        .start()
-                                        .line;
+                                    let line = function.sig.ident.span().start().line;
 
                                     patterns.push(TestingAntiPattern::OverlyComplexTest {
                                         test_name: function.sig.ident.to_string(),
@@ -73,7 +69,9 @@ impl TestingDetector for TestComplexityDetector {
                                         line,
                                         complexity_score: analysis.total_complexity,
                                         complexity_sources: analysis.sources.clone(),
-                                        suggested_simplification: suggest_simplification(&analysis, self),
+                                        suggested_simplification: suggest_simplification(
+                                            &analysis, self,
+                                        ),
                                     });
                                 }
                             }
@@ -92,7 +90,9 @@ impl TestingDetector for TestComplexityDetector {
 
     fn assess_test_quality_impact(&self, pattern: &TestingAntiPattern) -> TestQualityImpact {
         match pattern {
-            TestingAntiPattern::OverlyComplexTest { complexity_score, .. } => {
+            TestingAntiPattern::OverlyComplexTest {
+                complexity_score, ..
+            } => {
                 if *complexity_score > 20 {
                     TestQualityImpact::High
                 } else {
@@ -144,13 +144,19 @@ impl<'ast> Visit<'ast> for ComplexityAnalyzer {
 
         // Identify complexity sources
         if self.analysis.mock_setup_count > 3 {
-            self.analysis.sources.push(ComplexitySource::ExcessiveMocking);
+            self.analysis
+                .sources
+                .push(ComplexitySource::ExcessiveMocking);
         }
         if self.analysis.has_nested_conditionals {
-            self.analysis.sources.push(ComplexitySource::NestedConditionals);
+            self.analysis
+                .sources
+                .push(ComplexitySource::NestedConditionals);
         }
         if self.analysis.assertion_count > 5 {
-            self.analysis.sources.push(ComplexitySource::MultipleAssertions);
+            self.analysis
+                .sources
+                .push(ComplexitySource::MultipleAssertions);
         }
         if self.analysis.has_loops {
             self.analysis.sources.push(ComplexitySource::LoopInTest);
@@ -228,17 +234,14 @@ impl<'ast> Visit<'ast> for ComplexityAnalyzer {
 
     fn visit_expr(&mut self, node: &'ast Expr) {
         // Check for complex boolean expressions in assertions
-        match node {
-            Expr::Binary(binary) => {
-                use syn::BinOp;
-                match binary.op {
-                    BinOp::And(_) | BinOp::Or(_) => {
-                        self.analysis.assertion_complexity += 1;
-                    }
-                    _ => {}
+        if let Expr::Binary(binary) = node {
+            use syn::BinOp;
+            match binary.op {
+                BinOp::And(_) | BinOp::Or(_) => {
+                    self.analysis.assertion_complexity += 1;
                 }
+                _ => {}
             }
-            _ => {}
         }
 
         syn::visit::visit_expr(self, node);
@@ -259,9 +262,20 @@ fn count_lines_in_block(block: &Block) -> usize {
 
 fn is_mock_setup_call(name: &str) -> bool {
     let mock_patterns = [
-        "mock", "when", "given", "expect", "stub", "fake",
-        "with_return", "returns", "with_args", "times",
-        "Mock", "Stub", "Fake", "Double"
+        "mock",
+        "when",
+        "given",
+        "expect",
+        "stub",
+        "fake",
+        "with_return",
+        "returns",
+        "with_args",
+        "times",
+        "Mock",
+        "Stub",
+        "Fake",
+        "Double",
     ];
 
     mock_patterns.iter().any(|pattern| name.contains(pattern))
@@ -269,11 +283,18 @@ fn is_mock_setup_call(name: &str) -> bool {
 
 fn is_mock_method_call(name: &str) -> bool {
     let mock_methods = [
-        "expect", "times", "returning", "with", "withf",
-        "return_once", "return_const", "never", "once"
+        "expect",
+        "times",
+        "returning",
+        "with",
+        "withf",
+        "return_once",
+        "return_const",
+        "never",
+        "once",
     ];
 
-    mock_methods.contains(&name.as_ref())
+    mock_methods.contains(&name)
 }
 
 fn is_assertion_call(name: &str) -> bool {

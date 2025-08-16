@@ -8,6 +8,12 @@ use syn::{Expr, ExprCall, ExprMethodCall, File, Item, ItemFn};
 
 pub struct FlakyTestDetector {}
 
+impl Default for FlakyTestDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FlakyTestDetector {
     pub fn new() -> Self {
         Self {}
@@ -24,12 +30,7 @@ impl TestingDetector for FlakyTestDetector {
                     let flakiness_indicators = analyze_flakiness(function);
 
                     for indicator in flakiness_indicators {
-                        let line = function
-                            .sig
-                            .ident
-                            .span()
-                            .start()
-                            .line;
+                        let line = function.sig.ident.span().start().line;
 
                         patterns.push(TestingAntiPattern::FlakyTestPattern {
                             test_name: function.sig.ident.to_string(),
@@ -52,12 +53,7 @@ impl TestingDetector for FlakyTestDetector {
                                 let flakiness_indicators = analyze_flakiness(function);
 
                                 for indicator in flakiness_indicators {
-                                    let line = function
-                                        .sig
-                                        .ident
-                                        .span()
-                                        .start()
-                                        .line;
+                                    let line = function.sig.ident.span().start().line;
 
                                     patterns.push(TestingAntiPattern::FlakyTestPattern {
                                         test_name: function.sig.ident.to_string(),
@@ -132,8 +128,9 @@ impl<'ast> Visit<'ast> for FlakinessAnalyzer {
                 self.indicators.push(FlakinessIndicator {
                     flakiness_type: FlakinessType::TimingDependency,
                     impact: ReliabilityImpact::High,
-                    suggestion: "Replace sleep/timing dependencies with deterministic waits or mocks"
-                        .to_string(),
+                    suggestion:
+                        "Replace sleep/timing dependencies with deterministic waits or mocks"
+                            .to_string(),
                 });
             }
 
@@ -160,7 +157,8 @@ impl<'ast> Visit<'ast> for FlakinessAnalyzer {
                 self.indicators.push(FlakinessIndicator {
                     flakiness_type: FlakinessType::FilesystemDependency,
                     impact: ReliabilityImpact::Medium,
-                    suggestion: "Use temporary directories or mock filesystem operations".to_string(),
+                    suggestion: "Use temporary directories or mock filesystem operations"
+                        .to_string(),
                 });
             }
 
@@ -272,7 +270,9 @@ fn is_external_service_call(path: &str) -> bool {
         "diesel",
     ];
 
-    external_patterns.iter().any(|pattern| path.contains(pattern))
+    external_patterns
+        .iter()
+        .any(|pattern| path.contains(pattern))
 }
 
 fn is_filesystem_call(path: &str) -> bool {
@@ -308,5 +308,7 @@ fn is_network_call(path: &str) -> bool {
         "recv_from",
     ];
 
-    network_patterns.iter().any(|pattern| path.contains(pattern))
+    network_patterns
+        .iter()
+        .any(|pattern| path.contains(pattern))
 }

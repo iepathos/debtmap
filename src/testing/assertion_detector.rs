@@ -1,11 +1,15 @@
-use super::{
-    is_test_function, TestQualityImpact, TestingAntiPattern, TestingDetector,
-};
+use super::{is_test_function, TestQualityImpact, TestingAntiPattern, TestingDetector};
 use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, File, Item, ItemFn, Stmt};
 
 pub struct AssertionDetector {}
+
+impl Default for AssertionDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl AssertionDetector {
     pub fn new() -> Self {
@@ -23,12 +27,7 @@ impl TestingDetector for AssertionDetector {
                     let analysis = analyze_test_structure(function);
 
                     if !analysis.has_assertions {
-                        let line = function
-                            .sig
-                            .ident
-                            .span()
-                            .start()
-                            .line;
+                        let line = function.sig.ident.span().start().line;
 
                         patterns.push(TestingAntiPattern::TestWithoutAssertions {
                             test_name: function.sig.ident.to_string(),
@@ -51,12 +50,7 @@ impl TestingDetector for AssertionDetector {
                                 let analysis = analyze_test_structure(function);
 
                                 if !analysis.has_assertions {
-                                    let line = function
-                                        .sig
-                                        .ident
-                                        .span()
-                                        .start()
-                                        .line;
+                                    let line = function.sig.ident.span().start().line;
 
                                     patterns.push(TestingAntiPattern::TestWithoutAssertions {
                                         test_name: function.sig.ident.to_string(),
@@ -191,14 +185,11 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
     }
 
     fn visit_stmt(&mut self, node: &'ast Stmt) {
-        match node {
-            Stmt::Local(_) => {
-                // Variable assignment typically indicates setup
-                if !self.analysis.has_setup {
-                    self.analysis.has_setup = true;
-                }
+        if let Stmt::Local(_) = node {
+            // Variable assignment typically indicates setup
+            if !self.analysis.has_setup {
+                self.analysis.has_setup = true;
             }
-            _ => {}
         }
 
         syn::visit::visit_stmt(self, node);
@@ -214,7 +205,13 @@ fn analyze_test_structure(function: &ItemFn) -> TestStructureAnalysis {
 fn is_assertion_macro(name: &str) -> bool {
     matches!(
         name,
-        "assert" | "assert_eq" | "assert_ne" | "assert_matches" | "debug_assert" | "debug_assert_eq" | "debug_assert_ne"
+        "assert"
+            | "assert_eq"
+            | "assert_ne"
+            | "assert_matches"
+            | "debug_assert"
+            | "debug_assert_eq"
+            | "debug_assert_ne"
     )
 }
 
@@ -248,7 +245,8 @@ fn suggest_assertions(analysis: &TestStructureAnalysis) -> Vec<String> {
     }
 
     if !analysis.has_setup && !analysis.has_action && !analysis.has_assertions {
-        suggestions.push("Implement complete test structure: setup -> action -> assert".to_string());
+        suggestions
+            .push("Implement complete test structure: setup -> action -> assert".to_string());
     }
 
     if suggestions.is_empty() {

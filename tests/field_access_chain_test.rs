@@ -204,8 +204,13 @@ fn main() {
         line: process_func.line,
     };
 
-    let is_dead =
-        is_dead_code_with_exclusions(process_func, &call_graph, &process_id, &HashSet::new(), None);
+    let is_dead = is_dead_code_with_exclusions(
+        process_func,
+        &call_graph,
+        &process_id,
+        &HashSet::new(),
+        None,
+    );
 
     assert!(
         !is_dead,
@@ -279,8 +284,13 @@ fn main() {
         line: process_func.line,
     };
 
-    let is_dead =
-        is_dead_code_with_exclusions(process_func, &call_graph, &process_id, &HashSet::new(), None);
+    let is_dead = is_dead_code_with_exclusions(
+        process_func,
+        &call_graph,
+        &process_id,
+        &HashSet::new(),
+        None,
+    );
 
     assert!(
         !is_dead,

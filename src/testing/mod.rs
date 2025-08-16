@@ -131,7 +131,10 @@ fn convert_testing_pattern_to_debt_item(
         } => (
             Priority::High,
             format!("Test '{}' has no assertions", test_name),
-            Some(format!("Add assertions: {}", suggested_assertions.join(", "))),
+            Some(format!(
+                "Add assertions: {}",
+                suggested_assertions.join(", ")
+            )),
             line,
             DebtType::TestQuality,
         ),
@@ -143,7 +146,10 @@ fn convert_testing_pattern_to_debt_item(
             ..
         } => (
             Priority::Medium,
-            format!("Test '{}' is overly complex (score: {})", test_name, complexity_score),
+            format!(
+                "Test '{}' is overly complex (score: {})",
+                test_name, complexity_score
+            ),
             Some(format!("Consider: {:?}", suggested_simplification)),
             line,
             DebtType::TestComplexity,
@@ -156,7 +162,10 @@ fn convert_testing_pattern_to_debt_item(
             ..
         } => (
             Priority::High,
-            format!("Test '{}' has flaky pattern: {:?}", test_name, flakiness_type),
+            format!(
+                "Test '{}' has flaky pattern: {:?}",
+                test_name, flakiness_type
+            ),
             Some(stabilization_suggestion),
             line,
             DebtType::TestQuality,
