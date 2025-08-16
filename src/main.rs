@@ -34,8 +34,8 @@ struct AnalyzeConfig {
     detailed: bool,
     semantic_off: bool,
     verbosity: u8,
-    no_expand_macros: bool,
-    clear_expansion_cache: bool,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
 }
 
 struct ValidateConfig {
@@ -100,8 +100,8 @@ fn main() -> Result<()> {
             semantic_off,
             explain_score: _,
             verbosity,
-            no_expand_macros,
-            clear_expansion_cache,
+            verbose_macro_warnings,
+            show_macro_stats,
         } => {
             let config = AnalyzeConfig {
                 path,
@@ -120,8 +120,8 @@ fn main() -> Result<()> {
                 detailed,
                 semantic_off,
                 verbosity,
-                no_expand_macros,
-                clear_expansion_cache,
+                verbose_macro_warnings,
+                show_macro_stats,
             };
             handle_analyze(config)
         }
@@ -189,8 +189,8 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.coverage_file.as_ref(),
         config.semantic_off,
         &config.path,
-        !config.no_expand_macros, // Enable by default, disable with flag
-        config.clear_expansion_cache,
+        config.verbose_macro_warnings,
+        config.show_macro_stats,
     )?;
 
     // Output unified prioritized results
@@ -752,12 +752,12 @@ fn calculate_unified_debt_score(
     // Get project path from results
     let project_path = &results.project_path;
 
-    // Process Rust files to get framework exclusions (with macro expansion disabled for speed)
+    // Process Rust files to get framework exclusions
     let framework_exclusions = process_rust_files_for_call_graph(
         project_path,
         &mut call_graph,
-        false, // expand_macros = false for validation (faster)
-        false, // clear_expansion_cache = false
+        false, // verbose_macro_warnings = false for validation
+        false, // show_macro_stats = false
     )
     .unwrap_or_default();
 
@@ -1111,74 +1111,19 @@ fn build_initial_call_graph(metrics: &[debtmap::FunctionMetrics]) -> priority::C
     call_graph
 }
 
-/// Create expansion config based on whether macro expansion is enabled
-fn create_expansion_config(expand_macros: bool) -> Option<debtmap::expansion::ExpansionConfig> {
-    if expand_macros {
-        Some(debtmap::expansion::ExpansionConfig {
-            enabled: true,
-            ..Default::default()
-        })
-    } else {
-        None
-    }
-}
-
-/// Clear the expansion cache if requested and configured
-fn clear_expansion_cache_if_needed(
-    clear_cache: bool,
-    expansion_config: Option<&debtmap::expansion::ExpansionConfig>,
-) {
-    use debtmap::expansion::{MacroExpander, MacroExpansion};
-
-    if clear_cache {
-        if let Some(config) = expansion_config {
-            if let Ok(mut expander) = MacroExpander::new(config.clone()) {
-                let _ = expander.clear_cache();
-            }
-        }
-    }
-}
-
-/// Process a single Rust file with optional macro expansion
-#[allow(dead_code)]
-fn process_file_with_expansion(
-    file_path: &Path,
-    expansion_config: Option<&debtmap::expansion::ExpansionConfig>,
-) -> Result<priority::CallGraph> {
-    use debtmap::expansion::{MacroExpander, MacroExpansion};
-
-    if let Some(config) = expansion_config {
-        // Try to expand the file first
-        if let Ok(mut expander) = MacroExpander::new(config.clone()) {
-            if let Ok(expanded) = expander.expand_file(file_path) {
-                // Parse the expanded content
-                if let Ok(parsed) = syn::parse_file(&expanded.expanded_content) {
-                    use debtmap::analyzers::rust_call_graph::extract_call_graph;
-                    return Ok(extract_call_graph(&parsed, file_path));
-                }
-            }
-        }
-    }
-
-    // Fall back to regular parsing
-    extract_regular_call_graph(file_path)
-}
+// Expansion-related functions removed - now using enhanced token parsing in rust_call_graph.rs
 
 /// Process Rust files to extract call relationships with enhanced analysis
 fn process_rust_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
-    expand_macros: bool,
-    clear_expansion_cache: bool,
+    _verbose_macro_warnings: bool,
+    _show_macro_stats: bool,
 ) -> Result<std::collections::HashSet<priority::call_graph::FunctionId>> {
     let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
         .context("Failed to find Rust files for call graph")?;
 
-    // Create expansion config if enabled
-    let expansion_config = create_expansion_config(expand_macros);
-
-    // Clear cache if requested
-    clear_expansion_cache_if_needed(clear_expansion_cache, expansion_config.as_ref());
+    // Macro handling is now done through enhanced token parsing
 
     // Create Rust-specific call graph builder from the base graph
     let mut enhanced_builder = RustCallGraphBuilder::from_base_graph(call_graph.clone());
@@ -1190,44 +1135,8 @@ fn process_rust_files_for_call_graph(
     // First pass: collect all parsed files
     for file_path in rust_files {
         if let Ok(content) = io::read_file(&file_path) {
-            // Try to get expanded content if macro expansion is enabled
-            let file_content = if let Some(config) = expansion_config.as_ref() {
-                use debtmap::expansion::{MacroExpander, MacroExpansion};
-                match MacroExpander::new(config.clone()) {
-                    Ok(mut expander) => {
-                        match expander.expand_file(&file_path) {
-                            Ok(expanded) => {
-                                // Only log success if content actually changed
-                                if expanded.expanded_content != content {
-                                    eprintln!("✓ Successfully expanded: {}", file_path.display());
-                                    expanded.expanded_content
-                                } else {
-                                    eprintln!("ℹ No macros to expand in: {}", file_path.display());
-                                    content
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "⚠ Macro expansion failed for {}: {}",
-                                    file_path.display(),
-                                    e
-                                );
-                                eprintln!("  Using fallback: parsing macro tokens directly");
-                                content
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("⚠ Failed to create macro expander: {}", e);
-                        content
-                    }
-                }
-            } else {
-                content
-            };
-
-            // Parse the content (expanded or original)
-            if let Ok(parsed) = syn::parse_file(&file_content) {
+            // Parse the content - macro handling happens in rust_call_graph
+            if let Ok(parsed) = syn::parse_file(&content) {
                 expanded_files.push((parsed.clone(), file_path.clone()));
                 workspace_files.push((file_path.clone(), parsed));
             }
@@ -1604,8 +1513,8 @@ fn perform_unified_analysis(
     coverage_file: Option<&PathBuf>,
     _semantic_off: bool,
     project_path: &Path,
-    expand_macros: bool,
-    clear_expansion_cache: bool,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
 ) -> Result<priority::UnifiedAnalysis> {
     // Build initial call graph from complexity metrics
     let mut call_graph = build_initial_call_graph(&results.complexity.metrics);
@@ -1614,8 +1523,8 @@ fn perform_unified_analysis(
     let framework_exclusions = process_rust_files_for_call_graph(
         project_path,
         &mut call_graph,
-        expand_macros,
-        clear_expansion_cache,
+        verbose_macro_warnings,
+        show_macro_stats,
     )?;
 
     // Process Python files to extract method call relationships
@@ -3776,94 +3685,9 @@ end_of_record
         assert!(!callees.is_empty());
     }
 
-    #[test]
-    fn test_create_expansion_config_enabled() {
-        let config = create_expansion_config(true);
-        assert!(config.is_some());
-        let config = config.unwrap();
-        assert!(config.enabled);
-    }
+    // Expansion-related tests removed - now using enhanced token parsing
 
-    #[test]
-    fn test_create_expansion_config_disabled() {
-        let config = create_expansion_config(false);
-        assert!(config.is_none());
-    }
-
-    #[test]
-    fn test_clear_expansion_cache_if_needed_no_clear() {
-        use debtmap::expansion::ExpansionConfig;
-        let config = ExpansionConfig {
-            enabled: true,
-            ..Default::default()
-        };
-        // Should not panic or cause issues when clear_cache is false
-        clear_expansion_cache_if_needed(false, Some(&config));
-    }
-
-    #[test]
-    fn test_clear_expansion_cache_if_needed_no_config() {
-        // Should not panic when config is None
-        clear_expansion_cache_if_needed(true, None);
-    }
-
-    #[test]
-    fn test_process_file_with_expansion_no_config() {
-        use std::fs::File;
-        use std::io::Write;
-        use tempfile::tempdir;
-
-        let dir = tempdir().unwrap();
-        let test_file = dir.path().join("test.rs");
-
-        let rust_code = r#"
-            fn simple_function() {
-                println!("Hello");
-            }
-        "#;
-
-        let mut file = File::create(&test_file).unwrap();
-        file.write_all(rust_code.as_bytes()).unwrap();
-
-        // Should fall back to regular parsing when no config
-        let result = process_file_with_expansion(&test_file, None);
-        assert!(result.is_ok());
-        let call_graph = result.unwrap();
-        let functions = call_graph.find_all_functions();
-        assert!(functions.iter().any(|f| f.name == "simple_function"));
-    }
-
-    #[test]
-    fn test_process_file_with_expansion_with_config() {
-        use debtmap::expansion::ExpansionConfig;
-        use std::fs::File;
-        use std::io::Write;
-        use tempfile::tempdir;
-
-        let dir = tempdir().unwrap();
-        let test_file = dir.path().join("test.rs");
-
-        let rust_code = r#"
-            fn another_function() {
-                println!("World");
-            }
-        "#;
-
-        let mut file = File::create(&test_file).unwrap();
-        file.write_all(rust_code.as_bytes()).unwrap();
-
-        let config = ExpansionConfig {
-            enabled: true,
-            ..Default::default()
-        };
-
-        // Should process with expansion config (falls back to regular if expand fails)
-        let result = process_file_with_expansion(&test_file, Some(&config));
-        assert!(result.is_ok());
-        let call_graph = result.unwrap();
-        let functions = call_graph.find_all_functions();
-        assert!(functions.iter().any(|f| f.name == "another_function"));
-    }
+    // Process file tests removed - expansion functionality replaced
 
     #[test]
     fn test_format_threshold_failure() {

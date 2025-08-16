@@ -84,13 +84,13 @@ pub enum Commands {
         #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
         verbosity: u8,
 
-        /// Disable macro expansion (enabled by default for accuracy)
-        #[arg(long = "no-expand-macros")]
-        no_expand_macros: bool,
+        /// Show verbose macro parsing warnings
+        #[arg(long = "verbose-macro-warnings")]
+        verbose_macro_warnings: bool,
 
-        /// Clear expansion cache before analysis
-        #[arg(long = "clear-expansion-cache")]
-        clear_expansion_cache: bool,
+        /// Show macro expansion statistics at the end of analysis
+        #[arg(long = "show-macro-stats")]
+        show_macro_stats: bool,
     },
 
     /// Initialize configuration file

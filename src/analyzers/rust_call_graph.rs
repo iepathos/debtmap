@@ -4,10 +4,14 @@ use crate::analyzers::signature_extractor::SignatureExtractor;
 use crate::analyzers::type_registry::GlobalTypeRegistry;
 use crate::analyzers::type_tracker::{extract_type_from_pattern, ScopeKind, TypeTracker};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+use syn::token::Comma;
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprMethodCall, ImplItemFn, Item, ItemFn, Local, Pat};
+use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, ImplItemFn, Item, ItemFn, Local, Pat};
 
 /// Represents an unresolved function call that needs to be resolved in phase 2
 #[derive(Debug, Clone)]
@@ -16,6 +20,21 @@ struct UnresolvedCall {
     callee_name: String,
     call_type: CallType,
     same_file_hint: bool, // Hint that this is likely a same-file call
+}
+
+/// Statistics for macro expansion
+#[derive(Debug, Default)]
+pub struct MacroExpansionStats {
+    pub total_macros: usize,
+    pub successfully_parsed: usize,
+    pub failed_macros: HashMap<String, usize>,
+}
+
+/// Configuration for macro handling
+#[derive(Debug, Clone, Default)]
+pub struct MacroHandlingConfig {
+    pub verbose_warnings: bool,
+    pub show_statistics: bool,
 }
 
 /// Call graph extractor that uses two-pass resolution for accurate call tracking
@@ -34,6 +53,10 @@ pub struct CallGraphExtractor {
     /// Function signature registry for return type resolution
     #[allow(dead_code)]
     function_registry: Option<Arc<FunctionSignatureRegistry>>,
+    /// Macro expansion statistics
+    macro_stats: MacroExpansionStats,
+    /// Macro handling configuration
+    macro_config: MacroHandlingConfig,
 }
 
 impl CallGraphExtractor {
@@ -48,6 +71,8 @@ impl CallGraphExtractor {
             type_tracker: TypeTracker::new(),
             type_registry: None,
             function_registry: None,
+            macro_stats: MacroExpansionStats::default(),
+            macro_config: MacroHandlingConfig::default(),
         }
     }
 
@@ -66,6 +91,8 @@ impl CallGraphExtractor {
             type_tracker: tracker,
             type_registry: Some(registry),
             function_registry: None,
+            macro_stats: MacroExpansionStats::default(),
+            macro_config: MacroHandlingConfig::default(),
         }
     }
 
@@ -73,6 +100,16 @@ impl CallGraphExtractor {
     pub fn set_function_registry(&mut self, registry: Arc<FunctionSignatureRegistry>) {
         self.type_tracker.set_function_registry(registry.clone());
         self.function_registry = Some(registry);
+    }
+
+    /// Configure macro handling
+    pub fn set_macro_config(&mut self, config: MacroHandlingConfig) {
+        self.macro_config = config;
+    }
+
+    /// Get macro expansion statistics
+    pub fn get_macro_stats(&self) -> &MacroExpansionStats {
+        &self.macro_stats
     }
 
     /// Phase 1: Extract all functions and collect unresolved calls
@@ -303,6 +340,226 @@ impl CallGraphExtractor {
 
         // Fallback to unqualified name
         method_name
+    }
+
+    /// Enhanced macro handling with pattern recognition and logging
+    fn handle_macro_expression(&mut self, expr_macro: &ExprMacro) {
+        self.macro_stats.total_macros += 1;
+
+        let macro_name = self.extract_macro_name(&expr_macro.mac.path);
+
+        match macro_name.as_str() {
+            // Collection macros
+            "vec" | "vec_deque" | "hashmap" | "btreemap" | "hashset" | "btreeset" => {
+                self.parse_collection_macro(&expr_macro.mac.tokens, &macro_name);
+            }
+            // Formatting macros
+            "format" | "print" | "println" | "eprint" | "eprintln" | "write" | "writeln"
+            | "format_args" => {
+                self.parse_format_macro(&expr_macro.mac.tokens, &macro_name);
+            }
+            // Assertion macros
+            "assert" | "assert_eq" | "assert_ne" | "debug_assert" | "debug_assert_eq"
+            | "debug_assert_ne" => {
+                self.parse_assert_macro(&expr_macro.mac.tokens, &macro_name);
+            }
+            // Logging macros
+            "log" | "trace" | "debug" | "info" | "warn" | "error" => {
+                self.parse_logging_macro(&expr_macro.mac.tokens, &macro_name);
+            }
+            // Try generic expression parsing
+            _ => {
+                if let Ok(parsed_expr) = syn::parse2::<Expr>(expr_macro.mac.tokens.clone()) {
+                    self.macro_stats.successfully_parsed += 1;
+                    self.visit_expr(&parsed_expr);
+                } else {
+                    self.log_unexpandable_macro(&macro_name);
+                }
+            }
+        }
+    }
+
+    /// Parse collection macros like vec![], hashmap![]
+    fn parse_collection_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
+        // Try to parse as array-like: [expr, expr, ...]
+        if let Ok(exprs) = self.parse_bracketed_exprs(tokens) {
+            self.macro_stats.successfully_parsed += 1;
+            for expr in exprs {
+                self.visit_expr(&expr);
+            }
+        }
+        // Try to parse as map-like: {key => value, ...}
+        else if let Ok(exprs) = self.parse_braced_exprs(tokens) {
+            self.macro_stats.successfully_parsed += 1;
+            for expr in exprs {
+                self.visit_expr(&expr);
+            }
+        } else {
+            self.log_unexpandable_macro(macro_name);
+        }
+    }
+
+    /// Parse format macros, extracting arguments after the format string
+    fn parse_format_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
+        // Try to parse comma-separated expressions
+        if let Ok(exprs) = self.parse_comma_separated_exprs(tokens) {
+            self.macro_stats.successfully_parsed += 1;
+            // Skip the first element (format string) and visit the rest
+            for expr in exprs.into_iter().skip(1) {
+                self.visit_expr(&expr);
+            }
+        } else {
+            self.log_unexpandable_macro(macro_name);
+        }
+    }
+
+    /// Parse assertion macros
+    fn parse_assert_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
+        if let Ok(exprs) = self.parse_comma_separated_exprs(tokens) {
+            self.macro_stats.successfully_parsed += 1;
+            for expr in exprs {
+                self.visit_expr(&expr);
+            }
+        } else {
+            self.log_unexpandable_macro(macro_name);
+        }
+    }
+
+    /// Parse logging macros similar to format macros
+    fn parse_logging_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
+        self.parse_format_macro(tokens, macro_name);
+    }
+
+    /// Parse bracketed expressions [expr, expr, ...]
+    fn parse_bracketed_exprs(&self, tokens: &proc_macro2::TokenStream) -> syn::Result<Vec<Expr>> {
+        let parser = Punctuated::<Expr, Comma>::parse_terminated;
+
+        // Try to parse the tokens directly as comma-separated expressions
+        if let Ok(punctuated) = parser.parse2(tokens.clone()) {
+            return Ok(punctuated.into_iter().collect());
+        }
+
+        // If that fails, try to parse as [...]
+        let content = tokens.to_string();
+        if content.starts_with('[') && content.ends_with(']') {
+            let inner = &content[1..content.len() - 1];
+            if let Ok(inner_tokens) = inner.parse::<proc_macro2::TokenStream>() {
+                if let Ok(punctuated) = parser.parse2(inner_tokens) {
+                    return Ok(punctuated.into_iter().collect());
+                }
+            }
+        }
+
+        Err(syn::Error::new_spanned(
+            tokens,
+            "Could not parse bracketed expressions",
+        ))
+    }
+
+    /// Parse braced expressions for map-like macros
+    fn parse_braced_exprs(&self, tokens: &proc_macro2::TokenStream) -> syn::Result<Vec<Expr>> {
+        let mut exprs = Vec::new();
+        let content = tokens.to_string();
+
+        if content.starts_with('{') && content.ends_with('}') {
+            let inner = &content[1..content.len() - 1];
+            // Split by commas and parse each key-value pair
+            for pair in inner.split(',') {
+                // For key => value pairs, we want to visit both key and value
+                if let Some(arrow_pos) = pair.find("=>") {
+                    let key_str = &pair[..arrow_pos].trim();
+                    let val_str = &pair[arrow_pos + 2..].trim();
+
+                    if let Ok(key_tokens) = key_str.parse::<proc_macro2::TokenStream>() {
+                        if let Ok(key_expr) = syn::parse2::<Expr>(key_tokens) {
+                            exprs.push(key_expr);
+                        }
+                    }
+                    if let Ok(val_tokens) = val_str.parse::<proc_macro2::TokenStream>() {
+                        if let Ok(val_expr) = syn::parse2::<Expr>(val_tokens) {
+                            exprs.push(val_expr);
+                        }
+                    }
+                }
+            }
+
+            if !exprs.is_empty() {
+                return Ok(exprs);
+            }
+        }
+
+        Err(syn::Error::new_spanned(
+            tokens,
+            "Could not parse braced expressions",
+        ))
+    }
+
+    /// Parse comma-separated expressions
+    fn parse_comma_separated_exprs(
+        &self,
+        tokens: &proc_macro2::TokenStream,
+    ) -> syn::Result<Vec<Expr>> {
+        let parser = Punctuated::<Expr, Comma>::parse_terminated;
+
+        if let Ok(punctuated) = parser.parse2(tokens.clone()) {
+            return Ok(punctuated.into_iter().collect());
+        }
+
+        Err(syn::Error::new_spanned(
+            tokens,
+            "Could not parse comma-separated expressions",
+        ))
+    }
+
+    /// Extract macro name from path
+    fn extract_macro_name(&self, path: &syn::Path) -> String {
+        path.segments
+            .last()
+            .map(|seg| seg.ident.to_string())
+            .unwrap_or_else(|| "unknown".to_string())
+    }
+
+    /// Log unexpandable macro
+    fn log_unexpandable_macro(&mut self, macro_name: &str) {
+        if self.macro_config.verbose_warnings {
+            eprintln!(
+                "⚠ Cannot expand macro '{}' - may contain hidden function calls",
+                macro_name
+            );
+        }
+        self.macro_stats
+            .failed_macros
+            .entry(macro_name.to_string())
+            .and_modify(|e| *e += 1)
+            .or_insert(1);
+    }
+
+    /// Report macro expansion statistics
+    pub fn report_macro_stats(&self) {
+        if !self.macro_config.show_statistics || self.macro_stats.total_macros == 0 {
+            return;
+        }
+
+        eprintln!("\nMacro Expansion Statistics:");
+        eprintln!(
+            "  Total macros encountered: {}",
+            self.macro_stats.total_macros
+        );
+        eprintln!(
+            "  Successfully parsed: {} ({:.1}%)",
+            self.macro_stats.successfully_parsed,
+            (self.macro_stats.successfully_parsed as f64 / self.macro_stats.total_macros as f64)
+                * 100.0
+        );
+
+        if !self.macro_stats.failed_macros.is_empty() {
+            eprintln!("  Failed macros:");
+            let mut failed: Vec<_> = self.macro_stats.failed_macros.iter().collect();
+            failed.sort_by_key(|(name, _)| name.as_str());
+            for (name, count) in failed {
+                eprintln!("    {}: {} occurrences", name, count);
+            }
+        }
     }
 
     /// Extract function name from a path expression
@@ -604,13 +861,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
             }
             // Handle macros like vec![] that might contain function calls
             Expr::Macro(expr_macro) => {
-                // Try to parse the macro tokens as expressions
-                // This handles common cases like vec![...] where the content is valid expressions
-                if let Ok(parsed_expr) = syn::parse2::<Expr>(expr_macro.mac.tokens.clone()) {
-                    self.visit_expr(&parsed_expr);
-                }
-                // Also continue with default visiting in case there's more to process
-                syn::visit::visit_expr(self, expr);
+                self.handle_macro_expression(expr_macro);
                 return;
             }
             _ => {}
@@ -706,6 +957,280 @@ pub fn extract_call_graph_with_signatures(
 /// Merge a file's call graph into the main call graph (placeholder for compatibility)
 pub fn merge_call_graphs(_main: &mut CallGraph, _file_graph: CallGraph) {
     // This is handled by CallGraph::merge method now
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use syn;
+
+    fn parse_rust_code(code: &str) -> syn::File {
+        syn::parse_str(code).expect("Failed to parse code")
+    }
+
+    #[test]
+    fn test_vec_macro_with_struct_literals() {
+        let code = r#"
+            struct Item {
+                value: i32,
+            }
+            
+            fn create_item() -> Item {
+                Item { value: 42 }
+            }
+            
+            fn test() {
+                let items = vec![
+                    create_item(),
+                    Item { value: create_item().value },
+                ];
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the test function with the correct line number
+        let test_functions: Vec<_> = (1..20)
+            .filter_map(|line| {
+                let id = FunctionId {
+                    file: PathBuf::from("test.rs"),
+                    name: "test".to_string(),
+                    line,
+                };
+                if graph.get_callees(&id).len() > 0 {
+                    Some((line, graph.get_callees(&id)))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Should find callees for the test function
+        assert!(!test_functions.is_empty(), "No test function found with callees");
+        
+        // Check if any test function has create_item as a callee
+        let found = test_functions
+            .iter()
+            .any(|(_, callees)| callees.iter().any(|callee| callee.name == "create_item"));
+        
+        assert!(found, "create_item not found in any test function's callees");
+    }
+
+    #[test]
+    fn test_format_macro_with_function_calls() {
+        let code = r#"
+            fn get_name() -> String {
+                "Alice".to_string()
+            }
+            
+            fn get_age() -> u32 {
+                30
+            }
+            
+            fn test() {
+                let msg = format!("Name: {}, Age: {}", get_name(), get_age());
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let graph = extract_call_graph(&file, Path::new("test.rs"));
+
+        // Should detect calls to get_name() and get_age() inside format!
+        let test_fn_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test".to_string(),
+            line: 0,
+        };
+        let callees = graph.get_callees(&test_fn_id);
+
+        assert!(callees.iter().any(|callee| callee.name == "get_name"));
+        assert!(callees.iter().any(|callee| callee.name == "get_age"));
+    }
+
+    #[test]
+    fn test_println_macro_with_expressions() {
+        let code = r#"
+            fn calculate() -> i32 {
+                42
+            }
+            
+            fn test() {
+                println!("Result: {}", calculate() * 2);
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let graph = extract_call_graph(&file, Path::new("test.rs"));
+
+        // Should detect the call to calculate() inside println!
+        let test_fn_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test".to_string(),
+            line: 0,
+        };
+        let callees = graph.get_callees(&test_fn_id);
+        assert!(callees.iter().any(|callee| callee.name == "calculate"));
+    }
+
+    #[test]
+    fn test_assert_macro_with_function_calls() {
+        let code = r#"
+            fn is_valid() -> bool {
+                true
+            }
+            
+            fn get_value() -> i32 {
+                42
+            }
+            
+            fn test() {
+                assert!(is_valid());
+                assert_eq!(get_value(), 42);
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let graph = extract_call_graph(&file, Path::new("test.rs"));
+
+        // Should detect calls inside assert macros
+        let test_fn_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test".to_string(),
+            line: 0,
+        };
+        let callees = graph.get_callees(&test_fn_id);
+
+        assert!(callees.iter().any(|callee| callee.name == "is_valid"));
+        assert!(callees.iter().any(|callee| callee.name == "get_value"));
+    }
+
+    #[test]
+    fn test_hashmap_macro_with_function_calls() {
+        let code = r#"
+            use std::collections::HashMap;
+            
+            fn get_key() -> String {
+                "key".to_string()
+            }
+            
+            fn get_value() -> i32 {
+                42
+            }
+            
+            fn test() {
+                let map = hashmap!{
+                    get_key() => get_value(),
+                };
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+
+        // Should detect both key and value function calls
+        let test_fn_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test".to_string(),
+            line: 0,
+        };
+        let callees = extractor.call_graph.get_callees(&test_fn_id);
+
+        assert!(callees.iter().any(|callee| callee.name == "get_key"));
+        assert!(callees.iter().any(|callee| callee.name == "get_value"));
+    }
+
+    #[test]
+    fn test_macro_stats_tracking() {
+        let code = r#"
+            fn test() {
+                vec![1, 2, 3];
+                format!("test");
+                println!("hello");
+                unknown_macro!(something);
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.set_macro_config(MacroHandlingConfig {
+            verbose_warnings: false,
+            show_statistics: true,
+        });
+
+        extractor.extract_phase1(&file);
+
+        let stats = extractor.get_macro_stats();
+        assert_eq!(stats.total_macros, 4);
+        assert_eq!(stats.successfully_parsed, 3); // vec, format, println should succeed
+        assert!(stats.failed_macros.contains_key("unknown_macro"));
+    }
+
+    #[test]
+    fn test_nested_macros() {
+        let code = r#"
+            fn get_item() -> i32 {
+                42
+            }
+            
+            fn test() {
+                let result = vec![
+                    format!("{}", get_item()),
+                ];
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let graph = extract_call_graph(&file, Path::new("test.rs"));
+
+        // Should detect the call inside nested macros
+        let test_fn_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test".to_string(),
+            line: 0,
+        };
+        let callees = graph.get_callees(&test_fn_id);
+        assert!(callees.iter().any(|callee| callee.name == "get_item"));
+    }
+
+    #[test]
+    fn test_logging_macros() {
+        let code = r#"
+            fn get_debug_info() -> String {
+                "debug".to_string()
+            }
+            
+            fn test() {
+                info!("Info: {}", get_debug_info());
+                error!("Error occurred");
+                debug!("Debug: {}", get_debug_info());
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let graph = extract_call_graph(&file, Path::new("test.rs"));
+
+        // Should detect calls inside logging macros
+        let test_fn_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test".to_string(),
+            line: 0,
+        };
+        let callees = graph.get_callees(&test_fn_id);
+
+        // Should find at least 2 calls to get_debug_info (from info! and debug!)
+        let debug_calls = callees
+            .iter()
+            .filter(|callee| callee.name == "get_debug_info")
+            .count();
+        assert!(debug_calls >= 2);
+    }
 }
 
 /// Collect type definitions from a file into the global type registry

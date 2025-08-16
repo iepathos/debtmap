@@ -7,7 +7,6 @@ pub mod complexity;
 pub mod config;
 pub mod core;
 pub mod debt;
-pub mod expansion;
 pub mod io;
 pub mod priority;
 pub mod refactoring;
