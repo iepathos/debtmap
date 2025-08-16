@@ -329,9 +329,19 @@ fn find_workspace_root() -> Option<PathBuf> {
         let cargo_toml = dir.join("Cargo.toml");
         if cargo_toml.exists() {
             // Check if this is a workspace root
-            if let Ok(content) = fs::read_to_string(&cargo_toml) {
-                if content.contains("[workspace]") {
-                    return Some(dir.to_path_buf());
+            match fs::read_to_string(&cargo_toml) {
+                Ok(content) => {
+                    if content.contains("[workspace]") {
+                        return Some(dir.to_path_buf());
+                    }
+                }
+                Err(e) => {
+                    log::debug!(
+                        "Failed to read Cargo.toml at {}: {}",
+                        cargo_toml.display(),
+                        e
+                    );
+                    // Continue to treat it as package root even if we can't read it
                 }
             }
             // If not a workspace, might still be a package root

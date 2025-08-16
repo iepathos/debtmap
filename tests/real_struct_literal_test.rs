@@ -51,25 +51,25 @@ fn generate_suggested_functions(base_name: &str, count: u32) -> Vec<PureFunction
     let syntax = syn::parse_file(code).expect("Failed to parse code");
     let path = PathBuf::from("test.rs");
     let call_graph = extract_call_graph(&syntax, &path);
-    
+
     // Find the actual function IDs from the graph
     let all_functions = call_graph.find_all_functions();
-    
+
     println!("All functions found:");
     for func in &all_functions {
         println!("  {:?}", func);
     }
-    
+
     // Find generate_suggested_functions
     let generate_id = all_functions
         .iter()
         .find(|f| f.name == "generate_suggested_functions")
         .expect("generate_suggested_functions should be in the graph");
-    
+
     // Check that it has callers
     let callers = call_graph.get_callers(&generate_id);
     println!("Callers of generate_suggested_functions: {:?}", callers);
-    
+
     assert!(
         !callers.is_empty(),
         "generate_suggested_functions should have callers, but has none"
@@ -98,35 +98,35 @@ fn generate_functions(base_name: &str, count: u32) -> Vec<String> {
     let syntax = syn::parse_file(code).expect("Failed to parse code");
     let path = PathBuf::from("test.rs");
     let call_graph = extract_call_graph(&syntax, &path);
-    
+
     let all_functions = call_graph.find_all_functions();
-    
+
     println!("Functions in vec! macro test:");
     for func in &all_functions {
         println!("  {:?}", func);
     }
-    
+
     let detect_id = all_functions
         .iter()
         .find(|f| f.name == "detect")
         .expect("detect should be in the graph")
         .clone();
-    
+
     let generate_id = all_functions
         .iter()
         .find(|f| f.name == "generate_functions")
         .expect("generate_functions should be in the graph")
         .clone();
-    
+
     // Check the calls
     let calls_from_detect = call_graph.get_callees(&detect_id);
     println!("Calls from detect: {:?}", calls_from_detect);
-    
+
     assert!(
         calls_from_detect.contains(&generate_id),
         "detect should call generate_functions"
     );
-    
+
     // Check that generate_functions has callers
     let callers = call_graph.get_callers(&generate_id);
     assert!(

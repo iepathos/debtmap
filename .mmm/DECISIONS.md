@@ -536,3 +536,31 @@ Implement comprehensive trait tracking to resolve method calls through trait obj
 - ⚠️ Memory overhead for trait registry (linear with codebase size)
 - ⚠️ Slight increase in analysis time (< 15% overhead)
 - ⚠️ Limited to traits within analyzed codebase
+
+---
+
+## ADR-024: Functional Error Handling Patterns
+**Date**: 2025-08-16
+**Status**: Accepted
+
+### Context
+The codebase contained numerous instances of the `if let Ok(...)` pattern that silently swallowed errors, violating functional programming principles and making debugging difficult. This anti-pattern appeared in critical paths including file processing, configuration loading, and cache management, potentially leading to incorrect analysis results when operations failed silently. Analysis identified 25+ instances across the codebase, including 4 critical issues in main control flow and 4 high-impact issues in configuration and file I/O.
+
+### Decision
+Implement proper functional error handling patterns throughout the codebase:
+- Replace `if let Ok(...)` with proper Result propagation using the `?` operator where errors should bubble up
+- Use Result combinators (`map`, `and_then`, `map_err`) for functional error transformation
+- Add contextual error messages using `.with_context()` for better debugging
+- Implement appropriate logging for recoverable errors using the `log` crate
+- Provide sensible fallback behavior with logging using `unwrap_or_else` where appropriate
+- Update tests to use `expect()` with descriptive messages instead of silent skipping
+
+### Consequences
+- ✅ Improved debugging capabilities with clear error messages and context
+- ✅ Better observability through proper error logging at appropriate levels
+- ✅ Adherence to functional programming principles with explicit error handling
+- ✅ No silent failures in critical analysis paths
+- ✅ Easier troubleshooting for users with actionable error messages
+- ✅ Test failures are now visible and actionable
+- ⚠️ Some functions that previously returned default values now propagate errors (breaking change for tests)
+- ⚠️ Slightly more verbose code in some places due to explicit error handling

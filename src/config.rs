@@ -245,12 +245,23 @@ static SCORING_WEIGHTS: OnceLock<ScoringWeights> = OnceLock::new();
 /// Load configuration from .debtmap.toml if it exists
 pub fn load_config() -> DebtmapConfig {
     // Try to find .debtmap.toml in current directory or parent directories
-    let current = std::env::current_dir().ok();
-    if let Some(mut dir) = current {
-        loop {
-            let config_path = dir.join(".debtmap.toml");
-            if config_path.exists() {
-                if let Ok(contents) = fs::read_to_string(&config_path) {
+    let current = match std::env::current_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::warn!(
+                "Failed to get current directory: {}. Using default config.",
+                e
+            );
+            return DebtmapConfig::default();
+        }
+    };
+
+    let mut dir = current;
+    loop {
+        let config_path = dir.join(".debtmap.toml");
+        if config_path.exists() {
+            match fs::read_to_string(&config_path) {
+                Ok(contents) => {
                     match toml::from_str::<DebtmapConfig>(&contents) {
                         Ok(mut config) => {
                             // Validate and normalize scoring weights if present
@@ -276,11 +287,19 @@ pub fn load_config() -> DebtmapConfig {
                         }
                     }
                 }
+                Err(e) => {
+                    log::warn!(
+                        "Failed to read config file {}: {}",
+                        config_path.display(),
+                        e
+                    );
+                    // Continue searching in parent directories
+                }
             }
+        }
 
-            if !dir.pop() {
-                break;
-            }
+        if !dir.pop() {
+            break;
         }
     }
 

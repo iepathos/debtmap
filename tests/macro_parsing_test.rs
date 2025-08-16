@@ -16,9 +16,9 @@ fn some_function() -> i32 {
 "#;
 
     let syntax = syn::parse_file(code).expect("Failed to parse");
-    
+
     struct DebugVisitor;
-    
+
     impl<'ast> Visit<'ast> for DebugVisitor {
         fn visit_expr(&mut self, expr: &'ast syn::Expr) {
             match expr {
@@ -30,7 +30,10 @@ fn some_function() -> i32 {
                 }
                 syn::Expr::Call(c) => {
                     if let syn::Expr::Path(p) = &*c.func {
-                        let name = p.path.segments.last()
+                        let name = p
+                            .path
+                            .segments
+                            .last()
                             .map(|s| s.ident.to_string())
                             .unwrap_or_default();
                         println!("Found function call: {}", name);
@@ -41,7 +44,7 @@ fn some_function() -> i32 {
             syn::visit::visit_expr(self, expr);
         }
     }
-    
+
     let mut visitor = DebugVisitor;
     visitor.visit_file(&syntax);
 }

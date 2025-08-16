@@ -246,10 +246,16 @@ const DEFAULT_SIMILARITY_THRESHOLD: f64 = 0.8;
 fn prepare_files_for_duplication_check(files: &[PathBuf]) -> Vec<(PathBuf, String)> {
     files
         .iter()
-        .filter_map(|path| {
-            io::read_file(path)
-                .ok()
-                .map(|content| (path.clone(), content))
+        .filter_map(|path| match io::read_file(path) {
+            Ok(content) => Some((path.clone(), content)),
+            Err(e) => {
+                log::debug!(
+                    "Skipping file {} for duplication check: {}",
+                    path.display(),
+                    e
+                );
+                None
+            }
         })
         .collect()
 }
@@ -762,7 +768,10 @@ fn calculate_unified_debt_score(
     .unwrap_or_default();
 
     // Process Python files as well
-    let _ = process_python_files_for_call_graph(project_path, &mut call_graph);
+    if let Err(e) = process_python_files_for_call_graph(project_path, &mut call_graph) {
+        log::warn!("Failed to process Python files for call graph: {}", e);
+        // Continue with Rust-only analysis rather than failing completely
+    }
 
     // Create unified analysis using the same approach as analyze command
     let unified = create_unified_analysis_with_exclusions(
@@ -1132,8 +1141,16 @@ fn clear_expansion_cache_if_needed(
 
     if clear_cache {
         if let Some(config) = expansion_config {
-            if let Ok(mut expander) = MacroExpander::new(config.clone()) {
-                let _ = expander.clear_cache();
+            match MacroExpander::new(config.clone()) {
+                Ok(mut expander) => {
+                    if let Err(e) = expander.clear_cache() {
+                        log::warn!("Failed to clear expansion cache: {}", e);
+                        // Continue execution - cache clearing failure is not critical
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to create macro expander for cache clearing: {}", e);
+                }
             }
         }
     }
@@ -1189,27 +1206,33 @@ fn process_rust_files_for_call_graph(
 
     // First pass: collect all parsed files
     for file_path in rust_files {
-        if let Ok(content) = io::read_file(&file_path) {
-            // Try to get expanded content if macro expansion is enabled
-            let file_content = if let Some(config) = expansion_config.as_ref() {
-                use debtmap::expansion::{MacroExpander, MacroExpansion};
-                if let Ok(mut expander) = MacroExpander::new(config.clone()) {
-                    if let Ok(expanded) = expander.expand_file(&file_path) {
-                        expanded.expanded_content
+        match io::read_file(&file_path) {
+            Ok(content) => {
+                // Try to get expanded content if macro expansion is enabled
+                let file_content = if let Some(config) = expansion_config.as_ref() {
+                    use debtmap::expansion::{MacroExpander, MacroExpansion};
+                    if let Ok(mut expander) = MacroExpander::new(config.clone()) {
+                        if let Ok(expanded) = expander.expand_file(&file_path) {
+                            expanded.expanded_content
+                        } else {
+                            content
+                        }
                     } else {
                         content
                     }
                 } else {
                     content
-                }
-            } else {
-                content
-            };
+                };
 
-            // Parse the content (expanded or original)
-            if let Ok(parsed) = syn::parse_file(&file_content) {
-                expanded_files.push((parsed.clone(), file_path.clone()));
-                workspace_files.push((file_path.clone(), parsed));
+                // Parse the content (expanded or original)
+                if let Ok(parsed) = syn::parse_file(&file_content) {
+                    expanded_files.push((parsed.clone(), file_path.clone()));
+                    workspace_files.push((file_path.clone(), parsed));
+                }
+            }
+            Err(e) => {
+                log::warn!("Failed to read file {}: {}", file_path.display(), e);
+                // Continue processing other files rather than failing completely
             }
         }
     }
@@ -1252,16 +1275,14 @@ fn process_rust_files_for_call_graph(
 /// Extract call graph from a file without expansion
 #[allow(dead_code)]
 fn extract_regular_call_graph(file_path: &Path) -> Result<priority::CallGraph> {
-    if let Ok(content) = io::read_file(file_path) {
-        if let Ok(parsed) = syn::parse_file(&content) {
-            use debtmap::analyzers::rust_call_graph::extract_call_graph;
-            Ok(extract_call_graph(&parsed, file_path))
-        } else {
-            Ok(priority::CallGraph::new())
-        }
-    } else {
-        Ok(priority::CallGraph::new())
-    }
+    let content = io::read_file(file_path)
+        .with_context(|| format!("Failed to read file: {}", file_path.display()))?;
+
+    let parsed = syn::parse_file(&content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse Rust file {}: {}", file_path.display(), e))?;
+
+    use debtmap::analyzers::rust_call_graph::extract_call_graph;
+    Ok(extract_call_graph(&parsed, file_path))
 }
 
 /// Process Python files to extract method call relationships
@@ -1275,20 +1296,29 @@ fn process_python_files_for_call_graph(
     let mut analyzer = PythonCallGraphAnalyzer::new();
 
     for file_path in &python_files {
-        if let Ok(content) = io::read_file(file_path) {
-            // Parse Python file using rustpython_parser
-            if let Ok(module) =
-                rustpython_parser::parse(&content, rustpython_parser::Mode::Module, "<module>")
-            {
-                // Analyze the module and extract method calls with source for accurate line numbers
-                if let Err(e) =
-                    analyzer.analyze_module_with_source(&module, file_path, &content, call_graph)
-                {
-                    eprintln!(
-                        "Warning: Failed to analyze Python file {:?}: {}",
-                        file_path, e
-                    );
+        match io::read_file(file_path) {
+            Ok(content) => {
+                // Parse Python file using rustpython_parser
+                match rustpython_parser::parse(
+                    &content,
+                    rustpython_parser::Mode::Module,
+                    "<module>",
+                ) {
+                    Ok(module) => {
+                        // Analyze the module and extract method calls with source for accurate line numbers
+                        if let Err(e) = analyzer
+                            .analyze_module_with_source(&module, file_path, &content, call_graph)
+                        {
+                            log::warn!("Failed to analyze Python file {:?}: {}", file_path, e);
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
+                    }
                 }
+            }
+            Err(e) => {
+                log::warn!("Failed to read Python file {:?}: {}", file_path, e);
             }
         }
     }
@@ -3663,10 +3693,10 @@ end_of_record
         let nonexistent_path = Path::new("/nonexistent/file.rs");
         let result = extract_regular_call_graph(nonexistent_path);
 
-        // Should return Ok with empty call graph for file read errors
-        assert!(result.is_ok());
-        let call_graph = result.unwrap();
-        assert!(call_graph.is_empty());
+        // Should return an error for nonexistent files
+        assert!(result.is_err());
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Failed to read file"));
     }
 
     #[test]
@@ -3683,10 +3713,10 @@ end_of_record
 
         let result = extract_regular_call_graph(&test_file);
 
-        // Should return Ok with empty call graph for parse errors
-        assert!(result.is_ok());
-        let call_graph = result.unwrap();
-        assert!(call_graph.is_empty());
+        // Should return an error for invalid Rust syntax
+        assert!(result.is_err());
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Failed to parse Rust file"));
     }
 
     #[test]
