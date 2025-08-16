@@ -81,18 +81,29 @@ impl PatternMatcher for IoWithLogicMatcher {
 
 pub struct PureIoMatcher;
 
+impl PureIoMatcher {
+    /// Classifies whether a function name indicates I/O operations
+    fn is_io_function(name: &str) -> bool {
+        const IO_INDICATORS: &[&str] = &["read", "write", "save", "load"];
+        IO_INDICATORS
+            .iter()
+            .any(|indicator| name.contains(indicator))
+    }
+
+    /// Determines if complexity is simple enough for pure I/O pattern
+    fn is_simple_complexity(cyclomatic: u32) -> bool {
+        cyclomatic <= 2
+    }
+}
+
 impl PatternMatcher for PureIoMatcher {
     fn match_pattern(
         &self,
         function: &FunctionMetrics,
         _file: &FileMetrics,
     ) -> Option<DetectedPattern> {
-        let has_io = function.name.contains("read")
-            || function.name.contains("write")
-            || function.name.contains("save")
-            || function.name.contains("load");
-
-        let is_simple = function.cyclomatic <= 2;
+        let has_io = Self::is_io_function(&function.name);
+        let is_simple = Self::is_simple_complexity(function.cyclomatic);
 
         if has_io && is_simple {
             Some(DetectedPattern {
@@ -123,5 +134,133 @@ impl PatternMatcher for PureIoMatcher {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{ComplexityMetrics, FileMetrics, FunctionMetrics, Language};
+    use crate::refactoring::patterns::PatternMatcher;
+    use std::path::PathBuf;
+
+    fn create_test_function(name: &str, cyclomatic: u32) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic,
+            cognitive: 0,
+            nesting: 0,
+            length: 10,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+        }
+    }
+
+    fn create_test_file() -> FileMetrics {
+        FileMetrics {
+            path: PathBuf::from("test.rs"),
+            language: Language::Rust,
+            complexity: ComplexityMetrics::default(),
+            debt_items: vec![],
+            dependencies: vec![],
+            duplications: vec![],
+        }
+    }
+
+    #[test]
+    fn test_is_io_function_detects_read() {
+        assert!(PureIoMatcher::is_io_function("read_file"));
+        assert!(PureIoMatcher::is_io_function("file_reader"));
+        assert!(PureIoMatcher::is_io_function("async_read"));
+    }
+
+    #[test]
+    fn test_is_io_function_detects_write() {
+        assert!(PureIoMatcher::is_io_function("write_data"));
+        assert!(PureIoMatcher::is_io_function("file_writer"));
+        assert!(PureIoMatcher::is_io_function("buffer_write"));
+    }
+
+    #[test]
+    fn test_is_io_function_detects_save_and_load() {
+        assert!(PureIoMatcher::is_io_function("save_config"));
+        assert!(PureIoMatcher::is_io_function("load_settings"));
+        assert!(PureIoMatcher::is_io_function("autosave"));
+        assert!(PureIoMatcher::is_io_function("preload_cache"));
+    }
+
+    #[test]
+    fn test_is_io_function_rejects_non_io() {
+        assert!(!PureIoMatcher::is_io_function("calculate_sum"));
+        assert!(!PureIoMatcher::is_io_function("process_data"));
+        assert!(!PureIoMatcher::is_io_function("validate_input"));
+        assert!(!PureIoMatcher::is_io_function("transform_result"));
+    }
+
+    #[test]
+    fn test_is_simple_complexity() {
+        assert!(PureIoMatcher::is_simple_complexity(0));
+        assert!(PureIoMatcher::is_simple_complexity(1));
+        assert!(PureIoMatcher::is_simple_complexity(2));
+        assert!(!PureIoMatcher::is_simple_complexity(3));
+        assert!(!PureIoMatcher::is_simple_complexity(10));
+    }
+
+    #[test]
+    fn test_match_pattern_detects_pure_io() {
+        let matcher = PureIoMatcher;
+        let function = create_test_function("read_file", 1);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+
+        let pattern = result.unwrap();
+        assert_eq!(pattern.confidence, 0.9);
+
+        if let crate::refactoring::PatternType::IOOrchestration(orch) = pattern.pattern_type {
+            assert_eq!(orch.pattern_type, "PureIO");
+        } else {
+            panic!("Expected IOOrchestration pattern");
+        }
+    }
+
+    #[test]
+    fn test_match_pattern_rejects_complex_io() {
+        let matcher = PureIoMatcher;
+        let function = create_test_function("read_and_process_file", 5);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_match_pattern_rejects_non_io_simple() {
+        let matcher = PureIoMatcher;
+        let function = create_test_function("calculate_sum", 1);
+        let file = create_test_file();
+
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_match_pattern_boundary_complexity() {
+        let matcher = PureIoMatcher;
+        let file = create_test_file();
+
+        // Test at boundary (complexity = 2)
+        let function = create_test_function("write_buffer", 2);
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_some());
+
+        // Test just over boundary (complexity = 3)
+        let function = create_test_function("write_buffer", 3);
+        let result = matcher.match_pattern(&function, &file);
+        assert!(result.is_none());
     }
 }
