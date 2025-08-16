@@ -1,6 +1,7 @@
 use crate::core::{DebtItem, DebtType, Priority};
 use crate::debt::suppression::SuppressionContext;
 use std::path::Path;
+use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{Expr, ExprIf, ExprLet, ExprMatch, ExprMethodCall, File, ItemFn, Pat, Stmt};
 
@@ -24,6 +25,10 @@ impl<'a> ErrorSwallowingDetector<'a> {
     pub fn detect(mut self, file: &File) -> Vec<DebtItem> {
         self.visit_file(file);
         self.items
+    }
+
+    fn get_line_number(&self, span: proc_macro2::Span) -> usize {
+        span.start().line
     }
 
     fn add_debt_item(&mut self, line: usize, pattern: ErrorSwallowingPattern, context: &str) {
@@ -72,7 +77,8 @@ impl<'a> ErrorSwallowingDetector<'a> {
             return;
         }
 
-        let line = 1; // Placeholder line number
+        // Get the actual line number from the if expression's span
+        let line = self.get_line_number(expr_if.if_token.span);
         if let Some((pattern, description)) = Self::classify_error_handling(&expr_if.else_branch) {
             self.add_debt_item(line, pattern, description);
         }
@@ -116,11 +122,11 @@ impl<'a> ErrorSwallowingDetector<'a> {
 
     fn check_let_underscore(&mut self, stmt: &Stmt) {
         if let Stmt::Local(local) = stmt {
-            if let Pat::Wild(_) = &local.pat {
+            if let Pat::Wild(wild) = &local.pat {
                 if let Some(init) = &local.init {
                     if is_result_type(&init.expr) {
-                        // Use a placeholder line number
-                        let line = 1;
+                        // Get the actual line number from the underscore token's span
+                        let line = self.get_line_number(wild.underscore_token.span);
                         self.add_debt_item(
                             line,
                             ErrorSwallowingPattern::LetUnderscoreResult,
@@ -136,7 +142,7 @@ impl<'a> ErrorSwallowingDetector<'a> {
         let ident = &method_call.method;
         if ident == "ok" && method_call.args.is_empty() {
             // Check if the result of .ok() is used meaningfully
-            let line = 1;
+            let line = self.get_line_number(method_call.method.span());
             self.add_debt_item(
                 line,
                 ErrorSwallowingPattern::OkMethodDiscard,
@@ -149,7 +155,7 @@ impl<'a> ErrorSwallowingDetector<'a> {
         let ident = &method_call.method;
         let method_name = ident.to_string();
         if method_name == "unwrap_or" || method_name == "unwrap_or_default" {
-            let line = 1;
+            let line = self.get_line_number(method_call.method.span());
             let pattern = if method_name == "unwrap_or" {
                 ErrorSwallowingPattern::UnwrapOrNoLog
             } else {
@@ -170,7 +176,7 @@ impl<'a> ErrorSwallowingDetector<'a> {
                     if path == "Err" {
                         // Check if the Err arm body is effectively empty
                         if is_empty_expr(&arm.body) {
-                            let line = 1;
+                            let line = self.get_line_number(pat_tuple.path.span());
                             self.add_debt_item(
                                 line,
                                 ErrorSwallowingPattern::MatchIgnoredErr,
@@ -320,6 +326,8 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
         assert!(items[0].message.contains("if let Ok"));
+        // Verify we get the correct line number (line 3 in the test code)
+        assert_eq!(items[0].line, 3, "Expected detection at line 3");
     }
 
     #[test]

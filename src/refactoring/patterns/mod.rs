@@ -556,6 +556,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         }
     }
 
