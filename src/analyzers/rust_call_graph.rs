@@ -2199,6 +2199,255 @@ mod tests {
     }
 
     #[test]
+    fn test_visit_expr_macro_expressions() {
+        // Test that visit_expr correctly handles macro expressions through Expr::Macro path
+        let code = r#"
+            fn macro_user() {
+                // Collection macros with function calls - these are successfully parsed
+                let v = vec![generate_item(), process_item(), finalize_item()];
+                
+                // Format macro with function call - also successfully parsed
+                let msg = format!("Result: {}", calculate_result());
+                
+                // HashSet macro with function calls
+                let set = hashset![first_item(), second_item()];
+            }
+            
+            fn generate_item() -> i32 { 1 }
+            fn process_item() -> i32 { 2 }
+            fn finalize_item() -> i32 { 3 }
+            fn calculate_result() -> i32 { 100 }
+            fn first_item() -> i32 { 10 }
+            fn second_item() -> i32 { 20 }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the macro_user function
+        let macro_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "macro_user")
+            .expect("macro_user should exist");
+
+        let callees = graph.get_callees(&macro_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Test that the Expr::Macro path in visit_expr correctly delegates to handle_macro_expression
+        // which then parses known macro patterns and visits the expressions within
+
+        // vec! macro - collection macro parsing
+        assert!(
+            callee_names.contains(&"generate_item"),
+            "Should detect generate_item() in vec! macro"
+        );
+        assert!(
+            callee_names.contains(&"process_item"),
+            "Should detect process_item() in vec! macro"
+        );
+        assert!(
+            callee_names.contains(&"finalize_item"),
+            "Should detect finalize_item() in vec! macro"
+        );
+
+        // format! macro - format macro parsing (skips format string, visits arguments)
+        assert!(
+            callee_names.contains(&"calculate_result"),
+            "Should detect calculate_result() in format! macro"
+        );
+
+        // hashset! macro - collection macro parsing
+        assert!(
+            callee_names.contains(&"first_item"),
+            "Should detect first_item() in hashset! macro"
+        );
+        assert!(
+            callee_names.contains(&"second_item"),
+            "Should detect second_item() in hashset! macro"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_default_case_expressions() {
+        // Test expressions that hit the default case in visit_expr
+        let code = r#"
+            fn expressions_handler() {
+                // Binary operations with function calls
+                let sum = get_left() + get_right();
+                
+                // Unary operations
+                let neg = -compute_value();
+                
+                // Array expressions with function calls
+                let arr = [first(), second(), third()];
+                
+                // Index expressions
+                let val = get_array()[get_index()];
+                
+                // Field access on function result
+                let field = get_struct().field;
+                
+                // Range expressions
+                let range = start_value()..end_value();
+                
+                // If expressions with function calls
+                let result = if check_condition() {
+                    handle_true()
+                } else {
+                    handle_false()
+                };
+                
+                // Match expressions
+                match get_option() {
+                    Some(x) => process_some(x),
+                    None => process_none(),
+                }
+                
+                // Loop expressions
+                loop {
+                    if should_break() {
+                        break;
+                    }
+                    loop_body();
+                }
+                
+                // While expressions
+                while continue_condition() {
+                    iterate();
+                }
+                
+                // For loop expressions
+                for item in get_iterator() {
+                    process_item(item);
+                }
+            }
+            
+            fn get_left() -> i32 { 1 }
+            fn get_right() -> i32 { 2 }
+            fn compute_value() -> i32 { 42 }
+            fn first() -> i32 { 1 }
+            fn second() -> i32 { 2 }
+            fn third() -> i32 { 3 }
+            fn get_array() -> Vec<i32> { vec![1, 2, 3] }
+            fn get_index() -> usize { 0 }
+            struct MyStruct { field: i32 }
+            fn get_struct() -> MyStruct { MyStruct { field: 42 } }
+            fn start_value() -> i32 { 0 }
+            fn end_value() -> i32 { 10 }
+            fn check_condition() -> bool { true }
+            fn handle_true() -> i32 { 1 }
+            fn handle_false() -> i32 { 0 }
+            fn get_option() -> Option<i32> { Some(42) }
+            fn process_some(x: i32) {}
+            fn process_none() {}
+            fn should_break() -> bool { true }
+            fn loop_body() {}
+            fn continue_condition() -> bool { false }
+            fn iterate() {}
+            fn get_iterator() -> Vec<i32> { vec![1, 2, 3] }
+            fn process_item(x: i32) {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the expressions_handler function
+        let expr_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "expressions_handler")
+            .expect("expressions_handler should exist");
+
+        let callees = graph.get_callees(&expr_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls in various expression contexts
+        assert!(
+            callee_names.contains(&"get_left"),
+            "Should detect get_left() in binary operation"
+        );
+        assert!(
+            callee_names.contains(&"get_right"),
+            "Should detect get_right() in binary operation"
+        );
+        assert!(
+            callee_names.contains(&"compute_value"),
+            "Should detect compute_value() in unary operation"
+        );
+        assert!(
+            callee_names.contains(&"first"),
+            "Should detect first() in array expression"
+        );
+        assert!(
+            callee_names.contains(&"get_array"),
+            "Should detect get_array() in index expression"
+        );
+        assert!(
+            callee_names.contains(&"get_index"),
+            "Should detect get_index() in index expression"
+        );
+        assert!(
+            callee_names.contains(&"get_struct"),
+            "Should detect get_struct() in field access"
+        );
+        assert!(
+            callee_names.contains(&"check_condition"),
+            "Should detect check_condition() in if expression"
+        );
+        assert!(
+            callee_names.contains(&"handle_true"),
+            "Should detect handle_true() in if branch"
+        );
+        assert!(
+            callee_names.contains(&"handle_false"),
+            "Should detect handle_false() in else branch"
+        );
+        assert!(
+            callee_names.contains(&"get_option"),
+            "Should detect get_option() in match expression"
+        );
+        assert!(
+            callee_names.contains(&"process_some"),
+            "Should detect process_some() in match arm"
+        );
+        assert!(
+            callee_names.contains(&"process_none"),
+            "Should detect process_none() in match arm"
+        );
+        assert!(
+            callee_names.contains(&"should_break"),
+            "Should detect should_break() in loop"
+        );
+        assert!(
+            callee_names.contains(&"loop_body"),
+            "Should detect loop_body() in loop"
+        );
+        assert!(
+            callee_names.contains(&"continue_condition"),
+            "Should detect continue_condition() in while"
+        );
+        assert!(
+            callee_names.contains(&"iterate"),
+            "Should detect iterate() in while body"
+        );
+        assert!(
+            callee_names.contains(&"get_iterator"),
+            "Should detect get_iterator() in for loop"
+        );
+        assert!(
+            callee_names.contains(&"process_item"),
+            "Should detect process_item() in for loop body"
+        );
+    }
+
+    #[test]
     fn test_visit_expr_integration() {
         // Test that visit_expr correctly handles different expression types
         let code = r#"
