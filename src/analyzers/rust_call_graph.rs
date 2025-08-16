@@ -590,6 +590,18 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 self.visit_expr(&await_expr.base);
                 return;
             }
+            // Handle struct literals to find function calls in field values
+            Expr::Struct(expr_struct) => {
+                // Visit each field's value expression to detect function calls
+                for field in &expr_struct.fields {
+                    self.visit_expr(&field.expr);
+                }
+                // If there's a base struct (e.g., Foo { field: value, ..base })
+                if let Some(ref base) = expr_struct.rest {
+                    self.visit_expr(base);
+                }
+                return;
+            }
             _ => {}
         }
 
