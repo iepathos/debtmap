@@ -451,6 +451,7 @@ fn create_python_complexity_debt_item(func: &FunctionMetrics, threshold: u32) ->
         },
         file: func.file.clone(),
         line: func.line,
+        column: None,
         message: format!(
             "Function '{}' has high complexity (cyclomatic: {}, cognitive: {})",
             func.name, func.cyclomatic, func.cognitive

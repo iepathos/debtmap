@@ -686,6 +686,7 @@ mod tests {
             priority: crate::core::Priority::Medium,
             file: PathBuf::from("test.rs"),
             line: 5,
+            column: None,
             message: "TODO: Fix this".to_string(),
             context: None,
         });
