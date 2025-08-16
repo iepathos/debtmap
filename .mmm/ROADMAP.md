@@ -187,6 +187,15 @@ We have completed the initial implementation with core functionality for analyzi
   - Maintained backwards compatibility
   - Updated tests for new error semantics
 
+- [x] **Spec 34**: Error Swallowing Debt Detection
+  - Added new DebtType::ErrorSwallowing variant
+  - AST-based pattern detection for error swallowing
+  - Detects multiple anti-patterns (if let Ok, let _, .ok(), etc.)
+  - Context-aware priority classification
+  - Integration with suppression system
+  - Lower priority for test functions
+  - Note: Detection works but items not shown in priority output
+
 ## Pending Specs
 
 ### Enhancements

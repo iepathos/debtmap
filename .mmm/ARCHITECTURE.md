@@ -44,6 +44,7 @@ Technical debt detection:
 - `smells.rs`: Code smell detection patterns
 - `coupling.rs`: Module coupling analysis
 - `circular.rs`: Circular dependency detection
+- `error_swallowing.rs`: Error swallowing anti-pattern detection
 
 ### Transformers (`src/transformers/`)
 Functional data transformations:
