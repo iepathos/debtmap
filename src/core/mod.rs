@@ -99,6 +99,7 @@ pub enum DebtType {
     Dependency,
     ErrorSwallowing,
     ResourceManagement,
+    CodeOrganization,
     // Test-specific debt types
     TestComplexity,
     TestTodo,
@@ -116,6 +117,7 @@ impl std::fmt::Display for DebtType {
             (DebtType::Dependency, "Dependency"),
             (DebtType::ErrorSwallowing, "Error Swallowing"),
             (DebtType::ResourceManagement, "Resource Management"),
+            (DebtType::CodeOrganization, "Code Organization"),
             (DebtType::TestComplexity, "Test Complexity"),
             (DebtType::TestTodo, "Test TODO"),
             (DebtType::TestDuplication, "Test Duplication"),
