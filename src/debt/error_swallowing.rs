@@ -81,7 +81,7 @@ impl<'a> ErrorSwallowingDetector<'a> {
     // Pure function to check if expression is an if-let Ok pattern
     fn is_if_let_ok_pattern(cond: &Expr) -> bool {
         match cond {
-            Expr::Let(ExprLet { pat, .. }) => Self::is_ok_pattern(&**pat),
+            Expr::Let(ExprLet { pat, .. }) => Self::is_ok_pattern(pat),
             _ => false,
         }
     }
@@ -92,7 +92,7 @@ impl<'a> ErrorSwallowingDetector<'a> {
             Pat::TupleStruct(pat_tuple) => pat_tuple
                 .path
                 .get_ident()
-                .map_or(false, |ident| ident == "Ok"),
+                .is_some_and(|ident| ident == "Ok"),
             _ => false,
         }
     }
@@ -302,7 +302,7 @@ pub fn detect_error_swallowing(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::{parse_str, parse_quote, Pat};
+    use syn::{parse_quote, parse_str, Pat};
 
     #[test]
     fn test_if_let_ok_no_else() {
@@ -477,7 +477,10 @@ mod tests {
         let non_empty_block: Expr = parse_quote! { { println!("error"); } };
         let else_branch = Some((syn::token::Else::default(), Box::new(non_empty_block)));
         let result = ErrorSwallowingDetector::classify_error_handling(&else_branch);
-        assert!(result.is_none(), "Should not flag debt for proper error handling");
+        assert!(
+            result.is_none(),
+            "Should not flag debt for proper error handling"
+        );
     }
 
     #[test]
@@ -516,7 +519,11 @@ mod tests {
         let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
 
         // Should not detect debt when else branch has proper handling
-        assert_eq!(items.len(), 0, "Should not detect debt for proper error handling");
+        assert_eq!(
+            items.len(),
+            0,
+            "Should not detect debt for proper error handling"
+        );
     }
 
     #[test]
