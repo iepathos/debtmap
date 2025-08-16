@@ -13,6 +13,10 @@ use crate::debt::patterns::{
 };
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::organization::{
+    FeatureEnvyDetector, GodObjectDetector, MagicValueDetector, MaintainabilityImpact,
+    OrganizationAntiPattern, OrganizationDetector, ParameterAnalyzer, PrimitiveObsessionDetector,
+};
 use crate::priority::call_graph::CallGraph;
 use anyhow::Result;
 use quote::ToTokens;
@@ -139,6 +143,7 @@ fn collect_all_rust_debt_items(
         extract_rust_module_smell_items(path, source_content, suppression_context),
         extract_rust_function_smell_items(functions, suppression_context),
         detect_error_swallowing(file, path, Some(suppression_context)),
+        analyze_organization_patterns(file, path),
     ]
     .into_iter()
     .flatten()
@@ -532,6 +537,166 @@ fn create_complexity_debt_item(func: &FunctionMetrics, threshold: u32) -> DebtIt
             func.name, func.cyclomatic, func.cognitive
         ),
         context: None,
+    }
+}
+
+fn analyze_organization_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
+    let detectors: Vec<Box<dyn OrganizationDetector>> = vec![
+        Box::new(GodObjectDetector::new()),
+        Box::new(MagicValueDetector::new()),
+        Box::new(ParameterAnalyzer::new()),
+        Box::new(FeatureEnvyDetector::new()),
+        Box::new(PrimitiveObsessionDetector::new()),
+    ];
+
+    let mut organization_items = Vec::new();
+
+    for detector in detectors {
+        let anti_patterns = detector.detect_anti_patterns(file);
+
+        for pattern in anti_patterns {
+            let impact = detector.estimate_maintainability_impact(&pattern);
+            let debt_item = convert_organization_pattern_to_debt_item(pattern, impact, path);
+            organization_items.push(debt_item);
+        }
+    }
+
+    organization_items
+}
+
+fn convert_organization_pattern_to_debt_item(
+    pattern: OrganizationAntiPattern,
+    impact: MaintainabilityImpact,
+    path: &Path,
+) -> DebtItem {
+    let (priority, message, context) = match pattern {
+        OrganizationAntiPattern::GodObject {
+            type_name,
+            method_count,
+            field_count,
+            suggested_split,
+            ..
+        } => (
+            match impact {
+                MaintainabilityImpact::Critical => Priority::Critical,
+                MaintainabilityImpact::High => Priority::High,
+                MaintainabilityImpact::Medium => Priority::Medium,
+                MaintainabilityImpact::Low => Priority::Low,
+            },
+            format!(
+                "God object '{}' with {} methods and {} fields",
+                type_name, method_count, field_count
+            ),
+            Some(format!(
+                "Consider splitting into: {}",
+                suggested_split
+                    .iter()
+                    .map(|g| &g.name)
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+        ),
+        OrganizationAntiPattern::MagicValue {
+            value,
+            occurrence_count,
+            suggested_constant_name,
+            ..
+        } => (
+            match impact {
+                MaintainabilityImpact::Critical => Priority::Critical,
+                MaintainabilityImpact::High => Priority::High,
+                MaintainabilityImpact::Medium => Priority::Medium,
+                MaintainabilityImpact::Low => Priority::Low,
+            },
+            format!("Magic value '{}' appears {} times", value, occurrence_count),
+            Some(format!(
+                "Extract constant: const {} = {};",
+                suggested_constant_name, value
+            )),
+        ),
+        OrganizationAntiPattern::LongParameterList {
+            function_name,
+            parameter_count,
+            suggested_refactoring,
+            ..
+        } => (
+            match impact {
+                MaintainabilityImpact::Critical => Priority::Critical,
+                MaintainabilityImpact::High => Priority::High,
+                MaintainabilityImpact::Medium => Priority::Medium,
+                MaintainabilityImpact::Low => Priority::Low,
+            },
+            format!(
+                "Function '{}' has {} parameters",
+                function_name, parameter_count
+            ),
+            Some(format!("Consider: {:?}", suggested_refactoring)),
+        ),
+        OrganizationAntiPattern::FeatureEnvy {
+            method_name,
+            envied_type,
+            external_calls,
+            internal_calls,
+            ..
+        } => (
+            match impact {
+                MaintainabilityImpact::Critical => Priority::Critical,
+                MaintainabilityImpact::High => Priority::High,
+                MaintainabilityImpact::Medium => Priority::Medium,
+                MaintainabilityImpact::Low => Priority::Low,
+            },
+            format!(
+                "Method '{}' makes {} external calls vs {} internal calls",
+                method_name, external_calls, internal_calls
+            ),
+            Some(format!("Consider moving to '{}'", envied_type)),
+        ),
+        OrganizationAntiPattern::PrimitiveObsession {
+            primitive_type,
+            usage_context,
+            suggested_domain_type,
+            ..
+        } => (
+            match impact {
+                MaintainabilityImpact::Critical => Priority::Critical,
+                MaintainabilityImpact::High => Priority::High,
+                MaintainabilityImpact::Medium => Priority::Medium,
+                MaintainabilityImpact::Low => Priority::Low,
+            },
+            format!(
+                "Primitive obsession: '{}' used for {:?}",
+                primitive_type, usage_context
+            ),
+            Some(format!("Consider domain type: {}", suggested_domain_type)),
+        ),
+        OrganizationAntiPattern::DataClump {
+            parameter_group,
+            suggested_struct_name,
+            ..
+        } => (
+            match impact {
+                MaintainabilityImpact::Critical => Priority::Critical,
+                MaintainabilityImpact::High => Priority::High,
+                MaintainabilityImpact::Medium => Priority::Medium,
+                MaintainabilityImpact::Low => Priority::Low,
+            },
+            format!(
+                "Data clump with {} parameters",
+                parameter_group.parameters.len()
+            ),
+            Some(format!("Extract struct: {}", suggested_struct_name)),
+        ),
+    };
+
+    DebtItem {
+        id: format!("organization-{}-0", path.display()), // Line number not available from pattern
+        debt_type: DebtType::CodeOrganization,
+        priority,
+        file: path.to_path_buf(),
+        line: 0, // Would need to extract from AST
+        message,
+        context,
     }
 }
 

@@ -1,0 +1,323 @@
+use super::{
+    MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
+};
+use std::collections::HashMap;
+use syn::{self, visit::Visit};
+
+pub struct GodObjectDetector {
+    max_methods: usize,
+    max_fields: usize,
+    max_responsibilities: usize,
+}
+
+impl Default for GodObjectDetector {
+    fn default() -> Self {
+        Self {
+            max_methods: 15,
+            max_fields: 10,
+            max_responsibilities: 3,
+        }
+    }
+}
+
+impl GodObjectDetector {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn analyze_type(&self, item_struct: &syn::ItemStruct) -> TypeAnalysis {
+        let analysis = TypeAnalysis {
+            name: item_struct.ident.to_string(),
+            method_count: 0,
+            field_count: self.count_fields(&item_struct.fields),
+            methods: Vec::new(),
+            fields: self.extract_field_names(&item_struct.fields),
+            responsibilities: Vec::new(),
+            trait_implementations: 0,
+        };
+
+        analysis
+    }
+
+    fn count_fields(&self, fields: &syn::Fields) -> usize {
+        match fields {
+            syn::Fields::Named(fields) => fields.named.len(),
+            syn::Fields::Unnamed(fields) => fields.unnamed.len(),
+            syn::Fields::Unit => 0,
+        }
+    }
+
+    fn extract_field_names(&self, fields: &syn::Fields) -> Vec<String> {
+        match fields {
+            syn::Fields::Named(fields) => fields
+                .named
+                .iter()
+                .filter_map(|f| f.ident.as_ref().map(|id| id.to_string()))
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn is_god_object(&self, analysis: &TypeAnalysis) -> bool {
+        analysis.method_count > self.max_methods
+            || analysis.field_count > self.max_fields
+            || analysis.responsibilities.len() > self.max_responsibilities
+            || analysis.trait_implementations > 10
+    }
+
+    fn suggest_responsibility_split(&self, analysis: &TypeAnalysis) -> Vec<ResponsibilityGroup> {
+        let mut groups = Vec::new();
+
+        // Group methods by prefix patterns
+        let method_groups = self.group_methods_by_prefix(&analysis.methods);
+
+        for (prefix, methods) in method_groups {
+            let responsibility = self.infer_responsibility_name(&prefix);
+            groups.push(ResponsibilityGroup {
+                name: format!("{}Manager", responsibility.replace(' ', "")),
+                methods,
+                fields: Vec::new(), // Would need more sophisticated field grouping
+                responsibility,
+            });
+        }
+
+        // If no clear grouping, suggest a generic split
+        if groups.is_empty() && analysis.method_count > self.max_methods {
+            groups.push(ResponsibilityGroup {
+                name: format!("{}Core", analysis.name),
+                methods: analysis.methods.clone(),
+                fields: analysis.fields.clone(),
+                responsibility: "Core functionality".to_string(),
+            });
+        }
+
+        groups
+    }
+
+    fn group_methods_by_prefix(&self, methods: &[String]) -> HashMap<String, Vec<String>> {
+        let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+
+        for method in methods {
+            let prefix = self.extract_method_prefix(method);
+            groups.entry(prefix).or_default().push(method.clone());
+        }
+
+        groups
+    }
+
+    fn extract_method_prefix(&self, method_name: &str) -> String {
+        const COMMON_PREFIXES: &[&str] = &[
+            "get",
+            "set",
+            "is",
+            "has",
+            "can",
+            "should",
+            "will",
+            "create",
+            "build",
+            "make",
+            "new",
+            "init",
+            "calculate",
+            "compute",
+            "process",
+            "transform",
+            "validate",
+            "check",
+            "verify",
+            "ensure",
+            "save",
+            "load",
+            "store",
+            "retrieve",
+            "fetch",
+            "update",
+            "modify",
+            "change",
+            "edit",
+            "delete",
+            "remove",
+            "clear",
+            "reset",
+            "send",
+            "receive",
+            "handle",
+            "manage",
+        ];
+
+        let lower_name = method_name.to_lowercase();
+
+        for prefix in COMMON_PREFIXES {
+            if lower_name.starts_with(prefix) {
+                return prefix.to_string();
+            }
+        }
+
+        method_name
+            .split('_')
+            .next()
+            .unwrap_or(method_name)
+            .to_string()
+    }
+
+    fn infer_responsibility_name(&self, prefix: &str) -> String {
+        match prefix {
+            "get" | "set" => "Data Access".to_string(),
+            "calculate" | "compute" => "Computation".to_string(),
+            "validate" | "check" => "Validation".to_string(),
+            "save" | "load" | "store" => "Persistence".to_string(),
+            "create" | "build" | "new" => "Construction".to_string(),
+            "send" | "receive" | "handle" => "Communication".to_string(),
+            _ => format!("{} Operations", capitalize_first(prefix)),
+        }
+    }
+}
+
+impl OrganizationDetector for GodObjectDetector {
+    fn detect_anti_patterns(&self, file: &syn::File) -> Vec<OrganizationAntiPattern> {
+        let mut patterns = Vec::new();
+        let mut visitor = TypeVisitor::new();
+        visitor.visit_file(file);
+
+        // Analyze each struct found
+        for (_type_name, type_info) in visitor.types {
+            if self.is_god_object(&type_info) {
+                let suggested_split = self.suggest_responsibility_split(&type_info);
+
+                patterns.push(OrganizationAntiPattern::GodObject {
+                    type_name: type_info.name.clone(),
+                    method_count: type_info.method_count,
+                    field_count: type_info.field_count,
+                    responsibility_count: suggested_split.len(),
+                    suggested_split,
+                });
+            }
+        }
+
+        patterns
+    }
+
+    fn detector_name(&self) -> &'static str {
+        "GodObjectDetector"
+    }
+
+    fn estimate_maintainability_impact(
+        &self,
+        pattern: &OrganizationAntiPattern,
+    ) -> MaintainabilityImpact {
+        match pattern {
+            OrganizationAntiPattern::GodObject {
+                method_count,
+                field_count,
+                ..
+            } => {
+                if *method_count > 30 || *field_count > 20 {
+                    MaintainabilityImpact::Critical
+                } else if *method_count > 20 || *field_count > 15 {
+                    MaintainabilityImpact::High
+                } else {
+                    MaintainabilityImpact::Medium
+                }
+            }
+            _ => MaintainabilityImpact::Low,
+        }
+    }
+}
+
+struct TypeAnalysis {
+    name: String,
+    method_count: usize,
+    field_count: usize,
+    methods: Vec<String>,
+    fields: Vec<String>,
+    responsibilities: Vec<Responsibility>,
+    trait_implementations: usize,
+}
+
+struct Responsibility {
+    #[allow(dead_code)]
+    name: String,
+    #[allow(dead_code)]
+    methods: Vec<String>,
+    #[allow(dead_code)]
+    fields: Vec<String>,
+    #[allow(dead_code)]
+    cohesion_score: f64,
+}
+
+struct TypeVisitor {
+    types: HashMap<String, TypeAnalysis>,
+}
+
+impl TypeVisitor {
+    fn new() -> Self {
+        Self {
+            types: HashMap::new(),
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for TypeVisitor {
+    fn visit_item_struct(&mut self, node: &'ast syn::ItemStruct) {
+        let type_name = node.ident.to_string();
+        let field_count = match &node.fields {
+            syn::Fields::Named(fields) => fields.named.len(),
+            syn::Fields::Unnamed(fields) => fields.unnamed.len(),
+            syn::Fields::Unit => 0,
+        };
+
+        let fields = match &node.fields {
+            syn::Fields::Named(fields) => fields
+                .named
+                .iter()
+                .filter_map(|f| f.ident.as_ref().map(|id| id.to_string()))
+                .collect(),
+            _ => Vec::new(),
+        };
+
+        self.types.insert(
+            type_name.clone(),
+            TypeAnalysis {
+                name: type_name,
+                method_count: 0,
+                field_count,
+                methods: Vec::new(),
+                fields,
+                responsibilities: Vec::new(),
+                trait_implementations: 0,
+            },
+        );
+    }
+
+    fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
+        if let syn::Type::Path(type_path) = &*node.self_ty {
+            if let Some(ident) = type_path.path.get_ident() {
+                let type_name = ident.to_string();
+
+                if let Some(type_info) = self.types.get_mut(&type_name) {
+                    // Count methods
+                    for item in &node.items {
+                        if let syn::ImplItem::Fn(method) = item {
+                            type_info.methods.push(method.sig.ident.to_string());
+                            type_info.method_count += 1;
+                        }
+                    }
+
+                    // Count trait implementations
+                    if node.trait_.is_some() {
+                        type_info.trait_implementations += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn capitalize_first(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}

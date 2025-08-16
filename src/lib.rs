@@ -8,6 +8,7 @@ pub mod config;
 pub mod core;
 pub mod debt;
 pub mod io;
+pub mod organization;
 pub mod priority;
 pub mod refactoring;
 pub mod risk;
