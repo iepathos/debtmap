@@ -555,6 +555,30 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::TestTodo { .. } => "TEST TODO",
         DebtType::TestDuplication { .. } => "TEST DUPLICATION",
         DebtType::ErrorSwallowing { .. } => "ERROR SWALLOWING",
+        // Security debt types
+        DebtType::HardcodedSecrets { .. } => "HARDCODED SECRETS",
+        DebtType::WeakCryptography { .. } => "WEAK CRYPTO",
+        DebtType::SqlInjectionRisk { .. } => "SQL INJECTION",
+        DebtType::UnsafeCode { .. } => "UNSAFE CODE",
+        DebtType::InputValidationGap { .. } => "INPUT VALIDATION",
+        // Performance debt types
+        DebtType::AllocationInefficiency { .. } => "ALLOCATION",
+        DebtType::StringConcatenation { .. } => "STRING CONCAT",
+        DebtType::NestedLoops { .. } => "NESTED LOOPS",
+        DebtType::BlockingIO { .. } => "BLOCKING I/O",
+        DebtType::SuboptimalDataStructure { .. } => "DATA STRUCTURE",
+        // Organization debt types
+        DebtType::GodObject { .. } => "GOD OBJECT",
+        DebtType::FeatureEnvy { .. } => "FEATURE ENVY",
+        DebtType::PrimitiveObsession { .. } => "PRIMITIVE OBSESSION",
+        DebtType::MagicValues { .. } => "MAGIC VALUES",
+        // Testing quality debt types
+        DebtType::AssertionComplexity { .. } => "ASSERTION COMPLEXITY",
+        DebtType::FlakyTestPattern { .. } => "FLAKY TEST",
+        // Resource management debt types
+        DebtType::AsyncMisuse { .. } => "ASYNC MISUSE",
+        DebtType::ResourceLeak { .. } => "RESOURCE LEAK",
+        DebtType::CollectionInefficiency { .. } => "COLLECTION INEFFICIENCY",
     }
 }
 
@@ -581,6 +605,30 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
         DebtType::TestTodo { .. } => "Complete TODO",
         DebtType::TestDuplication { .. } => "Remove test duplication",
         DebtType::ErrorSwallowing { .. } => "Fix error swallowing",
+        // Security debt types
+        DebtType::HardcodedSecrets { .. } => "Remove hardcoded secrets",
+        DebtType::WeakCryptography { .. } => "Upgrade cryptography",
+        DebtType::SqlInjectionRisk { .. } => "Secure SQL queries",
+        DebtType::UnsafeCode { .. } => "Justify or remove unsafe",
+        DebtType::InputValidationGap { .. } => "Add input validation",
+        // Performance debt types
+        DebtType::AllocationInefficiency { .. } => "Optimize allocations",
+        DebtType::StringConcatenation { .. } => "Use string builder",
+        DebtType::NestedLoops { .. } => "Reduce loop complexity",
+        DebtType::BlockingIO { .. } => "Make async",
+        DebtType::SuboptimalDataStructure { .. } => "Change data structure",
+        // Organization debt types
+        DebtType::GodObject { .. } => "Split responsibilities",
+        DebtType::FeatureEnvy { .. } => "Move method",
+        DebtType::PrimitiveObsession { .. } => "Create domain type",
+        DebtType::MagicValues { .. } => "Extract constants",
+        // Testing quality debt types
+        DebtType::AssertionComplexity { .. } => "Simplify assertions",
+        DebtType::FlakyTestPattern { .. } => "Fix test reliability",
+        // Resource management debt types
+        DebtType::AsyncMisuse { .. } => "Fix async pattern",
+        DebtType::ResourceLeak { .. } => "Add cleanup",
+        DebtType::CollectionInefficiency { .. } => "Optimize collection usage",
     }
 }
 

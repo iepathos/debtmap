@@ -1515,6 +1515,84 @@ fn generate_recommendation(
         DebtType::ErrorSwallowing { pattern, context } => {
             generate_error_swallowing_recommendation(pattern, context)
         }
+        // Security debt types
+        DebtType::HardcodedSecrets {
+            secret_type,
+            severity,
+        } => generate_security_recommendation("hardcoded_secrets", secret_type, severity),
+        DebtType::WeakCryptography {
+            algorithm,
+            recommendation,
+        } => generate_security_recommendation("weak_crypto", algorithm, recommendation),
+        DebtType::SqlInjectionRisk {
+            query_pattern,
+            risk_level,
+        } => generate_security_recommendation("sql_injection", query_pattern, risk_level),
+        DebtType::UnsafeCode {
+            justification,
+            safety_concern,
+        } => generate_unsafe_code_recommendation(justification, safety_concern),
+        DebtType::InputValidationGap {
+            input_type,
+            validation_missing,
+        } => generate_security_recommendation("input_validation", input_type, validation_missing),
+        // Performance debt types
+        DebtType::AllocationInefficiency { pattern, impact } => {
+            generate_performance_recommendation("allocation", pattern, impact)
+        }
+        DebtType::StringConcatenation {
+            loop_type,
+            iterations,
+        } => generate_string_concat_recommendation(loop_type, iterations),
+        DebtType::NestedLoops {
+            depth,
+            complexity_estimate,
+        } => generate_nested_loops_recommendation(*depth, complexity_estimate),
+        DebtType::BlockingIO { operation, context } => {
+            generate_performance_recommendation("blocking_io", operation, context)
+        }
+        DebtType::SuboptimalDataStructure {
+            current_type,
+            recommended_type,
+        } => generate_data_structure_recommendation(current_type, recommended_type),
+        // Organization debt types
+        DebtType::GodObject {
+            responsibility_count,
+            complexity_score,
+        } => generate_god_object_recommendation(*responsibility_count, *complexity_score),
+        DebtType::FeatureEnvy {
+            external_class,
+            usage_ratio,
+        } => generate_feature_envy_recommendation(external_class, *usage_ratio),
+        DebtType::PrimitiveObsession {
+            primitive_type,
+            domain_concept,
+        } => generate_primitive_obsession_recommendation(primitive_type, domain_concept),
+        DebtType::MagicValues { value, occurrences } => {
+            generate_magic_values_recommendation(value, *occurrences)
+        }
+        // Testing quality debt types
+        DebtType::AssertionComplexity {
+            assertion_count,
+            complexity_score,
+        } => generate_assertion_complexity_recommendation(*assertion_count, *complexity_score),
+        DebtType::FlakyTestPattern {
+            pattern_type,
+            reliability_impact,
+        } => generate_flaky_test_recommendation(pattern_type, reliability_impact),
+        // Resource management debt types
+        DebtType::AsyncMisuse {
+            pattern,
+            performance_impact,
+        } => generate_async_misuse_recommendation(pattern, performance_impact),
+        DebtType::ResourceLeak {
+            resource_type,
+            cleanup_missing,
+        } => generate_resource_leak_recommendation(resource_type, cleanup_missing),
+        DebtType::CollectionInefficiency {
+            collection_type,
+            inefficiency_type,
+        } => generate_collection_inefficiency_recommendation(collection_type, inefficiency_type),
     };
 
     ActionableRecommendation {
@@ -1543,6 +1621,30 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::Orchestration { .. }
         | DebtType::TestTodo { .. }
         | DebtType::TestDuplication { .. } => 0.1,
+        // Security debt types (high risk)
+        DebtType::HardcodedSecrets { .. } => 0.8,
+        DebtType::SqlInjectionRisk { .. } => 0.9,
+        DebtType::UnsafeCode { .. } => 0.7,
+        DebtType::WeakCryptography { .. } => 0.65,
+        DebtType::InputValidationGap { .. } => 0.6,
+        // Performance debt types (medium risk)
+        DebtType::BlockingIO { .. } => 0.45,
+        DebtType::NestedLoops { .. } => 0.4,
+        DebtType::AllocationInefficiency { .. } => 0.3,
+        DebtType::StringConcatenation { .. } => 0.25,
+        DebtType::SuboptimalDataStructure { .. } => 0.2,
+        // Organization debt types (maintenance risk)
+        DebtType::GodObject { .. } => 0.4,
+        DebtType::FeatureEnvy { .. } => 0.25,
+        DebtType::PrimitiveObsession { .. } => 0.2,
+        DebtType::MagicValues { .. } => 0.15,
+        // Testing quality debt types (low risk)
+        DebtType::FlakyTestPattern { .. } => 0.3,
+        DebtType::AssertionComplexity { .. } => 0.15,
+        // Resource management debt types (medium risk)
+        DebtType::ResourceLeak { .. } => 0.5,
+        DebtType::AsyncMisuse { .. } => 0.4,
+        DebtType::CollectionInefficiency { .. } => 0.2,
     }
 }
 
@@ -1573,6 +1675,10 @@ fn calculate_lines_reduction(debt_type: &DebtType) -> u32 {
             total_lines,
             ..
         } => *total_lines - (*total_lines / instances),
+        // Security debt types - often require minimal code changes
+        DebtType::HardcodedSecrets { .. } => 2, // Move to config
+        DebtType::InputValidationGap { .. } => 5, // Add validation
+        DebtType::UnsafeCode { .. } => 3,       // Add documentation or safety
         _ => 0,
     }
 }
@@ -1588,6 +1694,12 @@ fn calculate_complexity_reduction(debt_type: &DebtType, is_complex: bool) -> f64
         DebtType::TestingGap { cyclomatic, .. } if is_complex => *cyclomatic as f64 * 0.3,
         DebtType::ComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.5,
         DebtType::TestComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.3,
+        // Organization debt types - significant complexity reduction potential
+        DebtType::GodObject {
+            complexity_score, ..
+        } => *complexity_score * 0.4,
+        DebtType::NestedLoops { depth, .. } => (*depth as f64).powf(2.0) * 0.3, // Quadratic impact
+        DebtType::FeatureEnvy { .. } => 2.0, // Modest improvement
         _ => 0.0,
     }
 }
@@ -1626,6 +1738,339 @@ fn calculate_expected_impact(
         complexity_reduction,
         risk_reduction,
     }
+}
+
+// New recommendation generators for expanded debt types
+
+fn generate_security_recommendation(
+    sec_type: &str,
+    detail1: &str,
+    detail2: &str,
+) -> (String, String, Vec<String>) {
+    match sec_type {
+        "hardcoded_secrets" => (
+            format!("Remove {} secret and use secure configuration", detail1),
+            format!(
+                "Severity {}: Hardcoded {} exposes sensitive data",
+                detail2, detail1
+            ),
+            vec![
+                "Move secret to environment variable or config file".to_string(),
+                "Use secure credential management system".to_string(),
+                "Add secret to .gitignore patterns".to_string(),
+                "Review git history for leaked secrets".to_string(),
+            ],
+        ),
+        "weak_crypto" => (
+            format!("Replace {} with {}", detail1, detail2),
+            format!("Algorithm {} is cryptographically weak", detail1),
+            vec![
+                format!("Upgrade to {}", detail2),
+                "Review all cryptographic dependencies".to_string(),
+                "Test compatibility with new algorithms".to_string(),
+                "Update security documentation".to_string(),
+            ],
+        ),
+        "sql_injection" => (
+            "Use parameterized queries to prevent SQL injection".to_string(),
+            format!(
+                "Risk level {}: Pattern {} vulnerable to injection",
+                detail2, detail1
+            ),
+            vec![
+                "Replace string concatenation with parameterized queries".to_string(),
+                "Use ORM or query builder for type safety".to_string(),
+                "Validate and sanitize all user inputs".to_string(),
+                "Add automated security testing".to_string(),
+            ],
+        ),
+        "input_validation" => (
+            format!("Add validation for {} input", detail1),
+            format!("Missing validation: {}", detail2),
+            vec![
+                "Implement input sanitization".to_string(),
+                "Add boundary and type checking".to_string(),
+                "Use validation library for consistency".to_string(),
+                "Add unit tests for edge cases".to_string(),
+            ],
+        ),
+        _ => (
+            "Fix security issue".to_string(),
+            "Security vulnerability detected".to_string(),
+            vec!["Review security best practices".to_string()],
+        ),
+    }
+}
+
+fn generate_unsafe_code_recommendation(
+    justification: &Option<String>,
+    safety_concern: &str,
+) -> (String, String, Vec<String>) {
+    let action = if justification.is_some() {
+        "Review unsafe block justification"
+    } else {
+        "Add safety documentation or remove unsafe"
+    };
+
+    (
+        action.to_string(),
+        format!("Safety concern: {}", safety_concern),
+        vec![
+            "Document safety invariants and preconditions".to_string(),
+            "Consider safe alternatives if available".to_string(),
+            "Add comprehensive safety comments".to_string(),
+            "Review with security team".to_string(),
+        ],
+    )
+}
+
+fn generate_performance_recommendation(
+    perf_type: &str,
+    detail1: &str,
+    detail2: &str,
+) -> (String, String, Vec<String>) {
+    match perf_type {
+        "allocation" => (
+            format!("Optimize allocation pattern: {}", detail1),
+            format!("Performance impact: {}", detail2),
+            vec![
+                "Use object pooling where appropriate".to_string(),
+                "Consider pre-allocation strategies".to_string(),
+                "Profile memory usage patterns".to_string(),
+                "Review data structure choices".to_string(),
+            ],
+        ),
+        "blocking_io" => (
+            format!("Make {} operation async", detail1),
+            format!("Context: {}", detail2),
+            vec![
+                "Convert to async/await pattern".to_string(),
+                "Use non-blocking I/O libraries".to_string(),
+                "Consider background processing".to_string(),
+                "Add timeout handling".to_string(),
+            ],
+        ),
+        _ => (
+            "Optimize performance".to_string(),
+            "Performance issue detected".to_string(),
+            vec!["Profile and benchmark".to_string()],
+        ),
+    }
+}
+
+fn generate_string_concat_recommendation(
+    loop_type: &str,
+    iterations: &Option<u32>,
+) -> (String, String, Vec<String>) {
+    let iter_info = iterations.map_or("unknown".to_string(), |i| i.to_string());
+    (
+        format!("Use StringBuilder for {} loop concatenation", loop_type),
+        format!(
+            "String concatenation in {} (≈{} iterations)",
+            loop_type, iter_info
+        ),
+        vec![
+            "Replace += with StringBuilder/StringBuffer".to_string(),
+            "Pre-allocate capacity if known".to_string(),
+            "Consider string formatting alternatives".to_string(),
+            "Benchmark performance improvement".to_string(),
+        ],
+    )
+}
+
+fn generate_nested_loops_recommendation(
+    depth: u32,
+    complexity_estimate: &str,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Reduce {}-level nested loop complexity", depth),
+        format!("Complexity estimate: {}", complexity_estimate),
+        vec![
+            "Extract inner loops into functions".to_string(),
+            "Consider algorithmic improvements".to_string(),
+            "Use iterators for cleaner code".to_string(),
+            "Profile actual performance impact".to_string(),
+        ],
+    )
+}
+
+fn generate_data_structure_recommendation(
+    current: &str,
+    recommended: &str,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Replace {} with {}", current, recommended),
+        format!(
+            "Data structure {} is suboptimal for access patterns",
+            current
+        ),
+        vec![
+            format!("Refactor to use {}", recommended),
+            "Update related algorithms".to_string(),
+            "Test performance before/after".to_string(),
+            "Update documentation".to_string(),
+        ],
+    )
+}
+
+fn generate_god_object_recommendation(
+    responsibility_count: u32,
+    complexity_score: f64,
+) -> (String, String, Vec<String>) {
+    (
+        format!(
+            "Split {} responsibilities into focused classes",
+            responsibility_count
+        ),
+        format!("God object with complexity {:.1}", complexity_score),
+        vec![
+            "Identify single responsibility principle violations".to_string(),
+            "Extract cohesive functionality into separate classes".to_string(),
+            "Use composition over inheritance".to_string(),
+            "Refactor incrementally with tests".to_string(),
+        ],
+    )
+}
+
+fn generate_feature_envy_recommendation(
+    external_class: &str,
+    usage_ratio: f64,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Move method closer to {} class", external_class),
+        format!(
+            "Method uses {}% external data",
+            (usage_ratio * 100.0) as u32
+        ),
+        vec![
+            format!("Consider moving method to {}", external_class),
+            "Extract shared functionality".to_string(),
+            "Review class responsibilities".to_string(),
+            "Maintain cohesion after refactoring".to_string(),
+        ],
+    )
+}
+
+fn generate_primitive_obsession_recommendation(
+    primitive_type: &str,
+    domain_concept: &str,
+) -> (String, String, Vec<String>) {
+    (
+        format!(
+            "Create {} domain type instead of {}",
+            domain_concept, primitive_type
+        ),
+        format!(
+            "Primitive obsession: {} used for {}",
+            primitive_type, domain_concept
+        ),
+        vec![
+            format!("Create {} value object", domain_concept),
+            "Add validation and behavior to type".to_string(),
+            "Replace primitive usage throughout codebase".to_string(),
+            "Add type safety and domain logic".to_string(),
+        ],
+    )
+}
+
+fn generate_magic_values_recommendation(
+    value: &str,
+    occurrences: u32,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Extract '{}' into named constant", value),
+        format!("Magic value '{}' appears {} times", value, occurrences),
+        vec![
+            format!(
+                "Define const {} = '{}'",
+                value.to_uppercase().replace(' ', "_"),
+                value
+            ),
+            "Replace all occurrences with named constant".to_string(),
+            "Add documentation explaining value meaning".to_string(),
+            "Group related constants in module".to_string(),
+        ],
+    )
+}
+
+fn generate_assertion_complexity_recommendation(
+    assertion_count: u32,
+    complexity_score: f64,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Simplify {} complex assertions", assertion_count),
+        format!("Test assertion complexity: {:.1}", complexity_score),
+        vec![
+            "Split complex assertions into multiple simple ones".to_string(),
+            "Use custom assertion helpers".to_string(),
+            "Add descriptive assertion messages".to_string(),
+            "Consider table-driven test patterns".to_string(),
+        ],
+    )
+}
+
+fn generate_flaky_test_recommendation(
+    pattern_type: &str,
+    reliability_impact: &str,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Fix {} flaky test pattern", pattern_type),
+        format!("Reliability impact: {}", reliability_impact),
+        vec![
+            "Identify and eliminate non-deterministic behavior".to_string(),
+            "Use test doubles to isolate dependencies".to_string(),
+            "Add proper test cleanup and setup".to_string(),
+            "Consider parallel test safety".to_string(),
+        ],
+    )
+}
+
+fn generate_async_misuse_recommendation(
+    pattern: &str,
+    performance_impact: &str,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Fix async pattern: {}", pattern),
+        format!("Performance impact: {}", performance_impact),
+        vec![
+            "Use proper async/await patterns".to_string(),
+            "Avoid blocking async contexts".to_string(),
+            "Configure async runtime appropriately".to_string(),
+            "Add timeout and cancellation handling".to_string(),
+        ],
+    )
+}
+
+fn generate_resource_leak_recommendation(
+    resource_type: &str,
+    cleanup_missing: &str,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Add {} resource cleanup", resource_type),
+        format!("Missing cleanup: {}", cleanup_missing),
+        vec![
+            "Implement Drop trait for automatic cleanup".to_string(),
+            "Use RAII patterns for resource management".to_string(),
+            "Add try-finally or defer patterns".to_string(),
+            "Test resource cleanup in error scenarios".to_string(),
+        ],
+    )
+}
+
+fn generate_collection_inefficiency_recommendation(
+    collection_type: &str,
+    inefficiency_type: &str,
+) -> (String, String, Vec<String>) {
+    (
+        format!("Optimize {} usage", collection_type),
+        format!("Inefficiency: {}", inefficiency_type),
+        vec![
+            "Review collection access patterns".to_string(),
+            "Consider alternative data structures".to_string(),
+            "Pre-allocate capacity where possible".to_string(),
+            "Profile collection performance".to_string(),
+        ],
+    )
 }
 
 #[cfg(test)]

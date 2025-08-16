@@ -429,6 +429,8 @@ fn format_debt_type(debt_type: &crate::priority::DebtType) -> &'static str {
         DebtType::TestTodo { .. } => "Test TODO",
         DebtType::TestDuplication { .. } => "Test Duplication",
         DebtType::ErrorSwallowing { .. } => "Error Swallowing",
+        // Add wildcard for all new debt types
+        _ => "Technical Debt",
     }
 }
 
@@ -493,6 +495,8 @@ fn format_debt_issue(debt_type: &crate::priority::DebtType) -> String {
             Some(ctx) => format!("{}: {}", pattern, ctx),
             None => pattern.to_string(),
         },
+        // Add default formatting for all new debt types
+        _ => "Technical debt pattern detected".to_string(),
     }
 }
 

@@ -142,6 +142,30 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::TestTodo { .. } => "Test TODO",
         DebtType::TestDuplication { .. } => "Test Duplication",
         DebtType::ErrorSwallowing { .. } => "Error Swallowing",
+        // Security debt types
+        DebtType::HardcodedSecrets { .. } => "Hardcoded Secrets",
+        DebtType::WeakCryptography { .. } => "Weak Cryptography",
+        DebtType::SqlInjectionRisk { .. } => "SQL Injection Risk",
+        DebtType::UnsafeCode { .. } => "Unsafe Code",
+        DebtType::InputValidationGap { .. } => "Input Validation Gap",
+        // Performance debt types
+        DebtType::AllocationInefficiency { .. } => "Allocation Inefficiency",
+        DebtType::StringConcatenation { .. } => "String Concatenation",
+        DebtType::NestedLoops { .. } => "Nested Loops",
+        DebtType::BlockingIO { .. } => "Blocking I/O",
+        DebtType::SuboptimalDataStructure { .. } => "Suboptimal Data Structure",
+        // Organization debt types
+        DebtType::GodObject { .. } => "God Object",
+        DebtType::FeatureEnvy { .. } => "Feature Envy",
+        DebtType::PrimitiveObsession { .. } => "Primitive Obsession",
+        DebtType::MagicValues { .. } => "Magic Values",
+        // Testing quality debt types
+        DebtType::AssertionComplexity { .. } => "Assertion Complexity",
+        DebtType::FlakyTestPattern { .. } => "Flaky Test Pattern",
+        // Resource management debt types
+        DebtType::AsyncMisuse { .. } => "Async Misuse",
+        DebtType::ResourceLeak { .. } => "Resource Leak",
+        DebtType::CollectionInefficiency { .. } => "Collection Inefficiency",
     }
 }
 

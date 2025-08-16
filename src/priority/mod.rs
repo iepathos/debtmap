@@ -104,6 +104,87 @@ pub enum DebtType {
         pattern: String,
         context: Option<String>,
     },
+    // Security debt types
+    HardcodedSecrets {
+        secret_type: String,
+        severity: String,
+    },
+    WeakCryptography {
+        algorithm: String,
+        recommendation: String,
+    },
+    SqlInjectionRisk {
+        query_pattern: String,
+        risk_level: String,
+    },
+    UnsafeCode {
+        justification: Option<String>,
+        safety_concern: String,
+    },
+    InputValidationGap {
+        input_type: String,
+        validation_missing: String,
+    },
+    // Performance debt types
+    AllocationInefficiency {
+        pattern: String,
+        impact: String,
+    },
+    StringConcatenation {
+        loop_type: String,
+        iterations: Option<u32>,
+    },
+    NestedLoops {
+        depth: u32,
+        complexity_estimate: String,
+    },
+    BlockingIO {
+        operation: String,
+        context: String,
+    },
+    SuboptimalDataStructure {
+        current_type: String,
+        recommended_type: String,
+    },
+    // Organization debt types
+    GodObject {
+        responsibility_count: u32,
+        complexity_score: f64,
+    },
+    FeatureEnvy {
+        external_class: String,
+        usage_ratio: f64,
+    },
+    PrimitiveObsession {
+        primitive_type: String,
+        domain_concept: String,
+    },
+    MagicValues {
+        value: String,
+        occurrences: u32,
+    },
+    // Testing quality debt types
+    AssertionComplexity {
+        assertion_count: u32,
+        complexity_score: f64,
+    },
+    FlakyTestPattern {
+        pattern_type: String,
+        reliability_impact: String,
+    },
+    // Resource management debt types
+    AsyncMisuse {
+        pattern: String,
+        performance_impact: String,
+    },
+    ResourceLeak {
+        resource_type: String,
+        cleanup_missing: String,
+    },
+    CollectionInefficiency {
+        collection_type: String,
+        inefficiency_type: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

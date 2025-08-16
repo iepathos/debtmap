@@ -35,12 +35,14 @@ impl EnhancedSqlInjectionDetector {
                 .map(|s| s.to_string())
                 .collect();
 
-        let safe_functions: HashSet<String> = ["bind",
+        let safe_functions: HashSet<String> = [
+            "bind",
             "prepare",
             "query_as",
             "query_scalar",
             "fetch_one",
-            "fetch_all"]
+            "fetch_all",
+        ]
         .iter()
         .map(|s| s.to_string())
         .collect();
