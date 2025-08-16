@@ -100,7 +100,7 @@ fn test_visit_trait_pattern_exclusion() {
 
     // The function should not be classified as dead code when using exclusions
     let debt_type =
-        classify_debt_type_with_exclusions(&visit_func, &call_graph, &func_id, &exclusions);
+        classify_debt_type_with_exclusions(&visit_func, &call_graph, &func_id, &exclusions, None);
 
     match debt_type {
         DebtType::DeadCode { .. } => {

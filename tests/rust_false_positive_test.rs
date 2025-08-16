@@ -115,6 +115,7 @@ mod tests {
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // Should NOT be marked as dead code because it has 2 callers
@@ -129,6 +130,7 @@ mod tests {
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // It should NOT be classified as DeadCode
@@ -213,6 +215,7 @@ pub fn use_calculator() -> i32 {
         &call_graph,
         &standalone_func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // Test method (should NOT be dead code)
@@ -226,6 +229,7 @@ pub fn use_calculator() -> i32 {
         &call_graph,
         &method_func_id,
         &framework_exclusions_std,
+        None,
     );
 
     assert!(

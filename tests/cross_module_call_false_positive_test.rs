@@ -120,6 +120,7 @@ fn test_cross_module_associated_function_call_false_positive() {
         &combined_graph,
         &contextual_risk_new,
         &framework_exclusions,
+        None,
     );
 
     // This assertion will FAIL, showing the false positive

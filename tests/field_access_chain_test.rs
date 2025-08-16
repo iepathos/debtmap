@@ -119,6 +119,7 @@ fn main() {
         &call_graph,
         &analyze_file_id,
         &HashSet::new(),
+        None,
     );
 
     // The function should NOT be dead code because it's called through field access chain
@@ -204,7 +205,7 @@ fn main() {
     };
 
     let is_dead =
-        is_dead_code_with_exclusions(process_func, &call_graph, &process_id, &HashSet::new());
+        is_dead_code_with_exclusions(process_func, &call_graph, &process_id, &HashSet::new(), None);
 
     assert!(
         !is_dead,
@@ -279,7 +280,7 @@ fn main() {
     };
 
     let is_dead =
-        is_dead_code_with_exclusions(process_func, &call_graph, &process_id, &HashSet::new());
+        is_dead_code_with_exclusions(process_func, &call_graph, &process_id, &HashSet::new(), None);
 
     assert!(
         !is_dead,

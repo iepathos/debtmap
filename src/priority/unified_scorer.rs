@@ -295,6 +295,7 @@ pub fn create_unified_debt_item_with_exclusions(
     coverage: Option<&LcovData>,
     roi_score: f64,
     framework_exclusions: &HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> UnifiedDebtItem {
     let func_id = FunctionId {
         file: func.file.clone(),
@@ -309,8 +310,13 @@ pub fn create_unified_debt_item_with_exclusions(
     });
 
     // Use the enhanced debt type classification with framework exclusions
-    let debt_type =
-        classify_debt_type_with_exclusions(func, call_graph, &func_id, framework_exclusions);
+    let debt_type = classify_debt_type_with_exclusions(
+        func,
+        call_graph,
+        &func_id,
+        framework_exclusions,
+        function_pointer_used_functions,
+    );
 
     // Calculate unified score
     let unified_score = calculate_unified_priority(func, call_graph, coverage, roi_score);
@@ -434,7 +440,7 @@ fn determine_debt_type(
     }
 
     // Check for dead code before falling back to generic risk
-    if is_dead_code(func, call_graph, func_id) {
+    if is_dead_code(func, call_graph, func_id, None) {
         return DebtType::DeadCode {
             visibility: determine_visibility(func),
             cyclomatic: func.cyclomatic,
@@ -577,10 +583,22 @@ fn identify_risk_factors(
     factors
 }
 
-fn is_dead_code(func: &FunctionMetrics, call_graph: &CallGraph, func_id: &FunctionId) -> bool {
+fn is_dead_code(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
+) -> bool {
     // Check hardcoded exclusions (includes test functions, main, etc.)
     if is_excluded_from_dead_code_analysis(func) {
         return false;
+    }
+
+    // Check if function is definitely used through function pointers
+    if let Some(fp_used) = function_pointer_used_functions {
+        if fp_used.contains(func_id) {
+            return false;
+        }
     }
 
     // Check if function has incoming calls
@@ -594,20 +612,15 @@ pub fn is_dead_code_with_exclusions(
     call_graph: &CallGraph,
     func_id: &FunctionId,
     framework_exclusions: &std::collections::HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> bool {
     // First check if this function is excluded by framework patterns
     if framework_exclusions.contains(func_id) {
         return false;
     }
 
-    // Then check hardcoded exclusions for backward compatibility
-    if is_excluded_from_dead_code_analysis(func) {
-        return false;
-    }
-
-    // Check if function has incoming calls
-    let callers = call_graph.get_callers(func_id);
-    callers.is_empty()
+    // Use the enhanced dead code detection with function pointer information
+    is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
 
 /// Enhanced dead code detection using the enhanced call graph
@@ -617,6 +630,7 @@ pub fn classify_debt_type_with_exclusions(
     call_graph: &CallGraph,
     func_id: &FunctionId,
     framework_exclusions: &HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> DebtType {
     // Test functions are special debt cases
     if func.is_test {
@@ -643,7 +657,13 @@ pub fn classify_debt_type_with_exclusions(
     }
 
     // Check for dead code with framework exclusions
-    if is_dead_code_with_exclusions(func, call_graph, func_id, framework_exclusions) {
+    if is_dead_code_with_exclusions(
+        func,
+        call_graph,
+        func_id,
+        framework_exclusions,
+        function_pointer_used_functions,
+    ) {
         return DebtType::DeadCode {
             visibility: determine_visibility(func),
             cyclomatic: func.cyclomatic,
@@ -755,7 +775,7 @@ pub fn classify_debt_type_enhanced(
     }
 
     // Check for dead code
-    if is_dead_code(func, call_graph, func_id) {
+    if is_dead_code(func, call_graph, func_id, None) {
         return DebtType::DeadCode {
             visibility: determine_visibility(func),
             cyclomatic: func.cyclomatic,

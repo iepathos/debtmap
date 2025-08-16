@@ -148,6 +148,7 @@ class FileManager:
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // Should NOT be marked as dead code because it has 3 callers
@@ -162,6 +163,7 @@ class FileManager:
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // It should NOT be classified as DeadCode
@@ -224,6 +226,7 @@ class MyClass:
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // This SHOULD be marked as dead code
@@ -281,6 +284,7 @@ class ResourceManager:
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     assert!(
@@ -371,6 +375,7 @@ class ConversationPanel:
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // Should NOT be marked as dead code because it's bound as an event handler
@@ -385,6 +390,7 @@ class ConversationPanel:
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
     );
 
     // It should NOT be classified as DeadCode

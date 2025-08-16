@@ -758,14 +758,15 @@ fn calculate_unified_debt_score(
     // Get project path from results
     let project_path = &results.project_path;
 
-    // Process Rust files to get framework exclusions
-    let framework_exclusions = process_rust_files_for_call_graph(
-        project_path,
-        &mut call_graph,
-        false, // verbose_macro_warnings = false for validation
-        false, // show_macro_stats = false
-    )
-    .unwrap_or_default();
+    // Process Rust files to get framework exclusions and function pointer usage
+    let (framework_exclusions, function_pointer_used_functions) =
+        process_rust_files_for_call_graph(
+            project_path,
+            &mut call_graph,
+            false, // verbose_macro_warnings = false for validation
+            false, // show_macro_stats = false
+        )
+        .unwrap_or_default();
 
     // Process Python files as well
     if let Err(e) = process_python_files_for_call_graph(project_path, &mut call_graph) {
@@ -779,6 +780,7 @@ fn calculate_unified_debt_score(
         &call_graph,
         lcov_data,
         &framework_exclusions,
+        Some(&function_pointer_used_functions),
         Some(&results.technical_debt.items),
     );
 
@@ -1129,7 +1131,10 @@ fn process_rust_files_for_call_graph(
     call_graph: &mut priority::CallGraph,
     _verbose_macro_warnings: bool,
     _show_macro_stats: bool,
-) -> Result<std::collections::HashSet<priority::call_graph::FunctionId>> {
+) -> Result<(
+    std::collections::HashSet<priority::call_graph::FunctionId>,
+    std::collections::HashSet<priority::call_graph::FunctionId>,
+)> {
     let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
         .context("Failed to find Rust files for call graph")?;
 
@@ -1179,13 +1184,20 @@ fn process_rust_files_for_call_graph(
     // Convert from im::HashSet to std::collections::HashSet
     let framework_exclusions_std: std::collections::HashSet<priority::call_graph::FunctionId> =
         framework_exclusions.into_iter().collect();
+
+    // Extract function pointer usage information to prevent false positives
+    let function_pointer_used_functions = enhanced_graph
+        .function_pointer_tracker
+        .get_definitely_used_functions();
+    let function_pointer_used_std: std::collections::HashSet<priority::call_graph::FunctionId> =
+        function_pointer_used_functions.into_iter().collect();
     // Merge the enhanced graph's calls into our existing call graph instead of replacing it
     call_graph.merge(enhanced_graph.base_graph);
 
     // Resolve cross-file function calls after all files have been processed
     call_graph.resolve_cross_file_calls();
 
-    Ok(framework_exclusions_std)
+    Ok((framework_exclusions_std, function_pointer_used_std))
 }
 
 /// Extract call graph from a file without expansion
@@ -1416,6 +1428,9 @@ fn create_debt_item_from_metric(
     call_graph: &priority::CallGraph,
     coverage_data: Option<&risk::lcov::LcovData>,
     framework_exclusions: &std::collections::HashSet<priority::call_graph::FunctionId>,
+    function_pointer_used_functions: Option<
+        &std::collections::HashSet<priority::call_graph::FunctionId>,
+    >,
 ) -> priority::UnifiedDebtItem {
     use priority::unified_scorer;
 
@@ -1426,6 +1441,7 @@ fn create_debt_item_from_metric(
         coverage_data,
         roi_score,
         framework_exclusions,
+        function_pointer_used_functions,
     )
 }
 
@@ -1506,6 +1522,9 @@ fn create_unified_analysis_with_exclusions(
     call_graph: &priority::CallGraph,
     coverage_data: Option<&risk::lcov::LcovData>,
     framework_exclusions: &std::collections::HashSet<priority::call_graph::FunctionId>,
+    function_pointer_used_functions: Option<
+        &std::collections::HashSet<priority::call_graph::FunctionId>,
+    >,
     debt_items: Option<&[core::DebtItem]>,
 ) -> priority::UnifiedAnalysis {
     use priority::UnifiedAnalysis;
@@ -1517,8 +1536,13 @@ fn create_unified_analysis_with_exclusions(
             continue;
         }
 
-        let item =
-            create_debt_item_from_metric(metric, call_graph, coverage_data, framework_exclusions);
+        let item = create_debt_item_from_metric(
+            metric,
+            call_graph,
+            coverage_data,
+            framework_exclusions,
+            function_pointer_used_functions,
+        );
         unified.add_item(item);
     }
 
@@ -1617,12 +1641,13 @@ fn perform_unified_analysis(
     let mut call_graph = build_initial_call_graph(&results.complexity.metrics);
 
     // Process Rust files to extract call relationships and get framework exclusions
-    let framework_exclusions = process_rust_files_for_call_graph(
-        project_path,
-        &mut call_graph,
-        verbose_macro_warnings,
-        show_macro_stats,
-    )?;
+    let (framework_exclusions, function_pointer_used_functions) =
+        process_rust_files_for_call_graph(
+            project_path,
+            &mut call_graph,
+            verbose_macro_warnings,
+            show_macro_stats,
+        )?;
 
     // Process Python files to extract method call relationships
     process_python_files_for_call_graph(project_path, &mut call_graph)?;
@@ -1641,6 +1666,7 @@ fn perform_unified_analysis(
         &call_graph,
         coverage_data.as_ref(),
         &framework_exclusions,
+        Some(&function_pointer_used_functions),
         Some(&results.technical_debt.items),
     ))
 }
