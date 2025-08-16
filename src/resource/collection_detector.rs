@@ -383,12 +383,6 @@ struct GrowthAnalysis {
     remove_sites: Vec<SourceLocation>,
 }
 
-impl Default for GrowthPattern {
-    fn default() -> Self {
-        GrowthPattern::NoEviction
-    }
-}
-
 const COLLECTION_TYPES: &[&str] = &[
     "Vec",
     "HashMap",
