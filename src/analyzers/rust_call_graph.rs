@@ -733,6 +733,42 @@ impl CallGraphExtractor {
     }
 }
 
+impl CallGraphExtractor {
+    fn handle_call_expr(&mut self, func: &Box<Expr>, args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>) {
+        if let Expr::Path(expr_path) = &**func {
+            if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
+                let resolved_name = Self::resolve_self_type(&name, &self.current_impl_type);
+                let same_file_hint =
+                    Self::is_same_file_call(&resolved_name, &self.current_impl_type);
+                self.process_call(resolved_name, same_file_hint);
+            }
+        }
+        // Process arguments for references and nested calls
+        self.process_arguments(args);
+    }
+
+    fn handle_method_call_expr(&mut self, method: &syn::Ident, args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>, receiver: &Box<Expr>) {
+        let name = self.construct_method_name(method, receiver, &self.current_impl_type);
+        let same_file_hint = Self::is_self_receiver(receiver);
+        self.process_call(name, same_file_hint);
+
+        // Process arguments and visit receiver
+        self.process_arguments(args);
+        self.visit_expr(receiver);
+    }
+
+    fn handle_struct_expr(&mut self, expr_struct: &syn::ExprStruct) {
+        // Visit each field's value expression to detect function calls
+        for field in &expr_struct.fields {
+            self.visit_expr(&field.expr);
+        }
+        // If there's a base struct (e.g., Foo { field: value, ..base })
+        if let Some(ref base) = expr_struct.rest {
+            self.visit_expr(base);
+        }
+    }
+}
+
 impl<'ast> Visit<'ast> for CallGraphExtractor {
     fn visit_local(&mut self, local: &'ast Local) {
         // Track type when visiting variable declarations
@@ -853,16 +889,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
         match expr {
             // Handle regular function calls: foo(), module::foo(), Self::method()
             Expr::Call(ExprCall { func, args, .. }) => {
-                if let Expr::Path(expr_path) = &**func {
-                    if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
-                        let resolved_name = Self::resolve_self_type(&name, &self.current_impl_type);
-                        let same_file_hint =
-                            Self::is_same_file_call(&resolved_name, &self.current_impl_type);
-                        self.process_call(resolved_name, same_file_hint);
-                    }
-                }
-                // Process arguments for references and nested calls
-                self.process_arguments(args);
+                self.handle_call_expr(func, args);
                 return; // Early return to avoid visiting children
             }
             // Handle method calls: obj.method()
@@ -872,13 +899,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 receiver,
                 ..
             }) => {
-                let name = self.construct_method_name(method, receiver, &self.current_impl_type);
-                let same_file_hint = Self::is_self_receiver(receiver);
-                self.process_call(name, same_file_hint);
-
-                // Process arguments and visit receiver
-                self.process_arguments(args);
-                self.visit_expr(receiver);
+                self.handle_method_call_expr(method, args, receiver);
                 return; // Early return to avoid visiting children
             }
             // Handle closures that might contain calls
@@ -901,14 +922,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
             }
             // Handle struct literals to find function calls in field values
             Expr::Struct(expr_struct) => {
-                // Visit each field's value expression to detect function calls
-                for field in &expr_struct.fields {
-                    self.visit_expr(&field.expr);
-                }
-                // If there's a base struct (e.g., Foo { field: value, ..base })
-                if let Some(ref base) = expr_struct.rest {
-                    self.visit_expr(base);
-                }
+                self.handle_struct_expr(expr_struct);
                 return;
             }
             // Handle macros like vec![] that might contain function calls
