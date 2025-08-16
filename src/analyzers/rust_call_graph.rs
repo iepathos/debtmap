@@ -903,17 +903,29 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 &method_call.args,
                 &method_call.receiver,
             ),
-            Expr::Closure(closure) => self.visit_expr(&closure.body),
-            Expr::Async(async_block) => {
-                for stmt in &async_block.block.stmts {
-                    self.visit_stmt(stmt);
-                }
-            }
-            Expr::Await(await_expr) => self.visit_expr(&await_expr.base),
+            Expr::Closure(closure) => self.process_closure_expr(closure),
+            Expr::Async(async_block) => self.process_async_expr(async_block),
+            Expr::Await(await_expr) => self.process_await_expr(await_expr),
             Expr::Struct(struct_expr) => self.handle_struct_expr(struct_expr),
             Expr::Macro(macro_expr) => self.handle_macro_expression(macro_expr),
             _ => syn::visit::visit_expr(self, expr),
         }
+    }
+}
+
+impl CallGraphExtractor {
+    fn process_closure_expr(&mut self, closure: &syn::ExprClosure) {
+        self.visit_expr(&closure.body);
+    }
+
+    fn process_async_expr(&mut self, async_block: &syn::ExprAsync) {
+        for stmt in &async_block.block.stmts {
+            self.visit_stmt(stmt);
+        }
+    }
+
+    fn process_await_expr(&mut self, await_expr: &syn::ExprAwait) {
+        self.visit_expr(&await_expr.base);
     }
 }
 
