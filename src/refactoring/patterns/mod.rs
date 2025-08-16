@@ -144,7 +144,9 @@ impl MutableStateMatcher {
     /// Pure function to detect mutation patterns in function names
     fn has_mutation_patterns(name: &str) -> bool {
         const MUTATION_PATTERNS: &[&str] = &["update", "modify", "set_", "mut"];
-        MUTATION_PATTERNS.iter().any(|pattern| name.contains(pattern))
+        MUTATION_PATTERNS
+            .iter()
+            .any(|pattern| name.contains(pattern))
     }
 
     /// Pure function to create a mutable state pattern detection
@@ -777,7 +779,7 @@ mod tests {
         assert_eq!(pattern.confidence, 0.6);
         assert_eq!(pattern.evidence.line_numbers, vec![250]);
         assert!(pattern.evidence.confidence_factors[0].contains("mutation"));
-        
+
         if let PatternAssessment::ImprovementOpportunity {
             current_issues,
             potential_benefits,
