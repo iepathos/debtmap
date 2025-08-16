@@ -185,6 +185,7 @@ fn convert_testing_pattern_to_debt_item(
         priority,
         file: path.clone(),
         line,
+        column: None,
         message,
         context,
     }

@@ -233,6 +233,7 @@ pub fn convert_resource_issue_to_debt_item(
         priority,
         file: path.to_path_buf(),
         line,
+        column: None,
         message,
         context,
     }

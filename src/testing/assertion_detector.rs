@@ -107,6 +107,27 @@ impl TestAnalyzer {
 }
 
 impl<'ast> Visit<'ast> for TestAnalyzer {
+    fn visit_macro(&mut self, node: &'ast syn::Macro) {
+        let macro_name = node
+            .path
+            .segments
+            .last()
+            .map(|seg| seg.ident.to_string())
+            .unwrap_or_default();
+
+
+        if is_assertion_macro(&macro_name) {
+            self.analysis.has_assertions = true;
+            self.analysis.assertion_count += 1;
+        }
+
+        if macro_name == "panic" {
+            self.analysis.has_panic = true;
+        }
+
+        syn::visit::visit_macro(self, node);
+    }
+    
     fn visit_expr_macro(&mut self, node: &'ast ExprMacro) {
         let macro_name = node
             .mac
@@ -115,6 +136,7 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
             .last()
             .map(|seg| seg.ident.to_string())
             .unwrap_or_default();
+
 
         if is_assertion_macro(&macro_name) {
             self.analysis.has_assertions = true;
@@ -185,11 +207,13 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
     }
 
     fn visit_stmt(&mut self, node: &'ast Stmt) {
-        if let Stmt::Local(_) = node {
-            // Variable assignment typically indicates setup
-            if !self.analysis.has_setup {
-                self.analysis.has_setup = true;
+        match node {
+            Stmt::Local(_) => {
+                if !self.analysis.has_setup {
+                    self.analysis.has_setup = true;
+                }
             }
+            _ => {}
         }
 
         syn::visit::visit_stmt(self, node);
@@ -198,7 +222,10 @@ impl<'ast> Visit<'ast> for TestAnalyzer {
 
 fn analyze_test_structure(function: &ItemFn) -> TestStructureAnalysis {
     let mut analyzer = TestAnalyzer::new();
-    analyzer.visit_item_fn(function);
+    
+    // Use the visitor trait to properly visit the entire function
+    syn::visit::visit_item_fn(&mut analyzer, function);
+    
     analyzer.analysis
 }
 

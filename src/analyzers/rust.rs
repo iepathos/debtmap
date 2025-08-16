@@ -758,6 +758,7 @@ fn convert_organization_pattern_to_debt_item(
         priority,
         file: path.to_path_buf(),
         line: 0, // Would need to extract from AST
+        column: None,
         message,
         context,
     }
