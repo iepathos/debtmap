@@ -1,77 +1,90 @@
 ---
 number: 13
-title: Add Comprehensive Risk Categories
+title: Complete Risk Categories Implementation
 category: foundation
 priority: high
-status: draft
+status: in-progress
 dependencies: [07, 10]
 created: 2025-01-10
+updated: 2025-01-16
 ---
 
-# Specification 13: Add Comprehensive Risk Categories
+# Specification 13: Complete Risk Categories Implementation
 
 **Category**: foundation
 **Priority**: high
-**Status**: draft
+**Status**: in-progress (60% complete)
 **Dependencies**: [07 - Recalibrate Risk Formula, 10 - Add Context-Aware Risk]
 
 ## Context
 
-The current risk analysis provides a single aggregate risk score that conflates multiple distinct risk types, making it difficult to understand the nature of risks and take appropriate mitigation actions. Different types of risk require different remediation strategies:
+Debtmap has a strong foundation for risk categorization with an evidence-based system already in place. The current implementation includes:
 
-- **Coverage Risk**: Requires writing tests
-- **Integration Risk**: Needs integration testing
-- **Architectural Risk**: Demands refactoring
-- **Maintenance Risk**: Benefits from documentation and simplification
+### Already Implemented
+- **Evidence-based risk system** (`src/risk/evidence/`) with modular analyzers
+- **Risk types**: Complexity, Coverage, Coupling, ChangeFrequency, Architecture
+- **Statistical thresholds** with role-based and module-type baselines
+- **Remediation actions** mapped to specific risk factors
+- **Context-aware calculations** using function roles and visibility
 
-Without categorized risk assessment, teams cannot prioritize the right type of improvement work or understand the risk profile of their codebase.
+### Current Limitations
+- Risk categories exist but lack unified profile aggregation
+- No configurable category weights
+- Missing Security and Performance risk categories
+- No historical tracking of risk trends
+- Limited visualization beyond terminal output
+- Integration risk analysis limited to coupling metrics
 
 ## Objective
 
-Implement a comprehensive risk categorization system that identifies, measures, and reports distinct risk types, enabling teams to understand their risk profile and choose appropriate mitigation strategies for each category of risk.
+Complete the risk categorization system by building on the existing evidence-based foundation to provide comprehensive risk profiles with configurable weights, new risk categories, and enhanced visualization.
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Coverage Risk Assessment**
-   - Direct test coverage gaps
-   - Branch coverage analysis
-   - Path coverage estimation
-   - Mutation testing readiness
-   - Test quality indicators
+#### Enhance Existing Categories
 
-2. **Integration Risk Analysis**
-   - Untested interaction paths
-   - API boundary coverage
-   - Cross-module dependencies
-   - External service interfaces
-   - Event-driven interactions
+1. **Coverage Risk Assessment** ✅ (Mostly Complete)
+   - ✅ Direct test coverage gaps (`CoverageRiskAnalyzer`)
+   - ✅ Test quality indicators (`TestQuality` enum)
+   - ⚠️ Branch coverage analysis (partial)
+   - ❌ Path coverage estimation
+   - ❌ Mutation testing readiness
 
-3. **Architectural Risk Evaluation**
-   - High coupling metrics
-   - Circular dependencies
-   - Layering violations
-   - Single points of failure
-   - Monolithic components
+2. **Architectural Risk Evaluation** ✅ (Complete)
+   - ✅ High coupling metrics (`CouplingRiskAnalyzer`)
+   - ✅ Circular dependencies (in `CouplingEvidence`)
+   - ✅ Layering violations (in `ArchitectureEvidence`)
+   - ✅ God class indicators
+   - ⚠️ Single points of failure (partial)
 
-4. **Maintenance Risk Measurement**
-   - Code complexity metrics
-   - Documentation coverage
-   - Code duplication levels
-   - Technical debt accumulation
-   - Knowledge concentration
+3. **Maintenance Risk Measurement** ⚠️ (Partial)
+   - ✅ Code complexity metrics (`ComplexityRiskAnalyzer`)
+   - ✅ Change frequency (`ChangeRiskAnalyzer`)
+   - ❌ Documentation coverage
+   - ❌ Code duplication levels
+   - ❌ Knowledge concentration
 
-5. **Security Risk Indicators**
+#### Add New Categories
+
+4. **Integration Risk Analysis** ⚠️ (Limited)
+   - ✅ Cross-module dependencies (via coupling)
+   - ❌ Untested interaction paths
+   - ❌ API boundary coverage
+   - ❌ External service interfaces
+   - ❌ Event-driven interactions
+
+5. **Security Risk Indicators** ❌ (Not Implemented)
    - Untested security paths
    - Input validation gaps
    - Authentication/authorization coverage
    - Sensitive data handling
    - Known vulnerability patterns
 
-6. **Performance Risk Detection**
+6. **Performance Risk Detection** ❌ (Not Implemented)
    - Untested performance paths
-   - Algorithm complexity
+   - Algorithm complexity (O(n²) detection)
    - Resource usage patterns
    - Scalability bottlenecks
    - Cache effectiveness
@@ -80,200 +93,204 @@ Implement a comprehensive risk categorization system that identifies, measures, 
 
 1. **Granularity**: Support file, module, and system-level categories
 2. **Composability**: Allow risk categories to be combined
-3. **Extensibility**: Easy to add new risk categories
+3. **Extensibility**: Easy to add new risk categories  
 4. **Visualization**: Support risk profile visualization
 5. **Actionability**: Each category maps to clear actions
+6. **Configuration**: User-configurable weights and thresholds
 
 ## Acceptance Criteria
 
-- [ ] All six risk categories properly calculated
-- [ ] Risk profiles show category breakdown
-- [ ] Each category has clear thresholds
-- [ ] Categories map to specific actions
-- [ ] Visualization clearly shows risk distribution
-- [ ] Aggregation works at multiple levels
-- [ ] Categories can be weighted differently
-- [ ] Historical tracking of category changes
-- [ ] Export supports category breakdown
-- [ ] Documentation explains each category
-- [ ] Unit tests cover all categories
+### Already Met ✅
+- [x] Coverage, Complexity, Coupling, Change risk categories calculated
+- [x] Each category has clear thresholds (statistical baselines)
+- [x] Categories map to specific remediation actions
+- [x] Role-based and module-type aware calculations
+
+### To Be Implemented
+- [ ] Add Security and Performance risk categories
+- [ ] Create unified RiskProfile aggregation structure
+- [ ] Implement configurable category weights
+- [ ] Add historical tracking of category changes
+- [ ] Enhanced visualization (beyond terminal)
+- [ ] Integration risk path analysis
+- [ ] Export supports full category breakdown
+- [ ] Documentation for new categories
+- [ ] Unit tests for new categories
 - [ ] Integration tests validate accuracy
 
 ## Technical Details
 
-### Implementation Approach
+### Current Architecture
 
-1. **Risk Category Framework**
+The existing evidence-based system provides a solid foundation:
+
 ```rust
-pub trait RiskCategory {
-    fn name(&self) -> &str;
-    fn calculate(&self, target: &AnalysisTarget) -> CategoryRisk;
-    fn aggregate(&self, risks: Vec<CategoryRisk>) -> CategoryRisk;
-    fn threshold(&self) -> RiskThreshold;
-    fn actions(&self) -> Vec<MitigationAction>;
+// Current structure in src/risk/evidence/mod.rs
+pub enum RiskType {
+    Complexity { ... },
+    Coverage { ... },
+    Coupling { ... },
+    ChangeFrequency { ... },
+    Architecture { ... },
 }
 
-pub struct RiskCategorySystem {
-    categories: Vec<Box<dyn RiskCategory>>,
-    weights: HashMap<String, f64>,
-}
-
-impl RiskCategorySystem {
-    pub fn analyze(&self, codebase: &Codebase) -> RiskProfile {
-        let mut profile = RiskProfile::new();
-        
-        for category in &self.categories {
-            let risk = category.calculate(&codebase);
-            profile.add_category(category.name(), risk);
-        }
-        
-        profile.calculate_aggregate(&self.weights);
-        profile
-    }
+// Current calculator in src/risk/evidence_calculator.rs
+pub struct EvidenceBasedRiskCalculator {
+    complexity_analyzer: ComplexityRiskAnalyzer,
+    coverage_analyzer: CoverageRiskAnalyzer,
+    coupling_analyzer: CouplingRiskAnalyzer,
+    change_analyzer: ChangeRiskAnalyzer,
 }
 ```
 
-2. **Coverage Risk Implementation**
+### Proposed Enhancements
+
+1. **Unified Risk Profile Structure**
 ```rust
-pub struct CoverageRiskCategory {
-    thresholds: CoverageThresholds,
-}
-
-impl RiskCategory for CoverageRiskCategory {
-    fn calculate(&self, target: &AnalysisTarget) -> CategoryRisk {
-        let coverage_gaps = self.identify_gaps(target);
-        let branch_coverage = self.calculate_branch_coverage(target);
-        let test_quality = self.assess_test_quality(target);
-        
-        CategoryRisk {
-            score: self.calculate_score(coverage_gaps, branch_coverage, test_quality),
-            severity: self.determine_severity(coverage_gaps),
-            components: vec![
-                RiskComponent::CoverageGap(coverage_gaps),
-                RiskComponent::BranchCoverage(branch_coverage),
-                RiskComponent::TestQuality(test_quality),
-            ],
-            hotspots: self.identify_hotspots(target),
-            trend: self.calculate_trend(target),
-        }
-    }
-    
-    fn actions(&self) -> Vec<MitigationAction> {
-        vec![
-            MitigationAction::WriteUnitTests,
-            MitigationAction::AddIntegrationTests,
-            MitigationAction::ImproveTestQuality,
-            MitigationAction::EnableMutationTesting,
-        ]
-    }
-}
-```
-
-3. **Integration Risk Calculator**
-```rust
-pub struct IntegrationRiskCategory {
-    interaction_analyzer: InteractionAnalyzer,
-}
-
-impl IntegrationRiskCategory {
-    fn calculate(&self, target: &AnalysisTarget) -> CategoryRisk {
-        let untested_paths = self.find_untested_interaction_paths(target);
-        let api_coverage = self.calculate_api_boundary_coverage(target);
-        let external_deps = self.analyze_external_dependencies(target);
-        
-        CategoryRisk {
-            score: self.calculate_integration_score(
-                untested_paths,
-                api_coverage,
-                external_deps,
-            ),
-            components: vec![
-                RiskComponent::UntestedPaths(untested_paths),
-                RiskComponent::ApiCoverage(api_coverage),
-                RiskComponent::ExternalDeps(external_deps),
-            ],
-            hotspots: self.identify_integration_hotspots(target),
-            recommendations: self.generate_integration_test_plan(target),
-        }
-    }
-}
-```
-
-4. **Architectural Risk Analyzer**
-```rust
-pub struct ArchitecturalRiskCategory {
-    coupling_analyzer: CouplingAnalyzer,
-    dependency_analyzer: DependencyAnalyzer,
-}
-
-impl ArchitecturalRiskCategory {
-    fn calculate(&self, target: &AnalysisTarget) -> CategoryRisk {
-        let coupling_metrics = self.coupling_analyzer.analyze(target);
-        let circular_deps = self.dependency_analyzer.find_cycles(target);
-        let layering_violations = self.detect_layering_violations(target);
-        let spof = self.identify_single_points_of_failure(target);
-        
-        CategoryRisk {
-            score: self.calculate_architectural_score(
-                coupling_metrics,
-                circular_deps,
-                layering_violations,
-                spof,
-            ),
-            severity: self.determine_architectural_severity(target),
-            components: vec![
-                RiskComponent::HighCoupling(coupling_metrics),
-                RiskComponent::CircularDeps(circular_deps),
-                RiskComponent::LayeringViolations(layering_violations),
-                RiskComponent::SinglePointsOfFailure(spof),
-            ],
-            refactoring_suggestions: self.generate_refactoring_plan(target),
-        }
-    }
-}
-```
-
-5. **Risk Profile Aggregation**
-```rust
+// New: src/risk/profile.rs
 pub struct RiskProfile {
-    categories: HashMap<String, CategoryRisk>,
+    categories: HashMap<String, RiskFactor>,
     aggregate_score: f64,
-    risk_distribution: RiskDistribution,
-    trend: RiskTrend,
+    weights: HashMap<String, f64>,
+    distribution: RiskDistribution,
+    trend: Option<RiskTrend>,
 }
 
 impl RiskProfile {
-    pub fn calculate_aggregate(&mut self, weights: &HashMap<String, f64>) {
+    pub fn from_evidence(assessment: RiskAssessment, weights: &HashMap<String, f64>) -> Self {
+        // Convert existing RiskAssessment to RiskProfile
+        // Aggregate with configurable weights
+    }
+    
+    pub fn calculate_aggregate(&mut self) {
         let mut weighted_sum = 0.0;
         let mut total_weight = 0.0;
         
-        for (category, risk) in &self.categories {
-            let weight = weights.get(category).unwrap_or(&1.0);
-            weighted_sum += risk.score * weight;
+        for (category, factor) in &self.categories {
+            let weight = self.weights.get(category).unwrap_or(&1.0);
+            weighted_sum += factor.score * weight;
             total_weight += weight;
         }
         
         self.aggregate_score = weighted_sum / total_weight;
-        self.risk_distribution = self.calculate_distribution();
     }
-    
-    pub fn get_top_risks(&self, n: usize) -> Vec<PrioritizedRisk> {
-        let mut risks: Vec<_> = self.categories.iter()
-            .flat_map(|(cat, risk)| {
-                risk.hotspots.iter().map(move |h| {
-                    PrioritizedRisk {
-                        category: cat.clone(),
-                        hotspot: h.clone(),
-                        score: h.risk_score,
-                        actions: self.get_actions_for_category(cat),
-                    }
-                })
-            })
-            .collect();
+}
+
+```
+
+2. **New Security Risk Analyzer**
+```rust
+// New: src/risk/evidence/security_analyzer.rs
+pub struct SecurityRiskAnalyzer {
+    threshold_provider: StatisticalThresholdProvider,
+}
+
+impl SecurityRiskAnalyzer {
+    pub fn analyze(
+        &self,
+        function: &FunctionAnalysis,
+        context: &RiskContext,
+        call_graph: &CallGraph,
+    ) -> RiskFactor {
+        let input_validation = self.check_input_validation(function);
+        let auth_coverage = self.check_auth_coverage(function, call_graph);
+        let sensitive_data = self.detect_sensitive_data_handling(function);
         
-        risks.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-        risks.truncate(n);
-        risks
+        RiskFactor {
+            risk_type: RiskType::Security {
+                input_validation_gaps: input_validation,
+                auth_coverage,
+                sensitive_data_exposed: sensitive_data,
+                vulnerability_patterns: self.detect_patterns(function),
+            },
+            score: self.calculate_security_score(...),
+            severity: self.determine_severity(...),
+            evidence: RiskEvidence::Security(...),
+            remediation_actions: vec![
+                RemediationAction::AddInputValidation,
+                RemediationAction::AddSecurityTests,
+            ],
+            weight: 1.2, // Higher weight for security
+            confidence: 0.8,
+        }
+    }
+}
+```
+
+3. **New Performance Risk Analyzer**
+```rust  
+// New: src/risk/evidence/performance_analyzer.rs
+pub struct PerformanceRiskAnalyzer {
+    complexity_detector: AlgorithmicComplexityDetector,
+}
+
+impl PerformanceRiskAnalyzer {
+    pub fn analyze(
+        &self,
+        function: &FunctionAnalysis,
+        context: &RiskContext,
+    ) -> RiskFactor {
+        let algo_complexity = self.complexity_detector.analyze(function);
+        let resource_usage = self.analyze_resource_patterns(function);
+        
+        RiskFactor {
+            risk_type: RiskType::Performance {
+                algorithmic_complexity: algo_complexity,
+                resource_patterns: resource_usage,
+                scalability_score: self.calculate_scalability(...),
+            },
+            score: self.calculate_performance_score(...),
+            severity: self.determine_severity(...),
+            evidence: RiskEvidence::Performance(...),
+            remediation_actions: vec![
+                RemediationAction::OptimizeAlgorithm,
+                RemediationAction::AddPerformanceTests,
+            ],
+            weight: 1.0,
+            confidence: 0.7,
+        }
+    }
+}
+```
+
+4. **Enhanced Integration Risk**
+```rust
+// Enhance: src/risk/evidence/integration_analyzer.rs
+pub struct IntegrationRiskAnalyzer {
+    call_graph: CallGraph,
+    coverage_data: Option<LcovData>,
+}
+
+impl IntegrationRiskAnalyzer {
+    pub fn analyze(
+        &self,
+        function: &FunctionAnalysis,
+        context: &RiskContext,
+    ) -> RiskFactor {
+        // Analyze interaction paths using call graph
+        let untested_paths = self.find_untested_interaction_paths(function);
+        let api_boundaries = self.identify_api_boundaries(function);
+        let external_deps = self.analyze_external_dependencies(function);
+        
+        RiskFactor {
+            risk_type: RiskType::Integration {
+                untested_interaction_paths: untested_paths.len(),
+                api_boundary_coverage: self.calculate_api_coverage(&api_boundaries),
+                external_dependencies: external_deps,
+                event_handlers: self.find_event_handlers(function),
+            },
+            score: self.calculate_integration_score(...),
+            severity: self.determine_severity(...),
+            evidence: RiskEvidence::Integration(...),
+            remediation_actions: vec![
+                RemediationAction::AddIntegrationTests {
+                    paths: untested_paths,
+                    estimated_effort_hours: untested_paths.len() as u32 * 2,
+                },
+            ],
+            weight: 1.1,
+            confidence: 0.85,
+        }
     }
 }
 ```
@@ -281,67 +298,65 @@ impl RiskProfile {
 ### Architecture Changes
 
 1. **Risk Module Restructuring**
-   - Create `src/risk/categories/` module
-   - Implement category trait system
-   - Add profile aggregation
-   - Create visualization support
+   - ✅ Already has `src/risk/evidence/` with modular analyzers
+   - ⚠️ Add `src/risk/profile.rs` for aggregation
+   - ❌ Add `src/risk/evidence/security_analyzer.rs`
+   - ❌ Add `src/risk/evidence/performance_analyzer.rs`
+   - ❌ Add `src/risk/evidence/integration_analyzer.rs`
+   - ❌ Add `src/risk/history/` for tracking
 
-2. **Data Flow Enhancement**
-   - Parallel category calculation
-   - Incremental risk updates
-   - Category-specific caching
-   - Historical tracking
+2. **Integration with Existing System**
+   - Extend `EvidenceBasedRiskCalculator` with new analyzers
+   - Create adapter from `RiskAssessment` to `RiskProfile`
+   - Maintain backward compatibility with existing `RiskInsight`
+   - Add configuration layer for weights
 
-### Data Structures
+### Enhanced Data Structures
 
 ```rust
-pub struct CategoryRisk {
-    pub score: f64,
-    pub severity: Severity,
-    pub components: Vec<RiskComponent>,
-    pub hotspots: Vec<RiskHotspot>,
-    pub trend: RiskTrend,
-    pub confidence: f64,
+// Extend existing RiskType enum in src/risk/evidence/mod.rs
+pub enum RiskType {
+    // Existing types...
+    Complexity { ... },
+    Coverage { ... },
+    Coupling { ... },
+    ChangeFrequency { ... },
+    Architecture { ... },
+    
+    // New types to add:
+    Security {
+        input_validation_gaps: u32,
+        auth_coverage: f64,
+        sensitive_data_exposed: bool,
+        vulnerability_patterns: Vec<String>,
+    },
+    Performance {
+        algorithmic_complexity: AlgorithmicComplexity,
+        resource_patterns: Vec<ResourcePattern>,
+        scalability_score: f64,
+    },
+    Integration {
+        untested_interaction_paths: usize,
+        api_boundary_coverage: f64,
+        external_dependencies: Vec<String>,
+        event_handlers: Vec<String>,
+    },
 }
 
-pub enum RiskComponent {
-    CoverageGap(CoverageGap),
-    BranchCoverage(f64),
-    TestQuality(QualityScore),
-    UntestedPaths(Vec<InteractionPath>),
-    ApiCoverage(f64),
-    ExternalDeps(Vec<Dependency>),
-    HighCoupling(CouplingMetrics),
-    CircularDeps(Vec<Cycle>),
-    ComplexCode(ComplexityMetrics),
-    Duplication(DuplicationMetrics),
-}
-
-pub struct RiskHotspot {
-    pub location: Location,
-    pub risk_score: f64,
-    pub category: String,
-    pub description: String,
-    pub suggested_action: MitigationAction,
-}
-
-pub enum MitigationAction {
-    WriteUnitTests,
-    AddIntegrationTests,
-    RefactorComplexity,
-    BreakCircularDeps,
-    ReduceCoupling,
-    AddDocumentation,
-    ExtractDuplication,
-    ImproveTestQuality,
-    AddSecurityTests,
-    OptimizePerformance,
+// New structures for risk profiles
+pub struct RiskProfile {
+    pub categories: HashMap<String, RiskFactor>,
+    pub aggregate_score: f64,
+    pub weights: HashMap<String, f64>,
+    pub distribution: RiskDistribution,
+    pub trend: Option<RiskTrend>,
+    pub timestamp: DateTime<Utc>,
 }
 
 pub struct RiskDistribution {
     pub by_category: HashMap<String, f64>,
-    pub by_severity: HashMap<Severity, usize>,
-    pub by_module: HashMap<String, RiskProfile>,
+    pub by_severity: HashMap<RiskSeverity, usize>,
+    pub by_module: HashMap<PathBuf, ModuleRisk>,
 }
 
 pub struct RiskTrend {
@@ -349,16 +364,18 @@ pub struct RiskTrend {
     pub rate: f64,
     pub history: Vec<HistoricalRisk>,
 }
+
+pub struct HistoricalRisk {
+    pub timestamp: DateTime<Utc>,
+    pub profile: RiskProfile,
+    pub commit_sha: Option<String>,
+}
 ```
 
 ### APIs and Interfaces
 
 ```rust
-pub trait RiskCategoryProvider {
-    fn categories(&self) -> Vec<Box<dyn RiskCategory>>;
-    fn weights(&self) -> HashMap<String, f64>;
-}
-
+// Configuration for risk categories
 pub struct RiskCategoryConfig {
     pub enabled_categories: Vec<String>,
     pub custom_weights: HashMap<String, f64>,
@@ -367,95 +384,123 @@ pub struct RiskCategoryConfig {
 }
 
 pub enum AggregationMethod {
-    WeightedAverage,
-    Maximum,
-    Multiplicative,
+    WeightedAverage,    // Default
+    Maximum,           // Most conservative
+    Multiplicative,    // Compound risk
     Custom(Box<dyn Fn(&[f64]) -> f64>),
+}
+
+// Extend EvidenceBasedRiskCalculator
+impl EvidenceBasedRiskCalculator {
+    pub fn with_security_analyzer(mut self, analyzer: SecurityRiskAnalyzer) -> Self {
+        self.security_analyzer = Some(analyzer);
+        self
+    }
+    
+    pub fn with_performance_analyzer(mut self, analyzer: PerformanceRiskAnalyzer) -> Self {
+        self.performance_analyzer = Some(analyzer);
+        self
+    }
+    
+    pub fn calculate_risk_profile(
+        &self,
+        function: &FunctionAnalysis,
+        call_graph: &CallGraph,
+        coverage_data: Option<&LcovData>,
+        config: &RiskCategoryConfig,
+    ) -> RiskProfile {
+        let assessment = self.calculate_risk(function, call_graph, coverage_data);
+        RiskProfile::from_evidence(assessment, &config.custom_weights)
+    }
 }
 ```
 
 ## Dependencies
 
-- **Prerequisites**:
-  - Spec 07 (Recalibrate Risk Formula) for base calculations
-  - Spec 10 (Context-Aware Risk) for context integration
+- **Prerequisites**: ✅ Already implemented
+  - Spec 07 (Recalibrate Risk Formula) - Using statistical thresholds
+  - Spec 10 (Context-Aware Risk) - Role and module-type awareness
+  
 - **Affected Components**:
-  - `src/risk/categories/` - New module
-  - `src/risk/mod.rs` - Integration point
-  - `src/io/writers/*` - Update for category output
-  - `src/risk/insights.rs` - Category-specific insights
+  - `src/risk/evidence/` - Add new analyzers
+  - `src/risk/profile.rs` - New aggregation module
+  - `src/risk/evidence_calculator.rs` - Extend with new analyzers
+  - `src/io/writers/*` - Update for profile output
+  - `src/risk/insights.rs` - Profile-based insights
+  
 - **External Dependencies**: None required
 
 ## Testing Strategy
 
 - **Unit Tests**:
-  - Test each category calculator
-  - Validate aggregation methods
-  - Test threshold detection
-  - Verify action mapping
+  - ✅ Existing analyzers already tested
+  - Test new Security and Performance analyzers
+  - Test RiskProfile aggregation
+  - Validate weight configuration
+  - Test historical tracking
 
 - **Integration Tests**:
-  - Test with diverse codebases
-  - Validate category accuracy
-  - Test visualization output
-  - Verify historical tracking
-
-- **Validation Tests**:
-  - Expert review of categorization
-  - Comparison with security tools
-  - Performance profiling
-  - User acceptance testing
+  - Test full risk profile generation
+  - Validate with diverse codebases
+  - Test backward compatibility
+  - Verify configuration loading
 
 ## Documentation Requirements
 
 - **Code Documentation**:
-  - Document each risk category
-  - Explain scoring algorithms
-  - Describe aggregation methods
-  - Provide threshold rationale
+  - Document new risk categories (Security, Performance)
+  - Explain profile aggregation
+  - Document configuration options
+  - Update existing analyzer docs
 
 - **User Documentation**:
-  - Risk category guide
-  - Interpretation handbook
-  - Action mapping reference
+  - Risk profile interpretation guide
   - Configuration examples
+  - Migration guide from RiskInsight to RiskProfile
 
-## Implementation Notes
+## Implementation Plan
 
-1. **Phased Rollout**
-   - Phase 1: Coverage and Integration risks
-   - Phase 2: Architectural and Maintenance risks
-   - Phase 3: Security and Performance risks
-   - Phase 4: Custom categories support
+### Phase 1: Foundation (Week 1)
+- [ ] Create `src/risk/profile.rs` with RiskProfile structure
+- [ ] Add configuration support for category weights
+- [ ] Create adapter from RiskAssessment to RiskProfile
+- [ ] Maintain backward compatibility
 
-2. **Visualization Support**
-   - Risk radar charts
-   - Category heat maps
-   - Trend visualizations
-   - Module risk profiles
+### Phase 2: New Categories (Week 2)
+- [ ] Implement SecurityRiskAnalyzer
+- [ ] Implement PerformanceRiskAnalyzer
+- [ ] Enhance IntegrationRiskAnalyzer with path analysis
+- [ ] Add tests for new analyzers
 
-3. **Extensibility Design**
-   - Plugin architecture for categories
-   - Custom category definition
-   - External tool integration
-   - API for risk consumers
+### Phase 3: Integration (Week 3)
+- [ ] Integrate new analyzers into EvidenceBasedRiskCalculator
+- [ ] Update output writers for risk profiles
+- [ ] Add configuration file support
+- [ ] Update CLI to support category filtering
+
+### Phase 4: Polish (Week 4)
+- [ ] Add historical tracking support
+- [ ] Enhance visualization output
+- [ ] Documentation and examples
+- [ ] Performance optimization
 
 ## Migration and Compatibility
 
-- **Breaking Changes**:
-  - Risk output format changes
-  - New configuration schema
-  - API modifications
+- **Non-Breaking Approach**:
+  - Keep existing RiskInsight and RiskAssessment
+  - Add new RiskProfile alongside existing structures
+  - Provide adapters between old and new formats
+  - Gradual deprecation of old structures
 
 - **Migration Path**:
-  1. Add categories alongside total
-  2. Deprecation warnings
-  3. Dual output period
-  4. Full migration
-  5. Legacy removal
+  1. Add RiskProfile as opt-in feature (--risk-profile flag)
+  2. Run both systems in parallel for validation
+  3. Make RiskProfile default with fallback option
+  4. Deprecate old system after stability period
+  5. Remove legacy code in major version
 
 - **Integration Points**:
-  - CI/CD risk gates by category
-  - IDE plugin support
-  - Dashboard integration
-  - Reporting tools
+  - Extend existing terminal writer for profiles
+  - Add JSON export for risk profiles
+  - Support category-based thresholds in CI/CD
+  - Enable profile comparison across commits
