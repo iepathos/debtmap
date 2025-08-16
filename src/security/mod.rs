@@ -4,7 +4,7 @@ pub mod input_validation_detector;
 pub mod sql_injection_detector;
 pub mod unsafe_detector;
 
-use crate::core::{DebtItem, DebtType, Priority};
+use crate::core::{DebtItem, Priority};
 use std::path::Path;
 use syn::File;
 
