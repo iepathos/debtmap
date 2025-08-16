@@ -392,21 +392,20 @@ impl CoverageRiskAnalyzer {
         }
     }
 
-    fn identify_critical_paths(&self, count: u32, role: &FunctionRole) -> Vec<String> {
-        let mut paths = Vec::new();
-
-        for i in 0..count.min(5) {
-            let path_name = match role {
-                FunctionRole::PureLogic => format!("Business logic path {}", i + 1),
-                FunctionRole::EntryPoint => format!("Entry point flow {}", i + 1),
-                FunctionRole::Orchestrator => format!("Orchestration path {}", i + 1),
-                FunctionRole::IOWrapper => format!("I/O operation {}", i + 1),
-                FunctionRole::Unknown => format!("Execution path {}", i + 1),
-            };
-            paths.push(path_name);
+    fn generate_path_name(role: &FunctionRole, index: u32) -> String {
+        match role {
+            FunctionRole::PureLogic => format!("Business logic path {}", index),
+            FunctionRole::EntryPoint => format!("Entry point flow {}", index),
+            FunctionRole::Orchestrator => format!("Orchestration path {}", index),
+            FunctionRole::IOWrapper => format!("I/O operation {}", index),
+            FunctionRole::Unknown => format!("Execution path {}", index),
         }
+    }
 
-        paths
+    fn identify_critical_paths(&self, count: u32, role: &FunctionRole) -> Vec<String> {
+        (0..count.min(5))
+            .map(|i| Self::generate_path_name(role, i + 1))
+            .collect()
     }
 }
 
@@ -873,5 +872,118 @@ mod tests {
             0.0,  // upper_bound
         );
         assert_eq!(score, 10.0);
+    }
+
+    #[test]
+    fn test_generate_path_name_pure_logic() {
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::PureLogic, 1),
+            "Business logic path 1"
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::PureLogic, 5),
+            "Business logic path 5"
+        );
+    }
+
+    #[test]
+    fn test_generate_path_name_entry_point() {
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::EntryPoint, 1),
+            "Entry point flow 1"
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::EntryPoint, 3),
+            "Entry point flow 3"
+        );
+    }
+
+    #[test]
+    fn test_generate_path_name_orchestrator() {
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::Orchestrator, 1),
+            "Orchestration path 1"
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::Orchestrator, 2),
+            "Orchestration path 2"
+        );
+    }
+
+    #[test]
+    fn test_generate_path_name_io_wrapper() {
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::IOWrapper, 1),
+            "I/O operation 1"
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::IOWrapper, 4),
+            "I/O operation 4"
+        );
+    }
+
+    #[test]
+    fn test_generate_path_name_unknown() {
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::Unknown, 1),
+            "Execution path 1"
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::Unknown, 10),
+            "Execution path 10"
+        );
+    }
+
+    #[test]
+    fn test_identify_critical_paths_zero_count() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        let paths = analyzer.identify_critical_paths(0, &FunctionRole::PureLogic);
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn test_identify_critical_paths_single_path() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        let paths = analyzer.identify_critical_paths(1, &FunctionRole::EntryPoint);
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], "Entry point flow 1");
+    }
+
+    #[test]
+    fn test_identify_critical_paths_multiple_paths() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        let paths = analyzer.identify_critical_paths(3, &FunctionRole::Orchestrator);
+        assert_eq!(paths.len(), 3);
+        assert_eq!(paths[0], "Orchestration path 1");
+        assert_eq!(paths[1], "Orchestration path 2");
+        assert_eq!(paths[2], "Orchestration path 3");
+    }
+
+    #[test]
+    fn test_identify_critical_paths_max_limit() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        let paths = analyzer.identify_critical_paths(10, &FunctionRole::IOWrapper);
+        assert_eq!(paths.len(), 5); // Should be capped at 5
+        assert_eq!(paths[0], "I/O operation 1");
+        assert_eq!(paths[4], "I/O operation 5");
+    }
+
+    #[test]
+    fn test_identify_critical_paths_unknown_role() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        let paths = analyzer.identify_critical_paths(2, &FunctionRole::Unknown);
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], "Execution path 1");
+        assert_eq!(paths[1], "Execution path 2");
+    }
+
+    #[test]
+    fn test_identify_critical_paths_boundary_at_five() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        let paths = analyzer.identify_critical_paths(5, &FunctionRole::PureLogic);
+        assert_eq!(paths.len(), 5);
+        for (i, path) in paths.iter().enumerate() {
+            assert_eq!(path, &format!("Business logic path {}", i + 1));
+        }
     }
 }
