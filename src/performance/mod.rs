@@ -126,86 +126,17 @@ pub fn convert_performance_pattern_to_debt_item(
     path: &Path,
     line: usize,
 ) -> DebtItem {
-    let (priority, message, recommendation) = match pattern {
+    let priority = match &pattern {
         PerformanceAntiPattern::NestedLoop {
-            nesting_level,
             estimated_complexity,
-            can_parallelize,
             ..
-        } => {
-            let priority = match estimated_complexity {
-                ComplexityClass::Exponential => Priority::Critical,
-                ComplexityClass::Cubic => Priority::High,
-                ComplexityClass::Quadratic => Priority::Medium,
-                _ => Priority::Low,
-            };
-            let mut rec = "Consider algorithm optimization or caching".to_string();
-            if can_parallelize {
-                rec.push_str(" (parallelization possible)");
-            }
-            (
-                priority,
-                format!(
-                    "Nested loop with {} levels ({:?} complexity)",
-                    nesting_level, estimated_complexity
-                ),
-                rec,
-            )
-        }
-        PerformanceAntiPattern::InefficientDataStructure {
-            operation,
-            collection_type,
-            recommended_alternative,
-            ..
-        } => (
-            impact_to_priority(impact),
-            format!(
-                "{:?} operation on {} in performance-critical code",
-                operation, collection_type
-            ),
-            format!(
-                "Consider using {} for better performance",
-                recommended_alternative
-            ),
-        ),
-        PerformanceAntiPattern::ExcessiveAllocation {
-            allocation_type,
-            frequency,
-            suggested_optimization,
-        } => (
-            impact_to_priority(impact),
-            format!("{:?} allocation {:?}", allocation_type, frequency),
-            suggested_optimization,
-        ),
-        PerformanceAntiPattern::InefficientIO {
-            io_pattern,
-            batching_opportunity,
-            async_opportunity,
-        } => {
-            let mut recommendations = Vec::new();
-            if batching_opportunity {
-                recommendations.push("batch operations");
-            }
-            if async_opportunity {
-                recommendations.push("use async I/O");
-            }
-
-            (
-                Priority::High,
-                format!("Inefficient I/O pattern: {:?}", io_pattern),
-                format!("Consider: {}", recommendations.join(", ")),
-            )
-        }
-        PerformanceAntiPattern::StringProcessingAntiPattern {
-            pattern_type,
-            recommended_approach,
-            ..
-        } => (
-            impact_to_priority(impact),
-            format!("Inefficient string processing: {:?}", pattern_type),
-            recommended_approach,
-        ),
+        } => classify_nested_loop_priority(estimated_complexity),
+        PerformanceAntiPattern::InefficientIO { .. } => Priority::High,
+        _ => impact_to_priority(impact),
     };
+
+    let message = format_pattern_message(&pattern);
+    let recommendation = generate_pattern_recommendation(&pattern);
 
     DebtItem {
         id: format!("performance-{}-{}", path.display(), line),
@@ -225,5 +156,380 @@ fn impact_to_priority(impact: PerformanceImpact) -> Priority {
         PerformanceImpact::High => Priority::High,
         PerformanceImpact::Medium => Priority::Medium,
         PerformanceImpact::Low => Priority::Low,
+    }
+}
+
+/// Classify nested loop complexity into priority level
+fn classify_nested_loop_priority(complexity: &ComplexityClass) -> Priority {
+    match complexity {
+        ComplexityClass::Exponential => Priority::Critical,
+        ComplexityClass::Cubic => Priority::High,
+        ComplexityClass::Quadratic => Priority::Medium,
+        _ => Priority::Low,
+    }
+}
+
+/// Format a performance pattern into a human-readable message
+fn format_pattern_message(pattern: &PerformanceAntiPattern) -> String {
+    match pattern {
+        PerformanceAntiPattern::NestedLoop {
+            nesting_level,
+            estimated_complexity,
+            ..
+        } => format!(
+            "Nested loop with {} levels ({:?} complexity)",
+            nesting_level, estimated_complexity
+        ),
+        PerformanceAntiPattern::InefficientDataStructure {
+            operation,
+            collection_type,
+            ..
+        } => format!(
+            "{:?} operation on {} in performance-critical code",
+            operation, collection_type
+        ),
+        PerformanceAntiPattern::ExcessiveAllocation {
+            allocation_type,
+            frequency,
+            ..
+        } => format!("{:?} allocation {:?}", allocation_type, frequency),
+        PerformanceAntiPattern::InefficientIO { io_pattern, .. } => {
+            format!("Inefficient I/O pattern: {:?}", io_pattern)
+        }
+        PerformanceAntiPattern::StringProcessingAntiPattern {
+            pattern_type, ..
+        } => format!("Inefficient string processing: {:?}", pattern_type),
+    }
+}
+
+/// Generate recommendation for a performance pattern
+fn generate_pattern_recommendation(pattern: &PerformanceAntiPattern) -> String {
+    match pattern {
+        PerformanceAntiPattern::NestedLoop {
+            can_parallelize, ..
+        } => {
+            let mut rec = "Consider algorithm optimization or caching".to_string();
+            if *can_parallelize {
+                rec.push_str(" (parallelization possible)");
+            }
+            rec
+        }
+        PerformanceAntiPattern::InefficientDataStructure {
+            recommended_alternative,
+            ..
+        } => format!(
+            "Consider using {} for better performance",
+            recommended_alternative
+        ),
+        PerformanceAntiPattern::ExcessiveAllocation {
+            suggested_optimization,
+            ..
+        } => suggested_optimization.clone(),
+        PerformanceAntiPattern::InefficientIO {
+            batching_opportunity,
+            async_opportunity,
+            ..
+        } => {
+            let mut recommendations = Vec::new();
+            if *batching_opportunity {
+                recommendations.push("batch operations");
+            }
+            if *async_opportunity {
+                recommendations.push("use async I/O");
+            }
+            format!("Consider: {}", recommendations.join(", "))
+        }
+        PerformanceAntiPattern::StringProcessingAntiPattern {
+            recommended_approach,
+            ..
+        } => recommended_approach.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::DebtType;
+    use crate::Priority;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_classify_nested_loop_priority() {
+        assert_eq!(
+            classify_nested_loop_priority(&ComplexityClass::Exponential),
+            Priority::Critical
+        );
+        assert_eq!(
+            classify_nested_loop_priority(&ComplexityClass::Cubic),
+            Priority::High
+        );
+        assert_eq!(
+            classify_nested_loop_priority(&ComplexityClass::Quadratic),
+            Priority::Medium
+        );
+        assert_eq!(
+            classify_nested_loop_priority(&ComplexityClass::Linear),
+            Priority::Low
+        );
+        assert_eq!(
+            classify_nested_loop_priority(&ComplexityClass::Unknown),
+            Priority::Low
+        );
+    }
+
+    #[test]
+    fn test_impact_to_priority() {
+        assert_eq!(
+            impact_to_priority(PerformanceImpact::Critical),
+            Priority::Critical
+        );
+        assert_eq!(
+            impact_to_priority(PerformanceImpact::High),
+            Priority::High
+        );
+        assert_eq!(
+            impact_to_priority(PerformanceImpact::Medium),
+            Priority::Medium
+        );
+        assert_eq!(impact_to_priority(PerformanceImpact::Low), Priority::Low);
+    }
+
+    #[test]
+    fn test_format_pattern_message_nested_loop() {
+        let pattern = PerformanceAntiPattern::NestedLoop {
+            nesting_level: 3,
+            estimated_complexity: ComplexityClass::Cubic,
+            can_parallelize: true,
+            inner_operations: vec![LoopOperation::Computation],
+        };
+        let message = format_pattern_message(&pattern);
+        assert_eq!(message, "Nested loop with 3 levels (Cubic complexity)");
+    }
+
+    #[test]
+    fn test_format_pattern_message_inefficient_data_structure() {
+        let pattern = PerformanceAntiPattern::InefficientDataStructure {
+            operation: DataStructureOperation::LinearSearch,
+            collection_type: "Vec".to_string(),
+            recommended_alternative: "HashSet".to_string(),
+            performance_impact: PerformanceImpact::High,
+        };
+        let message = format_pattern_message(&pattern);
+        assert_eq!(
+            message,
+            "LinearSearch operation on Vec in performance-critical code"
+        );
+    }
+
+    #[test]
+    fn test_format_pattern_message_excessive_allocation() {
+        let pattern = PerformanceAntiPattern::ExcessiveAllocation {
+            allocation_type: AllocationType::StringConcatenation,
+            frequency: AllocationFrequency::InLoop,
+            suggested_optimization: "Use String::with_capacity()".to_string(),
+        };
+        let message = format_pattern_message(&pattern);
+        assert_eq!(message, "StringConcatenation allocation InLoop");
+    }
+
+    #[test]
+    fn test_format_pattern_message_inefficient_io() {
+        let pattern = PerformanceAntiPattern::InefficientIO {
+            io_pattern: IOPattern::UnbufferedIO,
+            batching_opportunity: true,
+            async_opportunity: false,
+        };
+        let message = format_pattern_message(&pattern);
+        assert_eq!(message, "Inefficient I/O pattern: UnbufferedIO");
+    }
+
+    #[test]
+    fn test_format_pattern_message_string_processing() {
+        let pattern = PerformanceAntiPattern::StringProcessingAntiPattern {
+            pattern_type: StringAntiPattern::ConcatenationInLoop,
+            recommended_approach: "Use a String builder".to_string(),
+            performance_impact: PerformanceImpact::Medium,
+        };
+        let message = format_pattern_message(&pattern);
+        assert_eq!(
+            message,
+            "Inefficient string processing: ConcatenationInLoop"
+        );
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_nested_loop_parallel() {
+        let pattern = PerformanceAntiPattern::NestedLoop {
+            nesting_level: 3,
+            estimated_complexity: ComplexityClass::Cubic,
+            can_parallelize: true,
+            inner_operations: vec![LoopOperation::Computation],
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(
+            rec,
+            "Consider algorithm optimization or caching (parallelization possible)"
+        );
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_nested_loop_no_parallel() {
+        let pattern = PerformanceAntiPattern::NestedLoop {
+            nesting_level: 2,
+            estimated_complexity: ComplexityClass::Quadratic,
+            can_parallelize: false,
+            inner_operations: vec![LoopOperation::CollectionIteration],
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(rec, "Consider algorithm optimization or caching");
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_data_structure() {
+        let pattern = PerformanceAntiPattern::InefficientDataStructure {
+            operation: DataStructureOperation::FrequentInsertion,
+            collection_type: "Vec".to_string(),
+            recommended_alternative: "HashMap".to_string(),
+            performance_impact: PerformanceImpact::High,
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(rec, "Consider using HashMap for better performance");
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_allocation() {
+        let pattern = PerformanceAntiPattern::ExcessiveAllocation {
+            allocation_type: AllocationType::TemporaryCollection,
+            frequency: AllocationFrequency::InHotPath,
+            suggested_optimization: "Pre-allocate with Vec::with_capacity()".to_string(),
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(rec, "Pre-allocate with Vec::with_capacity()");
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_io_both_opportunities() {
+        let pattern = PerformanceAntiPattern::InefficientIO {
+            io_pattern: IOPattern::UnbufferedIO,
+            batching_opportunity: true,
+            async_opportunity: true,
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(rec, "Consider: batch operations, use async I/O");
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_io_batch_only() {
+        let pattern = PerformanceAntiPattern::InefficientIO {
+            io_pattern: IOPattern::UnbufferedIO,
+            batching_opportunity: true,
+            async_opportunity: false,
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(rec, "Consider: batch operations");
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_io_async_only() {
+        let pattern = PerformanceAntiPattern::InefficientIO {
+            io_pattern: IOPattern::SyncInLoop,
+            batching_opportunity: false,
+            async_opportunity: true,
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(rec, "Consider: use async I/O");
+    }
+
+    #[test]
+    fn test_generate_pattern_recommendation_string() {
+        let pattern = PerformanceAntiPattern::StringProcessingAntiPattern {
+            pattern_type: StringAntiPattern::InefficientParsing,
+            recommended_approach: "Use a dedicated parser library".to_string(),
+            performance_impact: PerformanceImpact::High,
+        };
+        let rec = generate_pattern_recommendation(&pattern);
+        assert_eq!(rec, "Use a dedicated parser library");
+    }
+
+    #[test]
+    fn test_convert_performance_pattern_nested_loop_critical() {
+        let pattern = PerformanceAntiPattern::NestedLoop {
+            nesting_level: 4,
+            estimated_complexity: ComplexityClass::Exponential,
+            can_parallelize: true,
+            inner_operations: vec![LoopOperation::DatabaseQuery, LoopOperation::Computation],
+        };
+        let path = PathBuf::from("src/test.rs");
+        let debt = convert_performance_pattern_to_debt_item(
+            pattern,
+            PerformanceImpact::Critical,
+            &path,
+            100,
+        );
+
+        assert_eq!(debt.priority, Priority::Critical);
+        assert_eq!(debt.debt_type, DebtType::Performance);
+        assert_eq!(
+            debt.message,
+            "Nested loop with 4 levels (Exponential complexity)"
+        );
+        assert_eq!(
+            debt.context,
+            Some(
+                "Consider algorithm optimization or caching (parallelization possible)"
+                    .to_string()
+            )
+        );
+        assert_eq!(debt.line, 100);
+        assert_eq!(debt.file, path);
+    }
+
+    #[test]
+    fn test_convert_performance_pattern_inefficient_io() {
+        let pattern = PerformanceAntiPattern::InefficientIO {
+            io_pattern: IOPattern::UnbufferedIO,
+            batching_opportunity: true,
+            async_opportunity: false,
+        };
+        let path = PathBuf::from("src/io.rs");
+        let debt = convert_performance_pattern_to_debt_item(
+            pattern,
+            PerformanceImpact::Medium,
+            &path,
+            50,
+        );
+
+        assert_eq!(debt.priority, Priority::High); // IO always gets High priority
+        assert_eq!(debt.debt_type, DebtType::Performance);
+        assert_eq!(
+            debt.message,
+            "Inefficient I/O pattern: UnbufferedIO"
+        );
+        assert_eq!(debt.context, Some("Consider: batch operations".to_string()));
+        assert_eq!(debt.line, 50);
+    }
+
+    #[test]
+    fn test_convert_performance_pattern_uses_impact_for_other_patterns() {
+        let pattern = PerformanceAntiPattern::ExcessiveAllocation {
+            allocation_type: AllocationType::StringConcatenation,
+            frequency: AllocationFrequency::InLoop,
+            suggested_optimization: "Use String::with_capacity()".to_string(),
+        };
+        let path = PathBuf::from("src/alloc.rs");
+        let debt = convert_performance_pattern_to_debt_item(
+            pattern,
+            PerformanceImpact::Medium,
+            &path,
+            75,
+        );
+
+        assert_eq!(debt.priority, Priority::Medium); // Uses impact_to_priority
+        assert_eq!(debt.debt_type, DebtType::Performance);
+        assert_eq!(debt.message, "StringConcatenation allocation InLoop");
+        assert_eq!(
+            debt.context,
+            Some("Use String::with_capacity()".to_string())
+        );
     }
 }

@@ -1,6 +1,4 @@
-use debtmap::testing::{
-    analyze_testing_patterns, FlakinessType, TestSimplification, TestingAntiPattern,
-};
+use debtmap::testing::analyze_testing_patterns;
 use std::path::PathBuf;
 use syn;
 
