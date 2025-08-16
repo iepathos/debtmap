@@ -275,6 +275,7 @@ impl FunctionVisitor {
             is_test,
             visibility,
             is_trait_method, // Use the parameter passed to this function
+            in_test_module: self.in_test_module,
         };
 
         self.functions.push(metrics);
@@ -429,6 +430,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     is_test: self.in_test_module, // Closures in test modules are test-related
                     visibility: None,             // Closures are always private
                     is_trait_method: false,       // Closures are not trait methods
+                    in_test_module: self.in_test_module,
                 };
 
                 self.functions.push(metrics);

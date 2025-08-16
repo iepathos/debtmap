@@ -91,6 +91,7 @@ impl EvidenceBasedRiskCalculator {
             is_test: function.is_test,
             visibility: Some(self.visibility_to_string(&function.visibility)),
             is_trait_method: false, // Default to false, can be updated if needed
+            in_test_module: false,  // Default to false for risk evidence
         };
 
         classify_function_role(&func_metrics, &func_id, call_graph)

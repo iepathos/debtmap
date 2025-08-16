@@ -1,4 +1,5 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
+use crate::priority::call_graph::CallGraph;
 use anyhow::Result;
 use im::{HashSet, Vector};
 use serde::{Deserialize, Serialize};
@@ -23,57 +24,8 @@ pub enum EntryType {
     WebHandler,
 }
 
-/// Represents a function call relationship
-#[derive(Debug, Clone)]
-pub struct CallEdge {
-    pub from: String,
-    pub to: String,
-    pub file: PathBuf,
-}
-
-/// Call graph for critical path analysis
-#[derive(Debug, Clone)]
-pub struct CallGraph {
-    edges: Vector<CallEdge>,
-    nodes: HashSet<String>,
-}
-
-impl Default for CallGraph {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CallGraph {
-    pub fn new() -> Self {
-        Self {
-            edges: Vector::new(),
-            nodes: HashSet::new(),
-        }
-    }
-
-    pub fn add_edge(&mut self, from: String, to: String, file: PathBuf) {
-        self.nodes.insert(from.clone());
-        self.nodes.insert(to.clone());
-        self.edges.push_back(CallEdge { from, to, file });
-    }
-
-    pub fn get_callees(&self, function: &str) -> Vector<String> {
-        self.edges
-            .iter()
-            .filter(|e| e.from == function)
-            .map(|e| e.to.clone())
-            .collect()
-    }
-
-    pub fn get_callers(&self, function: &str) -> Vector<String> {
-        self.edges
-            .iter()
-            .filter(|e| e.to == function)
-            .map(|e| e.from.clone())
-            .collect()
-    }
-}
+// CallGraph is now imported from crate::priority::call_graph
+// The main CallGraph provides string-based methods for critical path analysis
 
 /// Represents a critical execution path
 #[derive(Debug, Clone)]
@@ -216,7 +168,7 @@ impl CriticalPathAnalyzer {
         visited.insert(function.to_string());
         path.push_back(function.to_string());
 
-        for callee in self.call_graph.get_callees(function) {
+        for callee in self.call_graph.get_callees_by_name(function) {
             self.dfs_trace(&callee, visited, path);
         }
     }
@@ -402,28 +354,28 @@ mod tests {
     fn test_call_graph() {
         let mut graph = CallGraph::new();
 
-        graph.add_edge(
+        graph.add_edge_by_name(
             "main".to_string(),
             "init".to_string(),
             PathBuf::from("main.rs"),
         );
-        graph.add_edge(
+        graph.add_edge_by_name(
             "init".to_string(),
             "setup".to_string(),
             PathBuf::from("init.rs"),
         );
-        graph.add_edge(
+        graph.add_edge_by_name(
             "main".to_string(),
             "run".to_string(),
             PathBuf::from("main.rs"),
         );
 
-        let callees = graph.get_callees("main");
+        let callees = graph.get_callees_by_name("main");
         assert_eq!(callees.len(), 2);
         assert!(callees.contains(&"init".to_string()));
         assert!(callees.contains(&"run".to_string()));
 
-        let callers = graph.get_callers("init");
+        let callers = graph.get_callers_by_name("init");
         assert_eq!(callers.len(), 1);
         assert!(callers.contains(&"main".to_string()));
     }
@@ -577,7 +529,7 @@ mod tests {
         });
 
         // Add the function to the call graph
-        analyzer.call_graph.add_edge(
+        analyzer.call_graph.add_edge_by_name(
             "handle_event".to_string(),
             "process_data".to_string(),
             PathBuf::from("src/events.rs"),
@@ -623,7 +575,7 @@ mod tests {
         });
 
         // Add the function to the call graph
-        analyzer.call_graph.add_edge(
+        analyzer.call_graph.add_edge_by_name(
             "main".to_string(),
             "init".to_string(),
             PathBuf::from("src/main.rs"),
@@ -676,12 +628,12 @@ mod tests {
         });
 
         // Add shared function to both paths
-        analyzer.call_graph.add_edge(
+        analyzer.call_graph.add_edge_by_name(
             "main".to_string(),
             "shared_function".to_string(),
             PathBuf::from("src/main.rs"),
         );
-        analyzer.call_graph.add_edge(
+        analyzer.call_graph.add_edge_by_name(
             "handle_api".to_string(),
             "shared_function".to_string(),
             PathBuf::from("src/api.rs"),

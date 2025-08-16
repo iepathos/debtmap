@@ -124,6 +124,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         }];
         let report = build_complexity_report(&functions, 10);
 
@@ -159,6 +160,7 @@ mod tests {
                         is_test: false,
                         visibility: None,
                         is_trait_method: false,
+                        in_test_module: false,
                     }],
                     cyclomatic_complexity: 2,
                     cognitive_complexity: 3,
@@ -183,6 +185,7 @@ mod tests {
                             is_test: false,
                             visibility: None,
                             is_trait_method: false,
+                            in_test_module: false,
                         },
                         FunctionMetrics {
                             name: "func_c".to_string(),
@@ -195,6 +198,7 @@ mod tests {
                             is_test: true,
                             visibility: None,
                             is_trait_method: false,
+                            in_test_module: false,
                         },
                     ],
                     cyclomatic_complexity: 10,

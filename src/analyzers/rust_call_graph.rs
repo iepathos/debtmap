@@ -965,6 +965,77 @@ pub fn merge_call_graphs(_main: &mut CallGraph, _file_graph: CallGraph) {
     // This is handled by CallGraph::merge method now
 }
 
+/// Collect type definitions from a file into the global type registry
+fn collect_types_from_file(registry: &mut GlobalTypeRegistry, file: &syn::File, _path: &Path) {
+    // Track the module path as we traverse the file
+    let module_path = Vec::new();
+
+    for item in &file.items {
+        match item {
+            Item::Struct(item_struct) => {
+                // Register the struct with its fields
+                registry.register_struct(module_path.clone(), item_struct);
+            }
+            Item::Mod(item_mod) => {
+                // Handle nested modules
+                if let Some((_, items)) = &item_mod.content {
+                    let mut nested_path = module_path.clone();
+                    nested_path.push(item_mod.ident.to_string());
+
+                    // Recursively process items in nested module
+                    for nested_item in items {
+                        if let Item::Struct(nested_struct) = nested_item {
+                            registry.register_struct(nested_path.clone(), nested_struct);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Extract call graph from multiple files with cross-file resolution
+pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGraph {
+    // Create a global type registry for cross-module type resolution
+    let mut type_registry = GlobalTypeRegistry::new();
+
+    // Phase 1a: First pass - collect all type definitions from all files
+    // This ensures we have complete type information before resolving method calls
+    for (file, path) in files {
+        collect_types_from_file(&mut type_registry, file, path);
+    }
+
+    // Now wrap in Arc for sharing
+    let type_registry = Arc::new(type_registry);
+
+    // Create the combined extractor with the populated type registry
+    let mut combined_extractor =
+        CallGraphExtractor::with_registry(PathBuf::from("multi_file"), type_registry.clone());
+
+    // Phase 1b: Extract all functions from all files and collect all unresolved calls
+    // Now each file extractor has access to the complete type registry
+    for (file, path) in files {
+        let mut file_extractor =
+            CallGraphExtractor::with_registry(path.clone(), type_registry.clone());
+        file_extractor.extract_phase1(file);
+
+        // Merge the functions and unresolved calls into the combined extractor
+        combined_extractor
+            .call_graph
+            .merge(file_extractor.call_graph);
+        combined_extractor
+            .unresolved_calls
+            .extend(file_extractor.unresolved_calls);
+    }
+
+    // Phase 2: Resolve all calls now that we know ALL functions from ALL files
+    // and have complete type information
+    combined_extractor.resolve_phase2();
+
+    combined_extractor.call_graph
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1008,7 +1079,7 @@ mod tests {
                     name: "test".to_string(),
                     line,
                 };
-                if graph.get_callees(&id).len() > 0 {
+                if !graph.get_callees(&id).is_empty() {
                     Some((line, graph.get_callees(&id)))
                 } else {
                     None
@@ -1260,75 +1331,4 @@ mod tests {
             .count();
         assert!(debug_calls >= 2);
     }
-}
-
-/// Collect type definitions from a file into the global type registry
-fn collect_types_from_file(registry: &mut GlobalTypeRegistry, file: &syn::File, _path: &Path) {
-    // Track the module path as we traverse the file
-    let module_path = Vec::new();
-
-    for item in &file.items {
-        match item {
-            Item::Struct(item_struct) => {
-                // Register the struct with its fields
-                registry.register_struct(module_path.clone(), item_struct);
-            }
-            Item::Mod(item_mod) => {
-                // Handle nested modules
-                if let Some((_, items)) = &item_mod.content {
-                    let mut nested_path = module_path.clone();
-                    nested_path.push(item_mod.ident.to_string());
-
-                    // Recursively process items in nested module
-                    for nested_item in items {
-                        if let Item::Struct(nested_struct) = nested_item {
-                            registry.register_struct(nested_path.clone(), nested_struct);
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-/// Extract call graph from multiple files with cross-file resolution
-pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGraph {
-    // Create a global type registry for cross-module type resolution
-    let mut type_registry = GlobalTypeRegistry::new();
-
-    // Phase 1a: First pass - collect all type definitions from all files
-    // This ensures we have complete type information before resolving method calls
-    for (file, path) in files {
-        collect_types_from_file(&mut type_registry, file, path);
-    }
-
-    // Now wrap in Arc for sharing
-    let type_registry = Arc::new(type_registry);
-
-    // Create the combined extractor with the populated type registry
-    let mut combined_extractor =
-        CallGraphExtractor::with_registry(PathBuf::from("multi_file"), type_registry.clone());
-
-    // Phase 1b: Extract all functions from all files and collect all unresolved calls
-    // Now each file extractor has access to the complete type registry
-    for (file, path) in files {
-        let mut file_extractor =
-            CallGraphExtractor::with_registry(path.clone(), type_registry.clone());
-        file_extractor.extract_phase1(file);
-
-        // Merge the functions and unresolved calls into the combined extractor
-        combined_extractor
-            .call_graph
-            .merge(file_extractor.call_graph);
-        combined_extractor
-            .unresolved_calls
-            .extend(file_extractor.unresolved_calls);
-    }
-
-    // Phase 2: Resolve all calls now that we know ALL functions from ALL files
-    // and have complete type information
-    combined_extractor.resolve_phase2();
-
-    combined_extractor.call_graph
 }

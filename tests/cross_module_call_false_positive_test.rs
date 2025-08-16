@@ -110,6 +110,7 @@ fn test_cross_module_associated_function_call_false_positive() {
         is_test: false,
         visibility: Some("pub".to_string()),
         is_trait_method: false,
+        in_test_module: false,
     };
 
     // Test dead code detection - this should return FALSE but will return TRUE due to the bug

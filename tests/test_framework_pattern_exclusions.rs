@@ -22,6 +22,7 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         is_trait_method: false,
         length: 20,
         nesting: 2,
+        in_test_module: false,
     };
 
     let func_id = FunctionId {
@@ -70,6 +71,7 @@ fn test_visit_trait_pattern_exclusion() {
         is_trait_method: false,
         length: 30,
         nesting: 3,
+        in_test_module: false,
     };
 
     let func_id = FunctionId {

@@ -45,6 +45,7 @@ pub struct FunctionMetrics {
     pub is_test: bool,
     pub visibility: Option<String>, // "pub", "pub(crate)", or None for private
     pub is_trait_method: bool,      // Whether this is a trait method implementation
+    pub in_test_module: bool,       // Whether this function is inside a #[cfg(test)] module
 }
 
 impl FunctionMetrics {
@@ -60,6 +61,7 @@ impl FunctionMetrics {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         }
     }
 

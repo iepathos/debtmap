@@ -254,6 +254,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         }];
         let smells = detect_data_clumps(&functions);
         assert_eq!(
@@ -277,6 +278,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "function_b".to_string(),
@@ -289,6 +291,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -313,6 +316,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "validate_user_data".to_string(),
@@ -325,6 +329,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -357,6 +362,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "func_b".to_string(),
@@ -369,6 +375,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "func_c".to_string(),
@@ -381,6 +388,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "small_func".to_string(),
@@ -393,6 +401,7 @@ mod tests {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
         ];
         let smells = detect_data_clumps(&functions);

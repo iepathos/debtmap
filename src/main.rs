@@ -2021,6 +2021,7 @@ end_of_record
                     is_test: false,
                     visibility: None,
                     is_trait_method: false,
+                    in_test_module: false,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2080,6 +2081,7 @@ end_of_record
                     is_test: false,
                     visibility: None,
                     is_trait_method: false,
+                    in_test_module: false,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2157,6 +2159,7 @@ end_of_record
                     is_test: false,
                     visibility: None,
                     is_trait_method: false,
+                    in_test_module: false,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2257,6 +2260,7 @@ end_of_record
                         is_test: false,
                         visibility: None,
                         is_trait_method: false,
+                        in_test_module: false,
                     },
                     FunctionMetrics {
                         name: "partially_tested".to_string(),
@@ -2269,6 +2273,7 @@ end_of_record
                         is_test: false,
                         visibility: None,
                         is_trait_method: false,
+                        in_test_module: false,
                     },
                     FunctionMetrics {
                         name: "untested".to_string(),
@@ -2281,6 +2286,7 @@ end_of_record
                         is_test: false,
                         visibility: None,
                         is_trait_method: false,
+                        in_test_module: false,
                     },
                     FunctionMetrics {
                         name: "test_function".to_string(),
@@ -2293,6 +2299,7 @@ end_of_record
                         is_test: true,
                         visibility: None,
                         is_trait_method: false,
+                        in_test_module: false,
                     },
                 ],
                 summary: ComplexitySummary {
@@ -2834,6 +2841,7 @@ end_of_record
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "test_function".to_string(),
@@ -2846,6 +2854,7 @@ end_of_record
                 is_test: true,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
         ];
 
@@ -2885,6 +2894,7 @@ end_of_record
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         }];
 
         let mut call_graph = CallGraph::new();
@@ -2919,6 +2929,7 @@ end_of_record
                 is_test: false, // Production function
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "test_something".to_string(),
@@ -2931,6 +2942,7 @@ end_of_record
                 is_test: true, // Test function - should be excluded
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
             FunctionMetrics {
                 name: "another_production_function".to_string(),
@@ -2943,6 +2955,7 @@ end_of_record
                 is_test: false, // Production function
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             },
         ];
 

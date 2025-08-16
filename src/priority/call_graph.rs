@@ -198,6 +198,64 @@ impl CallGraph {
         self.nodes.get(func_id).map(|n| n.is_test).unwrap_or(false)
     }
 
+    // String-based convenience methods for critical path analysis
+
+    /// Add an edge between two functions by name (used by critical path analyzer)
+    pub fn add_edge_by_name(&mut self, from: String, to: String, file: PathBuf) {
+        // Create simplified FunctionIds for string-based access
+        let from_id = FunctionId {
+            file: file.clone(),
+            name: from,
+            line: 0, // Use 0 for string-based lookups
+        };
+        let to_id = FunctionId {
+            file: file.clone(),
+            name: to,
+            line: 0,
+        };
+
+        // Ensure both nodes exist
+        if !self.nodes.contains_key(&from_id) {
+            self.add_function(from_id.clone(), false, false, 0, 0);
+        }
+        if !self.nodes.contains_key(&to_id) {
+            self.add_function(to_id.clone(), false, false, 0, 0);
+        }
+
+        // Add the call
+        self.add_call(FunctionCall {
+            caller: from_id,
+            callee: to_id,
+            call_type: CallType::Direct,
+        });
+    }
+
+    /// Get callees by function name (returns function names)
+    pub fn get_callees_by_name(&self, function: &str) -> Vec<String> {
+        // Find all nodes with this function name
+        self.nodes
+            .keys()
+            .filter(|id| id.name == function)
+            .flat_map(|id| self.get_callees(id))
+            .map(|id| id.name.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
+    /// Get callers by function name (returns function names)
+    pub fn get_callers_by_name(&self, function: &str) -> Vec<String> {
+        // Find all nodes with this function name
+        self.nodes
+            .keys()
+            .filter(|id| id.name == function)
+            .flat_map(|id| self.get_callers(id))
+            .map(|id| id.name.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
     pub fn get_transitive_callees(
         &self,
         func_id: &FunctionId,

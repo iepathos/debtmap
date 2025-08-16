@@ -39,6 +39,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         };
         assert!(is_trivial_delegation(&trivial));
 
@@ -53,6 +54,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         };
         assert!(is_trivial_delegation(&simple));
 
@@ -67,6 +69,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         };
         assert!(!is_trivial_delegation(&complex));
     }
@@ -84,6 +87,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         };
         assert_eq!(calculate_complexity_weight(&trivial), 0.1);
 
@@ -98,6 +102,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         };
         assert_eq!(calculate_complexity_weight(&simple), 0.5);
 
@@ -112,6 +117,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         };
         assert_eq!(calculate_complexity_weight(&complex), 1.0);
     }

@@ -853,6 +853,8 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
     if func.is_test
         || func.name.starts_with("test_")
         || func.file.to_string_lossy().contains("/tests/")
+        || func.in_test_module
+    // Helper functions in test modules
     {
         return true;
     }
@@ -1613,6 +1615,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         }
     }
 

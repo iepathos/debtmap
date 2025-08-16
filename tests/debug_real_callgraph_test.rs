@@ -189,6 +189,7 @@ impl FrameworkPatternDetector {
             is_test: false,
             visibility: Some("pub".to_string()),
             is_trait_method: false,
+            in_test_module: false,
         };
 
         let debt_item = create_unified_debt_item_enhanced(&metrics, &call_graph, None, None, 5.0);

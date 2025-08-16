@@ -324,6 +324,7 @@ mod tests {
                     is_test: false,
                     visibility: None,
                     is_trait_method: false,
+                    in_test_module: false,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -667,6 +668,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         });
 
         assert!(!metrics_equal(&metrics1, &metrics2));
@@ -744,6 +746,7 @@ mod tests {
             is_test: false,
             visibility: None,
             is_trait_method: false,
+            in_test_module: false,
         });
 
         inc.previous_state = inc

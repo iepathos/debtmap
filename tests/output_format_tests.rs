@@ -20,6 +20,7 @@ fn test_output_json_format() {
                 is_test: false,
                 visibility: None,
                 is_trait_method: false,
+                in_test_module: false,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
