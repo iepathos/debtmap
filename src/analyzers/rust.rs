@@ -12,7 +12,6 @@ use crate::debt::patterns::{
 };
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
-use crate::expansion::{ExpansionConfig, MacroExpander, MacroExpansion};
 use crate::priority::call_graph::CallGraph;
 use anyhow::Result;
 use quote::ToTokens;
@@ -22,20 +21,13 @@ use syn::{visit::Visit, Item};
 
 pub struct RustAnalyzer {
     complexity_threshold: u32,
-    expansion_config: Option<ExpansionConfig>,
 }
 
 impl RustAnalyzer {
     pub fn new() -> Self {
         Self {
             complexity_threshold: 10,
-            expansion_config: None,
         }
-    }
-
-    pub fn with_expansion(mut self, config: ExpansionConfig) -> Self {
-        self.expansion_config = Some(config);
-        self
     }
 }
 
@@ -75,27 +67,7 @@ pub fn extract_rust_call_graph(ast: &RustAst) -> CallGraph {
     extract_call_graph(&ast.file, &ast.path)
 }
 
-pub fn extract_rust_call_graph_with_expansion(
-    ast: &RustAst,
-    expansion_config: &ExpansionConfig,
-) -> CallGraph {
-    use super::rust_call_graph::extract_call_graph;
-
-    // Try to expand the file first
-    if expansion_config.enabled {
-        if let Ok(mut expander) = MacroExpander::new(expansion_config.clone()) {
-            if let Ok(expanded) = expander.expand_file(&ast.path) {
-                // Parse the expanded content
-                if let Ok(expanded_file) = syn::parse_str::<syn::File>(&expanded.expanded_content) {
-                    return extract_call_graph(&expanded_file, &ast.path);
-                }
-            }
-        }
-    }
-
-    // Fall back to regular analysis
-    extract_call_graph(&ast.file, &ast.path)
-}
+// Expansion function removed - now using enhanced token parsing instead
 
 fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
     let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
