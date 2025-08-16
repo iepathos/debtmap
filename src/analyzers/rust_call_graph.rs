@@ -846,7 +846,8 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 if let Expr::Path(expr_path) = &**func {
                     if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
                         let resolved_name = Self::resolve_self_type(&name, &self.current_impl_type);
-                        let same_file_hint = Self::is_same_file_call(&resolved_name, &self.current_impl_type);
+                        let same_file_hint =
+                            Self::is_same_file_call(&resolved_name, &self.current_impl_type);
                         self.process_call(resolved_name, same_file_hint);
                     }
                 }
@@ -1085,25 +1086,25 @@ mod tests {
     fn test_resolve_self_type() {
         let impl_type = Some("MyStruct".to_string());
         let no_impl_type = None;
-        
+
         // Test with Self:: and impl type present
         assert_eq!(
             CallGraphExtractor::resolve_self_type("Self::new", &impl_type),
             "MyStruct::new"
         );
-        
+
         // Test with Self:: but no impl type
         assert_eq!(
             CallGraphExtractor::resolve_self_type("Self::new", &no_impl_type),
             "Self::new"
         );
-        
+
         // Test with regular function name
         assert_eq!(
             CallGraphExtractor::resolve_self_type("foo::bar", &impl_type),
             "foo::bar"
         );
-        
+
         // Test with no prefix
         assert_eq!(
             CallGraphExtractor::resolve_self_type("simple_func", &impl_type),
@@ -1115,36 +1116,54 @@ mod tests {
     fn test_is_same_file_call() {
         let impl_type = Some("MyStruct".to_string());
         let no_impl_type = None;
-        
+
         // Test local function (no ::)
-        assert!(CallGraphExtractor::is_same_file_call("local_func", &impl_type));
-        assert!(CallGraphExtractor::is_same_file_call("local_func", &no_impl_type));
-        
+        assert!(CallGraphExtractor::is_same_file_call(
+            "local_func",
+            &impl_type
+        ));
+        assert!(CallGraphExtractor::is_same_file_call(
+            "local_func",
+            &no_impl_type
+        ));
+
         // Test external function
-        assert!(!CallGraphExtractor::is_same_file_call("std::vec::Vec", &impl_type));
-        assert!(!CallGraphExtractor::is_same_file_call("other::module", &no_impl_type));
-        
+        assert!(!CallGraphExtractor::is_same_file_call(
+            "std::vec::Vec",
+            &impl_type
+        ));
+        assert!(!CallGraphExtractor::is_same_file_call(
+            "other::module",
+            &no_impl_type
+        ));
+
         // Test impl type method
-        assert!(CallGraphExtractor::is_same_file_call("MyStruct::method", &impl_type));
-        assert!(!CallGraphExtractor::is_same_file_call("OtherStruct::method", &impl_type));
+        assert!(CallGraphExtractor::is_same_file_call(
+            "MyStruct::method",
+            &impl_type
+        ));
+        assert!(!CallGraphExtractor::is_same_file_call(
+            "OtherStruct::method",
+            &impl_type
+        ));
     }
 
     #[test]
     fn test_is_self_receiver() {
         use syn::parse_quote;
-        
+
         // Test self receiver
         let self_expr: Expr = parse_quote!(self);
         assert!(CallGraphExtractor::is_self_receiver(&self_expr));
-        
+
         // Test non-self receiver
         let other_expr: Expr = parse_quote!(other);
         assert!(!CallGraphExtractor::is_self_receiver(&other_expr));
-        
+
         // Test field access
         let field_expr: Expr = parse_quote!(self.field);
         assert!(!CallGraphExtractor::is_self_receiver(&field_expr));
-        
+
         // Test method call receiver
         let method_expr: Expr = parse_quote!(obj);
         assert!(!CallGraphExtractor::is_self_receiver(&method_expr));
@@ -1153,22 +1172,52 @@ mod tests {
     #[test]
     fn test_classify_call_type() {
         // Test async calls
-        assert_eq!(CallGraphExtractor::classify_call_type("await"), CallType::Async);
-        assert_eq!(CallGraphExtractor::classify_call_type("async_func"), CallType::Async);
-        assert_eq!(CallGraphExtractor::classify_call_type("run_await"), CallType::Async);
-        
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("await"),
+            CallType::Async
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("async_func"),
+            CallType::Async
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("run_await"),
+            CallType::Async
+        );
+
         // Test delegate calls
-        assert_eq!(CallGraphExtractor::classify_call_type("handle_request"), CallType::Delegate);
-        assert_eq!(CallGraphExtractor::classify_call_type("process_data"), CallType::Delegate);
-        
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("handle_request"),
+            CallType::Delegate
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("process_data"),
+            CallType::Delegate
+        );
+
         // Test pipeline calls
-        assert_eq!(CallGraphExtractor::classify_call_type("map"), CallType::Pipeline);
-        assert_eq!(CallGraphExtractor::classify_call_type("and_then"), CallType::Pipeline);
-        assert_eq!(CallGraphExtractor::classify_call_type("map_values"), CallType::Pipeline);
-        
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("map"),
+            CallType::Pipeline
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("and_then"),
+            CallType::Pipeline
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("map_values"),
+            CallType::Pipeline
+        );
+
         // Test direct calls
-        assert_eq!(CallGraphExtractor::classify_call_type("regular_func"), CallType::Direct);
-        assert_eq!(CallGraphExtractor::classify_call_type("compute"), CallType::Direct);
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("regular_func"),
+            CallType::Direct
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_call_type("compute"),
+            CallType::Direct
+        );
     }
 
     #[test]
@@ -1190,25 +1239,32 @@ mod tests {
             
             fn other_func() {}
         "#;
-        
+
         let file = parse_rust_code(code);
         let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
         extractor.extract_phase1(&file);
         extractor.resolve_phase2();
         let graph = extractor.call_graph;
-        
+
         // Find the method function
-        let method_fn = graph.find_all_functions()
+        let method_fn = graph
+            .find_all_functions()
             .into_iter()
             .find(|f| f.name == "MyStruct::method")
             .expect("MyStruct::method should exist");
-        
+
         let callees = graph.get_callees(&method_fn);
         let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
-        
+
         // Should have resolved Self::new to MyStruct::new
-        assert!(callee_names.contains(&"MyStruct::new"), "Should contain MyStruct::new");
-        assert!(callee_names.contains(&"other_func"), "Should contain other_func");
+        assert!(
+            callee_names.contains(&"MyStruct::new"),
+            "Should contain MyStruct::new"
+        );
+        assert!(
+            callee_names.contains(&"other_func"),
+            "Should contain other_func"
+        );
         // module::external_func might not resolve in all cases since it's external
         // Just verify we have at least the local calls
         assert!(callees.len() >= 2, "Should have at least 2 callees");
@@ -1236,36 +1292,45 @@ mod tests {
                 foo.process();
             }
         "#;
-        
+
         let file = parse_rust_code(code);
         let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
         extractor.extract_phase1(&file);
         extractor.resolve_phase2();
         let graph = extractor.call_graph;
-        
+
         // Find the process function
-        let process_fn = graph.find_all_functions()
+        let process_fn = graph
+            .find_all_functions()
             .into_iter()
             .find(|f| f.name == "Foo::process")
             .expect("Foo::process should exist");
-        
+
         let callees = graph.get_callees(&process_fn);
         let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
-        
+
         // Should have detected self.compute() as Foo::compute
-        assert!(callee_names.contains(&"Foo::compute"), "Should contain Foo::compute");
-        
+        assert!(
+            callee_names.contains(&"Foo::compute"),
+            "Should contain Foo::compute"
+        );
+
         // Find use_foo function
-        let use_foo_fn = graph.find_all_functions()
+        let use_foo_fn = graph
+            .find_all_functions()
             .into_iter()
             .find(|f| f.name == "use_foo")
             .expect("use_foo should exist");
-        
+
         let use_foo_callees = graph.get_callees(&use_foo_fn);
-        let use_foo_callee_names: Vec<_> = use_foo_callees.iter().map(|c| c.name.as_str()).collect();
-        
-        // Should have detected foo.process() 
-        assert!(use_foo_callee_names.contains(&"Foo::process"), "Should contain Foo::process");
+        let use_foo_callee_names: Vec<_> =
+            use_foo_callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should have detected foo.process()
+        assert!(
+            use_foo_callee_names.contains(&"Foo::process"),
+            "Should contain Foo::process"
+        );
     }
 
     #[test]
