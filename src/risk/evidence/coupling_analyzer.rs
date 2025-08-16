@@ -362,53 +362,64 @@ impl CouplingRiskAnalyzer {
     ) -> Vec<RemediationAction> {
         match severity {
             RiskSeverity::None | RiskSeverity::Low => vec![],
-            RiskSeverity::Moderate => vec![RemediationAction::ReduceCoupling {
-                current_coupling: CouplingMetrics {
-                    afferent,
-                    efferent,
-                    instability,
-                },
-                coupling_issues: issues.to_vec(),
-                suggested_patterns: vec![DesignPattern::DependencyInjection],
-                estimated_effort_hours: 2,
-            }],
-            RiskSeverity::High => vec![RemediationAction::ReduceCoupling {
-                current_coupling: CouplingMetrics {
-                    afferent,
-                    efferent,
-                    instability,
-                },
-                coupling_issues: issues.to_vec(),
-                suggested_patterns: vec![
-                    DesignPattern::DependencyInjection,
-                    DesignPattern::FacadePattern,
-                    DesignPattern::AdapterPattern,
-                ],
-                estimated_effort_hours: 4,
-            }],
-            RiskSeverity::Critical => vec![
-                RemediationAction::ReduceCoupling {
-                    current_coupling: CouplingMetrics {
-                        afferent,
-                        efferent,
-                        instability,
-                    },
+            RiskSeverity::Moderate | RiskSeverity::High | RiskSeverity::Critical => {
+                let metrics = Self::create_coupling_metrics(afferent, efferent, instability);
+                let patterns = Self::get_suggested_patterns(severity);
+                let effort = Self::get_estimated_effort(severity);
+
+                let mut actions = vec![RemediationAction::ReduceCoupling {
+                    current_coupling: metrics,
                     coupling_issues: issues.to_vec(),
-                    suggested_patterns: vec![
-                        DesignPattern::DependencyInjection,
-                        DesignPattern::StrategyPattern,
-                        DesignPattern::ObserverPattern,
-                        DesignPattern::FacadePattern,
-                        DesignPattern::AdapterPattern,
-                    ],
-                    estimated_effort_hours: 8,
-                },
-                RemediationAction::ExtractLogic {
-                    extraction_candidates: vec![],
-                    pure_function_opportunities: efferent / 3,
-                    testability_improvement: 0.4,
-                },
+                    suggested_patterns: patterns,
+                    estimated_effort_hours: effort,
+                }];
+
+                if matches!(severity, RiskSeverity::Critical) {
+                    actions.push(RemediationAction::ExtractLogic {
+                        extraction_candidates: vec![],
+                        pure_function_opportunities: efferent / 3,
+                        testability_improvement: 0.4,
+                    });
+                }
+
+                actions
+            }
+        }
+    }
+
+    fn create_coupling_metrics(afferent: u32, efferent: u32, instability: f64) -> CouplingMetrics {
+        CouplingMetrics {
+            afferent,
+            efferent,
+            instability,
+        }
+    }
+
+    fn get_suggested_patterns(severity: &RiskSeverity) -> Vec<DesignPattern> {
+        match severity {
+            RiskSeverity::Moderate => vec![DesignPattern::DependencyInjection],
+            RiskSeverity::High => vec![
+                DesignPattern::DependencyInjection,
+                DesignPattern::FacadePattern,
+                DesignPattern::AdapterPattern,
             ],
+            RiskSeverity::Critical => vec![
+                DesignPattern::DependencyInjection,
+                DesignPattern::StrategyPattern,
+                DesignPattern::ObserverPattern,
+                DesignPattern::FacadePattern,
+                DesignPattern::AdapterPattern,
+            ],
+            _ => vec![],
+        }
+    }
+
+    fn get_estimated_effort(severity: &RiskSeverity) -> u32 {
+        match severity {
+            RiskSeverity::Moderate => 2,
+            RiskSeverity::High => 4,
+            RiskSeverity::Critical => 8,
+            _ => 0,
         }
     }
 

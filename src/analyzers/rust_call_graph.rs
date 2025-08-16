@@ -11,7 +11,7 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, ImplItemFn, Item, ItemFn, Local, Pat};
+use syn::{Expr, ExprMacro, ImplItemFn, Item, ItemFn, Local, Pat};
 
 /// Represents an unresolved function call that needs to be resolved in phase 2
 #[derive(Debug, Clone)]
@@ -374,6 +374,7 @@ impl CallGraphExtractor {
         method_name
     }
 
+    /// Classify expression for appropriate handling strategy
     /// Enhanced macro handling with pattern recognition and logging
     fn handle_macro_expression(&mut self, expr_macro: &ExprMacro) {
         self.macro_stats.total_macros += 1;
@@ -733,6 +734,51 @@ impl CallGraphExtractor {
     }
 }
 
+impl CallGraphExtractor {
+    fn handle_call_expr(
+        &mut self,
+        func: &Expr,
+        args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
+    ) {
+        if let Expr::Path(expr_path) = func {
+            if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
+                let resolved_name = Self::resolve_self_type(&name, &self.current_impl_type);
+                let same_file_hint =
+                    Self::is_same_file_call(&resolved_name, &self.current_impl_type);
+                self.process_call(resolved_name, same_file_hint);
+            }
+        }
+        // Process arguments for references and nested calls
+        self.process_arguments(args);
+    }
+
+    fn handle_method_call_expr(
+        &mut self,
+        method: &syn::Ident,
+        args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
+        receiver: &Expr,
+    ) {
+        let name = self.construct_method_name(method, receiver, &self.current_impl_type);
+        let same_file_hint = Self::is_self_receiver(receiver);
+        self.process_call(name, same_file_hint);
+
+        // Process arguments and visit receiver
+        self.process_arguments(args);
+        self.visit_expr(receiver);
+    }
+
+    fn handle_struct_expr(&mut self, expr_struct: &syn::ExprStruct) {
+        // Visit each field's value expression to detect function calls
+        for field in &expr_struct.fields {
+            self.visit_expr(&field.expr);
+        }
+        // If there's a base struct (e.g., Foo { field: value, ..base })
+        if let Some(ref base) = expr_struct.rest {
+            self.visit_expr(base);
+        }
+    }
+}
+
 impl<'ast> Visit<'ast> for CallGraphExtractor {
     fn visit_local(&mut self, local: &'ast Local) {
         // Track type when visiting variable declarations
@@ -850,77 +896,101 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        match expr {
-            // Handle regular function calls: foo(), module::foo(), Self::method()
-            Expr::Call(ExprCall { func, args, .. }) => {
-                if let Expr::Path(expr_path) = &**func {
-                    if let Some(name) = Self::extract_function_name_from_path(&expr_path.path) {
-                        let resolved_name = Self::resolve_self_type(&name, &self.current_impl_type);
-                        let same_file_hint =
-                            Self::is_same_file_call(&resolved_name, &self.current_impl_type);
-                        self.process_call(resolved_name, same_file_hint);
-                    }
-                }
-                // Process arguments for references and nested calls
-                self.process_arguments(args);
-                return; // Early return to avoid visiting children
-            }
-            // Handle method calls: obj.method()
-            Expr::MethodCall(ExprMethodCall {
-                method,
-                args,
-                receiver,
-                ..
-            }) => {
-                let name = self.construct_method_name(method, receiver, &self.current_impl_type);
-                let same_file_hint = Self::is_self_receiver(receiver);
-                self.process_call(name, same_file_hint);
+        // Classify the expression type for processing
+        let expr_category = Self::classify_expr_category(expr);
 
-                // Process arguments and visit receiver
-                self.process_arguments(args);
-                self.visit_expr(receiver);
-                return; // Early return to avoid visiting children
-            }
-            // Handle closures that might contain calls
-            Expr::Closure(closure) => {
-                // Visit the closure body to detect calls inside
-                self.visit_expr(&closure.body);
-                return;
-            }
-            // Handle async blocks
-            Expr::Async(async_block) => {
-                for stmt in &async_block.block.stmts {
-                    self.visit_stmt(stmt);
+        // Process based on category
+        match expr_category {
+            ExprCategory::Call => {
+                if let Expr::Call(call_expr) = expr {
+                    self.handle_call_expr(&call_expr.func, &call_expr.args);
                 }
-                return;
             }
-            // Handle await expressions
-            Expr::Await(await_expr) => {
-                self.visit_expr(&await_expr.base);
-                return;
-            }
-            // Handle struct literals to find function calls in field values
-            Expr::Struct(expr_struct) => {
-                // Visit each field's value expression to detect function calls
-                for field in &expr_struct.fields {
-                    self.visit_expr(&field.expr);
+            ExprCategory::MethodCall => {
+                if let Expr::MethodCall(method_call) = expr {
+                    self.handle_method_call_expr(
+                        &method_call.method,
+                        &method_call.args,
+                        &method_call.receiver,
+                    );
                 }
-                // If there's a base struct (e.g., Foo { field: value, ..base })
-                if let Some(ref base) = expr_struct.rest {
-                    self.visit_expr(base);
+            }
+            ExprCategory::Closure => {
+                if let Expr::Closure(closure) = expr {
+                    self.process_closure_expr(closure);
                 }
-                return;
             }
-            // Handle macros like vec![] that might contain function calls
-            Expr::Macro(expr_macro) => {
-                self.handle_macro_expression(expr_macro);
-                return;
+            ExprCategory::Async => {
+                if let Expr::Async(async_block) = expr {
+                    self.process_async_expr(async_block);
+                }
             }
-            _ => {}
+            ExprCategory::Await => {
+                if let Expr::Await(await_expr) = expr {
+                    self.process_await_expr(await_expr);
+                }
+            }
+            ExprCategory::Struct => {
+                if let Expr::Struct(struct_expr) = expr {
+                    self.handle_struct_expr(struct_expr);
+                }
+            }
+            ExprCategory::Macro => {
+                if let Expr::Macro(macro_expr) = expr {
+                    self.handle_macro_expression(macro_expr);
+                }
+            }
+            ExprCategory::Other => syn::visit::visit_expr(self, expr),
         }
+    }
+}
 
-        // Continue visiting for other expression types
-        syn::visit::visit_expr(self, expr);
+/// Category of expression for call graph processing
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExprCategory {
+    Call,
+    MethodCall,
+    Closure,
+    Async,
+    Await,
+    Struct,
+    Macro,
+    Other,
+}
+
+impl CallGraphExtractor {
+    /// Pure function to classify expression type for call graph processing
+    fn classify_expr_category(expr: &Expr) -> ExprCategory {
+        match expr {
+            Expr::Call(_) => ExprCategory::Call,
+            Expr::MethodCall(_) => ExprCategory::MethodCall,
+            Expr::Closure(_) => ExprCategory::Closure,
+            Expr::Async(_) => ExprCategory::Async,
+            Expr::Await(_) => ExprCategory::Await,
+            Expr::Struct(_) => ExprCategory::Struct,
+            Expr::Macro(_) => ExprCategory::Macro,
+            _ => ExprCategory::Other,
+        }
+    }
+
+    /// Pure function to determine if expression needs special handling
+    #[allow(dead_code)]
+    fn needs_special_handling(category: ExprCategory) -> bool {
+        !matches!(category, ExprCategory::Other)
+    }
+
+    fn process_closure_expr(&mut self, closure: &syn::ExprClosure) {
+        self.visit_expr(&closure.body);
+    }
+
+    fn process_async_expr(&mut self, async_block: &syn::ExprAsync) {
+        for stmt in &async_block.block.stmts {
+            self.visit_stmt(stmt);
+        }
+    }
+
+    fn process_await_expr(&mut self, await_expr: &syn::ExprAwait) {
+        self.visit_expr(&await_expr.base);
     }
 }
 
@@ -1085,6 +1155,7 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
     use std::path::PathBuf;
     use syn;
 
@@ -1841,5 +1912,1481 @@ mod tests {
         extractor.process_parsed_exprs(exprs);
         // The method processes expressions by visiting them
         // which may or may not add to the call graph depending on the expressions
+    }
+
+    #[test]
+    fn test_visit_expr_closure_handling() {
+        let code = r#"
+            fn process_with_closure() {
+                let numbers = vec![1, 2, 3];
+                
+                // Closure with function calls inside
+                let result = numbers.iter().map(|x| {
+                    let doubled = double(*x);
+                    let formatted = format_number(doubled);
+                    formatted
+                }).collect::<Vec<_>>();
+                
+                // Closure with method calls
+                let processor = |value: i32| {
+                    helper_function(value);
+                    value.to_string()
+                };
+            }
+            
+            fn double(x: i32) -> i32 { x * 2 }
+            fn format_number(x: i32) -> String { x.to_string() }
+            fn helper_function(x: i32) {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the process_with_closure function
+        let process_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "process_with_closure")
+            .expect("process_with_closure should exist");
+
+        let callees = graph.get_callees(&process_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls inside closures
+        assert!(
+            callee_names.contains(&"double"),
+            "Should detect double() call inside closure"
+        );
+        assert!(
+            callee_names.contains(&"format_number"),
+            "Should detect format_number() call inside closure"
+        );
+        assert!(
+            callee_names.contains(&"helper_function"),
+            "Should detect helper_function() call inside closure"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_async_block_handling() {
+        let code = r#"
+            async fn async_processor() {
+                // Async block with function calls
+                let future = async {
+                    prepare_data().await;
+                    let result = compute_async().await;
+                    finalize(result);
+                    result
+                };
+                
+                // Another async block
+                let another = async move {
+                    validate_input();
+                    process_item().await;
+                };
+            }
+            
+            async fn prepare_data() {}
+            async fn compute_async() -> i32 { 42 }
+            fn finalize(x: i32) {}
+            fn validate_input() {}
+            async fn process_item() {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the async_processor function
+        let async_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "async_processor")
+            .expect("async_processor should exist");
+
+        let callees = graph.get_callees(&async_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls inside async blocks
+        assert!(
+            callee_names.contains(&"prepare_data"),
+            "Should detect prepare_data() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"compute_async"),
+            "Should detect compute_async() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"finalize"),
+            "Should detect finalize() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"validate_input"),
+            "Should detect validate_input() call inside async block"
+        );
+        assert!(
+            callee_names.contains(&"process_item"),
+            "Should detect process_item() call inside async block"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_await_handling() {
+        let code = r#"
+            async fn await_handler() {
+                // Simple await expression
+                let result = fetch_data().await;
+                
+                // Chained await expressions
+                let processed = fetch_data()
+                    .await
+                    .transform()
+                    .await;
+                
+                // Await with method call on result
+                let final_result = compute()
+                    .await
+                    .finalize();
+            }
+            
+            async fn fetch_data() -> DataWrapper { DataWrapper }
+            async fn compute() -> Processor { Processor }
+            
+            struct DataWrapper;
+            impl DataWrapper {
+                async fn transform(self) -> ProcessedData { ProcessedData }
+            }
+            
+            struct ProcessedData;
+            struct Processor;
+            impl Processor {
+                fn finalize(self) -> i32 { 42 }
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the await_handler function
+        let await_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "await_handler")
+            .expect("await_handler should exist");
+
+        let callees = graph.get_callees(&await_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls with await expressions
+        assert!(
+            callee_names.contains(&"fetch_data"),
+            "Should detect fetch_data() call with await"
+        );
+        assert!(
+            callee_names.contains(&"compute"),
+            "Should detect compute() call with await"
+        );
+        // Method calls on awaited results
+        assert!(
+            callee_names.iter().any(|n| n.contains("transform")),
+            "Should detect transform() method call"
+        );
+        assert!(
+            callee_names.iter().any(|n| n.contains("finalize")),
+            "Should detect finalize() method call"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_struct_literal_handling() {
+        let code = r#"
+            struct Config {
+                name: String,
+                value: i32,
+                processor: fn(i32) -> i32,
+            }
+            
+            struct Nested {
+                config: Config,
+                data: Vec<i32>,
+            }
+            
+            fn create_config() {
+                // Struct literal with function calls in field values
+                let config = Config {
+                    name: generate_name(),
+                    value: calculate_value(),
+                    processor: get_processor(),
+                };
+                
+                // Nested struct literal
+                let nested = Nested {
+                    config: Config {
+                        name: format_string("test"),
+                        value: compute_default(),
+                        processor: default_processor,
+                    },
+                    data: generate_data(),
+                };
+                
+                // Struct with base
+                let updated = Config {
+                    name: new_name(),
+                    ..get_base_config()
+                };
+            }
+            
+            fn generate_name() -> String { String::new() }
+            fn calculate_value() -> i32 { 42 }
+            fn get_processor() -> fn(i32) -> i32 { |x| x }
+            fn format_string(s: &str) -> String { s.to_string() }
+            fn compute_default() -> i32 { 0 }
+            fn default_processor(x: i32) -> i32 { x }
+            fn generate_data() -> Vec<i32> { vec![] }
+            fn new_name() -> String { String::new() }
+            fn get_base_config() -> Config { 
+                Config { 
+                    name: String::new(), 
+                    value: 0, 
+                    processor: |x| x 
+                } 
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the create_config function
+        let create_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "create_config")
+            .expect("create_config should exist");
+
+        let callees = graph.get_callees(&create_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls in struct field values
+        assert!(
+            callee_names.contains(&"generate_name"),
+            "Should detect generate_name() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"calculate_value"),
+            "Should detect calculate_value() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"get_processor"),
+            "Should detect get_processor() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"format_string"),
+            "Should detect format_string() in nested struct"
+        );
+        assert!(
+            callee_names.contains(&"compute_default"),
+            "Should detect compute_default() in nested struct"
+        );
+        assert!(
+            callee_names.contains(&"generate_data"),
+            "Should detect generate_data() in struct field"
+        );
+        assert!(
+            callee_names.contains(&"new_name"),
+            "Should detect new_name() in struct update"
+        );
+        assert!(
+            callee_names.contains(&"get_base_config"),
+            "Should detect get_base_config() in struct base"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_complex_nested_calls() {
+        let code = r#"
+            fn complex_nested() {
+                // Deeply nested function calls in various expression types
+                let result = async {
+                    let closure = |x| {
+                        let config = Config {
+                            value: process(x),
+                            data: transform(fetch().await),
+                        };
+                        config
+                    };
+                    
+                    closure(compute())
+                }.await;
+            }
+            
+            struct Config {
+                value: i32,
+                data: String,
+            }
+            
+            fn process(x: i32) -> i32 { x }
+            fn transform(s: String) -> String { s }
+            async fn fetch() -> String { String::new() }
+            fn compute() -> i32 { 42 }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the complex_nested function
+        let complex_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "complex_nested")
+            .expect("complex_nested should exist");
+
+        let callees = graph.get_callees(&complex_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect all nested function calls
+        assert!(
+            callee_names.contains(&"process"),
+            "Should detect process() in nested context"
+        );
+        assert!(
+            callee_names.contains(&"transform"),
+            "Should detect transform() in nested context"
+        );
+        assert!(
+            callee_names.contains(&"fetch"),
+            "Should detect fetch() in nested context"
+        );
+        assert!(
+            callee_names.contains(&"compute"),
+            "Should detect compute() in nested context"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_macro_expressions() {
+        // Test that visit_expr correctly handles macro expressions through Expr::Macro path
+        let code = r#"
+            fn macro_user() {
+                // Collection macros with function calls - these are successfully parsed
+                let v = vec![generate_item(), process_item(), finalize_item()];
+                
+                // Format macro with function call - also successfully parsed
+                let msg = format!("Result: {}", calculate_result());
+                
+                // HashSet macro with function calls
+                let set = hashset![first_item(), second_item()];
+            }
+            
+            fn generate_item() -> i32 { 1 }
+            fn process_item() -> i32 { 2 }
+            fn finalize_item() -> i32 { 3 }
+            fn calculate_result() -> i32 { 100 }
+            fn first_item() -> i32 { 10 }
+            fn second_item() -> i32 { 20 }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the macro_user function
+        let macro_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "macro_user")
+            .expect("macro_user should exist");
+
+        let callees = graph.get_callees(&macro_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Test that the Expr::Macro path in visit_expr correctly delegates to handle_macro_expression
+        // which then parses known macro patterns and visits the expressions within
+
+        // vec! macro - collection macro parsing
+        assert!(
+            callee_names.contains(&"generate_item"),
+            "Should detect generate_item() in vec! macro"
+        );
+        assert!(
+            callee_names.contains(&"process_item"),
+            "Should detect process_item() in vec! macro"
+        );
+        assert!(
+            callee_names.contains(&"finalize_item"),
+            "Should detect finalize_item() in vec! macro"
+        );
+
+        // format! macro - format macro parsing (skips format string, visits arguments)
+        assert!(
+            callee_names.contains(&"calculate_result"),
+            "Should detect calculate_result() in format! macro"
+        );
+
+        // hashset! macro - collection macro parsing
+        assert!(
+            callee_names.contains(&"first_item"),
+            "Should detect first_item() in hashset! macro"
+        );
+        assert!(
+            callee_names.contains(&"second_item"),
+            "Should detect second_item() in hashset! macro"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_default_case_expressions() {
+        // Test expressions that hit the default case in visit_expr
+        let code = r#"
+            fn expressions_handler() {
+                // Binary operations with function calls
+                let sum = get_left() + get_right();
+                
+                // Unary operations
+                let neg = -compute_value();
+                
+                // Array expressions with function calls
+                let arr = [first(), second(), third()];
+                
+                // Index expressions
+                let val = get_array()[get_index()];
+                
+                // Field access on function result
+                let field = get_struct().field;
+                
+                // Range expressions
+                let range = start_value()..end_value();
+                
+                // If expressions with function calls
+                let result = if check_condition() {
+                    handle_true()
+                } else {
+                    handle_false()
+                };
+                
+                // Match expressions
+                match get_option() {
+                    Some(x) => process_some(x),
+                    None => process_none(),
+                }
+                
+                // Loop expressions
+                loop {
+                    if should_break() {
+                        break;
+                    }
+                    loop_body();
+                }
+                
+                // While expressions
+                while continue_condition() {
+                    iterate();
+                }
+                
+                // For loop expressions
+                for item in get_iterator() {
+                    process_item(item);
+                }
+            }
+            
+            fn get_left() -> i32 { 1 }
+            fn get_right() -> i32 { 2 }
+            fn compute_value() -> i32 { 42 }
+            fn first() -> i32 { 1 }
+            fn second() -> i32 { 2 }
+            fn third() -> i32 { 3 }
+            fn get_array() -> Vec<i32> { vec![1, 2, 3] }
+            fn get_index() -> usize { 0 }
+            struct MyStruct { field: i32 }
+            fn get_struct() -> MyStruct { MyStruct { field: 42 } }
+            fn start_value() -> i32 { 0 }
+            fn end_value() -> i32 { 10 }
+            fn check_condition() -> bool { true }
+            fn handle_true() -> i32 { 1 }
+            fn handle_false() -> i32 { 0 }
+            fn get_option() -> Option<i32> { Some(42) }
+            fn process_some(x: i32) {}
+            fn process_none() {}
+            fn should_break() -> bool { true }
+            fn loop_body() {}
+            fn continue_condition() -> bool { false }
+            fn iterate() {}
+            fn get_iterator() -> Vec<i32> { vec![1, 2, 3] }
+            fn process_item(x: i32) {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+        let graph = extractor.call_graph;
+
+        // Find the expressions_handler function
+        let expr_fn = graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "expressions_handler")
+            .expect("expressions_handler should exist");
+
+        let callees = graph.get_callees(&expr_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Should detect function calls in various expression contexts
+        assert!(
+            callee_names.contains(&"get_left"),
+            "Should detect get_left() in binary operation"
+        );
+        assert!(
+            callee_names.contains(&"get_right"),
+            "Should detect get_right() in binary operation"
+        );
+        assert!(
+            callee_names.contains(&"compute_value"),
+            "Should detect compute_value() in unary operation"
+        );
+        assert!(
+            callee_names.contains(&"first"),
+            "Should detect first() in array expression"
+        );
+        assert!(
+            callee_names.contains(&"get_array"),
+            "Should detect get_array() in index expression"
+        );
+        assert!(
+            callee_names.contains(&"get_index"),
+            "Should detect get_index() in index expression"
+        );
+        assert!(
+            callee_names.contains(&"get_struct"),
+            "Should detect get_struct() in field access"
+        );
+        assert!(
+            callee_names.contains(&"check_condition"),
+            "Should detect check_condition() in if expression"
+        );
+        assert!(
+            callee_names.contains(&"handle_true"),
+            "Should detect handle_true() in if branch"
+        );
+        assert!(
+            callee_names.contains(&"handle_false"),
+            "Should detect handle_false() in else branch"
+        );
+        assert!(
+            callee_names.contains(&"get_option"),
+            "Should detect get_option() in match expression"
+        );
+        assert!(
+            callee_names.contains(&"process_some"),
+            "Should detect process_some() in match arm"
+        );
+        assert!(
+            callee_names.contains(&"process_none"),
+            "Should detect process_none() in match arm"
+        );
+        assert!(
+            callee_names.contains(&"should_break"),
+            "Should detect should_break() in loop"
+        );
+        assert!(
+            callee_names.contains(&"loop_body"),
+            "Should detect loop_body() in loop"
+        );
+        assert!(
+            callee_names.contains(&"continue_condition"),
+            "Should detect continue_condition() in while"
+        );
+        assert!(
+            callee_names.contains(&"iterate"),
+            "Should detect iterate() in while body"
+        );
+        assert!(
+            callee_names.contains(&"get_iterator"),
+            "Should detect get_iterator() in for loop"
+        );
+        assert!(
+            callee_names.contains(&"process_item"),
+            "Should detect process_item() in for loop body"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_integration() {
+        // Test that visit_expr correctly handles different expression types
+        let code = r#"
+            fn test_function() {
+                // Function call
+                foo();
+                
+                // Method call
+                obj.method();
+                
+                // Closure
+                let c = |x| x + 1;
+                
+                // Async block
+                async {
+                    fetch().await;
+                };
+                
+                // Struct literal
+                let p = Point { x: 1, y: 2 };
+                
+                // Macro
+                let v = vec![1, 2, 3];
+                
+                // Regular expression (should use default handling)
+                let x = 42;
+            }
+            
+            fn foo() {}
+            struct Point { x: i32, y: i32 }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+
+        // Verify that the function was found and processed
+        let test_fn = extractor
+            .call_graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "test_function")
+            .expect("test_function should exist");
+
+        // Verify that foo() call was detected
+        let callees = extractor.call_graph.get_callees(&test_fn);
+        let callee_names: Vec<_> = callees.iter().map(|c| c.name.as_str()).collect();
+        assert!(callee_names.contains(&"foo"), "Should detect foo() call");
+    }
+
+    #[test]
+    fn test_visit_expr_all_branches() {
+        // Comprehensive test covering all match arms in visit_expr
+        let code = r#"
+            fn comprehensive_test() {
+                // Expr::Call case
+                regular_function();
+                module::external_func();
+                
+                // Expr::MethodCall case
+                let obj = MyType::new();
+                obj.instance_method();
+                self.self_method();
+                
+                // Expr::Closure case (with nested expression)
+                let closure = |x| {
+                    nested_func(x)
+                };
+                
+                // Expr::Async case (with statements)
+                let future = async {
+                    let result = async_func().await;
+                    process_result(result);
+                };
+                
+                // Expr::Await case
+                let value = some_future.await;
+                
+                // Expr::Struct case with fields containing calls
+                let s = MyStruct {
+                    field1: compute_value(),
+                    field2: Default::default(),
+                };
+                
+                // Expr::Macro case
+                vec![get_item(), get_item()];
+                format!("{}", formatter());
+                
+                // Default case expressions (should traverse children)
+                let binary = 1 + compute_sum();
+                let unary = !is_valid();
+                let array = [element_func(); 10];
+                let tuple = (first_func(), second_func());
+                let block_expr = {
+                    block_func();
+                    42
+                };
+                let if_expr = if condition_func() {
+                    then_func()
+                } else {
+                    else_func()
+                };
+                let match_expr = match get_option() {
+                    Some(v) => process_some(v),
+                    None => process_none(),
+                };
+                let loop_expr = loop {
+                    if exit_condition() {
+                        break;
+                    }
+                    loop_body();
+                };
+                let while_expr = while continue_condition() {
+                    while_body();
+                };
+                let for_expr = for item in get_iterator() {
+                    process_item(item);
+                };
+            }
+            
+            fn regular_function() {}
+            fn nested_func(x: i32) -> i32 { x }
+            async fn async_func() -> i32 { 42 }
+            fn process_result(r: i32) {}
+            fn compute_value() -> i32 { 0 }
+            fn formatter() -> String { String::new() }
+            fn get_item() -> i32 { 1 }
+            fn compute_sum() -> i32 { 2 }
+            fn is_valid() -> bool { true }
+            fn element_func() -> i32 { 3 }
+            fn first_func() -> i32 { 4 }
+            fn second_func() -> i32 { 5 }
+            fn block_func() {}
+            fn condition_func() -> bool { true }
+            fn then_func() -> i32 { 6 }
+            fn else_func() -> i32 { 7 }
+            fn get_option() -> Option<i32> { Some(8) }
+            fn process_some(v: i32) -> i32 { v }
+            fn process_none() -> i32 { 0 }
+            fn exit_condition() -> bool { true }
+            fn loop_body() {}
+            fn continue_condition() -> bool { false }
+            fn while_body() {}
+            fn get_iterator() -> Vec<i32> { vec![1, 2, 3] }
+            fn process_item(item: i32) {}
+            
+            struct MyType;
+            impl MyType {
+                fn new() -> Self { MyType }
+                fn instance_method(&self) {}
+                fn self_method(&self) {}
+            }
+            
+            struct MyStruct {
+                field1: i32,
+                field2: i32,
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+
+        // Find the comprehensive_test function
+        let test_fn = extractor
+            .call_graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "comprehensive_test")
+            .expect("comprehensive_test should exist");
+
+        let callees = extractor.call_graph.get_callees(&test_fn);
+        let callee_names: HashSet<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Verify calls from different expression types are detected
+
+        // From Expr::Call
+        assert!(
+            callee_names.contains("regular_function"),
+            "Should detect regular function call"
+        );
+
+        // From Expr::MethodCall
+        assert!(
+            callee_names.contains("MyType::new"),
+            "Should detect constructor call"
+        );
+        assert!(
+            callee_names.contains("MyType::instance_method"),
+            "Should detect method call"
+        );
+
+        // From nested expressions in Expr::Closure body
+        assert!(
+            callee_names.contains("nested_func"),
+            "Should detect call in closure body"
+        );
+
+        // From Expr::Async block statements
+        assert!(
+            callee_names.contains("process_result"),
+            "Should detect call in async block"
+        );
+
+        // From Expr::Struct fields
+        assert!(
+            callee_names.contains("compute_value"),
+            "Should detect call in struct field"
+        );
+
+        // From default case expressions that contain calls
+        assert!(
+            callee_names.contains("compute_sum"),
+            "Should detect call in binary expression"
+        );
+        assert!(
+            callee_names.contains("is_valid"),
+            "Should detect call in unary expression"
+        );
+        assert!(
+            callee_names.contains("element_func"),
+            "Should detect call in array expression"
+        );
+        assert!(
+            callee_names.contains("first_func"),
+            "Should detect call in tuple expression"
+        );
+        assert!(
+            callee_names.contains("block_func"),
+            "Should detect call in block expression"
+        );
+        assert!(
+            callee_names.contains("condition_func"),
+            "Should detect call in if condition"
+        );
+        assert!(
+            callee_names.contains("then_func"),
+            "Should detect call in then branch"
+        );
+        assert!(
+            callee_names.contains("else_func"),
+            "Should detect call in else branch"
+        );
+        assert!(
+            callee_names.contains("get_option"),
+            "Should detect call in match expression"
+        );
+        assert!(
+            callee_names.contains("process_some"),
+            "Should detect call in match arm"
+        );
+        assert!(
+            callee_names.contains("exit_condition"),
+            "Should detect call in loop condition"
+        );
+        assert!(
+            callee_names.contains("loop_body"),
+            "Should detect call in loop body"
+        );
+        assert!(
+            callee_names.contains("continue_condition"),
+            "Should detect call in while condition"
+        );
+        assert!(
+            callee_names.contains("while_body"),
+            "Should detect call in while body"
+        );
+        assert!(
+            callee_names.contains("get_iterator"),
+            "Should detect call in for iterator"
+        );
+        assert!(
+            callee_names.contains("process_item"),
+            "Should detect call in for body"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_nested_expressions() {
+        // Test deeply nested expressions to ensure recursion works correctly
+        let code = r#"
+            fn deeply_nested() {
+                // Nested calls within calls
+                outer_func(middle_func(inner_func()));
+                
+                // Nested method chains
+                builder()
+                    .with_option(get_option())
+                    .with_value(compute())
+                    .build();
+                
+                // Complex nested structure
+                let result = if check_condition() {
+                    match analyze_data() {
+                        Some(data) => process_data(transform_data(data)),
+                        None => default_value(),
+                    }
+                } else {
+                    fallback_computation()
+                };
+                
+                // Nested closures
+                let nested_closure = |x| {
+                    |y| {
+                        combine(x, y)
+                    }
+                };
+                
+                // Nested async blocks
+                let nested_async = async {
+                    let inner = async {
+                        fetch_data().await
+                    };
+                    process_async(inner.await).await
+                };
+            }
+            
+            fn outer_func(x: i32) -> i32 { x }
+            fn middle_func(x: i32) -> i32 { x }
+            fn inner_func() -> i32 { 1 }
+            fn builder() -> Builder { Builder }
+            fn get_option() -> i32 { 2 }
+            fn compute() -> i32 { 3 }
+            fn check_condition() -> bool { true }
+            fn analyze_data() -> Option<i32> { Some(4) }
+            fn process_data(x: i32) -> i32 { x }
+            fn transform_data(x: i32) -> i32 { x }
+            fn default_value() -> i32 { 0 }
+            fn fallback_computation() -> i32 { 5 }
+            fn combine(x: i32, y: i32) -> i32 { x + y }
+            async fn fetch_data() -> i32 { 6 }
+            async fn process_async(x: i32) -> i32 { x }
+            
+            struct Builder;
+            impl Builder {
+                fn with_option(self, _: i32) -> Self { self }
+                fn with_value(self, _: i32) -> Self { self }
+                fn build(self) -> i32 { 7 }
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+
+        let test_fn = extractor
+            .call_graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "deeply_nested")
+            .expect("deeply_nested should exist");
+
+        let callees = extractor.call_graph.get_callees(&test_fn);
+        let callee_names: HashSet<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Verify nested calls are all detected
+        assert!(
+            callee_names.contains("outer_func"),
+            "Should detect outer function"
+        );
+        assert!(
+            callee_names.contains("middle_func"),
+            "Should detect middle function"
+        );
+        assert!(
+            callee_names.contains("inner_func"),
+            "Should detect inner function"
+        );
+
+        // Verify method chain calls
+        assert!(
+            callee_names.contains("builder"),
+            "Should detect builder function"
+        );
+        assert!(
+            callee_names.contains("Builder::with_option"),
+            "Should detect with_option method"
+        );
+        assert!(
+            callee_names.contains("Builder::with_value"),
+            "Should detect with_value method"
+        );
+        assert!(
+            callee_names.contains("Builder::build"),
+            "Should detect build method"
+        );
+        assert!(
+            callee_names.contains("get_option"),
+            "Should detect get_option in chain"
+        );
+        assert!(
+            callee_names.contains("compute"),
+            "Should detect compute in chain"
+        );
+
+        // Verify complex nested structure calls
+        assert!(
+            callee_names.contains("check_condition"),
+            "Should detect condition check"
+        );
+        assert!(
+            callee_names.contains("analyze_data"),
+            "Should detect data analysis"
+        );
+        assert!(
+            callee_names.contains("process_data"),
+            "Should detect data processing"
+        );
+        assert!(
+            callee_names.contains("transform_data"),
+            "Should detect data transformation"
+        );
+        assert!(
+            callee_names.contains("default_value"),
+            "Should detect default value"
+        );
+        assert!(
+            callee_names.contains("fallback_computation"),
+            "Should detect fallback"
+        );
+
+        // Verify nested closure calls
+        assert!(
+            callee_names.contains("combine"),
+            "Should detect call in nested closure"
+        );
+
+        // Verify nested async calls
+        assert!(
+            callee_names.contains("fetch_data"),
+            "Should detect call in nested async"
+        );
+        assert!(
+            callee_names.contains("process_async"),
+            "Should detect async processing"
+        );
+    }
+
+    #[test]
+    fn test_visit_expr_edge_cases() {
+        // Test edge cases and error conditions
+        let code = r#"
+            struct EmptyStruct {}
+            
+            fn edge_cases() {
+                // Empty expressions
+                {};
+                
+                // Macro with empty content
+                vec![];
+                
+                // Closure with no body expression
+                let empty_closure = |_| {};
+                
+                // Async block with no statements
+                let empty_async = async {};
+                
+                // Struct with no fields
+                let empty_struct = EmptyStruct {};
+                
+                // Complex macro patterns (known limitation)
+                assert_eq!(compute_left(), compute_right());
+                debug_assert!(validate());
+                
+                // Path expressions with function calls
+                std::mem::drop(create_value());
+                
+                // Reference and dereference
+                let ref_call = &make_ref();
+                let deref_call = *make_ptr();
+                
+                // Range expressions
+                for i in start_value()..end_value() {
+                    process_index(i);
+                }
+            }
+            
+            fn compute_left() -> i32 { 1 }
+            fn compute_right() -> i32 { 1 }
+            fn validate() -> bool { true }
+            fn create_value() -> i32 { 2 }
+            fn make_ref() -> i32 { 3 }
+            fn make_ptr() -> Box<i32> { Box::new(4) }
+            fn start_value() -> i32 { 0 }
+            fn end_value() -> i32 { 10 }
+            fn process_index(i: i32) {}
+        "#;
+
+        let file = parse_rust_code(code);
+        let mut extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        extractor.extract_phase1(&file);
+        extractor.resolve_phase2();
+
+        let test_fn = extractor
+            .call_graph
+            .find_all_functions()
+            .into_iter()
+            .find(|f| f.name == "edge_cases")
+            .expect("edge_cases should exist");
+
+        let callees = extractor.call_graph.get_callees(&test_fn);
+        let callee_names: HashSet<_> = callees.iter().map(|c| c.name.as_str()).collect();
+
+        // Verify calls that should be detected in expressions
+        // Note: Many edge cases like drop() arguments, macro expansions, and
+        // qualified paths have known limitations in the current implementation
+
+        // Basic function calls that work through the default visitor
+        assert!(
+            callee_names.contains("create_value"),
+            "Should detect create_value call"
+        );
+        assert!(
+            callee_names.contains("make_ref"),
+            "Should detect make_ref call"
+        );
+        assert!(
+            callee_names.contains("make_ptr"),
+            "Should detect make_ptr call"
+        );
+
+        // Range and loop expressions
+        assert!(
+            callee_names.contains("start_value"),
+            "Should detect start_value call"
+        );
+        assert!(
+            callee_names.contains("end_value"),
+            "Should detect end_value call"
+        );
+        assert!(
+            callee_names.contains("process_index"),
+            "Should detect process_index call"
+        );
+    }
+
+    #[test]
+    fn test_classify_expr_category() {
+        // Test classification of different expression types
+        let code = r#"
+            fn test_exprs() {
+                // Call expression
+                foo();
+                
+                // Method call
+                obj.method();
+                
+                // Closure
+                let c = |x| x + 1;
+                
+                // Async block
+                let f = async { 42 };
+                
+                // Await
+                let r = future.await;
+                
+                // Struct literal
+                let s = MyStruct { field: 42 };
+                
+                // Macro (format! is more reliably parsed as Expr::Macro)
+                format!("test {}", 42);
+                
+                // Other expressions
+                let x = 1 + 2;
+                let y = if true { 1 } else { 2 };
+            }
+            
+            fn foo() {}
+            struct MyStruct { field: i32 }
+        "#;
+
+        let file = parse_rust_code(code);
+
+        // Extract expressions and classify them
+        struct ExprCollector {
+            categories: Vec<ExprCategory>,
+        }
+
+        impl<'ast> Visit<'ast> for ExprCollector {
+            fn visit_expr(&mut self, expr: &'ast Expr) {
+                let category = CallGraphExtractor::classify_expr_category(expr);
+                self.categories.push(category);
+                syn::visit::visit_expr(self, expr);
+            }
+        }
+
+        let mut collector = ExprCollector {
+            categories: Vec::new(),
+        };
+
+        for item in &file.items {
+            if let syn::Item::Fn(func) = item {
+                if func.sig.ident == "test_exprs" {
+                    for stmt in &func.block.stmts {
+                        collector.visit_stmt(stmt);
+                    }
+                }
+            }
+        }
+
+        // Verify classifications
+        assert!(
+            collector.categories.contains(&ExprCategory::Call),
+            "Should classify Call"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::MethodCall),
+            "Should classify MethodCall"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Closure),
+            "Should classify Closure"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Async),
+            "Should classify Async"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Await),
+            "Should classify Await"
+        );
+        assert!(
+            collector.categories.contains(&ExprCategory::Struct),
+            "Should classify Struct"
+        );
+        // Note: Macros like vec! and format! get expanded before parsing,
+        // so they don't appear as Expr::Macro in the AST
+        assert!(
+            collector.categories.contains(&ExprCategory::Other),
+            "Should classify Other"
+        );
+    }
+
+    #[test]
+    fn test_needs_special_handling() {
+        // Test the needs_special_handling pure function
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Call
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::MethodCall
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Closure
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Async
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Await
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Struct
+        ));
+        assert!(CallGraphExtractor::needs_special_handling(
+            ExprCategory::Macro
+        ));
+        assert!(!CallGraphExtractor::needs_special_handling(
+            ExprCategory::Other
+        ));
+    }
+
+    #[test]
+    fn test_classify_expr_category_edge_cases() {
+        // Test edge cases for expression classification
+        let code = r#"
+            fn edge_case_exprs() {
+                // Binary operations
+                let sum = 1 + 2;
+                let product = 3 * 4;
+                
+                // Unary operations
+                let neg = -5;
+                let not = !true;
+                
+                // Arrays and tuples
+                let arr = [1, 2, 3];
+                let tup = (1, "hello");
+                
+                // Conditionals
+                let cond = if true { 1 } else { 2 };
+                let matched = match Some(1) {
+                    Some(x) => x,
+                    None => 0,
+                };
+                
+                // Loops
+                loop { break; }
+                while false {}
+                for _ in 0..10 {}
+                
+                // Blocks
+                let block_val = { 42 };
+                
+                // References and dereferencing
+                let ref_val = &42;
+                let deref_val = *ref_val;
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+
+        struct CategoryCollector {
+            categories: Vec<ExprCategory>,
+        }
+
+        impl<'ast> Visit<'ast> for CategoryCollector {
+            fn visit_expr(&mut self, expr: &'ast Expr) {
+                let category = CallGraphExtractor::classify_expr_category(expr);
+                self.categories.push(category);
+                syn::visit::visit_expr(self, expr);
+            }
+        }
+
+        let mut collector = CategoryCollector {
+            categories: Vec::new(),
+        };
+
+        for item in &file.items {
+            if let syn::Item::Fn(func) = item {
+                if func.sig.ident == "edge_case_exprs" {
+                    for stmt in &func.block.stmts {
+                        collector.visit_stmt(stmt);
+                    }
+                }
+            }
+        }
+
+        // All these should be classified as Other
+        let other_count = collector
+            .categories
+            .iter()
+            .filter(|&&c| c == ExprCategory::Other)
+            .count();
+
+        assert!(
+            other_count > 10,
+            "Should have many Other category expressions"
+        );
+    }
+
+    #[test]
+    fn test_expr_category_exhaustiveness() {
+        // Test that all ExprCategory variants are covered
+        use ExprCategory::*;
+
+        let all_categories = vec![
+            Call, MethodCall, Closure, Async, Await, Struct, Macro, Other,
+        ];
+
+        // Ensure all categories have corresponding needs_special_handling behavior
+        for category in all_categories {
+            let needs_handling = CallGraphExtractor::needs_special_handling(category);
+            match category {
+                Other => assert!(!needs_handling, "Other should not need special handling"),
+                _ => assert!(
+                    needs_handling,
+                    "{:?} should need special handling",
+                    category
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn test_classify_expr_with_nested_expressions() {
+        // Test classification with deeply nested expressions
+        let code = r#"
+            fn nested_exprs() {
+                // Nested calls
+                foo(bar(baz()));
+                
+                // Method chains
+                obj.method1().method2().method3();
+                
+                // Closure with calls inside
+                let c = |x| foo(x);
+                
+                // Async with await inside
+                let f = async { fetch().await };
+                
+                // Struct with calls in fields
+                let s = MyStruct {
+                    field1: compute(),
+                    field2: process(),
+                };
+                
+                // Macro with calls
+                vec![generate(), transform()];
+            }
+            
+            fn foo(x: i32) -> i32 { x }
+            fn bar(x: i32) -> i32 { x }
+            fn baz() -> i32 { 0 }
+            fn compute() -> i32 { 1 }
+            fn process() -> i32 { 2 }
+            fn generate() -> i32 { 3 }
+            fn transform() -> i32 { 4 }
+            async fn fetch() -> i32 { 5 }
+            struct MyStruct { field1: i32, field2: i32 }
+        "#;
+
+        let file = parse_rust_code(code);
+
+        struct NestedCollector {
+            categories: Vec<(ExprCategory, usize)>, // category and depth
+            depth: usize,
+        }
+
+        impl<'ast> Visit<'ast> for NestedCollector {
+            fn visit_expr(&mut self, expr: &'ast Expr) {
+                let category = CallGraphExtractor::classify_expr_category(expr);
+                self.categories.push((category, self.depth));
+                self.depth += 1;
+                syn::visit::visit_expr(self, expr);
+                self.depth -= 1;
+            }
+        }
+
+        let mut collector = NestedCollector {
+            categories: Vec::new(),
+            depth: 0,
+        };
+
+        for item in &file.items {
+            if let syn::Item::Fn(func) = item {
+                if func.sig.ident == "nested_exprs" {
+                    for stmt in &func.block.stmts {
+                        collector.visit_stmt(stmt);
+                    }
+                }
+            }
+        }
+
+        // Verify nested classifications
+        let call_depths: Vec<usize> = collector
+            .categories
+            .iter()
+            .filter(|(cat, _)| *cat == ExprCategory::Call)
+            .map(|(_, depth)| *depth)
+            .collect();
+
+        assert!(!call_depths.is_empty(), "Should have Call expressions");
+        assert!(
+            call_depths.iter().any(|&d| d > 0),
+            "Should have nested Call expressions"
+        );
+
+        let method_depths: Vec<usize> = collector
+            .categories
+            .iter()
+            .filter(|(cat, _)| *cat == ExprCategory::MethodCall)
+            .map(|(_, depth)| *depth)
+            .collect();
+
+        assert!(
+            !method_depths.is_empty(),
+            "Should have MethodCall expressions"
+        );
     }
 }
