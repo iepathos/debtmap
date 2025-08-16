@@ -18,6 +18,7 @@ use crate::organization::{
     OrganizationAntiPattern, OrganizationDetector, ParameterAnalyzer, PrimitiveObsessionDetector,
 };
 use crate::priority::call_graph::CallGraph;
+use crate::testing;
 use anyhow::Result;
 use quote::ToTokens;
 use std::path::{Path, PathBuf};
@@ -145,6 +146,7 @@ fn collect_all_rust_debt_items(
         detect_error_swallowing(file, path, Some(suppression_context)),
         analyze_resource_patterns(file, path),
         analyze_organization_patterns(file, path),
+        testing::analyze_testing_patterns(file, &path.to_path_buf()),
     ]
     .into_iter()
     .flatten()

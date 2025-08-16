@@ -591,3 +591,29 @@ Implement error swallowing detection as a new debt type that:
 - ⚠️ Detection is currently functional but not integrated with priority output system
 - ⚠️ Line number detection uses placeholder values due to syn limitations
 - ⚠️ Some false positives possible without full type inference
+
+---
+
+## ADR-026: Testing Quality Patterns Detection
+**Date**: 2025-08-16
+**Status**: Accepted
+
+### Context
+Test quality significantly impacts codebase maintainability and reliability. Poor testing practices like tests without assertions, overly complex tests, and flaky tests create technical debt that undermines confidence and slows development. Existing test frameworks and language tooling don't catch these language-agnostic anti-patterns that exist across all testing frameworks.
+
+### Decision
+Implement testing quality analysis that identifies test-specific anti-patterns not caught by existing tools:
+- Detect test functions without assertion statements
+- Identify overly complex tests with excessive mocking or branching
+- Find flaky test patterns (timing dependencies, random values, external services)
+- Provide actionable simplification suggestions for complex tests
+- Integrate seamlessly with existing debt detection system using new DebtType::TestQuality
+
+### Consequences
+- ✅ Systematic identification of test anti-patterns across codebase
+- ✅ Improved test reliability through flaky test detection
+- ✅ Better test maintainability through complexity analysis
+- ✅ Framework-agnostic approach works with any test framework
+- ✅ Actionable suggestions for test improvement
+- ⚠️ Additional AST analysis overhead (minimal)
+- ⚠️ Some patterns require heuristics that may have false positives
