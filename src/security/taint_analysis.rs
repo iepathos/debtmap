@@ -354,6 +354,16 @@ impl<'a> TaintGraphBuilder<'a> {
         normalized.contains("Request") || normalized.contains("HttpRequest")
     }
 
+    /// Checks if the expression represents user input from stdin
+    fn is_user_input_source(normalized: &str) -> bool {
+        normalized.contains("stdin") || normalized.contains("read_line")
+    }
+
+    /// Checks if the expression represents file input
+    fn is_file_input_source(normalized: &str) -> bool {
+        normalized.contains("File::") || normalized.contains("read_")
+    }
+
     /// Classifies an expression string into an input source type
     /// This is a pure function that can be tested in isolation
     fn classify_input_source(expr_str: &str) -> Option<InputSource> {
@@ -365,12 +375,8 @@ impl<'a> TaintGraphBuilder<'a> {
             _ if Self::is_environment_source(&normalized) => Some(InputSource::Environment),
             _ if Self::is_http_request_source(&normalized) => Some(InputSource::HttpRequest),
             // Check for stdin/read_line BEFORE general read_ pattern
-            _ if normalized.contains("stdin") || normalized.contains("read_line") => {
-                Some(InputSource::UserInput)
-            }
-            _ if normalized.contains("File::") || normalized.contains("read_") => {
-                Some(InputSource::FileInput)
-            }
+            _ if Self::is_user_input_source(&normalized) => Some(InputSource::UserInput),
+            _ if Self::is_file_input_source(&normalized) => Some(InputSource::FileInput),
             _ => None,
         }
     }
@@ -860,5 +866,44 @@ mod tests {
         assert!(TaintGraphBuilder::is_environment_source(
             "read_env::var_from_system"
         ));
+    }
+
+    #[test]
+    fn test_is_user_input_source() {
+        // Test stdin patterns
+        assert!(TaintGraphBuilder::is_user_input_source("stdin().read_line"));
+        assert!(TaintGraphBuilder::is_user_input_source("io::stdin()"));
+        assert!(TaintGraphBuilder::is_user_input_source("std::io::stdin"));
+
+        // Test read_line patterns
+        assert!(TaintGraphBuilder::is_user_input_source(
+            "buffer.read_line()"
+        ));
+        assert!(TaintGraphBuilder::is_user_input_source(
+            "read_line_from_user"
+        ));
+
+        // Test false cases
+        assert!(!TaintGraphBuilder::is_user_input_source("read_file"));
+        assert!(!TaintGraphBuilder::is_user_input_source(""));
+    }
+
+    #[test]
+    fn test_is_file_input_source() {
+        // Test File:: patterns
+        assert!(TaintGraphBuilder::is_file_input_source("File::open"));
+        assert!(TaintGraphBuilder::is_file_input_source(
+            "std::fs::File::create"
+        ));
+        assert!(TaintGraphBuilder::is_file_input_source("File::read"));
+
+        // Test read_ patterns
+        assert!(TaintGraphBuilder::is_file_input_source("read_to_string"));
+        assert!(TaintGraphBuilder::is_file_input_source("read_dir"));
+        assert!(TaintGraphBuilder::is_file_input_source("fs::read_file"));
+
+        // Test false cases
+        assert!(!TaintGraphBuilder::is_file_input_source("write_file"));
+        assert!(!TaintGraphBuilder::is_file_input_source(""));
     }
 }
