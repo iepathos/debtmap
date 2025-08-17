@@ -237,6 +237,15 @@ We have completed the initial implementation with core functionality for analyzi
   - --enhanced-scoring and --legacy-scoring CLI flags
   - --exclude-tests option to filter test code from analysis
 
+- [x] **Spec 47**: Unified AST Traversal Optimization
+  - Single-pass AST traversal for all performance detectors
+  - Unified data collection in comprehensive data structures
+  - Parallel pattern detection on pre-collected data
+  - 60-80% reduction in AST traversal overhead
+  - Context sharing between detectors
+  - Optimized detector adapters for collected data analysis
+  - Controlled by DEBTMAP_OPTIMIZED_PERF environment variable
+
 ## Pending Specs
 
 ### Enhancements

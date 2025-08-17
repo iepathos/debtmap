@@ -160,23 +160,60 @@ pub trait PerformanceDetector {
 }
 
 pub mod allocation_detector;
+pub mod collected_data;
 pub mod context;
 pub mod data_structure_detector;
+pub mod detector_adapter;
 pub mod io_detector;
 pub mod location_extractor;
 pub mod nested_loop_detector;
 pub mod pattern_correlator;
 pub mod smart_detector;
 pub mod string_detector;
+pub mod unified_visitor;
 
 pub use allocation_detector::AllocationDetector;
+pub use collected_data::CollectedPerformanceData;
 pub use data_structure_detector::DataStructureDetector;
+pub use detector_adapter::{
+    OptimizedAllocationDetector, OptimizedDataStructureDetector, OptimizedIODetector,
+    OptimizedNestedLoopDetector, OptimizedPerformanceDetector, OptimizedStringDetector,
+};
 pub use io_detector::IOPerformanceDetector;
 pub use location_extractor::LocationExtractor;
 pub use nested_loop_detector::NestedLoopDetector;
 pub use pattern_correlator::PatternCorrelator;
 pub use smart_detector::{SmartPerformanceConfig, SmartPerformanceDetector, SmartPerformanceIssue};
 pub use string_detector::StringPerformanceDetector;
+pub use unified_visitor::collect_performance_data;
+
+/// Analyze performance patterns using optimized single-pass AST traversal
+pub fn analyze_performance_patterns_optimized(
+    file: &syn::File,
+    path: &Path,
+    source_content: &str,
+) -> Vec<PerformanceAntiPattern> {
+    // Phase 1: Single-pass data collection
+    let collected_data = collect_performance_data(file, path, source_content);
+    
+    // Phase 2: Parallel pattern detection using optimized detectors
+    let detectors: Vec<Box<dyn OptimizedPerformanceDetector>> = vec![
+        Box::new(OptimizedNestedLoopDetector::new()),
+        Box::new(OptimizedIODetector::new()),
+        Box::new(OptimizedAllocationDetector::new()),
+        Box::new(OptimizedStringDetector::new()),
+        Box::new(OptimizedDataStructureDetector::new()),
+    ];
+    
+    let mut all_patterns = Vec::new();
+    
+    for detector in detectors {
+        let patterns = detector.analyze_collected_data(&collected_data, path);
+        all_patterns.extend(patterns);
+    }
+    
+    all_patterns
+}
 
 pub fn convert_performance_pattern_to_debt_item(
     pattern: PerformanceAntiPattern,

@@ -60,8 +60,11 @@ Security pattern detection and vulnerability analysis:
 - `input_validation_detector.rs`: Input validation gap detection
 
 ### Performance (`src/performance/`)
-Performance anti-pattern detection with smart context analysis:
+Performance anti-pattern detection with smart context analysis and optimized AST traversal:
 - `mod.rs`: Core performance types and conversion functions
+- `unified_visitor.rs`: Single-pass AST traversal for collecting all performance data
+- `collected_data.rs`: Data structures for storing collected performance information
+- `detector_adapter.rs`: Adapters for detectors to analyze pre-collected data
 - `io_detector.rs`: I/O pattern detection
 - `nested_loop_detector.rs`: Nested loop complexity detection
 - `allocation_detector.rs`: Memory allocation pattern detection
@@ -69,6 +72,7 @@ Performance anti-pattern detection with smart context analysis:
 - `string_detector.rs`: String processing anti-pattern detection
 - `smart_detector.rs`: Smart context-aware performance detection
 - `pattern_correlator.rs`: Multi-pattern correlation analysis
+- `location_extractor.rs`: Source location extraction utilities
 - `context/`: Context analysis framework
   - `mod.rs`: Core context types and traits
   - `module_classifier.rs`: Module type classification (test, production, utility)
