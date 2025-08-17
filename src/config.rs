@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::{BufReader, Read};
 use std::sync::OnceLock;
 
 /// Scoring weights configuration
@@ -427,43 +428,59 @@ pub fn load_config() -> DebtmapConfig {
         }
 
         let config_path = dir.join(".debtmap.toml");
-        if config_path.exists() {
-            match fs::read_to_string(&config_path) {
-                Ok(contents) => {
-                    match toml::from_str::<DebtmapConfig>(&contents) {
-                        Ok(mut config) => {
-                            // Validate and normalize scoring weights if present
-                            if let Some(ref mut scoring) = config.scoring {
-                                if let Err(e) = scoring.validate() {
-                                    eprintln!(
-                                        "Warning: Invalid scoring weights: {}. Using defaults.",
-                                        e
-                                    );
-                                    config.scoring = Some(ScoringWeights::default());
-                                } else {
-                                    scoring.normalize(); // Ensure exact sum of 1.0
+        // Optimize I/O: Try to open directly instead of checking existence first
+        match fs::File::open(&config_path) {
+            Ok(file) => {
+                let mut reader = BufReader::new(file);
+                let mut contents = String::new();
+                match reader.read_to_string(&mut contents) {
+                    Ok(_) => {
+                        match toml::from_str::<DebtmapConfig>(&contents) {
+                            Ok(mut config) => {
+                                // Validate and normalize scoring weights if present
+                                if let Some(ref mut scoring) = config.scoring {
+                                    if let Err(e) = scoring.validate() {
+                                        eprintln!(
+                                            "Warning: Invalid scoring weights: {}. Using defaults.",
+                                            e
+                                        );
+                                        config.scoring = Some(ScoringWeights::default());
+                                    } else {
+                                        scoring.normalize(); // Ensure exact sum of 1.0
+                                    }
                                 }
+                                log::debug!("Loaded config from {}", config_path.display());
+                                return config;
                             }
-                            log::debug!("Loaded config from {}", config_path.display());
-                            return config;
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "Warning: Failed to parse .debtmap.toml: {}. Using defaults.",
-                                e
-                            );
-                            return DebtmapConfig::default();
+                            Err(e) => {
+                                eprintln!(
+                                    "Warning: Failed to parse .debtmap.toml: {}. Using defaults.",
+                                    e
+                                );
+                                return DebtmapConfig::default();
+                            }
                         }
                     }
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to read config file {}: {}",
+                            config_path.display(),
+                            e
+                        );
+                        // Continue searching in parent directories
+                    }
                 }
-                Err(e) => {
+            }
+            Err(e) => {
+                // Only log actual errors, not "file not found"
+                if e.kind() != std::io::ErrorKind::NotFound {
                     log::warn!(
-                        "Failed to read config file {}: {}",
+                        "Failed to open config file {}: {}",
                         config_path.display(),
                         e
                     );
-                    // Continue searching in parent directories
                 }
+                // Continue searching in parent directories
             }
         }
 
