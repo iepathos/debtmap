@@ -19,13 +19,15 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
-    pub complexity_factor: f64, // 0-10, configurable weight (default 15%)
-    pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
-    pub roi_factor: f64,        // 0-10, configurable weight (default 25%)
-    pub semantic_factor: f64,   // 0-10, configurable weight (default 5%)
-    pub dependency_factor: f64, // 0-10, configurable weight (default 15%)
-    pub role_multiplier: f64,   // 0.1-1.5x based on function role
-    pub final_score: f64,       // Computed composite score
+    pub complexity_factor: f64,   // 0-10, configurable weight (default 15%)
+    pub coverage_factor: f64,     // 0-10, configurable weight (default 35%)
+    pub roi_factor: f64,          // 0-10, configurable weight (default 25%)
+    pub semantic_factor: f64,     // 0-10, configurable weight (default 5%)
+    pub dependency_factor: f64,   // 0-10, configurable weight (default 10%)
+    pub security_factor: f64,     // 0-10, configurable weight (default 5%)
+    pub organization_factor: f64, // 0-10, configurable weight (default 5%)
+    pub role_multiplier: f64,     // 0.1-1.5x based on function role
+    pub final_score: f64,         // Computed composite score
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +61,8 @@ pub fn calculate_unified_priority(
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
     roi_score: f64,
+    security_issues: Option<f64>,
+    organization_issues: Option<f64>,
 ) -> UnifiedScore {
     let func_id = FunctionId {
         file: func.file.clone(),
@@ -92,6 +96,8 @@ pub fn calculate_unified_priority(
             roi_factor: 0.0,
             semantic_factor: 0.0,
             dependency_factor: 0.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
         };
@@ -122,6 +128,10 @@ pub fn calculate_unified_priority(
     let upstream_count = call_graph.get_callers(&func_id).len();
     let dependency_factor = calculate_dependency_factor(upstream_count);
 
+    // Security and organization factors (0-10 scale)
+    let security_factor = security_issues.unwrap_or(0.0).min(10.0);
+    let organization_factor = organization_issues.unwrap_or(0.0).min(10.0);
+
     // Get configurable weights
     let weights = config::get_scoring_weights();
 
@@ -131,13 +141,17 @@ pub fn calculate_unified_priority(
     let weighted_roi = roi_factor * weights.roi;
     let weighted_semantic = semantic_factor * weights.semantic;
     let weighted_dependency = dependency_factor * weights.dependency;
+    let weighted_security = security_factor * weights.security;
+    let weighted_organization = organization_factor * weights.organization;
 
     // Calculate weighted composite score
     let base_score = weighted_complexity
         + weighted_coverage
         + weighted_roi
         + weighted_semantic
-        + weighted_dependency;
+        + weighted_dependency
+        + weighted_security
+        + weighted_organization;
 
     // Apply role multiplier
     let final_score = (base_score * role_multiplier).min(10.0);
@@ -148,6 +162,8 @@ pub fn calculate_unified_priority(
         roi_factor,
         semantic_factor,
         dependency_factor,
+        security_factor,
+        organization_factor,
         role_multiplier,
         final_score,
     }
@@ -205,6 +221,91 @@ fn calculate_dependency_factor(upstream_count: usize) -> f64 {
     }
 }
 
+/// Calculate security factor based on function characteristics and patterns
+fn calculate_security_factor(func: &FunctionMetrics) -> f64 {
+    let mut score: f64 = 0.0;
+
+    // Check for security-related patterns in function name
+    let name_lower = func.name.to_lowercase();
+
+    // Security-critical function names
+    if name_lower.contains("auth")
+        || name_lower.contains("crypt")
+        || name_lower.contains("token")
+        || name_lower.contains("password")
+        || name_lower.contains("secret")
+        || name_lower.contains("permission")
+        || name_lower.contains("sanitize")
+        || name_lower.contains("validate")
+    {
+        score += 5.0;
+    }
+
+    // Functions that might handle user input
+    if name_lower.contains("parse")
+        || name_lower.contains("deserialize")
+        || name_lower.contains("decode")
+        || name_lower.contains("input")
+        || name_lower.contains("request")
+        || name_lower.contains("query")
+    {
+        score += 3.0;
+    }
+
+    // Functions dealing with file/network operations
+    if name_lower.contains("read_file")
+        || name_lower.contains("write_file")
+        || name_lower.contains("exec")
+        || name_lower.contains("system")
+        || name_lower.contains("sql")
+        || name_lower.contains("database")
+    {
+        score += 4.0;
+    }
+
+    // High complexity in security-sensitive functions is more risky
+    if score > 0.0 && func.cyclomatic > 10 {
+        score += 2.0;
+    }
+
+    score.min(10.0)
+}
+
+/// Calculate organization factor based on function characteristics
+fn calculate_organization_factor(func: &FunctionMetrics) -> f64 {
+    let mut score: f64 = 0.0;
+
+    // Long functions indicate poor organization
+    if func.length > 100 {
+        score += 3.0;
+    } else if func.length > 50 {
+        score += 2.0;
+    }
+
+    // High nesting indicates poor structure
+    if func.nesting > 5 {
+        score += 3.0;
+    } else if func.nesting > 3 {
+        score += 2.0;
+    }
+
+    // High cognitive complexity indicates poor organization
+    if func.cognitive > 20 {
+        score += 3.0;
+    } else if func.cognitive > 15 {
+        score += 2.0;
+    }
+
+    // High cyclomatic complexity also suggests poor organization
+    if func.cyclomatic > 15 {
+        score += 2.0;
+    } else if func.cyclomatic > 10 {
+        score += 1.0;
+    }
+
+    score.min(10.0)
+}
+
 /// Create evidence-based risk assessment for a function
 pub fn create_evidence_based_risk_assessment(
     func: &FunctionMetrics,
@@ -243,7 +344,18 @@ pub fn create_unified_debt_item_enhanced(
         line: func.line,
     };
 
-    let unified_score = calculate_unified_priority(func, call_graph, coverage, roi_score);
+    // Calculate security and organization factors
+    let security_factor = calculate_security_factor(func);
+    let organization_factor = calculate_organization_factor(func);
+
+    let unified_score = calculate_unified_priority(
+        func,
+        call_graph,
+        coverage,
+        roi_score,
+        Some(security_factor),
+        Some(organization_factor),
+    );
     let role = classify_function_role(func, &func_id, call_graph);
 
     let transitive_coverage =
@@ -319,7 +431,18 @@ pub fn create_unified_debt_item_with_exclusions(
     );
 
     // Calculate unified score
-    let unified_score = calculate_unified_priority(func, call_graph, coverage, roi_score);
+    // Calculate security and organization factors
+    let security_factor = calculate_security_factor(func);
+    let organization_factor = calculate_organization_factor(func);
+
+    let unified_score = calculate_unified_priority(
+        func,
+        call_graph,
+        coverage,
+        roi_score,
+        Some(security_factor),
+        Some(organization_factor),
+    );
 
     // Determine function role for more accurate analysis
     let function_role = classify_function_role(func, &func_id, call_graph);
@@ -369,7 +492,18 @@ pub fn create_unified_debt_item(
         line: func.line,
     };
 
-    let unified_score = calculate_unified_priority(func, call_graph, coverage, roi_score);
+    // Calculate security and organization factors
+    let security_factor = calculate_security_factor(func);
+    let organization_factor = calculate_organization_factor(func);
+
+    let unified_score = calculate_unified_priority(
+        func,
+        call_graph,
+        coverage,
+        roi_score,
+        Some(security_factor),
+        Some(organization_factor),
+    );
     let role = classify_function_role(func, &func_id, call_graph);
 
     let transitive_coverage =
@@ -2162,7 +2296,7 @@ mod tests {
     fn test_unified_scoring() {
         let func = create_test_metrics();
         let graph = CallGraph::new();
-        let score = calculate_unified_priority(&func, &graph, None, 5.0);
+        let score = calculate_unified_priority(&func, &graph, None, 5.0, None, None);
 
         assert!(score.complexity_factor > 0.0);
         assert!(score.coverage_factor > 0.0);
@@ -2207,6 +2341,8 @@ mod tests {
             roi_factor: 6.0,
             semantic_factor: 5.0,
             dependency_factor: 4.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 6.5,
         };
@@ -2291,7 +2427,7 @@ mod tests {
         );
 
         // Calculate priority score with coverage
-        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0);
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0, None, None);
 
         // Tested simple I/O wrapper should have zero score (not technical debt)
         assert_eq!(score.final_score, 0.0);
@@ -2314,7 +2450,7 @@ mod tests {
         let call_graph = CallGraph::new();
 
         // Calculate priority score without coverage (assume untested)
-        let score = calculate_unified_priority(&func, &call_graph, None, 0.0);
+        let score = calculate_unified_priority(&func, &call_graph, None, 0.0, None, None);
 
         // Untested simple I/O wrapper should have a non-zero score (testing gap)
         assert!(
@@ -2347,7 +2483,7 @@ mod tests {
         );
 
         // Calculate priority score with coverage
-        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0);
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0, None, None);
 
         // Tested simple entry point should have zero score (not technical debt)
         assert_eq!(score.final_score, 0.0);
@@ -2365,7 +2501,7 @@ mod tests {
         let call_graph = CallGraph::new();
 
         // Calculate priority score without coverage
-        let score = calculate_unified_priority(&func, &call_graph, None, 0.0);
+        let score = calculate_unified_priority(&func, &call_graph, None, 0.0, None, None);
 
         // Untested pure function should have non-zero score (testing gap)
         assert!(
@@ -2386,7 +2522,7 @@ mod tests {
         let call_graph = CallGraph::new();
 
         // Calculate priority score
-        let score = calculate_unified_priority(&func, &call_graph, None, 5.0);
+        let score = calculate_unified_priority(&func, &call_graph, None, 5.0, None, None);
 
         // Complex function should have non-zero score (is technical debt)
         assert!(score.final_score > 0.0);
@@ -2409,6 +2545,8 @@ mod tests {
             roi_factor: 0.0,
             semantic_factor: 1.0,
             dependency_factor: 0.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };
@@ -2853,6 +2991,8 @@ mod tests {
             roi_factor: 2.0,
             semantic_factor: 1.0,
             dependency_factor: 2.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -2886,6 +3026,8 @@ mod tests {
             roi_factor: 3.0,
             semantic_factor: 2.0,
             dependency_factor: 3.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 5.0,
         };
@@ -2913,6 +3055,8 @@ mod tests {
             roi_factor: 2.0,
             semantic_factor: 1.0,
             dependency_factor: 1.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -2941,6 +3085,8 @@ mod tests {
             roi_factor: 4.0,
             semantic_factor: 3.0,
             dependency_factor: 2.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.5,
         };

@@ -150,20 +150,58 @@ pub fn format_priority_item_with_verbosity(
             item.unified_score.semantic_factor * weights.semantic
         )
         .unwrap();
+        // Determine which is the last component to show (for proper tree formatting)
+        let has_security = item.unified_score.security_factor > 0.0;
+        let has_organization = item.unified_score.organization_factor > 0.0;
+
+        let dependency_prefix = if has_security || has_organization {
+            "├─"
+        } else {
+            "└─"
+        };
         writeln!(
             output,
-            "│  │  └─ Dependency:  {:.1} × {:.0}% = {:.2}",
+            "│  │  {} Dependency:  {:.1} × {:.0}% = {:.2}",
+            dependency_prefix,
             item.unified_score.dependency_factor,
             weights.dependency * 100.0,
             item.unified_score.dependency_factor * weights.dependency
         )
         .unwrap();
 
+        // Show security if non-zero
+        if has_security {
+            let security_prefix = if has_organization { "├─" } else { "└─" };
+            writeln!(
+                output,
+                "│  │  {} Security:    {:.1} × {:.0}% = {:.2}",
+                security_prefix,
+                item.unified_score.security_factor,
+                weights.security * 100.0,
+                item.unified_score.security_factor * weights.security
+            )
+            .unwrap();
+        }
+
+        // Show organization if non-zero
+        if has_organization {
+            writeln!(
+                output,
+                "│  │  └─ Organization: {:.1} × {:.0}% = {:.2}",
+                item.unified_score.organization_factor,
+                weights.organization * 100.0,
+                item.unified_score.organization_factor * weights.organization
+            )
+            .unwrap();
+        }
+
         let base_score = item.unified_score.complexity_factor * weights.complexity
             + item.unified_score.coverage_factor * weights.coverage
             + item.unified_score.roi_factor * weights.roi
             + item.unified_score.semantic_factor * weights.semantic
-            + item.unified_score.dependency_factor * weights.dependency;
+            + item.unified_score.dependency_factor * weights.dependency
+            + item.unified_score.security_factor * weights.security
+            + item.unified_score.organization_factor * weights.organization;
 
         writeln!(output, "│  ├─ Base Score: {:.2}", base_score).unwrap();
         writeln!(

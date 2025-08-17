@@ -343,7 +343,9 @@ impl<'a> TaintGraphBuilder<'a> {
         let expr_str = quote::quote!(#expr).to_string();
 
         // Check if expression matches any known taint source
-        let is_taint_source = self.analyzer.taint_sources
+        let is_taint_source = self
+            .analyzer
+            .taint_sources
             .iter()
             .any(|source| expr_str.contains(source));
 

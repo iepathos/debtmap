@@ -436,12 +436,14 @@ impl UnifiedAnalysis {
         };
 
         UnifiedScore {
-            complexity_factor: 2.0, // Security issues aren't about complexity
-            coverage_factor: 1.0,   // Coverage less relevant for security
-            roi_factor: 8.0,        // High ROI to fix security issues
-            semantic_factor: 9.0,   // Very important semantically
-            dependency_factor: 3.0, // Variable depending on code location
-            role_multiplier: 1.5,   // Security issues are always important
+            complexity_factor: 2.0,   // Security issues aren't about complexity
+            coverage_factor: 1.0,     // Coverage less relevant for security
+            roi_factor: 8.0,          // High ROI to fix security issues
+            semantic_factor: 9.0,     // Very important semantically
+            dependency_factor: 3.0,   // Variable depending on code location
+            security_factor: 10.0,    // Maximum security factor for security issues
+            organization_factor: 0.0, // Not an organization issue
+            role_multiplier: 1.5,     // Security issues are always important
             final_score: (base_score + priority_boost).min(10.0_f64),
         }
     }
@@ -468,12 +470,14 @@ impl UnifiedAnalysis {
         };
 
         UnifiedScore {
-            complexity_factor: 3.0, // Performance often relates to complexity
-            coverage_factor: 2.0,   // Testing helps catch performance regressions
-            roi_factor: 6.0,        // Good ROI for performance fixes
-            semantic_factor: 5.0,   // Important but not as critical as security
-            dependency_factor: 4.0, // Performance issues can affect many callers
-            role_multiplier: 1.2,   // Performance issues are important
+            complexity_factor: 3.0,   // Performance often relates to complexity
+            coverage_factor: 2.0,     // Testing helps catch performance regressions
+            roi_factor: 6.0,          // Good ROI for performance fixes
+            semantic_factor: 5.0,     // Important but not as critical as security
+            dependency_factor: 4.0,   // Performance issues can affect many callers
+            security_factor: 0.0,     // Not a security issue
+            organization_factor: 0.0, // Not an organization issue
+            role_multiplier: 1.2,     // Performance issues are important
             final_score: (base_score + priority_boost).min(10.0_f64),
         }
     }

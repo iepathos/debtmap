@@ -24,6 +24,14 @@ pub struct ScoringWeights {
     /// Weight for dependency criticality factor (0.0-1.0)
     #[serde(default = "default_dependency_weight")]
     pub dependency: f64,
+
+    /// Weight for security issues factor (0.0-1.0)
+    #[serde(default = "default_security_weight")]
+    pub security: f64,
+
+    /// Weight for code organization issues factor (0.0-1.0)
+    #[serde(default = "default_organization_weight")]
+    pub organization: f64,
 }
 
 impl Default for ScoringWeights {
@@ -34,6 +42,8 @@ impl Default for ScoringWeights {
             roi: default_roi_weight(),
             semantic: default_semantic_weight(),
             dependency: default_dependency_weight(),
+            security: default_security_weight(),
+            organization: default_organization_weight(),
         }
     }
 }
@@ -41,7 +51,13 @@ impl Default for ScoringWeights {
 impl ScoringWeights {
     /// Validate that weights sum to 1.0 (with small tolerance for floating point)
     pub fn validate(&self) -> Result<(), String> {
-        let sum = self.coverage + self.complexity + self.roi + self.semantic + self.dependency;
+        let sum = self.coverage
+            + self.complexity
+            + self.roi
+            + self.semantic
+            + self.dependency
+            + self.security
+            + self.organization;
         if (sum - 1.0).abs() > 0.001 {
             return Err(format!(
                 "Scoring weights must sum to 1.0, but sum to {:.3}",
@@ -65,26 +81,40 @@ impl ScoringWeights {
         if self.dependency < 0.0 || self.dependency > 1.0 {
             return Err("Dependency weight must be between 0.0 and 1.0".to_string());
         }
+        if self.security < 0.0 || self.security > 1.0 {
+            return Err("Security weight must be between 0.0 and 1.0".to_string());
+        }
+        if self.organization < 0.0 || self.organization > 1.0 {
+            return Err("Organization weight must be between 0.0 and 1.0".to_string());
+        }
 
         Ok(())
     }
 
     /// Normalize weights to ensure they sum to 1.0
     pub fn normalize(&mut self) {
-        let sum = self.coverage + self.complexity + self.roi + self.semantic + self.dependency;
+        let sum = self.coverage
+            + self.complexity
+            + self.roi
+            + self.semantic
+            + self.dependency
+            + self.security
+            + self.organization;
         if sum > 0.0 {
             self.coverage /= sum;
             self.complexity /= sum;
             self.roi /= sum;
             self.semantic /= sum;
             self.dependency /= sum;
+            self.security /= sum;
+            self.organization /= sum;
         }
     }
 }
 
 // Default weights - prioritize coverage but include dependency criticality
 fn default_coverage_weight() -> f64 {
-    0.40
+    0.35
 }
 fn default_complexity_weight() -> f64 {
     0.15
@@ -96,7 +126,13 @@ fn default_semantic_weight() -> f64 {
     0.05
 }
 fn default_dependency_weight() -> f64 {
-    0.15
+    0.10
+}
+fn default_security_weight() -> f64 {
+    0.05
+}
+fn default_organization_weight() -> f64 {
+    0.05
 }
 
 /// Root configuration structure for debtmap

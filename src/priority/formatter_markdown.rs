@@ -281,11 +281,37 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
     )
     .unwrap();
 
+    // Only show security if non-zero
+    if unified_score.security_factor > 0.0 {
+        writeln!(
+            &mut output,
+            "| Security | {:.1} | {:.0}% | {:.2} |",
+            unified_score.security_factor,
+            weights.security * 100.0,
+            unified_score.security_factor * weights.security
+        )
+        .unwrap();
+    }
+
+    // Only show organization if non-zero
+    if unified_score.organization_factor > 0.0 {
+        writeln!(
+            &mut output,
+            "| Organization | {:.1} | {:.0}% | {:.2} |",
+            unified_score.organization_factor,
+            weights.organization * 100.0,
+            unified_score.organization_factor * weights.organization
+        )
+        .unwrap();
+    }
+
     let base_score = unified_score.complexity_factor * weights.complexity
         + unified_score.coverage_factor * weights.coverage
         + unified_score.roi_factor * weights.roi
         + unified_score.semantic_factor * weights.semantic
-        + unified_score.dependency_factor * weights.dependency;
+        + unified_score.dependency_factor * weights.dependency
+        + unified_score.security_factor * weights.security
+        + unified_score.organization_factor * weights.organization;
 
     writeln!(&mut output).unwrap();
     writeln!(&mut output, "- **Base Score:** {:.2}", base_score).unwrap();
@@ -327,6 +353,18 @@ fn format_main_factors_with_debt_type(
     }
     if unified_score.complexity_factor > 5.0 {
         factors.push(format!("Complexity ({:.0}%)", weights.complexity * 100.0));
+    }
+    if unified_score.security_factor > 3.0 {
+        factors.push(format!(
+            "Security issues ({:.0}%)",
+            weights.security * 100.0
+        ));
+    }
+    if unified_score.organization_factor > 3.0 {
+        factors.push(format!(
+            "Organization issues ({:.0}%)",
+            weights.organization * 100.0
+        ));
     }
 
     // Add Security and Performance specific factors
@@ -555,6 +593,8 @@ mod tests {
             roi_factor: 7.5,
             semantic_factor: 3.0,
             dependency_factor: 4.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.2,
             final_score: 8.5,
         };
@@ -586,6 +626,8 @@ mod tests {
             roi_factor: 8.0,        // Above threshold
             semantic_factor: 2.0,
             dependency_factor: 6.0, // Above threshold
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.0,
         };
@@ -612,6 +654,8 @@ mod tests {
             roi_factor: 3.0,
             semantic_factor: 1.0,
             dependency_factor: 2.0,
+            security_factor: 0.0,
+            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };

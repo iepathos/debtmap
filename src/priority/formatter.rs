@@ -722,6 +722,8 @@ mod tests {
                 roi_factor: 6.0,
                 semantic_factor: 7.0,
                 dependency_factor: 3.0,
+                security_factor: 0.0,
+                organization_factor: 0.0,
                 role_multiplier: 1.0,
                 final_score: score,
             },
