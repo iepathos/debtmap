@@ -376,41 +376,77 @@ impl UnifiedAnalysis {
 
     // Helper methods for Security/Performance debt conversion
 
+    /// Classifies a security message into a vulnerability type
+    fn classify_vulnerability_type(message: &str) -> &'static str {
+        let lower_msg = message.to_lowercase();
+        match () {
+            _ if lower_msg.contains("unsafe") => "Unsafe Code",
+            _ if lower_msg.contains("sql injection") || lower_msg.contains("sql") => {
+                "SQL Injection"
+            }
+            _ if lower_msg.contains("secret")
+                || lower_msg.contains("password")
+                || lower_msg.contains("api key")
+                || lower_msg.contains("private key") =>
+            {
+                "Hardcoded Secret"
+            }
+            _ if lower_msg.contains("crypto") || lower_msg.contains("encryption") => {
+                "Weak Cryptography"
+            }
+            _ if lower_msg.contains("validation") || lower_msg.contains("input") => {
+                "Input Validation"
+            }
+            _ => "Security Issue",
+        }
+    }
+
+    /// Determines the severity level for a given vulnerability type
+    fn determine_severity(vulnerability_type: &str) -> &'static str {
+        match vulnerability_type {
+            "SQL Injection" | "Hardcoded Secret" => "Critical",
+            "Unsafe Code" | "Weak Cryptography" => "High",
+            _ => "Medium",
+        }
+    }
+
     fn parse_security_details(&self, message: &str) -> (String, String) {
-        // Extract vulnerability type and severity from security debt messages
-        if message.contains("unsafe") {
-            ("Unsafe Code".to_string(), "High".to_string())
-        } else if message.contains("SQL injection") || message.contains("sql") {
-            ("SQL Injection".to_string(), "Critical".to_string())
-        } else if message.contains("secret")
-            || message.contains("password")
-            || message.contains("key")
-        {
-            ("Hardcoded Secret".to_string(), "Critical".to_string())
-        } else if message.contains("crypto") || message.contains("encryption") {
-            ("Weak Cryptography".to_string(), "High".to_string())
-        } else if message.contains("validation") || message.contains("input") {
-            ("Input Validation".to_string(), "Medium".to_string())
-        } else {
-            ("Security Issue".to_string(), "Medium".to_string())
+        let vulnerability_type = Self::classify_vulnerability_type(message);
+        let severity = Self::determine_severity(vulnerability_type);
+        (vulnerability_type.to_string(), severity.to_string())
+    }
+
+    /// Classifies a performance message into an issue type
+    fn classify_performance_issue(message: &str) -> &'static str {
+        let lower_msg = message.to_lowercase();
+        match () {
+            _ if lower_msg.contains("nested loop") => "Nested Loops",
+            _ if lower_msg.contains("allocation") || lower_msg.contains("memory") => {
+                "Memory Allocation"
+            }
+            _ if lower_msg.contains("i/o") || lower_msg.contains("blocking") => "Blocking I/O",
+            _ if lower_msg.contains("string") && lower_msg.contains("concatenation") => {
+                "String Concatenation"
+            }
+            _ if lower_msg.contains("data structure") || message.contains("Vec::contains") => {
+                "Data Structure"
+            }
+            _ => "Performance Issue",
+        }
+    }
+
+    /// Determines the impact level for a given performance issue
+    fn determine_performance_impact(issue_type: &str) -> &'static str {
+        match issue_type {
+            "Nested Loops" | "Blocking I/O" => "High",
+            _ => "Medium",
         }
     }
 
     fn parse_performance_details(&self, message: &str) -> (String, String) {
-        // Extract performance issue type and impact from performance debt messages
-        if message.contains("nested loop") || message.contains("Nested loop") {
-            ("Nested Loops".to_string(), "High".to_string())
-        } else if message.contains("allocation") || message.contains("memory") {
-            ("Memory Allocation".to_string(), "Medium".to_string())
-        } else if message.contains("I/O") || message.contains("blocking") {
-            ("Blocking I/O".to_string(), "High".to_string())
-        } else if message.contains("string") && message.contains("concatenation") {
-            ("String Concatenation".to_string(), "Medium".to_string())
-        } else if message.contains("data structure") || message.contains("Vec::contains") {
-            ("Data Structure".to_string(), "Medium".to_string())
-        } else {
-            ("Performance Issue".to_string(), "Medium".to_string())
-        }
+        let issue_type = Self::classify_performance_issue(message);
+        let impact = Self::determine_performance_impact(issue_type);
+        (issue_type.to_string(), impact.to_string())
     }
 
     fn calculate_security_score(
@@ -623,5 +659,238 @@ impl UnifiedAnalysis {
         } else {
             self.items.iter().skip(total_items - n).cloned().collect()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::CallGraph;
+
+    #[test]
+    fn test_classify_vulnerability_type_unsafe_code() {
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Found unsafe block in function"),
+            "Unsafe Code"
+        );
+    }
+
+    #[test]
+    fn test_classify_vulnerability_type_sql_injection() {
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Potential SQL injection vulnerability"),
+            "SQL Injection"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Direct sql query construction"),
+            "SQL Injection"
+        );
+    }
+
+    #[test]
+    fn test_classify_vulnerability_type_hardcoded_secret() {
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Found hardcoded secret in code"),
+            "Hardcoded Secret"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Password stored in plaintext"),
+            "Hardcoded Secret"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("API key exposed in source"),
+            "Hardcoded Secret"
+        );
+    }
+
+    #[test]
+    fn test_classify_vulnerability_type_weak_crypto() {
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Using weak crypto algorithm"),
+            "Weak Cryptography"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Insecure encryption method"),
+            "Weak Cryptography"
+        );
+    }
+
+    #[test]
+    fn test_classify_vulnerability_type_input_validation() {
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Missing input validation"),
+            "Input Validation"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("No validation on user input"),
+            "Input Validation"
+        );
+    }
+
+    #[test]
+    fn test_classify_vulnerability_type_generic() {
+        assert_eq!(
+            UnifiedAnalysis::classify_vulnerability_type("Some other security concern"),
+            "Security Issue"
+        );
+    }
+
+    #[test]
+    fn test_determine_severity_critical() {
+        assert_eq!(
+            UnifiedAnalysis::determine_severity("SQL Injection"),
+            "Critical"
+        );
+        assert_eq!(
+            UnifiedAnalysis::determine_severity("Hardcoded Secret"),
+            "Critical"
+        );
+    }
+
+    #[test]
+    fn test_determine_severity_high() {
+        assert_eq!(UnifiedAnalysis::determine_severity("Unsafe Code"), "High");
+        assert_eq!(
+            UnifiedAnalysis::determine_severity("Weak Cryptography"),
+            "High"
+        );
+    }
+
+    #[test]
+    fn test_determine_severity_medium() {
+        assert_eq!(
+            UnifiedAnalysis::determine_severity("Input Validation"),
+            "Medium"
+        );
+        assert_eq!(
+            UnifiedAnalysis::determine_severity("Security Issue"),
+            "Medium"
+        );
+        assert_eq!(
+            UnifiedAnalysis::determine_severity("Unknown Issue"),
+            "Medium"
+        );
+    }
+
+    #[test]
+    fn test_classify_performance_issue_nested_loops() {
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Found nested loop in algorithm"),
+            "Nested Loops"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Nested loop detected"),
+            "Nested Loops"
+        );
+    }
+
+    #[test]
+    fn test_classify_performance_issue_memory() {
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Excessive memory allocation"),
+            "Memory Allocation"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Large allocation in hot path"),
+            "Memory Allocation"
+        );
+    }
+
+    #[test]
+    fn test_classify_performance_issue_blocking_io() {
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Synchronous I/O in async context"),
+            "Blocking I/O"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Blocking operation detected"),
+            "Blocking I/O"
+        );
+    }
+
+    #[test]
+    fn test_classify_performance_issue_string_concat() {
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Inefficient string concatenation in loop"),
+            "String Concatenation"
+        );
+    }
+
+    #[test]
+    fn test_classify_performance_issue_data_structure() {
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Using Vec::contains in hot path"),
+            "Data Structure"
+        );
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Inefficient data structure choice"),
+            "Data Structure"
+        );
+    }
+
+    #[test]
+    fn test_classify_performance_issue_generic() {
+        assert_eq!(
+            UnifiedAnalysis::classify_performance_issue("Some performance concern"),
+            "Performance Issue"
+        );
+    }
+
+    #[test]
+    fn test_determine_performance_impact_high() {
+        assert_eq!(
+            UnifiedAnalysis::determine_performance_impact("Nested Loops"),
+            "High"
+        );
+        assert_eq!(
+            UnifiedAnalysis::determine_performance_impact("Blocking I/O"),
+            "High"
+        );
+    }
+
+    #[test]
+    fn test_determine_performance_impact_medium() {
+        assert_eq!(
+            UnifiedAnalysis::determine_performance_impact("Memory Allocation"),
+            "Medium"
+        );
+        assert_eq!(
+            UnifiedAnalysis::determine_performance_impact("String Concatenation"),
+            "Medium"
+        );
+        assert_eq!(
+            UnifiedAnalysis::determine_performance_impact("Data Structure"),
+            "Medium"
+        );
+        assert_eq!(
+            UnifiedAnalysis::determine_performance_impact("Performance Issue"),
+            "Medium"
+        );
+    }
+
+    #[test]
+    fn test_parse_security_details_integration() {
+        let analysis = UnifiedAnalysis::new(CallGraph::default());
+
+        let (vuln_type, severity) = analysis.parse_security_details("SQL injection found");
+        assert_eq!(vuln_type, "SQL Injection");
+        assert_eq!(severity, "Critical");
+
+        let (vuln_type, severity) = analysis.parse_security_details("unsafe code block");
+        assert_eq!(vuln_type, "Unsafe Code");
+        assert_eq!(severity, "High");
+    }
+
+    #[test]
+    fn test_parse_performance_details_integration() {
+        let analysis = UnifiedAnalysis::new(CallGraph::default());
+
+        let (issue_type, impact) = analysis.parse_performance_details("nested loop detected");
+        assert_eq!(issue_type, "Nested Loops");
+        assert_eq!(impact, "High");
+
+        let (issue_type, impact) = analysis.parse_performance_details("excessive memory usage");
+        assert_eq!(issue_type, "Memory Allocation");
+        assert_eq!(impact, "Medium");
     }
 }

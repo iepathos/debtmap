@@ -137,6 +137,7 @@ impl DataStructureVisitor {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn infer_collection_type(&self, expr: &Expr) -> Option<&'static str> {
         // Simplified type inference - in real implementation would use type tracking
         match expr {

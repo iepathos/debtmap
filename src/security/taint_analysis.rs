@@ -339,6 +339,48 @@ impl<'a, 'ast> Visit<'ast> for TaintGraphBuilder<'a> {
 }
 
 impl<'a> TaintGraphBuilder<'a> {
+    /// Checks if the expression represents CLI argument input
+    fn is_cli_argument_source(normalized: &str) -> bool {
+        normalized.contains("args()") || normalized.contains("env::args")
+    }
+
+    /// Checks if the expression represents environment variable input
+    fn is_environment_source(normalized: &str) -> bool {
+        normalized.contains("env::var")
+    }
+
+    /// Checks if the expression represents HTTP request input
+    fn is_http_request_source(normalized: &str) -> bool {
+        normalized.contains("Request") || normalized.contains("HttpRequest")
+    }
+
+    /// Checks if the expression represents user input from stdin
+    fn is_user_input_source(normalized: &str) -> bool {
+        normalized.contains("stdin") || normalized.contains("read_line")
+    }
+
+    /// Checks if the expression represents file input
+    fn is_file_input_source(normalized: &str) -> bool {
+        normalized.contains("File::") || normalized.contains("read_")
+    }
+
+    /// Classifies an expression string into an input source type
+    /// This is a pure function that can be tested in isolation
+    fn classify_input_source(expr_str: &str) -> Option<InputSource> {
+        // Remove spaces for more reliable matching (quote adds spaces between tokens)
+        let normalized = expr_str.replace(" ", "");
+
+        match () {
+            _ if Self::is_cli_argument_source(&normalized) => Some(InputSource::CliArgument),
+            _ if Self::is_environment_source(&normalized) => Some(InputSource::Environment),
+            _ if Self::is_http_request_source(&normalized) => Some(InputSource::HttpRequest),
+            // Check for stdin/read_line BEFORE general read_ pattern
+            _ if Self::is_user_input_source(&normalized) => Some(InputSource::UserInput),
+            _ if Self::is_file_input_source(&normalized) => Some(InputSource::FileInput),
+            _ => None,
+        }
+    }
+
     fn detect_source(&self, expr: &Expr) -> Option<InputSource> {
         let expr_str = quote::quote!(#expr).to_string();
 
@@ -347,44 +389,46 @@ impl<'a> TaintGraphBuilder<'a> {
             .analyzer
             .taint_sources
             .iter()
-            .any(|source| expr_str.contains(source));
+            .any(|source| expr_str.contains(source.as_str()));
 
         if !is_taint_source {
             return None;
         }
 
-        // Determine the specific type of input source
-        if expr_str.contains("args()") || expr_str.contains("env::args") {
-            Some(InputSource::CliArgument)
-        } else if expr_str.contains("env::var") {
-            Some(InputSource::Environment)
-        } else if expr_str.contains("Request") || expr_str.contains("HttpRequest") {
-            Some(InputSource::HttpRequest)
-        } else if expr_str.contains("File::") || expr_str.contains("read_") {
-            Some(InputSource::FileInput)
-        } else if expr_str.contains("stdin") || expr_str.contains("read_line") {
-            Some(InputSource::UserInput)
-        } else {
-            None
-        }
+        // Determine the specific type of input source using pure classification function
+        Self::classify_input_source(&expr_str)
+    }
+
+    fn is_sql_sink(method_name: &str) -> bool {
+        method_name.contains("query")
+            || method_name.contains("execute")
+            || method_name.contains("sql")
+    }
+
+    fn is_process_sink(method_name: &str) -> bool {
+        method_name.contains("Command") || method_name.contains("system")
+    }
+
+    fn is_file_sink(method_name: &str) -> bool {
+        method_name.contains("File") || method_name.contains("write")
+    }
+
+    fn is_network_sink(method_name: &str) -> bool {
+        method_name.contains("request") || method_name.contains("http")
+    }
+
+    fn is_deserialization_sink(method_name: &str) -> bool {
+        method_name.contains("deserialize") || method_name.contains("from_")
     }
 
     fn detect_sink(&self, method_name: &str) -> Option<SinkOperation> {
-        if method_name.contains("query")
-            || method_name.contains("execute")
-            || method_name.contains("sql")
-        {
-            Some(SinkOperation::SqlQuery)
-        } else if method_name.contains("Command") || method_name.contains("system") {
-            Some(SinkOperation::ProcessExecution)
-        } else if method_name.contains("File") || method_name.contains("write") {
-            Some(SinkOperation::FileSystem)
-        } else if method_name.contains("request") || method_name.contains("http") {
-            Some(SinkOperation::NetworkRequest)
-        } else if method_name.contains("deserialize") || method_name.contains("from_") {
-            Some(SinkOperation::Deserialization)
-        } else {
-            None
+        match () {
+            _ if Self::is_sql_sink(method_name) => Some(SinkOperation::SqlQuery),
+            _ if Self::is_process_sink(method_name) => Some(SinkOperation::ProcessExecution),
+            _ if Self::is_file_sink(method_name) => Some(SinkOperation::FileSystem),
+            _ if Self::is_network_sink(method_name) => Some(SinkOperation::NetworkRequest),
+            _ if Self::is_deserialization_sink(method_name) => Some(SinkOperation::Deserialization),
+            _ => None,
         }
     }
 
@@ -434,5 +478,432 @@ mod tests {
         };
 
         assert_eq!(analyzer.assess_path_severity(&path2), Severity::Medium);
+    }
+
+    #[test]
+    fn test_is_sql_sink() {
+        assert!(TaintGraphBuilder::is_sql_sink("execute_query"));
+        assert!(TaintGraphBuilder::is_sql_sink("run_sql"));
+        assert!(TaintGraphBuilder::is_sql_sink("query_database"));
+        assert!(TaintGraphBuilder::is_sql_sink("execute"));
+        assert!(!TaintGraphBuilder::is_sql_sink("read_file"));
+        assert!(!TaintGraphBuilder::is_sql_sink("send_request"));
+    }
+
+    #[test]
+    fn test_is_process_sink() {
+        assert!(TaintGraphBuilder::is_process_sink("Command::new"));
+        assert!(TaintGraphBuilder::is_process_sink("system_call"));
+        assert!(TaintGraphBuilder::is_process_sink("run_system"));
+        assert!(!TaintGraphBuilder::is_process_sink("query_database"));
+        assert!(!TaintGraphBuilder::is_process_sink("write_file"));
+    }
+
+    #[test]
+    fn test_is_file_sink() {
+        assert!(TaintGraphBuilder::is_file_sink("File::create"));
+        assert!(TaintGraphBuilder::is_file_sink("write_to_disk"));
+        assert!(TaintGraphBuilder::is_file_sink("File::open"));
+        assert!(TaintGraphBuilder::is_file_sink("write_bytes"));
+        assert!(!TaintGraphBuilder::is_file_sink("execute_query"));
+        assert!(!TaintGraphBuilder::is_file_sink("send_request"));
+    }
+
+    #[test]
+    fn test_is_network_sink() {
+        assert!(TaintGraphBuilder::is_network_sink("send_request"));
+        assert!(TaintGraphBuilder::is_network_sink("http_post"));
+        assert!(TaintGraphBuilder::is_network_sink("make_http_call"));
+        assert!(TaintGraphBuilder::is_network_sink("request_api"));
+        assert!(!TaintGraphBuilder::is_network_sink("write_file"));
+        assert!(!TaintGraphBuilder::is_network_sink("execute_query"));
+    }
+
+    #[test]
+    fn test_is_deserialization_sink() {
+        assert!(TaintGraphBuilder::is_deserialization_sink(
+            "deserialize_json"
+        ));
+        assert!(TaintGraphBuilder::is_deserialization_sink("from_str"));
+        assert!(TaintGraphBuilder::is_deserialization_sink("from_bytes"));
+        assert!(TaintGraphBuilder::is_deserialization_sink(
+            "parse_from_string"
+        ));
+        assert!(!TaintGraphBuilder::is_deserialization_sink("write_file"));
+        assert!(!TaintGraphBuilder::is_deserialization_sink("execute_query"));
+    }
+
+    #[test]
+    fn test_detect_sink_integration() {
+        let mut analyzer = TaintAnalyzer::new();
+        let builder = TaintGraphBuilder {
+            analyzer: &mut analyzer,
+            current_file: PathBuf::from("test.rs"),
+            variable_taints: std::collections::HashMap::new(),
+        };
+
+        assert_eq!(
+            builder.detect_sink("execute_query"),
+            Some(SinkOperation::SqlQuery)
+        );
+        assert_eq!(
+            builder.detect_sink("Command::new"),
+            Some(SinkOperation::ProcessExecution)
+        );
+        assert_eq!(
+            builder.detect_sink("File::write"),
+            Some(SinkOperation::FileSystem)
+        );
+        assert_eq!(
+            builder.detect_sink("send_http_request"),
+            Some(SinkOperation::NetworkRequest)
+        );
+        assert_eq!(
+            builder.detect_sink("deserialize_input"),
+            Some(SinkOperation::Deserialization)
+        );
+        assert_eq!(builder.detect_sink("regular_function"), None);
+    }
+
+    #[test]
+    fn test_detect_sink_edge_cases() {
+        let mut analyzer = TaintAnalyzer::new();
+        let builder = TaintGraphBuilder {
+            analyzer: &mut analyzer,
+            current_file: PathBuf::from("test.rs"),
+            variable_taints: std::collections::HashMap::new(),
+        };
+
+        assert_eq!(builder.detect_sink(""), None);
+        assert_eq!(builder.detect_sink("random_method"), None);
+        assert_eq!(builder.detect_sink("query"), Some(SinkOperation::SqlQuery));
+        assert_eq!(
+            builder.detect_sink("execute"),
+            Some(SinkOperation::SqlQuery)
+        );
+        assert_eq!(builder.detect_sink("File"), Some(SinkOperation::FileSystem));
+    }
+
+    #[test]
+    fn test_classify_input_source_cli_arguments() {
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("std::env::args()"),
+            Some(InputSource::CliArgument)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("env::args().collect()"),
+            Some(InputSource::CliArgument)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("args().nth(2)"),
+            Some(InputSource::CliArgument)
+        );
+    }
+
+    #[test]
+    fn test_classify_input_source_environment() {
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("env::var(\"HOME\")"),
+            Some(InputSource::Environment)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("std::env::var(\"PATH\")"),
+            Some(InputSource::Environment)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("env::var_os(\"USER\")"),
+            Some(InputSource::Environment)
+        );
+    }
+
+    #[test]
+    fn test_classify_input_source_http_request() {
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("Request::new()"),
+            Some(InputSource::HttpRequest)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("HttpRequest::from_parts()"),
+            Some(InputSource::HttpRequest)
+        );
+        assert_eq!(TaintGraphBuilder::classify_input_source("req.body()"), None);
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("parse_Request_body()"),
+            Some(InputSource::HttpRequest)
+        );
+    }
+
+    #[test]
+    fn test_classify_input_source_file_input() {
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("File::open(\"data.txt\")"),
+            Some(InputSource::FileInput)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("read_to_string(&mut file)"),
+            Some(InputSource::FileInput)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("fs::read_file(path)"),
+            Some(InputSource::FileInput)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("BufReader::read_line()"),
+            Some(InputSource::UserInput)
+        );
+    }
+
+    #[test]
+    fn test_classify_input_source_user_input() {
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("io::stdin().read_line()"),
+            Some(InputSource::UserInput)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("stdin.lock()"),
+            Some(InputSource::UserInput)
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("read_line(&mut buffer)"),
+            Some(InputSource::UserInput)
+        );
+    }
+
+    #[test]
+    fn test_classify_input_source_no_match() {
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("regular_function_call()"),
+            None
+        );
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("calculate_sum(a, b)"),
+            None
+        );
+        assert_eq!(TaintGraphBuilder::classify_input_source(""), None);
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("process_data(input)"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_classify_input_source_edge_cases() {
+        // Test partial matches - "MyRequest" contains "Request" so it matches
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("MyRequest"),
+            Some(InputSource::HttpRequest)
+        );
+
+        // Test case sensitivity - "Request" is case-sensitive
+        assert_eq!(TaintGraphBuilder::classify_input_source("REQUEST"), None);
+
+        // Test combined patterns - read_line takes precedence over File::
+        assert_eq!(
+            TaintGraphBuilder::classify_input_source("File::read_line()"),
+            Some(InputSource::UserInput)
+        );
+    }
+
+    #[test]
+    fn test_detect_source_integration() {
+        use std::collections::HashSet;
+        use syn::parse_quote;
+
+        let mut analyzer = TaintAnalyzer::new();
+        analyzer.taint_sources = HashSet::from([
+            "args".to_string(),
+            "env".to_string(),
+            "Request".to_string(),
+            "File".to_string(),
+            "stdin".to_string(),
+        ]);
+
+        let builder = TaintGraphBuilder {
+            analyzer: &mut analyzer,
+            current_file: PathBuf::from("test.rs"),
+            variable_taints: std::collections::HashMap::new(),
+        };
+
+        // Test with CLI argument expression
+        let expr: Expr = parse_quote!(std::env::args());
+        assert_eq!(builder.detect_source(&expr), Some(InputSource::CliArgument));
+
+        // Test with environment variable expression
+        let expr: Expr = parse_quote!(env::var("HOME"));
+        assert_eq!(builder.detect_source(&expr), Some(InputSource::Environment));
+
+        // Test with file input expression
+        let expr: Expr = parse_quote!(File::open("data.txt"));
+        assert_eq!(builder.detect_source(&expr), Some(InputSource::FileInput));
+
+        // Test with non-taint expression
+        let expr: Expr = parse_quote!(calculate_sum(a, b));
+        assert_eq!(builder.detect_source(&expr), None);
+    }
+
+    #[test]
+    fn test_detect_source_respects_taint_sources() {
+        use std::collections::HashSet;
+        use syn::parse_quote;
+
+        let mut analyzer = TaintAnalyzer::new();
+        // Empty taint sources - should return None for everything
+        analyzer.taint_sources = HashSet::new();
+
+        let builder = TaintGraphBuilder {
+            analyzer: &mut analyzer,
+            current_file: PathBuf::from("test.rs"),
+            variable_taints: std::collections::HashMap::new(),
+        };
+
+        let expr: Expr = parse_quote!(std::env::args());
+        assert_eq!(builder.detect_source(&expr), None);
+
+        // Add "args" to taint sources
+        builder.analyzer.taint_sources.insert("args".to_string());
+        assert_eq!(builder.detect_source(&expr), Some(InputSource::CliArgument));
+    }
+
+    #[test]
+    fn test_is_cli_argument_source() {
+        // Test with args() pattern
+        assert!(TaintGraphBuilder::is_cli_argument_source("args()"));
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "std::env::args()"
+        ));
+        assert!(TaintGraphBuilder::is_cli_argument_source("env::args"));
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "env::args().collect()"
+        ));
+
+        // Test negative cases
+        assert!(!TaintGraphBuilder::is_cli_argument_source("environment"));
+        assert!(!TaintGraphBuilder::is_cli_argument_source("read_file"));
+        assert!(!TaintGraphBuilder::is_cli_argument_source(""));
+        assert!(!TaintGraphBuilder::is_cli_argument_source("arg")); // partial match shouldn't work
+        assert!(!TaintGraphBuilder::is_cli_argument_source("arguments")); // different word
+    }
+
+    #[test]
+    fn test_is_environment_source() {
+        // Test with env::var pattern
+        assert!(TaintGraphBuilder::is_environment_source("env::var"));
+        assert!(TaintGraphBuilder::is_environment_source("std::env::var"));
+        assert!(TaintGraphBuilder::is_environment_source(
+            "env::var(\"HOME\")"
+        ));
+        assert!(TaintGraphBuilder::is_environment_source("env::var_os"));
+
+        // Test negative cases
+        assert!(!TaintGraphBuilder::is_environment_source("env::args"));
+        assert!(!TaintGraphBuilder::is_environment_source("environment"));
+        assert!(!TaintGraphBuilder::is_environment_source("var"));
+        assert!(!TaintGraphBuilder::is_environment_source(""));
+        assert!(!TaintGraphBuilder::is_environment_source("getenv"));
+    }
+
+    #[test]
+    fn test_is_http_request_source() {
+        // Test with Request pattern
+        assert!(TaintGraphBuilder::is_http_request_source("Request"));
+        assert!(TaintGraphBuilder::is_http_request_source("Request::new()"));
+        assert!(TaintGraphBuilder::is_http_request_source("HttpRequest"));
+        assert!(TaintGraphBuilder::is_http_request_source(
+            "HttpRequest::from_parts()"
+        ));
+        assert!(TaintGraphBuilder::is_http_request_source("MyRequest")); // contains Request
+        assert!(TaintGraphBuilder::is_http_request_source(
+            "parse_Request_body"
+        ));
+
+        // Test negative cases
+        assert!(!TaintGraphBuilder::is_http_request_source("request")); // lowercase
+        assert!(!TaintGraphBuilder::is_http_request_source("REQUEST")); // uppercase (exact case needed)
+        assert!(!TaintGraphBuilder::is_http_request_source(""));
+        assert!(!TaintGraphBuilder::is_http_request_source("response"));
+        assert!(!TaintGraphBuilder::is_http_request_source("http"));
+    }
+
+    #[test]
+    fn test_predicate_functions_with_spaces() {
+        // Test that the predicates work with normalized input (spaces removed)
+        // This tests the integration between classify_input_source normalization and predicates
+
+        // CLI arguments with no spaces
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "env::args().nth(2)"
+        ));
+
+        // Environment with no spaces
+        assert!(TaintGraphBuilder::is_environment_source(
+            "env::var(\"PATH\")"
+        ));
+
+        // HTTP request with no spaces
+        assert!(TaintGraphBuilder::is_http_request_source(
+            "HttpRequest::body()"
+        ));
+    }
+
+    #[test]
+    fn test_predicate_edge_cases() {
+        // Test empty strings
+        assert!(!TaintGraphBuilder::is_cli_argument_source(""));
+        assert!(!TaintGraphBuilder::is_environment_source(""));
+        assert!(!TaintGraphBuilder::is_http_request_source(""));
+
+        // Test with special characters
+        assert!(TaintGraphBuilder::is_cli_argument_source("::env::args()"));
+        assert!(TaintGraphBuilder::is_environment_source(
+            "env::var_os(\"USER\")"
+        ));
+        assert!(TaintGraphBuilder::is_http_request_source("Request<Body>"));
+
+        // Test substring matches work correctly
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "get_args()_from_cli"
+        ));
+        assert!(TaintGraphBuilder::is_environment_source(
+            "read_env::var_from_system"
+        ));
+    }
+
+    #[test]
+    fn test_is_user_input_source() {
+        // Test stdin patterns
+        assert!(TaintGraphBuilder::is_user_input_source("stdin().read_line"));
+        assert!(TaintGraphBuilder::is_user_input_source("io::stdin()"));
+        assert!(TaintGraphBuilder::is_user_input_source("std::io::stdin"));
+
+        // Test read_line patterns
+        assert!(TaintGraphBuilder::is_user_input_source(
+            "buffer.read_line()"
+        ));
+        assert!(TaintGraphBuilder::is_user_input_source(
+            "read_line_from_user"
+        ));
+
+        // Test false cases
+        assert!(!TaintGraphBuilder::is_user_input_source("read_file"));
+        assert!(!TaintGraphBuilder::is_user_input_source(""));
+    }
+
+    #[test]
+    fn test_is_file_input_source() {
+        // Test File:: patterns
+        assert!(TaintGraphBuilder::is_file_input_source("File::open"));
+        assert!(TaintGraphBuilder::is_file_input_source(
+            "std::fs::File::create"
+        ));
+        assert!(TaintGraphBuilder::is_file_input_source("File::read"));
+
+        // Test read_ patterns
+        assert!(TaintGraphBuilder::is_file_input_source("read_to_string"));
+        assert!(TaintGraphBuilder::is_file_input_source("read_dir"));
+        assert!(TaintGraphBuilder::is_file_input_source("fs::read_file"));
+
+        // Test false cases
+        assert!(!TaintGraphBuilder::is_file_input_source("write_file"));
+        assert!(!TaintGraphBuilder::is_file_input_source(""));
     }
 }

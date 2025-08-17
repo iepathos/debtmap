@@ -152,7 +152,7 @@ fn collect_all_rust_debt_items(
         analyze_organization_patterns(file, path),
         analyze_performance_patterns(file, path),
         analyze_security_patterns(file, path, suppression_context),
-        testing::analyze_testing_patterns(file, &path.to_path_buf()),
+        testing::analyze_testing_patterns(file, path),
     ]
     .into_iter()
     .flatten()

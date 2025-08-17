@@ -22,6 +22,24 @@ impl AsyncResourceDetector {
         }
     }
 
+    /// Pure function to classify resource type based on path string patterns
+    /// This is extracted to reduce complexity and enable better testing
+    fn classify_resource_type_from_path(path_str: &str) -> ResourceType {
+        match () {
+            _ if path_str.contains("File") => ResourceType::FileHandle,
+            _ if path_str.contains("TcpStream") || path_str.contains("Socket") => {
+                ResourceType::NetworkConnection
+            }
+            _ if path_str.contains("Connection") || path_str.contains("Database") => {
+                ResourceType::DatabaseConnection
+            }
+            _ if path_str.contains("Thread") => ResourceType::ThreadHandle,
+            _ if path_str.contains("Mutex") => ResourceType::Mutex,
+            _ if path_str.contains("Channel") => ResourceType::Channel,
+            _ => ResourceType::SystemHandle,
+        }
+    }
+
     fn analyze_async_resource_usage(&self, async_fn: &AsyncFunction) -> AsyncResourceUsage {
         let mut usage = AsyncResourceUsage::default();
 
@@ -168,21 +186,7 @@ impl AsyncResourceDetector {
                         .collect::<Vec<_>>()
                         .join("::");
 
-                    if path_str.contains("File") {
-                        ResourceType::FileHandle
-                    } else if path_str.contains("TcpStream") || path_str.contains("Socket") {
-                        ResourceType::NetworkConnection
-                    } else if path_str.contains("Connection") || path_str.contains("Database") {
-                        ResourceType::DatabaseConnection
-                    } else if path_str.contains("Thread") {
-                        ResourceType::ThreadHandle
-                    } else if path_str.contains("Mutex") {
-                        ResourceType::Mutex
-                    } else if path_str.contains("Channel") {
-                        ResourceType::Channel
-                    } else {
-                        ResourceType::SystemHandle
-                    }
+                    Self::classify_resource_type_from_path(&path_str)
                 } else {
                     ResourceType::SystemHandle
                 }
@@ -465,3 +469,173 @@ const RESOURCE_FUNCTIONS: &[&str] = &[
 const RESOURCE_METHODS: &[&str] = &[
     "open", "create", "connect", "bind", "spawn", "close", "shutdown", "join",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_resource_type_file_handle() {
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("std::fs::File::open"),
+            ResourceType::FileHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("tokio::fs::File"),
+            ResourceType::FileHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("OpenFile"),
+            ResourceType::FileHandle
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_network_connection() {
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("TcpStream::connect"),
+            ResourceType::NetworkConnection
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("tokio::net::TcpStream"),
+            ResourceType::NetworkConnection
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("Socket::new"),
+            ResourceType::NetworkConnection
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("UdpSocket::bind"),
+            ResourceType::NetworkConnection
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_database_connection() {
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("Connection::open"),
+            ResourceType::DatabaseConnection
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("Database::connect"),
+            ResourceType::DatabaseConnection
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("PgConnection::new"),
+            ResourceType::DatabaseConnection
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("MySqlDatabase"),
+            ResourceType::DatabaseConnection
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_thread_handle() {
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("Thread::spawn"),
+            ResourceType::ThreadHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("std::thread::Thread"),
+            ResourceType::ThreadHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("JoinThread"),
+            ResourceType::ThreadHandle
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_mutex() {
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("Mutex::new"),
+            ResourceType::Mutex
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("std::sync::Mutex"),
+            ResourceType::Mutex
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("RwLockMutex"),
+            ResourceType::Mutex
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_channel() {
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("Channel::new"),
+            ResourceType::Channel
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("mpsc::Channel"),
+            ResourceType::Channel
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("SyncChannel"),
+            ResourceType::Channel
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_system_handle_default() {
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("SomeOtherType"),
+            ResourceType::SystemHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("UnknownResource"),
+            ResourceType::SystemHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path(""),
+            ResourceType::SystemHandle
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_priority_order() {
+        // Test that File takes precedence over Connection when both are present
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("FileConnection"),
+            ResourceType::FileHandle
+        );
+
+        // Test that TcpStream takes precedence over generic Connection
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("TcpStreamConnection"),
+            ResourceType::NetworkConnection
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_case_sensitive() {
+        // The function is case-sensitive, so lowercase variants should not match
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("file"),
+            ResourceType::SystemHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("mutex"),
+            ResourceType::SystemHandle
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_partial_matches() {
+        // Test that partial matches work correctly
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("AsyncFileReader"),
+            ResourceType::FileHandle
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("TcpStreamWrapper"),
+            ResourceType::NetworkConnection
+        );
+        assert_eq!(
+            AsyncResourceDetector::classify_resource_type_from_path("DatabasePool"),
+            ResourceType::DatabaseConnection
+        );
+    }
+}

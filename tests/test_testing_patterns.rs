@@ -1,6 +1,5 @@
 use debtmap::testing::analyze_testing_patterns;
 use std::path::PathBuf;
-use syn;
 
 #[test]
 fn test_detects_test_without_assertions() {

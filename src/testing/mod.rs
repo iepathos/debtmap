@@ -3,7 +3,7 @@ pub mod complexity_detector;
 pub mod flaky_detector;
 
 use crate::core::{DebtItem, DebtType, Priority};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use syn::{File, ItemFn};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,7 +79,7 @@ pub enum TestQualityImpact {
 }
 
 pub trait TestingDetector {
-    fn detect_anti_patterns(&self, file: &File, path: &PathBuf) -> Vec<TestingAntiPattern>;
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<TestingAntiPattern>;
     fn detector_name(&self) -> &'static str;
     fn assess_test_quality_impact(&self, pattern: &TestingAntiPattern) -> TestQualityImpact;
 }
@@ -105,7 +105,7 @@ pub fn is_test_function(function: &ItemFn) -> bool {
         || function.sig.ident.to_string().ends_with("_test")
 }
 
-pub fn analyze_testing_patterns(file: &File, path: &PathBuf) -> Vec<DebtItem> {
+pub fn analyze_testing_patterns(file: &File, path: &Path) -> Vec<DebtItem> {
     let detectors: Vec<Box<dyn TestingDetector>> = vec![
         Box::new(assertion_detector::AssertionDetector::new()),
         Box::new(complexity_detector::TestComplexityDetector::new()),
@@ -130,7 +130,7 @@ pub fn analyze_testing_patterns(file: &File, path: &PathBuf) -> Vec<DebtItem> {
 fn convert_testing_pattern_to_debt_item(
     pattern: TestingAntiPattern,
     _impact: TestQualityImpact,
-    path: &PathBuf,
+    path: &Path,
 ) -> DebtItem {
     let (priority, message, context, line, debt_type) = match pattern {
         TestingAntiPattern::TestWithoutAssertions {
@@ -186,7 +186,7 @@ fn convert_testing_pattern_to_debt_item(
         id: format!("testing-{}-{}", path.display(), line),
         debt_type,
         priority,
-        file: path.clone(),
+        file: path.to_path_buf(),
         line,
         column: None,
         message,

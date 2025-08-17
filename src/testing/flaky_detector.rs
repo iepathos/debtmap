@@ -2,7 +2,7 @@ use super::{
     is_test_function, FlakinessType, ReliabilityImpact, TestQualityImpact, TestingAntiPattern,
     TestingDetector,
 };
-use std::path::PathBuf;
+use std::path::Path;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMethodCall, File, Item, ItemFn};
 
@@ -21,7 +21,7 @@ impl FlakyTestDetector {
 }
 
 impl TestingDetector for FlakyTestDetector {
-    fn detect_anti_patterns(&self, file: &File, path: &PathBuf) -> Vec<TestingAntiPattern> {
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<TestingAntiPattern> {
         let mut patterns = Vec::new();
 
         for item in &file.items {
@@ -34,7 +34,7 @@ impl TestingDetector for FlakyTestDetector {
 
                         patterns.push(TestingAntiPattern::FlakyTestPattern {
                             test_name: function.sig.ident.to_string(),
-                            file: path.clone(),
+                            file: path.to_path_buf(),
                             line,
                             flakiness_type: indicator.flakiness_type,
                             reliability_impact: indicator.impact,
@@ -57,7 +57,7 @@ impl TestingDetector for FlakyTestDetector {
 
                                     patterns.push(TestingAntiPattern::FlakyTestPattern {
                                         test_name: function.sig.ident.to_string(),
-                                        file: path.clone(),
+                                        file: path.to_path_buf(),
                                         line,
                                         flakiness_type: indicator.flakiness_type,
                                         reliability_impact: indicator.impact,
