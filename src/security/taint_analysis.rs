@@ -1,6 +1,7 @@
 use crate::security::types::{InputSource, SecurityVulnerability, Severity, SinkOperation};
 use petgraph::algo::all_simple_paths;
 use petgraph::graph::{DiGraph, NodeIndex};
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
@@ -137,8 +138,6 @@ impl TaintAnalyzer {
     }
 
     fn find_taint_paths(&self) -> Vec<TaintPath> {
-        let mut vulnerable_paths = Vec::new();
-
         // Get source and sink nodes
         let source_nodes: Vec<_> = self
             .node_indices
@@ -164,32 +163,44 @@ impl TaintAnalyzer {
             })
             .collect();
 
-        // Find all paths from sources to sinks
-        for (source_idx, source_type) in source_nodes {
-            for (sink_idx, sink_type) in &sink_nodes {
-                let paths: Vec<Vec<NodeIndex>> =
-                    all_simple_paths(&self.taint_graph, source_idx, *sink_idx, 0, Some(10))
+        // Process source-sink pairs in parallel for better performance
+        let vulnerable_paths: Vec<TaintPath> = source_nodes
+            .par_iter()
+            .flat_map(|(source_idx, source_type)| {
+                sink_nodes
+                    .iter()
+                    .flat_map(|(sink_idx, sink_type)| {
+                        // Use iterator directly instead of collecting all paths first
+                        let paths: Vec<Vec<NodeIndex>> = all_simple_paths(
+                            &self.taint_graph,
+                            *source_idx,
+                            *sink_idx,
+                            0,
+                            Some(10),
+                        )
                         .collect();
 
-                for path in paths {
-                    let has_sanitizer = self.path_has_sanitizer(&path);
+                        paths
+                            .into_iter()
+                            .filter(|path| !self.path_has_sanitizer(path))
+                            .map(|path| {
+                                let node_names: Vec<String> = path
+                                    .iter()
+                                    .map(|&idx| self.taint_graph[idx].id.clone())
+                                    .collect();
 
-                    if !has_sanitizer {
-                        let node_names: Vec<String> = path
-                            .iter()
-                            .map(|&idx| self.taint_graph[idx].id.clone())
-                            .collect();
-
-                        vulnerable_paths.push(TaintPath {
-                            source: source_type,
-                            sink: *sink_type,
-                            nodes: node_names,
-                            has_sanitizer: false,
-                        });
-                    }
-                }
-            }
-        }
+                                TaintPath {
+                                    source: *source_type,
+                                    sink: *sink_type,
+                                    nodes: node_names,
+                                    has_sanitizer: false,
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
 
         vulnerable_paths
     }
