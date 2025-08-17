@@ -339,20 +339,31 @@ impl<'a, 'ast> Visit<'ast> for TaintGraphBuilder<'a> {
 }
 
 impl<'a> TaintGraphBuilder<'a> {
+    /// Checks if the expression represents CLI argument input
+    fn is_cli_argument_source(normalized: &str) -> bool {
+        normalized.contains("args()") || normalized.contains("env::args")
+    }
+
+    /// Checks if the expression represents environment variable input
+    fn is_environment_source(normalized: &str) -> bool {
+        normalized.contains("env::var")
+    }
+
+    /// Checks if the expression represents HTTP request input
+    fn is_http_request_source(normalized: &str) -> bool {
+        normalized.contains("Request") || normalized.contains("HttpRequest")
+    }
+
     /// Classifies an expression string into an input source type
     /// This is a pure function that can be tested in isolation
     fn classify_input_source(expr_str: &str) -> Option<InputSource> {
         // Remove spaces for more reliable matching (quote adds spaces between tokens)
         let normalized = expr_str.replace(" ", "");
-        
+
         match () {
-            _ if normalized.contains("args()") || normalized.contains("env::args") => {
-                Some(InputSource::CliArgument)
-            }
-            _ if normalized.contains("env::var") => Some(InputSource::Environment),
-            _ if normalized.contains("Request") || normalized.contains("HttpRequest") => {
-                Some(InputSource::HttpRequest)
-            }
+            _ if Self::is_cli_argument_source(&normalized) => Some(InputSource::CliArgument),
+            _ if Self::is_environment_source(&normalized) => Some(InputSource::Environment),
+            _ if Self::is_http_request_source(&normalized) => Some(InputSource::HttpRequest),
             // Check for stdin/read_line BEFORE general read_ pattern
             _ if normalized.contains("stdin") || normalized.contains("read_line") => {
                 Some(InputSource::UserInput)
@@ -609,10 +620,7 @@ mod tests {
             TaintGraphBuilder::classify_input_source("HttpRequest::from_parts()"),
             Some(InputSource::HttpRequest)
         );
-        assert_eq!(
-            TaintGraphBuilder::classify_input_source("req.body()"),
-            None
-        );
+        assert_eq!(TaintGraphBuilder::classify_input_source("req.body()"), None);
         assert_eq!(
             TaintGraphBuilder::classify_input_source("parse_Request_body()"),
             Some(InputSource::HttpRequest)
@@ -679,13 +687,10 @@ mod tests {
             TaintGraphBuilder::classify_input_source("MyRequest"),
             Some(InputSource::HttpRequest)
         );
-        
+
         // Test case sensitivity - "Request" is case-sensitive
-        assert_eq!(
-            TaintGraphBuilder::classify_input_source("REQUEST"),
-            None
-        );
-        
+        assert_eq!(TaintGraphBuilder::classify_input_source("REQUEST"), None);
+
         // Test combined patterns - read_line takes precedence over File::
         assert_eq!(
             TaintGraphBuilder::classify_input_source("File::read_line()"),
@@ -695,9 +700,9 @@ mod tests {
 
     #[test]
     fn test_detect_source_integration() {
-        use syn::parse_quote;
         use std::collections::HashSet;
-        
+        use syn::parse_quote;
+
         let mut analyzer = TaintAnalyzer::new();
         analyzer.taint_sources = HashSet::from([
             "args".to_string(),
@@ -706,25 +711,25 @@ mod tests {
             "File".to_string(),
             "stdin".to_string(),
         ]);
-        
+
         let builder = TaintGraphBuilder {
             analyzer: &mut analyzer,
             current_file: PathBuf::from("test.rs"),
             variable_taints: std::collections::HashMap::new(),
         };
-        
+
         // Test with CLI argument expression
         let expr: Expr = parse_quote!(std::env::args());
         assert_eq!(builder.detect_source(&expr), Some(InputSource::CliArgument));
-        
+
         // Test with environment variable expression
         let expr: Expr = parse_quote!(env::var("HOME"));
         assert_eq!(builder.detect_source(&expr), Some(InputSource::Environment));
-        
+
         // Test with file input expression
         let expr: Expr = parse_quote!(File::open("data.txt"));
         assert_eq!(builder.detect_source(&expr), Some(InputSource::FileInput));
-        
+
         // Test with non-taint expression
         let expr: Expr = parse_quote!(calculate_sum(a, b));
         assert_eq!(builder.detect_source(&expr), None);
@@ -732,24 +737,128 @@ mod tests {
 
     #[test]
     fn test_detect_source_respects_taint_sources() {
-        use syn::parse_quote;
         use std::collections::HashSet;
-        
+        use syn::parse_quote;
+
         let mut analyzer = TaintAnalyzer::new();
         // Empty taint sources - should return None for everything
         analyzer.taint_sources = HashSet::new();
-        
+
         let builder = TaintGraphBuilder {
             analyzer: &mut analyzer,
             current_file: PathBuf::from("test.rs"),
             variable_taints: std::collections::HashMap::new(),
         };
-        
+
         let expr: Expr = parse_quote!(std::env::args());
         assert_eq!(builder.detect_source(&expr), None);
-        
+
         // Add "args" to taint sources
         builder.analyzer.taint_sources.insert("args".to_string());
         assert_eq!(builder.detect_source(&expr), Some(InputSource::CliArgument));
+    }
+
+    #[test]
+    fn test_is_cli_argument_source() {
+        // Test with args() pattern
+        assert!(TaintGraphBuilder::is_cli_argument_source("args()"));
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "std::env::args()"
+        ));
+        assert!(TaintGraphBuilder::is_cli_argument_source("env::args"));
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "env::args().collect()"
+        ));
+
+        // Test negative cases
+        assert!(!TaintGraphBuilder::is_cli_argument_source("environment"));
+        assert!(!TaintGraphBuilder::is_cli_argument_source("read_file"));
+        assert!(!TaintGraphBuilder::is_cli_argument_source(""));
+        assert!(!TaintGraphBuilder::is_cli_argument_source("arg")); // partial match shouldn't work
+        assert!(!TaintGraphBuilder::is_cli_argument_source("arguments")); // different word
+    }
+
+    #[test]
+    fn test_is_environment_source() {
+        // Test with env::var pattern
+        assert!(TaintGraphBuilder::is_environment_source("env::var"));
+        assert!(TaintGraphBuilder::is_environment_source("std::env::var"));
+        assert!(TaintGraphBuilder::is_environment_source(
+            "env::var(\"HOME\")"
+        ));
+        assert!(TaintGraphBuilder::is_environment_source("env::var_os"));
+
+        // Test negative cases
+        assert!(!TaintGraphBuilder::is_environment_source("env::args"));
+        assert!(!TaintGraphBuilder::is_environment_source("environment"));
+        assert!(!TaintGraphBuilder::is_environment_source("var"));
+        assert!(!TaintGraphBuilder::is_environment_source(""));
+        assert!(!TaintGraphBuilder::is_environment_source("getenv"));
+    }
+
+    #[test]
+    fn test_is_http_request_source() {
+        // Test with Request pattern
+        assert!(TaintGraphBuilder::is_http_request_source("Request"));
+        assert!(TaintGraphBuilder::is_http_request_source("Request::new()"));
+        assert!(TaintGraphBuilder::is_http_request_source("HttpRequest"));
+        assert!(TaintGraphBuilder::is_http_request_source(
+            "HttpRequest::from_parts()"
+        ));
+        assert!(TaintGraphBuilder::is_http_request_source("MyRequest")); // contains Request
+        assert!(TaintGraphBuilder::is_http_request_source(
+            "parse_Request_body"
+        ));
+
+        // Test negative cases
+        assert!(!TaintGraphBuilder::is_http_request_source("request")); // lowercase
+        assert!(!TaintGraphBuilder::is_http_request_source("REQUEST")); // uppercase (exact case needed)
+        assert!(!TaintGraphBuilder::is_http_request_source(""));
+        assert!(!TaintGraphBuilder::is_http_request_source("response"));
+        assert!(!TaintGraphBuilder::is_http_request_source("http"));
+    }
+
+    #[test]
+    fn test_predicate_functions_with_spaces() {
+        // Test that the predicates work with normalized input (spaces removed)
+        // This tests the integration between classify_input_source normalization and predicates
+
+        // CLI arguments with no spaces
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "env::args().nth(2)"
+        ));
+
+        // Environment with no spaces
+        assert!(TaintGraphBuilder::is_environment_source(
+            "env::var(\"PATH\")"
+        ));
+
+        // HTTP request with no spaces
+        assert!(TaintGraphBuilder::is_http_request_source(
+            "HttpRequest::body()"
+        ));
+    }
+
+    #[test]
+    fn test_predicate_edge_cases() {
+        // Test empty strings
+        assert!(!TaintGraphBuilder::is_cli_argument_source(""));
+        assert!(!TaintGraphBuilder::is_environment_source(""));
+        assert!(!TaintGraphBuilder::is_http_request_source(""));
+
+        // Test with special characters
+        assert!(TaintGraphBuilder::is_cli_argument_source("::env::args()"));
+        assert!(TaintGraphBuilder::is_environment_source(
+            "env::var_os(\"USER\")"
+        ));
+        assert!(TaintGraphBuilder::is_http_request_source("Request<Body>"));
+
+        // Test substring matches work correctly
+        assert!(TaintGraphBuilder::is_cli_argument_source(
+            "get_args()_from_cli"
+        ));
+        assert!(TaintGraphBuilder::is_environment_source(
+            "read_env::var_from_system"
+        ));
     }
 }
