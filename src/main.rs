@@ -57,6 +57,8 @@ struct AnalyzeConfig {
     #[allow(dead_code)]
     filter_categories: Option<Vec<String>>,
     exclude_tests: bool,
+    #[allow(dead_code)]
+    smart_performance: bool,
 }
 
 struct ValidateConfig {
@@ -136,6 +138,7 @@ fn main() -> Result<()> {
             enhanced_scoring,
             legacy_scoring,
             exclude_tests,
+            smart_performance,
         } => {
             // Set enhanced scoring environment variable
             if legacy_scoring {
@@ -175,6 +178,7 @@ fn main() -> Result<()> {
                 min_priority,
                 filter_categories,
                 exclude_tests,
+                smart_performance,
             };
             handle_analyze(config)
         }

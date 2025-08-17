@@ -1,4 +1,3 @@
-use debtmap::common::SourceLocation;
 use debtmap::performance::{
     IOPattern, IOPerformanceDetector, NestedLoopDetector, PerformanceAntiPattern,
     PerformanceDetector, SmartPerformanceConfig, SmartPerformanceDetector,
@@ -93,7 +92,6 @@ fn test_smart_detection_with_custom_config() {
     "#;
 
     let file = syn::parse_str::<syn::File>(source).unwrap();
-    let detectors: Vec<Box<dyn PerformanceDetector>> = vec![Box::new(IOPerformanceDetector::new())];
 
     // Test with lenient config
     let lenient_config = SmartPerformanceConfig {
@@ -110,7 +108,8 @@ fn test_smart_detection_with_custom_config() {
         boost_critical_paths: true,
     };
 
-    let detector = SmartPerformanceDetector::new(detectors.clone()).with_config(lenient_config);
+    let detectors: Vec<Box<dyn PerformanceDetector>> = vec![Box::new(IOPerformanceDetector::new())];
+    let detector = SmartPerformanceDetector::new(detectors).with_config(lenient_config);
     let lenient_issues =
         detector.detect_with_context(&file, Path::new("src/utils/helper.rs"), None);
 
@@ -129,6 +128,7 @@ fn test_smart_detection_with_custom_config() {
         boost_critical_paths: true,
     };
 
+    let detectors: Vec<Box<dyn PerformanceDetector>> = vec![Box::new(IOPerformanceDetector::new())];
     let detector = SmartPerformanceDetector::new(detectors).with_config(strict_config);
     let strict_issues = detector.detect_with_context(&file, Path::new("src/utils/helper.rs"), None);
 
@@ -238,7 +238,8 @@ fn test_function_intent_classification() {
 
 #[test]
 fn test_severity_adjustment() {
-    use debtmap::core::{Priority, SourceLocation};
+    use debtmap::common::SourceLocation;
+    use debtmap::core::Priority;
     use debtmap::performance::context::{
         BusinessCriticality, FunctionIntent, ModuleType, PatternContext, PerformanceSensitivity,
         SeverityAdjuster,
@@ -304,7 +305,7 @@ fn test_severity_adjustment() {
 
 #[test]
 fn test_pattern_correlation() {
-    use debtmap::core::SourceLocation;
+    use debtmap::common::SourceLocation;
     use debtmap::performance::context::{
         BusinessCriticality, FunctionIntent, ModuleType, PatternContext, PerformanceSensitivity,
     };

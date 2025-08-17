@@ -2,9 +2,13 @@ use super::ModuleType;
 use std::path::Path;
 
 pub struct ModuleClassifier {
+    #[allow(dead_code)]
     test_patterns: Vec<String>,
+    #[allow(dead_code)]
     benchmark_patterns: Vec<String>,
+    #[allow(dead_code)]
     example_patterns: Vec<String>,
+    #[allow(dead_code)]
     doc_patterns: Vec<String>,
 }
 
@@ -93,7 +97,8 @@ impl ModuleClassifier {
             || path.ends_with("_test.rs")
             || path.ends_with("_tests.rs")
             || path.ends_with("/test.rs")
-            || path.contains("test_")
+            || path.contains("/test_")
+            || (path.starts_with("test_") && !path.contains("perf"))
             // Integration test patterns
             || (path.contains("integration") && path.contains("test"))
             // Framework-specific patterns

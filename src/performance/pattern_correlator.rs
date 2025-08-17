@@ -2,6 +2,7 @@ use crate::performance::context::{FunctionIntent, ModuleType, PatternContext};
 use crate::performance::PerformanceAntiPattern;
 
 pub struct PatternCorrelator {
+    #[allow(dead_code)]
     correlation_rules: Vec<CorrelationRule>,
 }
 
@@ -269,6 +270,7 @@ impl PatternCorrelator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::SourceLocation;
     use crate::performance::context::{BusinessCriticality, PerformanceSensitivity};
 
     #[test]

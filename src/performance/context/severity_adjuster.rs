@@ -163,6 +163,7 @@ impl SeverityAdjuster {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::SourceLocation;
     use crate::performance::PerformanceAntiPattern;
 
     #[test]

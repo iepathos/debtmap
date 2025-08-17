@@ -3,9 +3,13 @@ use crate::priority::call_graph::CallGraph;
 use syn::{visit::Visit, Expr, ItemFn};
 
 pub struct IntentClassifier {
+    #[allow(dead_code)]
     setup_patterns: Vec<String>,
+    #[allow(dead_code)]
     teardown_patterns: Vec<String>,
+    #[allow(dead_code)]
     business_logic_indicators: Vec<String>,
+    #[allow(dead_code)]
     io_wrapper_patterns: Vec<String>,
 }
 
@@ -281,6 +285,7 @@ struct BodyAnalysis {
 
 struct BodyAnalyzer {
     analysis: BodyAnalysis,
+    #[allow(dead_code)]
     depth: usize,
 }
 
