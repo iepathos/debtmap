@@ -13,9 +13,9 @@ pub struct SourceLocation {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LocationConfidence {
-    Exact,        // Precise syn::Span information
-    Approximate,  // Estimated from surrounding context
-    Unavailable,  // No location information available
+    Exact,       // Precise syn::Span information
+    Approximate, // Estimated from surrounding context
+    Unavailable, // No location information available
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ impl PerformanceAntiPattern {
             PerformanceAntiPattern::StringProcessingAntiPattern { location, .. } => location,
         }
     }
-    
+
     pub fn primary_line(&self) -> usize {
         self.location().line
     }
@@ -186,10 +186,11 @@ pub fn convert_performance_pattern_to_debt_item(
         line,
         column: location.column,
         message,
-        context: Some(format!("{}
-Location confidence: {:?}", 
-                             recommendation, 
-                             location.confidence)),
+        context: Some(format!(
+            "{}
+Location confidence: {:?}",
+            recommendation, location.confidence
+        )),
     }
 }
 
@@ -295,7 +296,7 @@ mod tests {
     use crate::DebtType;
     use crate::Priority;
     use std::path::PathBuf;
-    
+
     // Helper function to create a default SourceLocation for tests
     fn default_location() -> SourceLocation {
         SourceLocation {
@@ -531,11 +532,8 @@ mod tests {
             },
         };
         let path = PathBuf::from("src/test.rs");
-        let debt = convert_performance_pattern_to_debt_item(
-            pattern,
-            PerformanceImpact::Critical,
-            &path,
-        );
+        let debt =
+            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Critical, &path);
 
         assert_eq!(debt.priority, Priority::Critical);
         assert_eq!(debt.debt_type, DebtType::Performance);
@@ -574,7 +572,10 @@ mod tests {
         assert_eq!(debt.priority, Priority::High); // IO always gets High priority
         assert_eq!(debt.debt_type, DebtType::Performance);
         assert_eq!(debt.message, "Inefficient I/O pattern: UnbufferedIO");
-        assert_eq!(debt.context, Some("Consider: batch operations\nLocation confidence: Unavailable".to_string()));
+        assert_eq!(
+            debt.context,
+            Some("Consider: batch operations\nLocation confidence: Unavailable".to_string())
+        );
         assert_eq!(debt.line, 50);
     }
 

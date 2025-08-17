@@ -1,6 +1,6 @@
 use super::{
-    AllocationFrequency, AllocationType, LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector,
-    PerformanceImpact, SourceLocation,
+    AllocationFrequency, AllocationType, LocationConfidence, LocationExtractor,
+    PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, SourceLocation,
 };
 use std::path::Path;
 use syn::visit::{self, Visit};
@@ -16,7 +16,7 @@ impl AllocationDetector {
             location_extractor: None,
         }
     }
-    
+
     pub fn with_source_content(source_content: &str) -> Self {
         Self {
             location_extractor: Some(LocationExtractor::new(source_content)),
@@ -45,7 +45,7 @@ impl PerformanceDetector for AllocationDetector {
                 Err(_) => None,
             }
         };
-            
+
         let mut visitor = AllocationVisitor {
             patterns: Vec::new(),
             in_loop: false,

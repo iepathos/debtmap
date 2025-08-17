@@ -1,5 +1,6 @@
 use super::{
-    ComplexityClass, LocationConfidence, LocationExtractor, LoopOperation, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, SourceLocation,
+    ComplexityClass, LocationConfidence, LocationExtractor, LoopOperation, PerformanceAntiPattern,
+    PerformanceDetector, PerformanceImpact, SourceLocation,
 };
 use std::path::Path;
 use syn::visit::{self, Visit};
@@ -24,7 +25,7 @@ impl NestedLoopDetector {
             location_extractor: None,
         }
     }
-    
+
     pub fn with_source_content(source_content: &str) -> Self {
         Self {
             max_acceptable_nesting: 2,

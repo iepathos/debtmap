@@ -1,4 +1,7 @@
-use super::{LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, SourceLocation, StringAntiPattern};
+use super::{
+    LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector,
+    PerformanceImpact, SourceLocation, StringAntiPattern,
+};
 use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{
@@ -15,7 +18,7 @@ impl StringPerformanceDetector {
             location_extractor: None,
         }
     }
-    
+
     pub fn with_source_content(source_content: &str) -> Self {
         Self {
             location_extractor: Some(LocationExtractor::new(source_content)),
@@ -44,7 +47,7 @@ impl PerformanceDetector for StringPerformanceDetector {
                 Err(_) => None,
             }
         };
-            
+
         let mut visitor = StringVisitor {
             patterns: Vec::new(),
             in_loop: false,

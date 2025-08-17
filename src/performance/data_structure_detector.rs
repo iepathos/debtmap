@@ -1,5 +1,6 @@
 use super::{
-    DataStructureOperation, LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, SourceLocation,
+    DataStructureOperation, LocationConfidence, LocationExtractor, PerformanceAntiPattern,
+    PerformanceDetector, PerformanceImpact, SourceLocation,
 };
 use std::path::Path;
 use syn::visit::{self, Visit};
@@ -15,7 +16,7 @@ impl DataStructureDetector {
             location_extractor: None,
         }
     }
-    
+
     pub fn with_source_content(source_content: &str) -> Self {
         Self {
             location_extractor: Some(LocationExtractor::new(source_content)),
@@ -44,7 +45,7 @@ impl PerformanceDetector for DataStructureDetector {
                 Err(_) => None,
             }
         };
-            
+
         let mut visitor = DataStructureVisitor {
             patterns: Vec::new(),
             in_loop: false,
@@ -156,7 +157,8 @@ impl<'a> DataStructureVisitor<'a> {
                                 DataStructureOperation::FrequentDeletion
                             };
 
-                            let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
+                            let location =
+                                self.extract_location(&Expr::MethodCall(method_call.clone()));
                             self.patterns
                                 .push(PerformanceAntiPattern::InefficientDataStructure {
                                     operation,

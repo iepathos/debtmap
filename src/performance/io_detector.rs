@@ -1,4 +1,7 @@
-use super::{IOPattern, LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, SourceLocation};
+use super::{
+    IOPattern, LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector,
+    PerformanceImpact, SourceLocation,
+};
 use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{Expr, ExprCall, ExprForLoop, ExprLoop, ExprWhile, File};
@@ -13,7 +16,7 @@ impl IOPerformanceDetector {
             location_extractor: None,
         }
     }
-    
+
     pub fn with_source_content(source_content: &str) -> Self {
         Self {
             location_extractor: Some(LocationExtractor::new(source_content)),
@@ -42,7 +45,7 @@ impl PerformanceDetector for IOPerformanceDetector {
                 Err(_) => None,
             }
         };
-            
+
         let mut visitor = IOVisitor {
             patterns: Vec::new(),
             in_loop: false,
@@ -186,7 +189,7 @@ impl<'a> IOVisitor<'a> {
             || method == "send"
             || method == "recv"
     }
-    
+
     fn extract_location(&self, expr: &Expr) -> SourceLocation {
         if let Some(extractor) = self.location_extractor {
             extractor.extract_expr_location(expr)
@@ -215,7 +218,7 @@ impl<'a> IOVisitor<'a> {
             // Check for direct file operations without buffering
             if path_str.contains("File::open") || path_str.contains("File::create") {
                 let location = self.extract_location(&Expr::Call(call.clone()));
-                
+
                 // Check if it's being wrapped in a BufReader/BufWriter
                 // This is simplified - real implementation would track usage
                 self.patterns.push(PerformanceAntiPattern::InefficientIO {

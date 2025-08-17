@@ -18,7 +18,7 @@ use crate::organization::{
     OrganizationAntiPattern, OrganizationDetector, ParameterAnalyzer, PrimitiveObsessionDetector,
 };
 use crate::performance::{
-    convert_performance_pattern_to_debt_item, AllocationDetector, DataStructureDetector, 
+    convert_performance_pattern_to_debt_item, AllocationDetector, DataStructureDetector,
     IOPerformanceDetector, NestedLoopDetector, PerformanceDetector, StringPerformanceDetector,
 };
 use crate::priority::call_graph::CallGraph;
@@ -520,13 +520,15 @@ fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
 fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
     // Read source content for accurate line extraction
     let source_content = std::fs::read_to_string(path).unwrap_or_default();
-    
+
     let detectors: Vec<Box<dyn PerformanceDetector>> = vec![
         Box::new(NestedLoopDetector::with_source_content(&source_content)),
         Box::new(DataStructureDetector::with_source_content(&source_content)),
         Box::new(AllocationDetector::with_source_content(&source_content)),
         Box::new(IOPerformanceDetector::with_source_content(&source_content)),
-        Box::new(StringPerformanceDetector::with_source_content(&source_content)),
+        Box::new(StringPerformanceDetector::with_source_content(
+            &source_content,
+        )),
     ];
 
     let mut performance_items = Vec::new();
