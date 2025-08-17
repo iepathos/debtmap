@@ -233,6 +233,7 @@ impl<'ast> Visit<'ast> for MethodVisitor {
 }
 
 impl MethodVisitor {
+    #[allow(clippy::only_used_in_recursion)]
     fn extract_receiver_type(&self, expr: &syn::Expr) -> String {
         match expr {
             syn::Expr::Path(path) => path

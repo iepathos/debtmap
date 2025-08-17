@@ -181,6 +181,7 @@ impl StringVisitor {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn is_string_type(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Lit(lit) => matches!(lit.lit, syn::Lit::Str(_)),

@@ -2,7 +2,7 @@ use super::{
     is_test_function, ComplexitySource, TestQualityImpact, TestSimplification, TestingAntiPattern,
     TestingDetector,
 };
-use std::path::PathBuf;
+use std::path::Path;
 use syn::visit::Visit;
 use syn::{Block, Expr, ExprCall, ExprIf, ExprLoop, ExprMatch, ExprMethodCall, File, Item, ItemFn};
 
@@ -29,7 +29,7 @@ impl TestComplexityDetector {
 }
 
 impl TestingDetector for TestComplexityDetector {
-    fn detect_anti_patterns(&self, file: &File, path: &PathBuf) -> Vec<TestingAntiPattern> {
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<TestingAntiPattern> {
         let mut patterns = Vec::new();
 
         for item in &file.items {
@@ -42,7 +42,7 @@ impl TestingDetector for TestComplexityDetector {
 
                         patterns.push(TestingAntiPattern::OverlyComplexTest {
                             test_name: function.sig.ident.to_string(),
-                            file: path.clone(),
+                            file: path.to_path_buf(),
                             line,
                             complexity_score: analysis.total_complexity,
                             complexity_sources: analysis.sources.clone(),
@@ -65,7 +65,7 @@ impl TestingDetector for TestComplexityDetector {
 
                                     patterns.push(TestingAntiPattern::OverlyComplexTest {
                                         test_name: function.sig.ident.to_string(),
-                                        file: path.clone(),
+                                        file: path.to_path_buf(),
                                         line,
                                         complexity_score: analysis.total_complexity,
                                         complexity_sources: analysis.sources.clone(),

@@ -248,6 +248,7 @@ impl FunctionVisitor {
         parameters
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn extract_type_name(&self, ty: &syn::Type) -> String {
         match ty {
             syn::Type::Path(type_path) => type_path

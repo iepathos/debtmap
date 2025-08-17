@@ -160,7 +160,7 @@ impl EnhancedSecretDetector {
             }
         }
 
-        confidence.min(1.0).max(0.0)
+        confidence.clamp(0.0, 1.0)
     }
 
     fn calculate_entropy(&self, s: &str) -> f64 {
@@ -227,58 +227,59 @@ struct SecretVisitor<'a> {
 
 impl<'a, 'ast> Visit<'ast> for SecretVisitor<'a> {
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        if let Expr::Lit(ExprLit { lit, .. }) = expr {
-            if let Lit::Str(lit_str) = lit {
-                let value = lit_str.value();
+        if let Expr::Lit(ExprLit {
+            lit: Lit::Str(lit_str),
+            ..
+        }) = expr
+        {
+            let value = lit_str.value();
 
-                // Skip if in allowlist
-                if self.detector.is_in_allowlist(&value) {
-                    syn::visit::visit_expr(self, expr);
-                    return;
-                }
+            // Skip if in allowlist
+            if self.detector.is_in_allowlist(&value) {
+                syn::visit::visit_expr(self, expr);
+                return;
+            }
 
-                // Check against known patterns
-                for (secret_type, patterns) in &self.detector.patterns {
-                    for pattern in patterns {
-                        if pattern.is_match(&value) {
-                            let confidence =
-                                self.detector.calculate_confidence(&value, secret_type);
+            // Check against known patterns
+            for (secret_type, patterns) in &self.detector.patterns {
+                for pattern in patterns {
+                    if pattern.is_match(&value) {
+                        let confidence = self.detector.calculate_confidence(&value, secret_type);
 
-                            if confidence > 0.6 {
-                                let entropy = self.detector.calculate_entropy(&value);
-                                self.vulnerabilities
-                                    .push(SecurityVulnerability::HardcodedSecret {
-                                        secret_type: *secret_type,
-                                        confidence,
-                                        value_preview: self.detector.create_preview(&value),
-                                        entropy,
-                                        line: 0, // Would need span info for accurate line
-                                        file: self.path.clone(),
-                                    });
-                                syn::visit::visit_expr(self, expr);
-                                return;
-                            }
+                        if confidence > 0.6 {
+                            let entropy = self.detector.calculate_entropy(&value);
+                            self.vulnerabilities
+                                .push(SecurityVulnerability::HardcodedSecret {
+                                    secret_type: *secret_type,
+                                    confidence,
+                                    value_preview: self.detector.create_preview(&value),
+                                    entropy,
+                                    line: 0, // Would need span info for accurate line
+                                    file: self.path.clone(),
+                                });
+                            syn::visit::visit_expr(self, expr);
+                            return;
                         }
                     }
                 }
+            }
 
-                // Entropy-based detection for unknown patterns
-                let entropy = self.detector.calculate_entropy(&value);
-                if entropy > self.detector.entropy_threshold
-                    && value.len() > 20
-                    && !value.contains(' ')
-                    && value.chars().all(|c| c.is_ascii_graphic())
-                {
-                    self.vulnerabilities
-                        .push(SecurityVulnerability::HardcodedSecret {
-                            secret_type: SecretType::Unknown,
-                            confidence: 0.6,
-                            value_preview: self.detector.create_preview(&value),
-                            entropy,
-                            line: 0,
-                            file: self.path.clone(),
-                        });
-                }
+            // Entropy-based detection for unknown patterns
+            let entropy = self.detector.calculate_entropy(&value);
+            if entropy > self.detector.entropy_threshold
+                && value.len() > 20
+                && !value.contains(' ')
+                && value.chars().all(|c| c.is_ascii_graphic())
+            {
+                self.vulnerabilities
+                    .push(SecurityVulnerability::HardcodedSecret {
+                        secret_type: SecretType::Unknown,
+                        confidence: 0.6,
+                        value_preview: self.detector.create_preview(&value),
+                        entropy,
+                        line: 0,
+                        file: self.path.clone(),
+                    });
             }
         }
         syn::visit::visit_expr(self, expr);

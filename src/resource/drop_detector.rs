@@ -5,6 +5,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use syn::{visit::Visit, ImplItem, ItemImpl, ItemStruct, Type};
 
+/// Classification of resource cleanup patterns
+#[derive(Debug, PartialEq, Eq)]
+enum ResourceCleanupType {
+    AutoClose,     // Resources that are automatically closed (e.g., File, Socket)
+    ThreadJoin,    // Thread handles that need explicit joining
+    ExplicitClose, // Resources requiring explicit close() calls (e.g., Connection)
+    Generic,       // Generic resources requiring custom cleanup
+}
+
 pub struct DropDetector {
     #[allow(dead_code)]
     resource_type_patterns: HashMap<String, ResourcePattern>,
@@ -34,10 +43,10 @@ impl DropDetector {
     }
 
     fn analyze_type_for_resources(&self, type_def: &TypeDefinition) -> ResourceAnalysis {
-        let mut analysis = ResourceAnalysis::default();
-
-        // Check if type already implements Drop
-        analysis.has_drop_impl = type_def.has_drop_impl;
+        let mut analysis = ResourceAnalysis {
+            has_drop_impl: type_def.has_drop_impl,
+            ..Default::default()
+        };
 
         // Analyze fields for resource types
         for field in &type_def.fields {
@@ -97,44 +106,57 @@ impl DropDetector {
         !type_name.contains("Arc") && !type_name.contains("Rc")
     }
 
+    /// Classifies a resource type to determine its cleanup pattern
+    fn classify_resource_type(field_type: &str) -> ResourceCleanupType {
+        match () {
+            _ if field_type.contains("File") => ResourceCleanupType::AutoClose,
+            _ if field_type.contains("Thread") || field_type.contains("JoinHandle") => {
+                ResourceCleanupType::ThreadJoin
+            }
+            _ if field_type.contains("Connection") => ResourceCleanupType::ExplicitClose,
+            _ if field_type.contains("TcpStream") || field_type.contains("Socket") => {
+                ResourceCleanupType::AutoClose
+            }
+            _ => ResourceCleanupType::Generic,
+        }
+    }
+
+    /// Generates cleanup code for a specific field based on its resource type
+    fn generate_field_cleanup(field: &ResourceField) -> String {
+        let cleanup_type = Self::classify_resource_type(&field.field_type);
+
+        match cleanup_type {
+            ResourceCleanupType::AutoClose => match field.field_type.as_str() {
+                t if t.contains("File") => {
+                    "        // File handles are automatically closed\n".to_string()
+                }
+                _ => "        // Network streams are automatically closed\n".to_string(),
+            },
+            ResourceCleanupType::ThreadJoin => {
+                format!(
+                    "        if let Some(handle) = self.{}.take() {{\n            let _ = handle.join();\n        }}\n",
+                    field.field_name
+                )
+            }
+            ResourceCleanupType::ExplicitClose => {
+                format!(
+                    "        self.{}.close().unwrap_or_else(|e| {{\n            eprintln!(\"Failed to close connection: {{}}\", e);\n        }});\n",
+                    field.field_name
+                )
+            }
+            ResourceCleanupType::Generic => {
+                format!("        // Cleanup {} resource\n", field.field_name)
+            }
+        }
+    }
+
     fn generate_drop_implementation(&self, analysis: &ResourceAnalysis, type_name: &str) -> String {
         let mut drop_impl = String::new();
         drop_impl.push_str(&format!("impl Drop for {} {{\n", type_name));
         drop_impl.push_str("    fn drop(&mut self) {\n");
 
         for field in &analysis.resource_fields {
-            match field.field_type.as_str() {
-                t if t.contains("File") => {
-                    drop_impl.push_str("        // File handles are automatically closed\n");
-                }
-                t if t.contains("Thread") || t.contains("JoinHandle") => {
-                    drop_impl.push_str(&format!(
-                        "        if let Some(handle) = self.{}.take() {{\n",
-                        field.field_name
-                    ));
-                    drop_impl.push_str("            let _ = handle.join();\n");
-                    drop_impl.push_str("        }\n");
-                }
-                t if t.contains("Connection") => {
-                    drop_impl.push_str(&format!(
-                        "        self.{}.close().unwrap_or_else(|e| {{\n",
-                        field.field_name
-                    ));
-                    drop_impl.push_str(
-                        "            eprintln!(\"Failed to close connection: {}\", e);\n",
-                    );
-                    drop_impl.push_str("        });\n");
-                }
-                t if t.contains("TcpStream") || t.contains("Socket") => {
-                    drop_impl.push_str("        // Network streams are automatically closed\n");
-                }
-                _ => {
-                    drop_impl.push_str(&format!(
-                        "        // Cleanup {} resource\n",
-                        field.field_name
-                    ));
-                }
-            }
+            drop_impl.push_str(&Self::generate_field_cleanup(field));
         }
 
         drop_impl.push_str("    }\n");
@@ -401,3 +423,170 @@ const CRITICAL_TYPES: &[&str] = &[
 const CLEANUP_METHOD_NAMES: &[&str] = &[
     "cleanup", "close", "shutdown", "dispose", "destroy", "release", "free", "clear",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_resource_type_file() {
+        assert_eq!(
+            DropDetector::classify_resource_type("std::fs::File"),
+            ResourceCleanupType::AutoClose
+        );
+        assert_eq!(
+            DropDetector::classify_resource_type("FileHandle"),
+            ResourceCleanupType::AutoClose
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_thread() {
+        assert_eq!(
+            DropDetector::classify_resource_type("std::thread::JoinHandle<()>"),
+            ResourceCleanupType::ThreadJoin
+        );
+        assert_eq!(
+            DropDetector::classify_resource_type("Thread"),
+            ResourceCleanupType::ThreadJoin
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_connection() {
+        assert_eq!(
+            DropDetector::classify_resource_type("Connection"),
+            ResourceCleanupType::ExplicitClose
+        );
+        assert_eq!(
+            DropDetector::classify_resource_type("DatabaseConnection"),
+            ResourceCleanupType::ExplicitClose
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_network() {
+        assert_eq!(
+            DropDetector::classify_resource_type("TcpStream"),
+            ResourceCleanupType::AutoClose
+        );
+        assert_eq!(
+            DropDetector::classify_resource_type("Socket"),
+            ResourceCleanupType::AutoClose
+        );
+    }
+
+    #[test]
+    fn test_classify_resource_type_generic() {
+        assert_eq!(
+            DropDetector::classify_resource_type("CustomResource"),
+            ResourceCleanupType::Generic
+        );
+        assert_eq!(
+            DropDetector::classify_resource_type("Buffer"),
+            ResourceCleanupType::Generic
+        );
+    }
+
+    #[test]
+    fn test_generate_field_cleanup() {
+        // Test file cleanup
+        let file_field = ResourceField {
+            field_name: "log_file".to_string(),
+            field_type: "std::fs::File".to_string(),
+            is_owning: true,
+            cleanup_required: true,
+        };
+        assert_eq!(
+            DropDetector::generate_field_cleanup(&file_field),
+            "        // File handles are automatically closed\n"
+        );
+
+        // Test thread cleanup
+        let thread_field = ResourceField {
+            field_name: "worker".to_string(),
+            field_type: "JoinHandle<()>".to_string(),
+            is_owning: true,
+            cleanup_required: true,
+        };
+        assert_eq!(
+            DropDetector::generate_field_cleanup(&thread_field),
+            "        if let Some(handle) = self.worker.take() {\n            let _ = handle.join();\n        }\n"
+        );
+
+        // Test connection cleanup
+        let conn_field = ResourceField {
+            field_name: "db_conn".to_string(),
+            field_type: "Connection".to_string(),
+            is_owning: true,
+            cleanup_required: true,
+        };
+        assert_eq!(
+            DropDetector::generate_field_cleanup(&conn_field),
+            "        self.db_conn.close().unwrap_or_else(|e| {\n            eprintln!(\"Failed to close connection: {}\", e);\n        });\n"
+        );
+
+        // Test network stream cleanup
+        let stream_field = ResourceField {
+            field_name: "tcp".to_string(),
+            field_type: "TcpStream".to_string(),
+            is_owning: true,
+            cleanup_required: true,
+        };
+        assert_eq!(
+            DropDetector::generate_field_cleanup(&stream_field),
+            "        // Network streams are automatically closed\n"
+        );
+
+        // Test generic resource cleanup
+        let generic_field = ResourceField {
+            field_name: "buffer".to_string(),
+            field_type: "Buffer".to_string(),
+            is_owning: true,
+            cleanup_required: true,
+        };
+        assert_eq!(
+            DropDetector::generate_field_cleanup(&generic_field),
+            "        // Cleanup buffer resource\n"
+        );
+    }
+
+    #[test]
+    fn test_generate_drop_implementation_multiple_resources() {
+        let detector = DropDetector::new();
+        let analysis = ResourceAnalysis {
+            resource_fields: vec![
+                ResourceField {
+                    field_name: "file".to_string(),
+                    field_type: "File".to_string(),
+                    is_owning: true,
+                    cleanup_required: true,
+                },
+                ResourceField {
+                    field_name: "worker".to_string(),
+                    field_type: "JoinHandle<()>".to_string(),
+                    is_owning: true,
+                    cleanup_required: true,
+                },
+                ResourceField {
+                    field_name: "conn".to_string(),
+                    field_type: "Connection".to_string(),
+                    is_owning: true,
+                    cleanup_required: true,
+                },
+            ],
+            needs_drop: true,
+            has_drop_impl: false,
+            has_manual_cleanup: false,
+        };
+
+        let drop_impl = detector.generate_drop_implementation(&analysis, "MyStruct");
+
+        // Check that the implementation contains expected parts
+        assert!(drop_impl.contains("impl Drop for MyStruct"));
+        assert!(drop_impl.contains("fn drop(&mut self)"));
+        assert!(drop_impl.contains("// File handles are automatically closed"));
+        assert!(drop_impl.contains("if let Some(handle) = self.worker.take()"));
+        assert!(drop_impl.contains("self.conn.close().unwrap_or_else"));
+    }
+}

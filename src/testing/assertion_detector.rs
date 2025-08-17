@@ -1,5 +1,5 @@
 use super::{is_test_function, TestQualityImpact, TestingAntiPattern, TestingDetector};
-use std::path::PathBuf;
+use std::path::Path;
 use syn::visit::Visit;
 use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, File, Item, ItemFn, Stmt};
 
@@ -18,7 +18,7 @@ impl AssertionDetector {
 }
 
 impl TestingDetector for AssertionDetector {
-    fn detect_anti_patterns(&self, file: &File, path: &PathBuf) -> Vec<TestingAntiPattern> {
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<TestingAntiPattern> {
         let mut patterns = Vec::new();
 
         for item in &file.items {
@@ -31,7 +31,7 @@ impl TestingDetector for AssertionDetector {
 
                         patterns.push(TestingAntiPattern::TestWithoutAssertions {
                             test_name: function.sig.ident.to_string(),
-                            file: path.clone(),
+                            file: path.to_path_buf(),
                             line,
                             has_setup: analysis.has_setup,
                             has_action: analysis.has_action,
@@ -54,7 +54,7 @@ impl TestingDetector for AssertionDetector {
 
                                     patterns.push(TestingAntiPattern::TestWithoutAssertions {
                                         test_name: function.sig.ident.to_string(),
-                                        file: path.clone(),
+                                        file: path.to_path_buf(),
                                         line,
                                         has_setup: analysis.has_setup,
                                         has_action: analysis.has_action,
