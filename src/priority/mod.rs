@@ -1,5 +1,6 @@
 pub mod call_graph;
 pub mod coverage_propagation;
+pub mod debt_aggregator;
 pub mod external_api_detector;
 pub mod formatter;
 pub mod formatter_markdown;

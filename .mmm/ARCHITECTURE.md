@@ -103,6 +103,7 @@ Unified debt prioritization system:
 - `coverage_propagation.rs`: Transitive coverage calculation through call graph
 - `unified_scorer.rs`: Unified priority scoring algorithm combining all metrics, includes dead code detection
 - `formatter.rs`: Clean output formatters for different verbosity levels
+- `debt_aggregator.rs`: Aggregates all detected debt issues by function location and calculates debt scores
 
 ### Expansion (`src/expansion/`)
 Macro expansion for perfect call graph analysis:

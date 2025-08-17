@@ -195,6 +195,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Lower priority for test functions
   - Note: Detection works but items not shown in priority output
 
+- [x] **Spec 35**: Debt Pattern Unified Scoring Integration
+  - Comprehensive integration between pattern detection and unified scoring
+  - FunctionDebtProfile structure aggregates all issues per function
+  - DebtAggregator provides efficient indexing and lookup
+  - All detected issues directly influence priority scores
+  - Replaces heuristic-based scoring with actual detection results
+  - Performance optimized for large codebases
+
 ## Pending Specs
 
 ### Enhancements

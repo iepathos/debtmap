@@ -5,6 +5,7 @@ use crate::priority::{
     coverage_propagation::{
         calculate_coverage_urgency, calculate_transitive_coverage, TransitiveCoverage,
     },
+    debt_aggregator::{DebtAggregator, DebtScores, FunctionId as AggregatorFunctionId},
     external_api_detector::{generate_enhanced_dead_code_hints, is_likely_external_api},
     semantic_classifier::{
         calculate_semantic_priority, classify_function_role, get_role_multiplier, FunctionRole,
@@ -63,6 +64,26 @@ pub fn calculate_unified_priority(
     roi_score: f64,
     security_issues: Option<f64>,
     organization_issues: Option<f64>,
+) -> UnifiedScore {
+    calculate_unified_priority_with_debt(
+        func,
+        call_graph,
+        coverage,
+        roi_score,
+        security_issues,
+        organization_issues,
+        None,
+    )
+}
+
+pub fn calculate_unified_priority_with_debt(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    coverage: Option<&LcovData>,
+    roi_score: f64,
+    security_issues: Option<f64>,
+    organization_issues: Option<f64>,
+    debt_aggregator: Option<&DebtAggregator>,
 ) -> UnifiedScore {
     let func_id = FunctionId {
         file: func.file.clone(),
@@ -128,9 +149,46 @@ pub fn calculate_unified_priority(
     let upstream_count = call_graph.get_callers(&func_id).len();
     let dependency_factor = calculate_dependency_factor(upstream_count);
 
+    // Calculate debt-based factors if aggregator is available
+    let debt_scores = if let Some(aggregator) = debt_aggregator {
+        let agg_func_id = AggregatorFunctionId {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            start_line: func.line,
+            end_line: func.line + func.length,
+        };
+        aggregator.calculate_debt_scores(&agg_func_id)
+    } else {
+        DebtScores::default()
+    };
+
     // Security and organization factors (0-10 scale)
-    let security_factor = security_issues.unwrap_or(0.0).min(10.0);
-    let organization_factor = organization_issues.unwrap_or(0.0).min(10.0);
+    // Combine pattern-based detection with actual detected issues
+    let security_factor = if debt_scores.security > 0.0 {
+        // Use actual detected security issues if available
+        debt_scores.security
+    } else {
+        // Fall back to pattern-based detection or provided value
+        security_issues
+            .unwrap_or_else(|| calculate_security_factor(func))
+            .min(10.0)
+    };
+
+    let organization_factor = if debt_scores.organization > 0.0 {
+        // Use actual detected organization issues if available
+        debt_scores.organization
+    } else {
+        // Fall back to pattern-based detection or provided value
+        organization_issues
+            .unwrap_or_else(|| calculate_organization_factor(func))
+            .min(10.0)
+    };
+
+    // Add new debt category factors
+    let performance_factor = debt_scores.performance.min(10.0);
+    let testing_factor = debt_scores.testing.min(10.0);
+    let resource_factor = debt_scores.resource.min(10.0);
+    let duplication_factor = debt_scores.duplication.min(10.0);
 
     // Get configurable weights
     let weights = config::get_scoring_weights();
@@ -144,6 +202,12 @@ pub fn calculate_unified_priority(
     let weighted_security = security_factor * weights.security;
     let weighted_organization = organization_factor * weights.organization;
 
+    // Add weights for new debt categories (using smaller weights to not overshadow existing factors)
+    let weighted_performance = performance_factor * 0.1;
+    let weighted_testing = testing_factor * 0.05;
+    let weighted_resource = resource_factor * 0.1;
+    let weighted_duplication = duplication_factor * 0.05;
+
     // Calculate weighted composite score
     let base_score = weighted_complexity
         + weighted_coverage
@@ -151,7 +215,11 @@ pub fn calculate_unified_priority(
         + weighted_semantic
         + weighted_dependency
         + weighted_security
-        + weighted_organization;
+        + weighted_organization
+        + weighted_performance
+        + weighted_testing
+        + weighted_resource
+        + weighted_duplication;
 
     // Apply role multiplier
     let final_score = (base_score * role_multiplier).min(10.0);
@@ -396,6 +464,83 @@ pub fn create_unified_debt_item_enhanced(
         downstream_callees: downstream_callee_names,
         nesting_depth: 0,   // Would need to be calculated from AST
         function_length: 0, // Would need to be calculated from AST or additional metadata
+        cyclomatic_complexity: func.cyclomatic,
+        cognitive_complexity: func.cognitive,
+    }
+}
+
+pub fn create_unified_debt_item_with_aggregator(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    coverage: Option<&LcovData>,
+    roi_score: f64,
+    framework_exclusions: &HashSet<FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
+    debt_aggregator: &DebtAggregator,
+) -> UnifiedDebtItem {
+    let func_id = FunctionId {
+        file: func.file.clone(),
+        name: func.name.clone(),
+        line: func.line,
+    };
+
+    // Calculate transitive coverage if direct coverage is available
+    let transitive_coverage = coverage.and_then(|lcov| {
+        lcov.get_function_coverage_with_line(&func.file, &func.name, func.line)
+            .map(|_direct| calculate_transitive_coverage(&func_id, call_graph, lcov))
+    });
+
+    // Use the enhanced debt type classification with framework exclusions
+    let debt_type = classify_debt_type_with_exclusions(
+        func,
+        call_graph,
+        &func_id,
+        framework_exclusions,
+        function_pointer_used_functions,
+    );
+
+    // Calculate unified score with debt aggregator
+    let unified_score = calculate_unified_priority_with_debt(
+        func,
+        call_graph,
+        coverage,
+        roi_score,
+        None, // Let the aggregator provide security factor
+        None, // Let the aggregator provide organization factor
+        Some(debt_aggregator),
+    );
+
+    // Determine function role for more accurate analysis
+    let function_role = classify_function_role(func, &func_id, call_graph);
+
+    // Generate contextual recommendation based on debt type and metrics
+    let recommendation = generate_recommendation(func, &debt_type, function_role, &unified_score);
+
+    // Calculate expected impact
+    let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
+
+    // Get dependency information
+    let upstream = call_graph.get_callers(&func_id);
+    let downstream = call_graph.get_callees(&func_id);
+
+    UnifiedDebtItem {
+        location: Location {
+            file: func.file.clone(),
+            function: func.name.clone(),
+            line: func.line,
+        },
+        debt_type,
+        unified_score,
+        function_role,
+        recommendation,
+        expected_impact,
+        transitive_coverage,
+        upstream_dependencies: upstream.len(),
+        downstream_dependencies: downstream.len(),
+        upstream_callers: upstream.iter().map(|f| f.name.clone()).collect(),
+        downstream_callees: downstream.iter().map(|f| f.name.clone()).collect(),
+        nesting_depth: 0, // FunctionMetrics doesn't have nesting_depth field
+        function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
     }
