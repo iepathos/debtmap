@@ -1,3 +1,4 @@
+// debtmap:ignore-start -- This file contains test patterns for unsafe code detection, not actual unsafe code
 use crate::core::{DebtItem, DebtType, Priority};
 use std::path::Path;
 use syn::visit::Visit;
@@ -93,3 +94,4 @@ impl<'ast> Visit<'ast> for UnsafeVisitor {
         syn::visit::visit_expr_unsafe(self, i);
     }
 }
+// debtmap:ignore-end
