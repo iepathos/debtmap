@@ -279,7 +279,7 @@ mod tests {
             io_pattern: crate::performance::IOPattern::SyncInLoop,
             batching_opportunity: true,
             async_opportunity: true,
-            location: crate::core::SourceLocation::default(),
+            location: SourceLocation::default(),
         }];
 
         let contexts = vec![PatternContext {
@@ -310,12 +310,12 @@ mod tests {
                 io_pattern: crate::performance::IOPattern::SyncInLoop,
                 batching_opportunity: true,
                 async_opportunity: true,
-                location: crate::core::SourceLocation::default(),
+                location: SourceLocation::default(),
             },
             PerformanceAntiPattern::NestedLoopComplexity {
                 depth: 3,
                 complexity: 10,
-                location: crate::core::SourceLocation::default(),
+                location: SourceLocation::default(),
             },
         ];
 
@@ -343,7 +343,7 @@ mod tests {
             io_pattern: crate::performance::IOPattern::SingleSync,
             batching_opportunity: false,
             async_opportunity: true,
-            location: crate::core::SourceLocation::default(),
+            location: SourceLocation::default(),
         }];
 
         let contexts = vec![PatternContext {

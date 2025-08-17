@@ -173,7 +173,7 @@ mod tests {
             io_pattern: crate::performance::IOPattern::SyncInLoop,
             batching_opportunity: true,
             async_opportunity: true,
-            location: crate::core::SourceLocation::default(),
+            location: SourceLocation::default(),
         };
 
         let test_context = PatternContext {
@@ -200,7 +200,7 @@ mod tests {
             io_pattern: crate::performance::IOPattern::SyncInLoop,
             batching_opportunity: true,
             async_opportunity: true,
-            location: crate::core::SourceLocation::default(),
+            location: SourceLocation::default(),
         };
 
         let production_context = PatternContext {
@@ -227,7 +227,7 @@ mod tests {
             io_pattern: crate::performance::IOPattern::SyncInLoop,
             batching_opportunity: true,
             async_opportunity: true,
-            location: crate::core::SourceLocation::default(),
+            location: SourceLocation::default(),
         };
 
         let context = PatternContext {
