@@ -116,11 +116,11 @@ Implement a unified line number extraction system that provides accurate source 
    - Comprehensive test coverage for line number accuracy across all detectors
    - Consistent error handling for location extraction failures
 
-4. **Backward Compatibility**
-   - Existing detector trait interfaces remain unchanged
-   - No breaking changes to public APIs or configuration
-   - Gradual migration path for updating detector implementations
-   - Graceful degradation when enhanced location features are unavailable
+4. **Simplicity**
+   - Breaking changes acceptable as we're still in prototype phase
+   - Direct implementation without legacy compatibility concerns
+   - Clean, straightforward detector interface redesign
+   - Immediate adoption of enhanced location tracking
 
 ## Acceptance Criteria
 
@@ -130,7 +130,7 @@ Implement a unified line number extraction system that provides accurate source 
 - [ ] **Unified Location Structure**: SourceLocation structure used consistently across organization, security, and resource detectors
 - [ ] **Location Confidence**: All detectors provide confidence levels for reported line numbers
 - [ ] **No False Line Numbers**: Zero instances of hardcoded line 0 or arbitrary line assignments
-- [ ] **Backward Compatibility**: Existing detector interfaces continue working without modification
+- [ ] **Simplified Implementation**: Clean detector interfaces without legacy compatibility concerns
 - [ ] **Performance**: Line extraction overhead is <10% of total analysis time
 - [ ] **Test Coverage**: Comprehensive integration tests verify line number accuracy for all detector categories
 - [ ] **Documentation**: Updated architecture documentation reflects unified line extraction approach
@@ -318,19 +318,13 @@ pub enum SecurityVulnerability {
 use crate::common::source_location::{SourceLocation, UnifiedLocationExtractor};
 
 pub struct GodObjectDetector {
-    location_extractor: Option<UnifiedLocationExtractor>,
+    location_extractor: UnifiedLocationExtractor,
 }
 
 impl GodObjectDetector {
-    pub fn new() -> Self {
+    pub fn new(source_content: &str) -> Self {
         Self {
-            location_extractor: None,
-        }
-    }
-    
-    pub fn with_source_content(source_content: &str) -> Self {
-        Self {
-            location_extractor: Some(UnifiedLocationExtractor::new(source_content)),
+            location_extractor: UnifiedLocationExtractor::new(source_content),
         }
     }
 }
@@ -365,17 +359,7 @@ impl OrganizationDetector for GodObjectDetector {
 
 impl GodObjectDetector {
     fn extract_location(&self, struct_item: &syn::ItemStruct) -> SourceLocation {
-        if let Some(extractor) = &self.location_extractor {
-            extractor.extract_item_location(&syn::Item::Struct(struct_item.clone()))
-        } else {
-            SourceLocation {
-                line: 1,  // Conservative fallback
-                column: None,
-                end_line: None,
-                end_column: None,
-                confidence: LocationConfidence::Unavailable,
-            }
-        }
+        self.location_extractor.extract_item_location(&syn::Item::Struct(struct_item.clone()))
     }
 }
 ```
@@ -393,11 +377,11 @@ pub struct ValidationVisitor {
     current_function_location: Option<SourceLocation>,  // NEW: Track function location
     has_validation: bool,
     has_external_input: bool,
-    location_extractor: Option<UnifiedLocationExtractor>,  // NEW: Location extraction
+    location_extractor: UnifiedLocationExtractor,  // NEW: Location extraction
 }
 
 impl ValidationVisitor {
-    fn new(path: &Path, source_content: Option<&str>) -> Self {
+    fn new(path: &Path, source_content: &str) -> Self {
         Self {
             path: path.to_path_buf(),
             debt_items: Vec::new(),
@@ -405,7 +389,7 @@ impl ValidationVisitor {
             current_function_location: None,
             has_validation: false,
             has_external_input: false,
-            location_extractor: source_content.map(UnifiedLocationExtractor::new),
+            location_extractor: UnifiedLocationExtractor::new(source_content),
         }
     }
 
@@ -445,17 +429,9 @@ impl<'ast> Visit<'ast> for ValidationVisitor {
         self.current_function = Some(i.sig.ident.to_string());
         
         // NEW: Extract actual function location
-        self.current_function_location = if let Some(extractor) = &self.location_extractor {
-            Some(extractor.extract_item_location(&syn::Item::Fn(i.clone())))
-        } else {
-            Some(SourceLocation {
-                line: 1,
-                column: None,
-                end_line: None,
-                end_column: None,
-                confidence: LocationConfidence::Unavailable,
-            })
-        };
+        self.current_function_location = Some(
+            self.location_extractor.extract_item_location(&syn::Item::Fn(i.clone()))
+        );
         
         self.has_validation = false;
         self.has_external_input = false;
@@ -489,10 +465,8 @@ impl<'ast> Visit<'ast> for ValidationVisitor {
     }
 }
 
-pub fn detect_validation_gaps(file: &File, path: &Path) -> Vec<DebtItem> {
-    // NEW: Attempt to read source content for location extraction
-    let source_content = std::fs::read_to_string(path).ok();
-    let mut visitor = ValidationVisitor::new(path, source_content.as_deref());
+pub fn detect_validation_gaps(file: &File, path: &Path, source_content: &str) -> Vec<DebtItem> {
+    let mut visitor = ValidationVisitor::new(path, source_content);
     visitor.visit_file(file);
     visitor.debt_items
 }
@@ -604,15 +578,15 @@ fn convert_organization_pattern_to_debt_item(
 }
 
 fn analyze_organization_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
-    // NEW: Read source content for accurate line extraction
-    let source_content = std::fs::read_to_string(path).unwrap_or_default();
+    // Read source content for accurate line extraction
+    let source_content = std::fs::read_to_string(path).expect("Failed to read source file");
     
     let detectors: Vec<Box<dyn OrganizationDetector>> = vec![
-        Box::new(GodObjectDetector::with_source_content(&source_content)),
-        Box::new(MagicValueDetector::with_source_content(&source_content)),
-        Box::new(ParameterAnalyzer::with_source_content(&source_content)),
-        Box::new(FeatureEnvyDetector::with_source_content(&source_content)),
-        Box::new(PrimitiveObsessionDetector::with_source_content(&source_content)),
+        Box::new(GodObjectDetector::new(&source_content)),
+        Box::new(MagicValueDetector::new(&source_content)),
+        Box::new(ParameterAnalyzer::new(&source_content)),
+        Box::new(FeatureEnvyDetector::new(&source_content)),
+        Box::new(PrimitiveObsessionDetector::new(&source_content)),
     ];
 
     let mut organization_items = Vec::new();
@@ -708,7 +682,7 @@ impl UserManager {
         "#;
 
         let file = syn::parse_str::<syn::File>(source).unwrap();
-        let detector = GodObjectDetector::with_source_content(source);
+        let detector = GodObjectDetector::new(source);
         let patterns = detector.detect_anti_patterns(&file);
 
         assert!(!patterns.is_empty(), "Should detect God object pattern");
@@ -740,7 +714,7 @@ fn safe_function(internal_data: InternalData) -> Response {
         "#;
 
         let file = syn::parse_str::<syn::File>(source).unwrap();
-        let debt_items = detect_validation_gaps(&file, Path::new("test.rs"));
+        let debt_items = detect_validation_gaps(&file, Path::new("test.rs"), source);
 
         assert!(!debt_items.is_empty(), "Should detect input validation gap");
         
@@ -784,7 +758,7 @@ struct FileManager {    // Line 4 ← Should be detected here
         "#;
 
         let file = syn::parse_str::<syn::File>(source).unwrap();
-        let detector = DropDetector::with_source_content(source);
+        let detector = DropDetector::new(source);
         let issues = detector.detect_issues(&file, Path::new("test.rs"));
 
         if let Some(ResourceManagementIssue::MissingDrop { location, .. }) = issues.first() {
@@ -1025,15 +999,15 @@ Update ARCHITECTURE.md with unified line extraction architecture and cross-detec
 4. **Phase 4**: Resource detector line extraction (Missing Drop, Resource leaks)
 5. **Phase 5**: Integration testing and performance validation
 
-### Migration Strategy
-- **Backward Compatibility**: Existing detector trait interfaces remain unchanged
-- **Gradual Enhancement**: Detectors can be updated incrementally with line extraction
-- **Fallback Behavior**: Missing source content results in LocationConfidence::Unavailable
+### Implementation Strategy
+- **Clean Redesign**: Detector interfaces simplified to require source content from the start
+- **Direct Implementation**: No gradual migration needed, immediate adoption of location tracking
+- **Prototype Flexibility**: Breaking changes acceptable for rapid iteration and improvement
 - **Test Validation**: Comprehensive tests ensure line number accuracy across all detectors
 
 ### Edge Cases to Consider
 - **Macro-expanded code**: Use syn span information, fallback to original source locations
-- **Missing source files**: Graceful degradation with confidence indicators
+- **Missing source files**: Fail fast with clear error messages in prototype phase
 - **Multi-line patterns**: Report primary line with optional range information
 - **Generated code**: Clear indicators when location confidence is uncertain
 
@@ -1047,12 +1021,13 @@ After implementation:
 4. **Improved Workflow**: Integration with IDEs and editors becomes seamless with precise location information
 5. **Complete Coverage**: All detector categories provide actionable location information
 
-## Migration and Compatibility
+## Breaking Changes and Prototype Benefits
 
-- **Breaking Changes**: None - enhanced location information is additive
-- **API Compatibility**: Existing detector trait interfaces remain unchanged
-- **Output Enhancement**: Reports include precise location information without breaking existing parsers
-- **Configuration**: No new configuration required - line extraction works automatically
+- **Breaking Changes**: Acceptable and beneficial - cleaner, simpler detector interfaces
+- **API Redesign**: Detector constructors now require source content for immediate location tracking
+- **Output Improvement**: Reports include precise location information from the start
+- **Configuration**: No new configuration required - line extraction mandatory and automatic
 - **Performance**: <10% overhead for comprehensive location accuracy across all detectors
+- **Prototype Advantage**: Freedom to redesign interfaces optimally without legacy constraints
 
 This specification addresses the systemic line number issue across all detector categories, providing a unified solution that makes debtmap a reliable and trustworthy development tool with accurate source location reporting for every detected issue.
