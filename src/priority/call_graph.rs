@@ -441,16 +441,13 @@ impl CallGraph {
     /// Returns the function that contains the given line
     pub fn find_function_at_location(&self, file: &PathBuf, line: usize) -> Option<FunctionId> {
         // Find all functions in the specified file
-        let functions_in_file: Vec<_> = self.nodes
-            .keys()
-            .filter(|id| &id.file == file)
-            .collect();
-        
+        let functions_in_file: Vec<_> = self.nodes.keys().filter(|id| &id.file == file).collect();
+
         // Find the function that contains this line
         // We'll return the function with the closest line number that's <= the target line
         let mut best_match: Option<&FunctionId> = None;
         let mut best_distance = usize::MAX;
-        
+
         for func_id in functions_in_file {
             if func_id.line <= line {
                 let distance = line - func_id.line;
@@ -460,7 +457,7 @@ impl CallGraph {
                 }
             }
         }
-        
+
         best_match.cloned()
     }
 
@@ -609,53 +606,68 @@ mod tests {
     #[test]
     fn test_find_function_at_location() {
         let mut graph = CallGraph::new();
-        
+
         let file = PathBuf::from("test.rs");
-        
+
         // Add functions at different line numbers
         let func1 = FunctionId {
             file: file.clone(),
             name: "function_one".to_string(),
             line: 10,
         };
-        
+
         let func2 = FunctionId {
             file: file.clone(),
             name: "function_two".to_string(),
             line: 30,
         };
-        
+
         let func3 = FunctionId {
             file: file.clone(),
             name: "function_three".to_string(),
             line: 50,
         };
-        
+
         graph.add_function(func1.clone(), false, false, 5, 15);
         graph.add_function(func2.clone(), false, false, 3, 10);
         graph.add_function(func3.clone(), false, false, 4, 20);
-        
+
         // Test finding functions at exact line numbers
         let found = graph.find_function_at_location(&file, 10);
-        assert_eq!(found.as_ref().map(|f| &f.name), Some(&"function_one".to_string()));
-        
+        assert_eq!(
+            found.as_ref().map(|f| &f.name),
+            Some(&"function_one".to_string())
+        );
+
         let found = graph.find_function_at_location(&file, 30);
-        assert_eq!(found.as_ref().map(|f| &f.name), Some(&"function_two".to_string()));
-        
+        assert_eq!(
+            found.as_ref().map(|f| &f.name),
+            Some(&"function_two".to_string())
+        );
+
         // Test finding functions within their range
         let found = graph.find_function_at_location(&file, 15);
-        assert_eq!(found.as_ref().map(|f| &f.name), Some(&"function_one".to_string()));
-        
+        assert_eq!(
+            found.as_ref().map(|f| &f.name),
+            Some(&"function_one".to_string())
+        );
+
         let found = graph.find_function_at_location(&file, 35);
-        assert_eq!(found.as_ref().map(|f| &f.name), Some(&"function_two".to_string()));
-        
+        assert_eq!(
+            found.as_ref().map(|f| &f.name),
+            Some(&"function_two".to_string())
+        );
+
         let found = graph.find_function_at_location(&file, 60);
-        assert_eq!(found.as_ref().map(|f| &f.name), Some(&"function_three".to_string()));
-        
+        assert_eq!(
+            found.as_ref().map(|f| &f.name),
+            Some(&"function_three".to_string())
+        );
+
         // Test line before any function
         let found = graph.find_function_at_location(&file, 5);
         assert_eq!(found, None);
-        
+
         // Test different file
         let other_file = PathBuf::from("other.rs");
         let found = graph.find_function_at_location(&other_file, 25);

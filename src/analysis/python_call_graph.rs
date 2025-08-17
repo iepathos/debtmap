@@ -1031,7 +1031,6 @@ class EventPanel:
         }
     }
 
-
     #[test]
     fn test_nested_function_callback_detection() {
         let python_code = r#"
@@ -1049,12 +1048,21 @@ class DeliveryBoy:
         let mut call_graph = CallGraph::new();
 
         analyzer
-            .analyze_module_with_source(&module, Path::new("delivery_boy.py"), python_code, &mut call_graph)
+            .analyze_module_with_source(
+                &module,
+                Path::new("delivery_boy.py"),
+                python_code,
+                &mut call_graph,
+            )
             .unwrap();
 
         // Check that the nested deliver function has callers
         // We need to check with the actual line number from the analyzer
-        let deliver_line = analyzer.function_lines.get("DeliveryBoy.deliver_message_added.deliver").copied().unwrap_or(0);
+        let deliver_line = analyzer
+            .function_lines
+            .get("DeliveryBoy.deliver_message_added.deliver")
+            .copied()
+            .unwrap_or(0);
         let deliver_id = FunctionId {
             name: "DeliveryBoy.deliver_message_added.deliver".to_string(),
             file: Path::new("delivery_boy.py").to_path_buf(),
@@ -1087,10 +1095,19 @@ async def main():
         let mut call_graph = CallGraph::new();
 
         analyzer
-            .analyze_module_with_source(&module, Path::new("async_test.py"), python_code, &mut call_graph)
+            .analyze_module_with_source(
+                &module,
+                Path::new("async_test.py"),
+                python_code,
+                &mut call_graph,
+            )
             .unwrap();
 
-        let worker_line = analyzer.function_lines.get("main.worker").copied().unwrap_or(0);
+        let worker_line = analyzer
+            .function_lines
+            .get("main.worker")
+            .copied()
+            .unwrap_or(0);
         let worker_id = FunctionId {
             name: "main.worker".to_string(),
             file: Path::new("async_test.py").to_path_buf(),
@@ -1122,10 +1139,19 @@ def schedule_task():
         let mut call_graph = CallGraph::new();
 
         analyzer
-            .analyze_module_with_source(&module, Path::new("threading_test.py"), python_code, &mut call_graph)
+            .analyze_module_with_source(
+                &module,
+                Path::new("threading_test.py"),
+                python_code,
+                &mut call_graph,
+            )
             .unwrap();
 
-        let task_line = analyzer.function_lines.get("schedule_task.background_task").copied().unwrap_or(0);
+        let task_line = analyzer
+            .function_lines
+            .get("schedule_task.background_task")
+            .copied()
+            .unwrap_or(0);
         let task_id = FunctionId {
             name: "schedule_task.background_task".to_string(),
             file: Path::new("threading_test.py").to_path_buf(),
@@ -1158,10 +1184,19 @@ class Scheduler:
         let mut call_graph = CallGraph::new();
 
         analyzer
-            .analyze_module_with_source(&module, Path::new("scheduler_test.py"), python_code, &mut call_graph)
+            .analyze_module_with_source(
+                &module,
+                Path::new("scheduler_test.py"),
+                python_code,
+                &mut call_graph,
+            )
             .unwrap();
 
-        let task_line = analyzer.function_lines.get("Scheduler.run_scheduled.task").copied().unwrap_or(0);
+        let task_line = analyzer
+            .function_lines
+            .get("Scheduler.run_scheduled.task")
+            .copied()
+            .unwrap_or(0);
         let task_id = FunctionId {
             name: "Scheduler.run_scheduled.task".to_string(),
             file: Path::new("scheduler_test.py").to_path_buf(),
