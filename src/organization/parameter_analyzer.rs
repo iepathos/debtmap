@@ -2,6 +2,7 @@ use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, Parameter,
     ParameterGroup, ParameterRefactoring,
 };
+use crate::common::SourceLocation;
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -153,6 +154,7 @@ impl OrganizationDetector for ParameterAnalyzer {
                     parameter_count: function.parameters.len(),
                     data_clumps,
                     suggested_refactoring: refactoring,
+                    location: SourceLocation::default(), // TODO: Extract actual location
                 });
             }
 
@@ -164,6 +166,7 @@ impl OrganizationDetector for ParameterAnalyzer {
                         parameter_group: clump.clone(),
                         occurrence_count: self.count_clump_occurrences(&clump, &functions),
                         suggested_struct_name: self.suggest_struct_name(&clump),
+                        locations: vec![SourceLocation::default()], // TODO: Extract actual locations
                     });
                 }
             }

@@ -1,3 +1,4 @@
+use crate::common::SourceLocation;
 use syn;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,6 +9,7 @@ pub enum OrganizationAntiPattern {
         field_count: usize,
         responsibility_count: usize,
         suggested_split: Vec<ResponsibilityGroup>,
+        location: SourceLocation,
     },
     MagicValue {
         value_type: MagicValueType,
@@ -15,12 +17,14 @@ pub enum OrganizationAntiPattern {
         occurrence_count: usize,
         suggested_constant_name: String,
         context: ValueContext,
+        locations: Vec<SourceLocation>,
     },
     LongParameterList {
         function_name: String,
         parameter_count: usize,
         data_clumps: Vec<ParameterGroup>,
         suggested_refactoring: ParameterRefactoring,
+        location: SourceLocation,
     },
     FeatureEnvy {
         method_name: String,
@@ -28,18 +32,47 @@ pub enum OrganizationAntiPattern {
         external_calls: usize,
         internal_calls: usize,
         suggested_move: bool,
+        location: SourceLocation,
     },
     PrimitiveObsession {
         primitive_type: String,
         usage_context: PrimitiveUsageContext,
         occurrence_count: usize,
         suggested_domain_type: String,
+        locations: Vec<SourceLocation>,
     },
     DataClump {
         parameter_group: ParameterGroup,
         occurrence_count: usize,
         suggested_struct_name: String,
+        locations: Vec<SourceLocation>,
     },
+}
+
+impl OrganizationAntiPattern {
+    pub fn primary_location(&self) -> &SourceLocation {
+        match self {
+            OrganizationAntiPattern::GodObject { location, .. } => location,
+            OrganizationAntiPattern::MagicValue { locations, .. } => &locations[0],
+            OrganizationAntiPattern::LongParameterList { location, .. } => location,
+            OrganizationAntiPattern::FeatureEnvy { location, .. } => location,
+            OrganizationAntiPattern::PrimitiveObsession { locations, .. } => &locations[0],
+            OrganizationAntiPattern::DataClump { locations, .. } => &locations[0],
+        }
+    }
+
+    pub fn all_locations(&self) -> Vec<&SourceLocation> {
+        match self {
+            OrganizationAntiPattern::GodObject { location, .. } => vec![location],
+            OrganizationAntiPattern::MagicValue { locations, .. } => locations.iter().collect(),
+            OrganizationAntiPattern::LongParameterList { location, .. } => vec![location],
+            OrganizationAntiPattern::FeatureEnvy { location, .. } => vec![location],
+            OrganizationAntiPattern::PrimitiveObsession { locations, .. } => {
+                locations.iter().collect()
+            }
+            OrganizationAntiPattern::DataClump { locations, .. } => locations.iter().collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

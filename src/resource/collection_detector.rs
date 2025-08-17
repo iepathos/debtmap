@@ -79,6 +79,11 @@ impl ResourceDetector for UnboundedCollectionDetector {
                     collection_type: usage.collection_type,
                     growth_pattern: usage.growth_pattern,
                     bounding_strategy,
+                    location: SourceLocation {
+                        file: String::new(),
+                        line: 1,
+                        column: 0,
+                    }, // TODO: Extract actual location
                 });
             }
         }

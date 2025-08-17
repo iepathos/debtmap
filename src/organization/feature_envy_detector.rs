@@ -1,4 +1,5 @@
 use super::{MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector};
+use crate::common::SourceLocation;
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -81,6 +82,7 @@ impl OrganizationDetector for FeatureEnvyDetector {
                         external_calls: external_count,
                         internal_calls: analysis.internal_calls,
                         suggested_move: external_count > analysis.internal_calls * 2,
+                        location: SourceLocation::default(), // TODO: Extract actual location
                     });
                 }
             }

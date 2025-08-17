@@ -228,6 +228,11 @@ impl ResourceDetector for AsyncResourceDetector {
                     issue_type: issue.issue_type,
                     cancellation_safety: issue.cancellation_safety,
                     mitigation_strategy: issue.mitigation_strategy,
+                    location: SourceLocation {
+                        file: String::new(),
+                        line: 1,
+                        column: 0,
+                    }, // TODO: Extract actual location
                 });
             }
         }

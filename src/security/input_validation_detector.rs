@@ -1,10 +1,12 @@
+use crate::common::{LocationConfidence, SourceLocation, UnifiedLocationExtractor};
 use crate::core::{DebtItem, DebtType, Priority};
 use std::path::Path;
 use syn::visit::Visit;
 use syn::{Block, ExprMethodCall, File, ItemFn, Pat, PatIdent};
 
 pub fn detect_validation_gaps(file: &File, path: &Path) -> Vec<DebtItem> {
-    let mut visitor = ValidationVisitor::new(path);
+    let source_content = std::fs::read_to_string(path).unwrap_or_default();
+    let mut visitor = ValidationVisitor::new(path, &source_content);
     visitor.visit_file(file);
     visitor.debt_items
 }
@@ -13,31 +15,50 @@ struct ValidationVisitor {
     path: std::path::PathBuf,
     debt_items: Vec<DebtItem>,
     current_function: Option<String>,
+    current_function_location: Option<SourceLocation>,
     has_validation: bool,
     has_external_input: bool,
+    location_extractor: UnifiedLocationExtractor,
 }
 
 impl ValidationVisitor {
-    fn new(path: &Path) -> Self {
+    fn new(path: &Path, source_content: &str) -> Self {
         Self {
             path: path.to_path_buf(),
             debt_items: Vec::new(),
             current_function: None,
+            current_function_location: None,
             has_validation: false,
             has_external_input: false,
+            location_extractor: UnifiedLocationExtractor::new(source_content),
         }
     }
 
-    fn check_function_validation(&mut self, line: usize) {
+    fn check_function_validation(&mut self) {
         if self.has_external_input && !self.has_validation {
             if let Some(ref func_name) = self.current_function {
+                let location =
+                    self.current_function_location
+                        .clone()
+                        .unwrap_or_else(|| SourceLocation {
+                            line: 1,
+                            column: None,
+                            end_line: None,
+                            end_column: None,
+                            confidence: LocationConfidence::Unavailable,
+                        });
+
                 self.debt_items.push(DebtItem {
-                    id: format!("security-validation-{}-{}", self.path.display(), line),
+                    id: format!(
+                        "security-validation-{}-{}",
+                        self.path.display(),
+                        location.line
+                    ),
                     debt_type: DebtType::Security,
                     priority: Priority::High,
                     file: self.path.clone(),
-                    line,
-                    column: None,
+                    line: location.line,
+                    column: location.column,
                     message: format!("Missing input validation in function '{}'", func_name),
                     context: Some("External input should be validated before use".to_string()),
                 });
@@ -88,10 +109,18 @@ impl ValidationVisitor {
 impl<'ast> Visit<'ast> for ValidationVisitor {
     fn visit_item_fn(&mut self, i: &'ast ItemFn) {
         let prev_function = self.current_function.clone();
+        let prev_location = self.current_function_location.clone();
         let prev_validation = self.has_validation;
         let prev_input = self.has_external_input;
 
         self.current_function = Some(i.sig.ident.to_string());
+
+        // Extract actual function location
+        self.current_function_location = Some(
+            self.location_extractor
+                .extract_item_location(&syn::Item::Fn(i.clone())),
+        );
+
         self.has_validation = false;
         self.has_external_input = false;
 
@@ -114,9 +143,10 @@ impl<'ast> Visit<'ast> for ValidationVisitor {
         syn::visit::visit_item_fn(self, i);
 
         // Check after visiting the function body
-        self.check_function_validation(0);
+        self.check_function_validation();
 
         self.current_function = prev_function;
+        self.current_function_location = prev_location;
         self.has_validation = prev_validation;
         self.has_external_input = prev_input;
     }

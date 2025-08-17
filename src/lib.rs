@@ -3,6 +3,7 @@ pub mod analysis;
 pub mod analysis_utils;
 pub mod analyzers;
 pub mod cli;
+pub mod common;
 pub mod complexity;
 pub mod config;
 pub mod core;

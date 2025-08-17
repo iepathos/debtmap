@@ -1,6 +1,7 @@
 use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, PrimitiveUsageContext,
 };
+use crate::common::SourceLocation;
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -127,6 +128,7 @@ impl OrganizationDetector for PrimitiveObsessionDetector {
                     occurrence_count: usages.len(),
                     suggested_domain_type: self
                         .suggest_domain_type(&primitive_type, &usage_context),
+                    locations: vec![SourceLocation::default()], // TODO: Extract actual locations
                 });
             }
         }

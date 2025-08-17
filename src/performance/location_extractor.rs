@@ -1,4 +1,4 @@
-use super::{LocationConfidence, SourceLocation};
+use crate::common::{LocationConfidence, SourceLocation};
 use syn::spanned::Spanned;
 use syn::{Expr, Stmt};
 
@@ -39,14 +39,13 @@ impl LocationExtractor {
     /// Extract location from statement
     pub fn extract_stmt_location(&self, stmt: &Stmt) -> SourceLocation {
         let span = stmt.span();
-        self.span_to_location(span)
-            .unwrap_or(SourceLocation {
-                line: 1,
-                column: None,
-                end_line: None,
-                end_column: None,
-                confidence: LocationConfidence::Unavailable,
-            })
+        self.span_to_location(span).unwrap_or(SourceLocation {
+            line: 1,
+            column: None,
+            end_line: None,
+            end_column: None,
+            confidence: LocationConfidence::Unavailable,
+        })
     }
 
     fn span_to_location(&self, span: proc_macro2::Span) -> Option<SourceLocation> {
