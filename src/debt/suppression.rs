@@ -134,6 +134,11 @@ impl Default for SuppressionContext {
 
 // Helper functions extracted as pure functions for better testability
 fn line_within_block(line: usize, block: &SuppressionBlock) -> bool {
+    // Special case: line 0 means "unknown line" and should be suppressed if the block starts at line 1
+    // This handles cases where the AST doesn't provide exact line numbers
+    if line == 0 && block.start_line == 1 {
+        return true;
+    }
     line >= block.start_line && block.end_line.is_some_and(|end| line <= end)
 }
 

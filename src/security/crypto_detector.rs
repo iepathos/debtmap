@@ -25,21 +25,22 @@ impl CryptoVisitor {
 
     fn check_weak_algorithms(&mut self, name: &str, line: usize) {
         // debtmap:ignore - These are test patterns for crypto vulnerability detection
+        // Use word boundary matching to avoid false positives on common substrings
         let weak_algorithms = [
             (
-                "md5",
+                r"\bmd5\b",
                 "MD5",
                 "Cryptographically broken, use SHA-256 or better",
             ),
             (
-                "sha1",
+                r"\bsha1\b",
                 "SHA-1",
                 "Weak hash algorithm, use SHA-256 or better",
             ),
-            ("des", "DES", "Weak encryption, use AES"),
-            ("rc4", "RC4", "Broken cipher, use AES-GCM"),
+            (r"\bdes\b", "DES", "Weak encryption, use AES"),
+            (r"\brc4\b", "RC4", "Broken cipher, use AES-GCM"),
             (
-                "ecb",
+                r"\becb\b",
                 "ECB mode",
                 "Insecure block cipher mode, use CBC or GCM",
             ),
@@ -47,7 +48,8 @@ impl CryptoVisitor {
 
         let name_lower = name.to_lowercase();
         for (pattern, algo_name, recommendation) in weak_algorithms {
-            if name_lower.contains(pattern) {
+            let regex = regex::Regex::new(pattern).unwrap();
+            if regex.is_match(&name_lower) {
                 self.debt_items.push(DebtItem {
                     id: format!("security-crypto-{}-{}", self.path.display(), line),
                     debt_type: DebtType::Security,
