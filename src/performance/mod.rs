@@ -167,6 +167,7 @@ pub mod detector_adapter;
 pub mod io_detector;
 pub mod location_extractor;
 pub mod nested_loop_detector;
+pub mod optimized_smart_detector;
 pub mod pattern_correlator;
 pub mod smart_detector;
 pub mod string_detector;
@@ -182,6 +183,7 @@ pub use detector_adapter::{
 pub use io_detector::IOPerformanceDetector;
 pub use location_extractor::LocationExtractor;
 pub use nested_loop_detector::NestedLoopDetector;
+pub use optimized_smart_detector::OptimizedSmartDetector;
 pub use pattern_correlator::PatternCorrelator;
 pub use smart_detector::{SmartPerformanceConfig, SmartPerformanceDetector, SmartPerformanceIssue};
 pub use string_detector::StringPerformanceDetector;
@@ -196,23 +198,39 @@ pub fn analyze_performance_patterns_optimized(
     // Phase 1: Single-pass data collection
     let collected_data = collect_performance_data(file, path, source_content);
     
-    // Phase 2: Parallel pattern detection using optimized detectors
-    let detectors: Vec<Box<dyn OptimizedPerformanceDetector>> = vec![
-        Box::new(OptimizedNestedLoopDetector::new()),
-        Box::new(OptimizedIODetector::new()),
-        Box::new(OptimizedAllocationDetector::new()),
-        Box::new(OptimizedStringDetector::new()),
-        Box::new(OptimizedDataStructureDetector::new()),
-    ];
+    // Check if smart detection is enabled
+    let use_smart = std::env::var("DEBTMAP_SMART_PERF")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(true); // Default to smart
     
-    let mut all_patterns = Vec::new();
-    
-    for detector in detectors {
-        let patterns = detector.analyze_collected_data(&collected_data, path);
-        all_patterns.extend(patterns);
+    if use_smart {
+        // Phase 2: Smart detection with context analysis and pattern correlation
+        let smart_detector = OptimizedSmartDetector::new();
+        let smart_issues = smart_detector.analyze_with_context(&collected_data, path, None);
+        
+        // Extract the patterns from smart issues
+        smart_issues.into_iter()
+            .map(|issue| issue.original_pattern)
+            .collect()
+    } else {
+        // Phase 2: Basic parallel pattern detection using optimized detectors
+        let detectors: Vec<Box<dyn OptimizedPerformanceDetector>> = vec![
+            Box::new(OptimizedNestedLoopDetector::new()),
+            Box::new(OptimizedIODetector::new()),
+            Box::new(OptimizedAllocationDetector::new()),
+            Box::new(OptimizedStringDetector::new()),
+            Box::new(OptimizedDataStructureDetector::new()),
+        ];
+        
+        let mut all_patterns = Vec::new();
+        
+        for detector in detectors {
+            let patterns = detector.analyze_collected_data(&collected_data, path);
+            all_patterns.extend(patterns);
+        }
+        
+        all_patterns
     }
-    
-    all_patterns
 }
 
 pub fn convert_performance_pattern_to_debt_item(
