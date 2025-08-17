@@ -297,7 +297,7 @@ impl UnifiedAnalysis {
     fn create_security_unified_item(
         &self,
         debt_item: &crate::core::DebtItem,
-        _call_graph: &CallGraph,
+        call_graph: &CallGraph,
     ) -> Option<UnifiedDebtItem> {
         // Extract security details from the message
         let (vulnerability_type, severity) = self.parse_security_details(&debt_item.message);
@@ -313,10 +313,16 @@ impl UnifiedAnalysis {
         // Calculate unified score with security priority boost
         let unified_score = self.calculate_security_score(&severity, &debt_item.priority);
 
+        // Try to find the actual function name at this location
+        let function_name = call_graph
+            .find_function_at_location(&debt_item.file, debt_item.line)
+            .map(|func_id| func_id.name)
+            .unwrap_or_else(|| format!("security_issue_at_line_{}", debt_item.line));
+
         Some(UnifiedDebtItem {
             location: Location {
                 file: debt_item.file.clone(),
-                function: format!("security_issue_at_line_{}", debt_item.line),
+                function: function_name,
                 line: debt_item.line,
             },
             debt_type,
@@ -339,7 +345,7 @@ impl UnifiedAnalysis {
     fn create_performance_unified_item(
         &self,
         debt_item: &crate::core::DebtItem,
-        _call_graph: &CallGraph,
+        call_graph: &CallGraph,
     ) -> Option<UnifiedDebtItem> {
         // Extract performance details from the message
         let (issue_type, impact) = self.parse_performance_details(&debt_item.message);
@@ -353,10 +359,16 @@ impl UnifiedAnalysis {
         // Calculate unified score with performance considerations
         let unified_score = self.calculate_performance_score(&impact, &debt_item.priority);
 
+        // Try to find the actual function name at this location
+        let function_name = call_graph
+            .find_function_at_location(&debt_item.file, debt_item.line)
+            .map(|func_id| func_id.name)
+            .unwrap_or_else(|| format!("performance_issue_at_line_{}", debt_item.line));
+
         Some(UnifiedDebtItem {
             location: Location {
                 file: debt_item.file.clone(),
-                function: format!("performance_issue_at_line_{}", debt_item.line),
+                function: function_name,
                 line: debt_item.line,
             },
             debt_type,
