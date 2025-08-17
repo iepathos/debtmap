@@ -291,36 +291,61 @@ impl<'ast> Visit<'ast> for DropVisitor {
 
     fn visit_item_impl(&mut self, node: &'ast ItemImpl) {
         // Check if this is a Drop implementation
-        if let Some((_, path, _)) = &node.trait_ {
-            if path.segments.last().is_some_and(|s| s.ident == "Drop") {
-                if let Type::Path(type_path) = &*node.self_ty {
-                    if let Some(segment) = type_path.path.segments.last() {
-                        self.drop_implementations.insert(segment.ident.to_string());
-                    }
-                }
+        if is_drop_impl(&node.trait_) {
+            if let Some(type_name) = extract_impl_type_name(&node.self_ty) {
+                self.drop_implementations.insert(type_name);
             }
         }
 
         // Check for manual cleanup methods
-        if let Type::Path(type_path) = &*node.self_ty {
-            if let Some(segment) = type_path.path.segments.last() {
-                let type_name = segment.ident.to_string();
-
-                for item in &node.items {
-                    if let ImplItem::Fn(method) = item {
-                        let method_name = method.sig.ident.to_string();
-                        if CLEANUP_METHOD_NAMES.contains(&method_name.as_str()) {
-                            // Mark type as having cleanup methods
-                            for type_def in &mut self.type_definitions {
-                                if type_def.name == type_name {
-                                    type_def.has_cleanup_methods = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
+        if let Some(type_name) = extract_impl_type_name(&node.self_ty) {
+            if has_cleanup_methods(&node.items) {
+                mark_type_as_having_cleanup(&mut self.type_definitions, &type_name);
             }
+        }
+    }
+}
+
+/// Checks if a trait implementation is for the Drop trait
+fn is_drop_impl(trait_ref: &Option<(Option<syn::token::Not>, syn::Path, syn::token::For)>) -> bool {
+    if let Some((_, path, _)) = trait_ref {
+        path.segments.last().is_some_and(|s| s.ident == "Drop")
+    } else {
+        false
+    }
+}
+
+/// Extracts the type name from an impl block's self type
+fn extract_impl_type_name(self_ty: &Type) -> Option<String> {
+    if let Type::Path(type_path) = self_ty {
+        type_path.path.segments.last().map(|s| s.ident.to_string())
+    } else {
+        None
+    }
+}
+
+/// Checks if any of the impl items are cleanup methods
+fn has_cleanup_methods(items: &[ImplItem]) -> bool {
+    items.iter().any(|item| {
+        if let ImplItem::Fn(method) = item {
+            is_cleanup_method(&method.sig.ident.to_string())
+        } else {
+            false
+        }
+    })
+}
+
+/// Checks if a method name is a known cleanup method
+fn is_cleanup_method(method_name: &str) -> bool {
+    CLEANUP_METHOD_NAMES.contains(&method_name)
+}
+
+/// Marks a type as having cleanup methods in the type definitions
+fn mark_type_as_having_cleanup(type_definitions: &mut [TypeDefinition], type_name: &str) {
+    for type_def in type_definitions {
+        if type_def.name == type_name {
+            type_def.has_cleanup_methods = true;
+            break;
         }
     }
 }
@@ -594,5 +619,190 @@ mod tests {
         assert!(drop_impl.contains("// File handles are automatically closed"));
         assert!(drop_impl.contains("if let Some(handle) = self.worker.take()"));
         assert!(drop_impl.contains("self.conn.close().unwrap_or_else"));
+    }
+
+    #[test]
+    fn test_is_drop_impl() {
+        use syn::parse_quote;
+
+        // Test with Drop trait implementation
+        let drop_trait: Option<(Option<syn::token::Not>, syn::Path, syn::token::For)> =
+            Some((None, parse_quote!(Drop), parse_quote!(for)));
+        assert!(is_drop_impl(&drop_trait));
+
+        // Test with another trait
+        let other_trait: Option<(Option<syn::token::Not>, syn::Path, syn::token::For)> =
+            Some((None, parse_quote!(Debug), parse_quote!(for)));
+        assert!(!is_drop_impl(&other_trait));
+
+        // Test with qualified Drop trait
+        let qualified_drop: Option<(Option<syn::token::Not>, syn::Path, syn::token::For)> =
+            Some((None, parse_quote!(std::ops::Drop), parse_quote!(for)));
+        assert!(is_drop_impl(&qualified_drop));
+
+        // Test with None
+        assert!(!is_drop_impl(&None));
+    }
+
+    #[test]
+    fn test_extract_impl_type_name() {
+        use syn::parse_quote;
+
+        // Test with simple type path
+        let simple_type: Type = parse_quote!(MyStruct);
+        assert_eq!(
+            extract_impl_type_name(&simple_type),
+            Some("MyStruct".to_string())
+        );
+
+        // Test with qualified type path
+        let qualified_type: Type = parse_quote!(module::MyStruct);
+        assert_eq!(
+            extract_impl_type_name(&qualified_type),
+            Some("MyStruct".to_string())
+        );
+
+        // Test with generic type
+        let generic_type: Type = parse_quote!(MyStruct<T>);
+        assert_eq!(
+            extract_impl_type_name(&generic_type),
+            Some("MyStruct".to_string())
+        );
+
+        // Test with reference type (should return None)
+        let ref_type: Type = parse_quote!(&MyStruct);
+        assert_eq!(extract_impl_type_name(&ref_type), None);
+
+        // Test with tuple type (should return None)
+        let tuple_type: Type = parse_quote!((String, i32));
+        assert_eq!(extract_impl_type_name(&tuple_type), None);
+    }
+
+    #[test]
+    fn test_is_cleanup_method() {
+        // Test known cleanup method names
+        assert!(is_cleanup_method("cleanup"));
+        assert!(is_cleanup_method("close"));
+        assert!(is_cleanup_method("shutdown"));
+        assert!(is_cleanup_method("dispose"));
+        assert!(is_cleanup_method("destroy"));
+        assert!(is_cleanup_method("release"));
+        assert!(is_cleanup_method("free"));
+        assert!(is_cleanup_method("clear"));
+
+        // Test non-cleanup method names
+        assert!(!is_cleanup_method("new"));
+        assert!(!is_cleanup_method("create"));
+        assert!(!is_cleanup_method("open"));
+        assert!(!is_cleanup_method("run"));
+        assert!(!is_cleanup_method("execute"));
+        assert!(!is_cleanup_method("process"));
+    }
+
+    #[test]
+    fn test_has_cleanup_methods() {
+        use syn::parse_quote;
+
+        // Test with cleanup methods present
+        let items_with_cleanup: Vec<ImplItem> = vec![
+            parse_quote!(
+                fn new() -> Self {
+                    Self {}
+                }
+            ),
+            parse_quote!(
+                fn cleanup(&mut self) { /* cleanup logic */
+                }
+            ),
+            parse_quote!(
+                fn process(&self) { /* process logic */
+                }
+            ),
+        ];
+        assert!(has_cleanup_methods(&items_with_cleanup));
+
+        // Test with only close method
+        let items_with_close: Vec<ImplItem> = vec![parse_quote!(
+            fn close(&mut self) { /* close logic */
+            }
+        )];
+        assert!(has_cleanup_methods(&items_with_close));
+
+        // Test without cleanup methods
+        let items_without_cleanup: Vec<ImplItem> = vec![
+            parse_quote!(
+                fn new() -> Self {
+                    Self {}
+                }
+            ),
+            parse_quote!(
+                fn process(&self) { /* process logic */
+                }
+            ),
+            parse_quote!(
+                fn get_data(&self) -> String {
+                    String::new()
+                }
+            ),
+        ];
+        assert!(!has_cleanup_methods(&items_without_cleanup));
+
+        // Test with empty items
+        let empty_items: Vec<ImplItem> = vec![];
+        assert!(!has_cleanup_methods(&empty_items));
+
+        // Test with const item (not a function)
+        let items_with_const: Vec<ImplItem> = vec![
+            parse_quote!(
+                const SIZE: usize = 100;
+            ),
+            parse_quote!(
+                fn process(&self) { /* process logic */
+                }
+            ),
+        ];
+        assert!(!has_cleanup_methods(&items_with_const));
+    }
+
+    #[test]
+    fn test_mark_type_as_having_cleanup() {
+        let mut type_definitions = vec![
+            TypeDefinition {
+                name: "TypeA".to_string(),
+                fields: vec![],
+                has_drop_impl: false,
+                has_cleanup_methods: false,
+            },
+            TypeDefinition {
+                name: "TypeB".to_string(),
+                fields: vec![],
+                has_drop_impl: false,
+                has_cleanup_methods: false,
+            },
+            TypeDefinition {
+                name: "TypeC".to_string(),
+                fields: vec![],
+                has_drop_impl: true,
+                has_cleanup_methods: false,
+            },
+        ];
+
+        // Mark TypeB as having cleanup
+        mark_type_as_having_cleanup(&mut type_definitions, "TypeB");
+        assert!(!type_definitions[0].has_cleanup_methods);
+        assert!(type_definitions[1].has_cleanup_methods);
+        assert!(!type_definitions[2].has_cleanup_methods);
+
+        // Mark TypeC as having cleanup (already has drop impl)
+        mark_type_as_having_cleanup(&mut type_definitions, "TypeC");
+        assert!(!type_definitions[0].has_cleanup_methods);
+        assert!(type_definitions[1].has_cleanup_methods);
+        assert!(type_definitions[2].has_cleanup_methods);
+
+        // Try to mark non-existent type (should do nothing)
+        mark_type_as_having_cleanup(&mut type_definitions, "TypeD");
+        assert!(!type_definitions[0].has_cleanup_methods);
+        assert!(type_definitions[1].has_cleanup_methods);
+        assert!(type_definitions[2].has_cleanup_methods);
     }
 }
