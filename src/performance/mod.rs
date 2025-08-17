@@ -638,7 +638,10 @@ mod tests {
             debt.message,
             "Nested loop with 4 levels (Exponential complexity)"
         );
-        assert!(debt.context.unwrap().contains("Test performance debt - lower priority"));
+        assert!(debt
+            .context
+            .unwrap()
+            .contains("Test performance debt - lower priority"));
         assert_eq!(debt.line, 100);
         assert_eq!(debt.file, path);
     }
