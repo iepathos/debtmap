@@ -233,6 +233,9 @@ src/
 
 ## Next Steps
 
+### Critical Priority
+- Spec 35: Debt Pattern Unified Scoring Integration - Connect all detected issues to priority scoring
+
 ### Near-term Enhancements
 - Spec 10: Add modern pattern detection (async/await, callbacks, functional)
 - Spec 12: Improve ROI calculations
