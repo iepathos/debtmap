@@ -63,19 +63,29 @@ impl EnhancedSqlInjectionDetector {
 
     fn analyze_taint_source(&self, expr: &Expr) -> Option<TaintSource> {
         let expr_str = quote::quote!(#expr).to_string();
+        Self::classify_taint_source(&expr_str)
+    }
 
-        if expr_str.contains("args()") || expr_str.contains("env::args") {
-            Some(TaintSource::CliArgument)
-        } else if expr_str.contains("env::var") || expr_str.contains("std::env") {
-            Some(TaintSource::Environment)
-        } else if expr_str.contains("request") || expr_str.contains("req.") {
-            Some(TaintSource::HttpRequest)
-        } else if expr_str.contains("File::") || expr_str.contains("read_to_string") {
-            Some(TaintSource::FileInput)
-        } else if expr_str.contains("user_input") || expr_str.contains("input") {
-            Some(TaintSource::UserControlled)
-        } else {
-            None
+    /// Pure function to classify taint sources from expression strings
+    fn classify_taint_source(expr_str: &str) -> Option<TaintSource> {
+        // Pattern-based classification using functional approach
+        match () {
+            _ if expr_str.contains("args()") || expr_str.contains("env::args") => {
+                Some(TaintSource::CliArgument)
+            }
+            _ if expr_str.contains("env::var") || expr_str.contains("std::env") => {
+                Some(TaintSource::Environment)
+            }
+            _ if expr_str.contains("request") || expr_str.contains("req.") => {
+                Some(TaintSource::HttpRequest)
+            }
+            _ if expr_str.contains("File::") || expr_str.contains("read_to_string") => {
+                Some(TaintSource::FileInput)
+            }
+            _ if expr_str.contains("user_input") || expr_str.contains("input") => {
+                Some(TaintSource::UserControlled)
+            }
+            _ => None,
         }
     }
 
@@ -325,6 +335,167 @@ mod tests {
         assert_eq!(
             detector.calculate_severity(false, &SqlInjectionType::TemplateInjection),
             Severity::Medium
+        );
+    }
+
+    #[test]
+    fn test_classify_taint_source_cli_arguments() {
+        // Test CLI argument detection
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("env::args()"),
+            Some(TaintSource::CliArgument)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("std::env::args"),
+            Some(TaintSource::CliArgument)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("let args = args()"),
+            Some(TaintSource::CliArgument)
+        );
+    }
+
+    #[test]
+    fn test_classify_taint_source_environment() {
+        // Test environment variable detection
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("env::var(\"HOME\")"),
+            Some(TaintSource::Environment)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("std::env::var"),
+            Some(TaintSource::Environment)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("use std::env"),
+            Some(TaintSource::Environment)
+        );
+    }
+
+    #[test]
+    fn test_classify_taint_source_http_request() {
+        // Test HTTP request detection
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("request.body()"),
+            Some(TaintSource::HttpRequest)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("req.params"),
+            Some(TaintSource::HttpRequest)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("http_request"),
+            Some(TaintSource::HttpRequest)
+        );
+    }
+
+    #[test]
+    fn test_classify_taint_source_file_input() {
+        // Test file input detection
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("File::open(path)"),
+            Some(TaintSource::FileInput)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("fs::read_to_string"),
+            Some(TaintSource::FileInput)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("std::fs::File::"),
+            Some(TaintSource::FileInput)
+        );
+    }
+
+    #[test]
+    fn test_classify_taint_source_user_controlled() {
+        // Test user-controlled input detection
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("user_input.trim()"),
+            Some(TaintSource::UserControlled)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("get_input()"),
+            Some(TaintSource::UserControlled)
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("stdin_input"),
+            Some(TaintSource::UserControlled)
+        );
+    }
+
+    #[test]
+    fn test_classify_taint_source_none() {
+        // Test cases that should return None
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("let x = 5"),
+            None
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("println!(\"hello\")"),
+            None
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("safe_function()"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_classify_taint_source_edge_cases() {
+        // Test edge cases and boundary conditions
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source(""),
+            None
+        );
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("   "),
+            None
+        );
+        // Test priority - CLI args should take precedence over input
+        assert_eq!(
+            EnhancedSqlInjectionDetector::classify_taint_source("args() with input"),
+            Some(TaintSource::CliArgument)
+        );
+    }
+
+    #[test]
+    fn test_get_injection_type() {
+        let detector = EnhancedSqlInjectionDetector::new();
+
+        // Test format string detection
+        assert_eq!(
+            detector.get_injection_type("format!(\"SELECT {}\", id)"),
+            SqlInjectionType::FormatString
+        );
+        assert_eq!(
+            detector.get_injection_type("query.format()"),
+            SqlInjectionType::FormatString
+        );
+
+        // Test string concatenation detection
+        assert_eq!(
+            detector.get_injection_type("query.push_str(&user_input)"),
+            SqlInjectionType::StringConcatenation
+        );
+        assert_eq!(
+            detector.get_injection_type("sql + &table_name"),
+            SqlInjectionType::StringConcatenation
+        );
+
+        // Test dynamic query detection
+        assert_eq!(
+            detector.get_injection_type("diesel::query_dsl::RunQueryDsl"),
+            SqlInjectionType::DynamicQuery
+        );
+        assert_eq!(
+            detector.get_injection_type("diesel::sql_query(raw_sql)"),
+            SqlInjectionType::DynamicQuery
+        );
+
+        // Test template injection (default)
+        assert_eq!(
+            detector.get_injection_type("render_template(sql)"),
+            SqlInjectionType::TemplateInjection
         );
     }
 }
