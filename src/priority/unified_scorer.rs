@@ -27,6 +27,7 @@ pub struct UnifiedScore {
     pub dependency_factor: f64,   // 0-10, configurable weight (default 10%)
     pub security_factor: f64,     // 0-10, configurable weight (default 5%)
     pub organization_factor: f64, // 0-10, configurable weight (default 5%)
+    pub performance_factor: f64,  // 0-10, configurable weight (default 15%)
     pub role_multiplier: f64,     // 0.1-1.5x based on function role
     pub final_score: f64,         // Computed composite score
 }
@@ -119,6 +120,7 @@ pub fn calculate_unified_priority_with_debt(
             dependency_factor: 0.0,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
         };
@@ -202,10 +204,10 @@ pub fn calculate_unified_priority_with_debt(
     let weighted_security = security_factor * weights.security;
     let weighted_organization = organization_factor * weights.organization;
 
-    // Add weights for new debt categories (using smaller weights to not overshadow existing factors)
-    let weighted_performance = performance_factor * 0.1;
+    // Use configurable weight for performance, smaller weights for other categories
+    let weighted_performance = performance_factor * weights.performance;
     let weighted_testing = testing_factor * 0.05;
-    let weighted_resource = resource_factor * 0.1;
+    let weighted_resource = resource_factor * 0.05;
     let weighted_duplication = duplication_factor * 0.05;
 
     // Calculate weighted composite score
@@ -232,6 +234,7 @@ pub fn calculate_unified_priority_with_debt(
         dependency_factor,
         security_factor,
         organization_factor,
+        performance_factor,
         role_multiplier,
         final_score,
     }

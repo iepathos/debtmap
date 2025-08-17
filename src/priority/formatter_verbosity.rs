@@ -153,8 +153,9 @@ pub fn format_priority_item_with_verbosity(
         // Determine which is the last component to show (for proper tree formatting)
         let has_security = item.unified_score.security_factor > 0.0;
         let has_organization = item.unified_score.organization_factor > 0.0;
+        let has_performance = item.unified_score.performance_factor > 0.0;
 
-        let dependency_prefix = if has_security || has_organization {
+        let dependency_prefix = if has_security || has_organization || has_performance {
             "├─"
         } else {
             "└─"
@@ -171,7 +172,7 @@ pub fn format_priority_item_with_verbosity(
 
         // Show security if non-zero
         if has_security {
-            let security_prefix = if has_organization { "├─" } else { "└─" };
+            let security_prefix = if has_organization || has_performance { "├─" } else { "└─" };
             writeln!(
                 output,
                 "│  │  {} Security:    {:.1} × {:.0}% = {:.2}",
@@ -185,12 +186,26 @@ pub fn format_priority_item_with_verbosity(
 
         // Show organization if non-zero
         if has_organization {
+            let org_prefix = if has_performance { "├─" } else { "└─" };
             writeln!(
                 output,
-                "│  │  └─ Organization: {:.1} × {:.0}% = {:.2}",
+                "│  │  {} Organization: {:.1} × {:.0}% = {:.2}",
+                org_prefix,
                 item.unified_score.organization_factor,
                 weights.organization * 100.0,
                 item.unified_score.organization_factor * weights.organization
+            )
+            .unwrap();
+        }
+
+        // Show performance if non-zero
+        if has_performance {
+            writeln!(
+                output,
+                "│  │  └─ Performance: {:.1} × {:.0}% = {:.2}",
+                item.unified_score.performance_factor,
+                weights.performance * 100.0,
+                item.unified_score.performance_factor * weights.performance
             )
             .unwrap();
         }
@@ -201,7 +216,8 @@ pub fn format_priority_item_with_verbosity(
             + item.unified_score.semantic_factor * weights.semantic
             + item.unified_score.dependency_factor * weights.dependency
             + item.unified_score.security_factor * weights.security
-            + item.unified_score.organization_factor * weights.organization;
+            + item.unified_score.organization_factor * weights.organization
+            + item.unified_score.performance_factor * weights.performance;
 
         writeln!(output, "│  ├─ Base Score: {:.2}", base_score).unwrap();
         writeln!(

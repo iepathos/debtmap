@@ -481,6 +481,7 @@ impl UnifiedAnalysis {
             dependency_factor: 3.0,   // Variable depending on code location
             security_factor: 10.0,    // Maximum security factor for security issues
             organization_factor: 0.0, // Not an organization issue
+            performance_factor: 0.0,  // Not a performance issue
             role_multiplier: 1.5,     // Security issues are always important
             final_score: (base_score + priority_boost).min(10.0_f64),
         }
@@ -515,6 +516,7 @@ impl UnifiedAnalysis {
             dependency_factor: 4.0,   // Performance issues can affect many callers
             security_factor: 0.0,     // Not a security issue
             organization_factor: 0.0, // Not an organization issue
+            performance_factor: 10.0, // Maximum performance factor for performance issues
             role_multiplier: 1.2,     // Performance issues are important
             final_score: (base_score + priority_boost).min(10.0_f64),
         }
