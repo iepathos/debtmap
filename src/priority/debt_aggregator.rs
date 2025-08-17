@@ -127,10 +127,7 @@ impl DebtAggregator {
         // First, index all debt items by file
         for item in items {
             let file = item.file.clone();
-            self.debt_index
-                .entry(file)
-                .or_default()
-                .push(item);
+            self.debt_index.entry(file).or_default().push(item);
         }
 
         // Now map debt items to functions based on line ranges

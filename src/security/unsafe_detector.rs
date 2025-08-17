@@ -8,7 +8,7 @@ use syn::{ExprUnsafe, File, ItemFn, ItemImpl};
 enum UnsafePattern {
     Transmute,
     RawPointer,
-    FFI,
+    Ffi,
     PointerOps,
     MemoryOps,
     General,
@@ -55,7 +55,7 @@ impl UnsafeVisitor {
         match () {
             _ if Self::contains_transmute(content) => UnsafePattern::Transmute,
             _ if Self::contains_raw_pointer(content) => UnsafePattern::RawPointer,
-            _ if Self::contains_ffi(content) => UnsafePattern::FFI,
+            _ if Self::contains_ffi(content) => UnsafePattern::Ffi,
             _ if content.contains("std::ptr::") => UnsafePattern::PointerOps,
             _ if content.contains("mem::") => UnsafePattern::MemoryOps,
             _ => UnsafePattern::General,
@@ -66,7 +66,10 @@ impl UnsafeVisitor {
     fn get_risk_level(pattern: &UnsafePattern) -> &'static str {
         match pattern {
             UnsafePattern::Transmute => "Critical",
-            UnsafePattern::RawPointer | UnsafePattern::FFI | UnsafePattern::PointerOps | UnsafePattern::MemoryOps => "High",
+            UnsafePattern::RawPointer
+            | UnsafePattern::Ffi
+            | UnsafePattern::PointerOps
+            | UnsafePattern::MemoryOps => "High",
             UnsafePattern::General => "Medium",
         }
     }
@@ -75,8 +78,10 @@ impl UnsafeVisitor {
     fn get_pattern_context(pattern: &UnsafePattern) -> &'static str {
         match pattern {
             UnsafePattern::Transmute => "Contains transmute - very dangerous type casting",
-            UnsafePattern::RawPointer => "Raw pointer manipulation - potential memory safety issues",
-            UnsafePattern::FFI => "FFI usage - external code interaction",
+            UnsafePattern::RawPointer => {
+                "Raw pointer manipulation - potential memory safety issues"
+            }
+            UnsafePattern::Ffi => "FFI usage - external code interaction",
             UnsafePattern::PointerOps => "Pointer operations - requires careful review",
             UnsafePattern::MemoryOps => "Memory manipulation - potential undefined behavior",
             UnsafePattern::General => "General unsafe code - requires security review",
@@ -131,7 +136,7 @@ impl<'ast> Visit<'ast> for UnsafeVisitor {
         // Check the content of the unsafe block for specific patterns
         let unsafe_content = quote::quote!(#i).to_string();
         let (context, risk_level) = Self::analyze_unsafe_content(&unsafe_content);
-        
+
         // Use a placeholder line number since syn doesn't provide it directly
         self.add_unsafe_debt(0, context, risk_level);
 
@@ -156,7 +161,9 @@ mod tests {
     fn test_contains_raw_pointer() {
         assert!(UnsafeVisitor::contains_raw_pointer("*const u8"));
         assert!(UnsafeVisitor::contains_raw_pointer("*mut i32"));
-        assert!(UnsafeVisitor::contains_raw_pointer("raw_pointer operations"));
+        assert!(UnsafeVisitor::contains_raw_pointer(
+            "raw_pointer operations"
+        ));
         assert!(!UnsafeVisitor::contains_raw_pointer("safe code"));
         assert!(!UnsafeVisitor::contains_raw_pointer(""));
     }
@@ -180,10 +187,10 @@ mod tests {
     fn test_classify_unsafe_pattern_raw_pointer() {
         let pattern = UnsafeVisitor::classify_unsafe_pattern("unsafe { *const ptr }");
         assert_eq!(pattern, UnsafePattern::RawPointer);
-        
+
         let pattern = UnsafeVisitor::classify_unsafe_pattern("unsafe { *mut data }");
         assert_eq!(pattern, UnsafePattern::RawPointer);
-        
+
         let pattern = UnsafeVisitor::classify_unsafe_pattern("raw_pointer manipulation");
         assert_eq!(pattern, UnsafePattern::RawPointer);
     }
@@ -191,10 +198,10 @@ mod tests {
     #[test]
     fn test_classify_unsafe_pattern_ffi() {
         let pattern = UnsafeVisitor::classify_unsafe_pattern("unsafe { ffi::call() }");
-        assert_eq!(pattern, UnsafePattern::FFI);
-        
+        assert_eq!(pattern, UnsafePattern::Ffi);
+
         let pattern = UnsafeVisitor::classify_unsafe_pattern("extern \"C\" { fn foo(); }");
-        assert_eq!(pattern, UnsafePattern::FFI);
+        assert_eq!(pattern, UnsafePattern::Ffi);
     }
 
     #[test]
@@ -213,7 +220,7 @@ mod tests {
     fn test_classify_unsafe_pattern_general() {
         let pattern = UnsafeVisitor::classify_unsafe_pattern("unsafe { some_function() }");
         assert_eq!(pattern, UnsafePattern::General);
-        
+
         let pattern = UnsafeVisitor::classify_unsafe_pattern("");
         assert_eq!(pattern, UnsafePattern::General);
     }
@@ -227,12 +234,27 @@ mod tests {
 
     #[test]
     fn test_get_risk_level() {
-        assert_eq!(UnsafeVisitor::get_risk_level(&UnsafePattern::Transmute), "Critical");
-        assert_eq!(UnsafeVisitor::get_risk_level(&UnsafePattern::RawPointer), "High");
-        assert_eq!(UnsafeVisitor::get_risk_level(&UnsafePattern::FFI), "High");
-        assert_eq!(UnsafeVisitor::get_risk_level(&UnsafePattern::PointerOps), "High");
-        assert_eq!(UnsafeVisitor::get_risk_level(&UnsafePattern::MemoryOps), "High");
-        assert_eq!(UnsafeVisitor::get_risk_level(&UnsafePattern::General), "Medium");
+        assert_eq!(
+            UnsafeVisitor::get_risk_level(&UnsafePattern::Transmute),
+            "Critical"
+        );
+        assert_eq!(
+            UnsafeVisitor::get_risk_level(&UnsafePattern::RawPointer),
+            "High"
+        );
+        assert_eq!(UnsafeVisitor::get_risk_level(&UnsafePattern::Ffi), "High");
+        assert_eq!(
+            UnsafeVisitor::get_risk_level(&UnsafePattern::PointerOps),
+            "High"
+        );
+        assert_eq!(
+            UnsafeVisitor::get_risk_level(&UnsafePattern::MemoryOps),
+            "High"
+        );
+        assert_eq!(
+            UnsafeVisitor::get_risk_level(&UnsafePattern::General),
+            "Medium"
+        );
     }
 
     #[test]
@@ -246,7 +268,7 @@ mod tests {
             "Raw pointer manipulation - potential memory safety issues"
         );
         assert_eq!(
-            UnsafeVisitor::get_pattern_context(&UnsafePattern::FFI),
+            UnsafeVisitor::get_pattern_context(&UnsafePattern::Ffi),
             "FFI usage - external code interaction"
         );
         assert_eq!(
@@ -273,7 +295,10 @@ mod tests {
     #[test]
     fn test_analyze_unsafe_content_raw_pointer() {
         let (context, risk) = UnsafeVisitor::analyze_unsafe_content("*const ptr");
-        assert_eq!(context, "Raw pointer manipulation - potential memory safety issues");
+        assert_eq!(
+            context,
+            "Raw pointer manipulation - potential memory safety issues"
+        );
         assert_eq!(risk, "High");
     }
 

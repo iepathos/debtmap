@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 pub use call_graph::{CallGraph, FunctionCall};
 pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage};
+pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
 pub use formatter::{format_priorities, OutputFormat};
 pub use formatter_markdown::format_priorities_markdown;
 pub use semantic_classifier::{classify_function_role, FunctionRole};
