@@ -4,6 +4,7 @@ use anyhow::Result;
 pub mod function_registry;
 pub mod javascript;
 pub mod python;
+pub mod python_detectors;
 pub mod rust;
 pub mod rust_call_graph;
 pub mod signature_extractor;

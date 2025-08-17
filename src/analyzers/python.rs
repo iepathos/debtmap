@@ -1,4 +1,5 @@
 use crate::analyzers::Analyzer;
+use crate::analyzers::python_detectors::SimplifiedPythonDetector;
 use crate::complexity::python_patterns::analyze_python_patterns;
 use crate::core::{
     ast::{Ast, PythonAst},
@@ -41,7 +42,18 @@ impl Analyzer for PythonAnalyzer {
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
         match ast {
-            Ast::Python(python_ast) => analyze_python_file(python_ast, self.complexity_threshold),
+            Ast::Python(python_ast) => {
+                let mut metrics = analyze_python_file(python_ast, self.complexity_threshold);
+                
+                // Add simplified detector analysis
+                let mut detector = SimplifiedPythonDetector::new(python_ast.path.clone());
+                detector.analyze_module(&python_ast.module);
+                
+                // Add detected patterns to debt items
+                metrics.debt_items.extend(detector.get_debt_items());
+                
+                metrics
+            }
             _ => FileMetrics {
                 path: PathBuf::new(),
                 language: Language::Python,
