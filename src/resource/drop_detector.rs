@@ -1,5 +1,6 @@
 use super::{
     ResourceDetector, ResourceField, ResourceImpact, ResourceManagementIssue, ResourceSeverity,
+    SourceLocation,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -206,6 +207,11 @@ impl ResourceDetector for DropDetector {
                     resource_fields: resource_analysis.resource_fields,
                     suggested_drop_impl,
                     severity,
+                    location: SourceLocation {
+                        file: String::new(),
+                        line: 1,
+                        column: 0,
+                    }, // TODO: Extract actual location
                 });
             }
         }

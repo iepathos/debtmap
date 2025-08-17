@@ -9,6 +9,7 @@ pub enum ResourceManagementIssue {
         resource_fields: Vec<ResourceField>,
         suggested_drop_impl: String,
         severity: ResourceSeverity,
+        location: SourceLocation,
     },
     ResourceLeak {
         resource_type: ResourceType,
@@ -21,17 +22,20 @@ pub enum ResourceManagementIssue {
         issue_type: AsyncResourceIssueType,
         cancellation_safety: CancellationSafety,
         mitigation_strategy: String,
+        location: SourceLocation,
     },
     UnboundedCollection {
         collection_name: String,
         collection_type: String,
         growth_pattern: GrowthPattern,
         bounding_strategy: BoundingStrategy,
+        location: SourceLocation,
     },
     RaiiViolation {
         violation_type: RaiiViolationType,
         resource_involved: String,
         correct_pattern: String,
+        location: SourceLocation,
     },
     HandleLeak {
         handle_type: HandleType,
@@ -209,6 +213,7 @@ pub fn convert_resource_issue_to_debt_item(
             ref violation_type,
             ref resource_involved,
             ref correct_pattern,
+            ..
         } => (
             Priority::Medium,
             format!(
@@ -244,6 +249,9 @@ fn get_line_from_issue(issue: &ResourceManagementIssue) -> usize {
     match issue {
         ResourceManagementIssue::ResourceLeak { leak_site, .. } => leak_site.line,
         ResourceManagementIssue::HandleLeak { leak_location, .. } => leak_location.line,
-        _ => 0, // For issues without specific line numbers
+        ResourceManagementIssue::MissingDrop { location, .. } => location.line,
+        ResourceManagementIssue::AsyncResourceIssue { location, .. } => location.line,
+        ResourceManagementIssue::UnboundedCollection { location, .. } => location.line,
+        ResourceManagementIssue::RaiiViolation { location, .. } => location.line,
     }
 }

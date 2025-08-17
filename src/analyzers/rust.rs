@@ -647,6 +647,9 @@ fn convert_organization_pattern_to_debt_item(
     impact: MaintainabilityImpact,
     path: &Path,
 ) -> DebtItem {
+    let location = pattern.primary_location().clone();
+    let line = location.line;
+
     let (priority, message, context) = match pattern {
         OrganizationAntiPattern::GodObject {
             type_name,
@@ -768,12 +771,12 @@ fn convert_organization_pattern_to_debt_item(
     };
 
     DebtItem {
-        id: format!("organization-{}-0", path.display()), // Line number not available from pattern
+        id: format!("organization-{}-{}", path.display(), line),
         debt_type: DebtType::CodeOrganization,
         priority,
         file: path.to_path_buf(),
-        line: 0, // Would need to extract from AST
-        column: None,
+        line,
+        column: location.column,
         message,
         context,
     }

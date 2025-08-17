@@ -1,22 +1,7 @@
+use crate::common::{LocationConfidence, SourceLocation};
 use crate::core::{DebtItem, DebtType, Priority};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SourceLocation {
-    pub line: usize,
-    pub column: Option<usize>,
-    pub end_line: Option<usize>,
-    pub end_column: Option<usize>,
-    pub confidence: LocationConfidence,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum LocationConfidence {
-    Exact,       // Precise syn::Span information
-    Approximate, // Estimated from surrounding context
-    Unavailable, // No location information available
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PerformanceAntiPattern {

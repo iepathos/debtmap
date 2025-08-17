@@ -2,6 +2,7 @@ use super::{
     MagicValueType, MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector,
     ValueContext,
 };
+use crate::common::SourceLocation;
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -118,6 +119,7 @@ impl OrganizationDetector for MagicValueDetector {
                     occurrence_count: count,
                     suggested_constant_name: self.suggest_constant_name(&value, &context),
                     context,
+                    locations: vec![SourceLocation::default()], // TODO: Extract actual locations
                 });
             }
         }
@@ -138,6 +140,7 @@ impl OrganizationDetector for MagicValueDetector {
                     occurrence_count: count,
                     suggested_constant_name: format!("STR_{}", self.value_to_identifier(&value)),
                     context: ValueContext::BusinessLogic,
+                    locations: vec![SourceLocation::default()], // TODO: Extract actual locations
                 });
             }
         }

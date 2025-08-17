@@ -1,6 +1,7 @@
 use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
 };
+use crate::common::{SourceLocation, UnifiedLocationExtractor};
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -8,6 +9,7 @@ pub struct GodObjectDetector {
     max_methods: usize,
     max_fields: usize,
     max_responsibilities: usize,
+    location_extractor: Option<UnifiedLocationExtractor>,
 }
 
 impl Default for GodObjectDetector {
@@ -16,6 +18,7 @@ impl Default for GodObjectDetector {
             max_methods: 15,
             max_fields: 10,
             max_responsibilities: 3,
+            location_extractor: None,
         }
     }
 }
@@ -25,8 +28,23 @@ impl GodObjectDetector {
         Self::default()
     }
 
+    pub fn with_source_content(source_content: &str) -> Self {
+        Self {
+            max_methods: 15,
+            max_fields: 10,
+            max_responsibilities: 3,
+            location_extractor: Some(UnifiedLocationExtractor::new(source_content)),
+        }
+    }
+
     #[allow(dead_code)]
     fn analyze_type(&self, item_struct: &syn::ItemStruct) -> TypeAnalysis {
+        let location = if let Some(ref extractor) = self.location_extractor {
+            extractor.extract_item_location(&syn::Item::Struct(item_struct.clone()))
+        } else {
+            SourceLocation::default()
+        };
+
         TypeAnalysis {
             name: item_struct.ident.to_string(),
             method_count: 0,
@@ -35,6 +53,7 @@ impl GodObjectDetector {
             fields: self.extract_field_names(&item_struct.fields),
             responsibilities: Vec::new(),
             trait_implementations: 0,
+            location,
         }
     }
 
@@ -178,7 +197,7 @@ impl GodObjectDetector {
 impl OrganizationDetector for GodObjectDetector {
     fn detect_anti_patterns(&self, file: &syn::File) -> Vec<OrganizationAntiPattern> {
         let mut patterns = Vec::new();
-        let mut visitor = TypeVisitor::new();
+        let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
         visitor.visit_file(file);
 
         // Analyze each struct found
@@ -192,6 +211,7 @@ impl OrganizationDetector for GodObjectDetector {
                     field_count: type_info.field_count,
                     responsibility_count: suggested_split.len(),
                     suggested_split,
+                    location: type_info.location,
                 });
             }
         }
@@ -234,6 +254,7 @@ struct TypeAnalysis {
     fields: Vec<String>,
     responsibilities: Vec<Responsibility>,
     trait_implementations: usize,
+    location: SourceLocation,
 }
 
 struct Responsibility {
@@ -249,12 +270,21 @@ struct Responsibility {
 
 struct TypeVisitor {
     types: HashMap<String, TypeAnalysis>,
+    location_extractor: Option<UnifiedLocationExtractor>,
 }
 
 impl TypeVisitor {
     fn new() -> Self {
         Self {
             types: HashMap::new(),
+            location_extractor: None,
+        }
+    }
+
+    fn with_location_extractor(location_extractor: Option<UnifiedLocationExtractor>) -> Self {
+        Self {
+            types: HashMap::new(),
+            location_extractor,
         }
     }
 }
@@ -277,6 +307,12 @@ impl<'ast> Visit<'ast> for TypeVisitor {
             _ => Vec::new(),
         };
 
+        let location = if let Some(ref extractor) = self.location_extractor {
+            extractor.extract_item_location(&syn::Item::Struct(node.clone()))
+        } else {
+            SourceLocation::default()
+        };
+
         self.types.insert(
             type_name.clone(),
             TypeAnalysis {
@@ -287,6 +323,7 @@ impl<'ast> Visit<'ast> for TypeVisitor {
                 fields,
                 responsibilities: Vec::new(),
                 trait_implementations: 0,
+                location,
             },
         );
     }

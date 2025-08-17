@@ -2,6 +2,7 @@ use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, Parameter,
     ParameterGroup, ParameterRefactoring,
 };
+use crate::common::SourceLocation;
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -153,6 +154,7 @@ impl OrganizationDetector for ParameterAnalyzer {
                     parameter_count: function.parameters.len(),
                     data_clumps,
                     suggested_refactoring: refactoring,
+                    location: SourceLocation::default(), // TODO: Extract actual location
                 });
             }
 
@@ -164,6 +166,7 @@ impl OrganizationDetector for ParameterAnalyzer {
                         parameter_group: clump.clone(),
                         occurrence_count: self.count_clump_occurrences(&clump, &functions),
                         suggested_struct_name: self.suggest_struct_name(&clump),
+                        locations: vec![SourceLocation::default()], // TODO: Extract actual locations
                     });
                 }
             }
@@ -400,6 +403,7 @@ mod tests {
             parameter_count: 12,
             data_clumps: vec![],
             suggested_refactoring: ParameterRefactoring::ExtractStruct,
+            location: SourceLocation::default(),
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -412,6 +416,7 @@ mod tests {
             parameter_count: 8,
             data_clumps: vec![],
             suggested_refactoring: ParameterRefactoring::ExtractStruct,
+            location: SourceLocation::default(),
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -432,6 +437,7 @@ mod tests {
             },
             occurrence_count: 7,
             suggested_struct_name: "TestStruct".to_string(),
+            locations: vec![],
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -447,6 +453,7 @@ mod tests {
             },
             occurrence_count: 3,
             suggested_struct_name: "TestStruct".to_string(),
+            locations: vec![],
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -465,6 +472,7 @@ mod tests {
             occurrence_count: 5,
             suggested_constant_name: "ANSWER".to_string(),
             context: ValueContext::BusinessLogic,
+            locations: vec![],
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
