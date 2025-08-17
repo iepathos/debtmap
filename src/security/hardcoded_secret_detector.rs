@@ -18,6 +18,7 @@ struct SecretVisitor {
 
 impl SecretVisitor {
     fn new(path: &Path) -> Self {
+        // debtmap:ignore - These are test patterns for security detection, not real secrets
         let patterns = vec![
             (
                 Regex::new(r#"(?i)(api[_-]?key|apikey)[\s]*[:=][\s]*['"][\w\-]{20,}['"]"#).unwrap(),

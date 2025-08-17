@@ -21,6 +21,7 @@ impl EnhancedSecretDetector {
     pub fn new() -> Self {
         let mut patterns = HashMap::new();
 
+        // debtmap:ignore - These are test patterns for security detection, not real secrets
         // API Keys
         patterns.insert(
             SecretType::ApiKey,

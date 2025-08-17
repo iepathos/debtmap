@@ -306,7 +306,6 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
     output
 }
 
-
 fn format_main_factors_with_debt_type(
     unified_score: &crate::priority::UnifiedScore,
     debt_type: &crate::priority::DebtType,
@@ -590,7 +589,7 @@ mod tests {
             role_multiplier: 1.0,
             final_score: 7.0,
         };
-        
+
         let debt_type = DebtType::Risk {
             risk_score: 5.0,
             factors: vec!["Test factor".to_string()],
@@ -616,7 +615,7 @@ mod tests {
             role_multiplier: 1.0,
             final_score: 2.0,
         };
-        
+
         let debt_type = DebtType::Risk {
             risk_score: 1.0,
             factors: vec!["Test factor".to_string()],

@@ -23,6 +23,7 @@ impl SqlInjectionVisitor {
     }
 
     fn check_sql_pattern(&mut self, expr_str: &str, line: usize) {
+        // debtmap:ignore - These are test patterns for SQL injection detection
         let sql_keywords = [
             "SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "FROM", "WHERE",
         ];

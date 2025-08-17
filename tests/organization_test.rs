@@ -34,6 +34,7 @@ fn test_god_object_detection() {
             fn restore_data(&self) {}
             fn authenticate_user(&self) {}
             fn authorize_action(&self) {}
+            // debtmap:ignore - These are test function names, not actual crypto implementations
             fn encrypt_data(&self) {}
             fn decrypt_data(&self) {}
             fn schedule_task(&self) {}

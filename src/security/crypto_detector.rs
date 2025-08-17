@@ -23,6 +23,7 @@ impl CryptoVisitor {
     }
 
     fn check_weak_algorithms(&mut self, name: &str, line: usize) {
+        // debtmap:ignore - These are test patterns for crypto vulnerability detection
         let weak_algorithms = [
             (
                 "md5",
