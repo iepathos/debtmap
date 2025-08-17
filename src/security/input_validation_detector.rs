@@ -40,7 +40,7 @@ impl ValidationVisitor {
                 let location =
                     self.current_function_location
                         .clone()
-                        .unwrap_or_else(|| SourceLocation {
+                        .unwrap_or(SourceLocation {
                             line: 1,
                             column: None,
                             end_line: None,

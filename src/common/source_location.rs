@@ -47,7 +47,7 @@ impl UnifiedLocationExtractor {
     pub fn extract_location<T: Spanned>(&self, node: &T) -> SourceLocation {
         let span = node.span();
         self.span_to_location(span)
-            .unwrap_or_else(|| SourceLocation::default())
+            .unwrap_or_else(SourceLocation::default)
     }
 
     /// Extract location from item definitions (structs, enums, functions)

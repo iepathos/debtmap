@@ -403,6 +403,7 @@ mod tests {
             parameter_count: 12,
             data_clumps: vec![],
             suggested_refactoring: ParameterRefactoring::ExtractStruct,
+            location: SourceLocation::default(),
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -415,6 +416,7 @@ mod tests {
             parameter_count: 8,
             data_clumps: vec![],
             suggested_refactoring: ParameterRefactoring::ExtractStruct,
+            location: SourceLocation::default(),
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -435,6 +437,7 @@ mod tests {
             },
             occurrence_count: 7,
             suggested_struct_name: "TestStruct".to_string(),
+            locations: vec![],
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -450,6 +453,7 @@ mod tests {
             },
             occurrence_count: 3,
             suggested_struct_name: "TestStruct".to_string(),
+            locations: vec![],
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
@@ -468,6 +472,7 @@ mod tests {
             occurrence_count: 5,
             suggested_constant_name: "ANSWER".to_string(),
             context: ValueContext::BusinessLogic,
+            locations: vec![],
         };
         assert_eq!(
             analyzer.estimate_maintainability_impact(&pattern),
