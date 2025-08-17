@@ -183,24 +183,29 @@ impl OrganizationDetector for ParameterAnalyzer {
         match pattern {
             OrganizationAntiPattern::LongParameterList {
                 parameter_count, ..
-            } => {
-                if *parameter_count > 10 {
-                    MaintainabilityImpact::High
-                } else if *parameter_count > 7 {
-                    MaintainabilityImpact::Medium
-                } else {
-                    MaintainabilityImpact::Low
-                }
-            }
+            } => ParameterAnalyzer::classify_parameter_list_impact(*parameter_count),
             OrganizationAntiPattern::DataClump {
                 occurrence_count, ..
-            } => {
-                if *occurrence_count > 5 {
-                    MaintainabilityImpact::Medium
-                } else {
-                    MaintainabilityImpact::Low
-                }
-            }
+            } => ParameterAnalyzer::classify_data_clump_impact(*occurrence_count),
+            _ => MaintainabilityImpact::Low,
+        }
+    }
+}
+
+impl ParameterAnalyzer {
+    /// Classify the maintainability impact based on parameter count
+    fn classify_parameter_list_impact(parameter_count: usize) -> MaintainabilityImpact {
+        match parameter_count {
+            count if count > 10 => MaintainabilityImpact::High,
+            count if count > 7 => MaintainabilityImpact::Medium,
+            _ => MaintainabilityImpact::Low,
+        }
+    }
+
+    /// Classify the maintainability impact based on data clump occurrences
+    fn classify_data_clump_impact(occurrence_count: usize) -> MaintainabilityImpact {
+        match occurrence_count {
+            count if count > 5 => MaintainabilityImpact::Medium,
             _ => MaintainabilityImpact::Low,
         }
     }
@@ -290,5 +295,201 @@ fn capitalize_first(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::organization::{
+        OrganizationAntiPattern, ParameterGroup, ParameterRefactoring, ValueContext,
+    };
+
+    #[test]
+    fn test_classify_parameter_list_impact_high() {
+        // Test high impact for more than 10 parameters
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(11),
+            MaintainabilityImpact::High
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(15),
+            MaintainabilityImpact::High
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(100),
+            MaintainabilityImpact::High
+        );
+    }
+
+    #[test]
+    fn test_classify_parameter_list_impact_medium() {
+        // Test medium impact for 8-10 parameters
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(8),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(9),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(10),
+            MaintainabilityImpact::Medium
+        );
+    }
+
+    #[test]
+    fn test_classify_parameter_list_impact_low() {
+        // Test low impact for 7 or fewer parameters
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(0),
+            MaintainabilityImpact::Low
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(5),
+            MaintainabilityImpact::Low
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(7),
+            MaintainabilityImpact::Low
+        );
+    }
+
+    #[test]
+    fn test_classify_data_clump_impact_medium() {
+        // Test medium impact for more than 5 occurrences
+        assert_eq!(
+            ParameterAnalyzer::classify_data_clump_impact(6),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_data_clump_impact(10),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_data_clump_impact(100),
+            MaintainabilityImpact::Medium
+        );
+    }
+
+    #[test]
+    fn test_classify_data_clump_impact_low() {
+        // Test low impact for 5 or fewer occurrences
+        assert_eq!(
+            ParameterAnalyzer::classify_data_clump_impact(0),
+            MaintainabilityImpact::Low
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_data_clump_impact(3),
+            MaintainabilityImpact::Low
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_data_clump_impact(5),
+            MaintainabilityImpact::Low
+        );
+    }
+
+    #[test]
+    fn test_estimate_maintainability_impact_long_parameter_list() {
+        let analyzer = ParameterAnalyzer::new();
+
+        // Test with high parameter count
+        let pattern = OrganizationAntiPattern::LongParameterList {
+            function_name: "test_function".to_string(),
+            parameter_count: 12,
+            data_clumps: vec![],
+            suggested_refactoring: ParameterRefactoring::ExtractStruct,
+        };
+        assert_eq!(
+            analyzer.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::High
+        );
+
+        // Test with medium parameter count
+        let pattern = OrganizationAntiPattern::LongParameterList {
+            function_name: "test_function".to_string(),
+            parameter_count: 8,
+            data_clumps: vec![],
+            suggested_refactoring: ParameterRefactoring::ExtractStruct,
+        };
+        assert_eq!(
+            analyzer.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::Medium
+        );
+    }
+
+    #[test]
+    fn test_estimate_maintainability_impact_data_clump() {
+        let analyzer = ParameterAnalyzer::new();
+
+        // Test with high occurrence count
+        let pattern = OrganizationAntiPattern::DataClump {
+            parameter_group: ParameterGroup {
+                parameters: vec![],
+                group_name: "test_group".to_string(),
+                semantic_relationship: "related".to_string(),
+            },
+            occurrence_count: 7,
+            suggested_struct_name: "TestStruct".to_string(),
+        };
+        assert_eq!(
+            analyzer.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::Medium
+        );
+
+        // Test with low occurrence count
+        let pattern = OrganizationAntiPattern::DataClump {
+            parameter_group: ParameterGroup {
+                parameters: vec![],
+                group_name: "test_group".to_string(),
+                semantic_relationship: "related".to_string(),
+            },
+            occurrence_count: 3,
+            suggested_struct_name: "TestStruct".to_string(),
+        };
+        assert_eq!(
+            analyzer.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::Low
+        );
+    }
+
+    #[test]
+    fn test_estimate_maintainability_impact_other_patterns() {
+        let analyzer = ParameterAnalyzer::new();
+
+        // Test with other pattern types (should return Low)
+        let pattern = OrganizationAntiPattern::MagicValue {
+            value_type: crate::organization::MagicValueType::NumericLiteral,
+            value: "42".to_string(),
+            occurrence_count: 5,
+            suggested_constant_name: "ANSWER".to_string(),
+            context: ValueContext::BusinessLogic,
+        };
+        assert_eq!(
+            analyzer.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::Low
+        );
+    }
+
+    #[test]
+    fn test_parameter_list_boundary_values() {
+        // Test boundary values for parameter list impact classification
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(7),
+            MaintainabilityImpact::Low
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(8),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(10),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            ParameterAnalyzer::classify_parameter_list_impact(11),
+            MaintainabilityImpact::High
+        );
     }
 }
