@@ -46,6 +46,7 @@ impl PerformanceDetector for NestedLoopDetector {
             max_acceptable_nesting: self.max_acceptable_nesting,
             deepest_violation_depth: None,
             violation_operations: Vec::new(),
+            violation_line: None,
         };
 
         visitor.visit_file(file);
@@ -104,6 +105,7 @@ struct NestedLoopVisitor {
     max_acceptable_nesting: u32,
     deepest_violation_depth: Option<u32>,
     violation_operations: Vec<LoopOperation>,
+    violation_line: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -113,6 +115,8 @@ struct LoopInfo {
     has_mutable_state: bool,
     #[allow(dead_code)]
     has_dependencies: bool,
+    #[allow(dead_code)]
+    line: usize,
 }
 
 impl NestedLoopVisitor {
@@ -178,7 +182,7 @@ impl NestedLoopVisitor {
         !dep_visitor.has_dependencies && !dep_visitor.has_mutable_state && !dep_visitor.has_io
     }
 
-    fn enter_loop(&mut self, block: &Block) {
+    fn enter_loop(&mut self, block: &Block, line: usize) {
         self.current_nesting += 1;
         if self.current_nesting > self.max_nesting_seen {
             self.max_nesting_seen = self.current_nesting;
@@ -192,6 +196,7 @@ impl NestedLoopVisitor {
             operations: operations.clone(),
             has_mutable_state,
             has_dependencies,
+            line,
         });
 
         // Check if we've exceeded acceptable nesting
@@ -201,6 +206,7 @@ impl NestedLoopVisitor {
                 || self.current_nesting > self.deepest_violation_depth.unwrap()
             {
                 self.deepest_violation_depth = Some(self.current_nesting);
+                self.violation_line = Some(line);
 
                 // Collect all operations up to this point
                 self.violation_operations.clear();
@@ -228,17 +234,18 @@ impl NestedLoopVisitor {
                     inner_operations: self.violation_operations.clone(),
                     can_parallelize,
                     location: SourceLocation {
-                        line: 1,
+                        line: self.violation_line.unwrap_or(1),
                         column: None,
                         end_line: None,
                         end_column: None,
-                        confidence: LocationConfidence::Unavailable,
+                        confidence: LocationConfidence::Exact,
                     },
                 });
 
                 // Reset for next potential violation
                 self.deepest_violation_depth = None;
                 self.violation_operations.clear();
+                self.violation_line = None;
             }
         }
 
@@ -249,19 +256,22 @@ impl NestedLoopVisitor {
 
 impl<'ast> Visit<'ast> for NestedLoopVisitor {
     fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
-        self.enter_loop(&node.body);
+        let line = node.for_token.span.start().line;
+        self.enter_loop(&node.body, line);
         visit::visit_expr_for_loop(self, node);
         self.exit_loop();
     }
 
     fn visit_expr_while(&mut self, node: &'ast ExprWhile) {
-        self.enter_loop(&node.body);
+        let line = node.while_token.span.start().line;
+        self.enter_loop(&node.body, line);
         visit::visit_expr_while(self, node);
         self.exit_loop();
     }
 
     fn visit_expr_loop(&mut self, node: &'ast ExprLoop) {
-        self.enter_loop(&node.body);
+        let line = node.loop_token.span.start().line;
+        self.enter_loop(&node.body, line);
         visit::visit_expr_loop(self, node);
         self.exit_loop();
     }
