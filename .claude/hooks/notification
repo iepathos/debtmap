@@ -52,6 +52,7 @@ MESSAGES=(
     "I need your eyeballs on the screen please!"
     # "Attention human: Important AI business happening!"
     "Knock knock! Who's there? It's me, Claude!"
+    "Knock knock! Who's there? It's a me, Mario!"
     "Permission slip time! I need your signature!"
     "Red alert! Just kidding, but I do need you!"
 )
