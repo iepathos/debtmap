@@ -518,6 +518,15 @@ fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
 }
 
 fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
+    // Check if performance detection is disabled for test files
+    let test_config = crate::config::get_test_performance_config();
+    let is_test_file = crate::performance::is_test_path(path);
+
+    // Skip performance detection for test files if disabled
+    if is_test_file && !test_config.enabled {
+        return Vec::new();
+    }
+
     // Read source content for accurate line extraction
     let source_content = std::fs::read_to_string(path).unwrap_or_default();
 

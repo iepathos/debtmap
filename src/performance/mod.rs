@@ -151,7 +151,12 @@ pub fn convert_performance_pattern_to_debt_item(
 ) -> DebtItem {
     let location = pattern.location();
     let line = location.line;
-    let priority = match &pattern {
+
+    // Check if this is in a test file and apply configuration
+    let is_test_file = is_test_path(path);
+    let test_config = crate::config::get_test_performance_config();
+
+    let mut priority = match &pattern {
         PerformanceAntiPattern::NestedLoop {
             estimated_complexity,
             ..
@@ -160,8 +165,18 @@ pub fn convert_performance_pattern_to_debt_item(
         _ => impact_to_priority(impact),
     };
 
+    // Apply severity reduction for test files if configured
+    if is_test_file && test_config.enabled && test_config.severity_reduction > 0 {
+        priority = reduce_priority(priority, test_config.severity_reduction);
+    }
+
     let message = format_pattern_message(&pattern);
-    let recommendation = generate_pattern_recommendation(&pattern);
+    let mut recommendation = generate_pattern_recommendation(&pattern);
+
+    // Add note about test performance
+    if is_test_file {
+        recommendation.push_str(" (Test performance debt - lower priority)");
+    }
 
     DebtItem {
         id: format!("performance-{}-{}", path.display(), line),
@@ -176,6 +191,39 @@ pub fn convert_performance_pattern_to_debt_item(
 Location confidence: {:?}",
             recommendation, location.confidence
         )),
+    }
+}
+
+/// Check if a path represents a test file
+pub fn is_test_path(path: &Path) -> bool {
+    let path_str = path.to_string_lossy();
+    path_str.starts_with("tests/")
+        || path_str.contains("/tests/")
+        || path_str.contains("_test.rs")
+        || path_str.contains("_tests.rs")
+        || path_str.ends_with("test.rs")
+}
+
+/// Reduce priority by the specified number of levels
+#[cfg(test)]
+pub fn reduce_priority(priority: Priority, reduction: u8) -> Priority {
+    reduce_priority_impl(priority, reduction)
+}
+
+#[cfg(not(test))]
+fn reduce_priority(priority: Priority, reduction: u8) -> Priority {
+    reduce_priority_impl(priority, reduction)
+}
+
+fn reduce_priority_impl(priority: Priority, reduction: u8) -> Priority {
+    match (priority, reduction) {
+        (Priority::Critical, 1) => Priority::High,
+        (Priority::Critical, 2) => Priority::Medium,
+        (Priority::Critical, _) => Priority::Low,
+        (Priority::High, 1) => Priority::Medium,
+        (Priority::High, _) => Priority::Low,
+        (Priority::Medium, _) => Priority::Low,
+        (Priority::Low, _) => Priority::Low,
     }
 }
 
@@ -516,7 +564,7 @@ mod tests {
                 confidence: LocationConfidence::Unavailable,
             },
         };
-        let path = PathBuf::from("src/test.rs");
+        let path = PathBuf::from("src/main.rs"); // Use a non-test file to keep original test behavior
         let debt =
             convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Critical, &path);
 
@@ -562,6 +610,62 @@ mod tests {
             Some("Consider: batch operations\nLocation confidence: Unavailable".to_string())
         );
         assert_eq!(debt.line, 50);
+    }
+
+    #[test]
+    fn test_convert_performance_pattern_test_file_priority_reduction() {
+        let pattern = PerformanceAntiPattern::NestedLoop {
+            nesting_level: 4,
+            estimated_complexity: ComplexityClass::Exponential,
+            can_parallelize: true,
+            inner_operations: vec![LoopOperation::DatabaseQuery, LoopOperation::Computation],
+            location: SourceLocation {
+                line: 100,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            },
+        };
+        let path = PathBuf::from("tests/integration_test.rs");
+        let debt =
+            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Critical, &path);
+
+        // Critical should be reduced to High for test files
+        assert_eq!(debt.priority, Priority::High);
+        assert_eq!(debt.debt_type, DebtType::Performance);
+        assert_eq!(
+            debt.message,
+            "Nested loop with 4 levels (Exponential complexity)"
+        );
+        assert!(debt.context.unwrap().contains("Test performance debt - lower priority"));
+        assert_eq!(debt.line, 100);
+        assert_eq!(debt.file, path);
+    }
+
+    #[test]
+    fn test_is_test_path() {
+        use super::is_test_path;
+        // This should match because path starts with "tests/"
+        assert!(is_test_path(&PathBuf::from("tests/foo.rs")));
+        // This should match because it contains "/tests/"
+        assert!(is_test_path(&PathBuf::from("src/tests/bar.rs")));
+        assert!(is_test_path(&PathBuf::from("src/foo_test.rs")));
+        assert!(is_test_path(&PathBuf::from("src/foo_tests.rs")));
+        assert!(is_test_path(&PathBuf::from("src/test.rs")));
+        assert!(!is_test_path(&PathBuf::from("src/main.rs")));
+        assert!(!is_test_path(&PathBuf::from("src/testing.rs")));
+    }
+
+    #[test]
+    fn test_reduce_priority() {
+        assert_eq!(reduce_priority(Priority::Critical, 1), Priority::High);
+        assert_eq!(reduce_priority(Priority::Critical, 2), Priority::Medium);
+        assert_eq!(reduce_priority(Priority::Critical, 3), Priority::Low);
+        assert_eq!(reduce_priority(Priority::High, 1), Priority::Medium);
+        assert_eq!(reduce_priority(Priority::High, 2), Priority::Low);
+        assert_eq!(reduce_priority(Priority::Medium, 1), Priority::Low);
+        assert_eq!(reduce_priority(Priority::Low, 1), Priority::Low);
     }
 
     #[test]

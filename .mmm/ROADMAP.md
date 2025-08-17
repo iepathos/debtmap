@@ -203,6 +203,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Replaces heuristic-based scoring with actual detection results
   - Performance optimized for large codebases
 
+- [x] **Spec 41**: Test Performance as Tech Debt
+  - Recognizes test performance issues as valid technical debt
+  - Configurable detection for performance patterns in test files
+  - Severity reduction for test performance issues (default: 1 level)
+  - Option to completely disable test performance detection
+  - Documents test performance as lower-priority debt
+  - Helps teams gradually improve test suite performance
+
 ## Pending Specs
 
 ### Enhancements

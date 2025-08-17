@@ -617,3 +617,30 @@ Implement testing quality analysis that identifies test-specific anti-patterns n
 - ✅ Actionable suggestions for test improvement
 - ⚠️ Additional AST analysis overhead (minimal)
 - ⚠️ Some patterns require heuristics that may have false positives
+
+---
+
+## ADR-027: Test Performance as Technical Debt
+**Date**: 2025-08-17
+**Status**: Accepted
+
+### Context
+Performance detection was correctly identifying blocking I/O in test loops in tests/core_cache_tests.rs. These patterns represent real technical debt that impacts test suite performance and developer productivity. Sequential file I/O in test loops blocks on each write operation, making test suites slower than necessary. However, test performance issues are lower priority than production performance issues.
+
+### Decision
+Implement configurable test performance detection that:
+- Recognizes test performance issues as valid technical debt (not false positives)
+- Provides configurable severity reduction for test performance issues
+- Defaults to detecting test performance with 1-level severity reduction
+- Allows teams to completely disable test performance detection if desired
+- Adds "(Test performance debt - lower priority)" notation to test issues
+- Uses path-based detection for test files (/tests/, _test.rs, _tests.rs)
+
+### Consequences
+- ✅ Test performance issues are properly categorized as lower-priority debt
+- ✅ Teams maintain visibility into test suite performance problems
+- ✅ Configurable approach allows teams to tune detection to their needs
+- ✅ Gradual test performance improvements become trackable
+- ✅ Developer productivity improvements through faster test suites
+- ⚠️ Additional configuration complexity
+- ⚠️ Path-based test detection may miss some edge cases
