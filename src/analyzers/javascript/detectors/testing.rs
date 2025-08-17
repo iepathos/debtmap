@@ -1,3 +1,4 @@
+// debtmap:ignore-start -- This file contains test pattern detection and may trigger false security positives
 // Testing pattern detection for JavaScript/TypeScript
 
 use super::{get_node_text, SourceLocation};
@@ -517,3 +518,4 @@ fn contains_async_operations(body: &str) -> bool {
         && !body.contains("await")
         && !body.contains("done()")
 }
+// debtmap:ignore-end
