@@ -587,3 +587,10 @@ pub fn get_test_performance_config() -> TestPerformanceConfig {
         .and_then(|p| p.tests.clone())
         .unwrap_or_default()
 }
+
+/// Get smart performance configuration
+pub fn get_smart_performance_config() -> crate::performance::SmartPerformanceConfig {
+    // For now, use default config
+    // In the future, this could be loaded from configuration file
+    crate::performance::SmartPerformanceConfig::default()
+}

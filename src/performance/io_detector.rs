@@ -68,6 +68,7 @@ impl PerformanceDetector for IOPerformanceDetector {
                 IOPattern::UnbatchedQueries => PerformanceImpact::Critical,
                 IOPattern::UnbufferedIO => PerformanceImpact::Medium,
                 IOPattern::ExcessiveConnections => PerformanceImpact::High,
+                IOPattern::SingleSync => PerformanceImpact::Low,
             },
             _ => PerformanceImpact::Low,
         }

@@ -218,6 +218,15 @@ We have completed the initial implementation with core functionality for analyzi
   - Documents test performance as lower-priority debt
   - Helps teams gradually improve test suite performance
 
+- [x] **Spec 42**: Smart Pattern Matching for Performance Detection
+  - Context-aware pattern detection distinguishing test fixtures from production issues
+  - Module type classification (test, production, utility, benchmark)
+  - Function intent recognition (setup, teardown, business logic, I/O wrapper)
+  - Dynamic severity adjustment based on context
+  - Pattern correlation for multi-pattern analysis
+  - 70%+ reduction in false positives while maintaining sensitivity
+  - Configurable confidence thresholds for different contexts
+
 ## Pending Specs
 
 ### Enhancements

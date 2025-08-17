@@ -6,7 +6,8 @@ pub mod patterns;
 pub mod smells;
 pub mod suppression;
 
-use crate::core::{DebtItem, DebtType, Priority};
+use crate::core::{DebtItem, DebtType};
+pub use crate::core::Priority;
 use std::collections::HashMap;
 use std::path::PathBuf;
 

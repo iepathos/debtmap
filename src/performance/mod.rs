@@ -37,6 +37,29 @@ pub enum PerformanceAntiPattern {
         recommended_approach: String,
         location: SourceLocation,
     },
+    // New variants for smart detection
+    NestedLoopComplexity {
+        depth: usize,
+        complexity: usize,
+        location: SourceLocation,
+    },
+    UnboundedAllocation {
+        allocation_size: Option<usize>,
+        location: SourceLocation,
+    },
+    SynchronousBlocking {
+        operation_type: String,
+        location: SourceLocation,
+    },
+    InefficientAlgorithm {
+        algorithm_type: String,
+        complexity: ComplexityClass,
+        location: SourceLocation,
+    },
+    ResourceLeak {
+        resource_type: String,
+        location: SourceLocation,
+    },
 }
 
 impl PerformanceAntiPattern {
@@ -47,6 +70,11 @@ impl PerformanceAntiPattern {
             PerformanceAntiPattern::ExcessiveAllocation { location, .. } => location,
             PerformanceAntiPattern::InefficientIO { location, .. } => location,
             PerformanceAntiPattern::StringProcessingAntiPattern { location, .. } => location,
+            PerformanceAntiPattern::NestedLoopComplexity { location, .. } => location,
+            PerformanceAntiPattern::UnboundedAllocation { location, .. } => location,
+            PerformanceAntiPattern::SynchronousBlocking { location, .. } => location,
+            PerformanceAntiPattern::InefficientAlgorithm { location, .. } => location,
+            PerformanceAntiPattern::ResourceLeak { location, .. } => location,
         }
     }
 
@@ -106,6 +134,7 @@ pub enum IOPattern {
     UnbatchedQueries,
     UnbufferedIO,
     ExcessiveConnections,
+    SingleSync, // Added for smart detector
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -131,10 +160,13 @@ pub trait PerformanceDetector {
 }
 
 pub mod allocation_detector;
+pub mod context;
 pub mod data_structure_detector;
 pub mod io_detector;
 pub mod location_extractor;
 pub mod nested_loop_detector;
+pub mod pattern_correlator;
+pub mod smart_detector;
 pub mod string_detector;
 
 pub use allocation_detector::AllocationDetector;
@@ -142,6 +174,8 @@ pub use data_structure_detector::DataStructureDetector;
 pub use io_detector::IOPerformanceDetector;
 pub use location_extractor::LocationExtractor;
 pub use nested_loop_detector::NestedLoopDetector;
+pub use pattern_correlator::PatternCorrelator;
+pub use smart_detector::{SmartPerformanceConfig, SmartPerformanceDetector, SmartPerformanceIssue};
 pub use string_detector::StringPerformanceDetector;
 
 pub fn convert_performance_pattern_to_debt_item(
@@ -162,6 +196,19 @@ pub fn convert_performance_pattern_to_debt_item(
             ..
         } => classify_nested_loop_priority(estimated_complexity),
         PerformanceAntiPattern::InefficientIO { .. } => Priority::High,
+        PerformanceAntiPattern::NestedLoopComplexity { complexity, .. } => {
+            if *complexity > 10 {
+                Priority::High
+            } else {
+                Priority::Medium
+            }
+        }
+        PerformanceAntiPattern::UnboundedAllocation { .. } => Priority::Critical,
+        PerformanceAntiPattern::SynchronousBlocking { .. } => Priority::Medium,
+        PerformanceAntiPattern::InefficientAlgorithm { complexity, .. } => {
+            classify_nested_loop_priority(complexity)
+        }
+        PerformanceAntiPattern::ResourceLeak { .. } => Priority::Critical,
         _ => impact_to_priority(impact),
     };
 
@@ -276,6 +323,36 @@ fn format_pattern_message(pattern: &PerformanceAntiPattern) -> String {
         PerformanceAntiPattern::StringProcessingAntiPattern { pattern_type, .. } => {
             format!("Inefficient string processing: {:?}", pattern_type)
         }
+        PerformanceAntiPattern::NestedLoopComplexity {
+            depth, complexity, ..
+        } => {
+            format!(
+                "Nested loop complexity (depth: {}, complexity: {})",
+                depth, complexity
+            )
+        }
+        PerformanceAntiPattern::UnboundedAllocation {
+            allocation_size, ..
+        } => match allocation_size {
+            Some(size) => format!("Unbounded allocation of {} bytes", size),
+            None => "Unbounded memory allocation".to_string(),
+        },
+        PerformanceAntiPattern::SynchronousBlocking { operation_type, .. } => {
+            format!("Synchronous blocking operation: {}", operation_type)
+        }
+        PerformanceAntiPattern::InefficientAlgorithm {
+            algorithm_type,
+            complexity,
+            ..
+        } => {
+            format!(
+                "Inefficient algorithm '{}' with {:?} complexity",
+                algorithm_type, complexity
+            )
+        }
+        PerformanceAntiPattern::ResourceLeak { resource_type, .. } => {
+            format!("Potential resource leak: {}", resource_type)
+        }
     }
 }
 
@@ -320,6 +397,21 @@ fn generate_pattern_recommendation(pattern: &PerformanceAntiPattern) -> String {
             recommended_approach,
             ..
         } => recommended_approach.clone(),
+        PerformanceAntiPattern::NestedLoopComplexity { .. } => {
+            "Consider algorithmic improvements or early exits to reduce complexity".to_string()
+        }
+        PerformanceAntiPattern::UnboundedAllocation { .. } => {
+            "Implement bounds checking or streaming to prevent memory issues".to_string()
+        }
+        PerformanceAntiPattern::SynchronousBlocking { .. } => {
+            "Consider async operations to improve responsiveness".to_string()
+        }
+        PerformanceAntiPattern::InefficientAlgorithm { .. } => {
+            "Review algorithm choice for better time complexity".to_string()
+        }
+        PerformanceAntiPattern::ResourceLeak { .. } => {
+            "Ensure proper resource cleanup in all code paths".to_string()
+        }
     }
 }
 

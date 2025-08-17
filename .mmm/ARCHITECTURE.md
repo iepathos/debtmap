@@ -59,6 +59,22 @@ Security pattern detection and vulnerability analysis:
 - `unsafe_detector.rs`: Unsafe code block detection
 - `input_validation_detector.rs`: Input validation gap detection
 
+### Performance (`src/performance/`)
+Performance anti-pattern detection with smart context analysis:
+- `mod.rs`: Core performance types and conversion functions
+- `io_detector.rs`: I/O pattern detection
+- `nested_loop_detector.rs`: Nested loop complexity detection
+- `allocation_detector.rs`: Memory allocation pattern detection
+- `data_structure_detector.rs`: Inefficient data structure usage detection
+- `string_detector.rs`: String processing anti-pattern detection
+- `smart_detector.rs`: Smart context-aware performance detection
+- `pattern_correlator.rs`: Multi-pattern correlation analysis
+- `context/`: Context analysis framework
+  - `mod.rs`: Core context types and traits
+  - `module_classifier.rs`: Module type classification (test, production, utility)
+  - `intent_classifier.rs`: Function intent analysis (setup, teardown, business logic)
+  - `severity_adjuster.rs`: Context-based severity adjustment
+
 ### Transformers (`src/transformers/`)
 Functional data transformations:
 - `mod.rs`: Transformation composition
