@@ -1,5 +1,6 @@
 mod complexity;
 mod dependencies;
+pub mod detectors;
 
 use crate::analyzers::Analyzer;
 use crate::core::{
@@ -65,7 +66,7 @@ impl JavaScriptAnalyzer {
 
     fn create_debt_items(
         &self,
-        _tree: &tree_sitter::Tree,
+        tree: &tree_sitter::Tree,
         source: &str,
         path: &Path,
         functions: &[FunctionMetrics],
@@ -75,8 +76,8 @@ impl JavaScriptAnalyzer {
         // Report unclosed blocks
         report_unclosed_blocks(&suppression_context);
 
-        // Collect all debt items using functional approach
-        [
+        // Collect basic debt items
+        let mut debt_items: Vec<DebtItem> = [
             self.collect_todos_and_fixmes(source, path, &suppression_context),
             self.collect_code_smells(source, path, &suppression_context),
             self.collect_function_smells(functions, &suppression_context),
@@ -85,7 +86,33 @@ impl JavaScriptAnalyzer {
         ]
         .into_iter()
         .flatten()
-        .collect()
+        .collect();
+
+        // Run comprehensive detector analysis
+        let language = match self.language {
+            Language::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
+            Language::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+            _ => return debt_items,
+        };
+
+        let mut detector = detectors::JavaScriptDetectorVisitor::new(
+            source.to_string(),
+            path.to_path_buf(),
+            language,
+        );
+
+        detector.visit_tree(tree);
+
+        // Add detected patterns to debt items (apply suppression)
+        let detector_items = detector
+            .to_debt_items()
+            .into_iter()
+            .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
+            .collect::<Vec<_>>();
+
+        debt_items.extend(detector_items);
+
+        debt_items
     }
 
     fn collect_todos_and_fixmes(
