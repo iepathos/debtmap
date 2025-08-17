@@ -342,6 +342,16 @@ impl<'a> TaintGraphBuilder<'a> {
     fn detect_source(&self, expr: &Expr) -> Option<InputSource> {
         let expr_str = quote::quote!(#expr).to_string();
 
+        // Check if expression matches any known taint source
+        let is_taint_source = self.analyzer.taint_sources
+            .iter()
+            .any(|source| expr_str.contains(source));
+
+        if !is_taint_source {
+            return None;
+        }
+
+        // Determine the specific type of input source
         if expr_str.contains("args()") || expr_str.contains("env::args") {
             Some(InputSource::CliArgument)
         } else if expr_str.contains("env::var") {
