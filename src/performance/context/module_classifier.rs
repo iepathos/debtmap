@@ -60,14 +60,14 @@ impl ModuleClassifier {
     pub fn classify_module(&self, file_path: &Path) -> ModuleType {
         let path_str = file_path.to_string_lossy().to_lowercase();
 
+        // Check benchmark patterns first (they're more specific)
+        if self.is_benchmark_module(&path_str) {
+            return ModuleType::Benchmark;
+        }
+
         // Check explicit test directories and files
         if self.is_test_module(&path_str) {
             return ModuleType::Test;
-        }
-
-        // Check benchmark patterns
-        if self.is_benchmark_module(&path_str) {
-            return ModuleType::Benchmark;
         }
 
         // Check example patterns

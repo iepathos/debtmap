@@ -56,6 +56,7 @@ struct AnalyzeConfig {
     min_priority: Option<String>,
     #[allow(dead_code)]
     filter_categories: Option<Vec<String>>,
+    #[allow(dead_code)]
     exclude_tests: bool,
     #[allow(dead_code)]
     smart_performance: bool,

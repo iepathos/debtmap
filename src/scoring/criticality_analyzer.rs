@@ -1,7 +1,6 @@
 use crate::core::FunctionMetrics;
-use crate::priority::call_graph::{CallGraph, FunctionId};
+use crate::priority::call_graph::FunctionId;
 use crate::scoring::scoring_context::ScoringContext;
-use std::collections::HashSet;
 
 pub struct CriticalityAnalyzer<'a> {
     context: &'a ScoringContext,

@@ -1,12 +1,10 @@
 use crate::core::{FunctionMetrics, DebtItem};
 use crate::priority::debt_aggregator::DebtAggregator;
-use crate::priority::semantic_classifier::{classify_function_role, FunctionRole};
 use crate::priority::call_graph::FunctionId;
 use crate::scoring::{
     CriticalityAnalyzer, ScoreBreakdown, ScoreNormalizer, ScoringContext
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancedScore {

@@ -299,7 +299,8 @@ fn test_severity_adjustment() {
     let utility_severity = adjuster.adjust_severity(&pattern, &utility_context, 0.7);
     assert!(
         utility_severity > test_severity && utility_severity < production_severity,
-        "Utility context should have intermediate severity"
+        "Utility context should have intermediate severity. test={:?}, utility={:?}, production={:?}",
+        test_severity, utility_severity, production_severity
     );
 }
 
