@@ -9,28 +9,28 @@ use syn::{Block, Expr, ExprCall, ExprMethodCall, File, ItemFn, Stmt};
 pub struct UnifiedPerformanceVisitor {
     /// The collected data
     data: CollectedPerformanceData,
-    
+
     /// Location extractor for accurate line numbers
     location_extractor: LocationExtractor,
-    
+
     /// Current function context
     current_function: Option<FunctionId>,
-    
+
     /// Stack of loops we're currently inside
     loop_stack: Vec<LoopId>,
-    
+
     /// Current block depth for nesting calculation
     block_depth: usize,
-    
+
     /// Whether we're in a conditional block
     in_conditional: bool,
-    
+
     /// Whether we're in an error handler (catch, match Err, etc.)
     in_error_handler: bool,
-    
+
     /// Whether we're in an async block
     in_async_block: bool,
-    
+
     /// Counter for generating unique IDs
     next_operation_id: usize,
 }
@@ -39,7 +39,7 @@ impl UnifiedPerformanceVisitor {
     pub fn new(source_content: String, file_path: &Path) -> Self {
         let location_extractor = LocationExtractor::new(&source_content);
         let data = CollectedPerformanceData::new(source_content, file_path.to_path_buf());
-        
+
         Self {
             data,
             location_extractor,
@@ -52,16 +52,16 @@ impl UnifiedPerformanceVisitor {
             next_operation_id: 0,
         }
     }
-    
+
     /// Consume the visitor and return the collected data
     pub fn into_collected_data(self) -> CollectedPerformanceData {
         self.data
     }
-    
+
     /// Get current operation context
     fn current_context<T: Spanned>(&self, node: &T) -> OperationContext {
         let location = self.location_extractor.extract_location(node);
-        
+
         OperationContext {
             location,
             containing_function: self.current_function,
@@ -72,25 +72,25 @@ impl UnifiedPerformanceVisitor {
             in_async_block: self.in_async_block,
         }
     }
-    
+
     /// Generate next operation ID
     fn next_operation_id(&mut self) -> OperationId {
         let id = OperationId(self.next_operation_id);
         self.next_operation_id += 1;
         id
     }
-    
+
     /// Check if an expression is an I/O operation
     fn check_io_operation(&mut self, expr: &Expr) {
         match expr {
             Expr::MethodCall(method_call) => {
                 let method_name = method_call.method.to_string();
                 let io_type = self.classify_io_operation(&method_name, method_call);
-                
+
                 if let Some(io_type) = io_type {
                     let is_async = self.is_async_operation(&method_name);
                     let is_buffered = self.is_buffered_operation(&method_name, method_call);
-                    
+
                     let io_op = IOOperation {
                         id: self.next_operation_id(),
                         operation_type: io_type,
@@ -100,7 +100,7 @@ impl UnifiedPerformanceVisitor {
                         method_name,
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.io_operations.push(io_op);
                 }
             }
@@ -115,14 +115,14 @@ impl UnifiedPerformanceVisitor {
                         method_name: self.get_call_name(call),
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.io_operations.push(io_op);
                 }
             }
             _ => {}
         }
     }
-    
+
     /// Check if an expression is an allocation
     fn check_allocation(&mut self, expr: &Expr) {
         match expr {
@@ -134,7 +134,7 @@ impl UnifiedPerformanceVisitor {
                     "collect" => Some(AllocationType::Collect),
                     _ => None,
                 };
-                
+
                 if let Some(alloc_type) = alloc_type {
                     let alloc = AllocationInfo {
                         id: self.next_operation_id(),
@@ -144,7 +144,7 @@ impl UnifiedPerformanceVisitor {
                         estimated_size: None,
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.allocations.push(alloc);
                 }
             }
@@ -156,7 +156,7 @@ impl UnifiedPerformanceVisitor {
                     "format!" => Some(AllocationType::Format),
                     _ => None,
                 };
-                
+
                 if let Some(alloc_type) = alloc_type {
                     let alloc = AllocationInfo {
                         id: self.next_operation_id(),
@@ -166,7 +166,7 @@ impl UnifiedPerformanceVisitor {
                         estimated_size: None,
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.allocations.push(alloc);
                 }
             }
@@ -177,7 +177,7 @@ impl UnifiedPerformanceVisitor {
             _ => {}
         }
     }
-    
+
     /// Check if an expression is a string operation
     fn check_string_operation(&mut self, expr: &Expr) {
         match expr {
@@ -189,7 +189,7 @@ impl UnifiedPerformanceVisitor {
                     "parse" => Some(StringOperationType::Parse),
                     _ => None,
                 };
-                
+
                 if let Some(str_type) = str_type {
                     let str_op = StringOperation {
                         id: self.next_operation_id(),
@@ -198,7 +198,7 @@ impl UnifiedPerformanceVisitor {
                         is_repeated: self.loop_stack.len() > 0,
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.string_operations.push(str_op);
                 }
             }
@@ -211,14 +211,14 @@ impl UnifiedPerformanceVisitor {
                         is_repeated: self.loop_stack.len() > 0,
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.string_operations.push(str_op);
                 }
             }
             _ => {}
         }
     }
-    
+
     /// Check for string concatenation
     fn check_string_concat(&mut self, expr: &Expr) {
         if let Expr::Binary(binary) = expr {
@@ -232,9 +232,9 @@ impl UnifiedPerformanceVisitor {
                         is_repeated: true,
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.string_operations.push(str_op);
-                    
+
                     // Also record as allocation
                     let alloc = AllocationInfo {
                         id: self.next_operation_id(),
@@ -244,13 +244,13 @@ impl UnifiedPerformanceVisitor {
                         estimated_size: None,
                         expr: Some(Box::new(expr.clone())),
                     };
-                    
+
                     self.data.allocations.push(alloc);
                 }
             }
         }
     }
-    
+
     /// Check if an expression is a data structure operation
     fn check_data_structure_operation(&mut self, expr: &Expr) {
         if let Expr::MethodCall(method_call) = expr {
@@ -268,10 +268,10 @@ impl UnifiedPerformanceVisitor {
                 "range" => Some(DataStructureOpType::BTreeMapRange),
                 _ => None,
             };
-            
+
             if let Some(ds_type) = ds_type {
                 let collection_type = self.infer_collection_type(&method_call.receiver);
-                
+
                 let ds_op = DataStructureOp {
                     id: self.next_operation_id(),
                     operation_type: ds_type,
@@ -280,12 +280,12 @@ impl UnifiedPerformanceVisitor {
                     is_in_hot_path: self.loop_stack.len() > 1,
                     expr: Some(Box::new(expr.clone())),
                 };
-                
+
                 self.data.data_structure_ops.push(ds_op);
             }
         }
     }
-    
+
     /// Classify I/O operation type from method name
     fn classify_io_operation(&self, method_name: &str, _call: &ExprMethodCall) -> Option<IOType> {
         match method_name {
@@ -299,7 +299,7 @@ impl UnifiedPerformanceVisitor {
             _ => None,
         }
     }
-    
+
     /// Classify I/O call type
     fn classify_io_call(&self, call: &ExprCall) -> Option<IOType> {
         let call_name = self.get_call_name(call);
@@ -310,40 +310,39 @@ impl UnifiedPerformanceVisitor {
             _ => None,
         }
     }
-    
+
     /// Check if operation is async
     fn is_async_operation(&self, method_name: &str) -> bool {
         method_name.ends_with("_async") || method_name.starts_with("async_")
     }
-    
+
     /// Check if I/O is buffered
     fn is_buffered_operation(&self, method_name: &str, _call: &ExprMethodCall) -> bool {
         method_name.contains("buffered") || method_name.contains("buf_")
     }
-    
+
     /// Check if this is a Vec operation
     fn is_vec_operation(&self, _receiver: &Expr) -> bool {
         // Simplified heuristic - would need type information for accuracy
         true
     }
-    
+
     /// Infer collection type from receiver expression
     fn infer_collection_type(&self, _receiver: &Expr) -> String {
         // Simplified - would need type information for accuracy
         "Vec".to_string()
     }
-    
+
     /// Get function/method call name
     fn get_call_name(&self, call: &ExprCall) -> String {
         match &*call.func {
-            Expr::Path(path) => {
-                path.path
-                    .segments
-                    .iter()
-                    .map(|s| s.ident.to_string())
-                    .collect::<Vec<_>>()
-                    .join("::")
-            }
+            Expr::Path(path) => path
+                .path
+                .segments
+                .iter()
+                .map(|s| s.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::"),
             _ => "<unknown>".to_string(),
         }
     }
@@ -354,13 +353,13 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
         // Record function information
         let func_id = FunctionId(self.data.functions.len());
         let location = self.location_extractor.extract_location(func);
-        
+
         let is_test = func.attrs.iter().any(|attr| {
             attr.path().is_ident("test")
                 || attr.path().is_ident("tokio::test")
                 || attr.path().is_ident("async_std::test")
         });
-        
+
         let func_info = FunctionInfo {
             id: func_id,
             name: func.sig.ident.to_string(),
@@ -370,34 +369,36 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
             is_async: func.sig.asyncness.is_some(),
             body_span: func.block.span(),
         };
-        
-        self.data.function_by_name.insert(func_info.name.clone(), func_id);
+
+        self.data
+            .function_by_name
+            .insert(func_info.name.clone(), func_id);
         self.data.functions.push(func_info);
-        
+
         // Set current function context
         let prev_function = self.current_function;
         self.current_function = Some(func_id);
-        
+
         // Visit function body
         self.visit_block(&func.block);
-        
+
         // Restore previous context
         self.current_function = prev_function;
     }
-    
+
     fn visit_expr(&mut self, expr: &'ast Expr) {
         // Check for different types of operations
         self.check_io_operation(expr);
         self.check_allocation(expr);
         self.check_string_operation(expr);
         self.check_data_structure_operation(expr);
-        
+
         // Handle loop constructs
         match expr {
             Expr::ForLoop(for_loop) => {
                 let loop_id = LoopId(self.data.loops.len());
                 let location = self.location_extractor.extract_location(for_loop);
-                
+
                 let loop_info = LoopInfo {
                     id: loop_id,
                     loop_type: LoopType::For,
@@ -409,7 +410,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                     is_iterator_chain: false,
                     has_early_exit: self.check_early_exit(&for_loop.body),
                 };
-                
+
                 // Record nested loop relationship
                 if let Some(parent) = self.loop_stack.last() {
                     self.data
@@ -418,20 +419,20 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                         .or_insert_with(Vec::new)
                         .push(loop_id);
                 }
-                
+
                 self.data.loops.push(loop_info);
                 self.loop_stack.push(loop_id);
-                
+
                 // Visit loop body
                 visit::visit_expr(self, expr);
-                
+
                 self.loop_stack.pop();
                 return;
             }
             Expr::While(while_loop) => {
                 let loop_id = LoopId(self.data.loops.len());
                 let location = self.location_extractor.extract_location(while_loop);
-                
+
                 let loop_info = LoopInfo {
                     id: loop_id,
                     loop_type: LoopType::While,
@@ -443,7 +444,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                     is_iterator_chain: false,
                     has_early_exit: self.check_early_exit(&while_loop.body),
                 };
-                
+
                 if let Some(parent) = self.loop_stack.last() {
                     self.data
                         .nested_loops
@@ -451,19 +452,19 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                         .or_insert_with(Vec::new)
                         .push(loop_id);
                 }
-                
+
                 self.data.loops.push(loop_info);
                 self.loop_stack.push(loop_id);
-                
+
                 visit::visit_expr(self, expr);
-                
+
                 self.loop_stack.pop();
                 return;
             }
             Expr::Loop(loop_expr) => {
                 let loop_id = LoopId(self.data.loops.len());
                 let location = self.location_extractor.extract_location(loop_expr);
-                
+
                 let loop_info = LoopInfo {
                     id: loop_id,
                     loop_type: LoopType::Loop,
@@ -475,7 +476,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                     is_iterator_chain: false,
                     has_early_exit: self.check_early_exit(&loop_expr.body),
                 };
-                
+
                 if let Some(parent) = self.loop_stack.last() {
                     self.data
                         .nested_loops
@@ -483,12 +484,12 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                         .or_insert_with(Vec::new)
                         .push(loop_id);
                 }
-                
+
                 self.data.loops.push(loop_info);
                 self.loop_stack.push(loop_id);
-                
+
                 visit::visit_expr(self, expr);
-                
+
                 self.loop_stack.pop();
                 return;
             }
@@ -498,7 +499,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                 if matches!(method_name.as_str(), "for_each" | "map" | "filter_map") {
                     let loop_id = LoopId(self.data.loops.len());
                     let location = self.location_extractor.extract_location(method_call);
-                    
+
                     let loop_info = LoopInfo {
                         id: loop_id,
                         loop_type: LoopType::Iterator,
@@ -510,7 +511,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                         is_iterator_chain: true,
                         has_early_exit: false,
                     };
-                    
+
                     if let Some(parent) = self.loop_stack.last() {
                         self.data
                             .nested_loops
@@ -518,12 +519,12 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                             .or_insert_with(Vec::new)
                             .push(loop_id);
                     }
-                    
+
                     self.data.loops.push(loop_info);
                     self.loop_stack.push(loop_id);
-                    
+
                     visit::visit_expr(self, expr);
-                    
+
                     self.loop_stack.pop();
                     return;
                 }
@@ -553,11 +554,11 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
             }
             _ => {}
         }
-        
+
         // Continue visiting
         visit::visit_expr(self, expr);
     }
-    
+
     fn visit_block(&mut self, block: &'ast Block) {
         self.block_depth += 1;
         visit::visit_block(self, block);
@@ -577,18 +578,19 @@ impl UnifiedPerformanceVisitor {
         }
         false
     }
-    
+
     /// Check if expression is an early exit
     fn is_early_exit(&self, expr: &Expr) -> bool {
-        matches!(
-            expr,
-            Expr::Break(_) | Expr::Continue(_) | Expr::Return(_)
-        )
+        matches!(expr, Expr::Break(_) | Expr::Continue(_) | Expr::Return(_))
     }
 }
 
 /// Collect all performance data from a file in a single pass
-pub fn collect_performance_data(file: &File, path: &Path, source_content: &str) -> CollectedPerformanceData {
+pub fn collect_performance_data(
+    file: &File,
+    path: &Path,
+    source_content: &str,
+) -> CollectedPerformanceData {
     let mut visitor = UnifiedPerformanceVisitor::new(source_content.to_string(), path);
     visitor.visit_file(file);
     visitor.into_collected_data()

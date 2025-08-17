@@ -148,11 +148,14 @@ impl SeverityAdjuster {
     }
 
     fn score_to_priority(&self, score: f64) -> Priority {
-        if score >= 3.2 {  // 80% of Critical (4.0)
+        if score >= 3.2 {
+            // 80% of Critical (4.0)
             Priority::Critical
-        } else if score >= 2.0 {  // 67% of High (3.0)
+        } else if score >= 2.0 {
+            // 67% of High (3.0)
             Priority::High
-        } else if score >= 1.0 {  // 50% of Medium (2.0)
+        } else if score >= 1.0 {
+            // 50% of Medium (2.0)
             Priority::Medium
         } else {
             Priority::Low

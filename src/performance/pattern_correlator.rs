@@ -254,7 +254,7 @@ impl PatternCorrelator {
 
     fn value_to_priority(&self, value: f64) -> crate::debt::Priority {
         use crate::debt::Priority;
-        
+
         if value >= Self::priority_to_score(&Priority::Critical) * 0.8 {
             Priority::Critical
         } else if value >= Self::priority_to_score(&Priority::High) * 0.8 {

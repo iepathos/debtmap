@@ -19,7 +19,7 @@ use crate::organization::{
 };
 use crate::performance::{
     convert_performance_pattern_to_debt_item, AllocationDetector, DataStructureDetector,
-    IOPerformanceDetector, NestedLoopDetector, PerformanceAntiPattern, PerformanceDetector, 
+    IOPerformanceDetector, NestedLoopDetector, PerformanceAntiPattern, PerformanceDetector,
     StringPerformanceDetector,
 };
 use crate::priority::call_graph::CallGraph;
@@ -521,15 +521,15 @@ fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
 fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
     // Check if this is a test file - we want to reduce false positives in test code
     let is_test_file = crate::performance::is_test_path(path);
-    
+
     // Read source content for accurate line extraction
     let source_content = std::fs::read_to_string(path).unwrap_or_default();
-    
+
     // Check if we should use optimized analysis (controlled by feature flag or config)
     let use_optimized = std::env::var("DEBTMAP_OPTIMIZED_PERF")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(true); // Default to optimized
-    
+
     if use_optimized {
         return analyze_performance_patterns_optimized(file, path, &source_content);
     }
@@ -540,11 +540,11 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
         if let syn::Item::Fn(func) = item {
             // Check if this is a test function
             let is_test_fn = func.attrs.iter().any(|attr| {
-                attr.path().is_ident("test") || 
-                attr.path().is_ident("tokio::test") ||
-                attr.path().is_ident("async_std::test")
+                attr.path().is_ident("test")
+                    || attr.path().is_ident("tokio::test")
+                    || attr.path().is_ident("async_std::test")
             }) || func.sig.ident.to_string().starts_with("test_");
-            
+
             if is_test_fn {
                 // Get line range for test function
                 let span = func.span();
@@ -553,7 +553,7 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
                 test_line_ranges.push((start, end));
             }
         }
-        
+
         // Also check for test modules
         if let syn::Item::Mod(module) = item {
             let has_test_attr = module.attrs.iter().any(|attr| {
@@ -565,7 +565,7 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
                 }
                 false
             });
-            
+
             if has_test_attr {
                 // Mark entire module range as test code
                 let span = module.span();
@@ -594,12 +594,12 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
         for pattern in anti_patterns {
             let impact = detector.estimate_impact(&pattern);
             let pattern_line = pattern.primary_line();
-            
+
             // Check if this pattern is within a test function/module
-            let is_in_test = test_line_ranges.iter().any(|(start, end)| {
-                pattern_line >= *start && pattern_line <= *end
-            });
-            
+            let is_in_test = test_line_ranges
+                .iter()
+                .any(|(start, end)| pattern_line >= *start && pattern_line <= *end);
+
             // Skip low-priority issues in test code to reduce false positives
             if is_test_file || is_in_test {
                 // Convert impact to priority to check severity
@@ -607,7 +607,7 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
                 if priority == Priority::Low || priority == Priority::Medium {
                     continue; // Skip low/medium priority issues in test files
                 }
-                
+
                 // Also skip High priority I/O in test code (common false positive)
                 if priority == Priority::High {
                     // Check if it's an I/O pattern in test - these are usually test fixtures
@@ -616,7 +616,7 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
                     }
                 }
             }
-            
+
             // Now uses actual line numbers from pattern location
             let debt_item = convert_performance_pattern_to_debt_item(pattern, impact, path);
             performance_items.push(debt_item);
@@ -627,29 +627,33 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
 }
 
 /// Optimized performance pattern analysis using single-pass AST traversal
-fn analyze_performance_patterns_optimized(file: &syn::File, path: &Path, source_content: &str) -> Vec<DebtItem> {
+fn analyze_performance_patterns_optimized(
+    file: &syn::File,
+    path: &Path,
+    source_content: &str,
+) -> Vec<DebtItem> {
     use crate::performance::{
         analyze_performance_patterns_optimized, convert_performance_pattern_to_debt_item,
-        OptimizedPerformanceDetector, OptimizedNestedLoopDetector, OptimizedIODetector,
-        OptimizedAllocationDetector, OptimizedStringDetector, OptimizedDataStructureDetector,
+        OptimizedAllocationDetector, OptimizedDataStructureDetector, OptimizedIODetector,
+        OptimizedNestedLoopDetector, OptimizedPerformanceDetector, OptimizedStringDetector,
     };
-    
+
     // Get all patterns using the optimized single-pass analysis
     let patterns = analyze_performance_patterns_optimized(file, path, source_content);
-    
+
     // Check if this is a test file
     let is_test_file = crate::performance::is_test_path(path);
-    
+
     // Build test line ranges for filtering
     let mut test_line_ranges = Vec::new();
     for item in &file.items {
         if let syn::Item::Fn(func) = item {
             let is_test_fn = func.attrs.iter().any(|attr| {
-                attr.path().is_ident("test") || 
-                attr.path().is_ident("tokio::test") ||
-                attr.path().is_ident("async_std::test")
+                attr.path().is_ident("test")
+                    || attr.path().is_ident("tokio::test")
+                    || attr.path().is_ident("async_std::test")
             }) || func.sig.ident.to_string().starts_with("test_");
-            
+
             if is_test_fn {
                 let span = func.span();
                 let start = span.start().line;
@@ -657,7 +661,7 @@ fn analyze_performance_patterns_optimized(file: &syn::File, path: &Path, source_
                 test_line_ranges.push((start, end));
             }
         }
-        
+
         if let syn::Item::Mod(module) = item {
             let has_test_attr = module.attrs.iter().any(|attr| {
                 if attr.path().is_ident("cfg") {
@@ -667,7 +671,7 @@ fn analyze_performance_patterns_optimized(file: &syn::File, path: &Path, source_
                 }
                 false
             });
-            
+
             if has_test_attr {
                 let span = module.span();
                 let start = span.start().line;
@@ -676,7 +680,7 @@ fn analyze_performance_patterns_optimized(file: &syn::File, path: &Path, source_
             }
         }
     }
-    
+
     // Create temporary detectors to estimate impact
     let detectors: Vec<Box<dyn OptimizedPerformanceDetector>> = vec![
         Box::new(OptimizedNestedLoopDetector::new()),
@@ -685,17 +689,17 @@ fn analyze_performance_patterns_optimized(file: &syn::File, path: &Path, source_
         Box::new(OptimizedStringDetector::new()),
         Box::new(OptimizedDataStructureDetector::new()),
     ];
-    
+
     let mut performance_items = Vec::new();
-    
+
     for pattern in patterns {
         let pattern_line = pattern.primary_line();
-        
+
         // Check if this pattern is within a test function/module
-        let is_in_test = test_line_ranges.iter().any(|(start, end)| {
-            pattern_line >= *start && pattern_line <= *end
-        });
-        
+        let is_in_test = test_line_ranges
+            .iter()
+            .any(|(start, end)| pattern_line >= *start && pattern_line <= *end);
+
         // Estimate impact using the appropriate detector
         let impact = detectors
             .iter()
@@ -708,21 +712,24 @@ fn analyze_performance_patterns_optimized(file: &syn::File, path: &Path, source_
                     ),
                     path,
                 );
-                if test_patterns.iter().any(|p| std::mem::discriminant(p) == std::mem::discriminant(&pattern)) {
+                if test_patterns
+                    .iter()
+                    .any(|p| std::mem::discriminant(p) == std::mem::discriminant(&pattern))
+                {
                     Some(d.estimate_impact(&pattern))
                 } else {
                     None
                 }
             })
             .unwrap_or(crate::performance::PerformanceImpact::Low);
-        
+
         // Skip low-priority issues in test code
         if is_test_file || is_in_test {
             let priority = crate::performance::impact_to_priority(impact);
             if priority == Priority::Low || priority == Priority::Medium {
                 continue;
             }
-            
+
             // Skip High priority I/O in test code too
             if priority == Priority::High {
                 if let PerformanceAntiPattern::InefficientIO { .. } = pattern {
@@ -730,11 +737,11 @@ fn analyze_performance_patterns_optimized(file: &syn::File, path: &Path, source_
                 }
             }
         }
-        
+
         let debt_item = convert_performance_pattern_to_debt_item(pattern, impact, path);
         performance_items.push(debt_item);
     }
-    
+
     performance_items
 }
 

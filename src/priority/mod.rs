@@ -347,7 +347,6 @@ impl UnifiedAnalysis {
         debt_item: &crate::core::DebtItem,
         call_graph: &CallGraph,
     ) -> Option<UnifiedDebtItem> {
-        
         // Extract performance details from the message
         let (issue_type, impact) = self.parse_performance_details(&debt_item.message);
 
@@ -378,13 +377,13 @@ impl UnifiedAnalysis {
         // Use enhanced scoring if we have the context
         let unified_score = if let Some(func_id) = func_info {
             // Check if this is test code
-            let is_test = func_id.name.starts_with("test_") || 
-                          func_id.name.contains("::test") ||
-                          debt_item.file.to_string_lossy().contains("test");
-            
+            let is_test = func_id.name.starts_with("test_")
+                || func_id.name.contains("::test")
+                || debt_item.file.to_string_lossy().contains("test");
+
             // Create normalizer for score normalization
             let normalizer = crate::scoring::ScoreNormalizer::new();
-            
+
             // Create an enhanced score with factors based on performance issue
             let mut enhanced_score = crate::scoring::enhanced_scorer::EnhancedScore {
                 base_score: match &debt_item.priority {
@@ -403,16 +402,20 @@ impl UnifiedAnalysis {
                 raw_score: 0.0,
                 final_score: 0.0,
             };
-            
+
             // Calculate the raw and final scores
             enhanced_score.raw_score = enhanced_score.calculate_raw();
             enhanced_score.final_score = normalizer.normalize(enhanced_score.raw_score);
-            
+
             // Add jitter to prevent identical scores
-            let seed = debt_item.line as u64 ^ 
-                      debt_item.file.to_string_lossy().bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let seed = debt_item.line as u64
+                ^ debt_item
+                    .file
+                    .to_string_lossy()
+                    .bytes()
+                    .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
             enhanced_score.final_score = normalizer.add_jitter(enhanced_score.final_score, seed);
-            
+
             UnifiedScore {
                 complexity_factor: 3.0,
                 coverage_factor: 2.0,

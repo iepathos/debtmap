@@ -197,19 +197,20 @@ pub fn analyze_performance_patterns_optimized(
 ) -> Vec<PerformanceAntiPattern> {
     // Phase 1: Single-pass data collection
     let collected_data = collect_performance_data(file, path, source_content);
-    
+
     // Check if smart detection is enabled
     let use_smart = std::env::var("DEBTMAP_SMART_PERF")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(true); // Default to smart
-    
+
     if use_smart {
         // Phase 2: Smart detection with context analysis and pattern correlation
         let smart_detector = OptimizedSmartDetector::new();
         let smart_issues = smart_detector.analyze_with_context(&collected_data, path, None);
-        
+
         // Extract the patterns from smart issues
-        smart_issues.into_iter()
+        smart_issues
+            .into_iter()
             .map(|issue| issue.original_pattern)
             .collect()
     } else {
@@ -221,14 +222,14 @@ pub fn analyze_performance_patterns_optimized(
             Box::new(OptimizedStringDetector::new()),
             Box::new(OptimizedDataStructureDetector::new()),
         ];
-        
+
         let mut all_patterns = Vec::new();
-        
+
         for detector in detectors {
             let patterns = detector.analyze_collected_data(&collected_data, path);
             all_patterns.extend(patterns);
         }
-        
+
         all_patterns
     }
 }

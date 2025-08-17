@@ -5,8 +5,7 @@ use crate::performance::context::{
 use crate::performance::{
     CollectedPerformanceData, OptimizedAllocationDetector, OptimizedDataStructureDetector,
     OptimizedIODetector, OptimizedNestedLoopDetector, OptimizedPerformanceDetector,
-    OptimizedStringDetector, PerformanceAntiPattern, SmartPerformanceConfig,
-    SmartPerformanceIssue,
+    OptimizedStringDetector, PerformanceAntiPattern, SmartPerformanceConfig, SmartPerformanceIssue,
 };
 use crate::priority::call_graph::CallGraph;
 use std::path::Path;
@@ -78,21 +77,15 @@ impl OptimizedSmartDetector {
         // Step 4: Analyze each pattern with context
         let mut smart_issues = Vec::new();
         for pattern in patterns {
-            let function_context = self.analyze_pattern_context_from_data(
-                &pattern,
-                data,
-                &module_context,
-                call_graph,
-            );
+            let function_context =
+                self.analyze_pattern_context_from_data(&pattern, data, &module_context, call_graph);
             let confidence = self.calculate_pattern_confidence(&pattern, &function_context);
 
             // Step 5: Apply smart filtering
             if self.should_report_pattern(&pattern, &function_context, confidence) {
-                let adjusted_severity = self.severity_adjuster.adjust_severity(
-                    &pattern,
-                    &function_context,
-                    confidence,
-                );
+                let adjusted_severity =
+                    self.severity_adjuster
+                        .adjust_severity(&pattern, &function_context, confidence);
 
                 smart_issues.push(SmartPerformanceIssue {
                     original_pattern: pattern.clone(),
@@ -142,10 +135,7 @@ impl OptimizedSmartDetector {
             let location = pattern.location();
             // Check if this I/O is in a test function
             for func in &data.functions {
-                if func.is_test
-                    && location.line >= func.span.0
-                    && location.line <= func.span.1
-                {
+                if func.is_test && location.line >= func.span.0 && location.line <= func.span.1 {
                     return true; // Filter test I/O
                 }
             }
@@ -155,8 +145,7 @@ impl OptimizedSmartDetector {
         if let PerformanceAntiPattern::ExcessiveAllocation { .. } = pattern {
             // Check if allocation is in an iterator chain
             for loop_info in &data.loops {
-                if loop_info.is_iterator_chain
-                    && loop_info.location.line == pattern.location().line
+                if loop_info.is_iterator_chain && loop_info.location.line == pattern.location().line
                 {
                     return true; // Filter iterator allocations
                 }
@@ -209,7 +198,7 @@ impl OptimizedSmartDetector {
     ) -> PatternContext {
         // Find the function containing this pattern
         let pattern_line = pattern.location().line;
-        
+
         for func in &data.functions {
             if pattern_line >= func.span.0 && pattern_line <= func.span.1 {
                 // Determine function intent based on name and characteristics
@@ -322,11 +311,13 @@ impl OptimizedSmartDetector {
             .optimized_detectors
             .iter()
             .find_map(|d| {
-                let test_data = CollectedPerformanceData::new(String::new(), std::path::PathBuf::new());
+                let test_data =
+                    CollectedPerformanceData::new(String::new(), std::path::PathBuf::new());
                 let test_patterns = d.analyze_collected_data(&test_data, Path::new(""));
-                if test_patterns.iter().any(|p| {
-                    std::mem::discriminant(p) == std::mem::discriminant(pattern)
-                }) {
+                if test_patterns
+                    .iter()
+                    .any(|p| std::mem::discriminant(p) == std::mem::discriminant(pattern))
+                {
                     Some(d.estimate_impact(pattern))
                 } else {
                     None
@@ -391,12 +382,22 @@ impl OptimizedSmartDetector {
         }
     }
 
-    fn refine_business_criticality(&self, intent: &FunctionIntent, base: &BusinessCriticality) -> BusinessCriticality {
+    fn refine_business_criticality(
+        &self,
+        intent: &FunctionIntent,
+        base: &BusinessCriticality,
+    ) -> BusinessCriticality {
         use crate::performance::context::BusinessCriticality;
         match (intent, base) {
-            (FunctionIntent::BusinessLogic, BusinessCriticality::Utility) => BusinessCriticality::Important,
-            (FunctionIntent::BusinessLogic, BusinessCriticality::Important) => BusinessCriticality::Critical,
-            (FunctionIntent::Setup | FunctionIntent::Teardown, _) => BusinessCriticality::Development,
+            (FunctionIntent::BusinessLogic, BusinessCriticality::Utility) => {
+                BusinessCriticality::Important
+            }
+            (FunctionIntent::BusinessLogic, BusinessCriticality::Important) => {
+                BusinessCriticality::Critical
+            }
+            (FunctionIntent::Setup | FunctionIntent::Teardown, _) => {
+                BusinessCriticality::Development
+            }
             _ => base.clone(),
         }
     }
