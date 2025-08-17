@@ -19,7 +19,8 @@ use crate::organization::{
 };
 use crate::performance::{
     convert_performance_pattern_to_debt_item, AllocationDetector, DataStructureDetector,
-    IOPerformanceDetector, NestedLoopDetector, PerformanceDetector, StringPerformanceDetector,
+    IOPerformanceDetector, NestedLoopDetector, PerformanceAntiPattern, PerformanceDetector, 
+    StringPerformanceDetector,
 };
 use crate::priority::call_graph::CallGraph;
 use crate::testing;
@@ -518,17 +519,53 @@ fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
 }
 
 fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
-    // Check if performance detection is disabled for test files
-    let test_config = crate::config::get_test_performance_config();
+    // Check if this is a test file - we want to reduce false positives in test code
     let is_test_file = crate::performance::is_test_path(path);
-
-    // Skip performance detection for test files if disabled
-    if is_test_file && !test_config.enabled {
-        return Vec::new();
-    }
-
+    
     // Read source content for accurate line extraction
     let source_content = std::fs::read_to_string(path).unwrap_or_default();
+
+    // Check for test functions by examining the AST
+    let mut test_line_ranges = Vec::new();
+    for item in &file.items {
+        if let syn::Item::Fn(func) = item {
+            // Check if this is a test function
+            let is_test_fn = func.attrs.iter().any(|attr| {
+                attr.path().is_ident("test") || 
+                attr.path().is_ident("tokio::test") ||
+                attr.path().is_ident("async_std::test")
+            }) || func.sig.ident.to_string().starts_with("test_");
+            
+            if is_test_fn {
+                // Get line range for test function
+                let span = func.span();
+                let start = span.start().line;
+                let end = span.end().line;
+                test_line_ranges.push((start, end));
+            }
+        }
+        
+        // Also check for test modules
+        if let syn::Item::Mod(module) = item {
+            let has_test_attr = module.attrs.iter().any(|attr| {
+                if attr.path().is_ident("cfg") {
+                    // Check if it's #[cfg(test)]
+                    if let Ok(meta_list) = &attr.meta.require_list() {
+                        return meta_list.tokens.to_string().contains("test");
+                    }
+                }
+                false
+            });
+            
+            if has_test_attr {
+                // Mark entire module range as test code
+                let span = module.span();
+                let start = span.start().line;
+                let end = span.end().line;
+                test_line_ranges.push((start, end));
+            }
+        }
+    }
 
     let detectors: Vec<Box<dyn PerformanceDetector>> = vec![
         Box::new(NestedLoopDetector::with_source_content(&source_content)),
@@ -547,6 +584,30 @@ fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> 
 
         for pattern in anti_patterns {
             let impact = detector.estimate_impact(&pattern);
+            let pattern_line = pattern.primary_line();
+            
+            // Check if this pattern is within a test function/module
+            let is_in_test = test_line_ranges.iter().any(|(start, end)| {
+                pattern_line >= *start && pattern_line <= *end
+            });
+            
+            // Skip low-priority issues in test code to reduce false positives
+            if is_test_file || is_in_test {
+                // Convert impact to priority to check severity
+                let priority = crate::performance::impact_to_priority(impact);
+                if priority == Priority::Low || priority == Priority::Medium {
+                    continue; // Skip low/medium priority issues in test files
+                }
+                
+                // Also skip High priority I/O in test code (common false positive)
+                if priority == Priority::High {
+                    // Check if it's an I/O pattern in test - these are usually test fixtures
+                    if let PerformanceAntiPattern::InefficientIO { .. } = pattern {
+                        continue;
+                    }
+                }
+            }
+            
             // Now uses actual line numbers from pattern location
             let debt_item = convert_performance_pattern_to_debt_item(pattern, impact, path);
             performance_items.push(debt_item);

@@ -274,7 +274,7 @@ fn reduce_priority_impl(priority: Priority, reduction: u8) -> Priority {
     }
 }
 
-fn impact_to_priority(impact: PerformanceImpact) -> Priority {
+pub fn impact_to_priority(impact: PerformanceImpact) -> Priority {
     match impact {
         PerformanceImpact::Critical => Priority::Critical,
         PerformanceImpact::High => Priority::High,

@@ -347,6 +347,7 @@ impl UnifiedAnalysis {
         debt_item: &crate::core::DebtItem,
         call_graph: &CallGraph,
     ) -> Option<UnifiedDebtItem> {
+        
         // Extract performance details from the message
         let (issue_type, impact) = self.parse_performance_details(&debt_item.message);
 
@@ -356,14 +357,78 @@ impl UnifiedAnalysis {
             description: debt_item.message.clone(),
         };
 
-        // Calculate unified score with performance considerations
-        let unified_score = self.calculate_performance_score(&impact, &debt_item.priority);
-
         // Try to find the actual function name at this location
-        let function_name = call_graph
-            .find_function_at_location(&debt_item.file, debt_item.line)
-            .map(|func_id| func_id.name)
+        let func_info = call_graph.find_function_at_location(&debt_item.file, debt_item.line);
+        let function_name = func_info
+            .as_ref()
+            .map(|func_id| func_id.name.clone())
             .unwrap_or_else(|| format!("performance_issue_at_line_{}", debt_item.line));
+
+        // Get function metrics from call graph for enhanced scoring
+        let (upstream_deps, downstream_deps, role) = if let Some(func_id) = &func_info {
+            let upstream = call_graph.get_callers(func_id).len();
+            let downstream = call_graph.get_callees(func_id).len();
+            // We don't have FunctionMetrics here, so use Unknown role
+            let role = FunctionRole::Unknown;
+            (upstream, downstream, role)
+        } else {
+            (0, 0, FunctionRole::Unknown)
+        };
+
+        // Use enhanced scoring if we have the context
+        let unified_score = if let Some(func_id) = func_info {
+            // Check if this is test code
+            let is_test = func_id.name.starts_with("test_") || 
+                          func_id.name.contains("::test") ||
+                          debt_item.file.to_string_lossy().contains("test");
+            
+            // Create normalizer for score normalization
+            let normalizer = crate::scoring::ScoreNormalizer::new();
+            
+            // Create an enhanced score with factors based on performance issue
+            let mut enhanced_score = crate::scoring::enhanced_scorer::EnhancedScore {
+                base_score: match &debt_item.priority {
+                    crate::core::Priority::Critical => 9.0,
+                    crate::core::Priority::High => 7.0,
+                    crate::core::Priority::Medium => 5.0,
+                    crate::core::Priority::Low => 3.0,
+                },
+                criticality: if is_test { 0.5 } else { 1.5 },
+                complexity_factor: 1.2,
+                coverage_factor: 1.0,
+                dependency_factor: 1.0 + (upstream_deps as f64).min(10.0) / 10.0,
+                frequency_factor: 1.0 + (downstream_deps as f64).min(10.0) / 10.0,
+                test_weight: if is_test { 0.3 } else { 1.0 },
+                confidence: 0.8,
+                raw_score: 0.0,
+                final_score: 0.0,
+            };
+            
+            // Calculate the raw and final scores
+            enhanced_score.raw_score = enhanced_score.calculate_raw();
+            enhanced_score.final_score = normalizer.normalize(enhanced_score.raw_score);
+            
+            // Add jitter to prevent identical scores
+            let seed = debt_item.line as u64 ^ 
+                      debt_item.file.to_string_lossy().bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            enhanced_score.final_score = normalizer.add_jitter(enhanced_score.final_score, seed);
+            
+            UnifiedScore {
+                complexity_factor: 3.0,
+                coverage_factor: 2.0,
+                roi_factor: 6.0,
+                semantic_factor: 5.0,
+                dependency_factor: enhanced_score.dependency_factor * 10.0,
+                security_factor: 0.0,
+                organization_factor: 0.0,
+                performance_factor: 10.0,
+                role_multiplier: enhanced_score.test_weight,
+                final_score: enhanced_score.final_score,
+            }
+        } else {
+            // Fallback to simple scoring
+            self.calculate_performance_score(&impact, &debt_item.priority)
+        };
 
         Some(UnifiedDebtItem {
             location: Location {
@@ -373,12 +438,12 @@ impl UnifiedAnalysis {
             },
             debt_type,
             unified_score,
-            function_role: FunctionRole::Unknown,
+            function_role: role,
             recommendation: self.create_performance_recommendation(&issue_type, &impact),
             expected_impact: self.create_performance_impact(&impact),
             transitive_coverage: None,
-            upstream_dependencies: 0,
-            downstream_dependencies: 0,
+            upstream_dependencies: upstream_deps,
+            downstream_dependencies: downstream_deps,
             upstream_callers: vec![],
             downstream_callees: vec![],
             nesting_depth: 0,
