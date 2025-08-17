@@ -123,7 +123,7 @@ def nested_loops(data):
         .collect();
 
     assert!(
-        perf_issues.len() >= 1,
+        !perf_issues.is_empty(),
         "Should detect at least one performance issue in nested loops"
     );
 }

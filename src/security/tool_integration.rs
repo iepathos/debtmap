@@ -60,6 +60,62 @@ impl SecurityToolAdapter for ClippyAdapter {
 }
 
 impl ClippyAdapter {
+    /// Check if a rule_id is security-relevant
+    fn is_security_relevant(rule_id: &str) -> bool {
+        rule_id.contains("unwrap") || rule_id.contains("panic") || rule_id.contains("expect")
+    }
+
+    /// Extract finding from clippy message
+    fn extract_finding(
+        message: &serde_json::Map<String, serde_json::Value>,
+    ) -> Option<ToolFinding> {
+        let code = message.get("code")?.as_object()?;
+        let rule_id = code.get("code")?.as_str()?.to_string();
+
+        if !Self::is_security_relevant(&rule_id) {
+            return None;
+        }
+
+        let spans = message.get("spans")?.as_array()?;
+        let primary_span = spans.iter().find(|s| s["is_primary"] == true)?;
+
+        Some(ToolFinding {
+            tool: "clippy".to_string(),
+            severity: message
+                .get("level")
+                .and_then(|v| v.as_str())
+                .unwrap_or("warning")
+                .to_string(),
+            rule_id,
+            file: PathBuf::from(
+                primary_span
+                    .get("file_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(""),
+            ),
+            line: primary_span
+                .get("line_start")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as usize,
+            column: primary_span
+                .get("column_start")
+                .and_then(|v| v.as_u64())
+                .map(|c| c as usize),
+            message: message
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            remediation: message
+                .get("children")
+                .and_then(|v| v.as_array())
+                .and_then(|children| children.first())
+                .and_then(|child| child.get("message"))
+                .and_then(|v| v.as_str())
+                .map(String::from),
+        })
+    }
+
     fn parse_clippy_output(&self, output: &[u8]) -> Result<Vec<ToolFinding>> {
         let mut findings = Vec::new();
         let output_str = String::from_utf8_lossy(output);
@@ -68,48 +124,8 @@ impl ClippyAdapter {
             if let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) {
                 if msg["reason"] == "compiler-message" {
                     if let Some(message) = msg["message"].as_object() {
-                        if let Some(code) = message["code"].as_object() {
-                            let rule_id = code["code"].as_str().unwrap_or("unknown").to_string();
-
-                            // Only process security-relevant lints
-                            if !rule_id.contains("unwrap")
-                                && !rule_id.contains("panic")
-                                && !rule_id.contains("expect")
-                            {
-                                continue;
-                            }
-
-                            if let Some(spans) = message["spans"].as_array() {
-                                if let Some(primary_span) =
-                                    spans.iter().find(|s| s["is_primary"] == true)
-                                {
-                                    findings.push(ToolFinding {
-                                        tool: "clippy".to_string(),
-                                        severity: message["level"]
-                                            .as_str()
-                                            .unwrap_or("warning")
-                                            .to_string(),
-                                        rule_id,
-                                        file: PathBuf::from(
-                                            primary_span["file_name"].as_str().unwrap_or(""),
-                                        ),
-                                        line: primary_span["line_start"].as_u64().unwrap_or(0)
-                                            as usize,
-                                        column: primary_span["column_start"]
-                                            .as_u64()
-                                            .map(|c| c as usize),
-                                        message: message["message"]
-                                            .as_str()
-                                            .unwrap_or("")
-                                            .to_string(),
-                                        remediation: message["children"]
-                                            .as_array()
-                                            .and_then(|children| children.first())
-                                            .and_then(|child| child["message"].as_str())
-                                            .map(String::from),
-                                    });
-                                }
-                            }
+                        if let Some(finding) = Self::extract_finding(message) {
+                            findings.push(finding);
                         }
                     }
                 }
@@ -334,5 +350,170 @@ mod tests {
 
         let deduplicated = manager.deduplicate_findings(findings);
         assert_eq!(deduplicated.len(), 1);
+    }
+
+    #[test]
+    fn test_is_security_relevant() {
+        assert!(ClippyAdapter::is_security_relevant("clippy::unwrap_used"));
+        assert!(ClippyAdapter::is_security_relevant("clippy::panic"));
+        assert!(ClippyAdapter::is_security_relevant("clippy::expect_used"));
+        assert!(ClippyAdapter::is_security_relevant("unwrap"));
+        assert!(!ClippyAdapter::is_security_relevant(
+            "clippy::needless_return"
+        ));
+        assert!(!ClippyAdapter::is_security_relevant("unused_variables"));
+    }
+
+    #[test]
+    fn test_extract_finding_with_valid_message() {
+        let mut message = serde_json::Map::new();
+        message.insert(
+            "code".to_string(),
+            serde_json::json!({
+                "code": "clippy::unwrap_used"
+            }),
+        );
+        message.insert("level".to_string(), serde_json::json!("warning"));
+        message.insert("message".to_string(), serde_json::json!("use of unwrap"));
+        message.insert(
+            "spans".to_string(),
+            serde_json::json!([
+                {
+                    "is_primary": true,
+                    "file_name": "src/main.rs",
+                    "line_start": 42,
+                    "column_start": 10
+                }
+            ]),
+        );
+        message.insert(
+            "children".to_string(),
+            serde_json::json!([
+                {
+                    "message": "consider using expect() instead"
+                }
+            ]),
+        );
+
+        let finding = ClippyAdapter::extract_finding(&message);
+        assert!(finding.is_some());
+
+        let finding = finding.unwrap();
+        assert_eq!(finding.tool, "clippy");
+        assert_eq!(finding.rule_id, "clippy::unwrap_used");
+        assert_eq!(finding.severity, "warning");
+        assert_eq!(finding.line, 42);
+        assert_eq!(finding.column, Some(10));
+        assert_eq!(finding.message, "use of unwrap");
+        assert_eq!(
+            finding.remediation,
+            Some("consider using expect() instead".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_finding_with_non_security_rule() {
+        let mut message = serde_json::Map::new();
+        message.insert(
+            "code".to_string(),
+            serde_json::json!({
+                "code": "clippy::needless_return"
+            }),
+        );
+        message.insert(
+            "spans".to_string(),
+            serde_json::json!([
+                {
+                    "is_primary": true,
+                    "file_name": "src/main.rs",
+                    "line_start": 10,
+                    "column_start": 5
+                }
+            ]),
+        );
+
+        let finding = ClippyAdapter::extract_finding(&message);
+        assert!(finding.is_none());
+    }
+
+    #[test]
+    fn test_extract_finding_with_missing_spans() {
+        let mut message = serde_json::Map::new();
+        message.insert(
+            "code".to_string(),
+            serde_json::json!({
+                "code": "clippy::unwrap_used"
+            }),
+        );
+
+        let finding = ClippyAdapter::extract_finding(&message);
+        assert!(finding.is_none());
+    }
+
+    #[test]
+    fn test_extract_finding_with_no_primary_span() {
+        let mut message = serde_json::Map::new();
+        message.insert(
+            "code".to_string(),
+            serde_json::json!({
+                "code": "clippy::panic"
+            }),
+        );
+        message.insert(
+            "spans".to_string(),
+            serde_json::json!([
+                {
+                    "is_primary": false,
+                    "file_name": "src/main.rs",
+                    "line_start": 10
+                }
+            ]),
+        );
+
+        let finding = ClippyAdapter::extract_finding(&message);
+        assert!(finding.is_none());
+    }
+
+    #[test]
+    fn test_parse_clippy_output() {
+        let adapter = ClippyAdapter;
+
+        let output = r#"{"reason":"compiler-message","message":{"code":{"code":"clippy::unwrap_used"},"level":"warning","message":"use of unwrap","spans":[{"is_primary":true,"file_name":"src/main.rs","line_start":10,"column_start":5}],"children":[{"message":"try using expect"}]}}
+{"reason":"compiler-message","message":{"code":{"code":"unused_variable"},"level":"warning","message":"unused variable","spans":[{"is_primary":true,"file_name":"src/lib.rs","line_start":20}]}}
+{"reason":"compiler-message","message":{"code":{"code":"clippy::panic"},"level":"error","message":"panic in code","spans":[{"is_primary":true,"file_name":"src/test.rs","line_start":30,"column_start":15}]}}"#;
+
+        let findings = adapter.parse_clippy_output(output.as_bytes()).unwrap();
+
+        assert_eq!(findings.len(), 2);
+
+        assert_eq!(findings[0].rule_id, "clippy::unwrap_used");
+        assert_eq!(findings[0].line, 10);
+        assert_eq!(findings[0].file, PathBuf::from("src/main.rs"));
+        assert_eq!(
+            findings[0].remediation,
+            Some("try using expect".to_string())
+        );
+
+        assert_eq!(findings[1].rule_id, "clippy::panic");
+        assert_eq!(findings[1].line, 30);
+        assert_eq!(findings[1].severity, "error");
+    }
+
+    #[test]
+    fn test_parse_clippy_output_with_invalid_json() {
+        let adapter = ClippyAdapter;
+
+        let output = b"not json\n{invalid json}\n";
+
+        let findings = adapter.parse_clippy_output(output).unwrap();
+        assert_eq!(findings.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_clippy_output_with_empty_output() {
+        let adapter = ClippyAdapter;
+
+        let findings = adapter.parse_clippy_output(b"").unwrap();
+        assert_eq!(findings.len(), 0);
     }
 }
