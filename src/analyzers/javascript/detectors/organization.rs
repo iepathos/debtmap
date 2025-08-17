@@ -332,9 +332,7 @@ fn calculate_type_complexity(node: Node) -> usize {
     let mut cursor = node.walk();
 
     loop {
-        if cursor.goto_first_child() {
-            complexity += 1;
-        } else if cursor.goto_next_sibling() {
+        if cursor.goto_first_child() || cursor.goto_next_sibling() {
             complexity += 1;
         } else {
             // Go back up and try next sibling

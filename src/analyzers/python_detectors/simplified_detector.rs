@@ -69,26 +69,32 @@ impl SimplifiedPythonDetector {
 
         // Check if test function lacks assertions
         let func_name = func_def.name.as_str();
-        if func_name.starts_with("test_") || func_name.starts_with("Test") {
-            if !self.has_assertions(&func_def.body) {
-                self.debt_items.push(DebtItem {
-                    id: format!("py-test-no-assert-{}", self.debt_items.len()),
-                    debt_type: DebtType::TestQuality,
-                    priority: Priority::Medium,
-                    file: self.path.clone(),
-                    line: 1,
-                    column: None,
-                    message: format!("Test function '{}' has no assertions", func_name),
-                    context: None,
-                });
-            }
+        if (func_name.starts_with("test_") || func_name.starts_with("Test"))
+            && !Self::has_assertions(&func_def.body) {
+            self.debt_items.push(DebtItem {
+                id: format!("py-test-no-assert-{}", self.debt_items.len()),
+                debt_type: DebtType::TestQuality,
+                priority: Priority::Medium,
+                file: self.path.clone(),
+                line: 1,
+                column: None,
+                message: format!("Test function '{}' has no assertions", func_name),
+                context: None,
+            });
         }
     }
 
     fn check_class_patterns(&mut self, class_def: &ast::StmtClassDef) {
-        let method_count = class_def.body.iter().filter(|stmt| {
-            matches!(stmt, ast::Stmt::FunctionDef(_) | ast::Stmt::AsyncFunctionDef(_))
-        }).count();
+        let method_count = class_def
+            .body
+            .iter()
+            .filter(|stmt| {
+                matches!(
+                    stmt,
+                    ast::Stmt::FunctionDef(_) | ast::Stmt::AsyncFunctionDef(_)
+                )
+            })
+            .count();
 
         if method_count > 20 {
             self.debt_items.push(DebtItem {
@@ -98,7 +104,11 @@ impl SimplifiedPythonDetector {
                 file: self.path.clone(),
                 line: 1,
                 column: None,
-                message: format!("Class '{}' has {} methods (God Object)", class_def.name.as_str(), method_count),
+                message: format!(
+                    "Class '{}' has {} methods (God Object)",
+                    class_def.name.as_str(),
+                    method_count
+                ),
                 context: None,
             });
         }
@@ -123,10 +133,13 @@ impl SimplifiedPythonDetector {
     }
 
     fn is_mutable_default(&self, expr: &ast::Expr) -> bool {
-        matches!(expr, ast::Expr::List(_) | ast::Expr::Dict(_) | ast::Expr::Set(_))
+        matches!(
+            expr,
+            ast::Expr::List(_) | ast::Expr::Dict(_) | ast::Expr::Set(_)
+        )
     }
 
-    fn has_assertions(&self, body: &[ast::Stmt]) -> bool {
+    fn has_assertions(body: &[ast::Stmt]) -> bool {
         for stmt in body {
             if matches!(stmt, ast::Stmt::Assert(_)) {
                 return true;
@@ -134,12 +147,12 @@ impl SimplifiedPythonDetector {
             // Recursively check nested blocks
             match stmt {
                 ast::Stmt::If(if_stmt) => {
-                    if self.has_assertions(&if_stmt.body) || self.has_assertions(&if_stmt.orelse) {
+                    if Self::has_assertions(&if_stmt.body) || Self::has_assertions(&if_stmt.orelse) {
                         return true;
                     }
                 }
                 ast::Stmt::With(with_stmt) => {
-                    if self.has_assertions(&with_stmt.body) {
+                    if Self::has_assertions(&with_stmt.body) {
                         return true;
                     }
                 }
