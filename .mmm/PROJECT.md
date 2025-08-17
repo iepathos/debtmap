@@ -1,7 +1,7 @@
 # Debtmap Project Status
 
 ## Current State
-Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28 (Security Patterns Detection), spec 29, spec 30, spec 31 (Testing Quality Patterns), spec 32, spec 33, spec 34, spec 35 (Debt Pattern Unified Scoring Integration), and spec 41 (Test Performance as Tech Debt) implemented
+Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09, spec 11, spec 14, spec 18, spec 19, spec 21, spec 22, spec 23, spec 24, spec 26, spec 28 (Security Patterns Detection), spec 29, spec 30, spec 31 (Testing Quality Patterns), spec 32, spec 33, spec 34, spec 35 (Debt Pattern Unified Scoring Integration), spec 38 (Multi-Language Detector Support - Foundation), and spec 41 (Test Performance as Tech Debt) implemented
 
 ## What Exists
 - ✅ Standalone Rust binary with CLI interface
@@ -224,7 +224,8 @@ The project follows a functional core / imperative shell pattern:
 21. **Functional Error Handling**: Proper error propagation and logging instead of silent failures
 22. **Error Swallowing Detection**: Identifies anti-patterns where errors are silently discarded without proper handling
 23. **Debt Pattern Unified Scoring Integration**: All detected issues (security, performance, organization, testing, resource) directly influence function priority scores through weighted aggregation
-24. **Test Performance Configuration**: Configurable detection and severity reduction for performance issues in test files, recognizing test performance as valid but lower-priority technical debt
+24. **Multi-Language Detector Foundation**: Architecture established for language-specific detector implementations, enabling consistent debt detection across Python, JavaScript, and TypeScript
+25. **Test Performance Configuration**: Configurable detection and severity reduction for performance issues in test files, recognizing test performance as valid but lower-priority technical debt
 
 ## Project Structure
 ```

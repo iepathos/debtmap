@@ -644,3 +644,30 @@ Implement configurable test performance detection that:
 - ✅ Developer productivity improvements through faster test suites
 - ⚠️ Additional configuration complexity
 - ⚠️ Path-based test detection may miss some edge cases
+
+---
+
+## ADR-028: Multi-Language Detector Architecture
+**Date**: 2025-08-17
+**Status**: Accepted
+
+### Context
+Debtmap had comprehensive detector support only for Rust, while Python had basic support (complexity, TODOs, smells) and JavaScript/TypeScript had minimal support. This created an inconsistent experience across supported languages and limited the tool's effectiveness for polyglot codebases. The rustpython-parser 0.4 API changes also presented challenges for full implementation.
+
+### Decision
+Establish a detector architecture pattern for multi-language support that:
+- Defines a clear pattern for language-specific detector implementations
+- Creates foundation modules for Python detectors (performance, organization, security, resource, testing)
+- Establishes interfaces that can be adapted to different language AST libraries
+- Provides a roadmap for JavaScript/TypeScript detector implementation
+- Demonstrates extensibility beyond basic metrics to comprehensive debt detection
+
+### Consequences
+- ✅ Clear architectural pattern for language-specific detectors
+- ✅ Foundation established for Python detector implementation
+- ✅ Architecture ready for JavaScript/TypeScript expansion
+- ✅ Consistent debt detection approach across languages
+- ✅ Extensible design for future language additions
+- ⚠️ Full implementation requires API compatibility work with language parsers
+- ⚠️ Different AST structures require language-specific adaptations
+- ⚠️ Maintenance overhead increases with each language added

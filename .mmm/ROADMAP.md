@@ -203,6 +203,13 @@ We have completed the initial implementation with core functionality for analyzi
   - Replaces heuristic-based scoring with actual detection results
   - Performance optimized for large codebases
 
+- [x] **Spec 38**: Multi-Language Detector Support (Foundation)
+  - Established detector architecture pattern for multi-language support
+  - Created foundation for Python-specific detectors (performance, organization, security, resource, testing)
+  - Architecture ready for JavaScript/TypeScript detector implementation
+  - Demonstrated approach for extending language-specific analysis beyond basic metrics
+  - Note: Full implementation requires API compatibility updates with rustpython-parser 0.4
+
 - [x] **Spec 41**: Test Performance as Tech Debt
   - Recognizes test performance issues as valid technical debt
   - Configurable detection for performance patterns in test files
