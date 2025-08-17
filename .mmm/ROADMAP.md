@@ -227,6 +227,16 @@ We have completed the initial implementation with core functionality for analyzi
   - 70%+ reduction in false positives while maintaining sensitivity
   - Configurable confidence thresholds for different contexts
 
+- [x] **Spec 44**: Enhanced Scoring Differentiation
+  - Multi-factor scoring system with function criticality analysis
+  - Hot path detection based on call graph position
+  - Production vs test code weighting (default: 1.0 vs 0.3)
+  - Call frequency and dependency impact calculation
+  - Score normalization for better distribution (0-10 scale)
+  - Deterministic jitter to prevent identical scores
+  - --enhanced-scoring and --legacy-scoring CLI flags
+  - --exclude-tests option to filter test code from analysis
+
 ## Pending Specs
 
 ### Enhancements

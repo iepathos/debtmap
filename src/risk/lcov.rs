@@ -12,7 +12,7 @@ pub struct FunctionCoverage {
     pub coverage_percentage: f64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LcovData {
     pub functions: HashMap<PathBuf, Vec<FunctionCoverage>>,
     pub total_lines: usize,

@@ -135,6 +135,18 @@ pub enum Commands {
         /// Filter by debt categories (comma-separated)
         #[arg(long = "filter", value_delimiter = ',')]
         filter_categories: Option<Vec<String>>,
+
+        /// Enable enhanced scoring differentiation (default: enabled)
+        #[arg(long = "enhanced-scoring")]
+        enhanced_scoring: bool,
+
+        /// Use legacy scoring algorithm
+        #[arg(long = "legacy-scoring")]
+        legacy_scoring: bool,
+
+        /// Exclude test code from analysis
+        #[arg(long = "exclude-tests")]
+        exclude_tests: bool,
     },
 
     /// Initialize configuration file

@@ -56,6 +56,7 @@ struct AnalyzeConfig {
     min_priority: Option<String>,
     #[allow(dead_code)]
     filter_categories: Option<Vec<String>>,
+    exclude_tests: bool,
 }
 
 struct ValidateConfig {
@@ -132,7 +133,18 @@ fn main() -> Result<()> {
             group_by_category,
             min_priority,
             filter_categories,
+            enhanced_scoring,
+            legacy_scoring,
+            exclude_tests,
         } => {
+            // Set enhanced scoring environment variable
+            if legacy_scoring {
+                std::env::set_var("DEBTMAP_ENHANCED_SCORING", "false");
+            } else if enhanced_scoring {
+                std::env::set_var("DEBTMAP_ENHANCED_SCORING", "true");
+            }
+            // Default is true (enhanced scoring enabled)
+            
             let config = AnalyzeConfig {
                 path,
                 format,
@@ -162,6 +174,7 @@ fn main() -> Result<()> {
                 group_by_category,
                 min_priority,
                 filter_categories,
+                exclude_tests,
             };
             handle_analyze(config)
         }
@@ -1497,17 +1510,61 @@ fn create_debt_item_from_metric_with_aggregator(
     debt_aggregator: &priority::debt_aggregator::DebtAggregator,
 ) -> priority::UnifiedDebtItem {
     use priority::unified_scorer;
+    use debtmap::scoring::{ScoringContext, EnhancedScorer};
+    use std::collections::HashSet;
 
-    let roi_score = calculate_roi_for_metric(metric, call_graph, coverage_data);
-    unified_scorer::create_unified_debt_item_with_aggregator(
-        metric,
-        call_graph,
-        coverage_data,
-        roi_score,
-        framework_exclusions,
-        function_pointer_used_functions,
-        debt_aggregator,
-    )
+    // Check if enhanced scoring is enabled
+    let use_enhanced_scoring = std::env::var("DEBTMAP_ENHANCED_SCORING")
+        .unwrap_or_else(|_| "true".to_string()) == "true";
+
+    if use_enhanced_scoring {
+        // Create scoring context
+        let mut scoring_context = ScoringContext::new(call_graph.clone());
+        
+        // Add coverage data if available
+        if let Some(lcov) = coverage_data {
+            scoring_context = scoring_context.with_coverage(lcov.clone());
+        }
+        
+        // Identify test files
+        let test_files: HashSet<std::path::PathBuf> = HashSet::new();
+        scoring_context = scoring_context.with_test_files(test_files);
+        
+        // Create enhanced scorer
+        let scorer = EnhancedScorer::new(&scoring_context);
+        
+        // Score the function
+        let score_breakdown = scorer.score_function_with_aggregator(metric, debt_aggregator);
+        
+        // Convert to UnifiedDebtItem with enhanced score
+        let roi_score = calculate_roi_for_metric(metric, call_graph, coverage_data);
+        let mut item = unified_scorer::create_unified_debt_item_with_aggregator(
+            metric,
+            call_graph,
+            coverage_data,
+            roi_score,
+            framework_exclusions,
+            function_pointer_used_functions,
+            debt_aggregator,
+        );
+        
+        // Override the final score with enhanced score
+        item.unified_score.final_score = score_breakdown.total;
+        
+        item
+    } else {
+        // Use original scoring
+        let roi_score = calculate_roi_for_metric(metric, call_graph, coverage_data);
+        unified_scorer::create_unified_debt_item_with_aggregator(
+            metric,
+            call_graph,
+            coverage_data,
+            roi_score,
+            framework_exclusions,
+            function_pointer_used_functions,
+            debt_aggregator,
+        )
+    }
 }
 
 /// Convert error swallowing debt items to unified debt items
