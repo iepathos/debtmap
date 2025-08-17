@@ -1463,6 +1463,7 @@ fn calculate_risk_score(cyclomatic: u32, cognitive: u32, coverage_pct: f64) -> f
 }
 
 /// Create a debt item from a metric with framework exclusions
+#[allow(dead_code)]
 fn create_debt_item_from_metric(
     metric: &debtmap::FunctionMetrics,
     call_graph: &priority::CallGraph,
@@ -1482,6 +1483,30 @@ fn create_debt_item_from_metric(
         roi_score,
         framework_exclusions,
         function_pointer_used_functions,
+    )
+}
+
+fn create_debt_item_from_metric_with_aggregator(
+    metric: &debtmap::FunctionMetrics,
+    call_graph: &priority::CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    framework_exclusions: &std::collections::HashSet<priority::call_graph::FunctionId>,
+    function_pointer_used_functions: Option<
+        &std::collections::HashSet<priority::call_graph::FunctionId>,
+    >,
+    debt_aggregator: &priority::debt_aggregator::DebtAggregator,
+) -> priority::UnifiedDebtItem {
+    use priority::unified_scorer;
+
+    let roi_score = calculate_roi_for_metric(metric, call_graph, coverage_data);
+    unified_scorer::create_unified_debt_item_with_aggregator(
+        metric,
+        call_graph,
+        coverage_data,
+        roi_score,
+        framework_exclusions,
+        function_pointer_used_functions,
+        debt_aggregator,
     )
 }
 
@@ -1569,21 +1594,45 @@ fn create_unified_analysis_with_exclusions(
     >,
     debt_items: Option<&[core::DebtItem]>,
 ) -> priority::UnifiedAnalysis {
-    use priority::UnifiedAnalysis;
+    use priority::{debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId}, UnifiedAnalysis};
 
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
+
+    // Create debt aggregator and aggregate all debt items
+    let mut debt_aggregator = DebtAggregator::new();
+    if let Some(debt_items) = debt_items {
+        // Create function ID mappings for aggregation
+        let function_mappings: Vec<(AggregatorFunctionId, usize, usize)> = metrics
+            .iter()
+            .map(|m| {
+                let func_id = AggregatorFunctionId {
+                    file: m.file.clone(),
+                    name: m.name.clone(),
+                    start_line: m.line,
+                    end_line: m.line + m.length,
+                };
+                (func_id, m.line, m.line + m.length)
+            })
+            .collect();
+        
+        // The debt items are already the correct type
+        let debt_items_vec: Vec<core::DebtItem> = debt_items.to_vec();
+        
+        debt_aggregator.aggregate_debt(debt_items_vec, &function_mappings);
+    }
 
     for metric in metrics {
         if should_skip_metric_for_debt_analysis(metric, call_graph) {
             continue;
         }
 
-        let item = create_debt_item_from_metric(
+        let item = create_debt_item_from_metric_with_aggregator(
             metric,
             call_graph,
             coverage_data,
             framework_exclusions,
             function_pointer_used_functions,
+            &debt_aggregator,
         );
         unified.add_item(item);
     }
