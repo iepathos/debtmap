@@ -1,15 +1,28 @@
-use super::{PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, StringAntiPattern};
+use super::{
+    LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector,
+    PerformanceImpact, SourceLocation, StringAntiPattern,
+};
 use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{
     BinOp, Expr, ExprBinary, ExprCall, ExprForLoop, ExprLoop, ExprMethodCall, ExprWhile, File,
 };
 
-pub struct StringPerformanceDetector {}
+pub struct StringPerformanceDetector {
+    location_extractor: Option<LocationExtractor>,
+}
 
 impl StringPerformanceDetector {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            location_extractor: None,
+        }
+    }
+
+    pub fn with_source_content(source_content: &str) -> Self {
+        Self {
+            location_extractor: Some(LocationExtractor::new(source_content)),
+        }
     }
 }
 
@@ -20,11 +33,26 @@ impl Default for StringPerformanceDetector {
 }
 
 impl PerformanceDetector for StringPerformanceDetector {
-    fn detect_anti_patterns(&self, file: &File, _path: &Path) -> Vec<PerformanceAntiPattern> {
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<PerformanceAntiPattern> {
+        // If no location extractor, try to read source file for location extraction
+        let temp_extractor;
+        let location_extractor = if let Some(ref extractor) = self.location_extractor {
+            Some(extractor)
+        } else {
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    temp_extractor = LocationExtractor::new(&content);
+                    Some(&temp_extractor)
+                }
+                Err(_) => None,
+            }
+        };
+
         let mut visitor = StringVisitor {
             patterns: Vec::new(),
             in_loop: false,
             loop_depth: 0,
+            location_extractor,
         };
 
         visitor.visit_file(file);
@@ -52,13 +80,29 @@ impl PerformanceDetector for StringPerformanceDetector {
     }
 }
 
-struct StringVisitor {
+struct StringVisitor<'a> {
     patterns: Vec<PerformanceAntiPattern>,
     in_loop: bool,
     loop_depth: usize,
+    location_extractor: Option<&'a LocationExtractor>,
 }
 
-impl StringVisitor {
+impl<'a> StringVisitor<'a> {
+    fn extract_location(&self, expr: &Expr) -> SourceLocation {
+        if let Some(extractor) = self.location_extractor {
+            extractor.extract_expr_location(expr)
+        } else {
+            // Fallback when no source content available
+            SourceLocation {
+                line: 1,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            }
+        }
+    }
+
     fn check_string_concatenation(&mut self, binary: &ExprBinary) {
         if !self.in_loop {
             return;
@@ -67,6 +111,7 @@ impl StringVisitor {
         if matches!(binary.op, BinOp::Add(_)) {
             // Check if this looks like string concatenation
             if self.is_string_type(&binary.left) || self.is_string_type(&binary.right) {
+                let location = self.extract_location(&Expr::Binary(binary.clone()));
                 self.patterns
                     .push(PerformanceAntiPattern::StringProcessingAntiPattern {
                         pattern_type: StringAntiPattern::ConcatenationInLoop,
@@ -78,6 +123,7 @@ impl StringVisitor {
                         recommended_approach:
                             "Use String::with_capacity() and push_str() for better performance"
                                 .to_string(),
+                        location,
                     });
             }
         }
@@ -97,6 +143,7 @@ impl StringVisitor {
             .unwrap_or_default();
 
         if macro_name == "format" || macro_name == "write" || macro_name == "writeln" {
+            let location = self.extract_location(&Expr::Macro(mac.clone()));
             self.patterns
                 .push(PerformanceAntiPattern::StringProcessingAntiPattern {
                     pattern_type: StringAntiPattern::RepeatedFormatting,
@@ -104,6 +151,7 @@ impl StringVisitor {
                     recommended_approach:
                         "Pre-allocate String with capacity and use write! macro or push_str"
                             .to_string(),
+                    location,
                 });
         }
     }
@@ -123,6 +171,7 @@ impl StringVisitor {
                 .join("::");
 
             if path_str.contains("Regex::new") || path_str.contains("RegexBuilder::new") {
+                let location = self.extract_location(&Expr::Call(call.clone()));
                 self.patterns
                     .push(PerformanceAntiPattern::StringProcessingAntiPattern {
                         pattern_type: StringAntiPattern::RegexInLoop,
@@ -130,6 +179,7 @@ impl StringVisitor {
                         recommended_approach:
                             "Compile regex once outside the loop using lazy_static or OnceCell"
                                 .to_string(),
+                        location,
                     });
             }
         }
@@ -144,6 +194,7 @@ impl StringVisitor {
 
         // Check for repeated parsing
         if method_name == "parse" {
+            let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
             self.patterns
                 .push(PerformanceAntiPattern::StringProcessingAntiPattern {
                     pattern_type: StringAntiPattern::InefficientParsing,
@@ -151,6 +202,7 @@ impl StringVisitor {
                     recommended_approach:
                         "Consider caching parsed values or using more efficient parsing methods"
                             .to_string(),
+                    location,
                 });
         }
 
@@ -158,18 +210,21 @@ impl StringVisitor {
         if method_name == "push_str" || method_name == "push" {
             // Check if receiver is a mutable string being built inefficiently
             if self.is_inefficient_string_building(&method_call.receiver) {
+                let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
                 self.patterns
                     .push(PerformanceAntiPattern::StringProcessingAntiPattern {
                         pattern_type: StringAntiPattern::ConcatenationInLoop,
                         performance_impact: PerformanceImpact::Medium,
                         recommended_approach:
                             "Ensure String is pre-allocated with sufficient capacity".to_string(),
+                        location,
                     });
             }
         }
 
         // Check for repeated to_string() calls
         if method_name == "to_string" || method_name == "to_owned" {
+            let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
             self.patterns
                 .push(PerformanceAntiPattern::StringProcessingAntiPattern {
                     pattern_type: StringAntiPattern::RepeatedFormatting,
@@ -177,6 +232,7 @@ impl StringVisitor {
                     recommended_approach:
                         "Consider using string slices (&str) or caching converted strings"
                             .to_string(),
+                    location,
                 });
         }
     }
@@ -211,7 +267,7 @@ impl StringVisitor {
     }
 }
 
-impl<'ast> Visit<'ast> for StringVisitor {
+impl<'ast, 'a> Visit<'ast> for StringVisitor<'a> {
     fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
         let was_in_loop = self.in_loop;
         self.in_loop = true;

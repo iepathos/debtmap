@@ -1,5 +1,6 @@
 use super::{
-    ComplexityClass, LoopOperation, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact,
+    ComplexityClass, LocationConfidence, LocationExtractor, LoopOperation, PerformanceAntiPattern,
+    PerformanceDetector, PerformanceImpact, SourceLocation,
 };
 use std::path::Path;
 use syn::visit::{self, Visit};
@@ -7,18 +8,28 @@ use syn::{Block, Expr, ExprForLoop, ExprLoop, ExprWhile, File};
 
 pub struct NestedLoopDetector {
     max_acceptable_nesting: u32,
+    location_extractor: Option<LocationExtractor>,
 }
 
 impl NestedLoopDetector {
     pub fn new() -> Self {
         Self {
             max_acceptable_nesting: 2,
+            location_extractor: None,
         }
     }
 
     pub fn with_max_nesting(max_nesting: u32) -> Self {
         Self {
             max_acceptable_nesting: max_nesting,
+            location_extractor: None,
+        }
+    }
+
+    pub fn with_source_content(source_content: &str) -> Self {
+        Self {
+            max_acceptable_nesting: 2,
+            location_extractor: Some(LocationExtractor::new(source_content)),
         }
     }
 }
@@ -220,6 +231,13 @@ impl NestedLoopVisitor {
                     estimated_complexity: complexity,
                     inner_operations: self.violation_operations.clone(),
                     can_parallelize,
+                    location: SourceLocation {
+                        line: 1,
+                        column: None,
+                        end_line: None,
+                        end_column: None,
+                        confidence: LocationConfidence::Unavailable,
+                    },
                 });
 
                 // Reset for next potential violation

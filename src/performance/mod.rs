@@ -3,34 +3,71 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SourceLocation {
+    pub line: usize,
+    pub column: Option<usize>,
+    pub end_line: Option<usize>,
+    pub end_column: Option<usize>,
+    pub confidence: LocationConfidence,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum LocationConfidence {
+    Exact,       // Precise syn::Span information
+    Approximate, // Estimated from surrounding context
+    Unavailable, // No location information available
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PerformanceAntiPattern {
     NestedLoop {
         nesting_level: u32,
         estimated_complexity: ComplexityClass,
         inner_operations: Vec<LoopOperation>,
         can_parallelize: bool,
+        location: SourceLocation,
     },
     InefficientDataStructure {
         operation: DataStructureOperation,
         collection_type: String,
         recommended_alternative: String,
         performance_impact: PerformanceImpact,
+        location: SourceLocation,
     },
     ExcessiveAllocation {
         allocation_type: AllocationType,
         frequency: AllocationFrequency,
         suggested_optimization: String,
+        location: SourceLocation,
     },
     InefficientIO {
         io_pattern: IOPattern,
         batching_opportunity: bool,
         async_opportunity: bool,
+        location: SourceLocation,
     },
     StringProcessingAntiPattern {
         pattern_type: StringAntiPattern,
         performance_impact: PerformanceImpact,
         recommended_approach: String,
+        location: SourceLocation,
     },
+}
+
+impl PerformanceAntiPattern {
+    pub fn location(&self) -> &SourceLocation {
+        match self {
+            PerformanceAntiPattern::NestedLoop { location, .. } => location,
+            PerformanceAntiPattern::InefficientDataStructure { location, .. } => location,
+            PerformanceAntiPattern::ExcessiveAllocation { location, .. } => location,
+            PerformanceAntiPattern::InefficientIO { location, .. } => location,
+            PerformanceAntiPattern::StringProcessingAntiPattern { location, .. } => location,
+        }
+    }
+
+    pub fn primary_line(&self) -> usize {
+        self.location().line
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -111,12 +148,14 @@ pub trait PerformanceDetector {
 pub mod allocation_detector;
 pub mod data_structure_detector;
 pub mod io_detector;
+pub mod location_extractor;
 pub mod nested_loop_detector;
 pub mod string_detector;
 
 pub use allocation_detector::AllocationDetector;
 pub use data_structure_detector::DataStructureDetector;
 pub use io_detector::IOPerformanceDetector;
+pub use location_extractor::LocationExtractor;
 pub use nested_loop_detector::NestedLoopDetector;
 pub use string_detector::StringPerformanceDetector;
 
@@ -124,8 +163,9 @@ pub fn convert_performance_pattern_to_debt_item(
     pattern: PerformanceAntiPattern,
     impact: PerformanceImpact,
     path: &Path,
-    line: usize,
 ) -> DebtItem {
+    let location = pattern.location();
+    let line = location.line;
     let priority = match &pattern {
         PerformanceAntiPattern::NestedLoop {
             estimated_complexity,
@@ -144,9 +184,13 @@ pub fn convert_performance_pattern_to_debt_item(
         priority,
         file: path.to_path_buf(),
         line,
-        column: None,
+        column: location.column,
         message,
-        context: Some(recommendation),
+        context: Some(format!(
+            "{}
+Location confidence: {:?}",
+            recommendation, location.confidence
+        )),
     }
 }
 
@@ -253,6 +297,17 @@ mod tests {
     use crate::Priority;
     use std::path::PathBuf;
 
+    // Helper function to create a default SourceLocation for tests
+    fn default_location() -> SourceLocation {
+        SourceLocation {
+            line: 1,
+            column: None,
+            end_line: None,
+            end_column: None,
+            confidence: LocationConfidence::Unavailable,
+        }
+    }
+
     #[test]
     fn test_classify_nested_loop_priority() {
         assert_eq!(
@@ -298,6 +353,7 @@ mod tests {
             estimated_complexity: ComplexityClass::Cubic,
             can_parallelize: true,
             inner_operations: vec![LoopOperation::Computation],
+            location: default_location(),
         };
         let message = format_pattern_message(&pattern);
         assert_eq!(message, "Nested loop with 3 levels (Cubic complexity)");
@@ -310,6 +366,7 @@ mod tests {
             collection_type: "Vec".to_string(),
             recommended_alternative: "HashSet".to_string(),
             performance_impact: PerformanceImpact::High,
+            location: default_location(),
         };
         let message = format_pattern_message(&pattern);
         assert_eq!(
@@ -324,6 +381,7 @@ mod tests {
             allocation_type: AllocationType::StringConcatenation,
             frequency: AllocationFrequency::InLoop,
             suggested_optimization: "Use String::with_capacity()".to_string(),
+            location: default_location(),
         };
         let message = format_pattern_message(&pattern);
         assert_eq!(message, "StringConcatenation allocation InLoop");
@@ -335,6 +393,7 @@ mod tests {
             io_pattern: IOPattern::UnbufferedIO,
             batching_opportunity: true,
             async_opportunity: false,
+            location: default_location(),
         };
         let message = format_pattern_message(&pattern);
         assert_eq!(message, "Inefficient I/O pattern: UnbufferedIO");
@@ -346,6 +405,7 @@ mod tests {
             pattern_type: StringAntiPattern::ConcatenationInLoop,
             recommended_approach: "Use a String builder".to_string(),
             performance_impact: PerformanceImpact::Medium,
+            location: default_location(),
         };
         let message = format_pattern_message(&pattern);
         assert_eq!(
@@ -361,6 +421,7 @@ mod tests {
             estimated_complexity: ComplexityClass::Cubic,
             can_parallelize: true,
             inner_operations: vec![LoopOperation::Computation],
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(
@@ -376,6 +437,7 @@ mod tests {
             estimated_complexity: ComplexityClass::Quadratic,
             can_parallelize: false,
             inner_operations: vec![LoopOperation::CollectionIteration],
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(rec, "Consider algorithm optimization or caching");
@@ -388,6 +450,7 @@ mod tests {
             collection_type: "Vec".to_string(),
             recommended_alternative: "HashMap".to_string(),
             performance_impact: PerformanceImpact::High,
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(rec, "Consider using HashMap for better performance");
@@ -399,6 +462,7 @@ mod tests {
             allocation_type: AllocationType::TemporaryCollection,
             frequency: AllocationFrequency::InHotPath,
             suggested_optimization: "Pre-allocate with Vec::with_capacity()".to_string(),
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(rec, "Pre-allocate with Vec::with_capacity()");
@@ -410,6 +474,7 @@ mod tests {
             io_pattern: IOPattern::UnbufferedIO,
             batching_opportunity: true,
             async_opportunity: true,
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(rec, "Consider: batch operations, use async I/O");
@@ -421,6 +486,7 @@ mod tests {
             io_pattern: IOPattern::UnbufferedIO,
             batching_opportunity: true,
             async_opportunity: false,
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(rec, "Consider: batch operations");
@@ -432,6 +498,7 @@ mod tests {
             io_pattern: IOPattern::SyncInLoop,
             batching_opportunity: false,
             async_opportunity: true,
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(rec, "Consider: use async I/O");
@@ -443,6 +510,7 @@ mod tests {
             pattern_type: StringAntiPattern::InefficientParsing,
             recommended_approach: "Use a dedicated parser library".to_string(),
             performance_impact: PerformanceImpact::High,
+            location: default_location(),
         };
         let rec = generate_pattern_recommendation(&pattern);
         assert_eq!(rec, "Use a dedicated parser library");
@@ -455,14 +523,17 @@ mod tests {
             estimated_complexity: ComplexityClass::Exponential,
             can_parallelize: true,
             inner_operations: vec![LoopOperation::DatabaseQuery, LoopOperation::Computation],
+            location: SourceLocation {
+                line: 100,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            },
         };
         let path = PathBuf::from("src/test.rs");
-        let debt = convert_performance_pattern_to_debt_item(
-            pattern,
-            PerformanceImpact::Critical,
-            &path,
-            100,
-        );
+        let debt =
+            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Critical, &path);
 
         assert_eq!(debt.priority, Priority::Critical);
         assert_eq!(debt.debt_type, DebtType::Performance);
@@ -473,7 +544,7 @@ mod tests {
         assert_eq!(
             debt.context,
             Some(
-                "Consider algorithm optimization or caching (parallelization possible)".to_string()
+                "Consider algorithm optimization or caching (parallelization possible)\nLocation confidence: Unavailable".to_string()
             )
         );
         assert_eq!(debt.line, 100);
@@ -486,15 +557,25 @@ mod tests {
             io_pattern: IOPattern::UnbufferedIO,
             batching_opportunity: true,
             async_opportunity: false,
+            location: SourceLocation {
+                line: 50,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            },
         };
         let path = PathBuf::from("src/io.rs");
         let debt =
-            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Medium, &path, 50);
+            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Medium, &path);
 
         assert_eq!(debt.priority, Priority::High); // IO always gets High priority
         assert_eq!(debt.debt_type, DebtType::Performance);
         assert_eq!(debt.message, "Inefficient I/O pattern: UnbufferedIO");
-        assert_eq!(debt.context, Some("Consider: batch operations".to_string()));
+        assert_eq!(
+            debt.context,
+            Some("Consider: batch operations\nLocation confidence: Unavailable".to_string())
+        );
         assert_eq!(debt.line, 50);
     }
 
@@ -504,17 +585,25 @@ mod tests {
             allocation_type: AllocationType::StringConcatenation,
             frequency: AllocationFrequency::InLoop,
             suggested_optimization: "Use String::with_capacity()".to_string(),
+            location: SourceLocation {
+                line: 75,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            },
         };
         let path = PathBuf::from("src/alloc.rs");
         let debt =
-            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Medium, &path, 75);
+            convert_performance_pattern_to_debt_item(pattern, PerformanceImpact::Medium, &path);
 
         assert_eq!(debt.priority, Priority::Medium); // Uses impact_to_priority
         assert_eq!(debt.debt_type, DebtType::Performance);
         assert_eq!(debt.message, "StringConcatenation allocation InLoop");
         assert_eq!(
             debt.context,
-            Some("Use String::with_capacity()".to_string())
+            Some("Use String::with_capacity()\nLocation confidence: Unavailable".to_string())
         );
+        assert_eq!(debt.line, 75);
     }
 }
