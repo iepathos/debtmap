@@ -18,8 +18,8 @@ use crate::organization::{
     OrganizationAntiPattern, OrganizationDetector, ParameterAnalyzer, PrimitiveObsessionDetector,
 };
 use crate::performance::{
-    AllocationDetector, DataStructureDetector, IOPerformanceDetector, NestedLoopDetector,
-    PerformanceDetector, StringPerformanceDetector,
+    convert_performance_pattern_to_debt_item, AllocationDetector, DataStructureDetector, 
+    IOPerformanceDetector, NestedLoopDetector, PerformanceDetector, StringPerformanceDetector,
 };
 use crate::priority::call_graph::CallGraph;
 use crate::testing;
@@ -518,36 +518,27 @@ fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
 }
 
 fn analyze_performance_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
+    // Read source content for accurate line extraction
+    let source_content = std::fs::read_to_string(path).unwrap_or_default();
+    
     let detectors: Vec<Box<dyn PerformanceDetector>> = vec![
-        Box::new(NestedLoopDetector::new()),
-        Box::new(DataStructureDetector::new()),
-        Box::new(AllocationDetector::new()),
-        Box::new(IOPerformanceDetector::new()),
-        Box::new(StringPerformanceDetector::new()),
+        Box::new(NestedLoopDetector::with_source_content(&source_content)),
+        Box::new(DataStructureDetector::with_source_content(&source_content)),
+        Box::new(AllocationDetector::with_source_content(&source_content)),
+        Box::new(IOPerformanceDetector::with_source_content(&source_content)),
+        Box::new(StringPerformanceDetector::with_source_content(&source_content)),
     ];
 
-    let performance_items = Vec::new();
+    let mut performance_items = Vec::new();
 
     for detector in detectors {
         let anti_patterns = detector.detect_anti_patterns(file, path);
 
-        // Only process patterns that were actually found with valid locations
-        // Skip empty pattern lists to avoid false positives from placeholder line numbers
-        if anti_patterns.is_empty() {
-            continue;
-        }
-
-        for _pattern in anti_patterns {
-            // TODO: Extract actual line numbers from patterns instead of using placeholders
-            // For now, skip these patterns to prevent false positives
-            // Each detector should be updated to include line position information
-
-            // Until detectors provide actual line numbers, we skip processing
-            // to avoid the bug of assigning arbitrary line numbers to imports
-            eprintln!(
-                "Warning: Skipping performance pattern from {} - needs line number extraction",
-                detector.detector_name()
-            );
+        for pattern in anti_patterns {
+            let impact = detector.estimate_impact(&pattern);
+            // Now uses actual line numbers from pattern location
+            let debt_item = convert_performance_pattern_to_debt_item(pattern, impact, path);
+            performance_items.push(debt_item);
         }
     }
 

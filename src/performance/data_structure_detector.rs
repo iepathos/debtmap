@@ -1,15 +1,25 @@
 use super::{
-    DataStructureOperation, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact,
+    DataStructureOperation, LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, SourceLocation,
 };
 use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{Expr, ExprForLoop, ExprLoop, ExprMethodCall, ExprWhile, File};
 
-pub struct DataStructureDetector {}
+pub struct DataStructureDetector {
+    location_extractor: Option<LocationExtractor>,
+}
 
 impl DataStructureDetector {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            location_extractor: None,
+        }
+    }
+    
+    pub fn with_source_content(source_content: &str) -> Self {
+        Self {
+            location_extractor: Some(LocationExtractor::new(source_content)),
+        }
     }
 }
 
@@ -20,11 +30,26 @@ impl Default for DataStructureDetector {
 }
 
 impl PerformanceDetector for DataStructureDetector {
-    fn detect_anti_patterns(&self, file: &File, _path: &Path) -> Vec<PerformanceAntiPattern> {
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<PerformanceAntiPattern> {
+        // If no location extractor, try to read source file for location extraction
+        let temp_extractor;
+        let location_extractor = if let Some(ref extractor) = self.location_extractor {
+            Some(extractor)
+        } else {
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    temp_extractor = LocationExtractor::new(&content);
+                    Some(&temp_extractor)
+                }
+                Err(_) => None,
+            }
+        };
+            
         let mut visitor = DataStructureVisitor {
             patterns: Vec::new(),
             in_loop: false,
             loop_depth: 0,
+            location_extractor,
         };
 
         visitor.visit_file(file);
@@ -53,13 +78,28 @@ impl PerformanceDetector for DataStructureDetector {
     }
 }
 
-struct DataStructureVisitor {
+struct DataStructureVisitor<'a> {
     patterns: Vec<PerformanceAntiPattern>,
     in_loop: bool,
     loop_depth: usize,
+    location_extractor: Option<&'a LocationExtractor>,
 }
 
-impl DataStructureVisitor {
+impl<'a> DataStructureVisitor<'a> {
+    fn extract_location(&self, expr: &Expr) -> SourceLocation {
+        if let Some(extractor) = self.location_extractor {
+            extractor.extract_expr_location(expr)
+        } else {
+            // Fallback when no source content available
+            SourceLocation {
+                line: 1,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            }
+        }
+    }
     fn check_method_call(&mut self, method_call: &ExprMethodCall) {
         let method_name = method_call.method.to_string();
 
@@ -67,6 +107,7 @@ impl DataStructureVisitor {
         if self.in_loop && method_name == "contains" {
             if let Some(collection_type) = self.infer_collection_type(&method_call.receiver) {
                 if collection_type == "Vec" || collection_type == "slice" {
+                    let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
                     self.patterns
                         .push(PerformanceAntiPattern::InefficientDataStructure {
                             operation: DataStructureOperation::Contains,
@@ -78,6 +119,7 @@ impl DataStructureVisitor {
                             } else {
                                 PerformanceImpact::High
                             },
+                            location,
                         });
                 }
             }
@@ -88,6 +130,7 @@ impl DataStructureVisitor {
             && (method_name == "find" || method_name == "position")
             && self.is_preceded_by_iter(&method_call.receiver)
         {
+            let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
             self.patterns
                 .push(PerformanceAntiPattern::InefficientDataStructure {
                 operation: DataStructureOperation::LinearSearch,
@@ -96,6 +139,7 @@ impl DataStructureVisitor {
                     "Consider using HashMap for key-based lookups or BTreeMap for ordered access"
                         .to_string(),
                 performance_impact: PerformanceImpact::Medium,
+                location,
             });
         }
 
@@ -112,6 +156,7 @@ impl DataStructureVisitor {
                                 DataStructureOperation::FrequentDeletion
                             };
 
+                            let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
                             self.patterns
                                 .push(PerformanceAntiPattern::InefficientDataStructure {
                                     operation,
@@ -119,6 +164,7 @@ impl DataStructureVisitor {
                                     recommended_alternative: "VecDeque for O(1) front operations"
                                         .to_string(),
                                     performance_impact: PerformanceImpact::High,
+                                    location,
                                 });
                         }
                     }
@@ -187,7 +233,7 @@ impl DataStructureVisitor {
     }
 }
 
-impl<'ast> Visit<'ast> for DataStructureVisitor {
+impl<'ast, 'a> Visit<'ast> for DataStructureVisitor<'a> {
     fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
         let was_in_loop = self.in_loop;
         self.in_loop = true;

@@ -1,16 +1,26 @@
 use super::{
-    AllocationFrequency, AllocationType, PerformanceAntiPattern, PerformanceDetector,
-    PerformanceImpact,
+    AllocationFrequency, AllocationType, LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector,
+    PerformanceImpact, SourceLocation,
 };
 use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{BinOp, Expr, ExprBinary, ExprForLoop, ExprLoop, ExprMethodCall, ExprWhile, File};
 
-pub struct AllocationDetector {}
+pub struct AllocationDetector {
+    location_extractor: Option<LocationExtractor>,
+}
 
 impl AllocationDetector {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            location_extractor: None,
+        }
+    }
+    
+    pub fn with_source_content(source_content: &str) -> Self {
+        Self {
+            location_extractor: Some(LocationExtractor::new(source_content)),
+        }
     }
 }
 
@@ -21,12 +31,27 @@ impl Default for AllocationDetector {
 }
 
 impl PerformanceDetector for AllocationDetector {
-    fn detect_anti_patterns(&self, file: &File, _path: &Path) -> Vec<PerformanceAntiPattern> {
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<PerformanceAntiPattern> {
+        // If no location extractor, try to read source file for location extraction
+        let temp_extractor;
+        let location_extractor = if let Some(ref extractor) = self.location_extractor {
+            Some(extractor)
+        } else {
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    temp_extractor = LocationExtractor::new(&content);
+                    Some(&temp_extractor)
+                }
+                Err(_) => None,
+            }
+        };
+            
         let mut visitor = AllocationVisitor {
             patterns: Vec::new(),
             in_loop: false,
             loop_depth: 0,
             in_recursive_fn: false,
+            location_extractor,
         };
 
         visitor.visit_file(file);
@@ -63,14 +88,29 @@ impl PerformanceDetector for AllocationDetector {
     }
 }
 
-struct AllocationVisitor {
+struct AllocationVisitor<'a> {
     patterns: Vec<PerformanceAntiPattern>,
     in_loop: bool,
     loop_depth: usize,
     in_recursive_fn: bool,
+    location_extractor: Option<&'a LocationExtractor>,
 }
 
-impl AllocationVisitor {
+impl<'a> AllocationVisitor<'a> {
+    fn extract_location(&self, expr: &Expr) -> SourceLocation {
+        if let Some(extractor) = self.location_extractor {
+            extractor.extract_expr_location(expr)
+        } else {
+            // Fallback when no source content available
+            SourceLocation {
+                line: 1,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            }
+        }
+    }
     fn check_clone(&mut self, method_call: &ExprMethodCall) {
         if method_call.method == "clone" || method_call.method == "to_owned" {
             let frequency = if self.in_loop {
@@ -90,17 +130,20 @@ impl AllocationVisitor {
                     "Consider borrowing instead of cloning"
                 };
 
+                let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
                 self.patterns
                     .push(PerformanceAntiPattern::ExcessiveAllocation {
                         allocation_type: AllocationType::Clone,
                         frequency,
                         suggested_optimization: suggestion.to_string(),
+                        location,
                     });
             }
         }
 
         // Check for collect() which allocates
         if method_call.method == "collect" && self.in_loop {
+            let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
             self.patterns
                 .push(PerformanceAntiPattern::ExcessiveAllocation {
                     allocation_type: AllocationType::TemporaryCollection,
@@ -108,17 +151,20 @@ impl AllocationVisitor {
                     suggested_optimization:
                         "Consider using iterators directly or pre-allocating collections"
                             .to_string(),
+                    location,
                 });
         }
 
         // Check for to_string() in loops
         if (method_call.method == "to_string" || method_call.method == "to_owned") && self.in_loop {
+            let location = self.extract_location(&Expr::MethodCall(method_call.clone()));
             self.patterns
                 .push(PerformanceAntiPattern::ExcessiveAllocation {
                     allocation_type: AllocationType::StringConcatenation,
                     frequency: AllocationFrequency::InLoop,
                     suggested_optimization: "Consider using &str or String::with_capacity()"
                         .to_string(),
+                    location,
                 });
         }
     }
@@ -127,6 +173,7 @@ impl AllocationVisitor {
         if matches!(binary.op, BinOp::Add(_)) && self.in_loop {
             // Check if either operand looks like a string
             if self.looks_like_string(&binary.left) || self.looks_like_string(&binary.right) {
+                let location = self.extract_location(&Expr::Binary(binary.clone()));
                 self.patterns
                     .push(PerformanceAntiPattern::ExcessiveAllocation {
                         allocation_type: AllocationType::StringConcatenation,
@@ -134,6 +181,7 @@ impl AllocationVisitor {
                         suggested_optimization:
                             "Use String::with_capacity() and push_str() instead of + operator"
                                 .to_string(),
+                        location,
                     });
             }
         }
@@ -174,6 +222,7 @@ impl AllocationVisitor {
                         .join("::");
 
                     if path_str.contains("Vec::new") || path_str.contains("HashMap::new") {
+                        let location = self.extract_location(expr);
                         self.patterns
                             .push(PerformanceAntiPattern::ExcessiveAllocation {
                             allocation_type: AllocationType::TemporaryCollection,
@@ -181,6 +230,7 @@ impl AllocationVisitor {
                             suggested_optimization:
                                 "Pre-allocate collections outside the loop or use with_capacity()"
                                     .to_string(),
+                            location,
                         });
                     }
                 }
@@ -191,12 +241,14 @@ impl AllocationVisitor {
                 if mac.mac.path.segments.last().map(|s| s.ident.to_string())
                     == Some("vec".to_string())
                 {
+                    let location = self.extract_location(expr);
                     self.patterns
                         .push(PerformanceAntiPattern::ExcessiveAllocation {
                             allocation_type: AllocationType::TemporaryCollection,
                             frequency: AllocationFrequency::InLoop,
                             suggested_optimization:
                                 "Pre-allocate Vec outside the loop and clear/reuse it".to_string(),
+                            location,
                         });
                 }
             }
@@ -215,12 +267,14 @@ impl AllocationVisitor {
                     .join("::");
 
                 if path_str.contains("Box::new") && self.in_loop {
+                    let location = self.extract_location(expr);
                     self.patterns
                         .push(PerformanceAntiPattern::ExcessiveAllocation {
                             allocation_type: AllocationType::RepeatedBoxing,
                             frequency: AllocationFrequency::InLoop,
                             suggested_optimization:
                                 "Consider object pooling or pre-allocation strategies".to_string(),
+                            location,
                         });
                 }
             }
@@ -228,7 +282,7 @@ impl AllocationVisitor {
     }
 }
 
-impl<'ast> Visit<'ast> for AllocationVisitor {
+impl<'ast, 'a> Visit<'ast> for AllocationVisitor<'a> {
     fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
         let was_in_loop = self.in_loop;
         self.in_loop = true;

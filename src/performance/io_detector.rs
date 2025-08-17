@@ -1,13 +1,23 @@
-use super::{IOPattern, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact};
+use super::{IOPattern, LocationConfidence, LocationExtractor, PerformanceAntiPattern, PerformanceDetector, PerformanceImpact, SourceLocation};
 use std::path::Path;
 use syn::visit::{self, Visit};
 use syn::{Expr, ExprCall, ExprForLoop, ExprLoop, ExprWhile, File};
 
-pub struct IOPerformanceDetector {}
+pub struct IOPerformanceDetector {
+    location_extractor: Option<LocationExtractor>,
+}
 
 impl IOPerformanceDetector {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            location_extractor: None,
+        }
+    }
+    
+    pub fn with_source_content(source_content: &str) -> Self {
+        Self {
+            location_extractor: Some(LocationExtractor::new(source_content)),
+        }
     }
 }
 
@@ -18,11 +28,26 @@ impl Default for IOPerformanceDetector {
 }
 
 impl PerformanceDetector for IOPerformanceDetector {
-    fn detect_anti_patterns(&self, file: &File, _path: &Path) -> Vec<PerformanceAntiPattern> {
+    fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<PerformanceAntiPattern> {
+        // If no location extractor, try to read source file for location extraction
+        let temp_extractor;
+        let location_extractor = if let Some(ref extractor) = self.location_extractor {
+            Some(extractor)
+        } else {
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    temp_extractor = LocationExtractor::new(&content);
+                    Some(&temp_extractor)
+                }
+                Err(_) => None,
+            }
+        };
+            
         let mut visitor = IOVisitor {
             patterns: Vec::new(),
             in_loop: false,
             loop_depth: 0,
+            location_extractor,
         };
 
         visitor.visit_file(file);
@@ -46,17 +71,20 @@ impl PerformanceDetector for IOPerformanceDetector {
     }
 }
 
-struct IOVisitor {
+struct IOVisitor<'a> {
     patterns: Vec<PerformanceAntiPattern>,
     in_loop: bool,
     loop_depth: usize,
+    location_extractor: Option<&'a LocationExtractor>,
 }
 
-impl IOVisitor {
+impl<'a> IOVisitor<'a> {
     fn check_io_operation(&mut self, expr: &Expr) {
         if !self.in_loop {
             return;
         }
+
+        let location = self.extract_location(expr);
 
         // Check for file I/O operations
         if let Expr::Call(call) = expr {
@@ -74,18 +102,21 @@ impl IOVisitor {
                         io_pattern: IOPattern::SyncInLoop,
                         batching_opportunity: true,
                         async_opportunity: true,
+                        location: location.clone(),
                     });
                 } else if self.is_database_operation(&path_str) {
                     self.patterns.push(PerformanceAntiPattern::InefficientIO {
                         io_pattern: IOPattern::UnbatchedQueries,
                         batching_opportunity: true,
                         async_opportunity: true,
+                        location: location.clone(),
                     });
                 } else if self.is_network_operation(&path_str) {
                     self.patterns.push(PerformanceAntiPattern::InefficientIO {
                         io_pattern: IOPattern::SyncInLoop,
                         batching_opportunity: false,
                         async_opportunity: true,
+                        location: location.clone(),
                     });
                 }
             }
@@ -107,6 +138,7 @@ impl IOVisitor {
                     io_pattern,
                     batching_opportunity: can_batch,
                     async_opportunity: true,
+                    location: location.clone(),
                 });
             }
         }
@@ -154,6 +186,21 @@ impl IOVisitor {
             || method == "send"
             || method == "recv"
     }
+    
+    fn extract_location(&self, expr: &Expr) -> SourceLocation {
+        if let Some(extractor) = self.location_extractor {
+            extractor.extract_expr_location(expr)
+        } else {
+            // Fallback when no source content available
+            SourceLocation {
+                line: 1,
+                column: None,
+                end_line: None,
+                end_column: None,
+                confidence: LocationConfidence::Unavailable,
+            }
+        }
+    }
 
     fn check_unbuffered_io(&mut self, call: &ExprCall) {
         if let Expr::Path(path) = &*call.func {
@@ -167,19 +214,22 @@ impl IOVisitor {
 
             // Check for direct file operations without buffering
             if path_str.contains("File::open") || path_str.contains("File::create") {
+                let location = self.extract_location(&Expr::Call(call.clone()));
+                
                 // Check if it's being wrapped in a BufReader/BufWriter
                 // This is simplified - real implementation would track usage
                 self.patterns.push(PerformanceAntiPattern::InefficientIO {
                     io_pattern: IOPattern::UnbufferedIO,
                     batching_opportunity: false,
                     async_opportunity: false,
+                    location,
                 });
             }
         }
     }
 }
 
-impl<'ast> Visit<'ast> for IOVisitor {
+impl<'ast, 'a> Visit<'ast> for IOVisitor<'a> {
     fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
         let was_in_loop = self.in_loop;
         self.in_loop = true;
