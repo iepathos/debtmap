@@ -40,60 +40,60 @@ pub enum PerformanceAntiPattern {
 }
 
 impl PerformanceAntiPattern {
-    pub fn to_debt_item(&self, path: &Path) -> DebtItem {
-        let (message, priority) = match self {
+    fn generate_message(&self) -> String {
+        match self {
             Self::SequentialAsync {
                 count, suggestion, ..
-            } => (
-                format!(
-                    "Sequential async operations ({} awaits) - {}",
-                    count, suggestion
-                ),
-                Priority::Medium,
+            } => format!(
+                "Sequential async operations ({} awaits) - {}",
+                count, suggestion
             ),
-            Self::MissingPromiseAll { awaits, .. } => (
-                format!("{} sequential awaits could use Promise.all()", awaits),
-                Priority::Medium,
-            ),
+            Self::MissingPromiseAll { awaits, .. } => {
+                format!("{} sequential awaits could use Promise.all()", awaits)
+            }
             Self::DOMThrashing {
                 operations,
                 suggestion,
                 ..
-            } => (
-                format!(
-                    "DOM layout thrashing detected ({} operations) - {}",
-                    operations, suggestion
-                ),
-                Priority::High,
+            } => format!(
+                "DOM layout thrashing detected ({} operations) - {}",
+                operations, suggestion
             ),
-            Self::NestedLoops { depth, .. } => (
-                format!("Deeply nested loops (depth: {})", depth),
+            Self::NestedLoops { depth, .. } => format!("Deeply nested loops (depth: {})", depth),
+            Self::RepeatedDOMQueries {
+                selector, count, ..
+            } => format!(
+                "DOM selector '{}' queried {} times - consider caching",
+                selector, count
+            ),
+            Self::SynchronousXHR { .. } => {
+                "Synchronous XMLHttpRequest blocks the main thread".to_string()
+            }
+            Self::LargeImport { module, .. } => {
+                format!("Large library import '{}' - consider tree-shaking", module)
+            }
+        }
+    }
+
+    fn determine_priority(&self) -> Priority {
+        match self {
+            Self::SequentialAsync { .. } | Self::MissingPromiseAll { .. } => Priority::Medium,
+            Self::DOMThrashing { .. } => Priority::High,
+            Self::NestedLoops { depth, .. } => {
                 if *depth > 3 {
                     Priority::High
                 } else {
                     Priority::Medium
-                },
-            ),
-            Self::RepeatedDOMQueries {
-                selector, count, ..
-            } => (
-                format!(
-                    "DOM selector '{}' queried {} times - consider caching",
-                    selector, count
-                ),
-                Priority::Medium,
-            ),
-            Self::SynchronousXHR { .. } => (
-                "Synchronous XMLHttpRequest blocks the main thread".to_string(),
-                Priority::Critical,
-            ),
-            Self::LargeImport { module, .. } => (
-                format!("Large library import '{}' - consider tree-shaking", module),
-                Priority::Low,
-            ),
-        };
+                }
+            }
+            Self::RepeatedDOMQueries { .. } => Priority::Medium,
+            Self::SynchronousXHR { .. } => Priority::Critical,
+            Self::LargeImport { .. } => Priority::Low,
+        }
+    }
 
-        let location = match self {
+    fn get_location(&self) -> &SourceLocation {
+        match self {
             Self::SequentialAsync { location, .. }
             | Self::MissingPromiseAll { location, .. }
             | Self::DOMThrashing { location, .. }
@@ -101,7 +101,13 @@ impl PerformanceAntiPattern {
             | Self::RepeatedDOMQueries { location, .. }
             | Self::SynchronousXHR { location }
             | Self::LargeImport { location, .. } => location,
-        };
+        }
+    }
+
+    pub fn to_debt_item(&self, path: &Path) -> DebtItem {
+        let message = self.generate_message();
+        let priority = self.determine_priority();
+        let location = self.get_location();
 
         DebtItem {
             id: format!("perf-{}-{}", path.display(), location.line),
@@ -421,5 +427,283 @@ fn detect_synchronous_xhr(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{DebtType, Priority};
+    use std::path::PathBuf;
+
+    fn create_test_location() -> SourceLocation {
+        SourceLocation {
+            line: 42,
+            column: Some(10),
+            end_line: None,
+            end_column: None,
+        }
+    }
+
+    #[test]
+    fn test_generate_message_sequential_async() {
+        let pattern = PerformanceAntiPattern::SequentialAsync {
+            location: create_test_location(),
+            count: 5,
+            suggestion: "Consider using Promise.all()".to_string(),
+        };
+        assert_eq!(
+            pattern.generate_message(),
+            "Sequential async operations (5 awaits) - Consider using Promise.all()"
+        );
+    }
+
+    #[test]
+    fn test_generate_message_missing_promise_all() {
+        let pattern = PerformanceAntiPattern::MissingPromiseAll {
+            location: create_test_location(),
+            awaits: 3,
+        };
+        assert_eq!(
+            pattern.generate_message(),
+            "3 sequential awaits could use Promise.all()"
+        );
+    }
+
+    #[test]
+    fn test_generate_message_dom_thrashing() {
+        let pattern = PerformanceAntiPattern::DOMThrashing {
+            location: create_test_location(),
+            operations: 10,
+            suggestion: "Batch DOM operations".to_string(),
+        };
+        assert_eq!(
+            pattern.generate_message(),
+            "DOM layout thrashing detected (10 operations) - Batch DOM operations"
+        );
+    }
+
+    #[test]
+    fn test_generate_message_nested_loops() {
+        let pattern = PerformanceAntiPattern::NestedLoops {
+            location: create_test_location(),
+            depth: 4,
+        };
+        assert_eq!(pattern.generate_message(), "Deeply nested loops (depth: 4)");
+    }
+
+    #[test]
+    fn test_generate_message_repeated_dom_queries() {
+        let pattern = PerformanceAntiPattern::RepeatedDOMQueries {
+            location: create_test_location(),
+            selector: ".my-class".to_string(),
+            count: 7,
+        };
+        assert_eq!(
+            pattern.generate_message(),
+            "DOM selector '.my-class' queried 7 times - consider caching"
+        );
+    }
+
+    #[test]
+    fn test_generate_message_synchronous_xhr() {
+        let pattern = PerformanceAntiPattern::SynchronousXHR {
+            location: create_test_location(),
+        };
+        assert_eq!(
+            pattern.generate_message(),
+            "Synchronous XMLHttpRequest blocks the main thread"
+        );
+    }
+
+    #[test]
+    fn test_generate_message_large_import() {
+        let pattern = PerformanceAntiPattern::LargeImport {
+            location: create_test_location(),
+            module: "lodash".to_string(),
+        };
+        assert_eq!(
+            pattern.generate_message(),
+            "Large library import 'lodash' - consider tree-shaking"
+        );
+    }
+
+    #[test]
+    fn test_determine_priority_sequential_async() {
+        let pattern = PerformanceAntiPattern::SequentialAsync {
+            location: create_test_location(),
+            count: 5,
+            suggestion: "test".to_string(),
+        };
+        assert_eq!(pattern.determine_priority(), Priority::Medium);
+    }
+
+    #[test]
+    fn test_determine_priority_missing_promise_all() {
+        let pattern = PerformanceAntiPattern::MissingPromiseAll {
+            location: create_test_location(),
+            awaits: 3,
+        };
+        assert_eq!(pattern.determine_priority(), Priority::Medium);
+    }
+
+    #[test]
+    fn test_determine_priority_dom_thrashing() {
+        let pattern = PerformanceAntiPattern::DOMThrashing {
+            location: create_test_location(),
+            operations: 10,
+            suggestion: "test".to_string(),
+        };
+        assert_eq!(pattern.determine_priority(), Priority::High);
+    }
+
+    #[test]
+    fn test_determine_priority_nested_loops_shallow() {
+        let pattern = PerformanceAntiPattern::NestedLoops {
+            location: create_test_location(),
+            depth: 3,
+        };
+        assert_eq!(pattern.determine_priority(), Priority::Medium);
+    }
+
+    #[test]
+    fn test_determine_priority_nested_loops_deep() {
+        let pattern = PerformanceAntiPattern::NestedLoops {
+            location: create_test_location(),
+            depth: 5,
+        };
+        assert_eq!(pattern.determine_priority(), Priority::High);
+    }
+
+    #[test]
+    fn test_determine_priority_repeated_dom_queries() {
+        let pattern = PerformanceAntiPattern::RepeatedDOMQueries {
+            location: create_test_location(),
+            selector: "test".to_string(),
+            count: 5,
+        };
+        assert_eq!(pattern.determine_priority(), Priority::Medium);
+    }
+
+    #[test]
+    fn test_determine_priority_synchronous_xhr() {
+        let pattern = PerformanceAntiPattern::SynchronousXHR {
+            location: create_test_location(),
+        };
+        assert_eq!(pattern.determine_priority(), Priority::Critical);
+    }
+
+    #[test]
+    fn test_determine_priority_large_import() {
+        let pattern = PerformanceAntiPattern::LargeImport {
+            location: create_test_location(),
+            module: "test".to_string(),
+        };
+        assert_eq!(pattern.determine_priority(), Priority::Low);
+    }
+
+    #[test]
+    fn test_get_location_all_variants() {
+        let location = create_test_location();
+
+        let patterns = vec![
+            PerformanceAntiPattern::SequentialAsync {
+                location: location.clone(),
+                count: 1,
+                suggestion: "test".to_string(),
+            },
+            PerformanceAntiPattern::MissingPromiseAll {
+                location: location.clone(),
+                awaits: 1,
+            },
+            PerformanceAntiPattern::DOMThrashing {
+                location: location.clone(),
+                operations: 1,
+                suggestion: "test".to_string(),
+            },
+            PerformanceAntiPattern::NestedLoops {
+                location: location.clone(),
+                depth: 1,
+            },
+            PerformanceAntiPattern::RepeatedDOMQueries {
+                location: location.clone(),
+                selector: "test".to_string(),
+                count: 1,
+            },
+            PerformanceAntiPattern::SynchronousXHR {
+                location: location.clone(),
+            },
+            PerformanceAntiPattern::LargeImport {
+                location: location.clone(),
+                module: "test".to_string(),
+            },
+        ];
+
+        for pattern in patterns {
+            let retrieved_location = pattern.get_location();
+            assert_eq!(retrieved_location.line, 42);
+            assert_eq!(retrieved_location.column, Some(10));
+        }
+    }
+
+    #[test]
+    fn test_to_debt_item_integration() {
+        let pattern = PerformanceAntiPattern::DOMThrashing {
+            location: SourceLocation {
+                line: 100,
+                column: Some(20),
+                end_line: None,
+                end_column: None,
+            },
+            operations: 15,
+            suggestion: "Batch DOM operations".to_string(),
+        };
+
+        let path = PathBuf::from("test.js");
+        let debt_item = pattern.to_debt_item(&path);
+
+        assert_eq!(debt_item.id, "perf-test.js-100");
+        assert_eq!(debt_item.debt_type, DebtType::Performance);
+        assert_eq!(debt_item.priority, Priority::High);
+        assert_eq!(debt_item.file, path);
+        assert_eq!(debt_item.line, 100);
+        assert_eq!(debt_item.column, Some(20));
+        assert_eq!(
+            debt_item.message,
+            "DOM layout thrashing detected (15 operations) - Batch DOM operations"
+        );
+        assert_eq!(debt_item.context, None);
+    }
+
+    #[test]
+    fn test_to_debt_item_nested_loops_edge_case() {
+        // Test the edge case where depth is exactly 3 (should be Medium)
+        let pattern_medium = PerformanceAntiPattern::NestedLoops {
+            location: SourceLocation {
+                line: 50,
+                column: Some(5),
+                end_line: None,
+                end_column: None,
+            },
+            depth: 3,
+        };
+
+        let path = PathBuf::from("loops.js");
+        let debt_item = pattern_medium.to_debt_item(&path);
+        assert_eq!(debt_item.priority, Priority::Medium);
+
+        // Test when depth is 4 (should be High)
+        let pattern_high = PerformanceAntiPattern::NestedLoops {
+            location: SourceLocation {
+                line: 60,
+                column: Some(5),
+                end_line: None,
+                end_column: None,
+            },
+            depth: 4,
+        };
+
+        let debt_item_high = pattern_high.to_debt_item(&path);
+        assert_eq!(debt_item_high.priority, Priority::High);
     }
 }
