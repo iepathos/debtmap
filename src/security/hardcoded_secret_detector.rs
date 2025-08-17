@@ -1,3 +1,4 @@
+// debtmap:ignore-start -- This file contains test patterns for security detection, not real secrets
 use crate::core::{DebtItem, DebtType, Priority};
 use regex::Regex;
 use std::path::Path;
@@ -135,3 +136,4 @@ fn calculate_shannon_entropy(s: &str) -> f64 {
         })
         .sum()
 }
+// debtmap:ignore-end

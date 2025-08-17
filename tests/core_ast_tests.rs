@@ -1,3 +1,4 @@
+// debtmap:ignore-start -- This file contains test code with function names that trigger crypto detection
 use debtmap::core::ast::{
     combine_asts, filter_ast, Ast, AstNode, JavaScriptAst, NodeKind, RustAst, TypeScriptAst,
 };
@@ -321,3 +322,4 @@ fn test_ast_node_structure() {
     assert_eq!(node.children.len(), 1);
     assert_eq!(node.children[0].kind, NodeKind::If);
 }
+// debtmap:ignore-end

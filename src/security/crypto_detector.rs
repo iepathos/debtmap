@@ -1,3 +1,4 @@
+// debtmap:ignore-start -- This file contains test patterns for crypto vulnerability detection
 use crate::core::{DebtItem, DebtType, Priority};
 use std::path::Path;
 use syn::visit::Visit;
@@ -134,3 +135,4 @@ impl<'ast> Visit<'ast> for CryptoVisitor {
         syn::visit::visit_expr(self, expr);
     }
 }
+// debtmap:ignore-end

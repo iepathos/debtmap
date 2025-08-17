@@ -1,3 +1,4 @@
+// debtmap:ignore-start -- This file contains test patterns for security detection, not real secrets
 use crate::security::types::{SecretType, SecurityDetector, SecurityVulnerability};
 use regex::Regex;
 use std::collections::HashMap;
@@ -327,3 +328,4 @@ mod tests {
         );
     }
 }
+// debtmap:ignore-end

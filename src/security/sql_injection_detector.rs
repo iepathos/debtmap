@@ -1,3 +1,4 @@
+// debtmap:ignore-start -- This file contains test patterns for SQL injection detection
 use crate::core::{DebtItem, DebtType, Priority};
 use std::path::Path;
 use syn::visit::Visit;
@@ -105,3 +106,4 @@ impl<'ast> Visit<'ast> for SqlInjectionVisitor {
         syn::visit::visit_expr(self, expr);
     }
 }
+// debtmap:ignore-end
