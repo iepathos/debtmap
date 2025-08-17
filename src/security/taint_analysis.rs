@@ -369,22 +369,36 @@ impl<'a> TaintGraphBuilder<'a> {
         }
     }
 
-    fn detect_sink(&self, method_name: &str) -> Option<SinkOperation> {
-        if method_name.contains("query")
+    fn is_sql_sink(method_name: &str) -> bool {
+        method_name.contains("query")
             || method_name.contains("execute")
             || method_name.contains("sql")
-        {
-            Some(SinkOperation::SqlQuery)
-        } else if method_name.contains("Command") || method_name.contains("system") {
-            Some(SinkOperation::ProcessExecution)
-        } else if method_name.contains("File") || method_name.contains("write") {
-            Some(SinkOperation::FileSystem)
-        } else if method_name.contains("request") || method_name.contains("http") {
-            Some(SinkOperation::NetworkRequest)
-        } else if method_name.contains("deserialize") || method_name.contains("from_") {
-            Some(SinkOperation::Deserialization)
-        } else {
-            None
+    }
+
+    fn is_process_sink(method_name: &str) -> bool {
+        method_name.contains("Command") || method_name.contains("system")
+    }
+
+    fn is_file_sink(method_name: &str) -> bool {
+        method_name.contains("File") || method_name.contains("write")
+    }
+
+    fn is_network_sink(method_name: &str) -> bool {
+        method_name.contains("request") || method_name.contains("http")
+    }
+
+    fn is_deserialization_sink(method_name: &str) -> bool {
+        method_name.contains("deserialize") || method_name.contains("from_")
+    }
+
+    fn detect_sink(&self, method_name: &str) -> Option<SinkOperation> {
+        match () {
+            _ if Self::is_sql_sink(method_name) => Some(SinkOperation::SqlQuery),
+            _ if Self::is_process_sink(method_name) => Some(SinkOperation::ProcessExecution),
+            _ if Self::is_file_sink(method_name) => Some(SinkOperation::FileSystem),
+            _ if Self::is_network_sink(method_name) => Some(SinkOperation::NetworkRequest),
+            _ if Self::is_deserialization_sink(method_name) => Some(SinkOperation::Deserialization),
+            _ => None,
         }
     }
 
@@ -434,5 +448,109 @@ mod tests {
         };
 
         assert_eq!(analyzer.assess_path_severity(&path2), Severity::Medium);
+    }
+
+    #[test]
+    fn test_is_sql_sink() {
+        assert!(TaintGraphBuilder::is_sql_sink("execute_query"));
+        assert!(TaintGraphBuilder::is_sql_sink("run_sql"));
+        assert!(TaintGraphBuilder::is_sql_sink("query_database"));
+        assert!(TaintGraphBuilder::is_sql_sink("execute"));
+        assert!(!TaintGraphBuilder::is_sql_sink("read_file"));
+        assert!(!TaintGraphBuilder::is_sql_sink("send_request"));
+    }
+
+    #[test]
+    fn test_is_process_sink() {
+        assert!(TaintGraphBuilder::is_process_sink("Command::new"));
+        assert!(TaintGraphBuilder::is_process_sink("system_call"));
+        assert!(TaintGraphBuilder::is_process_sink("run_system"));
+        assert!(!TaintGraphBuilder::is_process_sink("query_database"));
+        assert!(!TaintGraphBuilder::is_process_sink("write_file"));
+    }
+
+    #[test]
+    fn test_is_file_sink() {
+        assert!(TaintGraphBuilder::is_file_sink("File::create"));
+        assert!(TaintGraphBuilder::is_file_sink("write_to_disk"));
+        assert!(TaintGraphBuilder::is_file_sink("File::open"));
+        assert!(TaintGraphBuilder::is_file_sink("write_bytes"));
+        assert!(!TaintGraphBuilder::is_file_sink("execute_query"));
+        assert!(!TaintGraphBuilder::is_file_sink("send_request"));
+    }
+
+    #[test]
+    fn test_is_network_sink() {
+        assert!(TaintGraphBuilder::is_network_sink("send_request"));
+        assert!(TaintGraphBuilder::is_network_sink("http_post"));
+        assert!(TaintGraphBuilder::is_network_sink("make_http_call"));
+        assert!(TaintGraphBuilder::is_network_sink("request_api"));
+        assert!(!TaintGraphBuilder::is_network_sink("write_file"));
+        assert!(!TaintGraphBuilder::is_network_sink("execute_query"));
+    }
+
+    #[test]
+    fn test_is_deserialization_sink() {
+        assert!(TaintGraphBuilder::is_deserialization_sink(
+            "deserialize_json"
+        ));
+        assert!(TaintGraphBuilder::is_deserialization_sink("from_str"));
+        assert!(TaintGraphBuilder::is_deserialization_sink("from_bytes"));
+        assert!(TaintGraphBuilder::is_deserialization_sink(
+            "parse_from_string"
+        ));
+        assert!(!TaintGraphBuilder::is_deserialization_sink("write_file"));
+        assert!(!TaintGraphBuilder::is_deserialization_sink("execute_query"));
+    }
+
+    #[test]
+    fn test_detect_sink_integration() {
+        let mut analyzer = TaintAnalyzer::new();
+        let builder = TaintGraphBuilder {
+            analyzer: &mut analyzer,
+            current_file: PathBuf::from("test.rs"),
+            variable_taints: std::collections::HashMap::new(),
+        };
+
+        assert_eq!(
+            builder.detect_sink("execute_query"),
+            Some(SinkOperation::SqlQuery)
+        );
+        assert_eq!(
+            builder.detect_sink("Command::new"),
+            Some(SinkOperation::ProcessExecution)
+        );
+        assert_eq!(
+            builder.detect_sink("File::write"),
+            Some(SinkOperation::FileSystem)
+        );
+        assert_eq!(
+            builder.detect_sink("send_http_request"),
+            Some(SinkOperation::NetworkRequest)
+        );
+        assert_eq!(
+            builder.detect_sink("deserialize_input"),
+            Some(SinkOperation::Deserialization)
+        );
+        assert_eq!(builder.detect_sink("regular_function"), None);
+    }
+
+    #[test]
+    fn test_detect_sink_edge_cases() {
+        let mut analyzer = TaintAnalyzer::new();
+        let builder = TaintGraphBuilder {
+            analyzer: &mut analyzer,
+            current_file: PathBuf::from("test.rs"),
+            variable_taints: std::collections::HashMap::new(),
+        };
+
+        assert_eq!(builder.detect_sink(""), None);
+        assert_eq!(builder.detect_sink("random_method"), None);
+        assert_eq!(builder.detect_sink("query"), Some(SinkOperation::SqlQuery));
+        assert_eq!(
+            builder.detect_sink("execute"),
+            Some(SinkOperation::SqlQuery)
+        );
+        assert_eq!(builder.detect_sink("File"), Some(SinkOperation::FileSystem));
     }
 }
