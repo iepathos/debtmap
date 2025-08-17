@@ -411,8 +411,21 @@ pub fn load_config() -> DebtmapConfig {
         }
     };
 
+    // Limit directory traversal to prevent excessive I/O
+    const MAX_TRAVERSAL_DEPTH: usize = 10;
     let mut dir = current;
+    let mut depth = 0;
+
     loop {
+        // Check traversal limit
+        if depth >= MAX_TRAVERSAL_DEPTH {
+            log::debug!(
+                "Reached maximum directory traversal depth ({}). Using default config.",
+                MAX_TRAVERSAL_DEPTH
+            );
+            return DebtmapConfig::default();
+        }
+
         let config_path = dir.join(".debtmap.toml");
         if config_path.exists() {
             match fs::read_to_string(&config_path) {
@@ -431,6 +444,7 @@ pub fn load_config() -> DebtmapConfig {
                                     scoring.normalize(); // Ensure exact sum of 1.0
                                 }
                             }
+                            log::debug!("Loaded config from {}", config_path.display());
                             return config;
                         }
                         Err(e) => {
@@ -456,6 +470,7 @@ pub fn load_config() -> DebtmapConfig {
         if !dir.pop() {
             break;
         }
+        depth += 1;
     }
 
     // Default configuration
