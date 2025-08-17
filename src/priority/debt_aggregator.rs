@@ -82,27 +82,27 @@ pub fn categorize_debt_type(debt_type: &DebtType) -> DebtCategory {
     match debt_type {
         // Security issues
         DebtType::Security => DebtCategory::Security,
-        
+
         // Performance issues
         DebtType::Performance => DebtCategory::Performance,
         DebtType::Complexity => DebtCategory::Performance,
-        
+
         // Organization issues
         DebtType::Todo | DebtType::Fixme => DebtCategory::Organization,
         DebtType::CodeOrganization => DebtCategory::Organization,
         DebtType::CodeSmell => DebtCategory::Organization,
         DebtType::Dependency => DebtCategory::Organization,
-        
+
         // Testing issues
         DebtType::TestComplexity | DebtType::TestTodo | DebtType::TestDuplication => {
             DebtCategory::Testing
         }
         DebtType::TestQuality => DebtCategory::Testing,
-        
+
         // Resource management issues
         DebtType::ErrorSwallowing => DebtCategory::Resource,
         DebtType::ResourceManagement => DebtCategory::Resource,
-        
+
         // Duplication issues
         DebtType::Duplication => DebtCategory::Duplication,
     }
@@ -119,20 +119,24 @@ impl DebtAggregator {
         Self::default()
     }
 
-    pub fn aggregate_debt(&mut self, items: Vec<DebtItem>, functions: &[(FunctionId, usize, usize)]) {
+    pub fn aggregate_debt(
+        &mut self,
+        items: Vec<DebtItem>,
+        functions: &[(FunctionId, usize, usize)],
+    ) {
         // First, index all debt items by file
         for item in items {
             let file = item.file.clone();
             self.debt_index
                 .entry(file)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(item);
         }
 
         // Now map debt items to functions based on line ranges
         for (func_id, _start, _end) in functions {
             let mut profile = FunctionDebtProfile::new(func_id.clone());
-            
+
             if let Some(file_debts) = self.debt_index.get(&func_id.file) {
                 for debt_item in file_debts {
                     // Check if the debt item falls within this function's line range
@@ -141,7 +145,7 @@ impl DebtAggregator {
                     }
                 }
             }
-            
+
             self.profiles.insert(func_id.clone(), profile);
         }
     }
@@ -153,15 +157,28 @@ impl DebtAggregator {
     pub fn calculate_debt_scores(&self, func_id: &FunctionId) -> DebtScores {
         self.profiles
             .get(func_id)
-            .map(|profile| {
-                DebtScores {
-                    security: calculate_category_score(&profile.security_issues, DebtCategory::Security),
-                    performance: calculate_category_score(&profile.performance_issues, DebtCategory::Performance),
-                    organization: calculate_category_score(&profile.organization_issues, DebtCategory::Organization),
-                    testing: calculate_category_score(&profile.testing_issues, DebtCategory::Testing),
-                    resource: calculate_category_score(&profile.resource_issues, DebtCategory::Resource),
-                    duplication: calculate_category_score(&profile.duplication_issues, DebtCategory::Duplication),
-                }
+            .map(|profile| DebtScores {
+                security: calculate_category_score(
+                    &profile.security_issues,
+                    DebtCategory::Security,
+                ),
+                performance: calculate_category_score(
+                    &profile.performance_issues,
+                    DebtCategory::Performance,
+                ),
+                organization: calculate_category_score(
+                    &profile.organization_issues,
+                    DebtCategory::Organization,
+                ),
+                testing: calculate_category_score(&profile.testing_issues, DebtCategory::Testing),
+                resource: calculate_category_score(
+                    &profile.resource_issues,
+                    DebtCategory::Resource,
+                ),
+                duplication: calculate_category_score(
+                    &profile.duplication_issues,
+                    DebtCategory::Duplication,
+                ),
             })
             .unwrap_or_default()
     }
@@ -169,14 +186,14 @@ impl DebtAggregator {
 
 fn calculate_category_score(issues: &[DebtItem], category: DebtCategory) -> f64 {
     use crate::core::Priority;
-    
+
     if issues.is_empty() {
         return 0.0;
     }
 
     let base_score = issues.len() as f64;
     let severity_weight = category.severity_weight();
-    
+
     // Calculate weighted score based on issue priorities
     let priority_sum: f64 = issues
         .iter()
@@ -187,7 +204,7 @@ fn calculate_category_score(issues: &[DebtItem], category: DebtCategory) -> f64 
             Priority::Low => 0.5,
         })
         .sum();
-    
+
     // Normalize and apply category weight
     let score = (priority_sum / issues.len() as f64) * severity_weight * base_score.sqrt();
     score.min(10.0) // Cap at 10.0
@@ -205,7 +222,12 @@ pub struct DebtScores {
 
 impl DebtScores {
     pub fn total(&self) -> f64 {
-        self.security + self.performance + self.organization + self.testing + self.resource + self.duplication
+        self.security
+            + self.performance
+            + self.organization
+            + self.testing
+            + self.resource
+            + self.duplication
     }
 }
 
@@ -216,25 +238,43 @@ mod tests {
 
     #[test]
     fn test_debt_categorization() {
-        assert_eq!(categorize_debt_type(&DebtType::Security), DebtCategory::Security);
-        assert_eq!(categorize_debt_type(&DebtType::ErrorSwallowing), DebtCategory::Resource);
-        assert_eq!(categorize_debt_type(&DebtType::Todo), DebtCategory::Organization);
-        assert_eq!(categorize_debt_type(&DebtType::TestQuality), DebtCategory::Testing);
-        assert_eq!(categorize_debt_type(&DebtType::Complexity), DebtCategory::Performance);
-        assert_eq!(categorize_debt_type(&DebtType::Duplication), DebtCategory::Duplication);
+        assert_eq!(
+            categorize_debt_type(&DebtType::Security),
+            DebtCategory::Security
+        );
+        assert_eq!(
+            categorize_debt_type(&DebtType::ErrorSwallowing),
+            DebtCategory::Resource
+        );
+        assert_eq!(
+            categorize_debt_type(&DebtType::Todo),
+            DebtCategory::Organization
+        );
+        assert_eq!(
+            categorize_debt_type(&DebtType::TestQuality),
+            DebtCategory::Testing
+        );
+        assert_eq!(
+            categorize_debt_type(&DebtType::Complexity),
+            DebtCategory::Performance
+        );
+        assert_eq!(
+            categorize_debt_type(&DebtType::Duplication),
+            DebtCategory::Duplication
+        );
     }
 
     #[test]
     fn test_debt_aggregation() {
         let mut aggregator = DebtAggregator::new();
-        
+
         let func_id = FunctionId {
             file: PathBuf::from("test.rs"),
             name: "test_func".to_string(),
             start_line: 10,
             end_line: 20,
         };
-        
+
         let debt_items = vec![
             DebtItem {
                 id: "1".to_string(),
@@ -268,9 +308,9 @@ mod tests {
                 context: None,
             },
         ];
-        
+
         aggregator.aggregate_debt(debt_items, &[(func_id.clone(), 10, 20)]);
-        
+
         let profile = aggregator.get_profile(&func_id).unwrap();
         assert_eq!(profile.security_issues.len(), 1);
         assert_eq!(profile.organization_issues.len(), 1);
@@ -281,14 +321,14 @@ mod tests {
     #[test]
     fn test_debt_score_calculation() {
         let mut aggregator = DebtAggregator::new();
-        
+
         let func_id = FunctionId {
             file: PathBuf::from("test.rs"),
             name: "critical_func".to_string(),
             start_line: 1,
             end_line: 50,
         };
-        
+
         let debt_items = vec![
             DebtItem {
                 id: "4".to_string(),
@@ -311,9 +351,9 @@ mod tests {
                 context: None,
             },
         ];
-        
+
         aggregator.aggregate_debt(debt_items, &[(func_id.clone(), 1, 50)]);
-        
+
         let scores = aggregator.calculate_debt_scores(&func_id);
         assert!(scores.security > 0.0);
         assert!(scores.security <= 10.0);

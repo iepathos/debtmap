@@ -169,17 +169,21 @@ pub fn calculate_unified_priority_with_debt(
         debt_scores.security
     } else {
         // Fall back to pattern-based detection or provided value
-        security_issues.unwrap_or_else(|| calculate_security_factor(func)).min(10.0)
+        security_issues
+            .unwrap_or_else(|| calculate_security_factor(func))
+            .min(10.0)
     };
-    
+
     let organization_factor = if debt_scores.organization > 0.0 {
         // Use actual detected organization issues if available
         debt_scores.organization
     } else {
         // Fall back to pattern-based detection or provided value
-        organization_issues.unwrap_or_else(|| calculate_organization_factor(func)).min(10.0)
+        organization_issues
+            .unwrap_or_else(|| calculate_organization_factor(func))
+            .min(10.0)
     };
-    
+
     // Add new debt category factors
     let performance_factor = debt_scores.performance.min(10.0);
     let testing_factor = debt_scores.testing.min(10.0);
@@ -197,7 +201,7 @@ pub fn calculate_unified_priority_with_debt(
     let weighted_dependency = dependency_factor * weights.dependency;
     let weighted_security = security_factor * weights.security;
     let weighted_organization = organization_factor * weights.organization;
-    
+
     // Add weights for new debt categories (using smaller weights to not overshadow existing factors)
     let weighted_performance = performance_factor * 0.1;
     let weighted_testing = testing_factor * 0.05;
@@ -501,8 +505,8 @@ pub fn create_unified_debt_item_with_aggregator(
         call_graph,
         coverage,
         roi_score,
-        None,  // Let the aggregator provide security factor
-        None,  // Let the aggregator provide organization factor
+        None, // Let the aggregator provide security factor
+        None, // Let the aggregator provide organization factor
         Some(debt_aggregator),
     );
 

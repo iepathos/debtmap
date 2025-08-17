@@ -1594,7 +1594,10 @@ fn create_unified_analysis_with_exclusions(
     >,
     debt_items: Option<&[core::DebtItem]>,
 ) -> priority::UnifiedAnalysis {
-    use priority::{debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId}, UnifiedAnalysis};
+    use priority::{
+        debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
+        UnifiedAnalysis,
+    };
 
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
@@ -1614,10 +1617,10 @@ fn create_unified_analysis_with_exclusions(
                 (func_id, m.line, m.line + m.length)
             })
             .collect();
-        
+
         // The debt items are already the correct type
         let debt_items_vec: Vec<core::DebtItem> = debt_items.to_vec();
-        
+
         debt_aggregator.aggregate_debt(debt_items_vec, &function_mappings);
     }
 
