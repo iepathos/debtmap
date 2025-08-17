@@ -13,7 +13,7 @@ pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage
 pub use formatter::{format_priorities, OutputFormat};
 pub use formatter_markdown::format_priorities_markdown;
 pub use semantic_classifier::{classify_function_role, FunctionRole};
-pub use unified_scorer::{calculate_unified_priority, UnifiedDebtItem, UnifiedScore};
+pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, UnifiedScore};
 
 use im::Vector;
 use std::path::PathBuf;
@@ -185,6 +185,17 @@ pub enum DebtType {
         collection_type: String,
         inefficiency_type: String,
     },
+    // Basic Security and Performance debt types (for core::DebtType integration)
+    BasicSecurity {
+        vulnerability_type: String,
+        severity: String,
+        description: String,
+    },
+    BasicPerformance {
+        issue_type: String,
+        impact: String,
+        description: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -236,6 +247,8 @@ impl UnifiedAnalysis {
             DebtType::TestComplexityHotspot { .. }
                 | DebtType::TestTodo { .. }
                 | DebtType::TestDuplication { .. }
+                | DebtType::BasicSecurity { .. }
+                | DebtType::BasicPerformance { .. }
         ) && item.cyclomatic_complexity <= min_cyclomatic
             && item.cognitive_complexity <= min_cognitive
         {
@@ -247,6 +260,301 @@ impl UnifiedAnalysis {
         }
 
         self.items.push_back(item);
+    }
+
+    /// Convert core::DebtItem (Security/Performance) to UnifiedDebtItem for unified analysis
+    pub fn add_security_performance_items(
+        &mut self,
+        debt_items: &[crate::core::DebtItem],
+        call_graph: &CallGraph,
+    ) {
+        for debt_item in debt_items {
+            if let Some(unified_item) = self.convert_debt_item_to_unified(debt_item, call_graph) {
+                self.add_item(unified_item);
+            }
+        }
+    }
+
+    fn convert_debt_item_to_unified(
+        &self,
+        debt_item: &crate::core::DebtItem,
+        call_graph: &CallGraph,
+    ) -> Option<UnifiedDebtItem> {
+        use crate::core::DebtType as CoreDebtType;
+
+        // Only process Security and Performance debt items
+        match debt_item.debt_type {
+            CoreDebtType::Security => self.create_security_unified_item(debt_item, call_graph),
+            CoreDebtType::Performance => {
+                self.create_performance_unified_item(debt_item, call_graph)
+            }
+            _ => None,
+        }
+    }
+
+    fn create_security_unified_item(
+        &self,
+        debt_item: &crate::core::DebtItem,
+        _call_graph: &CallGraph,
+    ) -> Option<UnifiedDebtItem> {
+        // Extract security details from the message
+        let (vulnerability_type, severity) = self.parse_security_details(&debt_item.message);
+
+        let debt_type = DebtType::BasicSecurity {
+            vulnerability_type: vulnerability_type.clone(),
+            severity: severity.clone(),
+            description: debt_item.message.clone(),
+        };
+
+        // Security issues don't need synthetic function metrics
+
+        // Calculate unified score with security priority boost
+        let unified_score = self.calculate_security_score(&severity, &debt_item.priority);
+
+        Some(UnifiedDebtItem {
+            location: Location {
+                file: debt_item.file.clone(),
+                function: format!("security_issue_at_line_{}", debt_item.line),
+                line: debt_item.line,
+            },
+            debt_type,
+            unified_score,
+            function_role: FunctionRole::Unknown,
+            recommendation: self.create_security_recommendation(&vulnerability_type, &severity),
+            expected_impact: self.create_security_impact(&severity),
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 0,
+            function_length: 1,
+            cyclomatic_complexity: 1,
+            cognitive_complexity: 1,
+        })
+    }
+
+    fn create_performance_unified_item(
+        &self,
+        debt_item: &crate::core::DebtItem,
+        _call_graph: &CallGraph,
+    ) -> Option<UnifiedDebtItem> {
+        // Extract performance details from the message
+        let (issue_type, impact) = self.parse_performance_details(&debt_item.message);
+
+        let debt_type = DebtType::BasicPerformance {
+            issue_type: issue_type.clone(),
+            impact: impact.clone(),
+            description: debt_item.message.clone(),
+        };
+
+        // Calculate unified score with performance considerations
+        let unified_score = self.calculate_performance_score(&impact, &debt_item.priority);
+
+        Some(UnifiedDebtItem {
+            location: Location {
+                file: debt_item.file.clone(),
+                function: format!("performance_issue_at_line_{}", debt_item.line),
+                line: debt_item.line,
+            },
+            debt_type,
+            unified_score,
+            function_role: FunctionRole::Unknown,
+            recommendation: self.create_performance_recommendation(&issue_type, &impact),
+            expected_impact: self.create_performance_impact(&impact),
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 0,
+            function_length: 1,
+            cyclomatic_complexity: 1,
+            cognitive_complexity: 1,
+        })
+    }
+
+    // Helper methods for Security/Performance debt conversion
+
+    fn parse_security_details(&self, message: &str) -> (String, String) {
+        // Extract vulnerability type and severity from security debt messages
+        if message.contains("unsafe") {
+            ("Unsafe Code".to_string(), "High".to_string())
+        } else if message.contains("SQL injection") || message.contains("sql") {
+            ("SQL Injection".to_string(), "Critical".to_string())
+        } else if message.contains("secret")
+            || message.contains("password")
+            || message.contains("key")
+        {
+            ("Hardcoded Secret".to_string(), "Critical".to_string())
+        } else if message.contains("crypto") || message.contains("encryption") {
+            ("Weak Cryptography".to_string(), "High".to_string())
+        } else if message.contains("validation") || message.contains("input") {
+            ("Input Validation".to_string(), "Medium".to_string())
+        } else {
+            ("Security Issue".to_string(), "Medium".to_string())
+        }
+    }
+
+    fn parse_performance_details(&self, message: &str) -> (String, String) {
+        // Extract performance issue type and impact from performance debt messages
+        if message.contains("nested loop") || message.contains("Nested loop") {
+            ("Nested Loops".to_string(), "High".to_string())
+        } else if message.contains("allocation") || message.contains("memory") {
+            ("Memory Allocation".to_string(), "Medium".to_string())
+        } else if message.contains("I/O") || message.contains("blocking") {
+            ("Blocking I/O".to_string(), "High".to_string())
+        } else if message.contains("string") && message.contains("concatenation") {
+            ("String Concatenation".to_string(), "Medium".to_string())
+        } else if message.contains("data structure") || message.contains("Vec::contains") {
+            ("Data Structure".to_string(), "Medium".to_string())
+        } else {
+            ("Performance Issue".to_string(), "Medium".to_string())
+        }
+    }
+
+    fn calculate_security_score(
+        &self,
+        severity: &str,
+        priority: &crate::core::Priority,
+    ) -> UnifiedScore {
+        use crate::core::Priority;
+
+        // Security issues get high base scores regardless of function complexity
+        let base_score: f64 = match severity {
+            "Critical" => 9.5,
+            "High" => 8.5,
+            "Medium" => 7.0,
+            _ => 5.0,
+        };
+
+        let priority_boost: f64 = match priority {
+            Priority::Critical => 1.0,
+            Priority::High => 0.8,
+            Priority::Medium => 0.5,
+            Priority::Low => 0.2,
+        };
+
+        UnifiedScore {
+            complexity_factor: 2.0, // Security issues aren't about complexity
+            coverage_factor: 1.0,   // Coverage less relevant for security
+            roi_factor: 8.0,        // High ROI to fix security issues
+            semantic_factor: 9.0,   // Very important semantically
+            dependency_factor: 3.0, // Variable depending on code location
+            role_multiplier: 1.5,   // Security issues are always important
+            final_score: (base_score + priority_boost).min(10.0_f64),
+        }
+    }
+
+    fn calculate_performance_score(
+        &self,
+        impact: &str,
+        priority: &crate::core::Priority,
+    ) -> UnifiedScore {
+        use crate::core::Priority;
+
+        let base_score: f64 = match impact {
+            "High" | "Critical" => 7.5,
+            "Medium" => 6.0,
+            "Low" => 4.5,
+            _ => 3.0,
+        };
+
+        let priority_boost: f64 = match priority {
+            Priority::Critical => 1.0,
+            Priority::High => 0.8,
+            Priority::Medium => 0.5,
+            Priority::Low => 0.2,
+        };
+
+        UnifiedScore {
+            complexity_factor: 3.0, // Performance often relates to complexity
+            coverage_factor: 2.0,   // Testing helps catch performance regressions
+            roi_factor: 6.0,        // Good ROI for performance fixes
+            semantic_factor: 5.0,   // Important but not as critical as security
+            dependency_factor: 4.0, // Performance issues can affect many callers
+            role_multiplier: 1.2,   // Performance issues are important
+            final_score: (base_score + priority_boost).min(10.0_f64),
+        }
+    }
+
+    fn create_security_recommendation(
+        &self,
+        vulnerability_type: &str,
+        severity: &str,
+    ) -> ActionableRecommendation {
+        let primary_action = format!("Fix {} security vulnerability", vulnerability_type);
+        let rationale = format!(
+            "Security vulnerability ({}) detected: {}",
+            severity, vulnerability_type
+        );
+        let implementation_steps = vec![
+            "Review security vulnerability details".to_string(),
+            "Apply security best practices".to_string(),
+            "Test fix thoroughly".to_string(),
+            "Consider security review".to_string(),
+        ];
+
+        ActionableRecommendation {
+            primary_action,
+            rationale,
+            implementation_steps,
+            related_items: vec![],
+        }
+    }
+
+    fn create_performance_recommendation(
+        &self,
+        issue_type: &str,
+        impact: &str,
+    ) -> ActionableRecommendation {
+        let primary_action = format!("Optimize {} performance issue", issue_type);
+        let rationale = format!("Performance issue ({}) detected: {}", impact, issue_type);
+        let implementation_steps = vec![
+            "Profile performance bottleneck".to_string(),
+            "Apply optimization techniques".to_string(),
+            "Benchmark improvements".to_string(),
+            "Verify no regressions".to_string(),
+        ];
+
+        ActionableRecommendation {
+            primary_action,
+            rationale,
+            implementation_steps,
+            related_items: vec![],
+        }
+    }
+
+    fn create_security_impact(&self, severity: &str) -> ImpactMetrics {
+        let risk_reduction = match severity {
+            "Critical" => 9.0,
+            "High" => 7.0,
+            "Medium" => 5.0,
+            _ => 3.0,
+        };
+
+        ImpactMetrics {
+            coverage_improvement: 0.0, // Security fixes don't typically improve coverage
+            lines_reduction: 3,        // Security fixes usually involve small code changes
+            complexity_reduction: 0.0, // Security fixes don't reduce complexity
+            risk_reduction,
+        }
+    }
+
+    fn create_performance_impact(&self, impact: &str) -> ImpactMetrics {
+        let (risk_reduction, lines_reduction) = match impact {
+            "High" | "Critical" => (6.0, 15),
+            "Medium" => (4.0, 8),
+            "Low" => (2.0, 3),
+            _ => (1.0, 2),
+        };
+
+        ImpactMetrics {
+            coverage_improvement: 0.0, // Performance fixes don't typically improve coverage
+            lines_reduction,
+            complexity_reduction: 1.0, // Performance fixes may reduce algorithmic complexity
+            risk_reduction,
+        }
     }
 
     pub fn sort_by_priority(&mut self) {

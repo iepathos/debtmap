@@ -1593,6 +1593,17 @@ fn generate_recommendation(
             collection_type,
             inefficiency_type,
         } => generate_collection_inefficiency_recommendation(collection_type, inefficiency_type),
+        // Basic Security and Performance debt types
+        DebtType::BasicSecurity {
+            vulnerability_type,
+            severity,
+            description: _,
+        } => generate_security_recommendation("basic", vulnerability_type, severity),
+        DebtType::BasicPerformance {
+            issue_type,
+            impact,
+            description: _,
+        } => generate_performance_recommendation("basic", issue_type, impact),
     };
 
     ActionableRecommendation {
@@ -1645,6 +1656,19 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::ResourceLeak { .. } => 0.5,
         DebtType::AsyncMisuse { .. } => 0.4,
         DebtType::CollectionInefficiency { .. } => 0.2,
+        // Basic Security and Performance debt types
+        DebtType::BasicSecurity { severity, .. } => match severity.as_str() {
+            "Critical" | "HIGH" => 0.9,
+            "High" | "MEDIUM" => 0.7,
+            "Medium" | "LOW" => 0.5,
+            _ => 0.4,
+        },
+        DebtType::BasicPerformance { impact, .. } => match impact.as_str() {
+            "High" | "CRITICAL" => 0.6,
+            "Medium" | "HIGH" => 0.4,
+            "Low" | "MEDIUM" => 0.3,
+            _ => 0.2,
+        },
     }
 }
 
@@ -1679,6 +1703,8 @@ fn calculate_lines_reduction(debt_type: &DebtType) -> u32 {
         DebtType::HardcodedSecrets { .. } => 2, // Move to config
         DebtType::InputValidationGap { .. } => 5, // Add validation
         DebtType::UnsafeCode { .. } => 3,       // Add documentation or safety
+        DebtType::BasicSecurity { .. } => 3,    // Security fixes typically small
+        DebtType::BasicPerformance { .. } => 8, // Performance fixes can involve more restructuring
         _ => 0,
     }
 }
@@ -1794,6 +1820,16 @@ fn generate_security_recommendation(
                 "Add unit tests for edge cases".to_string(),
             ],
         ),
+        "basic" => (
+            format!("Address {} security issue", detail1),
+            format!("Security vulnerability detected ({}): {}", detail2, detail1),
+            vec![
+                "Review and fix security vulnerability".to_string(),
+                "Apply security best practices".to_string(),
+                "Consider security impact assessment".to_string(),
+                "Add security testing for this area".to_string(),
+            ],
+        ),
         _ => (
             "Fix security issue".to_string(),
             "Security vulnerability detected".to_string(),
@@ -1848,6 +1884,16 @@ fn generate_performance_recommendation(
                 "Use non-blocking I/O libraries".to_string(),
                 "Consider background processing".to_string(),
                 "Add timeout handling".to_string(),
+            ],
+        ),
+        "basic" => (
+            format!("Optimize {} performance issue", detail1),
+            format!("Performance impact ({}): {}", detail2, detail1),
+            vec![
+                "Profile and identify performance bottlenecks".to_string(),
+                "Apply performance optimization techniques".to_string(),
+                "Benchmark before and after changes".to_string(),
+                "Consider algorithmic improvements".to_string(),
             ],
         ),
         _ => (

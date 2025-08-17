@@ -36,6 +36,60 @@ pub fn format_priority_item_with_verbosity(
             factors.push(format!("Complexity ({:.0}%)", weights.complexity * 100.0));
         }
 
+        // Add Security and Performance specific factors
+        match &item.debt_type {
+            crate::priority::DebtType::BasicSecurity {
+                severity,
+                vulnerability_type,
+                ..
+            } => {
+                factors.push(format!("Security vulnerability ({})", severity));
+                if !vulnerability_type.is_empty() && vulnerability_type != "Security Issue" {
+                    factors.push(format!("{} detected", vulnerability_type));
+                }
+            }
+            crate::priority::DebtType::BasicPerformance {
+                impact, issue_type, ..
+            } => {
+                factors.push(format!("Performance impact ({})", impact));
+                if !issue_type.is_empty() && issue_type != "Performance Issue" {
+                    factors.push(format!("{} detected", issue_type));
+                }
+            }
+            crate::priority::DebtType::HardcodedSecrets {
+                severity,
+                secret_type,
+            } => {
+                factors.push(format!("Security vulnerability ({})", severity));
+                factors.push(format!("Hardcoded {} detected", secret_type));
+            }
+            crate::priority::DebtType::SqlInjectionRisk { risk_level, .. } => {
+                factors.push(format!("Security vulnerability ({})", risk_level));
+                factors.push("SQL injection risk detected".to_string());
+            }
+            crate::priority::DebtType::UnsafeCode { safety_concern, .. } => {
+                factors.push("Security vulnerability (High)".to_string());
+                factors.push(format!("Unsafe code: {}", safety_concern));
+            }
+            crate::priority::DebtType::WeakCryptography { algorithm, .. } => {
+                factors.push("Security vulnerability (High)".to_string());
+                factors.push(format!("Weak crypto: {}", algorithm));
+            }
+            crate::priority::DebtType::NestedLoops { depth, .. } => {
+                factors.push("Performance impact (High)".to_string());
+                factors.push(format!("{} level nested loops", depth));
+            }
+            crate::priority::DebtType::BlockingIO { operation, .. } => {
+                factors.push("Performance impact (High)".to_string());
+                factors.push(format!("Blocking {}", operation));
+            }
+            crate::priority::DebtType::AllocationInefficiency { pattern, .. } => {
+                factors.push("Performance impact (Medium)".to_string());
+                factors.push(format!("Allocation: {}", pattern));
+            }
+            _ => {} // No additional factors for other debt types
+        }
+
         writeln!(
             output,
             "#{} {} [{}]",

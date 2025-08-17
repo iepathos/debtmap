@@ -63,7 +63,10 @@ fn format_priority_item_markdown(
         output.push_str(&format_score_breakdown(&item.unified_score));
     } else if verbosity >= 1 {
         // Show main contributing factors for verbosity >= 1
-        output.push_str(&format_main_factors(&item.unified_score));
+        output.push_str(&format_main_factors_with_debt_type(
+            &item.unified_score,
+            &item.debt_type,
+        ));
     }
 
     // Location and type
@@ -166,6 +169,9 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "Async Misuse",
         DebtType::ResourceLeak { .. } => "Resource Leak",
         DebtType::CollectionInefficiency { .. } => "Collection Inefficiency",
+        // Basic Security and Performance debt types
+        DebtType::BasicSecurity { .. } => "Security",
+        DebtType::BasicPerformance { .. } => "Performance",
     }
 }
 
@@ -300,7 +306,11 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
     output
 }
 
-fn format_main_factors(unified_score: &crate::priority::UnifiedScore) -> String {
+
+fn format_main_factors_with_debt_type(
+    unified_score: &crate::priority::UnifiedScore,
+    debt_type: &crate::priority::DebtType,
+) -> String {
     let weights = crate::config::get_scoring_weights();
     let mut factors = vec![];
 
@@ -318,6 +328,60 @@ fn format_main_factors(unified_score: &crate::priority::UnifiedScore) -> String 
     }
     if unified_score.complexity_factor > 5.0 {
         factors.push(format!("Complexity ({:.0}%)", weights.complexity * 100.0));
+    }
+
+    // Add Security and Performance specific factors
+    match debt_type {
+        crate::priority::DebtType::BasicSecurity {
+            severity,
+            vulnerability_type,
+            ..
+        } => {
+            factors.push(format!("Security vulnerability ({})", severity));
+            if !vulnerability_type.is_empty() && vulnerability_type != "Security Issue" {
+                factors.push(format!("{} detected", vulnerability_type));
+            }
+        }
+        crate::priority::DebtType::BasicPerformance {
+            impact, issue_type, ..
+        } => {
+            factors.push(format!("Performance impact ({})", impact));
+            if !issue_type.is_empty() && issue_type != "Performance Issue" {
+                factors.push(format!("{} detected", issue_type));
+            }
+        }
+        crate::priority::DebtType::HardcodedSecrets {
+            severity,
+            secret_type,
+        } => {
+            factors.push(format!("Security vulnerability ({})", severity));
+            factors.push(format!("Hardcoded {} detected", secret_type));
+        }
+        crate::priority::DebtType::SqlInjectionRisk { risk_level, .. } => {
+            factors.push(format!("Security vulnerability ({})", risk_level));
+            factors.push("SQL injection risk detected".to_string());
+        }
+        crate::priority::DebtType::UnsafeCode { safety_concern, .. } => {
+            factors.push("Security vulnerability (High)".to_string());
+            factors.push(format!("Unsafe code: {}", safety_concern));
+        }
+        crate::priority::DebtType::WeakCryptography { algorithm, .. } => {
+            factors.push("Security vulnerability (High)".to_string());
+            factors.push(format!("Weak crypto: {}", algorithm));
+        }
+        crate::priority::DebtType::NestedLoops { depth, .. } => {
+            factors.push("Performance impact (High)".to_string());
+            factors.push(format!("{} level nested loops", depth));
+        }
+        crate::priority::DebtType::BlockingIO { operation, .. } => {
+            factors.push("Performance impact (High)".to_string());
+            factors.push(format!("Blocking {}", operation));
+        }
+        crate::priority::DebtType::AllocationInefficiency { pattern, .. } => {
+            factors.push("Performance impact (Medium)".to_string());
+            factors.push(format!("Allocation: {}", pattern));
+        }
+        _ => {} // No additional factors for other debt types
     }
 
     if !factors.is_empty() {
@@ -526,8 +590,13 @@ mod tests {
             role_multiplier: 1.0,
             final_score: 7.0,
         };
+        
+        let debt_type = DebtType::Risk {
+            risk_score: 5.0,
+            factors: vec!["Test factor".to_string()],
+        };
 
-        let result = format_main_factors(&score);
+        let result = format_main_factors_with_debt_type(&score, &debt_type);
 
         assert!(result.contains("Main factors:"));
         assert!(result.contains("Coverage gap"));
@@ -547,8 +616,13 @@ mod tests {
             role_multiplier: 1.0,
             final_score: 2.0,
         };
+        
+        let debt_type = DebtType::Risk {
+            risk_score: 1.0,
+            factors: vec!["Test factor".to_string()],
+        };
 
-        let result = format_main_factors(&score);
+        let result = format_main_factors_with_debt_type(&score, &debt_type);
         assert_eq!(result, "");
     }
 

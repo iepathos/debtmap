@@ -1588,10 +1588,14 @@ fn create_unified_analysis_with_exclusions(
 
     // Add error swallowing debt items if provided
     if let Some(debt_items) = debt_items {
+        // Convert error swallowing debt items
         let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
         for item in error_swallowing_items {
             unified.add_item(item);
         }
+
+        // Convert Security and Performance debt items to unified format
+        unified.add_security_performance_items(debt_items, call_graph);
     }
 
     unified.sort_by_priority();
