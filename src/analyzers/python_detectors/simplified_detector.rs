@@ -70,7 +70,8 @@ impl SimplifiedPythonDetector {
         // Check if test function lacks assertions
         let func_name = func_def.name.as_str();
         if (func_name.starts_with("test_") || func_name.starts_with("Test"))
-            && !Self::has_assertions(&func_def.body) {
+            && !Self::has_assertions(&func_def.body)
+        {
             self.debt_items.push(DebtItem {
                 id: format!("py-test-no-assert-{}", self.debt_items.len()),
                 debt_type: DebtType::TestQuality,
@@ -147,7 +148,8 @@ impl SimplifiedPythonDetector {
             // Recursively check nested blocks
             match stmt {
                 ast::Stmt::If(if_stmt) => {
-                    if Self::has_assertions(&if_stmt.body) || Self::has_assertions(&if_stmt.orelse) {
+                    if Self::has_assertions(&if_stmt.body) || Self::has_assertions(&if_stmt.orelse)
+                    {
                         return true;
                     }
                 }
