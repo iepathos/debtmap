@@ -2,15 +2,11 @@ use crate::common::{LocationConfidence, SourceLocation};
 use syn::spanned::Spanned;
 use syn::{Expr, Stmt};
 
-pub struct LocationExtractor {
-    source_lines: Vec<String>,
-}
+pub struct LocationExtractor {}
 
 impl LocationExtractor {
-    pub fn new(source_content: &str) -> Self {
-        Self {
-            source_lines: source_content.lines().map(String::from).collect(),
-        }
+    pub fn new(_source_content: &str) -> Self {
+        Self {}
     }
 
     /// Extract location from any syn AST node that implements Spanned

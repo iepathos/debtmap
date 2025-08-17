@@ -1534,7 +1534,7 @@ fn convert_error_swallowing_to_unified(
                 dependency_factor: 4.0, // Moderate dependency impact
                 security_factor: 0.0,   // Not a security issue
                 organization_factor: 0.0, // Not an organization issue
-                performance_factor: 0.0,  // Not a performance issue
+                performance_factor: 0.0, // Not a performance issue
                 role_multiplier: 1.2,   // Slightly elevated importance
                 final_score: 5.5,       // Above average priority
             };

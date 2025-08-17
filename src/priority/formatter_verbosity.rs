@@ -172,7 +172,11 @@ pub fn format_priority_item_with_verbosity(
 
         // Show security if non-zero
         if has_security {
-            let security_prefix = if has_organization || has_performance { "├─" } else { "└─" };
+            let security_prefix = if has_organization || has_performance {
+                "├─"
+            } else {
+                "└─"
+            };
             writeln!(
                 output,
                 "│  │  {} Security:    {:.1} × {:.0}% = {:.2}",

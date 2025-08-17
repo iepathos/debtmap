@@ -690,6 +690,7 @@ mod tests {
                 dependency_factor: 0.5,
                 security_factor: 0.0,
                 organization_factor: 0.0,
+                performance_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::ComplexityHotspot {
@@ -732,6 +733,7 @@ mod tests {
             dependency_factor: 0.45,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
         };
 
@@ -822,6 +824,7 @@ mod tests {
             dependency_factor: 0.456789,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
         };
 
@@ -865,6 +868,7 @@ mod tests {
                 dependency_factor: 0.2,
                 security_factor: 0.0,
                 organization_factor: 0.0,
+                performance_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -918,6 +922,7 @@ mod tests {
                 dependency_factor: 0.5,
                 security_factor: 0.0,
                 organization_factor: 0.0,
+                performance_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::TestingGap {
@@ -1341,6 +1346,7 @@ mod tests {
                 dependency_factor: 0.2,
                 security_factor: 0.0,
                 organization_factor: 0.0,
+                performance_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -1388,6 +1394,7 @@ mod tests {
                 dependency_factor: 0.2,
                 security_factor: 0.0,
                 organization_factor: 0.0,
+                performance_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -1505,6 +1512,7 @@ mod tests {
                 dependency_factor: 0.2,
                 security_factor: 0.0,
                 organization_factor: 0.0,
+                performance_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {

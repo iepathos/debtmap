@@ -37,16 +37,16 @@ impl ValidationVisitor {
     fn check_function_validation(&mut self) {
         if self.has_external_input && !self.has_validation {
             if let Some(ref func_name) = self.current_function {
-                let location =
-                    self.current_function_location
-                        .clone()
-                        .unwrap_or(SourceLocation {
-                            line: 1,
-                            column: None,
-                            end_line: None,
-                            end_column: None,
-                            confidence: LocationConfidence::Unavailable,
-                        });
+                let location = self
+                    .current_function_location
+                    .clone()
+                    .unwrap_or(SourceLocation {
+                        line: 1,
+                        column: None,
+                        end_line: None,
+                        end_column: None,
+                        confidence: LocationConfidence::Unavailable,
+                    });
 
                 self.debt_items.push(DebtItem {
                     id: format!(

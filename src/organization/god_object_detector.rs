@@ -274,13 +274,6 @@ struct TypeVisitor {
 }
 
 impl TypeVisitor {
-    fn new() -> Self {
-        Self {
-            types: HashMap::new(),
-            location_extractor: None,
-        }
-    }
-
     fn with_location_extractor(location_extractor: Option<UnifiedLocationExtractor>) -> Self {
         Self {
             types: HashMap::new(),

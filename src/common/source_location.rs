@@ -32,22 +32,17 @@ pub enum LocationConfidence {
 
 /// Common utilities for all detectors to extract source locations
 #[derive(Clone)]
-pub struct UnifiedLocationExtractor {
-    source_lines: Vec<String>,
-}
+pub struct UnifiedLocationExtractor {}
 
 impl UnifiedLocationExtractor {
-    pub fn new(source_content: &str) -> Self {
-        Self {
-            source_lines: source_content.lines().map(String::from).collect(),
-        }
+    pub fn new(_source_content: &str) -> Self {
+        Self {}
     }
 
     /// Extract location from any syn AST node that implements Spanned
     pub fn extract_location<T: Spanned>(&self, node: &T) -> SourceLocation {
         let span = node.span();
-        self.span_to_location(span)
-            .unwrap_or_else(SourceLocation::default)
+        self.span_to_location(span).unwrap_or_default()
     }
 
     /// Extract location from item definitions (structs, enums, functions)

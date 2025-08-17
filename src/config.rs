@@ -146,7 +146,7 @@ fn default_organization_weight() -> f64 {
     0.05
 }
 fn default_performance_weight() -> f64 {
-    0.0  // Default to 0 for backward compatibility
+    0.0 // Default to 0 for backward compatibility
 }
 
 /// Root configuration structure for debtmap

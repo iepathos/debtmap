@@ -2491,6 +2491,7 @@ mod tests {
             dependency_factor: 4.0,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 6.5,
         };
@@ -2695,6 +2696,7 @@ mod tests {
             dependency_factor: 0.0,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };
@@ -3141,6 +3143,7 @@ mod tests {
             dependency_factor: 2.0,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3176,6 +3179,7 @@ mod tests {
             dependency_factor: 3.0,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 5.0,
         };
@@ -3205,6 +3209,7 @@ mod tests {
             dependency_factor: 1.0,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3235,6 +3240,7 @@ mod tests {
             dependency_factor: 2.0,
             security_factor: 0.0,
             organization_factor: 0.0,
+            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.5,
         };
