@@ -15,7 +15,7 @@ use std::path::Path;
 pub struct OptimizedSmartDetector {
     optimized_detectors: Vec<Box<dyn OptimizedPerformanceDetector>>,
     module_classifier: ModuleClassifier,
-    intent_classifier: IntentClassifier,
+    _intent_classifier: IntentClassifier,
     severity_adjuster: SeverityAdjuster,
     config: SmartPerformanceConfig,
 }
@@ -33,7 +33,7 @@ impl OptimizedSmartDetector {
         Self {
             optimized_detectors,
             module_classifier: ModuleClassifier::new(),
-            intent_classifier: IntentClassifier::new(),
+            _intent_classifier: IntentClassifier::new(),
             severity_adjuster: SeverityAdjuster::new(),
             config: SmartPerformanceConfig::default(),
         }
@@ -339,7 +339,7 @@ impl OptimizedSmartDetector {
 
     fn generate_reasoning(
         &self,
-        pattern: &PerformanceAntiPattern,
+        _pattern: &PerformanceAntiPattern,
         context: &PatternContext,
     ) -> String {
         format!(

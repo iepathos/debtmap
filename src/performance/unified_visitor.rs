@@ -535,7 +535,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                 self.in_conditional = prev_conditional;
                 return;
             }
-            Expr::Match(match_expr) => {
+            Expr::Match(_match_expr) => {
                 // Check if this is error handling
                 let prev_error_handler = self.in_error_handler;
                 // Simple heuristic: if matching on Result or Option

@@ -237,7 +237,7 @@ impl CollectedPerformanceData {
     
     /// Get all operations within a loop
     pub fn get_loop_operations(&self, loop_id: LoopId) -> LoopOperations {
-        let loop_info = match self.get_loop(loop_id) {
+        let _loop_info = match self.get_loop(loop_id) {
             Some(l) => l,
             None => return LoopOperations::default(),
         };
