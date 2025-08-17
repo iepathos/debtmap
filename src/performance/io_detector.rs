@@ -318,4 +318,30 @@ mod tests {
         });
         assert!(unbuffered_pattern.is_some());
     }
+
+    #[test]
+    fn test_no_false_positives_on_imports() {
+        let source = r#"
+            use debtmap::core::{
+                cache::AnalysisCache, ComplexityMetrics, FileMetrics, FunctionMetrics, Language,
+            };
+            use std::path::PathBuf;
+            use tempfile::TempDir;
+
+            fn simple_function() {
+                println!("No I/O operations here");
+            }
+        "#;
+
+        let file = syn::parse_str::<File>(source).unwrap();
+        let detector = IOPerformanceDetector::new();
+        let patterns = detector.detect_anti_patterns(&file, Path::new("test.rs"));
+
+        // Should find no patterns since there are no actual I/O operations
+        assert_eq!(
+            patterns.len(),
+            0,
+            "Should not detect I/O patterns in import statements"
+        );
+    }
 }
