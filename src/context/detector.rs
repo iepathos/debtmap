@@ -4,8 +4,8 @@ use crate::context::{
     detect_function_role, FileType, FrameworkPattern, FunctionContext, FunctionRole,
 };
 use syn::{
-    visit::Visit, Attribute, Block, Expr, ExprCall, ExprMethodCall, ImplItem, ItemFn,
-    ItemImpl, Path,
+    visit::Visit, Attribute, Block, Expr, ExprCall, ExprMethodCall, ImplItem, ItemFn, ItemImpl,
+    Path,
 };
 
 /// Detects context information from Rust AST
@@ -202,7 +202,7 @@ fn detect_framework_pattern(
         return Some(FrameworkPattern::RustMain);
     }
 
-    // Check for web handler attributes
+    // Check for web handler attributes (various frameworks)
     for attr in attrs {
         let attr_str = attr
             .path()
@@ -212,12 +212,27 @@ fn detect_framework_pattern(
             .collect::<Vec<_>>()
             .join("::");
 
+        // Common web framework patterns
         if attr_str.contains("get")
             || attr_str.contains("post")
             || attr_str.contains("put")
             || attr_str.contains("delete")
+            || attr_str.contains("patch")
             || attr_str.contains("route")
             || attr_str.contains("handler")
+            || attr_str.contains("endpoint")
+            || attr_str.contains("api")
+            || attr_str.contains("web")
+            // Actix-web
+            || attr_str.contains("actix_web")
+            // Rocket
+            || attr_str.contains("rocket")
+            // Warp
+            || attr_str.contains("warp")
+            // Axum
+            || attr_str.contains("axum")
+            // Tide
+            || attr_str.contains("tide")
         {
             return Some(FrameworkPattern::WebHandler);
         }

@@ -6,6 +6,7 @@
 
 use std::path::Path;
 
+pub mod async_detector;
 pub mod detector;
 pub mod rules;
 
@@ -172,12 +173,14 @@ impl FunctionContext {
         // - Config loaders (usually run at startup)
         // - Test functions (simplicity over performance)
         // - Initialization code
+        // - Build scripts (compile-time execution)
         // - Non-async contexts
         match self.role {
             FunctionRole::Main
             | FunctionRole::ConfigLoader
             | FunctionRole::TestFunction
-            | FunctionRole::Initialization => true,
+            | FunctionRole::Initialization
+            | FunctionRole::BuildScript => true,
             _ => !self.is_async,
         }
     }
@@ -273,12 +276,17 @@ pub fn detect_file_type(path: &Path) -> FileType {
 /// Detect function role from name and patterns
 pub fn detect_function_role(name: &str, is_test_attr: bool) -> FunctionRole {
     // Test functions
-    if is_test_attr || name.starts_with("test_") || name.ends_with("_test") {
+    if is_test_attr
+        || name.starts_with("test_")
+        || name.ends_with("_test")
+        || name.starts_with("it_")
+        || name.starts_with("should_")
+    {
         return FunctionRole::TestFunction;
     }
 
-    // Main function
-    if name == "main" || name == "__main__" {
+    // Main function (Rust, Python, Java, etc.)
+    if name == "main" || name == "__main__" || name == "Main" {
         return FunctionRole::Main;
     }
 

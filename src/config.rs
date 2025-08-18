@@ -150,6 +150,102 @@ fn default_performance_weight() -> f64 {
     0.0 // Default to 0 for backward compatibility
 }
 
+/// Context-aware detection configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextConfig {
+    /// Whether context-aware detection is enabled
+    #[serde(default = "default_context_enabled")]
+    pub enabled: bool,
+
+    /// Custom context rules
+    #[serde(default)]
+    pub rules: Vec<ContextRuleConfig>,
+
+    /// Function role patterns
+    #[serde(default)]
+    pub function_patterns: Option<FunctionPatternConfig>,
+}
+
+impl Default for ContextConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_context_enabled(),
+            rules: Vec::new(),
+            function_patterns: None,
+        }
+    }
+}
+
+fn default_context_enabled() -> bool {
+    false // Opt-in by default
+}
+
+/// Configuration for a context rule
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextRuleConfig {
+    /// Name of the rule
+    pub name: String,
+
+    /// Pattern to match (e.g., "blocking_io", "security", "performance")
+    pub pattern: String,
+
+    /// Context matcher configuration
+    pub context: ContextMatcherConfig,
+
+    /// Action to take (allow, skip, warn, reduce_severity)
+    pub action: String,
+
+    /// Priority (higher number = higher priority)
+    #[serde(default = "default_rule_priority")]
+    pub priority: i32,
+
+    /// Optional reason for the rule
+    pub reason: Option<String>,
+}
+
+fn default_rule_priority() -> i32 {
+    50
+}
+
+/// Context matcher configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextMatcherConfig {
+    /// Function role (main, test, handler, config_loader, etc.)
+    pub role: Option<String>,
+
+    /// File type (production, test, benchmark, example, etc.)
+    pub file_type: Option<String>,
+
+    /// Whether function is async
+    pub is_async: Option<bool>,
+
+    /// Framework pattern (rust_main, web_handler, cli_handler, etc.)
+    pub framework_pattern: Option<String>,
+
+    /// Function name pattern (regex)
+    pub name_pattern: Option<String>,
+}
+
+/// Function pattern configuration for detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionPatternConfig {
+    /// Additional test function patterns
+    #[serde(default)]
+    pub test_patterns: Vec<String>,
+
+    /// Additional config loader patterns
+    #[serde(default)]
+    pub config_patterns: Vec<String>,
+
+    /// Additional handler patterns
+    #[serde(default)]
+    pub handler_patterns: Vec<String>,
+
+    /// Additional initialization patterns
+    #[serde(default)]
+    pub init_patterns: Vec<String>,
+}
+
 /// Performance detection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceConfig {
@@ -226,6 +322,10 @@ pub struct DebtmapConfig {
     /// Performance detection configuration
     #[serde(default)]
     pub performance: Option<PerformanceConfig>,
+
+    /// Context-aware detection configuration
+    #[serde(default)]
+    pub context: Option<ContextConfig>,
 }
 
 impl DebtmapConfig {
@@ -518,6 +618,11 @@ pub fn load_config() -> DebtmapConfig {
 /// Get the cached configuration
 pub fn get_config() -> &'static DebtmapConfig {
     CONFIG.get_or_init(load_config)
+}
+
+/// Get the configuration without panicking on errors
+pub fn get_config_safe() -> Result<DebtmapConfig, std::io::Error> {
+    Ok(load_config())
 }
 
 /// Get the scoring weights (with defaults if not configured)

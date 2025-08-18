@@ -37,12 +37,7 @@ impl ContextAwareAnalyzer {
     }
 
     /// Filter debt items based on context rules
-    fn filter_debt_items(
-        &self,
-        mut metrics: FileMetrics,
-        ast: &Ast,
-        path: &Path,
-    ) -> FileMetrics {
+    fn filter_debt_items(&self, mut metrics: FileMetrics, ast: &Ast, path: &Path) -> FileMetrics {
         if !self.enabled {
             return metrics;
         }
@@ -60,21 +55,24 @@ impl ContextAwareAnalyzer {
                 // Find the function context for this debt item
                 // Build a location string from file:line
                 let location = format!("{}:{}", item.file.display(), item.line);
-                let context =
-                    if let Some(func_name) = extract_function_from_location(&location) {
-                        detector
-                            .get_context(&func_name)
-                            .cloned()
-                            .unwrap_or_else(|| FunctionContext::new().with_file_type(file_type))
-                    } else {
-                        FunctionContext::new().with_file_type(file_type)
-                    };
+                let context = if let Some(func_name) = extract_function_from_location(&location) {
+                    detector
+                        .get_context(&func_name)
+                        .cloned()
+                        .unwrap_or_else(|| FunctionContext::new().with_file_type(file_type))
+                } else {
+                    FunctionContext::new().with_file_type(file_type)
+                };
 
                 // Convert debt type to pattern
                 let pattern = debt_type_to_pattern(&item.debt_type);
 
                 // Evaluate the rule
-                let action = self.rule_engine.write().unwrap().evaluate(&pattern, &context);
+                let action = self
+                    .rule_engine
+                    .write()
+                    .unwrap()
+                    .evaluate(&pattern, &context);
 
                 match action {
                     RuleAction::Allow => {
@@ -88,9 +86,14 @@ impl ContextAwareAnalyzer {
                     RuleAction::Warn => {
                         // Reduce severity by 2
                         item.priority = adjust_priority(item.priority, -2);
-                        
+
                         // Add context note to the message
-                        if let Some(reason) = self.rule_engine.write().unwrap().get_reason(&pattern, &context) {
+                        if let Some(reason) = self
+                            .rule_engine
+                            .write()
+                            .unwrap()
+                            .get_reason(&pattern, &context)
+                        {
                             item.message = format!("{} (Context: {})", item.message, reason);
                         }
                         true
@@ -100,7 +103,12 @@ impl ContextAwareAnalyzer {
                         item.priority = adjust_priority(item.priority, -n);
 
                         // Add context note to the message
-                        if let Some(reason) = self.rule_engine.write().unwrap().get_reason(&pattern, &context) {
+                        if let Some(reason) = self
+                            .rule_engine
+                            .write()
+                            .unwrap()
+                            .get_reason(&pattern, &context)
+                        {
                             item.message = format!("{} (Context: {})", item.message, reason);
                         }
                         true
@@ -117,7 +125,11 @@ impl ContextAwareAnalyzer {
 
             metrics.debt_items.retain_mut(|item| {
                 let pattern = debt_type_to_pattern(&item.debt_type);
-                let action = self.rule_engine.write().unwrap().evaluate(&pattern, &context);
+                let action = self
+                    .rule_engine
+                    .write()
+                    .unwrap()
+                    .evaluate(&pattern, &context);
 
                 match action {
                     RuleAction::Allow | RuleAction::Skip => false,
@@ -165,10 +177,10 @@ fn debt_type_to_pattern(debt_type: &DebtType) -> DebtPattern {
     match debt_type {
         // Performance patterns - simplified since we don't have access to details
         DebtType::Performance => DebtPattern::Performance,
-        
+
         // Security patterns
         DebtType::Security => DebtPattern::Security,
-        
+
         // All other debt types
         _ => DebtPattern::DebtType(*debt_type),
     }
