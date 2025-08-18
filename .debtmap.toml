@@ -44,7 +44,12 @@ patterns = [
     "venv/**",
     "node_modules/**",
     "*.min.js",
-    "benches/**"
+    "benches/**",
+    "tests/**/*",           # Exclude all files in tests directory
+    "**/test_*.rs",         # Exclude test files with test_ prefix
+    "**/*_test.rs",         # Exclude test files with _test suffix
+    "**/*_tests.rs",        # Exclude test files with _tests suffix
+    "**/fixtures/**"        # Exclude test fixtures
 ]
 
 [output]
