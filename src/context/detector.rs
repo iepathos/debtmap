@@ -63,13 +63,14 @@ impl ContextDetector {
 
         // Store the context
         self.contexts.push((func_name.clone(), context.clone()));
-        
+
         // Store line range if span locations are available
         let start_span = func.sig.ident.span();
         let end_span = func.block.brace_token.span.join();
         let start_line = start_span.start().line;
         let end_line = end_span.end().line;
-        self.line_contexts.push((start_line, end_line, context.clone()));
+        self.line_contexts
+            .push((start_line, end_line, context.clone()));
 
         context
     }
@@ -81,7 +82,7 @@ impl ContextDetector {
             .find(|(name, _)| name == func_name)
             .map(|(_, context)| context)
     }
-    
+
     /// Get context for a line number
     pub fn get_context_for_line(&self, line: usize) -> Option<&FunctionContext> {
         self.line_contexts
@@ -175,16 +176,16 @@ impl<'ast> Visit<'ast> for ContextDetector {
         for item in &node.items {
             if let ImplItem::Fn(method) = item {
                 let func_name = method.sig.ident.to_string();
-                
+
                 // Check for test attribute on the method
                 let is_test = has_test_attribute(&method.attrs);
-                
+
                 // Detect function role
                 let role = detect_function_role(&func_name, is_test);
-                
+
                 // Check if async
                 let is_async = method.sig.asyncness.is_some();
-                
+
                 // Build context
                 let context = FunctionContext::new()
                     .with_role(role)
@@ -192,10 +193,10 @@ impl<'ast> Visit<'ast> for ContextDetector {
                     .with_async(is_async)
                     .with_function_name(func_name.clone())
                     .with_module_path(self.module_path.clone());
-                
+
                 // Store the context with name
                 self.contexts.push((func_name.clone(), context.clone()));
-                
+
                 // Store line range if span locations are available
                 let start_span = method.sig.ident.span();
                 let end_span = method.block.brace_token.span.join();

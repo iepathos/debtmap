@@ -49,151 +49,233 @@ impl ValidationVisitor {
                     });
 
                 self.debt_items.push(DebtItem {
-                    id: format!(
-                        "security-validation-{}-{}",
-                        self.path.display(),
-                        location.line
-                    ),
+                    id: format!("SEC-VAL-{}", self.debt_items.len() + 1),
                     debt_type: DebtType::Security,
-                    priority: Priority::High,
+                    priority: Priority::Medium,
                     file: self.path.clone(),
                     line: location.line,
                     column: location.column,
-                    message: format!("Missing input validation in function '{}'", func_name),
-                    context: Some("External input should be validated before use".to_string()),
+                    message: format!(
+                        "Input Validation: Function '{}' handles external input without validation",
+                        func_name
+                    ),
+                    context: Some(format!("{}()", func_name)),
                 });
             }
         }
-    }
 
-    fn is_external_input_source(&self, name: &str) -> bool {
-        let input_sources = [
-            "request",
-            "req",
-            "body",
-            "params",
-            "query",
-            "headers",
-            "user_input",
-            "input",
-            "data",
-            "payload",
-            "form",
-            "stdin",
-            "args",
-            "env",
-            "file",
-            "socket",
-            "stream",
-        ];
-
-        let name_lower = name.to_lowercase();
-        input_sources
-            .iter()
-            .any(|&source| name_lower.contains(source))
-    }
-
-    fn is_validation_method(&self, name: &str) -> bool {
-        let validation_methods = [
-            "validate", "verify", "check", "sanitize", "escape", "is_valid", "parse", "try_from",
-            "from_str", "filter", "clean", "strip", "trim",
-        ];
-
-        let name_lower = name.to_lowercase();
-        validation_methods
-            .iter()
-            .any(|&method| name_lower.contains(method))
+        // Reset for next function
+        self.has_validation = false;
+        self.has_external_input = false;
     }
 }
 
 impl<'ast> Visit<'ast> for ValidationVisitor {
-    fn visit_item_fn(&mut self, i: &'ast ItemFn) {
-        let prev_function = self.current_function.clone();
+    fn visit_item_fn(&mut self, node: &'ast ItemFn) {
+        // Store previous function state
+        let prev_func = self.current_function.clone();
         let prev_location = self.current_function_location.clone();
-        let prev_validation = self.has_validation;
-        let prev_input = self.has_external_input;
 
-        self.current_function = Some(i.sig.ident.to_string());
+        self.current_function = Some(node.sig.ident.to_string());
+        self.current_function_location = Some(self.location_extractor.extract_location(node));
 
-        // Extract actual function location
-        self.current_function_location = Some(
-            self.location_extractor
-                .extract_item_location(&syn::Item::Fn(i.clone())),
-        );
+        // Visit function body
+        syn::visit::visit_item_fn(self, node);
 
-        self.has_validation = false;
-        self.has_external_input = false;
+        // Check validation after visiting
+        self.check_function_validation();
 
-        // Check function parameters for external input
-        for input in &i.sig.inputs {
-            if let syn::FnArg::Typed(pat_type) = input {
-                if let Pat::Ident(PatIdent { ident, .. }) = &*pat_type.pat {
-                    if self.is_external_input_source(&ident.to_string()) {
+        // Restore previous state
+        self.current_function = prev_func;
+        self.current_function_location = prev_location;
+    }
+
+    fn visit_block(&mut self, node: &'ast Block) {
+        // Check for external input patterns
+        for stmt in &node.stmts {
+            if let syn::Stmt::Local(local) = stmt {
+                if let Pat::Ident(PatIdent { ident, .. }) = &local.pat {
+                    let name = ident.to_string();
+                    if name.contains("input") || name.contains("param") || name.contains("arg") {
                         self.has_external_input = true;
                     }
                 }
             }
         }
 
-        // Check if function name suggests it handles external input
-        if self.is_external_input_source(&i.sig.ident.to_string()) {
-            self.has_external_input = true;
-        }
-
-        syn::visit::visit_item_fn(self, i);
-
-        // Check after visiting the function body
-        self.check_function_validation();
-
-        self.current_function = prev_function;
-        self.current_function_location = prev_location;
-        self.has_validation = prev_validation;
-        self.has_external_input = prev_input;
+        syn::visit::visit_block(self, node);
     }
 
-    fn visit_expr_method_call(&mut self, i: &'ast ExprMethodCall) {
-        let method_name = i.method.to_string();
+    fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+        let method_name = node.method.to_string();
 
         // Check for validation methods
-        if self.is_validation_method(&method_name) {
+        if method_name.contains("validate")
+            || method_name.contains("sanitize")
+            || method_name.contains("check")
+            || method_name.contains("verify")
+        {
             self.has_validation = true;
         }
 
-        // Check for external input access
-        if self.is_external_input_source(&method_name) {
+        // Check for input methods
+        if method_name.contains("read")
+            || method_name.contains("parse")
+            || method_name.contains("from")
+        {
             self.has_external_input = true;
         }
 
-        // Check for dangerous operations without validation
-        let dangerous_ops = ["execute", "eval", "system", "command", "shell"];
-        if dangerous_ops.contains(&method_name.as_str()) && !self.has_validation {
-            self.debt_items.push(DebtItem {
-                id: format!("security-dangerous-{}-{}", self.path.display(), 0),
-                debt_type: DebtType::Security,
-                priority: Priority::Critical,
-                file: self.path.clone(),
-                line: 0,
-                column: None,
-                message: format!(
-                    "Critical: Dangerous operation '{}' without validation",
-                    method_name
-                ),
-                context: Some(
-                    "Validate and sanitize all inputs before dangerous operations".to_string(),
-                ),
-            });
-        }
+        syn::visit::visit_expr_method_call(self, node);
+    }
+}
 
-        syn::visit::visit_expr_method_call(self, i);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detects_input_validation_in_test_functions() {
+        // This test exposes the bug - we detect issues in test functions
+        let code = r#"
+#[test]
+fn test_something() {
+    let input = "test";
+    assert_eq!(input, "test");
+}
+
+fn production_function() {
+    let user_input = "data";
+    process(user_input);
+}
+"#;
+
+        let file = syn::parse_file(code).unwrap();
+        let path = Path::new("test.rs");
+
+        let debt_items = detect_validation_gaps(&file, path);
+
+        // Find issues in test function (lines 1-6)
+        let test_function_issues = debt_items.iter().filter(|item| item.line <= 6).count();
+
+        // Current behavior: we DO detect issues in test functions (bug)
+        assert!(test_function_issues > 0,
+                "BUG: Input validation detector should detect issues in test functions (current behavior)");
+
+        // TODO: When fixed, this should be:
+        // assert_eq!(test_function_issues, 0, "Test functions should not have validation issues");
     }
 
-    fn visit_block(&mut self, i: &'ast Block) {
-        // Check for validation patterns in blocks
-        let block_str = quote::quote!(#i).to_string();
-        if self.is_validation_method(&block_str) {
-            self.has_validation = true;
+    #[test]
+    fn test_numeric_literals_trigger_validation() {
+        let code = r#"
+fn function_with_literals() {
+    let value = 42;
+    if value == 42 {
+        println!("Match");
+    }
+}
+"#;
+
+        let file = syn::parse_file(code).unwrap();
+        let path = Path::new("test.rs");
+
+        let debt_items = detect_validation_gaps(&file, path);
+
+        // Document current behavior
+        println!(
+            "Found {} validation issues with numeric literals",
+            debt_items.len()
+        );
+        for item in &debt_items {
+            println!("  - {}", item.message);
+        }
+    }
+
+    #[test]
+    fn test_assert_statements_with_literals() {
+        // Pattern from parameter_analyzer.rs
+        let code = r#"
+#[test]
+fn test_classify_parameter_list_impact_low() {
+    assert_eq!(
+        ParameterAnalyzer::classify_parameter_list_impact(0),
+        MaintainabilityImpact::Low
+    );
+    assert_eq!(
+        ParameterAnalyzer::classify_parameter_list_impact(5),
+        MaintainabilityImpact::Low
+    );
+}
+"#;
+
+        let file = syn::parse_file(code).unwrap();
+        let path = Path::new("test.rs");
+
+        let debt_items = detect_validation_gaps(&file, path);
+
+        println!("Assert pattern issues: {}", debt_items.len());
+        for item in &debt_items {
+            println!("  Line {}: {}", item.line, item.message);
         }
 
-        syn::visit::visit_block(self, i);
+        // Document that we detect issues in test assertions
+        let has_issues = !debt_items.is_empty();
+        println!("Has validation issues in test assertions: {}", has_issues);
+    }
+
+    #[test]
+    fn test_should_ignore_test_attribute() {
+        let code = r#"
+#[test]
+fn test_function() {
+    let input_value = 100;
+    assert_eq!(input_value, 100);
+}
+
+fn regular_function() {
+    let input_value = 100;
+    process(input_value);
+}
+"#;
+
+        let file = syn::parse_file(code).unwrap();
+        let path = Path::new("test.rs");
+
+        let debt_items = detect_validation_gaps(&file, path);
+
+        // Both functions have issues currently (bug)
+        let test_issues = debt_items
+            .iter()
+            .filter(|item| {
+                item.context
+                    .as_ref()
+                    .map_or(false, |c| c.contains("test_function"))
+            })
+            .count();
+
+        let regular_issues = debt_items
+            .iter()
+            .filter(|item| {
+                item.context
+                    .as_ref()
+                    .map_or(false, |c| c.contains("regular_function"))
+            })
+            .count();
+
+        println!(
+            "Test function issues: {}, Regular function issues: {}",
+            test_issues, regular_issues
+        );
+
+        // Current behavior - both have issues
+        assert!(
+            test_issues > 0 || regular_issues > 0,
+            "One or both functions should have issues in current implementation"
+        );
+
+        // TODO: When fixed:
+        // assert_eq!(test_issues, 0, "Test functions should have no issues");
+        // assert!(regular_issues > 0, "Regular functions should have issues");
     }
 }

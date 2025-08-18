@@ -61,6 +61,7 @@ struct AnalyzeConfig {
     exclude_tests: bool,
     #[allow(dead_code)]
     smart_performance: bool,
+    #[allow(dead_code)]
     context_aware: bool,
 }
 

@@ -178,7 +178,7 @@ fn debt_type_to_pattern(debt_type: &DebtType, message: &str) -> DebtPattern {
                 DebtPattern::Security
             }
         }
-        
+
         // Performance patterns
         DebtType::Performance => DebtPattern::Performance,
 
@@ -186,7 +186,6 @@ fn debt_type_to_pattern(debt_type: &DebtType, message: &str) -> DebtPattern {
         _ => DebtPattern::DebtType(*debt_type),
     }
 }
-
 
 /// Adjust priority based on severity adjustment
 fn adjust_priority(priority: Priority, adjustment: i32) -> Priority {
@@ -215,7 +214,6 @@ fn adjust_priority(priority: Priority, adjustment: i32) -> Priority {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn test_adjust_priority() {
