@@ -113,7 +113,7 @@ analyze-self:
     echo "Generating code coverage (lcov format)..."
     cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage
     echo "Analyzing current repository with debtmap..."
-    ./target/release/debtmap analyze . --lcov target/coverage/lcov.info
+    ./target/release/debtmap analyze . --lcov target/coverage/lcov.info --context-aware -vv
     echo "Analysis complete!"
 
 # Run property-based tests only (if using proptest)
