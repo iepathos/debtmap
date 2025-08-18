@@ -55,13 +55,11 @@ impl ValidationDetector {
     pub fn is_validation_node(&self, node: &DataFlowNode) -> bool {
         match node {
             DataFlowNode::Validator { .. } => true,
-            DataFlowNode::Expression { kind, .. } => {
-                if let super::graph::ExpressionKind::MethodCall { method, .. } = kind {
-                    self.is_validation_method(method)
-                } else {
-                    false
-                }
-            }
+            DataFlowNode::Expression {
+                kind: super::graph::ExpressionKind::MethodCall { method, .. },
+                ..
+            } => self.is_validation_method(method),
+            DataFlowNode::Expression { .. } => false,
             _ => false,
         }
     }

@@ -148,9 +148,9 @@ pub enum Commands {
         #[arg(long = "exclude-tests")]
         exclude_tests: bool,
 
-        /// Enable context-aware false positive reduction
-        #[arg(long = "context-aware")]
-        context_aware: bool,
+        /// Disable context-aware false positive reduction (enabled by default)
+        #[arg(long = "no-context-aware")]
+        no_context_aware: bool,
     },
 
     /// Initialize configuration file

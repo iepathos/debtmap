@@ -10,6 +10,7 @@ fn test_context_aware_filters_parameter_analyzer() {
             "--",
             "analyze",
             "src/organization/parameter_analyzer.rs",
+            "--no-context-aware",
         ])
         .output()
         .expect("Failed to run debtmap");
@@ -22,7 +23,6 @@ fn test_context_aware_filters_parameter_analyzer() {
             "--",
             "analyze",
             "src/organization/parameter_analyzer.rs",
-            "--context-aware",
         ])
         .output()
         .expect("Failed to run debtmap");
@@ -34,10 +34,13 @@ fn test_context_aware_filters_parameter_analyzer() {
     let security_with = stdout_with.matches("SECURITY:").count();
 
     println!(
-        "Security issues without --context-aware: {}",
+        "Security issues with --no-context-aware: {}",
         security_without
     );
-    println!("Security issues with --context-aware: {}", security_with);
+    println!(
+        "Security issues with default (context-aware): {}",
+        security_with
+    );
 
     // Check for specific test function issues
     let test_function_patterns = [
@@ -57,7 +60,7 @@ fn test_context_aware_filters_parameter_analyzer() {
 
         if has_with {
             println!(
-                "  ISSUE: Test function '{}' still appears with --context-aware",
+                "  ISSUE: Test function '{}' still appears with context-aware (default)",
                 pattern
             );
         }
@@ -65,20 +68,14 @@ fn test_context_aware_filters_parameter_analyzer() {
 
     // Context-aware should reduce or eliminate test function issues
     if security_with >= security_without && security_without > 0 {
-        println!("WARNING: --context-aware did not reduce security issues");
+        println!("WARNING: context-aware (default) did not reduce security issues");
     }
 }
 
 #[test]
 fn test_context_aware_filters_rust_call_graph() {
     let output = Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "analyze",
-            "src/analyzers/rust_call_graph.rs",
-            "--context-aware",
-        ])
+        .args(&["run", "--", "analyze", "src/analyzers/rust_call_graph.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -117,7 +114,7 @@ fn test_context_aware_on_entire_codebase() {
     // This is the actual command the user is running
     // NOTE: This analyzes the ENTIRE codebase and can take several minutes
     let output = Command::new("cargo")
-        .args(&["run", "--", "analyze", ".", "--context-aware"])
+        .args(&["run", "--", "analyze", "."])
         .output()
         .expect("Failed to run debtmap");
 
@@ -144,7 +141,7 @@ fn test_context_aware_on_entire_codebase() {
     }
 
     if found_test_issues {
-        println!("ISSUE CONFIRMED: Test functions are triggering false positives even with --context-aware");
+        println!("ISSUE CONFIRMED: Test functions are triggering false positives even with context-aware (default)");
     }
 }
 
@@ -155,7 +152,7 @@ fn test_context_aware_on_specific_dirs() {
 
     for dir in &dirs_to_test {
         let output = Command::new("cargo")
-            .args(&["run", "--", "analyze", dir, "--context-aware"])
+            .args(&["run", "--", "analyze", dir])
             .output()
             .expect(&format!("Failed to analyze {}", dir));
 

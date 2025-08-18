@@ -41,9 +41,15 @@ mod tests {
 
     fs::write("test_param_analyzer.rs", code).unwrap();
 
-    // Run without --context-aware
+    // Run with --no-context-aware (context-aware is now default)
     let output = Command::new("cargo")
-        .args(&["run", "--", "analyze", "test_param_analyzer.rs"])
+        .args(&[
+            "run",
+            "--",
+            "analyze",
+            "test_param_analyzer.rs",
+            "--no-context-aware",
+        ])
         .output()
         .expect("Failed to run debtmap");
 
@@ -52,15 +58,9 @@ mod tests {
     // Check for Input Validation issues
     let has_input_validation = stdout.contains("Input Validation");
 
-    // Run with --context-aware
+    // Run with default (context-aware enabled)
     let output_aware = Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "analyze",
-            "test_param_analyzer.rs",
-            "--context-aware",
-        ])
+        .args(&["run", "--", "analyze", "test_param_analyzer.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -70,17 +70,17 @@ mod tests {
     fs::remove_file("test_param_analyzer.rs").ok();
 
     println!(
-        "Without --context-aware: has Input Validation = {}",
+        "With --no-context-aware: has Input Validation = {}",
         has_input_validation
     );
     println!(
-        "With --context-aware: has Input Validation = {}",
+        "With default (context-aware): has Input Validation = {}",
         has_input_validation_aware
     );
 
     // Document the bug: context-aware flag doesn't help
     if has_input_validation && has_input_validation_aware {
-        println!("BUG CONFIRMED: --context-aware flag does not filter Input Validation in test functions");
+        println!("BUG CONFIRMED: context-aware does not filter Input Validation in test functions");
     }
 
     // This should be the correct behavior but currently fails
@@ -115,13 +115,7 @@ mod tests {
     fs::write("test_call_graph.rs", code).unwrap();
 
     let output = Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "analyze",
-            "test_call_graph.rs",
-            "--context-aware",
-        ])
+        .args(&["run", "--", "analyze", "test_call_graph.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -160,13 +154,7 @@ impl GlobalTypeRegistry {
     fs::write("test_type_registry.rs", code).unwrap();
 
     let output = Command::new("cargo")
-        .args(&[
-            "run",
-            "--",
-            "analyze",
-            "test_type_registry.rs",
-            "--context-aware",
-        ])
+        .args(&["run", "--", "analyze", "test_type_registry.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -247,7 +235,7 @@ fn test_comprehensive_false_positive_patterns() {
         fs::write(&filename, code).unwrap();
 
         let output = Command::new("cargo")
-            .args(&["run", "--", "analyze", &filename, "--context-aware"])
+            .args(&["run", "--", "analyze", &filename])
             .output()
             .expect("Failed to run debtmap");
 
@@ -265,7 +253,7 @@ fn test_comprehensive_false_positive_patterns() {
         // These should all NOT trigger issues with context-aware, but currently do
         if has_issue && name.contains("test") {
             println!(
-                "  BUG: Test pattern '{}' triggers false positive even with --context-aware",
+                "  BUG: Test pattern '{}' triggers false positive even with context-aware (default)",
                 name
             );
         }

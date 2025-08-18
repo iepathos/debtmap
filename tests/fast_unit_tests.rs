@@ -38,17 +38,23 @@ mod tests {
 
     #[test]
     fn test_input_validation_detector_finds_issues() {
+        // Test with actual external input that flows to a dangerous sink
         let code = r#"
+            use std::env;
+            use std::fs::File;
+            use std::io::Write;
+            
             fn process_input() {
-                let user_input = "data";
-                process(user_input);
+                let user_input = env::var("USER_DATA").unwrap();
+                let mut file = File::create(&user_input).unwrap();
+                file.write_all(b"data").unwrap();
             }
         "#;
 
         let file = syn::parse_file(code).unwrap();
         let debt_items = detect_validation_gaps(&file, Path::new("test.rs"));
 
-        // Should find validation issues
+        // Should find validation issues for environment variable flowing to file system
         assert!(!debt_items.is_empty(), "Should detect validation issues");
     }
 

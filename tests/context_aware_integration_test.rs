@@ -41,23 +41,23 @@ impl ParameterAnalyzer {
     // Write test file
     fs::write("test_context_aware_temp.rs", test_content).unwrap();
 
-    // Run without context-aware
+    // Run with --no-context-aware
     let output_without = Command::new("cargo")
-        .args(&["run", "--", "analyze", "test_context_aware_temp.rs"])
-        .output()
-        .expect("Failed to run debtmap");
-
-    let stdout_without = String::from_utf8_lossy(&output_without.stdout);
-
-    // Run with context-aware
-    let output_with = Command::new("cargo")
         .args(&[
             "run",
             "--",
             "analyze",
             "test_context_aware_temp.rs",
-            "--context-aware",
+            "--no-context-aware",
         ])
+        .output()
+        .expect("Failed to run debtmap");
+
+    let stdout_without = String::from_utf8_lossy(&output_without.stdout);
+
+    // Run with default (context-aware enabled)
+    let output_with = Command::new("cargo")
+        .args(&["run", "--", "analyze", "test_context_aware_temp.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -71,19 +71,19 @@ impl ParameterAnalyzer {
     let security_count_with = stdout_with.matches("SECURITY:").count();
 
     println!(
-        "Security issues without context-aware: {}",
+        "Security issues with --no-context-aware: {}",
         security_count_without
     );
     println!(
-        "Security issues with context-aware: {}",
+        "Security issues with default (context-aware): {}",
         security_count_with
     );
 
     // Debug output if test fails
     if security_count_with >= security_count_without && security_count_without > 0 {
-        println!("\n=== OUTPUT WITHOUT CONTEXT-AWARE ===");
+        println!("\n=== OUTPUT WITH --NO-CONTEXT-AWARE ===");
         println!("{}", stdout_without);
-        println!("\n=== OUTPUT WITH CONTEXT-AWARE ===");
+        println!("\n=== OUTPUT WITH DEFAULT (CONTEXT-AWARE) ===");
         println!("{}", stdout_with);
     }
 

@@ -62,7 +62,7 @@ struct AnalyzeConfig {
     #[allow(dead_code)]
     smart_performance: bool,
     #[allow(dead_code)]
-    context_aware: bool,
+    no_context_aware: bool,
 }
 
 struct ValidateConfig {
@@ -143,7 +143,7 @@ fn main() -> Result<()> {
             legacy_scoring,
             exclude_tests,
             smart_performance,
-            context_aware,
+            no_context_aware,
         } => {
             // Set enhanced scoring environment variable
             if legacy_scoring {
@@ -153,8 +153,8 @@ fn main() -> Result<()> {
             }
             // Default is true (enhanced scoring enabled)
 
-            // Set context-aware environment variable
-            if context_aware {
+            // Set context-aware environment variable (enabled by default)
+            if !no_context_aware {
                 std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
             }
 
@@ -189,7 +189,7 @@ fn main() -> Result<()> {
                 filter_categories,
                 exclude_tests,
                 smart_performance,
-                context_aware,
+                no_context_aware,
             };
             handle_analyze(config)
         }
