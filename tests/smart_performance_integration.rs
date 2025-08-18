@@ -3,7 +3,6 @@ use debtmap::performance::{
     PerformanceDetector, SmartPerformanceConfig, SmartPerformanceDetector,
 };
 use std::path::Path;
-use syn;
 
 #[test]
 fn test_smart_detection_filters_test_fixtures() {

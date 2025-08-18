@@ -1,6 +1,5 @@
 /// Fast unit tests that don't spawn external processes
 /// These tests run quickly and can be used in CI
-
 #[cfg(test)]
 mod tests {
     use debtmap::context::{detect_file_type, detector::ContextDetector, FileType, FunctionRole};

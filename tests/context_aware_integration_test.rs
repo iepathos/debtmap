@@ -43,7 +43,7 @@ impl ParameterAnalyzer {
 
     // Run with --no-context-aware
     let output_without = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "analyze",
@@ -57,7 +57,7 @@ impl ParameterAnalyzer {
 
     // Run with default (context-aware enabled)
     let output_with = Command::new("cargo")
-        .args(&["run", "--", "analyze", "test_context_aware_temp.rs"])
+        .args(["run", "--", "analyze", "test_context_aware_temp.rs"])
         .output()
         .expect("Failed to run debtmap");
 

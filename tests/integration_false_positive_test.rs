@@ -5,7 +5,7 @@ use std::process::Command;
 fn test_context_aware_filters_parameter_analyzer() {
     // Run debtmap on the actual parameter_analyzer.rs file
     let output_without = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "analyze",
@@ -18,7 +18,7 @@ fn test_context_aware_filters_parameter_analyzer() {
     let stdout_without = String::from_utf8_lossy(&output_without.stdout);
 
     let output_with = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "analyze",
@@ -75,7 +75,7 @@ fn test_context_aware_filters_parameter_analyzer() {
 #[test]
 fn test_context_aware_filters_rust_call_graph() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "analyze", "src/analyzers/rust_call_graph.rs"])
+        .args(["run", "--", "analyze", "src/analyzers/rust_call_graph.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -114,7 +114,7 @@ fn test_context_aware_on_entire_codebase() {
     // This is the actual command the user is running
     // NOTE: This analyzes the ENTIRE codebase and can take several minutes
     let output = Command::new("cargo")
-        .args(&["run", "--", "analyze", "."])
+        .args(["run", "--", "analyze", "."])
         .output()
         .expect("Failed to run debtmap");
 
@@ -152,9 +152,9 @@ fn test_context_aware_on_specific_dirs() {
 
     for dir in &dirs_to_test {
         let output = Command::new("cargo")
-            .args(&["run", "--", "analyze", dir])
+            .args(["run", "--", "analyze", dir])
             .output()
-            .expect(&format!("Failed to analyze {}", dir));
+            .unwrap_or_else(|_| panic!("Failed to analyze {}", dir));
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 

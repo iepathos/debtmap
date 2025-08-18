@@ -43,7 +43,7 @@ mod tests {
 
     // Run with --no-context-aware (context-aware is now default)
     let output = Command::new("cargo")
-        .args(&[
+        .args([
             "run",
             "--",
             "analyze",
@@ -60,7 +60,7 @@ mod tests {
 
     // Run with default (context-aware enabled)
     let output_aware = Command::new("cargo")
-        .args(&["run", "--", "analyze", "test_param_analyzer.rs"])
+        .args(["run", "--", "analyze", "test_param_analyzer.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -115,7 +115,7 @@ mod tests {
     fs::write("test_call_graph.rs", code).unwrap();
 
     let output = Command::new("cargo")
-        .args(&["run", "--", "analyze", "test_call_graph.rs"])
+        .args(["run", "--", "analyze", "test_call_graph.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -154,7 +154,7 @@ impl GlobalTypeRegistry {
     fs::write("test_type_registry.rs", code).unwrap();
 
     let output = Command::new("cargo")
-        .args(&["run", "--", "analyze", "test_type_registry.rs"])
+        .args(["run", "--", "analyze", "test_type_registry.rs"])
         .output()
         .expect("Failed to run debtmap");
 
@@ -235,7 +235,7 @@ fn test_comprehensive_false_positive_patterns() {
         fs::write(&filename, code).unwrap();
 
         let output = Command::new("cargo")
-            .args(&["run", "--", "analyze", &filename])
+            .args(["run", "--", "analyze", &filename])
             .output()
             .expect("Failed to run debtmap");
 

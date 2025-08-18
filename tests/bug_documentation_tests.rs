@@ -15,10 +15,7 @@ fn test_gap_security_module_bypasses_context_aware() {
     // 6. It doesn't check the context-aware flag or filter test functions
 
     // This test documents the architectural issue
-    assert!(
-        true,
-        "Security module needs to be integrated with context-aware system"
-    );
+    // TODO: Security module needs to be integrated with context-aware system
 }
 
 #[test]
@@ -35,10 +32,7 @@ fn test_gap_input_validation_detector_ignores_test_functions() {
     // - If it's in a #[cfg(test)] module
     // - If the function name starts with 'test_'
 
-    assert!(
-        true,
-        "Input validation detector needs test function awareness"
-    );
+    // TODO: Input validation detector needs test function awareness
 }
 
 #[test]
@@ -49,7 +43,7 @@ fn test_gap_priority_module_may_add_issues() {
     // It's possible that Input Validation issues are being added or modified
     // during the priority scoring phase
 
-    assert!(true, "Priority module interaction needs investigation");
+    // TODO: Priority module interaction needs investigation
 }
 
 #[test]
@@ -66,7 +60,7 @@ fn test_gap_no_integration_tests_for_cli_flags() {
     // - Security module integration
     // - Priority scoring with context-aware
 
-    assert!(true, "Need comprehensive integration tests for CLI flags");
+    // TODO: Need comprehensive integration tests for CLI flags
 }
 
 #[test]
@@ -85,7 +79,7 @@ fn test_expected_behavior_documentation() {
 
     // 3. Reduce false positives by 60%+ as per spec 43
 
-    assert!(true, "This documents the expected behavior");
+    // This documents the expected behavior
 }
 
 #[test]
@@ -104,5 +98,5 @@ fn test_affected_files_documentation() {
     //    - Investigate if it's adding issues
     //    - Ensure it respects context-aware filtering
 
-    assert!(true, "This documents the files that need changes");
+    // This documents the files that need changes
 }

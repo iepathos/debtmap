@@ -198,7 +198,7 @@ fn vulnerable_function() {
 
         // This should be flagged as it's actual input to file system operation
         assert!(
-            debt_items.len() > 0,
+            !debt_items.is_empty(),
             "Should detect path traversal vulnerability"
         );
 
