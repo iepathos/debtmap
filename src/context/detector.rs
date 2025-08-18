@@ -14,6 +14,8 @@ pub struct ContextDetector {
     module_path: Vec<String>,
     /// Detected contexts for functions
     pub contexts: Vec<(String, FunctionContext)>,
+    /// Function contexts mapped by line range (start_line, end_line, context)
+    pub line_contexts: Vec<(usize, usize, FunctionContext)>,
     /// File type for the current file
     file_type: FileType,
 }
@@ -24,6 +26,7 @@ impl ContextDetector {
         Self {
             module_path: Vec::new(),
             contexts: Vec::new(),
+            line_contexts: Vec::new(),
             file_type,
         }
     }
@@ -59,7 +62,14 @@ impl ContextDetector {
         };
 
         // Store the context
-        self.contexts.push((func_name, context.clone()));
+        self.contexts.push((func_name.clone(), context.clone()));
+        
+        // Store line range if span locations are available
+        let start_span = func.sig.ident.span();
+        let end_span = func.block.brace_token.span.join();
+        let start_line = start_span.start().line;
+        let end_line = end_span.end().line;
+        self.line_contexts.push((start_line, end_line, context.clone()));
 
         context
     }
@@ -70,6 +80,14 @@ impl ContextDetector {
             .iter()
             .find(|(name, _)| name == func_name)
             .map(|(_, context)| context)
+    }
+    
+    /// Get context for a line number
+    pub fn get_context_for_line(&self, line: usize) -> Option<&FunctionContext> {
+        self.line_contexts
+            .iter()
+            .find(|(start, end, _)| line >= *start && line <= *end)
+            .map(|(_, _, context)| context)
     }
 
     /// Detect if a function is a configuration loader based on its implementation
@@ -154,22 +172,36 @@ impl<'ast> Visit<'ast> for ContextDetector {
 
     fn visit_item_impl(&mut self, node: &'ast ItemImpl) {
         // Track impl blocks for context
-        if let Some((_, path, _)) = &node.trait_ {
-            let trait_name = path_to_string(path);
-
-            // Check for test implementations
-            if trait_name.contains("Test") || trait_name.contains("Benchmark") {
-                // Mark all methods in this impl as test-related
-                for item in &node.items {
-                    if let ImplItem::Fn(method) = item {
-                        let func_name = method.sig.ident.to_string();
-                        let context = FunctionContext::new()
-                            .with_role(FunctionRole::TestFunction)
-                            .with_file_type(self.file_type)
-                            .with_function_name(func_name.clone());
-                        self.contexts.push((func_name, context));
-                    }
-                }
+        for item in &node.items {
+            if let ImplItem::Fn(method) = item {
+                let func_name = method.sig.ident.to_string();
+                
+                // Check for test attribute on the method
+                let is_test = has_test_attribute(&method.attrs);
+                
+                // Detect function role
+                let role = detect_function_role(&func_name, is_test);
+                
+                // Check if async
+                let is_async = method.sig.asyncness.is_some();
+                
+                // Build context
+                let context = FunctionContext::new()
+                    .with_role(role)
+                    .with_file_type(self.file_type)
+                    .with_async(is_async)
+                    .with_function_name(func_name.clone())
+                    .with_module_path(self.module_path.clone());
+                
+                // Store the context with name
+                self.contexts.push((func_name.clone(), context.clone()));
+                
+                // Store line range if span locations are available
+                let start_span = method.sig.ident.span();
+                let end_span = method.block.brace_token.span.join();
+                let start_line = start_span.start().line;
+                let end_line = end_span.end().line;
+                self.line_contexts.push((start_line, end_line, context));
             }
         }
 

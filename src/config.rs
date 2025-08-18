@@ -337,7 +337,8 @@ impl DebtmapConfig {
     /// # Examples
     ///
     /// ```
-    /// let config = DebtmapConfig::load();
+    /// use debtmap::config::DebtmapConfig;
+    /// let config = DebtmapConfig::default();
     /// let patterns = config.get_ignore_patterns();
     /// // patterns might contain ["tests/**/*", "*.test.rs"]
     /// ```

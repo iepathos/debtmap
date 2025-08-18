@@ -52,20 +52,14 @@ impl ContextAwareAnalyzer {
 
             // Filter debt items based on context
             metrics.debt_items.retain_mut(|item| {
-                // Find the function context for this debt item
-                // Build a location string from file:line
-                let location = format!("{}:{}", item.file.display(), item.line);
-                let context = if let Some(func_name) = extract_function_from_location(&location) {
-                    detector
-                        .get_context(&func_name)
-                        .cloned()
-                        .unwrap_or_else(|| FunctionContext::new().with_file_type(file_type))
-                } else {
-                    FunctionContext::new().with_file_type(file_type)
-                };
+                // Find the function context for this debt item using line number
+                let context = detector
+                    .get_context_for_line(item.line)
+                    .cloned()
+                    .unwrap_or_else(|| FunctionContext::new().with_file_type(file_type));
 
                 // Convert debt type to pattern
-                let pattern = debt_type_to_pattern(&item.debt_type);
+                let pattern = debt_type_to_pattern(&item.debt_type, &item.message);
 
                 // Evaluate the rule
                 let action = self
@@ -124,7 +118,7 @@ impl ContextAwareAnalyzer {
             let context = FunctionContext::new().with_file_type(file_type);
 
             metrics.debt_items.retain_mut(|item| {
-                let pattern = debt_type_to_pattern(&item.debt_type);
+                let pattern = debt_type_to_pattern(&item.debt_type, &item.message);
                 let action = self
                     .rule_engine
                     .write()
@@ -173,42 +167,26 @@ impl Analyzer for ContextAwareAnalyzer {
 }
 
 /// Convert a debt type to a debt pattern for rule matching
-fn debt_type_to_pattern(debt_type: &DebtType) -> DebtPattern {
+fn debt_type_to_pattern(debt_type: &DebtType, message: &str) -> DebtPattern {
     match debt_type {
-        // Performance patterns - simplified since we don't have access to details
+        // Security patterns - check message for specific types
+        DebtType::Security => {
+            // Check if it's an input validation issue
+            if message.contains("Input Validation") || message.contains("input validation") {
+                DebtPattern::InputValidation
+            } else {
+                DebtPattern::Security
+            }
+        }
+        
+        // Performance patterns
         DebtType::Performance => DebtPattern::Performance,
-
-        // Security patterns
-        DebtType::Security => DebtPattern::Security,
 
         // All other debt types
         _ => DebtPattern::DebtType(*debt_type),
     }
 }
 
-/// Extract function name from a location string (e.g., "function_name:123")
-fn extract_function_from_location(location: &str) -> Option<String> {
-    // Try to parse location as "function_name:line_number"
-    if let Some(colon_pos) = location.find(':') {
-        let func_part = &location[..colon_pos];
-        // Check if it looks like a function name
-        if func_part.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            return Some(func_part.to_string());
-        }
-    }
-
-    // Try to find function name in parentheses (e.g., "in function (main)")
-    if let Some(start) = location.find('(') {
-        if let Some(end) = location.find(')') {
-            let func_name = &location[start + 1..end];
-            if !func_name.is_empty() {
-                return Some(func_name.to_string());
-            }
-        }
-    }
-
-    None
-}
 
 /// Adjust priority based on severity adjustment
 fn adjust_priority(priority: Priority, adjustment: i32) -> Priority {
@@ -238,18 +216,6 @@ fn adjust_priority(priority: Priority, adjustment: i32) -> Priority {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_extract_function_from_location() {
-        assert_eq!(
-            extract_function_from_location("main:123"),
-            Some("main".to_string())
-        );
-        assert_eq!(
-            extract_function_from_location("in function (test_something)"),
-            Some("test_something".to_string())
-        );
-        assert_eq!(extract_function_from_location("line 123"), None);
-    }
 
     #[test]
     fn test_adjust_priority() {
