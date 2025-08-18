@@ -49,9 +49,23 @@ impl AsyncBoundaryDetector {
 
     /// Check if a function call is blocking I/O
     fn is_blocking_io(path: &str, method: &str) -> bool {
+        // First check if it's an async I/O library - these are NOT blocking
+        let async_patterns = [
+            "tokio::",
+            "async_std::",
+            "futures::",
+            "smol::",
+        ];
+        
+        for pattern in &async_patterns {
+            if path.starts_with(pattern) {
+                return false; // Async I/O is not blocking
+            }
+        }
+        
         // Common blocking I/O patterns
         let blocking_patterns = [
-            // File I/O
+            // File I/O (standard library)
             ("std::fs", "read"),
             ("std::fs", "write"),
             ("std::fs", "read_to_string"),
@@ -59,9 +73,6 @@ impl AsyncBoundaryDetector {
             ("std::fs", "copy"),
             ("std::fs", "rename"),
             ("std::fs", "remove_file"),
-            ("fs", "read"),
-            ("fs", "write"),
-            ("fs", "read_to_string"),
             ("File", "open"),
             ("File", "create"),
             // Network I/O (synchronous)
@@ -83,7 +94,10 @@ impl AsyncBoundaryDetector {
 
         // Check for blocking patterns
         for (module, func) in &blocking_patterns {
-            if path.contains(module) && method == *func {
+            // Check if the path contains the module pattern
+            // For exact module matching (e.g., "std::fs" but not "tokio::fs")
+            if (path == *module || path.starts_with(&format!("{}::", module)) || path.ends_with(&format!("::{}", module))) 
+                && method == *func {
                 return true;
             }
         }
