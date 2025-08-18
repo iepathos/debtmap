@@ -61,6 +61,21 @@ Create a report with:
 - Suggested fix (ignore block, config change, or debtmap improvement)
 - Priority for addressing each type
 
+## Step 7: Commit Changes (if fixes applied)
+
+If any fixes were applied (ignore blocks, config changes, etc.), create a commit:
+
+```bash
+git add -A
+git commit -m "fix: reduce false positives in debtmap analysis
+
+- Add ignore blocks for test fixtures
+- Update configuration for known patterns
+- Exclude intentional complexity in test data"
+```
+
+Note: Do not include Claude attribution in the commit message to avoid commit bloat.
+
 ## Example Output Format
 
 ```markdown
