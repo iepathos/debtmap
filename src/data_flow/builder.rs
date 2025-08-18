@@ -86,6 +86,10 @@ impl DataFlowBuilder {
             Expr::Loop(loop_expr) => self.analyze_loop(loop_expr),
             Expr::While(while_expr) => self.analyze_while(while_expr),
             Expr::ForLoop(for_expr) => self.analyze_for(for_expr),
+            Expr::Reference(ref_expr) => {
+                // For references, analyze the inner expression
+                self.analyze_expr(&ref_expr.expr)
+            }
             Expr::Lit(_) => {
                 // Literals don't create data flow
                 None
@@ -171,7 +175,7 @@ impl DataFlowBuilder {
         };
         self.graph.add_node(node_id.clone(), node);
 
-        // Connect receiver if present
+        // Connect receiver if present - data flows FROM receiver TO this method call result
         if let Some(receiver) = receiver_node {
             self.graph.add_edge(DataFlowEdge {
                 from: receiver,
@@ -198,7 +202,18 @@ impl DataFlowBuilder {
 
     fn analyze_call(&mut self, call: &ExprCall) -> Option<NodeId> {
         // Check if this is a source function
-        let func_str = format!("{:?}", call.func);
+        // Try to get a better string representation
+        let func_str = if let Expr::Path(path) = &*call.func {
+            // Build path string from segments
+            path.path
+                .segments
+                .iter()
+                .map(|seg| seg.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::")
+        } else {
+            format!("{:?}", call.func)
+        };
 
         if let Some(source) = self.detect_source_function(&func_str) {
             let node_id = self.next_node_id();
@@ -207,6 +222,29 @@ impl DataFlowBuilder {
                 location: self.make_location(0),
             };
             self.graph.add_node(node_id.clone(), node);
+            return Some(node_id);
+        }
+
+        // Check if this is a sink function
+        if let Some(sink) = self.detect_sink_function(&func_str) {
+            let node_id = self.next_node_id();
+            let node = DataFlowNode::Sink {
+                kind: sink,
+                location: self.make_location(0),
+            };
+            self.graph.add_node(node_id.clone(), node);
+
+            // Connect arguments to sink
+            for arg in &call.args {
+                if let Some(arg_node) = self.analyze_expr(arg) {
+                    self.graph.add_edge(DataFlowEdge {
+                        from: arg_node,
+                        to: node_id.clone(),
+                        kind: EdgeKind::Parameter { index: 0 },
+                    });
+                }
+            }
+
             return Some(node_id);
         }
 
@@ -461,6 +499,16 @@ impl DataFlowBuilder {
     fn detect_source_method(&self, method: &str, receiver: &Expr) -> Option<InputSource> {
         let receiver_str = format!("{:?}", receiver);
 
+        // Check for env::args() - args is a method on env module
+        if method == "args" && receiver_str.contains("env") {
+            return Some(InputSource::CliArgument);
+        }
+
+        // Check for env::var()
+        if method == "var" && receiver_str.contains("env") {
+            return Some(InputSource::Environment);
+        }
+
         // File operations that read data
         if method == "read" || method == "read_to_string" || method == "read_line" {
             if receiver_str.contains("File") || receiver_str.contains("BufReader") {
@@ -503,13 +551,27 @@ impl DataFlowBuilder {
         None
     }
 
+    /// Detect if a function call is a dangerous sink
+    fn detect_sink_function(&self, func: &str) -> Option<SinkOperation> {
+        if func.contains("File::create") || func.contains("fs::write") {
+            return Some(SinkOperation::FileSystem);
+        }
+
+        if func.contains("Command::new") {
+            return Some(SinkOperation::ProcessExecution);
+        }
+
+        None
+    }
+
     /// Detect if a method call is a dangerous sink
     fn detect_sink_method(&self, method: &str) -> Option<SinkOperation> {
         if method == "execute" || method == "query" || method.contains("sql") {
             return Some(SinkOperation::SqlQuery);
         }
 
-        if method == "spawn" || method == "output" || method == "status" {
+        // For process execution, both spawn and arg are dangerous when used with untrusted data
+        if method == "spawn" || method == "output" || method == "status" || method == "arg" {
             return Some(SinkOperation::ProcessExecution);
         }
 

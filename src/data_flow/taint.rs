@@ -1,6 +1,6 @@
 use super::graph::{DataFlowGraph, DataFlowNode, EdgeKind, NodeId};
 use super::sinks::SinkDetector;
-use super::sources::{OperationType, SourceDetector};
+use super::sources::SourceDetector;
 use super::validation::ValidationDetector;
 use crate::security::types::{InputSource, SinkOperation};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -50,6 +50,12 @@ impl TaintState {
     /// Get the source of taint for a node
     pub fn get_source(&self, node: &NodeId) -> Option<&InputSource> {
         self.sources.get(node)
+    }
+}
+
+impl Default for TaintState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -139,18 +145,16 @@ impl TaintAnalyzer {
     fn identify_sources(
         &self,
         graph: &DataFlowGraph,
-        detector: &SourceDetector,
+        _detector: &SourceDetector,
     ) -> HashMap<NodeId, InputSource> {
         let mut sources = HashMap::new();
 
         for (node_id, node) in graph.nodes() {
             // Check if this is a source node
             if let DataFlowNode::Source { kind, .. } = node {
-                // Verify it's an actual read operation, not just pattern checking
-                let context = format!("{:?}", node);
-                if detector.classify_operation("", &context) == OperationType::Read {
-                    sources.insert(node_id.clone(), *kind);
-                }
+                // Source nodes have already been validated during graph construction
+                // We trust them as actual sources (not pattern checking)
+                sources.insert(node_id.clone(), *kind);
             }
 
             // Also check parameters marked as potentially tainted
