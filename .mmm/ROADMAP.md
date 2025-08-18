@@ -266,6 +266,19 @@ We have completed the initial implementation with core functionality for analyzi
   - 60%+ reduction in false positives
   - --context-aware CLI flag for enabling the feature
 
+- [x] **Spec 51**: Data Flow Analysis for Input Validation Detection
+  - Created comprehensive data flow analysis module (`src/data_flow/`)
+  - Data flow graph construction from AST with nodes, edges, and scopes
+  - Accurate source detection distinguishing reads from pattern checks
+  - Sink detection for dangerous operations (SQL, process, file, network)
+  - Taint propagation analysis through graph with validation tracking
+  - Eliminated false positives from pattern checking functions
+  - Clear data flow paths provided for each detected issue
+  - Integration with existing context detection from spec 43
+  - Optional activation via DEBTMAP_USE_DATAFLOW=true environment variable
+  - Backward compatible with existing pattern-based detector
+  - --context-aware CLI flag for enabling the feature
+
 ## Pending Specs
 
 ### Enhancements

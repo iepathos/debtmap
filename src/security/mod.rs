@@ -3,6 +3,7 @@ pub mod enhanced_secret_detector;
 pub mod enhanced_sql_detector;
 pub mod hardcoded_secret_detector;
 pub mod input_validation_detector;
+pub mod input_validation_detector_v2;
 pub mod sql_injection_detector;
 pub mod taint_analysis;
 pub mod tool_integration;
@@ -29,9 +30,17 @@ pub fn analyze_security_patterns(file: &File, path: &Path) -> Vec<DebtItem> {
     ));
     debt_items.extend(sql_injection_detector::detect_sql_injection(file, path));
     debt_items.extend(crypto_detector::detect_crypto_misuse(file, path));
-    debt_items.extend(input_validation_detector::detect_validation_gaps(
-        file, path,
-    ));
+
+    // Use new data flow-based validation detector if enabled
+    if std::env::var("DEBTMAP_USE_DATAFLOW").unwrap_or_default() == "true" {
+        debt_items.extend(input_validation_detector_v2::detect_validation_gaps_v2(
+            file, path,
+        ));
+    } else {
+        debt_items.extend(input_validation_detector::detect_validation_gaps(
+            file, path,
+        ));
+    }
 
     debt_items
 }

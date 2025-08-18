@@ -753,3 +753,34 @@ Implement a context-aware detection system that classifies functions by their ro
 - ✅ Opt-in via --context-aware flag for compatibility
 - ⚠️ Additional AST analysis overhead (<5% performance impact)
 - ⚠️ Rules may need tuning for specific codebases
+
+---
+
+## ADR-032: Data Flow Analysis for Input Validation
+**Date**: 2025-08-18
+**Status**: Accepted
+
+### Context
+The input validation detector was generating an extremely high rate of false positives (all top 10 "security vulnerabilities" were false positives). The detector used simplistic pattern matching on variable names and function calls, conflating functions that detect input sources with functions that handle input, variable names containing "input" with actual external input, and analysis/utility functions with input-handling functions.
+
+### Decision
+Implement proper data flow analysis that tracks actual input from sources to sinks through a comprehensive data flow graph:
+- Build data flow graphs from AST with nodes representing variables, expressions, sources, and sinks
+- Track data propagation through assignments, method calls, field access, and control flow
+- Distinguish between actual read operations and pattern checking/analysis functions
+- Implement taint propagation to track untrusted data through the program
+- Detect validation and sanitization operations that clean tainted data
+- Find paths from actual input sources to dangerous sinks
+- Integrate with existing context detection to further reduce false positives
+- Provide optional activation via environment variable for backward compatibility
+
+### Consequences
+- ✅ Eliminates false positives from pattern checking and analysis functions
+- ✅ Accurate detection of actual input validation gaps
+- ✅ Clear data flow paths provided for each issue
+- ✅ Better understanding of how data flows through the program
+- ✅ Foundation for future security analysis improvements
+- ✅ Backward compatible with existing detector
+- ⚠️ Additional complexity in implementation
+- ⚠️ Higher memory usage for graph construction
+- ⚠️ Slightly longer analysis time (mitigated by optional activation)

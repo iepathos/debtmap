@@ -408,8 +408,11 @@ impl<'ast> Visit<'ast> for ValidationVisitor {
                     }
 
                     // Check if this is validation (e.g., parsing with Result)
-                    if (expr_str.contains("?") || expr_str.contains(".ok()") || expr_str.contains(".expect("))
-                        && (expr_str.contains("parse") || expr_str.contains("from_str")) {
+                    if (expr_str.contains("?")
+                        || expr_str.contains(".ok()")
+                        || expr_str.contains(".expect("))
+                        && (expr_str.contains("parse") || expr_str.contains("from_str"))
+                    {
                         self.function_analysis.has_validation = true;
                     }
                 }
