@@ -235,7 +235,7 @@ impl PatternCorrelator {
 
         // Update reasoning
         if !issue.reasoning.is_empty() {
-            issue.reasoning.push_str("\n");
+            issue.reasoning.push('\n');
         }
         issue
             .reasoning

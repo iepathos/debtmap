@@ -98,7 +98,7 @@ impl ScoreNormalizer {
         let hash = seed.wrapping_mul(2654435761); // Knuth's multiplicative hash
         let jitter = ((hash % 100) as f64 / 1000.0) - 0.05; // ±0.05 range
 
-        (score + jitter).max(0.0).min(10.0)
+        (score + jitter).clamp(0.0, 10.0)
     }
 }
 

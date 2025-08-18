@@ -2,7 +2,6 @@ use std::fs;
 /// Tests that reproduce the exact false positives from production
 /// These tests verify the bugs we're seeing with Input Validation in test functions
 use std::process::Command;
-use std::time::{Duration, Instant};
 
 #[test]
 fn test_exact_parameter_analyzer_false_positive() {

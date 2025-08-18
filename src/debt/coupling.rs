@@ -91,7 +91,7 @@ pub fn analyze_module_cohesion(
     // Simplified cohesion: ratio of functions using shared data
     // In a real implementation, we'd analyze actual data usage
     let cohesion = shared_data.len() as f64 / functions.len() as f64;
-    cohesion.min(1.0)
+    cohesion.clamp(0.0, 1.0)
 }
 
 /// Detect inappropriate intimacy between modules

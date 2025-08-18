@@ -1,6 +1,5 @@
 /// Integration test to verify false positives are properly filtered
 use std::process::Command;
-use std::time::Duration;
 
 #[test]
 fn test_context_aware_filters_parameter_analyzer() {

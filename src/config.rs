@@ -346,7 +346,7 @@ impl DebtmapConfig {
         self.ignore
             .as_ref()
             .map(|ig| ig.patterns.clone())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 }
 

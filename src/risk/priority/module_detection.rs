@@ -1,6 +1,6 @@
 use std::path::Path;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ModuleType {
     EntryPoint,
     Core,
@@ -32,7 +32,7 @@ impl ModuleTypeDetector {
         PATTERNS
             .iter()
             .find(|(keywords, _)| keywords.iter().any(|k| path_str.contains(k)))
-            .map(|(_, module_type)| module_type.clone())
+            .map(|(_, module_type)| *module_type)
             .unwrap_or(ModuleType::Unknown)
     }
 }

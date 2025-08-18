@@ -19,6 +19,12 @@ pub struct OptimizedSmartDetector {
     config: SmartPerformanceConfig,
 }
 
+impl Default for OptimizedSmartDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OptimizedSmartDetector {
     pub fn new() -> Self {
         let optimized_detectors: Vec<Box<dyn OptimizedPerformanceDetector>> = vec![
@@ -180,7 +186,7 @@ impl OptimizedSmartDetector {
         let module_type = self.module_classifier.classify_module(path);
 
         PatternContext {
-            module_type: module_type.clone(),
+            module_type,
             function_intent: FunctionIntent::Unknown,
             architectural_pattern: None,
             business_criticality: self.infer_business_criticality(&module_type),
@@ -217,7 +223,7 @@ impl OptimizedSmartDetector {
                 };
 
                 return PatternContext {
-                    module_type: module_context.module_type.clone(),
+                    module_type: module_context.module_type,
                     function_intent: function_intent.clone(),
                     architectural_pattern: None,
                     business_criticality: self.refine_business_criticality(
@@ -300,7 +306,7 @@ impl OptimizedSmartDetector {
             _ => {}
         }
 
-        confidence.min(1.0).max(0.0)
+        confidence.clamp(0.0, 1.0)
     }
 
     fn get_base_severity(&self, pattern: &PerformanceAntiPattern) -> crate::debt::Priority {
@@ -346,10 +352,10 @@ impl OptimizedSmartDetector {
     ) -> String {
         match (&context.module_type, &context.function_intent) {
             (ModuleType::Test, _) => {
-                format!("In test code: Consider if optimization is worth the complexity")
+                "In test code: Consider if optimization is worth the complexity".to_string()
             }
             (_, FunctionIntent::IOWrapper) => {
-                format!("I/O-bound function: Focus on batching and async operations")
+                "I/O-bound function: Focus on batching and async operations".to_string()
             }
             _ => self.generate_default_recommendation(pattern),
         }
@@ -398,7 +404,7 @@ impl OptimizedSmartDetector {
             (FunctionIntent::Setup | FunctionIntent::Teardown, _) => {
                 BusinessCriticality::Development
             }
-            _ => base.clone(),
+            _ => *base,
         }
     }
 
@@ -411,7 +417,7 @@ impl OptimizedSmartDetector {
             (FunctionIntent::Setup | FunctionIntent::Teardown, _) => {
                 PerformanceSensitivity::Irrelevant
             }
-            _ => base.clone(),
+            _ => *base,
         }
     }
 }

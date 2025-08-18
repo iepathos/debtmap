@@ -23,7 +23,7 @@ impl Default for PatternContext {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ModuleType {
     Production,
     Test,

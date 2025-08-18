@@ -23,6 +23,12 @@ pub trait OptimizedPerformanceDetector {
 /// Adapter for the NestedLoopDetector to use collected data
 pub struct OptimizedNestedLoopDetector;
 
+impl Default for OptimizedNestedLoopDetector {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl OptimizedNestedLoopDetector {
     pub fn new() -> Self {
         Self
@@ -128,6 +134,12 @@ impl OptimizedPerformanceDetector for OptimizedNestedLoopDetector {
 /// Adapter for the IOPerformanceDetector to use collected data
 pub struct OptimizedIODetector;
 
+impl Default for OptimizedIODetector {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl OptimizedIODetector {
     pub fn new() -> Self {
         Self
@@ -198,6 +210,12 @@ impl OptimizedPerformanceDetector for OptimizedIODetector {
 
 /// Adapter for the AllocationDetector to use collected data
 pub struct OptimizedAllocationDetector;
+
+impl Default for OptimizedAllocationDetector {
+    fn default() -> Self {
+        Self
+    }
+}
 
 impl OptimizedAllocationDetector {
     pub fn new() -> Self {
@@ -291,6 +309,12 @@ impl OptimizedPerformanceDetector for OptimizedAllocationDetector {
 /// Adapter for the StringPerformanceDetector to use collected data
 pub struct OptimizedStringDetector;
 
+impl Default for OptimizedStringDetector {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl OptimizedStringDetector {
     pub fn new() -> Self {
         Self
@@ -362,6 +386,12 @@ impl OptimizedPerformanceDetector for OptimizedStringDetector {
 
 /// Adapter for the DataStructureDetector to use collected data
 pub struct OptimizedDataStructureDetector;
+
+impl Default for OptimizedDataStructureDetector {
+    fn default() -> Self {
+        Self
+    }
+}
 
 impl OptimizedDataStructureDetector {
     pub fn new() -> Self {

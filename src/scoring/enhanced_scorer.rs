@@ -97,7 +97,7 @@ impl<'a> EnhancedScorer<'a> {
             dependency_factor,
             frequency_factor,
             test_weight,
-            confidence: self.calculate_confidence(&item),
+            confidence: self.calculate_confidence(item),
             raw_score: 0.0,   // Will be calculated
             final_score: 0.0, // Will be normalized
         };

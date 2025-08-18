@@ -244,7 +244,7 @@ pub struct RiskContext {
     pub module_type: ModuleType,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ModuleType {
     Core,
     Api,

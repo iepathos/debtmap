@@ -142,7 +142,7 @@ impl SmartPerformanceDetector {
         let module_type = self.module_classifier.classify_module(path);
 
         PatternContext {
-            module_type: module_type.clone(),
+            module_type,
             function_intent: FunctionIntent::Unknown,
             architectural_pattern: None,
             business_criticality: self.infer_business_criticality(&module_type),
@@ -165,7 +165,7 @@ impl SmartPerformanceDetector {
                 .classify_function_intent(&function, call_graph);
 
             PatternContext {
-                module_type: module_context.module_type.clone(),
+                module_type: module_context.module_type,
                 function_intent: function_intent.clone(),
                 architectural_pattern: self.detect_architectural_pattern(&function, module_context),
                 business_criticality: self.refine_business_criticality(
@@ -196,7 +196,7 @@ impl SmartPerformanceDetector {
             if let syn::Item::Fn(func) = item {
                 // Check if pattern location is within function
                 // This would require proper span tracking
-                if self.is_location_in_function(&location, func) {
+                if self.is_location_in_function(location, func) {
                     return Some(func.clone());
                 }
             }
@@ -278,7 +278,7 @@ impl SmartPerformanceDetector {
             _ => {}
         }
 
-        confidence.min(1.0).max(0.0)
+        confidence.clamp(0.0, 1.0)
     }
 
     fn generate_reasoning(
@@ -487,13 +487,12 @@ impl SmartPerformanceDetector {
         let function_name = function.sig.ident.to_string().to_lowercase();
 
         // Check for test fixture patterns
-        if context.module_type == ModuleType::Test {
-            if function_name.contains("setup")
+        if context.module_type == ModuleType::Test
+            && (function_name.contains("setup")
                 || function_name.contains("fixture")
-                || function_name.contains("mock")
-            {
-                return Some(ArchitecturalPattern::TestFixture);
-            }
+                || function_name.contains("mock"))
+        {
+            return Some(ArchitecturalPattern::TestFixture);
         }
 
         // Check for builder pattern
@@ -525,7 +524,7 @@ impl SmartPerformanceDetector {
             FunctionIntent::Setup | FunctionIntent::Teardown | FunctionIntent::Configuration => {
                 BusinessCriticality::Infrastructure
             }
-            _ => base_criticality.clone(),
+            _ => *base_criticality,
         }
     }
 
@@ -543,7 +542,7 @@ impl SmartPerformanceDetector {
             FunctionIntent::Setup | FunctionIntent::Teardown | FunctionIntent::Configuration => {
                 PerformanceSensitivity::Low
             }
-            _ => base_sensitivity.clone(),
+            _ => *base_sensitivity,
         }
     }
 

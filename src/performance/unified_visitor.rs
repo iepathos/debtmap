@@ -195,7 +195,7 @@ impl UnifiedPerformanceVisitor {
                         id: self.next_operation_id(),
                         operation_type: str_type,
                         context: self.current_context(method_call),
-                        is_repeated: self.loop_stack.len() > 0,
+                        is_repeated: !self.loop_stack.is_empty(),
                         expr: Some(Box::new(expr.clone())),
                     };
 
@@ -208,7 +208,7 @@ impl UnifiedPerformanceVisitor {
                         id: self.next_operation_id(),
                         operation_type: StringOperationType::Format,
                         context: self.current_context(mac),
-                        is_repeated: self.loop_stack.len() > 0,
+                        is_repeated: !self.loop_stack.is_empty(),
                         expr: Some(Box::new(expr.clone())),
                     };
 
@@ -224,7 +224,7 @@ impl UnifiedPerformanceVisitor {
         if let Expr::Binary(binary) = expr {
             if matches!(binary.op, syn::BinOp::Add(_)) {
                 // Simple heuristic: if in a loop, it's likely string concatenation
-                if self.loop_stack.len() > 0 {
+                if !self.loop_stack.is_empty() {
                     let str_op = StringOperation {
                         id: self.next_operation_id(),
                         operation_type: StringOperationType::Concatenation,
@@ -416,7 +416,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                     self.data
                         .nested_loops
                         .entry(*parent)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(loop_id);
                 }
 
@@ -449,7 +449,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                     self.data
                         .nested_loops
                         .entry(*parent)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(loop_id);
                 }
 
@@ -481,7 +481,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                     self.data
                         .nested_loops
                         .entry(*parent)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(loop_id);
                 }
 
@@ -516,7 +516,7 @@ impl<'ast> Visit<'ast> for UnifiedPerformanceVisitor {
                         self.data
                             .nested_loops
                             .entry(*parent)
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(loop_id);
                     }
 

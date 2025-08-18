@@ -38,7 +38,7 @@ impl CriticalityScorer {
         let size_factor = (target.lines as f64).ln() / 10.0;
         let debt_factor = 1.0 + (target.debt_items as f64 * 0.1);
 
-        (base_score * dependency_factor * size_factor * debt_factor).min(10.0)
+        (base_score * dependency_factor * size_factor * debt_factor).clamp(0.0, 10.0)
     }
 
     fn pattern_match_score(&self, path: &Path) -> f64 {
@@ -50,17 +50,23 @@ impl CriticalityScorer {
         }
 
         let file_lower = file_name.to_lowercase();
-        for (pattern, score) in self.patterns.iter() {
-            if file_lower.contains(pattern) {
-                return *score;
-            }
+        if let Some(score) = self
+            .patterns
+            .iter()
+            .find(|(pattern, _)| file_lower.contains(*pattern))
+            .map(|(_, score)| *score)
+        {
+            return score;
         }
 
         let path_str = path.to_string_lossy().to_lowercase();
-        for (pattern, score) in self.patterns.iter() {
-            if path_str.contains(pattern) {
-                return *score * 0.8;
-            }
+        if let Some(score) = self
+            .patterns
+            .iter()
+            .find(|(pattern, _)| path_str.contains(*pattern))
+            .map(|(_, score)| *score * 0.8)
+        {
+            return score;
         }
 
         4.0
@@ -70,8 +76,8 @@ impl CriticalityScorer {
         let dependent_count = target.dependents.len() as f64;
         let dependency_count = target.dependencies.len() as f64;
 
-        let dependent_factor = (1.0 + dependent_count / 10.0).min(2.0);
-        let dependency_factor = (1.0 + dependency_count / 20.0).min(1.5);
+        let dependent_factor = (1.0 + dependent_count / 10.0).clamp(1.0, 2.0);
+        let dependency_factor = (1.0 + dependency_count / 20.0).clamp(1.0, 1.5);
 
         dependent_factor * dependency_factor
     }

@@ -1,8 +1,6 @@
 //! AST-based context detection for functions and code blocks
 
-use crate::context::{
-    detect_function_role, FileType, FrameworkPattern, FunctionContext, FunctionRole,
-};
+use crate::context::{detect_function_role, FileType, FrameworkPattern, FunctionContext};
 use syn::{
     visit::Visit, Attribute, Block, Expr, ExprCall, ExprMethodCall, ImplItem, ItemFn, ItemImpl,
     Path,
@@ -337,6 +335,7 @@ fn path_to_string(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::FunctionRole;
     use syn;
 
     #[test]
