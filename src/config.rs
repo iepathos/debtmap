@@ -230,12 +230,12 @@ pub struct DebtmapConfig {
 
 impl DebtmapConfig {
     /// Get ignore patterns from configuration
-    /// 
+    ///
     /// Returns a vector of glob patterns that should be excluded from analysis.
     /// If no configuration is found or no patterns are specified, returns an empty vector.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// let config = DebtmapConfig::load();
     /// let patterns = config.get_ignore_patterns();

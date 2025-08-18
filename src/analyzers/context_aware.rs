@@ -1,0 +1,249 @@
+//! Context-aware analyzer wrapper that integrates context detection
+
+use crate::analyzers::Analyzer;
+use crate::context::rules::DebtPattern;
+use crate::context::{
+    detect_file_type, ContextDetector, ContextRuleEngine, FunctionContext, RuleAction,
+};
+use crate::core::{ast::Ast, DebtType, FileMetrics, Language, Priority};
+use anyhow::Result;
+use std::path::{Path, PathBuf};
+use std::sync::RwLock;
+use syn::visit::Visit;
+
+/// Wrapper that adds context-awareness to any analyzer
+pub struct ContextAwareAnalyzer {
+    /// The underlying analyzer
+    inner: Box<dyn Analyzer>,
+    /// Context rule engine
+    rule_engine: RwLock<ContextRuleEngine>,
+    /// Whether context awareness is enabled
+    enabled: bool,
+}
+
+impl ContextAwareAnalyzer {
+    /// Create a new context-aware analyzer
+    pub fn new(inner: Box<dyn Analyzer>) -> Self {
+        Self {
+            inner,
+            rule_engine: RwLock::new(ContextRuleEngine::new()),
+            enabled: true,
+        }
+    }
+
+    /// Enable or disable context awareness
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    /// Filter debt items based on context rules
+    fn filter_debt_items(
+        &self,
+        mut metrics: FileMetrics,
+        ast: &Ast,
+        path: &Path,
+    ) -> FileMetrics {
+        if !self.enabled {
+            return metrics;
+        }
+
+        // Detect file type
+        let file_type = detect_file_type(path);
+
+        // For Rust code, perform context detection
+        if let Ast::Rust(rust_ast) = ast {
+            let mut detector = ContextDetector::new(file_type);
+            detector.visit_file(&rust_ast.file);
+
+            // Filter debt items based on context
+            metrics.debt_items.retain_mut(|item| {
+                // Find the function context for this debt item
+                // Build a location string from file:line
+                let location = format!("{}:{}", item.file.display(), item.line);
+                let context =
+                    if let Some(func_name) = extract_function_from_location(&location) {
+                        detector
+                            .get_context(&func_name)
+                            .cloned()
+                            .unwrap_or_else(|| FunctionContext::new().with_file_type(file_type))
+                    } else {
+                        FunctionContext::new().with_file_type(file_type)
+                    };
+
+                // Convert debt type to pattern
+                let pattern = debt_type_to_pattern(&item.debt_type);
+
+                // Evaluate the rule
+                let action = self.rule_engine.write().unwrap().evaluate(&pattern, &context);
+
+                match action {
+                    RuleAction::Allow => {
+                        // Pattern is allowed in this context, filter it out
+                        false
+                    }
+                    RuleAction::Skip => {
+                        // Skip analysis for this pattern
+                        false
+                    }
+                    RuleAction::Warn => {
+                        // Reduce severity by 2
+                        item.priority = adjust_priority(item.priority, -2);
+                        
+                        // Add context note to the message
+                        if let Some(reason) = self.rule_engine.write().unwrap().get_reason(&pattern, &context) {
+                            item.message = format!("{} (Context: {})", item.message, reason);
+                        }
+                        true
+                    }
+                    RuleAction::ReduceSeverity(n) => {
+                        // Reduce severity by n
+                        item.priority = adjust_priority(item.priority, -n);
+
+                        // Add context note to the message
+                        if let Some(reason) = self.rule_engine.write().unwrap().get_reason(&pattern, &context) {
+                            item.message = format!("{} (Context: {})", item.message, reason);
+                        }
+                        true
+                    }
+                    RuleAction::Deny => {
+                        // Keep the item as-is
+                        true
+                    }
+                }
+            });
+        } else {
+            // For non-Rust code, apply file-type based rules
+            let context = FunctionContext::new().with_file_type(file_type);
+
+            metrics.debt_items.retain_mut(|item| {
+                let pattern = debt_type_to_pattern(&item.debt_type);
+                let action = self.rule_engine.write().unwrap().evaluate(&pattern, &context);
+
+                match action {
+                    RuleAction::Allow | RuleAction::Skip => false,
+                    RuleAction::Warn => {
+                        item.priority = adjust_priority(item.priority, -2);
+                        true
+                    }
+                    RuleAction::ReduceSeverity(n) => {
+                        item.priority = adjust_priority(item.priority, -n);
+                        true
+                    }
+                    RuleAction::Deny => true,
+                }
+            });
+        }
+
+        metrics
+    }
+}
+
+impl Analyzer for ContextAwareAnalyzer {
+    fn parse(&self, content: &str, path: PathBuf) -> Result<Ast> {
+        self.inner.parse(content, path)
+    }
+
+    fn analyze(&self, ast: &Ast) -> FileMetrics {
+        let metrics = self.inner.analyze(ast);
+
+        // Apply context-aware filtering if we have the path
+        if !metrics.path.as_os_str().is_empty() {
+            let path = metrics.path.clone();
+            self.filter_debt_items(metrics, ast, &path)
+        } else {
+            metrics
+        }
+    }
+
+    fn language(&self) -> Language {
+        self.inner.language()
+    }
+}
+
+/// Convert a debt type to a debt pattern for rule matching
+fn debt_type_to_pattern(debt_type: &DebtType) -> DebtPattern {
+    match debt_type {
+        // Performance patterns - simplified since we don't have access to details
+        DebtType::Performance => DebtPattern::Performance,
+        
+        // Security patterns
+        DebtType::Security => DebtPattern::Security,
+        
+        // All other debt types
+        _ => DebtPattern::DebtType(*debt_type),
+    }
+}
+
+/// Extract function name from a location string (e.g., "function_name:123")
+fn extract_function_from_location(location: &str) -> Option<String> {
+    // Try to parse location as "function_name:line_number"
+    if let Some(colon_pos) = location.find(':') {
+        let func_part = &location[..colon_pos];
+        // Check if it looks like a function name
+        if func_part.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            return Some(func_part.to_string());
+        }
+    }
+
+    // Try to find function name in parentheses (e.g., "in function (main)")
+    if let Some(start) = location.find('(') {
+        if let Some(end) = location.find(')') {
+            let func_name = &location[start + 1..end];
+            if !func_name.is_empty() {
+                return Some(func_name.to_string());
+            }
+        }
+    }
+
+    None
+}
+
+/// Adjust priority based on severity adjustment
+fn adjust_priority(priority: Priority, adjustment: i32) -> Priority {
+    if adjustment == -999 {
+        // Special case: effectively disable
+        return Priority::Low;
+    }
+
+    let current = match priority {
+        Priority::Critical => 4,
+        Priority::High => 3,
+        Priority::Medium => 2,
+        Priority::Low => 1,
+    };
+
+    let new = (current + adjustment).clamp(1, 4);
+
+    match new {
+        4 => Priority::Critical,
+        3 => Priority::High,
+        2 => Priority::Medium,
+        _ => Priority::Low,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_function_from_location() {
+        assert_eq!(
+            extract_function_from_location("main:123"),
+            Some("main".to_string())
+        );
+        assert_eq!(
+            extract_function_from_location("in function (test_something)"),
+            Some("test_something".to_string())
+        );
+        assert_eq!(extract_function_from_location("line 123"), None);
+    }
+
+    #[test]
+    fn test_adjust_priority() {
+        assert_eq!(adjust_priority(Priority::High, -1), Priority::Medium);
+        assert_eq!(adjust_priority(Priority::Medium, -2), Priority::Low);
+        assert_eq!(adjust_priority(Priority::Low, -1), Priority::Low);
+        assert_eq!(adjust_priority(Priority::Critical, -999), Priority::Low);
+    }
+}

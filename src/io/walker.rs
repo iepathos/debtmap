@@ -63,10 +63,11 @@ impl FileWalker {
 
             // Check ignore patterns against both absolute and relative paths
             let path_str = path.to_string_lossy();
-            let relative_path = path.strip_prefix(&self.root)
+            let relative_path = path
+                .strip_prefix(&self.root)
                 .unwrap_or(path)
                 .to_string_lossy();
-            
+
             for pattern in &self.ignore_patterns {
                 if let Ok(glob_pattern) = glob::Pattern::new(pattern) {
                     // Check against absolute path
@@ -188,8 +189,7 @@ mod tests {
     fn test_find_files_without_ignore_patterns() {
         let (_temp_dir, root) = create_test_project();
 
-        let walker = FileWalker::new(root.clone())
-            .with_languages(vec![Language::Rust]);
+        let walker = FileWalker::new(root.clone()).with_languages(vec![Language::Rust]);
 
         let files = walker.walk().unwrap();
 
@@ -241,10 +241,7 @@ mod tests {
 
         let config = crate::config::DebtmapConfig {
             ignore: Some(crate::config::IgnoreConfig {
-                patterns: vec![
-                    "tests/**/*".to_string(),
-                    "**/*.test.rs".to_string(),
-                ],
+                patterns: vec!["tests/**/*".to_string(), "**/*.test.rs".to_string()],
             }),
             ..Default::default()
         };
@@ -278,7 +275,8 @@ mod tests {
         };
 
         // When a single file is specified directly, ignore patterns don't apply
-        let files = find_project_files_with_config(&test_file, vec![Language::Rust], &config).unwrap();
+        let files =
+            find_project_files_with_config(&test_file, vec![Language::Rust], &config).unwrap();
 
         assert_eq!(files.len(), 1);
         assert_eq!(files[0], test_file);

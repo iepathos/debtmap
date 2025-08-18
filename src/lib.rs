@@ -6,6 +6,7 @@ pub mod cli;
 pub mod common;
 pub mod complexity;
 pub mod config;
+pub mod context;
 pub mod core;
 pub mod debt;
 pub mod io;

@@ -30,6 +30,7 @@ Language-specific analysis implementations:
 - `rust_call_graph.rs`: Two-pass call graph extraction with type-aware and signature-aware resolution
 - `trait_implementation_tracker.rs`: Comprehensive trait definition and implementation tracking
 - `trait_resolver.rs`: Dynamic dispatch resolution with method resolution order
+- `context_aware.rs`: Context-aware analyzer wrapper for false positive reduction
 
 ### Complexity (`src/complexity/`)
 Complexity metric calculations:
@@ -58,6 +59,12 @@ Security pattern detection and vulnerability analysis:
 - `crypto_detector.rs`: Cryptographic misuse detection
 - `unsafe_detector.rs`: Unsafe code block detection
 - `input_validation_detector.rs`: Input validation gap detection
+
+### Context (`src/context/`)
+Context-aware detection for false positive reduction:
+- `mod.rs`: Core context types (FunctionContext, FileType, FunctionRole)
+- `detector.rs`: AST-based context detection for functions
+- `rules.rs`: Context-aware rules engine for debt filtering
 
 ### Performance (`src/performance/`)
 Performance anti-pattern detection with smart context analysis and optimized AST traversal:

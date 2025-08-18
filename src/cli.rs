@@ -147,6 +147,10 @@ pub enum Commands {
         /// Exclude test code from analysis
         #[arg(long = "exclude-tests")]
         exclude_tests: bool,
+
+        /// Enable context-aware false positive reduction
+        #[arg(long = "context-aware")]
+        context_aware: bool,
     },
 
     /// Initialize configuration file

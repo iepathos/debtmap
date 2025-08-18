@@ -1,6 +1,7 @@
 use crate::core::{ast::Ast, FileMetrics};
 use anyhow::Result;
 
+pub mod context_aware;
 pub mod function_registry;
 pub mod javascript;
 pub mod python;
@@ -76,6 +77,19 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
         .find(|(lang, _)| *lang == language)
         .map(|(_, factory)| factory())
         .unwrap_or_else(|| Box::new(NullAnalyzer))
+}
+
+pub fn get_analyzer_with_context(
+    language: crate::core::Language,
+    context_aware: bool,
+) -> Box<dyn Analyzer> {
+    let base_analyzer = get_analyzer(language);
+
+    if context_aware {
+        Box::new(context_aware::ContextAwareAnalyzer::new(base_analyzer))
+    } else {
+        base_analyzer
+    }
 }
 
 fn create_js_analyzer<F>(factory: F, lang_name: &str) -> Box<dyn Analyzer>

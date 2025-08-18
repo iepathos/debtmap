@@ -61,6 +61,7 @@ struct AnalyzeConfig {
     exclude_tests: bool,
     #[allow(dead_code)]
     smart_performance: bool,
+    context_aware: bool,
 }
 
 struct ValidateConfig {
@@ -141,6 +142,7 @@ fn main() -> Result<()> {
             legacy_scoring,
             exclude_tests,
             smart_performance,
+            context_aware,
         } => {
             // Set enhanced scoring environment variable
             if legacy_scoring {
@@ -149,6 +151,11 @@ fn main() -> Result<()> {
                 std::env::set_var("DEBTMAP_ENHANCED_SCORING", "true");
             }
             // Default is true (enhanced scoring enabled)
+
+            // Set context-aware environment variable
+            if context_aware {
+                std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+            }
 
             let config = AnalyzeConfig {
                 path,
@@ -181,6 +188,7 @@ fn main() -> Result<()> {
                 filter_categories,
                 exclude_tests,
                 smart_performance,
+                context_aware,
             };
             handle_analyze(config)
         }
@@ -1196,8 +1204,9 @@ fn process_rust_files_for_call_graph(
     std::collections::HashSet<priority::call_graph::FunctionId>,
 )> {
     let config = config::get_config();
-    let rust_files = io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
-        .context("Failed to find Rust files for call graph")?;
+    let rust_files =
+        io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
+            .context("Failed to find Rust files for call graph")?;
 
     // Macro handling is now done through enhanced token parsing
 
@@ -1280,8 +1289,9 @@ fn process_python_files_for_call_graph(
     call_graph: &mut priority::CallGraph,
 ) -> Result<()> {
     let config = config::get_config();
-    let python_files = io::walker::find_project_files_with_config(project_path, vec![Language::Python], config)
-        .context("Failed to find Python files for call graph")?;
+    let python_files =
+        io::walker::find_project_files_with_config(project_path, vec![Language::Python], config)
+            .context("Failed to find Python files for call graph")?;
 
     let mut analyzer = PythonCallGraphAnalyzer::new();
 

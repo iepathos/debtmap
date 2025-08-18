@@ -88,7 +88,10 @@ pub fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {
 
     (language != Language::Unknown)
         .then(|| {
-            let analyzer = analyzers::get_analyzer(language);
+            let context_aware = std::env::var("DEBTMAP_CONTEXT_AWARE")
+                .map(|v| v == "true")
+                .unwrap_or(false);
+            let analyzer = analyzers::get_analyzer_with_context(language, context_aware);
             analyzers::analyze_file(content, file_path.to_path_buf(), analyzer.as_ref())
         })?
         .ok()
