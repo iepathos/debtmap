@@ -536,6 +536,20 @@ You can suppress debt detection for specific code sections using inline comments
 
 Use the `.debtmap.toml` configuration file to ignore entire files or directories:
 
+#### Pattern Syntax
+
+- `*` - Matches any sequence of characters except path separator
+- `**` - Matches any sequence of characters including path separators
+- `?` - Matches any single character
+- `[abc]` - Matches any character in the set
+- `[!abc]` - Matches any character not in the set
+
+Examples:
+- `tests/**/*` - All files under any tests directory
+- `**/*.test.rs` - All files ending with .test.rs anywhere
+- `src/**/test_*.py` - Python test files in any subdirectory of src
+- `[!.]*.rs` - Rust files not starting with a dot
+
 ## Configuration
 
 Create a `.debtmap.toml` file in your project root:
@@ -556,10 +570,20 @@ minimum_cognitive_complexity = 3      # Skip functions with cognitive <= this va
 minimum_risk_score = 1.0              # Minimum risk score for Risk debt types (default: 1.0)
 
 [ignore]
-# Paths to completely ignore during analysis
-paths = ["target/", "node_modules/", "vendor/"]
-# File patterns to ignore (glob patterns)
-patterns = ["*.generated.rs", "*.pb.go", "*.min.js", "test/fixtures/**"]
+# File and directory patterns to ignore during analysis (glob patterns)
+patterns = [
+  "tests/**/*",           # Ignore all files in tests directory
+  "**/*.test.rs",         # Ignore all .test.rs files
+  "**/*_test.py",         # Ignore Python test files
+  "**/fixtures/**",       # Ignore fixture directories
+  "benches/**",           # Ignore benchmark files
+  "*.generated.rs",       # Ignore generated code
+  "*.pb.go",              # Ignore protobuf files
+  "*.min.js",             # Ignore minified JS
+  "target/**",            # Rust build directory
+  "node_modules/**",      # Node dependencies
+  ".venv/**",             # Python virtual environments
+]
 
 [languages]
 # Languages to analyze (rust, python, javascript, typescript)

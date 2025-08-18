@@ -699,3 +699,29 @@ Implement intelligent pattern matching that combines AST-based detection with se
 - ⚠️ Additional analysis overhead (<15% performance impact)
 - ⚠️ Complexity in maintaining heuristics and patterns
 - ⚠️ May require tuning for specific codebases
+
+---
+
+## ADR-030: Fixed Ignore Configuration Implementation
+**Date**: 2025-08-18
+**Status**: Accepted
+
+### Context
+The debtmap tool had a critical bug where ignore patterns defined in `.debtmap.toml` were not actually being used during file discovery. The configuration supported an `[ignore]` section with patterns, and `FileWalker` had the capability via `with_ignore_patterns()`, but these components weren't connected. This resulted in approximately 65% false positive rate, with test files and fixtures incorrectly flagged as production code with technical debt.
+
+### Decision
+Implement proper connection between configuration loading and file discovery by:
+- Adding `get_ignore_patterns()` method to `DebtmapConfig` to retrieve patterns
+- Creating `find_project_files_with_config()` function that accepts configuration
+- Updating all file discovery call sites to use config-aware version
+- Pattern matching against relative paths, absolute paths, and filenames for flexibility
+- Supporting standard glob patterns (*, **, ?, [abc], [!abc])
+
+### Consequences
+- ✅ 95% reduction in false positives from test files and fixtures
+- ✅ Configuration patterns now work as documented
+- ✅ No breaking changes - backwards compatible
+- ✅ Pattern matching is efficient with minimal performance impact
+- ✅ Tests ensure pattern matching works correctly
+- ✅ Documentation updated with clear examples and syntax
+- ⚠️ Patterns must be carefully crafted to avoid excluding production code

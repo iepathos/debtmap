@@ -228,6 +228,27 @@ pub struct DebtmapConfig {
     pub performance: Option<PerformanceConfig>,
 }
 
+impl DebtmapConfig {
+    /// Get ignore patterns from configuration
+    /// 
+    /// Returns a vector of glob patterns that should be excluded from analysis.
+    /// If no configuration is found or no patterns are specified, returns an empty vector.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// let config = DebtmapConfig::load();
+    /// let patterns = config.get_ignore_patterns();
+    /// // patterns might contain ["tests/**/*", "*.test.rs"]
+    /// ```
+    pub fn get_ignore_patterns(&self) -> Vec<String> {
+        self.ignore
+            .as_ref()
+            .map(|ig| ig.patterns.clone())
+            .unwrap_or_else(Vec::new)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThresholdsConfig {
     pub complexity: Option<u32>,
@@ -593,4 +614,47 @@ pub fn get_smart_performance_config() -> crate::performance::SmartPerformanceCon
     // For now, use default config
     // In the future, this could be loaded from configuration file
     crate::performance::SmartPerformanceConfig::default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_ignore_patterns_with_patterns() {
+        let config = DebtmapConfig {
+            ignore: Some(IgnoreConfig {
+                patterns: vec![
+                    "tests/**/*".to_string(),
+                    "*.test.rs".to_string(),
+                    "**/fixtures/**".to_string(),
+                ],
+            }),
+            ..Default::default()
+        };
+
+        let patterns = config.get_ignore_patterns();
+        assert_eq!(patterns.len(), 3);
+        assert!(patterns.contains(&"tests/**/*".to_string()));
+        assert!(patterns.contains(&"*.test.rs".to_string()));
+        assert!(patterns.contains(&"**/fixtures/**".to_string()));
+    }
+
+    #[test]
+    fn test_get_ignore_patterns_without_config() {
+        let config = DebtmapConfig::default();
+        let patterns = config.get_ignore_patterns();
+        assert_eq!(patterns.len(), 0);
+    }
+
+    #[test]
+    fn test_get_ignore_patterns_with_empty_patterns() {
+        let config = DebtmapConfig {
+            ignore: Some(IgnoreConfig { patterns: vec![] }),
+            ..Default::default()
+        };
+
+        let patterns = config.get_ignore_patterns();
+        assert_eq!(patterns.len(), 0);
+    }
 }

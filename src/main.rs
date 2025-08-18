@@ -2,6 +2,7 @@ use debtmap::analysis::call_graph::RustCallGraphBuilder;
 use debtmap::analysis::python_call_graph::PythonCallGraphAnalyzer;
 use debtmap::analysis_utils;
 use debtmap::cli;
+use debtmap::config;
 use debtmap::core;
 use debtmap::debt;
 use debtmap::io;
@@ -277,7 +278,8 @@ fn analyze_project(
     complexity_threshold: u32,
     duplication_threshold: usize,
 ) -> Result<AnalysisResults> {
-    let files = io::walker::find_project_files(&path, languages.clone())
+    let config = config::get_config();
+    let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
 
     let file_metrics = analysis_utils::collect_file_metrics(&files);
@@ -1193,7 +1195,8 @@ fn process_rust_files_for_call_graph(
     std::collections::HashSet<priority::call_graph::FunctionId>,
     std::collections::HashSet<priority::call_graph::FunctionId>,
 )> {
-    let rust_files = io::walker::find_project_files(project_path, vec![Language::Rust])
+    let config = config::get_config();
+    let rust_files = io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
         .context("Failed to find Rust files for call graph")?;
 
     // Macro handling is now done through enhanced token parsing
@@ -1276,7 +1279,8 @@ fn process_python_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
 ) -> Result<()> {
-    let python_files = io::walker::find_project_files(project_path, vec![Language::Python])
+    let config = config::get_config();
+    let python_files = io::walker::find_project_files_with_config(project_path, vec![Language::Python], config)
         .context("Failed to find Python files for call graph")?;
 
     let mut analyzer = PythonCallGraphAnalyzer::new();
