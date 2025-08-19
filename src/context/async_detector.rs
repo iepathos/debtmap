@@ -1,8 +1,9 @@
 //! Detection of async boundaries and async context analysis
 
+use std::collections::HashSet;
 use syn::{
     visit::Visit, Block, Expr, ExprAsync, ExprAwait, ExprBlock, ExprCall, ExprClosure,
-    ExprMethodCall, ItemFn, Stmt,
+    ExprMethodCall, Item, ItemFn, Stmt, UseTree,
 };
 
 /// Detects async boundaries where blocking I/O would be problematic
@@ -13,6 +14,18 @@ pub struct AsyncBoundaryDetector {
     pub in_async_boundary: bool,
     /// Detected blocking I/O calls in async context
     pub blocking_in_async: Vec<BlockingCall>,
+    /// Track imports to disambiguate Command types
+    imports: ImportTracker,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ImportTracker {
+    /// Set of async command imports (tokio::process, async_std::process)
+    has_async_command: bool,
+    /// Set of blocking command imports (std::process)
+    has_std_command: bool,
+    /// Imported symbols and their sources
+    imported_symbols: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -29,6 +42,85 @@ impl AsyncBoundaryDetector {
             async_stack: vec![false],
             in_async_boundary: false,
             blocking_in_async: Vec::new(),
+            imports: ImportTracker::default(),
+        }
+    }
+    
+    /// Analyze file with import tracking
+    pub fn analyze_file(&mut self, file: &syn::File) {
+        // First pass: analyze imports
+        self.analyze_imports(&file.items);
+        // Second pass: visit the file normally
+        self.visit_file(file);
+    }
+    
+    /// Analyze imports before visiting the rest of the file
+    fn analyze_imports(&mut self, items: &[Item]) {
+        for item in items {
+            if let Item::Use(use_item) = item {
+                self.process_use_tree(&use_item.tree, String::new());
+            }
+        }
+    }
+    
+    fn process_use_tree(&mut self, tree: &UseTree, prefix: String) {
+        match tree {
+            UseTree::Path(path) => {
+                let new_prefix = if prefix.is_empty() {
+                    path.ident.to_string()
+                } else {
+                    format!("{}::{}", prefix, path.ident)
+                };
+                self.process_use_tree(&path.tree, new_prefix);
+            }
+            UseTree::Name(name) => {
+                let full_path = if prefix.is_empty() {
+                    name.ident.to_string()
+                } else {
+                    format!("{}::{}", prefix, name.ident)
+                };
+                
+                // Track what kind of Command is imported
+                if full_path == "tokio::process::Command" || 
+                   full_path == "async_std::process::Command" {
+                    self.imports.has_async_command = true;
+                    self.imports.imported_symbols.insert("Command".to_string());
+                } else if full_path == "std::process::Command" {
+                    self.imports.has_std_command = true;
+                    self.imports.imported_symbols.insert("Command".to_string());
+                }
+                
+                self.imports.imported_symbols.insert(full_path);
+            }
+            UseTree::Glob(_) => {
+                // Handle glob imports
+                if prefix == "tokio::process" || prefix == "async_std::process" {
+                    self.imports.has_async_command = true;
+                } else if prefix == "std::process" {
+                    self.imports.has_std_command = true;
+                }
+            }
+            UseTree::Group(group) => {
+                for tree in &group.items {
+                    self.process_use_tree(tree, prefix.clone());
+                }
+            }
+            UseTree::Rename(rename) => {
+                let full_path = if prefix.is_empty() {
+                    rename.ident.to_string()
+                } else {
+                    format!("{}::{}", prefix, rename.ident)
+                };
+                
+                if full_path == "tokio::process::Command" || 
+                   full_path == "async_std::process::Command" {
+                    self.imports.has_async_command = true;
+                    self.imports.imported_symbols.insert(rename.rename.to_string());
+                } else if full_path == "std::process::Command" {
+                    self.imports.has_std_command = true;
+                    self.imports.imported_symbols.insert(rename.rename.to_string());
+                }
+            }
         }
     }
 
@@ -48,13 +140,27 @@ impl AsyncBoundaryDetector {
     }
 
     /// Check if a function call is blocking I/O
-    fn is_blocking_io(path: &str, method: &str) -> bool {
+    fn is_blocking_io(&self, path: &str, method: &str) -> bool {
         // First check if it's an async I/O library - these are NOT blocking
         let async_patterns = ["tokio::", "async_std::", "futures::", "smol::"];
 
         for pattern in &async_patterns {
             if path.starts_with(pattern) {
                 return false; // Async I/O is not blocking
+            }
+        }
+        
+        // Special case: If method is "output" or "status" on Command,
+        // check our import tracking to determine if it's blocking
+        if (method == "output" || method == "status" || method == "spawn") && path == "Command" {
+            // If we have import information, use it
+            if self.imports.has_async_command && !self.imports.has_std_command {
+                return false; // Definitely async
+            } else if self.imports.has_std_command && !self.imports.has_async_command {
+                return true; // Definitely blocking
+            } else {
+                // Ambiguous or no imports - in async context, assume async
+                return false;
             }
         }
 
@@ -74,10 +180,10 @@ impl AsyncBoundaryDetector {
             ("std::net", "TcpStream"),
             ("std::net", "TcpListener"),
             ("std::net", "UdpSocket"),
-            // Process/Command
-            ("std::process", "Command"),
-            ("Command", "output"),
-            ("Command", "status"),
+            // Process/Command - only flag if explicitly std::process
+            ("std::process::Command", "output"),
+            ("std::process::Command", "status"),
+            ("std::process::Command", "spawn"),
             // Thread blocking
             ("std::thread", "sleep"),
             ("thread", "sleep"),
@@ -101,6 +207,7 @@ impl AsyncBoundaryDetector {
         }
 
         // Check for common blocking method names
+        // But be careful - some of these could be async versions too
         let blocking_methods = [
             "read_to_string",
             "read_to_end",
@@ -113,8 +220,14 @@ impl AsyncBoundaryDetector {
             "wait",
             "join",
         ];
-
-        blocking_methods.contains(&method)
+        
+        // Only flag these if path suggests it's std library, not async library
+        if blocking_methods.contains(&method) {
+            // If path is empty or doesn't indicate async library, might be blocking
+            return path.is_empty() || path.starts_with("std::");
+        }
+        
+        false
     }
 
     /// Detect if we're in an async block boundary
@@ -197,7 +310,7 @@ impl<'ast> Visit<'ast> for AsyncBoundaryDetector {
                     .map(|s| s.ident.to_string())
                     .unwrap_or_default();
 
-                if Self::is_blocking_io(&path_str, &last_segment) {
+                if self.is_blocking_io(&path_str, &last_segment) {
                     self.blocking_in_async.push(BlockingCall {
                         function_name: path_str,
                         is_blocking: true,
@@ -224,10 +337,31 @@ impl<'ast> Visit<'ast> for AsyncBoundaryDetector {
                     .map(|s| s.ident.to_string())
                     .collect::<Vec<_>>()
                     .join("::"),
+                Expr::Call(call) => {
+                    // Handle chained calls like Command::new("echo").output()
+                    if let Expr::Path(path) = &*call.func {
+                        let full_path = path.path
+                            .segments
+                            .iter()
+                            .map(|s| s.ident.to_string())
+                            .collect::<Vec<_>>()
+                            .join("::");
+                        
+                        // Extract just the type name (e.g., "Command" from "Command::new")
+                        if full_path.ends_with("::new") {
+                            full_path.strip_suffix("::new").unwrap_or(&full_path).to_string()
+                        } else {
+                            full_path
+                        }
+                    } else {
+                        String::new()
+                    }
+                }
                 _ => String::new(),
             };
 
-            if Self::is_blocking_io(&receiver_str, &method_name) {
+            // Check if this is a blocking I/O call
+            if self.is_blocking_io(&receiver_str, &method_name) {
                 self.blocking_in_async.push(BlockingCall {
                     function_name: format!("{}.{}", receiver_str, method_name),
                     is_blocking: true,
@@ -284,14 +418,15 @@ mod tests {
 
     #[test]
     fn test_blocking_io_detection() {
-        assert!(AsyncBoundaryDetector::is_blocking_io("std::fs", "read"));
-        assert!(AsyncBoundaryDetector::is_blocking_io(
+        let detector = AsyncBoundaryDetector::new();
+        assert!(detector.is_blocking_io("std::fs", "read"));
+        assert!(detector.is_blocking_io(
             "std::fs::read_to_string",
             "read_to_string"
         ));
-        assert!(AsyncBoundaryDetector::is_blocking_io("File", "open"));
-        assert!(!AsyncBoundaryDetector::is_blocking_io("tokio::fs", "read"));
-        assert!(!AsyncBoundaryDetector::is_blocking_io(
+        assert!(detector.is_blocking_io("File", "open"));
+        assert!(!detector.is_blocking_io("tokio::fs", "read"));
+        assert!(!detector.is_blocking_io(
             "async_std::fs",
             "read"
         ));
