@@ -15,43 +15,149 @@ Required parameters passed from MapReduce workflow:
 - `--line`: The line number where the issue starts
 - `--score`: The unified priority score of this item
 
+Additional context parameters:
+- `--cyclomatic`: Cyclomatic complexity of the function
+- `--cognitive`: Cognitive complexity of the function
+- `--nesting`: Maximum nesting depth
+- `--length`: Number of lines in the function
+- `--role`: Function role (e.g., PureLogic, IOWrapper, Orchestration)
+- `--action`: Primary action recommended by debtmap
+- `--coverage-factor`: Coverage factor from unified score
+- `--complexity-factor`: Complexity factor from unified score
+- `--roi-factor`: ROI factor from unified score
+- `--upstream`: Number of upstream dependencies
+- `--downstream`: Number of downstream dependencies
+- `--risk-reduction`: Expected risk reduction from fixing
+- `--complexity-reduction`: Expected complexity reduction from fixing
+
 ## Process
 
+### Step 0: Interpret the Recommended Action
+
+The `--action` parameter provides debtmap's specific recommendation. Common patterns:
+
+- **"Extract N pure functions (complexity X → Y), then add Z tests"**
+  → Priority is refactoring for complexity reduction, followed by testing
+  
+- **"Add X unit tests covering Y scenarios"**
+  → Focus on test coverage without refactoring
+  
+- **"Refactor to reduce complexity from X to <10"**
+  → Focus on complexity reduction using functional patterns
+  
+- **"Extract business logic from I/O operations"**
+  → Separate pure logic from side effects
+
+Use this action as your primary guide, but validate it makes sense given the code.
+
 ### Step 1: Analyze the Specific Issue
+
 Read the file and locate the exact function:
 ```bash
 # View the function context
 sed -n "${line},+50p" ${file}
 ```
 
-Determine the issue type based on the function's characteristics:
-- High cyclomatic complexity (>10)
-- Low test coverage
-- Both complexity and coverage issues
+Use the provided metrics to understand the issue:
+- **Score**: ${score} (Priority level)
+- **Complexity**: Cyclomatic=${cyclomatic}, Cognitive=${cognitive}
+- **Structure**: Nesting depth=${nesting}, Length=${length} lines
+- **Role**: ${role} (determines refactoring approach)
+- **Dependencies**: ${upstream} upstream, ${downstream} downstream
+- **Recommended Action**: ${action}
+- **Expected Impact**: Risk reduction=${risk-reduction}, Complexity reduction=${complexity-reduction}
 
-### Step 2: Apply Functional Programming Refactoring
+Priority levels:
+- **CRITICAL (Score 10.0)**: Functions with high complexity and zero coverage
+- **HIGH (Score 7-9)**: Important business logic with test gaps  
+- **MEDIUM (Score 4-6)**: Moderate complexity or coverage issues
+- **LOW (Score 1-3)**: Minor improvements
 
-For high complexity issues, follow these functional patterns:
+### Step 2: Evaluate Refactoring Approach
 
-#### Pattern 1: Extract Pure Classification Functions
-If the function contains multiple conditionals for categorization:
+**First, consider the function role (${role}):**
+
+- **PureLogic**: Focus on breaking down complex logic into smaller pure functions
+- **IOWrapper**: Extract business logic from I/O operations  
+- **Orchestration**: Keep orchestration thin, extract any complex logic
+- **Visitor/Parser**: Often legitimately complex, focus on tests instead
+- **Unknown**: Analyze the code to determine the actual role
+
+**Then use this decision tree:**
+
+```
+Is it a visitor pattern or large switch/match?
+├─ YES → Don't refactor, add tests if needed
+└─ NO → Continue
+   │
+   Cyclomatic > 10 AND Score >= 7?
+   ├─ NO → Focus on adding tests only
+   └─ YES → Continue
+      │
+      Does it classify/categorize inputs?
+      ├─ YES → Extract as pure static function
+      └─ NO → Continue
+         │
+         Does it have repeated similar conditions?
+         ├─ YES → Consolidate with pattern matching
+         └─ NO → Continue
+            │
+            Does it have nested loops?
+            ├─ YES → Convert to iterator chains
+            └─ NO → Consider if refactoring is needed
+```
+
+**WARNING: Avoid these anti-patterns:**
+- Creating multiple single-use helper methods that are only called from tests
+- Extracting helpers that aren't used in production code paths
+- Over-engineering: 5+ helper methods for a 15-line function
+- Breaking apart clear match expressions
+- Adding complexity to reduce metrics
+
+### Step 3: Apply Functional Programming Patterns
+
+Based on the complexity source, apply the appropriate pattern:
+
+#### Pattern 1: Extract Pure Classification Functions (PREFERRED)
+For functions with classification/decision logic:
 
 ```rust
-// Before: Multiple if-else chains
-if condition_a { TypeA } else if condition_b { TypeB } else { TypeC }
+// Before: Complexity 15
+if name.contains("async") || name.contains("await") { 
+    CallType::Async 
+} else if name.starts_with("handle_") { 
+    CallType::Delegate 
+} else if name.starts_with("map") { 
+    CallType::Pipeline 
+} else { 
+    CallType::Direct 
+}
 
-// After: Pure static function with pattern matching
-fn classify_type(input: &str) -> Type {
+// After: Extract as pure static function
+fn classify_call_type(name: &str) -> CallType {
     match () {
-        _ if input.starts_with("test_") => Type::Test,
-        _ if input.contains("_impl") => Type::Implementation,
-        _ => Type::Regular,
+        _ if name.contains("async") || name.contains("await") => CallType::Async,
+        _ if name.starts_with("handle_") => CallType::Delegate,
+        _ if name.starts_with("map") => CallType::Pipeline,
+        _ => CallType::Direct,
     }
 }
 ```
 
-#### Pattern 2: Replace Imperative Loops with Iterator Chains
-Transform loops into functional iterator patterns:
+#### Pattern 2: Pattern Consolidation
+Use match expressions with guards instead of if-else chains:
+
+```rust
+// Combine similar branches using pattern matching
+match () {
+    _ if condition_a || condition_b => handle_similar_cases(),
+    _ if condition_c => handle_special_case(),
+    _ => handle_default(),
+}
+```
+
+#### Pattern 3: Functional Composition
+Replace imperative loops with iterator chains:
 
 ```rust
 // Before: Imperative loop
@@ -70,8 +176,8 @@ let results: Vec<_> = items
     .collect();
 ```
 
-#### Pattern 3: Extract Pure Business Logic from I/O
-Separate side effects from pure logic:
+#### Pattern 4: Extract Pure Business Logic from I/O
+For orchestration/I/O functions:
 
 ```rust
 // Before: Mixed I/O and logic
@@ -94,9 +200,28 @@ fn process_file(path: &Path) -> Result<(), Error> {
 }
 ```
 
-### Step 3: Add Comprehensive Tests
+**Note**: For orchestration/I/O functions with low complexity:
+- Extract formatting logic to pure functions that return strings
+- Extract parsing/validation to separate modules
+- Create pure functions for decision logic
+- Keep thin I/O wrappers untested (they're not the real debt)
 
-For functions lacking coverage, create thorough test cases:
+### Step 4: Add Comprehensive Tests
+
+**For Testing Priority:**
+
+Based on the metrics (Score=${score}, Cyclomatic=${cyclomatic}):
+- Score >= 7 AND Cyclomatic > 10 → Apply functional refactoring first (see Step 3)
+- Coverage-factor > 5 → Focus on comprehensive test coverage
+- Otherwise → Add targeted tests for uncovered branches
+
+**For Business Logic Functions:**
+Write test cases covering:
+- Happy path scenarios
+- Edge cases and boundary conditions  
+- Error conditions and invalid inputs
+- All branches of pattern matching
+- Any uncovered paths
 
 ```rust
 #[cfg(test)]
@@ -104,8 +229,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_happy_path() {
-        // Test normal operation
+    fn test_classification_logic() {
+        // Test extracted pure functions
+        assert_eq!(classify_type("test_foo"), Type::Test);
+        assert_eq!(classify_type("bar_impl"), Type::Implementation);
     }
 
     #[test]
@@ -120,30 +247,71 @@ mod tests {
 }
 ```
 
-Focus on testing:
-- Pure functions extracted during refactoring
-- Business logic separated from I/O
-- Edge cases and error conditions
-- All branches of pattern matching
+**For Orchestration/I/O Functions:**
+- DON'T test the I/O wrapper directly
+- DO test any extracted pure functions
+- Focus tests on business logic, not I/O operations
 
-### Step 4: Verify the Fix
+### Step 5: Verify the Fix
 
 Run tests to ensure the fix works:
 ```bash
-cargo test --lib $(echo ${function} | tr '::' ' ')
+just ci
 ```
 
-Check that the function still compiles and passes clippy:
+All tests must pass, no clippy warnings allowed, and code must be properly formatted.
+
+### Step 6: Commit the Changes
+
+**REQUIRED: Create a commit with your fix.**
+
+Create a descriptive commit message that includes:
+- What was changed (refactoring applied or tests added)
+- The specific function and file that was fixed
+- The metrics that guided the fix
+
+**For refactoring commits:**
 ```bash
-cargo clippy --all-targets -- -D warnings
+git add -A
+git commit -m "refactor: reduce complexity in ${function}
+
+- Applied: ${action}
+- Complexity: ${cyclomatic} → [new_complexity]
+- Function: ${function} in ${file}
+- Risk reduction: ${risk-reduction}
+"
 ```
 
-### Step 5: Measure Improvement
+**For test addition commits:**
+```bash
+git add -A
+git commit -m "test: add coverage for ${function}
 
-Calculate the improvement for this specific function:
-- If complexity was reduced, note the before/after cyclomatic complexity
-- If tests were added, note the coverage improvement
-- Document which functional patterns were applied
+- Added [N] test cases for ${function}
+- Coverage factor: ${coverage-factor}
+- Function: ${function} in ${file}
+- Expected risk reduction: ${risk-reduction}
+"
+```
+
+**For combined refactoring + tests:**
+```bash
+git add -A
+git commit -m "fix: refactor and test ${function}
+
+- Applied: ${action}
+- Complexity: ${cyclomatic} → [new_complexity]
+- Added [N] comprehensive tests
+- Function: ${function} in ${file}
+- Risk reduction: ${risk-reduction}
+"
+```
+
+**IMPORTANT**: 
+- Always create a commit after completing the fix
+- Include the actual metrics in the commit message
+- Reference the specific function and file
+- Each agent in the MapReduce workflow creates its own commit
 
 ## Implementation Guidelines
 
@@ -157,26 +325,24 @@ Calculate the improvement for this specific function:
 - **Iterator chains** over imperative loops
 - **Type-driven design** - use the type system to enforce invariants
 
-### Refactoring Decision Tree
+### Common Pitfalls to Avoid
 
-```
-Score >= 7 AND Complexity > 10?
-├─ YES → Apply functional refactoring
-│   ├─ Classification logic? → Extract pure static function
-│   ├─ Nested loops? → Convert to iterator chains
-│   ├─ Mixed I/O and logic? → Extract pure core
-│   └─ Complex conditionals? → Use pattern matching
-└─ NO → Add comprehensive tests only
-```
+❌ **DON'T:**
+- Extract helper methods that are only called once
+- Create test-only helper functions (helpers not used in production code)
+- Break apart a clear match/switch into multiple functions
+- Add abstraction layers for simple logic
+- Refactor visitor pattern implementations (they're meant to have many branches)
+- Create 5+ helper methods for a 15-line function
+- Test I/O directly instead of extracting logic
 
-### What NOT to Do
-
-**Avoid these anti-patterns:**
-- Creating single-use helper methods
-- Over-abstracting simple logic
-- Breaking apart clear match expressions
-- Adding complexity to reduce metrics
-- Testing I/O directly instead of extracting logic
+✅ **DO:**
+- Extract reusable classification/decision logic as static pure functions
+- Use functional patterns (map, filter, fold) where appropriate
+- Consolidate similar patterns into single functions
+- Keep related logic together
+- Accept that some functions legitimately have high complexity
+- Test the extracted pure functions thoroughly
 
 ### Idiomatic Rust Patterns
 
@@ -202,21 +368,46 @@ items.iter().map(|x| x.process())
 value.map(|v| v.transform()).unwrap_or_default()
 ```
 
+### Example of Good Refactoring
+
+```rust
+// Extract classification logic as pure static function
+impl MyStruct {
+    // This can be tested in isolation and reused
+    fn classify_item(name: &str) -> ItemType {
+        match () {
+            _ if name.starts_with("test_") => ItemType::Test,
+            _ if name.contains("_impl") => ItemType::Implementation,
+            _ => ItemType::Regular,
+        }
+    }
+    
+    // Main function uses the pure classifier
+    fn process(&mut self, name: &str) {
+        let item_type = Self::classify_item(name);
+        // ... rest of logic
+    }
+}
+```
+
 ## Success Criteria
 
 The fix is complete when:
 - [ ] The specific function has been refactored or tested
-- [ ] All tests pass (`cargo test`)
-- [ ] No clippy warnings (`cargo clippy`)
+- [ ] All tests pass (`just ci`)
 - [ ] Code follows functional programming patterns
-- [ ] The fix reduces the debt score for this specific item
 - [ ] Implementation uses idiomatic Rust patterns
+- [ ] Changes are minimal and focused
+- [ ] Backward compatibility is maintained
+- [ ] **Changes are committed with descriptive message including metrics**
 
 ## Notes
 
-- Focus only on the specific function identified
-- Apply functional programming patterns consistently
-- Keep changes minimal and focused
-- Ensure backward compatibility
-- Document any extracted pure functions
+- Focus only on the specific function identified by the parameters
+- For Score >= 7 with Complexity > 10: Apply functional refactoring
+- For other cases: Add comprehensive tests
+- Extract pure functions that can be tested in isolation
+- Accept that some functions (visitor patterns, large matches) have legitimate complexity
+- **A commit is REQUIRED at the end of each fix** (Step 6)
 - This command is designed for MapReduce workflow integration
+- Each parallel agent creates its own commit; these are later aggregated in the reduce phase
