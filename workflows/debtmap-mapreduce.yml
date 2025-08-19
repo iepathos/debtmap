@@ -1,0 +1,88 @@
+name: debtmap-parallel-elimination
+mode: mapreduce
+
+# Setup phase: Analyze the codebase and generate debt items
+setup:
+  - shell: "just coverage-lcov"
+    
+  - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output debtmap.json --format json"
+
+# Map phase: Process each debt item in parallel
+map:
+  # Input configuration - debtmap.json contains items array
+  input: debtmap.json
+  json_path: "$.items[*]"
+  
+  # Commands to execute for each debt item
+  agent_template:
+    commands:
+      # Fix the specific debt item
+      - claude: "/fix-debt-item --file ${item.location.file} --function ${item.location.function} --line ${item.location.line} --score ${item.unified_score.final_score}"
+        capture_output: true
+        timeout: 300
+      
+      # Run tests to verify the fix
+      - shell: "just test"
+        on_failure:
+          claude: "/mmm-debug-test-failure --output '${shell.output}'"
+          max_attempts: 2
+          fail_workflow: false
+      
+      # Run linting
+      - shell: "just fmt && just lint"
+        on_failure:
+          claude: "/mmm-lint '${shell.output}'"
+          max_attempts: 2
+          fail_workflow: false
+  
+  # Parallelization settings
+  max_parallel: 5  # Run up to 5 agents in parallel
+  timeout_per_agent: 600s  # 10 minutes per agent
+  retry_on_failure: 1  # Retry once if an agent fails
+  
+  # Process high-score items first
+  filter: "unified_score.final_score >= 5"  # Only process items with score >= 5
+  sort_by: "unified_score.final_score DESC"  # Process highest score items first
+  max_items: 10  # Limit to 10 items per run
+
+# Reduce phase: Aggregate results and finalize
+reduce:
+  commands:
+    # Run full test suite after all fixes
+    - shell: "just test"
+      on_failure:
+        claude: "/mmm-debug-test-failure --output '${shell.output}'"
+        max_attempts: 3
+        fail_workflow: true  # Fail if tests don't pass after merging
+    
+    # Run formatting and linting
+    - shell: "just fmt && just lint"
+      on_failure:
+        claude: "/lint ${shell.output}"
+        max_attempts: 3
+        fail_workflow: false
+          
+    # Re-run debtmap to measure improvements
+    - shell: "just coverage-lcov"
+    
+    - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output debtmap-after.json --format json"
+      capture_output: true
+    
+    # Compare before/after debt metrics and generate summary
+    - claude: "/mmm-compare-debt-results --before debtmap.json --after debtmap-after.json --map-results '${map.results}' --successful ${map.successful} --failed ${map.failed}"
+      capture_output: true
+    
+    # Create final commit with comparison results
+    - shell: |
+        git add -A && git commit -m "fix: eliminate ${map.successful} technical debt items via MapReduce
+        
+        Processed ${map.total} debt items in parallel:
+        - Successfully fixed: ${map.successful} items
+        - Failed to fix: ${map.failed} items
+        
+        Debt improvements measured by debtmap:
+        ${claude.output}
+        
+        This commit represents the aggregated work of multiple parallel agents."
+      commit_required: true
+
