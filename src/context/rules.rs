@@ -30,8 +30,6 @@ pub enum DebtPattern {
     InputValidation,
     /// Match security issues
     Security,
-    /// Match performance issues
-    Performance,
     /// Match all patterns
     All,
 }
@@ -185,7 +183,6 @@ impl ContextRuleEngine {
             "blocking_io" => DebtPattern::BlockingIO,
             "input_validation" => DebtPattern::InputValidation,
             "security" => DebtPattern::Security,
-            "performance" => DebtPattern::Performance,
             "all" => DebtPattern::All,
             _ => return None, // Unknown pattern
         };
@@ -348,23 +345,6 @@ impl ContextRuleEngine {
             reason: Some("Examples often demonstrate concepts without security".to_string()),
         });
 
-        // Performance is less critical in test code
-        self.add_rule(ContextRule {
-            pattern: DebtPattern::Performance,
-            context_matcher: ContextMatcher::for_file_type(FileType::Test),
-            action: RuleAction::ReduceSeverity(2),
-            priority: 70,
-            reason: Some("Test performance is less critical than correctness".to_string()),
-        });
-
-        // Performance is less critical in benchmarks (they measure it)
-        self.add_rule(ContextRule {
-            pattern: DebtPattern::Performance,
-            context_matcher: ContextMatcher::for_file_type(FileType::Benchmark),
-            action: RuleAction::Warn,
-            priority: 70,
-            reason: Some("Benchmarks intentionally test performance patterns".to_string()),
-        });
 
         // Build scripts have different constraints
         self.add_rule(ContextRule {
@@ -420,7 +400,6 @@ impl ContextRuleEngine {
             (DebtPattern::BlockingIO, DebtPattern::BlockingIO) => true,
             (DebtPattern::InputValidation, DebtPattern::InputValidation) => true,
             (DebtPattern::Security, DebtPattern::Security) => true,
-            (DebtPattern::Performance, DebtPattern::Performance) => true,
             _ => false,
         }
     }
@@ -508,9 +487,9 @@ mod tests {
     fn test_custom_rules() {
         let mut engine = ContextRuleEngine::new();
 
-        // Add a custom rule
+        // Add a custom rule for testing
         engine.add_rule(ContextRule {
-            pattern: DebtPattern::Performance,
+            pattern: DebtPattern::Security,
             context_matcher: ContextMatcher {
                 role: None,
                 file_type: None,
@@ -520,13 +499,13 @@ mod tests {
             },
             action: RuleAction::Skip,
             priority: 200,
-            reason: Some("Benchmarks measure performance".to_string()),
+            reason: Some("Benchmarks are test contexts".to_string()),
         });
 
         // Test the custom rule
         let benchmark_context =
             FunctionContext::new().with_function_name("run_benchmark".to_string());
-        let action = engine.evaluate(&DebtPattern::Performance, &benchmark_context);
+        let action = engine.evaluate(&DebtPattern::Security, &benchmark_context);
         assert_eq!(action, RuleAction::Skip);
     }
 }

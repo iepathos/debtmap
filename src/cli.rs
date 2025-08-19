@@ -104,13 +104,6 @@ pub enum Commands {
         #[arg(long = "security-enhanced")]
         security_enhanced: bool,
 
-        /// Enable performance analysis only
-        #[arg(long = "performance-only")]
-        performance_only: bool,
-
-        /// Enable smart performance detection with context-aware analysis
-        #[arg(long = "smart-performance")]
-        smart_performance: bool,
 
         /// Enable organization analysis only
         #[arg(long = "organization-only")]

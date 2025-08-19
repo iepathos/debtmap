@@ -586,7 +586,6 @@ mod tests {
             dependency_factor: 4.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.2,
             final_score: 8.5,
         };
@@ -620,7 +619,6 @@ mod tests {
             dependency_factor: 6.0, // Above threshold
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.0,
         };
@@ -649,7 +647,6 @@ mod tests {
             dependency_factor: 2.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };

@@ -194,7 +194,6 @@ impl<'a> EnhancedScorer<'a> {
         breakdown.add_component("frequency", frequency_factor);
         breakdown.add_component("test_weight", test_weight);
         breakdown.add_component("security_debt", debt_scores.security);
-        breakdown.add_component("performance_debt", debt_scores.performance);
         breakdown.add_component("organization_debt", debt_scores.organization);
 
         let explanation = format!(
@@ -248,11 +247,6 @@ impl<'a> EnhancedScorer<'a> {
     ) -> f64 {
         // Combine all debt categories into a base score
         let security_weight = if debt_scores.security > 0.0 { 2.0 } else { 0.0 };
-        let performance_weight = if debt_scores.performance > 0.0 {
-            1.5
-        } else {
-            0.0
-        };
         let organization_weight = if debt_scores.organization > 0.0 {
             1.0
         } else {
@@ -262,7 +256,6 @@ impl<'a> EnhancedScorer<'a> {
         let resource_weight = if debt_scores.resource > 0.0 { 1.3 } else { 0.0 };
 
         let total_weight = security_weight
-            + performance_weight
             + organization_weight
             + testing_weight
             + resource_weight;
@@ -272,7 +265,6 @@ impl<'a> EnhancedScorer<'a> {
         }
 
         let weighted_sum = debt_scores.security * security_weight
-            + debt_scores.performance * performance_weight
             + debt_scores.organization * organization_weight
             + debt_scores.testing * testing_weight
             + debt_scores.resource * resource_weight;

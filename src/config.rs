@@ -34,9 +34,6 @@ pub struct ScoringWeights {
     #[serde(default = "default_organization_weight")]
     pub organization: f64,
 
-    /// Weight for performance issues factor (0.0-1.0)
-    #[serde(default = "default_performance_weight")]
-    pub performance: f64,
 }
 
 impl Default for ScoringWeights {
@@ -49,7 +46,6 @@ impl Default for ScoringWeights {
             dependency: default_dependency_weight(),
             security: default_security_weight(),
             organization: default_organization_weight(),
-            performance: default_performance_weight(),
         }
     }
 }
@@ -64,7 +60,7 @@ impl ScoringWeights {
             + self.dependency
             + self.security
             + self.organization
-            + self.performance;
+;
         if (sum - 1.0).abs() > 0.001 {
             return Err(format!(
                 "Scoring weights must sum to 1.0, but sum to {:.3}",
@@ -94,9 +90,6 @@ impl ScoringWeights {
         if self.organization < 0.0 || self.organization > 1.0 {
             return Err("Organization weight must be between 0.0 and 1.0".to_string());
         }
-        if self.performance < 0.0 || self.performance > 1.0 {
-            return Err("Weight must be between 0.0 and 1.0".to_string());
-        }
 
         Ok(())
     }
@@ -110,7 +103,7 @@ impl ScoringWeights {
             + self.dependency
             + self.security
             + self.organization
-            + self.performance;
+;
         if sum > 0.0 {
             self.coverage /= sum;
             self.complexity /= sum;
@@ -119,35 +112,31 @@ impl ScoringWeights {
             self.dependency /= sum;
             self.security /= sum;
             self.organization /= sum;
-            self.performance /= sum;
         }
     }
 }
 
 // Default weights - prioritize coverage but include dependency criticality
 fn default_coverage_weight() -> f64 {
-    0.35
+    0.30  // Reduced from 0.35 (-0.05) to balance weights
 }
 fn default_complexity_weight() -> f64 {
-    0.15
+    0.20  // Increased from 0.15 (+0.05) to absorb some performance weight
 }
 fn default_roi_weight() -> f64 {
-    0.25
+    0.25  // Reduced back to original to maintain sum of 1.0
 }
 fn default_semantic_weight() -> f64 {
     0.05
 }
 fn default_dependency_weight() -> f64 {
-    0.10
+    0.10  // Unchanged
 }
 fn default_security_weight() -> f64 {
-    0.05
+    0.05  // Unchanged
 }
 fn default_organization_weight() -> f64 {
-    0.05
-}
-fn default_performance_weight() -> f64 {
-    0.0 // Default to 0 for backward compatibility
+    0.05  // Reduced back to maintain sum of 1.0
 }
 
 /// Context-aware detection configuration

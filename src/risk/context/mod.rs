@@ -80,7 +80,6 @@ pub enum Impact {
     Revenue,
     UserExperience,
     Security,
-    Performance,
     Compliance,
 }
 

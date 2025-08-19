@@ -44,8 +44,6 @@ struct AnalyzeConfig {
     #[allow(dead_code)]
     security_enhanced: bool,
     #[allow(dead_code)]
-    performance_only: bool,
-    #[allow(dead_code)]
     organization_only: bool,
     #[allow(dead_code)]
     testing_only: bool,
@@ -59,8 +57,6 @@ struct AnalyzeConfig {
     filter_categories: Option<Vec<String>>,
     #[allow(dead_code)]
     exclude_tests: bool,
-    #[allow(dead_code)]
-    smart_performance: bool,
     #[allow(dead_code)]
     no_context_aware: bool,
 }
@@ -132,7 +128,6 @@ fn main() -> Result<()> {
             comprehensive,
             security_only,
             security_enhanced,
-            performance_only,
             organization_only,
             testing_only,
             resource_only,
@@ -142,7 +137,6 @@ fn main() -> Result<()> {
             enhanced_scoring,
             legacy_scoring,
             exclude_tests,
-            smart_performance,
             no_context_aware,
         } => {
             // Set enhanced scoring environment variable
@@ -180,16 +174,14 @@ fn main() -> Result<()> {
                 comprehensive,
                 security_only,
                 security_enhanced,
-                performance_only,
-                organization_only,
+                    organization_only,
                 testing_only,
                 resource_only,
                 group_by_category,
                 min_priority,
                 filter_categories,
                 exclude_tests,
-                smart_performance,
-                no_context_aware,
+                    no_context_aware,
             };
             handle_analyze(config)
         }
@@ -1611,7 +1603,6 @@ fn convert_error_swallowing_to_unified(
                 dependency_factor: 4.0, // Moderate dependency impact
                 security_factor: 0.0,   // Not a security issue
                 organization_factor: 0.0, // Not an organization issue
-                performance_factor: 0.0, // Not a performance issue
                 role_multiplier: 1.2,   // Slightly elevated importance
                 final_score: 5.5,       // Above average priority
             };

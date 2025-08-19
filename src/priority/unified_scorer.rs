@@ -27,7 +27,6 @@ pub struct UnifiedScore {
     pub dependency_factor: f64,   // 0-10, configurable weight (default 10%)
     pub security_factor: f64,     // 0-10, configurable weight (default 5%)
     pub organization_factor: f64, // 0-10, configurable weight (default 5%)
-    pub performance_factor: f64,  // 0-10, configurable weight (default 15%)
     pub role_multiplier: f64,     // 0.1-1.5x based on function role
     pub final_score: f64,         // Computed composite score
 }
@@ -120,7 +119,6 @@ pub fn calculate_unified_priority_with_debt(
             dependency_factor: 0.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
         };
@@ -187,7 +185,6 @@ pub fn calculate_unified_priority_with_debt(
     };
 
     // Add new debt category factors
-    let performance_factor = debt_scores.performance.min(10.0);
     let testing_factor = debt_scores.testing.min(10.0);
     let resource_factor = debt_scores.resource.min(10.0);
     let duplication_factor = debt_scores.duplication.min(10.0);
@@ -204,8 +201,7 @@ pub fn calculate_unified_priority_with_debt(
     let weighted_security = security_factor * weights.security;
     let weighted_organization = organization_factor * weights.organization;
 
-    // Use configurable weight for performance, smaller weights for other categories
-    let weighted_performance = performance_factor * weights.performance;
+    // Use smaller weights for additional debt categories
     let weighted_testing = testing_factor * 0.05;
     let weighted_resource = resource_factor * 0.05;
     let weighted_duplication = duplication_factor * 0.05;
@@ -218,7 +214,6 @@ pub fn calculate_unified_priority_with_debt(
         + weighted_dependency
         + weighted_security
         + weighted_organization
-        + weighted_performance
         + weighted_testing
         + weighted_resource
         + weighted_duplication;
@@ -234,7 +229,6 @@ pub fn calculate_unified_priority_with_debt(
         dependency_factor,
         security_factor,
         organization_factor,
-        performance_factor,
         role_multiplier,
         final_score,
     }
@@ -1820,7 +1814,7 @@ fn generate_recommendation(
         } => generate_security_recommendation("input_validation", input_type, validation_missing),
         // Resource Management debt types
         DebtType::AllocationInefficiency { pattern, impact } => {
-            generate_performance_recommendation("allocation", pattern, impact)
+            generate_resource_management_recommendation("allocation", pattern, impact)
         }
         DebtType::StringConcatenation {
             loop_type,
@@ -1831,7 +1825,7 @@ fn generate_recommendation(
             complexity_estimate,
         } => generate_nested_loops_recommendation(*depth, complexity_estimate),
         DebtType::BlockingIO { operation, context } => {
-            generate_performance_recommendation("blocking_io", operation, context)
+            generate_resource_management_recommendation("blocking_io", operation, context)
         }
         DebtType::SuboptimalDataStructure {
             current_type,
@@ -2130,15 +2124,15 @@ fn generate_unsafe_code_recommendation(
     )
 }
 
-fn generate_performance_recommendation(
-    perf_type: &str,
+fn generate_resource_management_recommendation(
+    resource_type: &str,
     detail1: &str,
     detail2: &str,
 ) -> (String, String, Vec<String>) {
-    match perf_type {
+    match resource_type {
         "allocation" => (
             format!("Optimize allocation pattern: {}", detail1),
-            format!("Performance impact: {}", detail2),
+            format!("Resource impact: {}", detail2),
             vec![
                 "Use object pooling where appropriate".to_string(),
                 "Consider pre-allocation strategies".to_string(),
@@ -2147,29 +2141,29 @@ fn generate_performance_recommendation(
             ],
         ),
         "blocking_io" => (
-            format!("Make {} operation async", detail1),
+            format!("Optimize {} operation", detail1),
             format!("Context: {}", detail2),
             vec![
-                "Convert to async/await pattern".to_string(),
-                "Use non-blocking I/O libraries".to_string(),
+                "Consider async/await pattern".to_string(),
+                "Use appropriate I/O libraries".to_string(),
                 "Consider background processing".to_string(),
-                "Add timeout handling".to_string(),
+                "Add proper error handling".to_string(),
             ],
         ),
         "basic" => (
-            format!("Optimize {} performance issue", detail1),
-            format!("Performance impact ({}): {}", detail2, detail1),
+            format!("Optimize {} resource issue", detail1),
+            format!("Resource impact ({}): {}", detail2, detail1),
             vec![
-                "Profile and identify performance bottlenecks".to_string(),
-                "Apply performance optimization techniques".to_string(),
-                "Benchmark before and after changes".to_string(),
+                "Profile and identify resource bottlenecks".to_string(),
+                "Apply resource optimization techniques".to_string(),
+                "Monitor resource usage before and after changes".to_string(),
                 "Consider algorithmic improvements".to_string(),
             ],
         ),
         _ => (
-            "Optimize performance".to_string(),
-            "Performance issue detected".to_string(),
-            vec!["Profile and benchmark".to_string()],
+            "Optimize resource usage".to_string(),
+            "Resource issue detected".to_string(),
+            vec!["Monitor and profile resource usage".to_string()],
         ),
     }
 }
@@ -2347,7 +2341,7 @@ fn generate_async_misuse_recommendation(
 ) -> (String, String, Vec<String>) {
     (
         format!("Fix async pattern: {}", pattern),
-        format!("Performance impact: {}", performance_impact),
+        format!("Resource impact: {}", performance_impact),
         vec![
             "Use proper async/await patterns".to_string(),
             "Avoid blocking async contexts".to_string(),
@@ -2384,7 +2378,7 @@ fn generate_collection_inefficiency_recommendation(
             "Review collection access patterns".to_string(),
             "Consider alternative data structures".to_string(),
             "Pre-allocate capacity where possible".to_string(),
-            "Profile collection performance".to_string(),
+            "Monitor collection resource usage".to_string(),
         ],
     )
 }
@@ -2479,7 +2473,6 @@ mod tests {
             dependency_factor: 4.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 6.5,
         };
@@ -2684,7 +2677,6 @@ mod tests {
             dependency_factor: 0.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };
@@ -3131,7 +3123,6 @@ mod tests {
             dependency_factor: 2.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3167,7 +3158,6 @@ mod tests {
             dependency_factor: 3.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 5.0,
         };
@@ -3197,7 +3187,6 @@ mod tests {
             dependency_factor: 1.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3228,7 +3217,6 @@ mod tests {
             dependency_factor: 2.0,
             security_factor: 0.0,
             organization_factor: 0.0,
-            performance_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.5,
         };
