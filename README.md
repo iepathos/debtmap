@@ -27,7 +27,7 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - **Quantified Impact**: Provides concrete metrics like "refactoring this will reduce complexity by 60%" or "testing this will reduce risk by 5%"
 - **Language-Agnostic Coverage Integration**: Works with any tool that generates LCOV format (Jest, pytest, cargo-tarpaulin, etc.)
 
-**Performance:**
+**Speed:**
 - Written in Rust for 10-100x faster analysis than Java/Python-based competitors
 - Parallel processing with Rayon for analyzing massive codebases in seconds
 - Incremental analysis caches results for lightning-fast re-runs
@@ -35,9 +35,9 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 ## Features
 
 - **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript with Go support coming soon
-- **Comprehensive debt detection** - Identifies 20+ types of technical debt across security, performance, organization, testing, and resource management
+- **Comprehensive debt detection** - Identifies technical debt across security, organization, testing, and resource management
 - **Security vulnerability detection** - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns
-- **Performance anti-pattern detection** - Identifies inefficient allocations, string operations, nested loops, and blocking I/O
+- **Resource management analysis** - Identifies inefficient allocations, nested loops, and blocking I/O patterns
 - **Code organization analysis** - Detects god objects, feature envy, primitive obsession, and magic values
 - **Testing quality assessment** - Analyzes test complexity, flaky patterns, and assertion quality
 - **Resource management review** - Finds async/await misuse, resource leaks, and collection inefficiencies
@@ -425,7 +425,7 @@ Identifies similar code blocks that could be refactored into shared functions.
 - **Unsafe code blocks**: Unnecessary or poorly justified unsafe operations
 - **Input validation gaps**: Missing validation for user inputs and external data
 
-#### Performance Anti-patterns
+#### Resource Management Issues
 - **Inefficient allocations**: Unnecessary heap allocations and memory waste
 - **String concatenation**: Inefficient string building in loops
 - **Nested loops**: O(n²) and higher complexity patterns
@@ -651,7 +651,7 @@ api_files = [
 
 ## Architecture
 
-Debtmap is built with a functional, modular architecture designed for extensibility and performance:
+Debtmap is built with a functional, modular architecture designed for extensibility and speed:
 
 ### Core Modules
 
@@ -685,13 +685,6 @@ Debtmap is built with a functional, modular architecture designed for extensibil
   - SQL injection risk analysis
   - Unsafe code block assessment
   - Input validation gap detection
-
-- **`performance/`** - Performance anti-pattern detection
-  - Memory allocation inefficiencies
-  - String concatenation issues
-  - Nested loop complexity
-  - Blocking I/O operations
-  - Suboptimal data structure usage
 
 - **`organization/`** - Code organization analysis
   - God object detection
@@ -727,7 +720,7 @@ We welcome contributions! This is an early-stage project, so there's plenty of r
 
 - **Language support**: Add analyzers for Go, Java, etc.
 - **New metrics**: Implement additional complexity or quality metrics
-- **Performance**: Optimize analysis algorithms
+- **Speed**: Optimize analysis algorithms
 - **Documentation**: Improve docs and add examples
 - **Testing**: Expand test coverage
 
@@ -836,7 +829,7 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 - [x] ROI-based testing prioritization
 - [x] Comprehensive debt detection (20+ pattern types)
 - [x] Security vulnerability detection
-- [x] Performance anti-pattern analysis
+- [x] Resource management analysis
 - [x] Code organization assessment
 - [x] Testing quality evaluation
 - [x] Resource management review

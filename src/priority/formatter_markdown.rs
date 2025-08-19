@@ -151,7 +151,7 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::SqlInjectionRisk { .. } => "SQL Injection Risk",
         DebtType::UnsafeCode { .. } => "Unsafe Code",
         DebtType::InputValidationGap { .. } => "Input Validation Gap",
-        // Performance debt types
+        // Resource Management debt types
         DebtType::AllocationInefficiency { .. } => "Allocation Inefficiency",
         DebtType::StringConcatenation { .. } => "String Concatenation",
         DebtType::NestedLoops { .. } => "Nested Loops",
@@ -366,7 +366,7 @@ fn format_main_factors_with_debt_type(
         ));
     }
 
-    // Add Security and Performance specific factors
+    // Add Security specific factors
     match debt_type {
         crate::priority::DebtType::BasicSecurity {
             severity,
@@ -398,15 +398,15 @@ fn format_main_factors_with_debt_type(
             factors.push(format!("Weak crypto: {}", algorithm));
         }
         crate::priority::DebtType::NestedLoops { depth, .. } => {
-            factors.push("Performance impact (High)".to_string());
+            factors.push("Complexity impact (High)".to_string());
             factors.push(format!("{} level nested loops", depth));
         }
         crate::priority::DebtType::BlockingIO { operation, .. } => {
-            factors.push("Performance impact (High)".to_string());
+            factors.push("Resource management issue".to_string());
             factors.push(format!("Blocking {}", operation));
         }
         crate::priority::DebtType::AllocationInefficiency { pattern, .. } => {
-            factors.push("Performance impact (Medium)".to_string());
+            factors.push("Resource management issue".to_string());
             factors.push(format!("Allocation: {}", pattern));
         }
         _ => {} // No additional factors for other debt types

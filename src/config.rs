@@ -95,7 +95,7 @@ impl ScoringWeights {
             return Err("Organization weight must be between 0.0 and 1.0".to_string());
         }
         if self.performance < 0.0 || self.performance > 1.0 {
-            return Err("Performance weight must be between 0.0 and 1.0".to_string());
+            return Err("Weight must be between 0.0 and 1.0".to_string());
         }
 
         Ok(())
@@ -246,51 +246,6 @@ pub struct FunctionPatternConfig {
     pub init_patterns: Vec<String>,
 }
 
-/// Performance detection configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceConfig {
-    /// Configuration for test performance detection
-    #[serde(default)]
-    pub tests: Option<TestPerformanceConfig>,
-}
-
-impl Default for PerformanceConfig {
-    fn default() -> Self {
-        Self {
-            tests: Some(TestPerformanceConfig::default()),
-        }
-    }
-}
-
-/// Test performance detection configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestPerformanceConfig {
-    /// Whether to detect performance issues in tests
-    #[serde(default = "default_test_perf_enabled")]
-    pub enabled: bool,
-
-    /// Severity reduction for test performance issues
-    /// 0 = no reduction, 1 = reduce by one level, 2 = reduce by two levels
-    #[serde(default = "default_test_severity_reduction")]
-    pub severity_reduction: u8,
-}
-
-impl Default for TestPerformanceConfig {
-    fn default() -> Self {
-        Self {
-            enabled: default_test_perf_enabled(),
-            severity_reduction: default_test_severity_reduction(),
-        }
-    }
-}
-
-fn default_test_perf_enabled() -> bool {
-    true // Detect test performance issues by default
-}
-
-fn default_test_severity_reduction() -> u8 {
-    1 // Reduce severity by one level for test performance issues
-}
 
 /// Root configuration structure for debtmap
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -318,10 +273,6 @@ pub struct DebtmapConfig {
     /// Output configuration
     #[serde(default)]
     pub output: Option<OutputConfig>,
-
-    /// Performance detection configuration
-    #[serde(default)]
-    pub performance: Option<PerformanceConfig>,
 
     /// Context-aware detection configuration
     #[serde(default)]
@@ -706,14 +657,6 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
     }
 }
 
-/// Get test performance configuration
-pub fn get_test_performance_config() -> TestPerformanceConfig {
-    get_config()
-        .performance
-        .as_ref()
-        .and_then(|p| p.tests.clone())
-        .unwrap_or_default()
-}
 
 /// Get smart performance configuration
 

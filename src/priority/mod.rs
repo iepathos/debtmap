@@ -127,7 +127,7 @@ pub enum DebtType {
         input_type: String,
         validation_missing: String,
     },
-    // Performance debt types
+    // Resource Management debt types
     AllocationInefficiency {
         pattern: String,
         impact: String,

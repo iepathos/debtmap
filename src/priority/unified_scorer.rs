@@ -1818,7 +1818,7 @@ fn generate_recommendation(
             input_type,
             validation_missing,
         } => generate_security_recommendation("input_validation", input_type, validation_missing),
-        // Performance debt types
+        // Resource Management debt types
         DebtType::AllocationInefficiency { pattern, impact } => {
             generate_performance_recommendation("allocation", pattern, impact)
         }
@@ -1915,7 +1915,7 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::UnsafeCode { .. } => 0.7,
         DebtType::WeakCryptography { .. } => 0.65,
         DebtType::InputValidationGap { .. } => 0.6,
-        // Performance debt types (medium risk)
+        // Resource Management debt types (medium risk)
         DebtType::BlockingIO { .. } => 0.45,
         DebtType::NestedLoops { .. } => 0.4,
         DebtType::AllocationInefficiency { .. } => 0.3,

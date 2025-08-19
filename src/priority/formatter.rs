@@ -561,7 +561,7 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::SqlInjectionRisk { .. } => "SQL INJECTION",
         DebtType::UnsafeCode { .. } => "UNSAFE CODE",
         DebtType::InputValidationGap { .. } => "INPUT VALIDATION",
-        // Performance debt types
+        // Resource Management debt types
         DebtType::AllocationInefficiency { .. } => "ALLOCATION",
         DebtType::StringConcatenation { .. } => "STRING CONCAT",
         DebtType::NestedLoops { .. } => "NESTED LOOPS",
@@ -613,7 +613,7 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
         DebtType::SqlInjectionRisk { .. } => "Secure SQL queries",
         DebtType::UnsafeCode { .. } => "Justify or remove unsafe",
         DebtType::InputValidationGap { .. } => "Add input validation",
-        // Performance debt types
+        // Resource Management debt types
         DebtType::AllocationInefficiency { .. } => "Optimize allocations",
         DebtType::StringConcatenation { .. } => "Use string builder",
         DebtType::NestedLoops { .. } => "Reduce loop complexity",
