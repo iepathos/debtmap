@@ -3,14 +3,13 @@
 [scoring]
 # Weights for different scoring factors (must sum to 1.0)
 # Balanced approach: coverage important but ROI and criticality guide smart prioritization
-coverage = 0.20      # Weight for test coverage gaps
-complexity = 0.15    # Weight for code complexity
-roi = 0.15          # Weight for return on investment
+coverage = 0.30      # Weight for test coverage gaps (increased)
+complexity = 0.20    # Weight for code complexity (increased)
+roi = 0.25          # Weight for return on investment (increased)
 semantic = 0.05     # Weight for semantic importance
 dependency = 0.10   # Weight for dependency criticality
-security = 0.10     # Weight for security issues
-organization = 0.10 # Weight for code organization issues
-performance = 0.15  # Weight for performance issues
+security = 0.05     # Weight for security issues
+organization = 0.05 # Weight for code organization issues
 
 [thresholds]
 complexity = 10

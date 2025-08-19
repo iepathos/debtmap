@@ -27,7 +27,7 @@ impl ContextProvider for MockProvider {
             contribution: 0.5,
             details: ContextDetails::Business {
                 priority: Priority::Medium,
-                impact: Impact::Performance,
+                impact: Impact::UserExperience,
                 annotations: vec!["test".to_string()],
             },
         })
@@ -341,5 +341,5 @@ fn test_impact_equality() {
     assert_eq!(Impact::Revenue, Impact::Revenue);
     assert_ne!(Impact::Revenue, Impact::Security);
     assert_eq!(Impact::Compliance, Impact::Compliance);
-    assert_ne!(Impact::Performance, Impact::UserExperience);
+    assert_ne!(Impact::Security, Impact::UserExperience);
 }
