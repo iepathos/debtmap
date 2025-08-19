@@ -295,7 +295,9 @@ impl UnifiedPerformanceVisitor {
             "query" | "execute" | "fetch" | "insert" | "update" | "delete" => {
                 Some(IOType::DatabaseQuery)
             }
-            "spawn" | "output" => Some(IOType::ProcessSpawn),
+            "spawn" => Some(IOType::ProcessSpawn),
+            // Note: "output" removed - it's often used with async tokio::process::Command
+            // and should not be automatically classified as blocking I/O
             _ => None,
         }
     }

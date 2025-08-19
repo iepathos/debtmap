@@ -160,3 +160,40 @@ fn test_std_command_with_imports_is_blocking() {
         "std::process::Command with imports should be flagged as blocking"
     );
 }
+
+#[test]
+fn test_retry_rs_exact_pattern() {
+    // Test the EXACT pattern from retry.rs that's causing the false positive
+    let source = r#"
+        use tokio::process::Command;
+        use tokio::time::sleep;
+        use std::time::Duration;
+        
+        pub async fn execute_with_retry(
+            mut command: Command,  // Parameter passed in as Command type
+            description: &str,
+            max_retries: u32,
+        ) -> Result<std::process::Output, Box<dyn std::error::Error>> {
+            // This is the exact pattern - command is a parameter
+            match command.output().await {
+                Ok(output) => Ok(output),
+                Err(e) => Err(Box::new(e))
+            }
+        }
+    "#;
+
+    let file = parse_str::<File>(source).unwrap();
+    let mut detector = AsyncBoundaryDetector::new();
+    detector.analyze_file(&file);
+    
+    // Print what was detected for debugging
+    for call in &detector.blocking_in_async {
+        eprintln!("Detected blocking call: {}", call.function_name);
+    }
+    
+    assert_eq!(
+        detector.blocking_in_async.len(), 
+        0,
+        "tokio::process::Command parameter should not be flagged as blocking"
+    );
+}
