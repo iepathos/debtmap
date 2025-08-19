@@ -242,15 +242,28 @@ fn is_io_orchestration(func: &FunctionMetrics) -> bool {
 
 // Helper to identify standard library and utility functions that shouldn't count as delegation targets
 fn is_std_or_utility_function(name: &str) -> bool {
+    // Check the base name (after :: if present)
+    let base_name = name.rsplit("::").next().unwrap_or(name);
+    
     matches!(
-        name,
+        base_name,
         // Standard library functions from macro expansion
         "format" | "write" | "print" | "println" |
-        // Common utility functions that are too generic
-        "clone" | "to_string" | "into" | "from"
+        // Common utility functions that are too generic  
+        "clone" | "to_string" | "into" | "from" | "as_ref" |
+        // Iterator methods that are utilities, not business logic
+        "iter" | "into_iter" | "iter_mut" | "any" | "all" | "filter" | 
+        "filter_map" | "find" | "fold" | "collect" | "zip" | "enumerate" |
+        "skip" | "take" | "chain" | "flat_map" | "flatten" | "for_each" |
+        // String manipulation utilities
+        "to_lowercase" | "to_uppercase" | "trim" | "split" | "join" |
+        // Common pattern checking functions
+        "starts_with" | "ends_with" | "contains" | "is_empty" | "len"
     ) || name.starts_with("std::")
         || name.starts_with("core::")
         || name.starts_with("alloc::")
+        || name.ends_with("::iter")  // Any type's iter method
+        || name.ends_with("::any")   // Any type's any method
 }
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
@@ -442,10 +455,27 @@ mod tests {
         assert!(is_std_or_utility_function("into"));
         assert!(is_std_or_utility_function("from"));
 
+        // Test iterator methods
+        assert!(is_std_or_utility_function("iter"));
+        assert!(is_std_or_utility_function("any"));
+        assert!(is_std_or_utility_function("filter"));
+        assert!(is_std_or_utility_function("collect"));
+        
+        // Test qualified method names
+        assert!(is_std_or_utility_function("ContextMap::iter"));
+        assert!(is_std_or_utility_function("ContextMatcher::any"));
+        assert!(is_std_or_utility_function("Vec::iter"));
+        
+        // Test string utilities
+        assert!(is_std_or_utility_function("to_lowercase"));
+        assert!(is_std_or_utility_function("starts_with"));
+        assert!(is_std_or_utility_function("ends_with"));
+
         // Test non-std functions
         assert!(!is_std_or_utility_function("calculate_dash_count"));
         assert!(!is_std_or_utility_function("format_complexity_info"));
         assert!(!is_std_or_utility_function("my_custom_function"));
+        assert!(!is_std_or_utility_function("is_entry_point_by_name"));
     }
 
     #[test]

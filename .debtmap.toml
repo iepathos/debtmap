@@ -48,7 +48,9 @@ patterns = [
     "**/test_*.rs",         # Exclude test files with test_ prefix
     "**/*_test.rs",         # Exclude test files with _test suffix
     "**/*_tests.rs",        # Exclude test files with _tests suffix
-    "**/fixtures/**"        # Exclude test fixtures
+    "**/fixtures/**",       # Exclude test fixtures
+    "**/mocks/**",          # Exclude mock implementations
+    "**/stubs/**"           # Exclude stub implementations
 ]
 
 [output]

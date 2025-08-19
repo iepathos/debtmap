@@ -239,6 +239,16 @@ impl FrameworkPatternDetector {
 
         self.detected_patterns.push_back(pattern);
     }
+
+    /// Check if a function is likely a visitor pattern method by name
+    pub fn is_visitor_pattern_method(func_name: &str) -> bool {
+        // Common visitor pattern method prefixes
+        func_name.starts_with("visit_")
+            || func_name.starts_with("walk_")
+            || func_name.starts_with("traverse_")
+            || func_name == "visit"
+            || func_name == "walk"
+    }
 }
 
 /// Statistics about detected framework patterns
@@ -278,6 +288,19 @@ impl PatternVisitor {
             name: func_name.clone(),
             line,
         };
+
+        // Check for visitor pattern methods by name
+        if FrameworkPatternDetector::is_visitor_pattern_method(&func_name) {
+            let pattern = FrameworkPattern {
+                pattern_type: PatternType::VisitTrait,
+                function_id: Some(func_id.clone()),
+                triggering_attributes: Vector::new(),
+                framework_name: Some("visitor_pattern".to_string()),
+                confidence: 0.9, // High confidence based on naming convention
+                metadata: HashMap::new(),
+            };
+            self.patterns.push(pattern);
+        }
 
         // Check for main function
         if func_name == "main" {
@@ -523,6 +546,38 @@ impl<'ast> Visit<'ast> for PatternVisitor {
 
         // Continue visiting
         syn::visit::visit_item_fn(self, item);
+    }
+
+    fn visit_item_impl(&mut self, item: &'ast syn::ItemImpl) {
+        // Check methods in impl blocks for visitor patterns
+        for impl_item in &item.items {
+            if let syn::ImplItem::Fn(method) = impl_item {
+                let method_name = method.sig.ident.to_string();
+                let line = self.get_line_number(method.sig.ident.span());
+                
+                let func_id = FunctionId {
+                    file: self.file_path.clone(),
+                    name: method_name.clone(),
+                    line,
+                };
+                
+                // Check if this is a visitor pattern method
+                if FrameworkPatternDetector::is_visitor_pattern_method(&method_name) {
+                    let pattern = FrameworkPattern {
+                        pattern_type: PatternType::VisitTrait,
+                        function_id: Some(func_id.clone()),
+                        triggering_attributes: Vector::new(),
+                        framework_name: Some("visitor_pattern".to_string()),
+                        confidence: 0.9, // High confidence based on naming convention
+                        metadata: HashMap::new(),
+                    };
+                    self.patterns.push(pattern);
+                }
+            }
+        }
+        
+        // Continue visiting
+        syn::visit::visit_item_impl(self, item);
     }
 }
 
