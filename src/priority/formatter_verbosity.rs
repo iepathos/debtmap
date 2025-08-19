@@ -142,19 +142,12 @@ pub fn format_priority_item_with_verbosity(
             item.unified_score.semantic_factor * weights.semantic
         )
         .unwrap();
-        // Determine which is the last component to show (for proper tree formatting)
+        // Always show all components for consistency
         let has_security = item.unified_score.security_factor > 0.0;
-        let has_organization = item.unified_score.organization_factor > 0.0;
 
-        let dependency_prefix = if has_security || has_organization {
-            "├─"
-        } else {
-            "└─"
-        };
         writeln!(
             output,
-            "│  │  {} Dependency:  {:.1} × {:.0}% = {:.2}",
-            dependency_prefix,
+            "│  │  ├─ Dependency:  {:.1} × {:.0}% = {:.2}",
             item.unified_score.dependency_factor,
             weights.dependency * 100.0,
             item.unified_score.dependency_factor * weights.dependency
@@ -163,11 +156,9 @@ pub fn format_priority_item_with_verbosity(
 
         // Show security if non-zero
         if has_security {
-            let security_prefix = if has_organization { "├─" } else { "└─" };
             writeln!(
                 output,
-                "│  │  {} Security:    {:.1} × {:.0}% = {:.2}",
-                security_prefix,
+                "│  │  ├─ Security:    {:.1} × {:.0}% = {:.2}",
                 item.unified_score.security_factor,
                 weights.security * 100.0,
                 item.unified_score.security_factor * weights.security
@@ -175,19 +166,15 @@ pub fn format_priority_item_with_verbosity(
             .unwrap();
         }
 
-        // Show organization if non-zero
-        if has_organization {
-            let org_prefix = "└─";
-            writeln!(
-                output,
-                "│  │  {} Organization: {:.1} × {:.0}% = {:.2}",
-                org_prefix,
-                item.unified_score.organization_factor,
-                weights.organization * 100.0,
-                item.unified_score.organization_factor * weights.organization
-            )
-            .unwrap();
-        }
+        // Always show organization for consistency (last item)
+        writeln!(
+            output,
+            "│  │  └─ Organization: {:.1} × {:.0}% = {:.2}",
+            item.unified_score.organization_factor,
+            weights.organization * 100.0,
+            item.unified_score.organization_factor * weights.organization
+        )
+        .unwrap();
 
         let base_score = item.unified_score.complexity_factor * weights.complexity
             + item.unified_score.coverage_factor * weights.coverage
