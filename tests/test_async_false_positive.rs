@@ -56,7 +56,7 @@ fn test_std_command_output_is_blocking() {
 
     // The detector SHOULD find blocking calls
     assert!(
-        detector.blocking_in_async.len() > 0,
+        !detector.blocking_in_async.is_empty(),
         "std::process::Command::output() should be flagged as blocking I/O in async context"
     );
 }
@@ -159,7 +159,7 @@ fn test_std_command_with_imports_is_blocking() {
     detector.analyze_file(&file);
 
     assert!(
-        detector.blocking_in_async.len() > 0,
+        !detector.blocking_in_async.is_empty(),
         "std::process::Command with imports should be flagged as blocking"
     );
 }

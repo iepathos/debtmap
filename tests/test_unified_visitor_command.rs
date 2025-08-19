@@ -1,7 +1,9 @@
 //! Test that unified_visitor doesn't incorrectly flag tokio::process::Command::output() as I/O
 
-use debtmap::performance::UnifiedPerformanceVisitor;
-use syn::{parse_file, File};
+use debtmap::performance::collect_performance_data;
+use debtmap::performance::collected_data::IOType;
+use std::path::Path;
+use syn::parse_file;
 
 #[test]
 fn test_tokio_command_output_not_flagged() {
@@ -22,20 +24,15 @@ fn test_tokio_command_output_not_flagged() {
     "#;
 
     let file = parse_file(source).unwrap();
-    let mut visitor = UnifiedPerformanceVisitor::new();
 
-    // Visit the file to collect performance data
-    use syn::visit::Visit;
-    visitor.visit_file(&file);
-
-    // Get the collected data
-    let data = visitor.get_data();
+    // Collect performance data
+    let data = collect_performance_data(&file, Path::new("test.rs"), source);
 
     // Check that no I/O operations were detected for the output() call
     // The output() method on tokio::process::Command should not be flagged
     for io_op in &data.io_operations {
         // If we find an I/O operation, check it's not the output() call
-        if io_op.operation_type == debtmap::performance::IOType::ProcessSpawn {
+        if io_op.operation_type == IOType::ProcessSpawn {
             panic!("tokio::process::Command::output() incorrectly flagged as ProcessSpawn I/O");
         }
     }
@@ -58,20 +55,15 @@ fn test_std_process_command_new_is_flagged() {
     "#;
 
     let file = parse_file(source).unwrap();
-    let mut visitor = UnifiedPerformanceVisitor::new();
 
-    use syn::visit::Visit;
-    visitor.visit_file(&file);
-
-    let data = visitor.get_data();
+    // Collect performance data
+    let data = collect_performance_data(&file, Path::new("test.rs"), source);
 
     // std::process::Command::new should be detected as ProcessSpawn
-    let has_process_spawn = data.io_operations.iter().any(|io| {
-        matches!(
-            io.operation_type,
-            debtmap::performance::IOType::ProcessSpawn
-        )
-    });
+    let has_process_spawn = data
+        .io_operations
+        .iter()
+        .any(|io| matches!(io.operation_type, IOType::ProcessSpawn));
 
     assert!(
         has_process_spawn,
