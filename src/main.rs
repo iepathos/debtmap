@@ -273,11 +273,8 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         Some(config.format),
     )?;
 
-    // Check if analysis passed
-    if !is_analysis_passing(&results, config.threshold_complexity) {
-        process::exit(1);
-    }
-
+    // Analyze command should only fail on actual errors, not thresholds
+    // Threshold checking is done by the validate command
     Ok(())
 }
 
@@ -1139,6 +1136,9 @@ fn default_languages() -> Vec<Language> {
     ]
 }
 
+// Note: This function is now only used by tests. The actual threshold checking
+// for CI/CD is done by the validate command using the validate_and_report function.
+#[cfg(test)]
 fn is_analysis_passing(results: &AnalysisResults, _complexity_threshold: u32) -> bool {
     let debt_score = debt::total_debt_score(&results.technical_debt.items);
     let debt_threshold = 100;

@@ -23,14 +23,14 @@ fn test_tokio_command_output_not_flagged() {
 
     let file = parse_file(source).unwrap();
     let mut visitor = UnifiedPerformanceVisitor::new();
-    
+
     // Visit the file to collect performance data
     use syn::visit::Visit;
     visitor.visit_file(&file);
-    
+
     // Get the collected data
     let data = visitor.get_data();
-    
+
     // Check that no I/O operations were detected for the output() call
     // The output() method on tokio::process::Command should not be flagged
     for io_op in &data.io_operations {
@@ -39,7 +39,7 @@ fn test_tokio_command_output_not_flagged() {
             panic!("tokio::process::Command::output() incorrectly flagged as ProcessSpawn I/O");
         }
     }
-    
+
     println!("✅ tokio::process::Command::output() not flagged as I/O");
 }
 
@@ -59,16 +59,22 @@ fn test_std_process_command_new_is_flagged() {
 
     let file = parse_file(source).unwrap();
     let mut visitor = UnifiedPerformanceVisitor::new();
-    
+
     use syn::visit::Visit;
     visitor.visit_file(&file);
-    
+
     let data = visitor.get_data();
-    
+
     // std::process::Command::new should be detected as ProcessSpawn
-    let has_process_spawn = data.io_operations.iter()
-        .any(|io| matches!(io.operation_type, debtmap::performance::IOType::ProcessSpawn));
-    
-    assert!(has_process_spawn, 
-        "std::process::Command::new should be detected as ProcessSpawn");
+    let has_process_spawn = data.io_operations.iter().any(|io| {
+        matches!(
+            io.operation_type,
+            debtmap::performance::IOType::ProcessSpawn
+        )
+    });
+
+    assert!(
+        has_process_spawn,
+        "std::process::Command::new should be detected as ProcessSpawn"
+    );
 }

@@ -26,10 +26,10 @@ fn test_tokio_command_output_not_blocking() {
     let file = parse_str::<File>(source).unwrap();
     let mut detector = AsyncBoundaryDetector::new();
     detector.analyze_file(&file);
-    
+
     // The detector should NOT find any blocking calls
     assert_eq!(
-        detector.blocking_in_async.len(), 
+        detector.blocking_in_async.len(),
         0,
         "tokio::process::Command::output().await should not be flagged as blocking I/O, but found: {:?}",
         detector.blocking_in_async
@@ -53,7 +53,7 @@ fn test_std_command_output_is_blocking() {
     let file = parse_str::<File>(source).unwrap();
     let mut detector = AsyncBoundaryDetector::new();
     detector.analyze_file(&file);
-    
+
     // The detector SHOULD find blocking calls
     assert!(
         detector.blocking_in_async.len() > 0,
@@ -79,11 +79,14 @@ fn test_tokio_spawn_blocking_is_ok() {
     let file = parse_str::<File>(source).unwrap();
     let mut detector = AsyncBoundaryDetector::new();
     detector.analyze_file(&file);
-    
+
     // spawn_blocking wraps the blocking call properly
     // The detector might flag the fs::read_to_string inside, but that's in a blocking context
     // For this test, we're mainly checking it doesn't explode
-    println!("Found {} potential blocking calls", detector.blocking_in_async.len());
+    println!(
+        "Found {} potential blocking calls",
+        detector.blocking_in_async.len()
+    );
 }
 
 #[test]
@@ -103,9 +106,9 @@ fn test_async_std_command_also_not_blocking() {
     let file = parse_str::<File>(source).unwrap();
     let mut detector = AsyncBoundaryDetector::new();
     detector.analyze_file(&file);
-    
+
     assert_eq!(
-        detector.blocking_in_async.len(), 
+        detector.blocking_in_async.len(),
         0,
         "async_std::process::Command::output().await should not be flagged as blocking I/O"
     );
@@ -129,9 +132,9 @@ fn test_import_disambiguation_works() {
     let file = parse_str::<File>(source).unwrap();
     let mut detector = AsyncBoundaryDetector::new();
     detector.analyze_file(&file);
-    
+
     assert_eq!(
-        detector.blocking_in_async.len(), 
+        detector.blocking_in_async.len(),
         0,
         "tokio::process::Command with proper imports should not be flagged"
     );
@@ -154,7 +157,7 @@ fn test_std_command_with_imports_is_blocking() {
     let file = parse_str::<File>(source).unwrap();
     let mut detector = AsyncBoundaryDetector::new();
     detector.analyze_file(&file);
-    
+
     assert!(
         detector.blocking_in_async.len() > 0,
         "std::process::Command with imports should be flagged as blocking"
@@ -185,14 +188,14 @@ fn test_retry_rs_exact_pattern() {
     let file = parse_str::<File>(source).unwrap();
     let mut detector = AsyncBoundaryDetector::new();
     detector.analyze_file(&file);
-    
+
     // Print what was detected for debugging
     for call in &detector.blocking_in_async {
         eprintln!("Detected blocking call: {}", call.function_name);
     }
-    
+
     assert_eq!(
-        detector.blocking_in_async.len(), 
+        detector.blocking_in_async.len(),
         0,
         "tokio::process::Command parameter should not be flagged as blocking"
     );
