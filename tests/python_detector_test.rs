@@ -115,15 +115,15 @@ def nested_loops(data):
     let ast = analyzer.parse(code, PathBuf::from("test.py")).unwrap();
     let metrics = analyzer.analyze(&ast);
 
-    // Should detect performance issue (nested loop)
-    let perf_issues: Vec<_> = metrics
+    // Should detect complexity issue (nested loop)
+    let complexity_issues: Vec<_> = metrics
         .debt_items
         .iter()
-        .filter(|item| item.debt_type == DebtType::Performance)
+        .filter(|item| item.debt_type == DebtType::Complexity)
         .collect();
 
     assert!(
-        !perf_issues.is_empty(),
-        "Should detect at least one performance issue in nested loops"
+        !complexity_issues.is_empty(),
+        "Should detect at least one complexity issue in nested loops"
     );
 }

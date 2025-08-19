@@ -169,9 +169,8 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "Async Misuse",
         DebtType::ResourceLeak { .. } => "Resource Leak",
         DebtType::CollectionInefficiency { .. } => "Collection Inefficiency",
-        // Basic Security and Performance debt types
+        // Basic Security debt type
         DebtType::BasicSecurity { .. } => "Security",
-        DebtType::BasicPerformance { .. } => "Performance",
     }
 }
 
@@ -377,14 +376,6 @@ fn format_main_factors_with_debt_type(
             factors.push(format!("Security vulnerability ({})", severity));
             if !vulnerability_type.is_empty() && vulnerability_type != "Security Issue" {
                 factors.push(format!("{} detected", vulnerability_type));
-            }
-        }
-        crate::priority::DebtType::BasicPerformance {
-            impact, issue_type, ..
-        } => {
-            factors.push(format!("Performance impact ({})", impact));
-            if !issue_type.is_empty() && issue_type != "Performance Issue" {
-                factors.push(format!("{} detected", issue_type));
             }
         }
         crate::priority::DebtType::HardcodedSecrets {

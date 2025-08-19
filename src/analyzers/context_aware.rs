@@ -179,9 +179,6 @@ fn debt_type_to_pattern(debt_type: &DebtType, message: &str) -> DebtPattern {
             }
         }
 
-        // Performance patterns
-        DebtType::Performance => DebtPattern::Performance,
-
         // All other debt types
         _ => DebtPattern::DebtType(*debt_type),
     }

@@ -1881,11 +1881,6 @@ fn generate_recommendation(
             severity,
             description: _,
         } => generate_security_recommendation("basic", vulnerability_type, severity),
-        DebtType::BasicPerformance {
-            issue_type,
-            impact,
-            description: _,
-        } => generate_performance_recommendation("basic", issue_type, impact),
     };
 
     ActionableRecommendation {
@@ -1945,12 +1940,6 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
             "Medium" | "LOW" => 0.5,
             _ => 0.4,
         },
-        DebtType::BasicPerformance { impact, .. } => match impact.as_str() {
-            "High" | "CRITICAL" => 0.6,
-            "Medium" | "HIGH" => 0.4,
-            "Low" | "MEDIUM" => 0.3,
-            _ => 0.2,
-        },
     }
 }
 
@@ -1986,7 +1975,6 @@ fn calculate_lines_reduction(debt_type: &DebtType) -> u32 {
         DebtType::InputValidationGap { .. } => 5, // Add validation
         DebtType::UnsafeCode { .. } => 3,       // Add documentation or safety
         DebtType::BasicSecurity { .. } => 3,    // Security fixes typically small
-        DebtType::BasicPerformance { .. } => 8, // Performance fixes can involve more restructuring
         _ => 0,
     }
 }

@@ -48,14 +48,6 @@ pub fn format_priority_item_with_verbosity(
                     factors.push(format!("{} detected", vulnerability_type));
                 }
             }
-            crate::priority::DebtType::BasicPerformance {
-                impact, issue_type, ..
-            } => {
-                factors.push(format!("Performance impact ({})", impact));
-                if !issue_type.is_empty() && issue_type != "Performance Issue" {
-                    factors.push(format!("{} detected", issue_type));
-                }
-            }
             crate::priority::DebtType::HardcodedSecrets {
                 severity,
                 secret_type,

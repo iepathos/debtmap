@@ -2,7 +2,6 @@
 // Implements comprehensive debt detection using tree-sitter queries
 
 pub mod organization;
-pub mod performance;
 pub mod resource;
 pub mod security;
 pub mod testing;
@@ -41,7 +40,6 @@ pub struct JavaScriptDetectorVisitor {
     pub language: tree_sitter::Language,
 
     // Collected patterns
-    pub performance_patterns: Vec<performance::PerformanceAntiPattern>,
     pub organization_patterns: Vec<organization::OrganizationAntiPattern>,
     pub security_vulnerabilities: Vec<security::SecurityVulnerability>,
     pub resource_issues: Vec<resource::ResourceManagementIssue>,
@@ -54,7 +52,6 @@ impl JavaScriptDetectorVisitor {
             source_content: source,
             path,
             language,
-            performance_patterns: Vec::new(),
             organization_patterns: Vec::new(),
             security_vulnerabilities: Vec::new(),
             resource_issues: Vec::new(),
@@ -67,20 +64,10 @@ impl JavaScriptDetectorVisitor {
         let root_node = tree.root_node();
 
         // Run all detector modules
-        self.detect_performance_patterns(root_node);
         self.detect_organization_patterns(root_node);
         self.detect_security_patterns(root_node);
         self.detect_resource_patterns(root_node);
         self.detect_testing_patterns(root_node);
-    }
-
-    fn detect_performance_patterns(&mut self, root: Node) {
-        performance::detect_performance_patterns(
-            root,
-            &self.source_content,
-            &self.language,
-            &mut self.performance_patterns,
-        );
     }
 
     fn detect_organization_patterns(&mut self, root: Node) {
@@ -123,11 +110,6 @@ impl JavaScriptDetectorVisitor {
     /// Convert detected patterns to debt items
     pub fn to_debt_items(&self) -> Vec<DebtItem> {
         let mut items = Vec::new();
-
-        // Convert performance patterns
-        for pattern in &self.performance_patterns {
-            items.push(pattern.to_debt_item(&self.path));
-        }
 
         // Convert organization patterns
         for pattern in &self.organization_patterns {

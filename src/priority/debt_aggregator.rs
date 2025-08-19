@@ -84,7 +84,6 @@ pub fn categorize_debt_type(debt_type: &DebtType) -> DebtCategory {
         DebtType::Security => DebtCategory::Security,
 
         // Performance issues
-        DebtType::Performance => DebtCategory::Performance,
         DebtType::Complexity => DebtCategory::Performance,
 
         // Organization issues

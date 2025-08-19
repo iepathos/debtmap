@@ -121,12 +121,12 @@ impl SimplifiedPythonDetector {
             if matches!(stmt, ast::Stmt::For(_) | ast::Stmt::While(_)) {
                 self.debt_items.push(DebtItem {
                     id: format!("py-nested-loop-{}", self.debt_items.len()),
-                    debt_type: DebtType::Performance,
+                    debt_type: DebtType::Complexity,
                     priority: Priority::Medium,
                     file: self.path.clone(),
                     line: 1,
                     column: None,
-                    message: "Nested loop detected - potential performance issue".to_string(),
+                    message: "Nested loop detected - increases code complexity".to_string(),
                     context: None,
                 });
             }

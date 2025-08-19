@@ -1726,8 +1726,8 @@ fn create_unified_analysis_with_exclusions(
             unified.add_item(item);
         }
 
-        // Convert Security and Performance debt items to unified format
-        unified.add_security_performance_items(debt_items, call_graph);
+        // Convert Security debt items to unified format
+        unified.add_security_items(debt_items, call_graph);
     }
 
     unified.sort_by_priority();

@@ -187,15 +187,10 @@ pub enum DebtType {
         collection_type: String,
         inefficiency_type: String,
     },
-    // Basic Security and Performance debt types (for core::DebtType integration)
+    // Basic Security debt types (for core::DebtType integration)
     BasicSecurity {
         vulnerability_type: String,
         severity: String,
-        description: String,
-    },
-    BasicPerformance {
-        issue_type: String,
-        impact: String,
         description: String,
     },
 }
@@ -250,7 +245,6 @@ impl UnifiedAnalysis {
                 | DebtType::TestTodo { .. }
                 | DebtType::TestDuplication { .. }
                 | DebtType::BasicSecurity { .. }
-                | DebtType::BasicPerformance { .. }
         ) && item.cyclomatic_complexity <= min_cyclomatic
             && item.cognitive_complexity <= min_cognitive
         {
@@ -275,8 +269,8 @@ impl UnifiedAnalysis {
         }
     }
 
-    /// Convert core::DebtItem (Security/Performance) to UnifiedDebtItem for unified analysis
-    pub fn add_security_performance_items(
+    /// Convert core::DebtItem (Security) to UnifiedDebtItem for unified analysis
+    pub fn add_security_items(
         &mut self,
         debt_items: &[crate::core::DebtItem],
         call_graph: &CallGraph,
@@ -295,12 +289,9 @@ impl UnifiedAnalysis {
     ) -> Option<UnifiedDebtItem> {
         use crate::core::DebtType as CoreDebtType;
 
-        // Only process Security and Performance debt items
+        // Only process Security debt items
         match debt_item.debt_type {
             CoreDebtType::Security => self.create_security_unified_item(debt_item, call_graph),
-            CoreDebtType::Performance => {
-                self.create_performance_unified_item(debt_item, call_graph)
-            }
             _ => None,
         }
     }
@@ -353,157 +344,8 @@ impl UnifiedAnalysis {
         })
     }
 
-    fn create_performance_unified_item(
-        &self,
-        debt_item: &crate::core::DebtItem,
-        call_graph: &CallGraph,
-    ) -> Option<UnifiedDebtItem> {
-        // Extract performance details from the message
-        let (issue_type, impact) = self.parse_performance_details(&debt_item.message);
 
-        let debt_type = DebtType::BasicPerformance {
-            issue_type: issue_type.clone(),
-            impact: impact.clone(),
-            description: debt_item.message.clone(),
-        };
-
-        // Try to find the actual function name at this location
-        let func_info = call_graph.find_function_at_location(&debt_item.file, debt_item.line);
-        let function_name = func_info
-            .as_ref()
-            .map(|func_id| func_id.name.clone())
-            .unwrap_or_else(|| format!("performance_issue_at_line_{}", debt_item.line));
-
-        // Get function metrics from call graph for enhanced scoring
-        let (upstream_deps, downstream_deps, role) = if let Some(func_id) = &func_info {
-            let upstream = call_graph.get_callers(func_id).len();
-            let downstream = call_graph.get_callees(func_id).len();
-            // We don't have FunctionMetrics here, so use Unknown role
-            let role = FunctionRole::Unknown;
-            (upstream, downstream, role)
-        } else {
-            (0, 0, FunctionRole::Unknown)
-        };
-
-        // Use enhanced scoring if we have the context
-        let unified_score = if let Some(func_id) = func_info {
-            // Check if this is test code
-            let is_test = func_id.name.starts_with("test_")
-                || func_id.name.contains("::test")
-                || debt_item.file.to_string_lossy().contains("test");
-
-            // Calculate differentiated base score using available data
-            // Use file path, function name, and dependencies to create variation
-            let file_hash = debt_item
-                .file
-                .to_string_lossy()
-                .bytes()
-                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-
-            let name_hash = func_id
-                .name
-                .bytes()
-                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-
-            // Create pseudo-complexity score based on function characteristics
-            let complexity_score = 2.0 + ((file_hash ^ name_hash) % 400) as f64 / 100.0; // 2.0-6.0 range
-
-            // Dependency-based differentiation: more dependencies = higher score
-            let dependency_score = 1.0 + (upstream_deps + downstream_deps) as f64 / 10.0; // Variable based on actual dependencies
-
-            // Issue type differentiation
-            let issue_type_modifier = match issue_type.as_str() {
-                "Blocking I/O" => 2.5,
-                "Performance Issue" => 2.0,
-                "Inefficient Algorithm" => 2.2,
-                "Memory Allocation" => 1.8,
-                "Database Query" => 2.3,
-                _ => 1.5,
-            };
-
-            // Calculate base score using actual function characteristics instead of hardcoded priority
-            let dynamic_base_score = complexity_score * dependency_score * issue_type_modifier;
-
-            // Apply priority scaling but don't override the differentiation
-            let priority_scaling = match &debt_item.priority {
-                crate::core::Priority::Critical => 1.4,
-                crate::core::Priority::High => 1.2,
-                crate::core::Priority::Medium => 1.0,
-                crate::core::Priority::Low => 0.8,
-            };
-
-            let final_base_score = dynamic_base_score * priority_scaling;
-
-            // Create an enhanced score with differentiated factors
-            let mut enhanced_score = crate::scoring::enhanced_scorer::EnhancedScore {
-                base_score: final_base_score,
-                criticality: if is_test { 0.5 } else { 1.5 },
-                complexity_factor: 1.0 + (complexity_score - 4.0) / 2.0 * 0.5, // Differentiate based on pseudo-complexity
-                coverage_factor: if is_test { 0.8 } else { 1.2 }, // Test functions have lower priority
-                dependency_factor: dependency_score,
-                frequency_factor: 1.0 + (downstream_deps as f64).min(10.0) / 10.0,
-                test_weight: if is_test { 0.3 } else { 1.0 },
-                confidence: 0.8,
-                raw_score: 0.0,
-                final_score: 0.0,
-            };
-
-            // Calculate the raw score (no normalization to preserve differentiation)
-            enhanced_score.raw_score = enhanced_score.calculate_raw();
-            enhanced_score.final_score = enhanced_score.raw_score;
-
-            // Add small jitter to prevent identical scores but preserve relative ordering
-            let seed = debt_item.line as u64
-                ^ debt_item
-                    .file
-                    .to_string_lossy()
-                    .bytes()
-                    .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-            let jitter_amount = ((seed % 200) as f64 / 10000.0) - 0.01; // ±0.01 range
-            enhanced_score.final_score =
-                (enhanced_score.final_score + jitter_amount).clamp(0.1, 10.0);
-
-            UnifiedScore {
-                complexity_factor: 3.0,
-                coverage_factor: 2.0,
-                roi_factor: 6.0,
-                semantic_factor: 5.0,
-                dependency_factor: enhanced_score.dependency_factor * 10.0,
-                security_factor: 0.0,
-                organization_factor: 0.0,
-                performance_factor: 10.0,
-                role_multiplier: enhanced_score.test_weight,
-                final_score: enhanced_score.final_score,
-            }
-        } else {
-            // Fallback to simple scoring
-            self.calculate_performance_score(&impact, &debt_item.priority)
-        };
-
-        Some(UnifiedDebtItem {
-            location: Location {
-                file: debt_item.file.clone(),
-                function: function_name,
-                line: debt_item.line,
-            },
-            debt_type,
-            unified_score,
-            function_role: role,
-            recommendation: self.create_performance_recommendation(&issue_type, &impact),
-            expected_impact: self.create_performance_impact(&impact),
-            transitive_coverage: None,
-            upstream_dependencies: upstream_deps,
-            downstream_dependencies: downstream_deps,
-            upstream_callers: vec![],
-            downstream_callees: vec![],
-            nesting_depth: 0,
-            function_length: 1,
-            cyclomatic_complexity: 1,
-            cognitive_complexity: 1,
-        })
-    }
-
-    // Helper methods for Security/Performance debt conversion
+    // Helper methods for Security debt conversion
 
     /// Classifies a security message into a vulnerability type
     fn classify_vulnerability_type(message: &str) -> &'static str {
@@ -545,38 +387,8 @@ impl UnifiedAnalysis {
         (vulnerability_type.to_string(), severity.to_string())
     }
 
-    /// Classifies a performance message into an issue type
-    fn classify_performance_issue(message: &str) -> &'static str {
-        let lower_msg = message.to_lowercase();
-        match () {
-            _ if lower_msg.contains("nested loop") => "Nested Loops",
-            _ if lower_msg.contains("allocation") || lower_msg.contains("memory") => {
-                "Memory Allocation"
-            }
-            _ if lower_msg.contains("i/o") || lower_msg.contains("blocking") => "Blocking I/O",
-            _ if lower_msg.contains("string") && lower_msg.contains("concatenation") => {
-                "String Concatenation"
-            }
-            _ if lower_msg.contains("data structure") || message.contains("Vec::contains") => {
-                "Data Structure"
-            }
-            _ => "Performance Issue",
-        }
-    }
 
-    /// Determines the impact level for a given performance issue
-    fn determine_performance_impact(issue_type: &str) -> &'static str {
-        match issue_type {
-            "Nested Loops" | "Blocking I/O" => "High",
-            _ => "Medium",
-        }
-    }
 
-    fn parse_performance_details(&self, message: &str) -> (String, String) {
-        let issue_type = Self::classify_performance_issue(message);
-        let impact = Self::determine_performance_impact(issue_type);
-        (issue_type.to_string(), impact.to_string())
-    }
 
     fn calculate_security_score(
         &self,
@@ -614,40 +426,6 @@ impl UnifiedAnalysis {
         }
     }
 
-    fn calculate_performance_score(
-        &self,
-        impact: &str,
-        priority: &crate::core::Priority,
-    ) -> UnifiedScore {
-        use crate::core::Priority;
-
-        let base_score: f64 = match impact {
-            "High" | "Critical" => 7.5,
-            "Medium" => 6.0,
-            "Low" => 4.5,
-            _ => 3.0,
-        };
-
-        let priority_boost: f64 = match priority {
-            Priority::Critical => 1.0,
-            Priority::High => 0.8,
-            Priority::Medium => 0.5,
-            Priority::Low => 0.2,
-        };
-
-        UnifiedScore {
-            complexity_factor: 3.0,   // Performance often relates to complexity
-            coverage_factor: 2.0,     // Testing helps catch performance regressions
-            roi_factor: 6.0,          // Good ROI for performance fixes
-            semantic_factor: 5.0,     // Important but not as critical as security
-            dependency_factor: 4.0,   // Performance issues can affect many callers
-            security_factor: 0.0,     // Not a security issue
-            organization_factor: 0.0, // Not an organization issue
-            performance_factor: 10.0, // Maximum performance factor for performance issues
-            role_multiplier: 1.2,     // Performance issues are important
-            final_score: (base_score + priority_boost).min(10.0_f64),
-        }
-    }
 
     fn create_security_recommendation(
         &self,
@@ -674,27 +452,6 @@ impl UnifiedAnalysis {
         }
     }
 
-    fn create_performance_recommendation(
-        &self,
-        issue_type: &str,
-        impact: &str,
-    ) -> ActionableRecommendation {
-        let primary_action = format!("Optimize {} performance issue", issue_type);
-        let rationale = format!("Performance issue ({}) detected: {}", impact, issue_type);
-        let implementation_steps = vec![
-            "Profile performance bottleneck".to_string(),
-            "Apply optimization techniques".to_string(),
-            "Benchmark improvements".to_string(),
-            "Verify no regressions".to_string(),
-        ];
-
-        ActionableRecommendation {
-            primary_action,
-            rationale,
-            implementation_steps,
-            related_items: vec![],
-        }
-    }
 
     fn create_security_impact(&self, severity: &str) -> ImpactMetrics {
         let risk_reduction = match severity {
@@ -712,21 +469,6 @@ impl UnifiedAnalysis {
         }
     }
 
-    fn create_performance_impact(&self, impact: &str) -> ImpactMetrics {
-        let (risk_reduction, lines_reduction) = match impact {
-            "High" | "Critical" => (6.0, 15),
-            "Medium" => (4.0, 8),
-            "Low" => (2.0, 3),
-            _ => (1.0, 2),
-        };
-
-        ImpactMetrics {
-            coverage_improvement: 0.0, // Performance fixes don't typically improve coverage
-            lines_reduction,
-            complexity_reduction: 1.0, // Performance fixes may reduce algorithmic complexity
-            risk_reduction,
-        }
-    }
 
     pub fn sort_by_priority(&mut self) {
         let mut items_vec: Vec<UnifiedDebtItem> = self.items.iter().cloned().collect();
@@ -904,102 +646,6 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_performance_issue_nested_loops() {
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Found nested loop in algorithm"),
-            "Nested Loops"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Nested loop detected"),
-            "Nested Loops"
-        );
-    }
-
-    #[test]
-    fn test_classify_performance_issue_memory() {
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Excessive memory allocation"),
-            "Memory Allocation"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Large allocation in hot path"),
-            "Memory Allocation"
-        );
-    }
-
-    #[test]
-    fn test_classify_performance_issue_blocking_io() {
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Synchronous I/O in async context"),
-            "Blocking I/O"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Blocking operation detected"),
-            "Blocking I/O"
-        );
-    }
-
-    #[test]
-    fn test_classify_performance_issue_string_concat() {
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Inefficient string concatenation in loop"),
-            "String Concatenation"
-        );
-    }
-
-    #[test]
-    fn test_classify_performance_issue_data_structure() {
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Using Vec::contains in hot path"),
-            "Data Structure"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Inefficient data structure choice"),
-            "Data Structure"
-        );
-    }
-
-    #[test]
-    fn test_classify_performance_issue_generic() {
-        assert_eq!(
-            UnifiedAnalysis::classify_performance_issue("Some performance concern"),
-            "Performance Issue"
-        );
-    }
-
-    #[test]
-    fn test_determine_performance_impact_high() {
-        assert_eq!(
-            UnifiedAnalysis::determine_performance_impact("Nested Loops"),
-            "High"
-        );
-        assert_eq!(
-            UnifiedAnalysis::determine_performance_impact("Blocking I/O"),
-            "High"
-        );
-    }
-
-    #[test]
-    fn test_determine_performance_impact_medium() {
-        assert_eq!(
-            UnifiedAnalysis::determine_performance_impact("Memory Allocation"),
-            "Medium"
-        );
-        assert_eq!(
-            UnifiedAnalysis::determine_performance_impact("String Concatenation"),
-            "Medium"
-        );
-        assert_eq!(
-            UnifiedAnalysis::determine_performance_impact("Data Structure"),
-            "Medium"
-        );
-        assert_eq!(
-            UnifiedAnalysis::determine_performance_impact("Performance Issue"),
-            "Medium"
-        );
-    }
-
-    #[test]
     fn test_parse_security_details_integration() {
         let analysis = UnifiedAnalysis::new(CallGraph::default());
 
@@ -1012,16 +658,4 @@ mod tests {
         assert_eq!(severity, "High");
     }
 
-    #[test]
-    fn test_parse_performance_details_integration() {
-        let analysis = UnifiedAnalysis::new(CallGraph::default());
-
-        let (issue_type, impact) = analysis.parse_performance_details("nested loop detected");
-        assert_eq!(issue_type, "Nested Loops");
-        assert_eq!(impact, "High");
-
-        let (issue_type, impact) = analysis.parse_performance_details("excessive memory usage");
-        assert_eq!(issue_type, "Memory Allocation");
-        assert_eq!(impact, "Medium");
-    }
 }

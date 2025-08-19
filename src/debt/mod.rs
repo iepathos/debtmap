@@ -71,7 +71,6 @@ fn type_weight(debt_type: &DebtType) -> u32 {
         (DebtType::ErrorSwallowing, 4),
         (DebtType::ResourceManagement, 4),
         (DebtType::CodeOrganization, 3),
-        (DebtType::Performance, 4),
         (DebtType::Security, 10), // Security issues get highest weight
         (DebtType::TestComplexity, 2),
         (DebtType::TestTodo, 1),

@@ -222,7 +222,6 @@ impl<'a> EnhancedScorer<'a> {
         let base = match item.debt_type {
             DebtType::Security => 8.5,
             DebtType::ErrorSwallowing => 7.5,
-            DebtType::Performance => 7.0,
             DebtType::Complexity => 6.5,
             DebtType::Duplication => 6.0,
             DebtType::Dependency => 5.5,
@@ -382,7 +381,6 @@ impl<'a> EnhancedScorer<'a> {
             DebtType::CodeSmell => 0.85,             // Pattern-based
             DebtType::TestQuality => 0.8,            // Heuristic-based
             DebtType::ErrorSwallowing => 0.9,        // AST-based
-            DebtType::Performance => 0.75,           // Heuristic-based
             _ => 0.75,
         }
     }
@@ -452,7 +450,6 @@ impl<'a> EnhancedScorer<'a> {
             DebtType::Duplication => "Duplication",
             DebtType::Dependency => "Dependency",
             DebtType::Complexity => "Complexity",
-            DebtType::Performance => "Performance",
             DebtType::ResourceManagement => "Resource",
             DebtType::CodeOrganization => "Organization",
             DebtType::TestComplexity => "Test complexity",

@@ -579,9 +579,8 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "ASYNC MISUSE",
         DebtType::ResourceLeak { .. } => "RESOURCE LEAK",
         DebtType::CollectionInefficiency { .. } => "COLLECTION INEFFICIENCY",
-        // Basic Security and Performance debt types (for core::DebtType integration)
+        // Basic Security debt type (for core::DebtType integration)
         DebtType::BasicSecurity { .. } => "SECURITY",
-        DebtType::BasicPerformance { .. } => "PERFORMANCE",
     }
 }
 
@@ -632,9 +631,8 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "Fix async pattern",
         DebtType::ResourceLeak { .. } => "Add cleanup",
         DebtType::CollectionInefficiency { .. } => "Optimize collection usage",
-        // Basic Security and Performance debt types
+        // Basic Security debt type
         DebtType::BasicSecurity { .. } => "Fix security issue",
-        DebtType::BasicPerformance { .. } => "Optimize performance",
     }
 }
 
