@@ -33,7 +33,6 @@ pub struct ScoringWeights {
     /// Weight for code organization issues factor (0.0-1.0)
     #[serde(default = "default_organization_weight")]
     pub organization: f64,
-
 }
 
 impl Default for ScoringWeights {
@@ -59,8 +58,7 @@ impl ScoringWeights {
             + self.semantic
             + self.dependency
             + self.security
-            + self.organization
-;
+            + self.organization;
         if (sum - 1.0).abs() > 0.001 {
             return Err(format!(
                 "Scoring weights must sum to 1.0, but sum to {:.3}",
@@ -102,8 +100,7 @@ impl ScoringWeights {
             + self.semantic
             + self.dependency
             + self.security
-            + self.organization
-;
+            + self.organization;
         if sum > 0.0 {
             self.coverage /= sum;
             self.complexity /= sum;
@@ -118,25 +115,25 @@ impl ScoringWeights {
 
 // Default weights - prioritize coverage but include dependency criticality
 fn default_coverage_weight() -> f64 {
-    0.30  // Reduced from 0.35 (-0.05) to balance weights
+    0.30 // Reduced from 0.35 (-0.05) to balance weights
 }
 fn default_complexity_weight() -> f64 {
-    0.20  // Increased from 0.15 (+0.05) to absorb some performance weight
+    0.20 // Increased from 0.15 (+0.05) to absorb some performance weight
 }
 fn default_roi_weight() -> f64 {
-    0.25  // Reduced back to original to maintain sum of 1.0
+    0.25 // Reduced back to original to maintain sum of 1.0
 }
 fn default_semantic_weight() -> f64 {
     0.05
 }
 fn default_dependency_weight() -> f64 {
-    0.10  // Unchanged
+    0.10 // Unchanged
 }
 fn default_security_weight() -> f64 {
-    0.05  // Unchanged
+    0.05 // Unchanged
 }
 fn default_organization_weight() -> f64 {
-    0.05  // Reduced back to maintain sum of 1.0
+    0.05 // Reduced back to maintain sum of 1.0
 }
 
 /// Context-aware detection configuration
@@ -234,7 +231,6 @@ pub struct FunctionPatternConfig {
     #[serde(default)]
     pub init_patterns: Vec<String>,
 }
-
 
 /// Root configuration structure for debtmap
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -646,9 +642,7 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
     }
 }
 
-
 /// Get smart performance configuration
-
 #[cfg(test)]
 mod tests {
     use super::*;

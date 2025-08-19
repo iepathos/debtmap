@@ -255,10 +255,7 @@ impl<'a> EnhancedScorer<'a> {
         let testing_weight = if debt_scores.testing > 0.0 { 1.2 } else { 0.0 };
         let resource_weight = if debt_scores.resource > 0.0 { 1.3 } else { 0.0 };
 
-        let total_weight = security_weight
-            + organization_weight
-            + testing_weight
-            + resource_weight;
+        let total_weight = security_weight + organization_weight + testing_weight + resource_weight;
 
         if total_weight == 0.0 {
             return 0.0;

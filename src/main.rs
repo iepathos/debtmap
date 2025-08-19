@@ -174,14 +174,14 @@ fn main() -> Result<()> {
                 comprehensive,
                 security_only,
                 security_enhanced,
-                    organization_only,
+                organization_only,
                 testing_only,
                 resource_only,
                 group_by_category,
                 min_priority,
                 filter_categories,
                 exclude_tests,
-                    no_context_aware,
+                no_context_aware,
             };
             handle_analyze(config)
         }

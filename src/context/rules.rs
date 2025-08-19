@@ -345,7 +345,6 @@ impl ContextRuleEngine {
             reason: Some("Examples often demonstrate concepts without security".to_string()),
         });
 
-
         // Build scripts have different constraints
         self.add_rule(ContextRule {
             pattern: DebtPattern::All,

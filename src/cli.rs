@@ -104,7 +104,6 @@ pub enum Commands {
         #[arg(long = "security-enhanced")]
         security_enhanced: bool,
 
-
         /// Enable organization analysis only
         #[arg(long = "organization-only")]
         organization_only: bool,

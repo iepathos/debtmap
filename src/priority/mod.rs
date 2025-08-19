@@ -344,7 +344,6 @@ impl UnifiedAnalysis {
         })
     }
 
-
     // Helper methods for Security debt conversion
 
     /// Classifies a security message into a vulnerability type
@@ -387,9 +386,6 @@ impl UnifiedAnalysis {
         (vulnerability_type.to_string(), severity.to_string())
     }
 
-
-
-
     fn calculate_security_score(
         &self,
         severity: &str,
@@ -425,7 +421,6 @@ impl UnifiedAnalysis {
         }
     }
 
-
     fn create_security_recommendation(
         &self,
         vulnerability_type: &str,
@@ -451,7 +446,6 @@ impl UnifiedAnalysis {
         }
     }
 
-
     fn create_security_impact(&self, severity: &str) -> ImpactMetrics {
         let risk_reduction = match severity {
             "Critical" => 9.0,
@@ -467,7 +461,6 @@ impl UnifiedAnalysis {
             risk_reduction,
         }
     }
-
 
     pub fn sort_by_priority(&mut self) {
         let mut items_vec: Vec<UnifiedDebtItem> = self.items.iter().cloned().collect();
@@ -656,5 +649,4 @@ mod tests {
         assert_eq!(vuln_type, "Unsafe Code");
         assert_eq!(severity, "High");
     }
-
 }

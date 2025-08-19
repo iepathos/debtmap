@@ -207,11 +207,7 @@ pub struct DebtScores {
 
 impl DebtScores {
     pub fn total(&self) -> f64 {
-        self.security
-            + self.organization
-            + self.testing
-            + self.resource
-            + self.duplication
+        self.security + self.organization + self.testing + self.resource + self.duplication
     }
 }
 
