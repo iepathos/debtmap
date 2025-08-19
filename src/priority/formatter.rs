@@ -705,11 +705,13 @@ mod tests {
     }
 
     fn create_test_item(score: f64) -> UnifiedDebtItem {
+        // Use score as part of line number to make each test item unique
+        // This prevents duplicate detection from filtering test items
         UnifiedDebtItem {
             location: Location {
                 file: PathBuf::from("test.rs"),
                 function: "test_func".to_string(),
-                line: 10,
+                line: (score * 10.0) as usize,
             },
             debt_type: DebtType::TestingGap {
                 coverage: 0.1,

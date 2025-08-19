@@ -261,7 +261,18 @@ impl UnifiedAnalysis {
             }
         }
 
-        self.items.push_back(item);
+        // Check for duplicates before adding
+        // Two items are considered duplicates if they have the same location and debt type
+        let is_duplicate = self.items.iter().any(|existing| {
+            existing.location.file == item.location.file
+                && existing.location.line == item.location.line
+                && std::mem::discriminant(&existing.debt_type)
+                    == std::mem::discriminant(&item.debt_type)
+        });
+
+        if !is_duplicate {
+            self.items.push_back(item);
+        }
     }
 
     /// Convert core::DebtItem (Security/Performance) to UnifiedDebtItem for unified analysis
