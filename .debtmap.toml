@@ -24,11 +24,6 @@ minimum_cyclomatic_complexity = 1     # Skip functions with cyclomatic <= this v
 minimum_cognitive_complexity = 1      # Skip functions with cognitive <= this value  
 minimum_risk_score = 1.0              # Minimum risk score for Risk debt types
 
-# Context-aware thresholds to reduce false positives
-orchestration_complexity_threshold = 3   # Don't flag simple orchestration functions
-visitor_pattern_threshold = 12          # Higher threshold for visitor pattern methods
-detector_pattern_threshold = 8          # Adjusted threshold for detector functions
-
 # Validation thresholds for 'debtmap validate' command
 [thresholds.validation]
 max_average_complexity = 10.0         # Maximum allowed average complexity
@@ -53,13 +48,8 @@ patterns = [
     "**/test_*.rs",         # Exclude test files with test_ prefix
     "**/*_test.rs",         # Exclude test files with _test suffix
     "**/*_tests.rs",        # Exclude test files with _tests suffix
-    "**/fixtures/**",       # Exclude test fixtures
-    "**/mocks/**",          # Exclude mock implementations
-    "**/stubs/**"           # Exclude stub implementations
+    "**/fixtures/**"        # Exclude test fixtures
 ]
-
-# Pattern-specific exclusions to reduce false positives
-# debtmap:ignore annotations can be used inline for specific cases
 
 [output]
 default_format = "terminal"
@@ -72,16 +62,3 @@ detect_external_api = false
 # (Currently empty since debtmap doesn't expose any external APIs)
 api_functions = []
 api_files = []
-
-[patterns]
-# Pattern detection configuration to reduce false positives
-detect_visitor_pattern = true          # Recognize visitor pattern implementations
-detect_builder_pattern = true          # Recognize builder pattern implementations
-detect_orchestration_pattern = true    # Recognize orchestration/delegation patterns
-detect_factory_pattern = true          # Recognize factory pattern implementations
-
-# Functions matching these patterns get adjusted complexity scores
-visitor_methods = ["visit_*", "walk_*", "traverse_*"]
-orchestration_methods = ["handle_*", "process_*", "coordinate_*", "orchestrate_*"]
-detector_methods = ["detect_*", "analyze_*", "check_*", "validate_*"]
-configuration_methods = ["configure_*", "setup_*", "init_*", "bootstrap_*"]
