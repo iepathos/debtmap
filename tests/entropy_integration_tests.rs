@@ -205,7 +205,7 @@ fn test_pattern_corpus_detection() {
             .unwrap();
         let metrics = analyzer.analyze(&ast);
 
-        if let Some(_func) = metrics.complexity.functions.first() {
+        if let Some(func) = metrics.complexity.functions.first() {
             // Extract the function block for entropy analysis
             if let Ok(file) = syn::parse_str::<syn::File>(example.code) {
                 if let Some(item) = file.items.first() {
@@ -472,7 +472,7 @@ fn test_entropy_benchmark_suite() {
             .unwrap();
         let metrics = analyzer.analyze(&ast);
 
-        if let Some(_func) = metrics.complexity.functions.first() {
+        if let Some(func) = metrics.complexity.functions.first() {
             if let Ok(file) = syn::parse_str::<syn::File>(example.code) {
                 if let Some(syn::Item::Fn(item_fn)) = file.items.first() {
                     let hash = format!("{}_hash", example.name);
