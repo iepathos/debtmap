@@ -3319,40 +3319,40 @@ mod tests {
     fn test_calculate_dependency_factor_comprehensive_coverage() {
         // Test every single branch in the match statement for complete coverage
         // This ensures 100% branch coverage of the function
-        
+
         // Branch 0: Dead code
         assert_eq!(calculate_dependency_factor(0), 0.0);
-        
+
         // Branch 1: Single caller
         assert_eq!(calculate_dependency_factor(1), 2.0);
-        
+
         // Branch 2: Two callers
         assert_eq!(calculate_dependency_factor(2), 3.0);
-        
+
         // Branch 3: Three callers
         assert_eq!(calculate_dependency_factor(3), 4.0);
-        
+
         // Branch 4: Four callers
         assert_eq!(calculate_dependency_factor(4), 5.0);
-        
+
         // Branch 5: Five callers
         assert_eq!(calculate_dependency_factor(5), 6.0);
-        
+
         // Branch 6..=7: Six and seven callers
         assert_eq!(calculate_dependency_factor(6), 7.0);
         assert_eq!(calculate_dependency_factor(7), 7.0);
-        
+
         // Branch 8..=9: Eight and nine callers
         assert_eq!(calculate_dependency_factor(8), 8.0);
         assert_eq!(calculate_dependency_factor(9), 8.0);
-        
+
         // Branch 10..=14: Ten to fourteen callers
         assert_eq!(calculate_dependency_factor(10), 9.0);
         assert_eq!(calculate_dependency_factor(11), 9.0);
         assert_eq!(calculate_dependency_factor(12), 9.0);
         assert_eq!(calculate_dependency_factor(13), 9.0);
         assert_eq!(calculate_dependency_factor(14), 9.0);
-        
+
         // Branch _: Fifteen or more callers
         assert_eq!(calculate_dependency_factor(15), 10.0);
         assert_eq!(calculate_dependency_factor(16), 10.0);
@@ -3376,23 +3376,35 @@ mod tests {
     #[test]
     fn test_calculate_dependency_factor_typical_scenarios() {
         // Test typical real-world scenarios with descriptive assertions
-        
+
         // Utility function used by one module
         let single_use_utility = calculate_dependency_factor(1);
-        assert_eq!(single_use_utility, 2.0, "Single-use utility should have low priority");
-        
+        assert_eq!(
+            single_use_utility, 2.0,
+            "Single-use utility should have low priority"
+        );
+
         // Helper function used by a few modules
         let shared_helper = calculate_dependency_factor(3);
-        assert_eq!(shared_helper, 4.0, "Shared helper should have medium priority");
-        
+        assert_eq!(
+            shared_helper, 4.0,
+            "Shared helper should have medium priority"
+        );
+
         // Core business logic used across the codebase
         let core_logic = calculate_dependency_factor(8);
-        assert_eq!(core_logic, 8.0, "Core business logic should have high priority");
-        
+        assert_eq!(
+            core_logic, 8.0,
+            "Core business logic should have high priority"
+        );
+
         // Critical infrastructure function
         let infrastructure = calculate_dependency_factor(20);
-        assert_eq!(infrastructure, 10.0, "Critical infrastructure should have maximum priority");
-        
+        assert_eq!(
+            infrastructure, 10.0,
+            "Critical infrastructure should have maximum priority"
+        );
+
         // Dead code that can be removed
         let dead_code = calculate_dependency_factor(0);
         assert_eq!(dead_code, 0.0, "Dead code should have zero priority");
@@ -3401,22 +3413,22 @@ mod tests {
     #[test]
     fn test_calculate_dependency_factor_classification_consistency() {
         // Test that the classification is consistent within each range
-        
+
         // Low criticality range (1-2)
         assert!(calculate_dependency_factor(1) < calculate_dependency_factor(3));
         assert!(calculate_dependency_factor(2) < calculate_dependency_factor(3));
-        
+
         // Medium criticality range (3-5)
         assert!(calculate_dependency_factor(3) < calculate_dependency_factor(6));
         assert!(calculate_dependency_factor(4) < calculate_dependency_factor(6));
         assert!(calculate_dependency_factor(5) < calculate_dependency_factor(6));
-        
+
         // High criticality range (6-9)
         assert!(calculate_dependency_factor(6) < calculate_dependency_factor(10));
         assert!(calculate_dependency_factor(7) < calculate_dependency_factor(10));
         assert!(calculate_dependency_factor(8) < calculate_dependency_factor(10));
         assert!(calculate_dependency_factor(9) < calculate_dependency_factor(10));
-        
+
         // Critical path range (10-14)
         assert!(calculate_dependency_factor(10) < calculate_dependency_factor(15));
         assert!(calculate_dependency_factor(14) < calculate_dependency_factor(15));
@@ -3426,59 +3438,98 @@ mod tests {
     fn test_calculate_dependency_factor_step_function_behavior() {
         // Test that the function behaves as a proper step function
         // with discrete jumps at boundaries
-        
+
         // Test discrete jumps
-        assert_ne!(calculate_dependency_factor(0), calculate_dependency_factor(1));
-        assert_ne!(calculate_dependency_factor(1), calculate_dependency_factor(2));
-        assert_ne!(calculate_dependency_factor(2), calculate_dependency_factor(3));
-        assert_ne!(calculate_dependency_factor(5), calculate_dependency_factor(6));
-        assert_ne!(calculate_dependency_factor(7), calculate_dependency_factor(8));
-        assert_ne!(calculate_dependency_factor(9), calculate_dependency_factor(10));
-        assert_ne!(calculate_dependency_factor(14), calculate_dependency_factor(15));
-        
+        assert_ne!(
+            calculate_dependency_factor(0),
+            calculate_dependency_factor(1)
+        );
+        assert_ne!(
+            calculate_dependency_factor(1),
+            calculate_dependency_factor(2)
+        );
+        assert_ne!(
+            calculate_dependency_factor(2),
+            calculate_dependency_factor(3)
+        );
+        assert_ne!(
+            calculate_dependency_factor(5),
+            calculate_dependency_factor(6)
+        );
+        assert_ne!(
+            calculate_dependency_factor(7),
+            calculate_dependency_factor(8)
+        );
+        assert_ne!(
+            calculate_dependency_factor(9),
+            calculate_dependency_factor(10)
+        );
+        assert_ne!(
+            calculate_dependency_factor(14),
+            calculate_dependency_factor(15)
+        );
+
         // Test plateaus within ranges
-        assert_eq!(calculate_dependency_factor(6), calculate_dependency_factor(7));
-        assert_eq!(calculate_dependency_factor(8), calculate_dependency_factor(9));
-        assert_eq!(calculate_dependency_factor(10), calculate_dependency_factor(14));
-        assert_eq!(calculate_dependency_factor(15), calculate_dependency_factor(100));
+        assert_eq!(
+            calculate_dependency_factor(6),
+            calculate_dependency_factor(7)
+        );
+        assert_eq!(
+            calculate_dependency_factor(8),
+            calculate_dependency_factor(9)
+        );
+        assert_eq!(
+            calculate_dependency_factor(10),
+            calculate_dependency_factor(14)
+        );
+        assert_eq!(
+            calculate_dependency_factor(15),
+            calculate_dependency_factor(100)
+        );
     }
 
     #[test]
     fn test_calculate_dependency_factor_mathematical_properties() {
         // Test mathematical properties of the function
-        
+
         // Non-negative output
         for i in 0..=100 {
-            assert!(calculate_dependency_factor(i) >= 0.0, 
-                   "Output should always be non-negative");
+            assert!(
+                calculate_dependency_factor(i) >= 0.0,
+                "Output should always be non-negative"
+            );
         }
-        
+
         // Bounded output [0, 10]
         for i in 0..=1000 {
             let result = calculate_dependency_factor(i);
-            assert!(result >= 0.0 && result <= 10.0,
-                   "Output should be in range [0, 10]");
+            assert!(
+                result >= 0.0 && result <= 10.0,
+                "Output should be in range [0, 10]"
+            );
         }
-        
+
         // Monotonic non-decreasing
         let mut prev = calculate_dependency_factor(0);
         for i in 1..=100 {
             let curr = calculate_dependency_factor(i);
-            assert!(curr >= prev, 
-                   "Function should be monotonic non-decreasing");
+            assert!(curr >= prev, "Function should be monotonic non-decreasing");
             prev = curr;
         }
-        
+
         // Saturation at maximum
-        assert_eq!(calculate_dependency_factor(15), calculate_dependency_factor(1000),
-                  "Function should saturate at maximum value");
+        assert_eq!(
+            calculate_dependency_factor(15),
+            calculate_dependency_factor(1000),
+            "Function should saturate at maximum value"
+        );
     }
 
     #[test]
     fn test_calculate_dependency_factor_integration_with_scoring() {
         // Test how the dependency factor integrates with the overall scoring system
         // Simulating real-world usage patterns
-        
+
         // Simulate scoring for different function types
         let test_scenarios = vec![
             (0, "dead_code_function", 0.0),
@@ -3488,16 +3539,21 @@ mod tests {
             (12, "core_utility", 9.0),
             (25, "framework_base", 10.0),
         ];
-        
+
         for (callers, description, expected) in test_scenarios {
             let factor = calculate_dependency_factor(callers);
-            assert_eq!(factor, expected, 
-                      "Function '{}' with {} callers should have factor {}",
-                      description, callers, expected);
-            
+            assert_eq!(
+                factor, expected,
+                "Function '{}' with {} callers should have factor {}",
+                description, callers, expected
+            );
+
             // Verify the factor can be used in calculations without issues
             let weighted_score = factor * 1.5; // Simulate weighting
-            assert!(weighted_score.is_finite(), "Factor should produce valid calculations");
+            assert!(
+                weighted_score.is_finite(),
+                "Factor should produce valid calculations"
+            );
         }
     }
 }
