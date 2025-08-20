@@ -282,6 +282,42 @@ impl TypeVisitor {
     }
 }
 
+impl TypeVisitor {
+    fn extract_type_name(self_ty: &syn::Type) -> Option<String> {
+        match self_ty {
+            syn::Type::Path(type_path) => type_path.path.get_ident().map(|id| id.to_string()),
+            _ => None,
+        }
+    }
+
+    fn count_impl_methods(items: &[syn::ImplItem]) -> (Vec<String>, usize) {
+        let mut methods = Vec::new();
+        let mut count = 0;
+
+        for item in items {
+            if let syn::ImplItem::Fn(method) = item {
+                methods.push(method.sig.ident.to_string());
+                count += 1;
+            }
+        }
+
+        (methods, count)
+    }
+
+    fn update_type_info(&mut self, type_name: &str, node: &syn::ItemImpl) {
+        if let Some(type_info) = self.types.get_mut(type_name) {
+            let (methods, count) = Self::count_impl_methods(&node.items);
+
+            type_info.methods.extend(methods);
+            type_info.method_count += count;
+
+            if node.trait_.is_some() {
+                type_info.trait_implementations += 1;
+            }
+        }
+    }
+}
+
 impl<'ast> Visit<'ast> for TypeVisitor {
     fn visit_item_struct(&mut self, node: &'ast syn::ItemStruct) {
         let type_name = node.ident.to_string();
@@ -322,25 +358,8 @@ impl<'ast> Visit<'ast> for TypeVisitor {
     }
 
     fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
-        if let syn::Type::Path(type_path) = &*node.self_ty {
-            if let Some(ident) = type_path.path.get_ident() {
-                let type_name = ident.to_string();
-
-                if let Some(type_info) = self.types.get_mut(&type_name) {
-                    // Count methods
-                    for item in &node.items {
-                        if let syn::ImplItem::Fn(method) = item {
-                            type_info.methods.push(method.sig.ident.to_string());
-                            type_info.method_count += 1;
-                        }
-                    }
-
-                    // Count trait implementations
-                    if node.trait_.is_some() {
-                        type_info.trait_implementations += 1;
-                    }
-                }
-            }
+        if let Some(type_name) = Self::extract_type_name(&node.self_ty) {
+            self.update_type_info(&type_name, node);
         }
     }
 }
@@ -350,5 +369,194 @@ fn capitalize_first(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::{parse_quote, ItemImpl};
+
+    #[test]
+    fn test_extract_type_name_with_path_type() {
+        let self_ty: syn::Type = parse_quote!(MyStruct);
+        let result = TypeVisitor::extract_type_name(&self_ty);
+        assert_eq!(result, Some("MyStruct".to_string()));
+    }
+
+    #[test]
+    fn test_extract_type_name_with_complex_path() {
+        let self_ty: syn::Type = parse_quote!(std::collections::HashMap);
+        let result = TypeVisitor::extract_type_name(&self_ty);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_type_name_with_reference_type() {
+        let self_ty: syn::Type = parse_quote!(&MyStruct);
+        let result = TypeVisitor::extract_type_name(&self_ty);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_count_impl_methods_empty() {
+        let items = vec![];
+        let (methods, count) = TypeVisitor::count_impl_methods(&items);
+        assert_eq!(methods.len(), 0);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_count_impl_methods_with_functions() {
+        let impl_block: ItemImpl = parse_quote! {
+            impl MyStruct {
+                fn method1(&self) {}
+                fn method2(&mut self) {}
+                const CONSTANT: i32 = 42;
+                fn method3() {}
+            }
+        };
+
+        let (methods, count) = TypeVisitor::count_impl_methods(&impl_block.items);
+        assert_eq!(count, 3);
+        assert_eq!(methods.len(), 3);
+        assert!(methods.contains(&"method1".to_string()));
+        assert!(methods.contains(&"method2".to_string()));
+        assert!(methods.contains(&"method3".to_string()));
+    }
+
+    #[test]
+    fn test_count_impl_methods_mixed_items() {
+        let impl_block: ItemImpl = parse_quote! {
+            impl MyStruct {
+                type Item = i32;
+                fn method1(&self) {}
+                const VALUE: i32 = 10;
+                fn method2(&self) {}
+            }
+        };
+
+        let (methods, count) = TypeVisitor::count_impl_methods(&impl_block.items);
+        assert_eq!(count, 2);
+        assert_eq!(methods.len(), 2);
+        assert!(methods.contains(&"method1".to_string()));
+        assert!(methods.contains(&"method2".to_string()));
+    }
+
+    #[test]
+    fn test_update_type_info_with_methods() {
+        let mut visitor = TypeVisitor::with_location_extractor(None);
+
+        visitor.types.insert(
+            "TestStruct".to_string(),
+            TypeAnalysis {
+                name: "TestStruct".to_string(),
+                method_count: 0,
+                field_count: 0,
+                methods: Vec::new(),
+                fields: Vec::new(),
+                responsibilities: Vec::new(),
+                trait_implementations: 0,
+                location: SourceLocation::default(),
+            },
+        );
+
+        let impl_block: ItemImpl = parse_quote! {
+            impl TestStruct {
+                fn method1(&self) {}
+                fn method2(&self) {}
+            }
+        };
+
+        visitor.update_type_info("TestStruct", &impl_block);
+
+        let type_info = visitor.types.get("TestStruct").unwrap();
+        assert_eq!(type_info.method_count, 2);
+        assert_eq!(type_info.methods.len(), 2);
+        assert!(type_info.methods.contains(&"method1".to_string()));
+        assert!(type_info.methods.contains(&"method2".to_string()));
+    }
+
+    #[test]
+    fn test_update_type_info_with_trait_impl() {
+        let mut visitor = TypeVisitor::with_location_extractor(None);
+
+        visitor.types.insert(
+            "TestStruct".to_string(),
+            TypeAnalysis {
+                name: "TestStruct".to_string(),
+                method_count: 0,
+                field_count: 0,
+                methods: Vec::new(),
+                fields: Vec::new(),
+                responsibilities: Vec::new(),
+                trait_implementations: 0,
+                location: SourceLocation::default(),
+            },
+        );
+
+        let impl_block: ItemImpl = parse_quote! {
+            impl Display for TestStruct {
+                fn fmt(&self, f: &mut Formatter) -> Result {
+                    Ok(())
+                }
+            }
+        };
+
+        visitor.update_type_info("TestStruct", &impl_block);
+
+        let type_info = visitor.types.get("TestStruct").unwrap();
+        assert_eq!(type_info.trait_implementations, 1);
+        assert_eq!(type_info.method_count, 1);
+        assert!(type_info.methods.contains(&"fmt".to_string()));
+    }
+
+    #[test]
+    fn test_update_type_info_nonexistent_type() {
+        let mut visitor = TypeVisitor::with_location_extractor(None);
+
+        let impl_block: ItemImpl = parse_quote! {
+            impl NonExistent {
+                fn method(&self) {}
+            }
+        };
+
+        visitor.update_type_info("NonExistent", &impl_block);
+
+        assert!(!visitor.types.contains_key("NonExistent"));
+    }
+
+    #[test]
+    fn test_visit_item_impl_integration() {
+        use syn::visit::Visit;
+
+        let mut visitor = TypeVisitor::with_location_extractor(None);
+
+        visitor.types.insert(
+            "MyStruct".to_string(),
+            TypeAnalysis {
+                name: "MyStruct".to_string(),
+                method_count: 0,
+                field_count: 0,
+                methods: Vec::new(),
+                fields: Vec::new(),
+                responsibilities: Vec::new(),
+                trait_implementations: 0,
+                location: SourceLocation::default(),
+            },
+        );
+
+        let impl_block: ItemImpl = parse_quote! {
+            impl MyStruct {
+                fn new() -> Self { MyStruct }
+                fn process(&self) {}
+            }
+        };
+
+        visitor.visit_item_impl(&impl_block);
+
+        let type_info = visitor.types.get("MyStruct").unwrap();
+        assert_eq!(type_info.method_count, 2);
+        assert_eq!(type_info.methods.len(), 2);
     }
 }
