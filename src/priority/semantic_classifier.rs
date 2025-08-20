@@ -706,6 +706,7 @@ mod tests {
         graph.add_function(func_id.clone(), false, false, 2, 15);
 
         // Add meaningful callees (not std library)
+        // Need at least 3 for the current config settings
         let callee1 = FunctionId {
             file: PathBuf::from("workflow.rs"),
             name: "process_step_one".to_string(),
@@ -716,9 +717,15 @@ mod tests {
             name: "process_step_two".to_string(),
             line: 100,
         };
+        let callee3 = FunctionId {
+            file: PathBuf::from("workflow.rs"),
+            name: "process_step_three".to_string(),
+            line: 150,
+        };
 
         graph.add_function(callee1.clone(), false, false, 5, 30);
         graph.add_function(callee2.clone(), false, false, 5, 30);
+        graph.add_function(callee3.clone(), false, false, 5, 30);
 
         graph.add_call(FunctionCall {
             caller: func_id.clone(),
@@ -728,6 +735,11 @@ mod tests {
         graph.add_call(FunctionCall {
             caller: func_id.clone(),
             callee: callee2,
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: func_id.clone(),
+            callee: callee3,
             call_type: CallType::Direct,
         });
 
