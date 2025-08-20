@@ -3556,7 +3556,7 @@ mod tests {
         for i in 0..=1000 {
             let result = calculate_dependency_factor(i);
             assert!(
-                result >= 0.0 && result <= 10.0,
+                (0.0..=10.0).contains(&result),
                 "Output should be in range [0, 10]"
             );
         }

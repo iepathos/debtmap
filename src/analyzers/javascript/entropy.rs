@@ -35,12 +35,12 @@ impl JavaScriptEntropyAnalyzer {
         let mut tokens = Vec::new();
         let mut cursor = node.walk();
 
-        self.visit_node(&mut cursor, source, &mut tokens);
+        Self::visit_node(&mut cursor, source, &mut tokens);
         tokens
     }
 
     /// Recursively visit nodes to extract tokens
-    fn visit_node(&self, cursor: &mut TreeCursor, source: &str, tokens: &mut Vec<TokenType>) {
+    fn visit_node(cursor: &mut TreeCursor, source: &str, tokens: &mut Vec<TokenType>) {
         let node = cursor.node();
         let kind = node.kind();
 
@@ -100,7 +100,7 @@ impl JavaScriptEntropyAnalyzer {
         // Visit children
         if cursor.goto_first_child() {
             loop {
-                self.visit_node(cursor, source, tokens);
+                Self::visit_node(cursor, source, tokens);
                 if !cursor.goto_next_sibling() {
                     break;
                 }
@@ -171,7 +171,7 @@ impl JavaScriptEntropyAnalyzer {
     fn collect_patterns(
         &self,
         cursor: &mut TreeCursor,
-        source: &str,
+        _source: &str,
         patterns: &mut HashMap<String, usize>,
         total_patterns: &mut usize,
     ) {
@@ -186,7 +186,7 @@ impl JavaScriptEntropyAnalyzer {
         // Visit children
         if cursor.goto_first_child() {
             loop {
-                self.collect_patterns(cursor, source, patterns, total_patterns);
+                self.collect_patterns(cursor, _source, patterns, total_patterns);
                 if !cursor.goto_next_sibling() {
                     break;
                 }
@@ -301,17 +301,12 @@ impl JavaScriptEntropyAnalyzer {
         let mut tokens = Vec::new();
         let mut cursor = node.walk();
 
-        self.extract_simple_tokens(&mut cursor, source, &mut tokens);
+        Self::extract_simple_tokens(&mut cursor, source, &mut tokens);
         tokens
     }
 
     /// Extract simplified tokens for branch comparison
-    fn extract_simple_tokens(
-        &self,
-        cursor: &mut TreeCursor,
-        source: &str,
-        tokens: &mut Vec<String>,
-    ) {
+    fn extract_simple_tokens(cursor: &mut TreeCursor, _source: &str, tokens: &mut Vec<String>) {
         let node = cursor.node();
         let kind = node.kind();
 
@@ -325,7 +320,7 @@ impl JavaScriptEntropyAnalyzer {
         // Visit children
         if cursor.goto_first_child() {
             loop {
-                self.extract_simple_tokens(cursor, source, tokens);
+                Self::extract_simple_tokens(cursor, _source, tokens);
                 if !cursor.goto_next_sibling() {
                     break;
                 }

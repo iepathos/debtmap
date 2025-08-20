@@ -282,7 +282,6 @@ enum TokenType {
     Operator(String),     // +, -, ==, etc.
     Identifier(String),   // Variable/function names (normalized)
     Literal(LiteralType), // Numbers, strings, etc.
-    Punctuation(char),    // {, }, (, ), etc.
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

@@ -205,64 +205,62 @@ fn test_pattern_corpus_detection() {
             .unwrap();
         let metrics = analyzer.analyze(&ast);
 
-        if let Some(func) = metrics.complexity.functions.first() {
+        if let Some(_func) = metrics.complexity.functions.first() {
             // Extract the function block for entropy analysis
             if let Ok(file) = syn::parse_str::<syn::File>(example.code) {
-                if let Some(item) = file.items.first() {
-                    if let syn::Item::Fn(item_fn) = item {
-                        let score = entropy_analyzer.calculate_entropy(&item_fn.block);
+                if let Some(syn::Item::Fn(item_fn)) = file.items.first() {
+                    let score = entropy_analyzer.calculate_entropy(&item_fn.block);
 
-                        // Test pattern repetition
-                        if example.expected_high_repetition {
-                            assert!(
-                                score.pattern_repetition > 0.4,
-                                "{}: Expected high repetition, got {}",
-                                example.name,
-                                score.pattern_repetition
-                            );
-                        } else {
-                            // Note: Even complex code has some pattern repetition
-                            assert!(
-                                score.pattern_repetition < 0.8,
-                                "{}: Expected lower repetition, got {}",
-                                example.name,
-                                score.pattern_repetition
-                            );
-                        }
+                    // Test pattern repetition
+                    if example.expected_high_repetition {
+                        assert!(
+                            score.pattern_repetition > 0.4,
+                            "{}: Expected high repetition, got {}",
+                            example.name,
+                            score.pattern_repetition
+                        );
+                    } else {
+                        // Note: Even complex code has some pattern repetition
+                        assert!(
+                            score.pattern_repetition < 0.8,
+                            "{}: Expected lower repetition, got {}",
+                            example.name,
+                            score.pattern_repetition
+                        );
+                    }
 
-                        // Test token entropy
-                        if example.expected_low_entropy {
-                            assert!(
-                                score.token_entropy < 0.65, // Adjusted threshold for real-world code
-                                "{}: Expected low entropy, got {}",
-                                example.name,
-                                score.token_entropy
-                            );
-                        } else {
-                            assert!(
-                                score.token_entropy > 0.3,
-                                "{}: Expected high entropy, got {}",
-                                example.name,
-                                score.token_entropy
-                            );
-                        }
+                    // Test token entropy
+                    if example.expected_low_entropy {
+                        assert!(
+                            score.token_entropy < 0.65, // Adjusted threshold for real-world code
+                            "{}: Expected low entropy, got {}",
+                            example.name,
+                            score.token_entropy
+                        );
+                    } else {
+                        assert!(
+                            score.token_entropy > 0.3,
+                            "{}: Expected high entropy, got {}",
+                            example.name,
+                            score.token_entropy
+                        );
+                    }
 
-                        // Test effective complexity (dampening)
-                        if example.expected_dampening {
-                            assert!(
-                                score.effective_complexity < 0.8, // Adjusted - any reduction is good
-                                "{}: Expected dampening, got effective complexity {}",
-                                example.name,
-                                score.effective_complexity
-                            );
-                        } else {
-                            assert!(
-                                score.effective_complexity > 0.7, // High complexity retained
-                                "{}: Expected no dampening, got effective complexity {}",
-                                example.name,
-                                score.effective_complexity
-                            );
-                        }
+                    // Test effective complexity (dampening)
+                    if example.expected_dampening {
+                        assert!(
+                            score.effective_complexity < 0.8, // Adjusted - any reduction is good
+                            "{}: Expected dampening, got effective complexity {}",
+                            example.name,
+                            score.effective_complexity
+                        );
+                    } else {
+                        assert!(
+                            score.effective_complexity > 0.7, // High complexity retained
+                            "{}: Expected no dampening, got effective complexity {}",
+                            example.name,
+                            score.effective_complexity
+                        );
                     }
                 }
             }
