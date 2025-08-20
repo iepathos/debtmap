@@ -65,6 +65,7 @@ impl CoverageRiskAnalyzer {
             FunctionRole::EntryPoint => 0.9,   // High weight for entry points
             FunctionRole::Orchestrator => 0.6, // Moderate weight for orchestration
             FunctionRole::IOWrapper => 0.4,    // Lower weight for I/O
+            FunctionRole::PatternMatch => 0.3, // Low weight for pattern matching
             FunctionRole::Unknown => 0.8,      // Default weight
         }
     }
@@ -198,6 +199,7 @@ impl CoverageRiskAnalyzer {
             FunctionRole::EntryPoint => 2.0, // Entry points are critical
             FunctionRole::Orchestrator => 1.0, // Normal criticality
             FunctionRole::IOWrapper => 0.5, // Less critical paths
+            FunctionRole::PatternMatch => 0.3, // Pattern matching has low criticality
             FunctionRole::Unknown => 1.0,
         }
     }
@@ -229,7 +231,7 @@ impl CoverageRiskAnalyzer {
                 poor: base_thresholds.poor * 0.9,
                 critical: base_thresholds.critical * 0.9,
             },
-            FunctionRole::IOWrapper => CoverageThresholds {
+            FunctionRole::PatternMatch | FunctionRole::IOWrapper => CoverageThresholds {
                 excellent: base_thresholds.excellent * 0.8,
                 good: base_thresholds.good * 0.8,
                 moderate: base_thresholds.moderate * 0.8,
@@ -398,6 +400,7 @@ impl CoverageRiskAnalyzer {
             FunctionRole::EntryPoint => format!("Entry point flow {}", index),
             FunctionRole::Orchestrator => format!("Orchestration path {}", index),
             FunctionRole::IOWrapper => format!("I/O operation {}", index),
+            FunctionRole::PatternMatch => format!("Pattern branch {}", index),
             FunctionRole::Unknown => format!("Execution path {}", index),
         }
     }

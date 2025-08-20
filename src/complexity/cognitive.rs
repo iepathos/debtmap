@@ -1,3 +1,4 @@
+use super::pattern_adjustments::calculate_cognitive_adjusted;
 use super::patterns::{analyze_patterns, PatternComplexity};
 use syn::{visit::Visit, Block, Expr};
 
@@ -10,7 +11,15 @@ pub fn calculate_cognitive(block: &Block) -> u32 {
 
     // Add pattern-based complexity
     let patterns = analyze_patterns(block);
-    visitor.complexity + patterns.total_complexity()
+    let base_complexity = visitor.complexity + patterns.total_complexity();
+
+    // Only apply pattern-specific adjustments if complexity is significant
+    // This avoids false positives on simple blocks
+    if base_complexity > 2 {
+        calculate_cognitive_adjusted(block, base_complexity)
+    } else {
+        base_complexity
+    }
 }
 
 pub fn calculate_cognitive_with_patterns(block: &Block) -> (u32, PatternComplexity) {
@@ -21,8 +30,13 @@ pub fn calculate_cognitive_with_patterns(block: &Block) -> (u32, PatternComplexi
     visitor.visit_block(block);
 
     let patterns = analyze_patterns(block);
-    let total = visitor.complexity + patterns.total_complexity();
-    (total, patterns)
+    let base_complexity = visitor.complexity + patterns.total_complexity();
+    let adjusted_total = if base_complexity > 2 {
+        calculate_cognitive_adjusted(block, base_complexity)
+    } else {
+        base_complexity
+    };
+    (adjusted_total, patterns)
 }
 
 struct CognitiveVisitor {

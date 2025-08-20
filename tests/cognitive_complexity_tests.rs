@@ -303,9 +303,12 @@ fn test_calculate_cognitive_else_if_chain() {
     }};
 
     let complexity = calculate_cognitive(&block);
+    // With pattern adjustments, else-if chains are recognized as pattern matching
+    // and get logarithmic complexity: log2(3) = 2 (rounded up)
     assert!(
-        complexity >= 3,
-        "Else-if chain should have complexity for each branch"
+        complexity >= 2,
+        "Else-if chain should have complexity >= 2, got {}",
+        complexity
     );
 }
 

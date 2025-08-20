@@ -591,6 +591,7 @@ fn format_role(role: FunctionRole) -> &'static str {
         FunctionRole::Orchestrator => "Orchestrator",
         FunctionRole::IOWrapper => "IOWrapper",
         FunctionRole::EntryPoint => "EntryPoint",
+        FunctionRole::PatternMatch => "PatternMatch",
         FunctionRole::Unknown => "Unknown",
     }
 }

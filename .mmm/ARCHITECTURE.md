@@ -35,8 +35,9 @@ Language-specific analysis implementations:
 ### Complexity (`src/complexity/`)
 Complexity metric calculations:
 - `cyclomatic.rs`: Cyclomatic complexity using visitor pattern
-- `cognitive.rs`: Cognitive complexity with nesting penalties
+- `cognitive.rs`: Cognitive complexity with nesting penalties and pattern adjustments
 - `entropy.rs`: Entropy-based complexity scoring using information theory
+- `pattern_adjustments.rs`: Pattern-specific complexity adjustments (pattern matching, simple delegation)
 - `patterns.rs`: Modern pattern complexity detection
 
 ### Debt (`src/debt/`)

@@ -108,6 +108,7 @@ pub fn calculate_unified_priority_with_debt(
     let is_trivial = (func.cyclomatic <= 3 && func.cognitive <= 5)
         && (role == FunctionRole::IOWrapper
             || role == FunctionRole::EntryPoint
+            || role == FunctionRole::PatternMatch
             || (role == FunctionRole::PureLogic && func.length <= 10));
 
     // Check actual test coverage if we have lcov data
@@ -797,7 +798,10 @@ fn determine_debt_type(
     // should not be flagged as technical debt
     if func.cyclomatic <= 3 && func.cognitive <= 5 {
         // Check if it's an I/O wrapper or entry point
-        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+        if role == FunctionRole::IOWrapper
+            || role == FunctionRole::EntryPoint
+            || role == FunctionRole::PatternMatch
+        {
             // These are acceptable patterns, not debt
             return DebtType::Risk {
                 risk_score: 0.0,
@@ -1029,7 +1033,10 @@ pub fn classify_debt_type_with_exclusions(
     // should not be flagged as technical debt
     if func.cyclomatic <= 3 && func.cognitive <= 5 {
         // Check if it's an I/O wrapper or entry point
-        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+        if role == FunctionRole::IOWrapper
+            || role == FunctionRole::EntryPoint
+            || role == FunctionRole::PatternMatch
+        {
             // These are acceptable patterns, not debt
             return DebtType::Risk {
                 risk_score: 0.0,
@@ -1141,7 +1148,10 @@ pub fn classify_debt_type_enhanced(
     // should not be flagged as technical debt
     if func.cyclomatic <= 3 && func.cognitive <= 5 {
         // Check if it's an I/O wrapper or entry point
-        if role == FunctionRole::IOWrapper || role == FunctionRole::EntryPoint {
+        if role == FunctionRole::IOWrapper
+            || role == FunctionRole::EntryPoint
+            || role == FunctionRole::PatternMatch
+        {
             // These are acceptable patterns, not debt
             return DebtType::Risk {
                 risk_score: 0.0,
@@ -1354,6 +1364,7 @@ fn format_role_description(role: FunctionRole) -> &'static str {
         FunctionRole::Orchestrator => "orchestration",
         FunctionRole::IOWrapper => "I/O wrapper",
         FunctionRole::EntryPoint => "entry point",
+        FunctionRole::PatternMatch => "pattern matching",
         FunctionRole::Unknown => "function",
     }
 }
@@ -1501,6 +1512,7 @@ fn generate_testing_gap_recommendation(
             FunctionRole::Orchestrator => "Orchestration",
             FunctionRole::IOWrapper => "I/O wrapper",
             FunctionRole::EntryPoint => "Entry point",
+            FunctionRole::PatternMatch => "Pattern matching",
             FunctionRole::Unknown => "Function",
         };
         (
