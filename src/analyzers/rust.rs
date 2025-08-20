@@ -1,6 +1,7 @@
 use crate::analyzers::Analyzer;
 use crate::complexity::{
-    cognitive::calculate_cognitive_with_patterns, cyclomatic::calculate_cyclomatic,
+    cognitive::calculate_cognitive_with_patterns,
+    cyclomatic::{calculate_cyclomatic, calculate_cyclomatic_adjusted},
 };
 use crate::core::{
     ast::{Ast, RustAst},
@@ -470,7 +471,8 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 }
 
 fn calculate_cyclomatic_syn(block: &syn::Block) -> u32 {
-    calculate_cyclomatic(block)
+    // Use the adjusted version that applies pattern recognition
+    calculate_cyclomatic_adjusted(block)
 }
 
 fn calculate_cognitive_syn(block: &syn::Block) -> u32 {

@@ -1,4 +1,5 @@
 use super::{Difficulty, FunctionRisk, RiskCategory, TestEffort};
+use crate::complexity::pattern_adjustments::PatternType;
 use crate::core::ComplexityMetrics;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -52,6 +53,9 @@ pub struct RiskContext {
     pub debt_score: Option<f64>,
     pub debt_threshold: Option<f64>,
     pub is_test: bool,
+    pub is_recognized_pattern: bool,
+    pub pattern_type: Option<PatternType>,
+    pub pattern_confidence: f32,
 }
 
 pub trait RiskCalculator: Send + Sync {
@@ -104,6 +108,9 @@ impl RiskCalculator for EnhancedRiskStrategy {
         let base_risk = self.calculate_base_risk(context);
         let debt_factor = self.calculate_debt_factor(context.debt_score, context.debt_threshold);
 
+        // Apply pattern-based complexity adjustment
+        let complexity_factor = self.calculate_pattern_adjusted_factor(context);
+
         // Don't apply coverage penalty to test functions - they don't need test coverage
         let coverage_penalty = if context.is_test {
             1.0 // No penalty for test functions
@@ -111,8 +118,20 @@ impl RiskCalculator for EnhancedRiskStrategy {
             self.calculate_coverage_penalty(context.coverage)
         };
 
-        let final_risk = base_risk * debt_factor * coverage_penalty;
-        final_risk.min(10.0)
+        // Apply coverage-based reduction for well-tested patterns
+        let coverage_factor = self.calculate_coverage_reduction(context);
+
+        let final_risk =
+            base_risk * debt_factor * complexity_factor * coverage_penalty * coverage_factor;
+
+        // Ensure genuinely complex code maintains minimum risk signal
+        let adjusted_risk = if context.complexity.cognitive_complexity > 40 && final_risk < 3.0 {
+            3.0 // Very complex code always has at least medium risk
+        } else {
+            final_risk
+        };
+
+        adjusted_risk.min(10.0)
     }
 
     fn calculate_risk_reduction(
@@ -172,6 +191,47 @@ impl EnhancedRiskStrategy {
             Some(c) if c < 60.0 => 1.5,
             Some(c) if c < 80.0 => 1.2,
             Some(_) => 0.8,
+        }
+    }
+
+    /// Calculate pattern-based complexity reduction factor
+    fn calculate_pattern_adjusted_factor(&self, context: &RiskContext) -> f64 {
+        if !context.is_recognized_pattern {
+            return 1.0; // No adjustment for non-patterns
+        }
+
+        match context.pattern_type {
+            Some(PatternType::EnumMatching) | Some(PatternType::StringMatching) => {
+                // Simple dispatch patterns get significant reduction
+                0.3 // 70% reduction for pattern matching
+            }
+            Some(PatternType::TraitDelegation) | Some(PatternType::SerializationDispatch) => {
+                // Boilerplate patterns get moderate reduction
+                0.5 // 50% reduction for necessary boilerplate
+            }
+            _ => {
+                // Algorithmic complexity remains a concern
+                if context.complexity.cognitive_complexity > 30 {
+                    0.9 // Only 10% reduction for very complex logic
+                } else if context.complexity.cognitive_complexity > 20 {
+                    0.8 // 20% reduction for complex logic
+                } else {
+                    0.7 // 30% reduction for moderate complexity
+                }
+            }
+        }
+    }
+
+    /// Calculate additional reduction for well-tested pattern code
+    fn calculate_coverage_reduction(&self, context: &RiskContext) -> f64 {
+        if !context.is_recognized_pattern {
+            return 1.0; // No additional reduction for non-patterns
+        }
+
+        match context.coverage {
+            Some(cov) if cov >= 90.0 => 0.8, // Well tested: 20% additional reduction
+            Some(cov) if cov >= 70.0 => 0.9, // Tested: 10% additional reduction
+            _ => 1.0,                        // No coverage: no additional reduction
         }
     }
 
@@ -287,6 +347,9 @@ mod tests {
             debt_score,
             debt_threshold: Some(100.0),
             is_test: false,
+            is_recognized_pattern: false,
+            pattern_type: None,
+            pattern_confidence: 0.0,
         }
     }
 

@@ -12,11 +12,13 @@ pub struct PatternMatchInfo {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternType {
-    StringMatching,   // ends_with, starts_with patterns
-    EnumMatching,     // Matching against enum variants
-    RangeMatching,    // Numeric range checks
-    TypeChecking,     // instanceof or type checks
-    SimpleComparison, // Simple equality/inequality checks
+    StringMatching,        // ends_with, starts_with patterns
+    EnumMatching,          // Matching against enum variants
+    RangeMatching,         // Numeric range checks
+    TypeChecking,          // instanceof or type checks
+    SimpleComparison,      // Simple equality/inequality checks
+    TraitDelegation,       // Trait method delegation patterns
+    SerializationDispatch, // Serialization/encoding dispatch patterns
 }
 
 /// Trait for pattern recognition
@@ -300,7 +302,7 @@ impl SimpleDelegationRecognizer {
         if block.stmts.is_empty() {
             return false;
         }
-        
+
         // Count control flow statements
         let mut control_flow_count = 0;
         let mut visitor = ControlFlowCounter {
@@ -359,7 +361,25 @@ impl<'ast> Visit<'ast> for ControlFlowCounter<'_> {
 
 /// Calculate adjusted cognitive complexity using pattern recognition
 pub fn calculate_cognitive_adjusted(block: &Block, base_complexity: u32) -> u32 {
+    use super::match_patterns::MatchExpressionRecognizer;
+
+    // First check for match expressions in the block
+    for stmt in &block.stmts {
+        if let Stmt::Expr(Expr::Match(_match_expr), _) = stmt {
+            let recognizer = MatchExpressionRecognizer::new();
+            // Create a temporary block with just the match expression
+            let temp_block = syn::Block {
+                brace_token: block.brace_token,
+                stmts: vec![stmt.clone()],
+            };
+            if let Some(info) = recognizer.detect(&temp_block) {
+                return recognizer.adjust_complexity(&info, base_complexity);
+            }
+        }
+    }
+
     let recognizers: Vec<Box<dyn PatternRecognizer>> = vec![
+        Box::new(MatchExpressionRecognizer::new()),
         Box::new(PatternMatchRecognizer::new()),
         Box::new(SimpleDelegationRecognizer::new()),
     ];

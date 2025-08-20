@@ -150,6 +150,9 @@ impl RiskAnalyzer {
             debt_score: self.debt_score,
             debt_threshold: self.debt_threshold,
             is_test,
+            is_recognized_pattern: false,
+            pattern_type: None,
+            pattern_confidence: 0.0,
         };
 
         self.strategy.calculate(&context)
@@ -211,6 +214,9 @@ impl RiskAnalyzer {
             debt_score: self.debt_score,
             debt_threshold: self.debt_threshold,
             is_test: false,
+            is_recognized_pattern: false,
+            pattern_type: None,
+            pattern_confidence: 0.0,
         };
 
         self.strategy.calculate_risk_score(&context)
