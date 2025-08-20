@@ -93,3 +93,8 @@ include_patterns = [
     # "workflow_*",
     # "pipeline_*"
 ]
+[entropy]
+enabled = true
+weight = 0.5
+min_tokens = 10
+pattern_threshold = 0.7
