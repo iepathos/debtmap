@@ -1,4 +1,4 @@
-# Debtmap Configuration
+# Improved Debtmap Configuration with False Positive Reduction
 
 [scoring]
 # Weights for different scoring factors (must sum to 1.0)
@@ -19,10 +19,10 @@ max_function_length = 50
 
 # Minimum thresholds for including items in debt analysis
 # These help filter out trivial functions that aren't really technical debt
-minimum_debt_score = 1.0              # Minimum unified score to include (0.0-10.0)
-minimum_cyclomatic_complexity = 1     # Skip functions with cyclomatic <= this value
-minimum_cognitive_complexity = 1      # Skip functions with cognitive <= this value  
-minimum_risk_score = 1.0              # Minimum risk score for Risk debt types
+minimum_debt_score = 2.0              # Increased from 1.0 to filter out minor issues
+minimum_cyclomatic_complexity = 3     # Increased from 1 to skip simple functions
+minimum_cognitive_complexity = 5      # Increased from 1 to skip simple cognitive load
+minimum_risk_score = 2.0              # Increased from 1.0 for Risk debt types
 
 # Validation thresholds for 'debtmap validate' command
 [thresholds.validation]
@@ -35,7 +35,7 @@ max_high_risk_functions = 50          # Maximum allowed high-risk functions
 min_coverage_percentage = 0.0         # Minimum required code coverage percentage (0 = no minimum)
 
 [languages]
-enabled = ["rust"]
+enabled = ["rust", "javascript", "python", "go"]
 
 [ignore]
 patterns = [
@@ -50,7 +50,38 @@ patterns = [
     "**/*_tests.rs",        # Exclude test files with _tests suffix
     "**/fixtures/**",       # Exclude test fixtures
     "**/mocks/**",          # Exclude mock implementations
-    "**/stubs/**"           # Exclude stub implementations
+    "**/stubs/**",          # Exclude stub implementations
+    "**/examples/**",       # Exclude example code
+    "**/demo/**",           # Exclude demo code
+    "**/*_demo.rs",         # Exclude demo files
+    "**/testdata/**",       # Exclude test data directories
+]
+
+# Function name patterns to ignore - common patterns that are intentionally complex
+[ignore.functions]
+patterns = [
+    # Test setup/teardown that are naturally complex
+    "setup_test_*",
+    "teardown_test_*",
+    "create_test_*",
+    "mock_*",
+    
+    # Generated or macro-expanded code patterns
+    "derive_*",
+    "__*",  # Dunder methods
+    
+    # CLI argument parsing - naturally complex
+    "parse_args",
+    "parse_cli",
+    "build_cli",
+    
+    # Serialization/deserialization - naturally complex pattern matching
+    "serialize_*",
+    "deserialize_*",
+    "to_json",
+    "from_json",
+    "to_*_format",
+    "from_*_format",
 ]
 
 [output]
@@ -69,8 +100,8 @@ api_files = []
 # Configuration for orchestration detection to reduce false positives
 
 # Minimum number of meaningful function delegations to be considered orchestration
-# Default: 2 (must coordinate at least 2 functions)
-min_delegations = 2
+# Increased from 2 to 3 to reduce false positives
+min_delegations = 3
 
 # Whether to exclude adapter patterns (single delegation with data transformation)
 # Default: true (adapters are not considered orchestration)
@@ -83,18 +114,79 @@ allow_functional_chains = true
 # Additional function name patterns to exclude from orchestration detection
 # These patterns will never be considered orchestration regardless of structure
 exclude_patterns = [
-    # "my_adapter",
-    # "convert_*"
+    # Simple delegation patterns
+    "*_wrapper",
+    "*_adapter",
+    "convert_*",
+    "transform_*",
+    "map_*",
+    "translate_*",
+    
+    # Proxy/facade patterns
+    "*_proxy",
+    "*_facade",
+    
+    # Factory methods that delegate
+    "create_*",
+    "build_*",
+    "make_*",
+    
+    # Visitor pattern methods
+    "visit_*",
+    "walk_*",
+    "traverse_*",
 ]
 
 # Additional function name patterns to always consider as orchestration
 # These patterns will be considered orchestration if they meet minimum requirements
 include_patterns = [
-    # "workflow_*",
-    # "pipeline_*"
+    "workflow_*",
+    "pipeline_*",
+    "process_*",
+    "orchestrate_*",
+    "coordinate_*",
+    "execute_flow_*",
 ]
+
 [entropy]
 enabled = true
 weight = 0.5
 min_tokens = 10
 pattern_threshold = 0.7
+
+# Pattern-specific adjustments to reduce false positives
+[patterns]
+# Detector functions often have moderate complexity by design
+[patterns.detectors]
+name_patterns = ["detect_*", "check_*", "validate_*", "verify_*"]
+complexity_adjustment = 0.7  # Reduce complexity score by 30% for detector patterns
+cognitive_adjustment = 0.8   # Reduce cognitive complexity by 20%
+
+# Builder patterns often have chained method calls
+[patterns.builders]
+name_patterns = ["*Builder", "builder", "with_*", "set_*"]
+orchestration_threshold = 5  # Need at least 5 delegations to be considered orchestration
+complexity_adjustment = 0.8  # Reduce complexity score by 20%
+
+# Pattern matching functions are idiomatic in Rust
+[patterns.matching]
+name_patterns = ["match_*", "classify_*", "categorize_*", "determine_*"]
+complexity_adjustment = 0.6  # Reduce complexity score by 40% for pattern matching
+cognitive_adjustment = 0.7   # Reduce cognitive complexity by 30%
+
+# Error handling functions naturally have branching
+[patterns.error_handling]
+name_patterns = ["handle_error", "process_error", "map_error", "convert_error"]
+complexity_adjustment = 0.7  # Reduce complexity score by 30%
+
+# Configuration loading is naturally complex
+[patterns.configuration]
+name_patterns = ["load_config", "parse_config", "init_*", "setup_*"]
+complexity_adjustment = 0.8  # Reduce complexity score by 20%
+minimum_complexity = 15      # Only flag if complexity > 15
+
+# Visitor pattern implementations
+[patterns.visitors]
+name_patterns = ["visit_*", "walk_*", "traverse_*"]
+orchestration_threshold = 6  # Need at least 6 delegations
+complexity_adjustment = 0.7  # Reduce complexity score by 30%
