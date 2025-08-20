@@ -35,7 +35,10 @@ map:
             --upstream ${item.upstream_dependencies:-0} \
             --downstream ${item.downstream_dependencies:-0} \
             --risk-reduction ${item.expected_impact.risk_reduction:-0} \
-            --complexity-reduction ${item.expected_impact.complexity_reduction:-0}
+            --complexity-reduction ${item.expected_impact.complexity_reduction:-0} \
+            --entropy ${item.entropy_details.entropy_score:-0} \
+            --repetition ${item.entropy_details.pattern_repetition:-0} \
+            --adjusted-complexity ${item.entropy_details.adjusted_complexity:-0}
         capture_output: true
         commit_required: true
         timeout: 300

@@ -29,6 +29,9 @@ Additional context parameters:
 - `--downstream`: Number of downstream dependencies
 - `--risk-reduction`: Expected risk reduction from fixing
 - `--complexity-reduction`: Expected complexity reduction from fixing
+- `--entropy`: Entropy score (0-1, higher means more diverse patterns)
+- `--repetition`: Pattern repetition rate (0-1, higher means more repetitive)
+- `--adjusted-complexity`: Entropy-adjusted complexity value
 
 ## Process
 
@@ -60,7 +63,8 @@ sed -n "${line},+50p" ${file}
 
 Use the provided metrics to understand the issue:
 - **Score**: ${score} (Priority level)
-- **Complexity**: Cyclomatic=${cyclomatic}, Cognitive=${cognitive}
+- **Complexity**: Cyclomatic=${cyclomatic}, Cognitive=${cognitive}, Adjusted=${adjusted-complexity}
+- **Entropy**: Score=${entropy}, Repetition=${repetition} (high repetition suggests extractable patterns)
 - **Structure**: Nesting depth=${nesting}, Length=${length} lines
 - **Role**: ${role} (determines refactoring approach)
 - **Dependencies**: ${upstream} upstream, ${downstream} downstream
@@ -75,7 +79,14 @@ Priority levels:
 
 ### Step 2: Evaluate Refactoring Approach
 
-**First, consider the function role (${role}):**
+**First, check entropy metrics to understand pattern complexity:**
+
+- **High repetition (>60%)**: Code has repetitive patterns - good candidate for extraction
+- **Low entropy (<0.4)**: Simple, predictable patterns - might not need refactoring
+- **Adjusted complexity < Original**: Entropy analysis suggests true complexity is lower
+- **High entropy (>0.7)**: Diverse patterns - may be legitimately complex
+
+**Then consider the function role (${role}):**
 
 - **PureLogic**: Focus on breaking down complex logic into smaller pure functions
 - **IOWrapper**: Extract business logic from I/O operations  
@@ -276,7 +287,8 @@ git add -A
 git commit -m "refactor: reduce complexity in ${function}
 
 - Applied: ${action}
-- Complexity: ${cyclomatic} → [new_complexity]
+- Complexity: ${cyclomatic} → [new_complexity] (adjusted: ${adjusted-complexity})
+- Entropy: ${entropy}, Repetition: ${repetition}
 - Function: ${function} in ${file}
 - Risk reduction: ${risk-reduction}
 "
