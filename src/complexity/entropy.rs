@@ -1,11 +1,35 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::SystemTime;
 use syn::{visit::Visit, Block, Expr};
+
+/// Cache entry with metadata for entropy scores
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheEntry {
+    pub score: EntropyScore,
+    pub timestamp: SystemTime,
+    pub function_hash: String,
+    pub hit_count: usize,
+}
+
+/// Cache statistics for monitoring performance
+#[derive(Debug, Clone, Serialize)]
+pub struct CacheStats {
+    pub entries: usize,
+    pub memory_usage: usize,
+    pub hit_rate: f64,
+    pub miss_rate: f64,
+    pub evictions: usize,
+}
 
 /// Entropy-based complexity analyzer using information theory
 #[derive(Debug, Clone)]
 pub struct EntropyAnalyzer {
-    token_cache: HashMap<String, EntropyScore>,
+    token_cache: HashMap<String, CacheEntry>,
+    cache_hits: usize,
+    cache_misses: usize,
+    cache_evictions: usize,
+    max_cache_size: usize,
 }
 
 /// Score representing the entropy (randomness/variety) of code patterns
@@ -27,6 +51,21 @@ impl EntropyAnalyzer {
     pub fn new() -> Self {
         Self {
             token_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
+            cache_evictions: 0,
+            max_cache_size: 1000, // Default max cache size
+        }
+    }
+
+    /// Create analyzer with custom cache size
+    pub fn with_cache_size(max_cache_size: usize) -> Self {
+        Self {
+            token_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
+            cache_evictions: 0,
+            max_cache_size,
         }
     }
 
@@ -43,6 +82,96 @@ impl EntropyAnalyzer {
             branch_similarity: similarity,
             effective_complexity: self.adjust_complexity(entropy, patterns, similarity),
         }
+    }
+
+    /// Calculate entropy score with caching support
+    pub fn calculate_entropy_cached(
+        &mut self,
+        block: &Block,
+        signature_hash: &str,
+    ) -> EntropyScore {
+        // Check cache first
+        if let Some(entry) = self.token_cache.get_mut(signature_hash) {
+            entry.hit_count += 1;
+            self.cache_hits += 1;
+            return entry.score.clone();
+        }
+
+        self.cache_misses += 1;
+
+        // Calculate if not cached
+        let score = self.calculate_entropy(block);
+
+        // Evict oldest entry if cache is full
+        if self.token_cache.len() >= self.max_cache_size {
+            self.evict_oldest();
+        }
+
+        // Insert new entry
+        let entry = CacheEntry {
+            score: score.clone(),
+            timestamp: SystemTime::now(),
+            function_hash: signature_hash.to_string(),
+            hit_count: 0,
+        };
+        self.token_cache.insert(signature_hash.to_string(), entry);
+
+        score
+    }
+
+    /// Evict the oldest cache entry
+    fn evict_oldest(&mut self) {
+        if let Some((oldest_key, _)) = self
+            .token_cache
+            .iter()
+            .min_by_key(|(_, entry)| entry.timestamp)
+            .map(|(k, v)| (k.clone(), v.clone()))
+        {
+            self.token_cache.remove(&oldest_key);
+            self.cache_evictions += 1;
+        }
+    }
+
+    /// Get cache statistics
+    pub fn get_cache_stats(&self) -> CacheStats {
+        let total_requests = self.cache_hits + self.cache_misses;
+        let hit_rate = if total_requests > 0 {
+            self.cache_hits as f64 / total_requests as f64
+        } else {
+            0.0
+        };
+        let miss_rate = if total_requests > 0 {
+            self.cache_misses as f64 / total_requests as f64
+        } else {
+            0.0
+        };
+
+        CacheStats {
+            entries: self.token_cache.len(),
+            memory_usage: self.estimate_cache_memory(),
+            hit_rate,
+            miss_rate,
+            evictions: self.cache_evictions,
+        }
+    }
+
+    /// Estimate memory usage of the cache
+    fn estimate_cache_memory(&self) -> usize {
+        // Rough estimation:
+        // Each entry is approximately:
+        // - Key string: ~64 bytes
+        // - EntropyScore: 4 * 8 bytes = 32 bytes
+        // - Metadata: ~32 bytes
+        // Total: ~128 bytes per entry
+        self.token_cache.len() * 128
+    }
+
+    /// Clear the cache
+    pub fn clear_cache(&mut self) {
+        self.token_cache.clear();
+        self.cache_hits = 0;
+        self.cache_misses = 0;
+        self.cache_evictions = 0;
     }
 
     /// Extract tokens from AST for entropy calculation
@@ -98,11 +227,13 @@ impl EntropyAnalyzer {
         }
 
         // Count patterns that appear more than once
-        let repeated_pattern_count: usize = detector.patterns.values()
+        let repeated_pattern_count: usize = detector
+            .patterns
+            .values()
             .filter(|&&count| count > 1)
-            .map(|&count| count - 1)  // Subtract 1 to get the number of repetitions
+            .map(|&count| count - 1) // Subtract 1 to get the number of repetitions
             .sum();
-        
+
         let repetition_ratio = repeated_pattern_count as f64 / detector.total_patterns as f64;
         repetition_ratio.min(1.0)
     }
@@ -130,13 +261,13 @@ impl EntropyAnalyzer {
         // Weight the factors - repetition and entropy are always relevant
         // Branch similarity is optional (0 when no branches)
         let base_simplicity = (1.0 - entropy) * repetition;
-        
+
         // If we have branch similarity, it reinforces the pattern
         // Otherwise, use base simplicity alone
         let simplicity_factor = if similarity > 0.0 {
             base_simplicity * (0.5 + similarity * 0.5)
         } else {
-            base_simplicity * 0.7  // Reduce impact when no branches
+            base_simplicity * 0.7 // Reduce impact when no branches
         };
 
         // Return effective complexity multiplier (0.1 = very simple, 1.0 = genuinely complex)
@@ -540,11 +671,7 @@ mod tests {
 
     #[test]
     fn test_entropy_dampening() {
-        // Note: This test assumes the default config has entropy disabled,
-        // so we can't test the actual dampening without modifying global config.
-        // Instead, we'll test the entropy calculation itself
-
-        // High repetition should indicate low complexity
+        // Test with entropy that would trigger dampening if enabled
         let entropy_score = EntropyScore {
             token_entropy: 0.3,
             pattern_repetition: 0.8,
@@ -555,7 +682,17 @@ mod tests {
         // With default config (disabled), should return original
         let original = 10;
         let dampened = apply_entropy_dampening(original, &entropy_score);
-        assert_eq!(dampened, original); // No change when disabled
+
+        // Default config has entropy disabled, so should return original
+        // If entropy is enabled in the future, this test may need updating
+        if !crate::config::get_entropy_config().enabled {
+            assert_eq!(dampened, original); // No change when disabled
+        } else {
+            // When enabled, should apply dampening
+            assert!(dampened < original);
+            // With effective_complexity of 0.3, expect significant reduction
+            assert!(dampened <= 6);
+        }
     }
 
     #[test]
@@ -572,5 +709,81 @@ mod tests {
         assert!(entropy_score.effective_complexity > 0.8);
         assert!(entropy_score.token_entropy > 0.7);
         assert!(entropy_score.pattern_repetition < 0.3);
+    }
+
+    #[test]
+    fn test_cache_functionality() {
+        let mut analyzer = EntropyAnalyzer::with_cache_size(2);
+
+        let block1: syn::Block = parse_quote! {{
+            if x > 0 { return true; }
+            false
+        }};
+
+        let block2: syn::Block = parse_quote! {{
+            match x {
+                1 => "one",
+                2 => "two",
+                _ => "other",
+            }
+        }};
+
+        // First calculation - cache miss
+        let score1 = analyzer.calculate_entropy_cached(&block1, "func1_hash");
+        assert_eq!(analyzer.cache_misses, 1);
+        assert_eq!(analyzer.cache_hits, 0);
+
+        // Second calculation with same hash - cache hit
+        let score1_cached = analyzer.calculate_entropy_cached(&block1, "func1_hash");
+        assert_eq!(score1, score1_cached);
+        assert_eq!(analyzer.cache_misses, 1);
+        assert_eq!(analyzer.cache_hits, 1);
+
+        // Different function - cache miss
+        let _score2 = analyzer.calculate_entropy_cached(&block2, "func2_hash");
+        assert_eq!(analyzer.cache_misses, 2);
+        assert_eq!(analyzer.cache_hits, 1);
+
+        // Cache should now have 2 entries
+        let stats = analyzer.get_cache_stats();
+        assert_eq!(stats.entries, 2);
+        assert_eq!(stats.hit_rate, 1.0 / 3.0);
+
+        // Add third function - should trigger eviction
+        let block3: syn::Block = parse_quote! {{
+            println!("test");
+        }};
+        let _score3 = analyzer.calculate_entropy_cached(&block3, "func3_hash");
+        assert_eq!(analyzer.cache_evictions, 1);
+
+        // Cache should still have max 2 entries
+        let stats = analyzer.get_cache_stats();
+        assert_eq!(stats.entries, 2);
+    }
+
+    #[test]
+    fn test_cache_clear() {
+        let mut analyzer = EntropyAnalyzer::new();
+
+        let block: syn::Block = parse_quote! {{
+            x + y
+        }};
+
+        // Add some entries
+        analyzer.calculate_entropy_cached(&block, "hash1");
+        analyzer.calculate_entropy_cached(&block, "hash2");
+        analyzer.calculate_entropy_cached(&block, "hash1"); // Hit
+
+        let stats = analyzer.get_cache_stats();
+        assert!(stats.entries > 0);
+        assert_eq!(analyzer.cache_hits, 1);
+
+        // Clear cache
+        analyzer.clear_cache();
+
+        let stats = analyzer.get_cache_stats();
+        assert_eq!(stats.entries, 0);
+        assert_eq!(analyzer.cache_hits, 0);
+        assert_eq!(analyzer.cache_misses, 0);
     }
 }

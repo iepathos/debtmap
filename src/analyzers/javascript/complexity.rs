@@ -1,3 +1,4 @@
+use super::entropy::JavaScriptEntropyAnalyzer;
 use crate::core::FunctionMetrics;
 use std::path::Path;
 use tree_sitter::Node;
@@ -41,6 +42,13 @@ fn analyze_function(node: Node, source: &str, path: &Path) -> Option<FunctionMet
     metrics.cognitive = calculate_cognitive_complexity(node, source, 0);
     metrics.nesting = calculate_max_nesting(node, 0);
     metrics.length = node.end_position().row - node.start_position().row + 1;
+
+    // Calculate entropy if enabled
+    if crate::config::get_entropy_config().enabled {
+        let mut entropy_analyzer = JavaScriptEntropyAnalyzer::new();
+        let entropy_score = entropy_analyzer.calculate_entropy(node, source);
+        metrics.entropy_score = Some(entropy_score);
+    }
 
     Some(metrics)
 }

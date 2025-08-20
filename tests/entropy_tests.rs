@@ -167,7 +167,10 @@ fn test_entropy_analyzer_directly() {
 
     // Should detect variety - adjusted threshold to be more realistic
     // Some repetition is expected from variable reuse
-    assert!(complex_score.pattern_repetition < 0.6, 
-            "Expected pattern_repetition < 0.6, got {}", complex_score.pattern_repetition);
+    assert!(
+        complex_score.pattern_repetition < 0.6,
+        "Expected pattern_repetition < 0.6, got {}",
+        complex_score.pattern_repetition
+    );
     assert!(complex_score.effective_complexity > 0.5); // Higher effective complexity
 }

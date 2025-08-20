@@ -227,6 +227,22 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
             func.cognitive
         );
 
+        // Display entropy information if available
+        if let Some(entropy_details) = func.get_entropy_details() {
+            if entropy_details.dampening_applied {
+                println!(
+                    "     {} Entropy: {:.2}, Repetition: {:.0}%, Effective: {:.1}x",
+                    "↓".green(),
+                    entropy_details.token_entropy,
+                    entropy_details.pattern_repetition * 100.0,
+                    entropy_details.effective_complexity
+                );
+                for reason in entropy_details.reasoning.iter().take(1) {
+                    println!("       {}", reason.dimmed());
+                }
+            }
+        }
+
         // Generate refactoring guidance for high complexity functions
         if func.cyclomatic > 5 {
             let complexity_level = classify_complexity_level(func.cyclomatic);

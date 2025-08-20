@@ -1,6 +1,7 @@
 mod complexity;
 mod dependencies;
 pub mod detectors;
+mod entropy;
 
 use crate::analyzers::Analyzer;
 use crate::core::{

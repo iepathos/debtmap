@@ -49,6 +49,18 @@ pub struct FunctionMetrics {
     pub entropy_score: Option<crate::complexity::entropy::EntropyScore>, // Optional entropy-based complexity score
 }
 
+/// Entropy details for explainable output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntropyDetails {
+    pub token_entropy: f64,
+    pub pattern_repetition: f64,
+    pub branch_similarity: f64,
+    pub effective_complexity: f64,
+    pub dampening_applied: bool,
+    pub dampening_factor: f64,
+    pub reasoning: Vec<String>,
+}
+
 impl FunctionMetrics {
     pub fn new(name: String, file: PathBuf, line: usize) -> Self {
         Self {
@@ -69,6 +81,56 @@ impl FunctionMetrics {
 
     pub fn is_complex(&self, threshold: u32) -> bool {
         self.cyclomatic > threshold || self.cognitive > threshold
+    }
+
+    /// Get entropy details with explanation for verbose output
+    pub fn get_entropy_details(&self) -> Option<EntropyDetails> {
+        self.entropy_score.as_ref().map(|score| {
+            let mut reasoning = Vec::new();
+
+            // Add reasoning based on metrics
+            if score.pattern_repetition > 0.6 {
+                reasoning.push(format!(
+                    "High pattern repetition detected ({}%)",
+                    (score.pattern_repetition * 100.0) as i32
+                ));
+            }
+
+            if score.token_entropy < 0.4 {
+                reasoning.push(format!(
+                    "Low token entropy indicates simple patterns ({:.2})",
+                    score.token_entropy
+                ));
+            }
+
+            if score.branch_similarity > 0.7 {
+                reasoning.push(format!(
+                    "Similar branch structures found ({}% similarity)",
+                    (score.branch_similarity * 100.0) as i32
+                ));
+            }
+
+            let dampening_factor = 1.0 - score.effective_complexity;
+            if dampening_factor > 0.3 {
+                reasoning.push(format!(
+                    "Complexity reduced by {}% due to pattern-based code",
+                    (dampening_factor * 100.0) as i32
+                ));
+            } else {
+                reasoning
+                    .push("Genuine complexity detected - minimal reduction applied".to_string());
+            }
+
+            EntropyDetails {
+                token_entropy: score.token_entropy,
+                pattern_repetition: score.pattern_repetition,
+                branch_similarity: score.branch_similarity,
+                effective_complexity: score.effective_complexity,
+                dampening_applied: dampening_factor > 0.1,
+                dampening_factor,
+                reasoning,
+            }
+        })
     }
 }
 
