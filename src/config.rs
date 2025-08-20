@@ -262,6 +262,10 @@ pub struct DebtmapConfig {
     /// Context-aware detection configuration
     #[serde(default)]
     pub context: Option<ContextConfig>,
+    
+    /// Orchestration detection configuration
+    #[serde(default)]
+    pub orchestration: Option<OrchestrationConfig>,
 }
 
 impl DebtmapConfig {
@@ -442,6 +446,54 @@ fn default_detect_duplication() -> bool {
     true
 }
 
+/// Configuration for orchestration detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrchestrationConfig {
+    /// Minimum number of delegations to be considered orchestration (default: 2)
+    #[serde(default = "default_min_delegations")]
+    pub min_delegations: usize,
+    
+    /// Whether to exclude adapter patterns (single delegation with transformation)
+    #[serde(default = "default_exclude_adapters")]
+    pub exclude_adapters: bool,
+    
+    /// Whether to recognize functional chains as idiomatic patterns
+    #[serde(default = "default_allow_functional_chains")]
+    pub allow_functional_chains: bool,
+    
+    /// Additional function name patterns to exclude from orchestration detection
+    #[serde(default)]
+    pub exclude_patterns: Vec<String>,
+    
+    /// Additional function name patterns to include in orchestration detection
+    #[serde(default)]
+    pub include_patterns: Vec<String>,
+}
+
+impl Default for OrchestrationConfig {
+    fn default() -> Self {
+        Self {
+            min_delegations: default_min_delegations(),
+            exclude_adapters: default_exclude_adapters(),
+            allow_functional_chains: default_allow_functional_chains(),
+            exclude_patterns: Vec::new(),
+            include_patterns: Vec::new(),
+        }
+    }
+}
+
+fn default_min_delegations() -> usize {
+    2
+}
+
+fn default_exclude_adapters() -> bool {
+    true
+}
+
+fn default_allow_functional_chains() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IgnoreConfig {
     pub patterns: Vec<String>,
@@ -565,6 +617,11 @@ pub fn get_config_safe() -> Result<DebtmapConfig, std::io::Error> {
 /// Get the scoring weights (with defaults if not configured)
 pub fn get_scoring_weights() -> &'static ScoringWeights {
     SCORING_WEIGHTS.get_or_init(|| get_config().scoring.clone().unwrap_or_default())
+}
+
+/// Get the orchestration detection configuration (with defaults if not configured)
+pub fn get_orchestration_config() -> OrchestrationConfig {
+    get_config().orchestration.clone().unwrap_or_default()
 }
 
 /// Get minimum debt score threshold (default: 1.0)

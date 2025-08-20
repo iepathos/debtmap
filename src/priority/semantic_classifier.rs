@@ -51,6 +51,8 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
 
 // Pure function to check if a function is an orchestrator
 fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &CallGraph) -> bool {
+    let config = crate::config::get_orchestration_config();
+    
     // First check if there are meaningful callees to orchestrate
     let callees = call_graph.get_callees(func_id);
     let meaningful_callees: Vec<_> = callees
@@ -58,9 +60,29 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
         .filter(|f| !is_std_or_utility_function(&f.name))
         .collect();
 
+    // Check if this is a functional chain (all calls are functional methods)
+    if config.allow_functional_chains && !meaningful_callees.is_empty() && callees.len() > meaningful_callees.len() {
+        // If all non-utility calls are removed, this might be a functional chain
+        let functional_chain = callees.iter().all(|f| {
+            is_std_or_utility_function(&f.name) || 
+            f.name.contains("Pipeline") || 
+            f.name.contains("Stream") ||
+            f.name.contains("Iterator")
+        });
+        if functional_chain {
+            return false;
+        }
+    }
+    
+    // Check for single delegation (adapter pattern)
+    if config.exclude_adapters && meaningful_callees.len() == 1 {
+        // This is likely an adapter/wrapper, not orchestration
+        return false;
+    }
+
     // Can't be an orchestrator without functions to orchestrate
-    // Must have at least 2 meaningful callees to be considered an orchestrator
-    if meaningful_callees.len() < 2 {
+    // Use configurable minimum delegation count
+    if meaningful_callees.len() < config.min_delegations {
         return false;
     }
 
@@ -103,17 +125,38 @@ fn is_entry_point_by_name(name: &str) -> bool {
 }
 
 fn is_orchestrator_by_name(name: &str) -> bool {
+    let config = crate::config::get_orchestration_config();
     let name_lower = name.to_lowercase();
+    
+    // Check custom exclude patterns from config
+    for pattern in &config.exclude_patterns {
+        if name_lower.contains(&pattern.to_lowercase()) {
+            return false;
+        }
+    }
 
     // Exclude common non-orchestration patterns first
     let exclude_patterns = [
         "print", "format", "create", "build", "extract", "parse", "new", "from", "to", "into",
         "write", "read", "display", "render", "emit",
+        // Exclude adapter/wrapper patterns
+        "adapt", "wrap", "convert", "transform", "translate",
+        // Exclude functional patterns
+        "map", "filter", "reduce", "fold", "collect", "apply",
+        // Exclude single-purpose functions
+        "get", "set", "find", "search", "check", "validate"
     ];
 
     for pattern in &exclude_patterns {
         if name_lower.starts_with(pattern) || name_lower.ends_with(pattern) {
             return false;
+        }
+    }
+    
+    // Check custom include patterns from config (these override excludes)
+    for pattern in &config.include_patterns {
+        if name_lower.contains(&pattern.to_lowercase()) {
+            return true;
         }
     }
 
@@ -245,20 +288,38 @@ fn is_std_or_utility_function(name: &str) -> bool {
     // Check the base name (after :: if present)
     let base_name = name.rsplit("::").next().unwrap_or(name);
 
+    // Check if it's a functional chain method (like map, filter, collect)
+    let is_functional_chain = matches!(
+        base_name,
+        "map" | "filter" | "filter_map" | "flat_map" | "fold" | 
+        "collect" | "zip" | "enumerate" | "chain" | "flatten" |
+        "skip" | "take" | "skip_while" | "take_while" |
+        "any" | "all" | "find" | "position" | "for_each" |
+        "reduce" | "scan" | "inspect" | "partition" | "unzip"
+    );
+    
+    // If it's a functional chain method on any type (e.g., LazyPipeline::map),
+    // it's a utility function, not orchestration
+    if is_functional_chain {
+        return true;
+    }
+
     matches!(
         base_name,
         // Standard library functions from macro expansion
         "format" | "write" | "print" | "println" |
         // Common utility functions that are too generic  
-        "clone" | "to_string" | "into" | "from" | "as_ref" |
+        "clone" | "to_string" | "into" | "from" | "as_ref" | "as_mut" |
+        "borrow" | "borrow_mut" | "deref" | "deref_mut" |
         // Iterator methods that are utilities, not business logic
-        "iter" | "into_iter" | "iter_mut" | "any" | "all" | "filter" | 
-        "filter_map" | "find" | "fold" | "collect" | "zip" | "enumerate" |
-        "skip" | "take" | "chain" | "flat_map" | "flatten" | "for_each" |
+        "iter" | "into_iter" | "iter_mut" |
         // String manipulation utilities
         "to_lowercase" | "to_uppercase" | "trim" | "split" | "join" |
         // Common pattern checking functions
-        "starts_with" | "ends_with" | "contains" | "is_empty" | "len"
+        "starts_with" | "ends_with" | "contains" | "is_empty" | "len" |
+        // Memory management
+        "new" | "default" | "drop" | "unwrap" | "expect" |
+        "ok" | "err" | "some" | "none"
     ) || name.starts_with("std::")
         || name.starts_with("core::")
         || name.starts_with("alloc::")

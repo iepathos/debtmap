@@ -64,3 +64,32 @@ detect_external_api = false
 # (Currently empty since debtmap doesn't expose any external APIs)
 api_functions = []
 api_files = []
+
+[orchestration]
+# Configuration for orchestration detection to reduce false positives
+
+# Minimum number of meaningful function delegations to be considered orchestration
+# Default: 2 (must coordinate at least 2 functions)
+min_delegations = 2
+
+# Whether to exclude adapter patterns (single delegation with data transformation)
+# Default: true (adapters are not considered orchestration)
+exclude_adapters = true
+
+# Whether to recognize functional chains (map/filter/collect) as idiomatic patterns
+# Default: true (functional chains are not considered orchestration)
+allow_functional_chains = true
+
+# Additional function name patterns to exclude from orchestration detection
+# These patterns will never be considered orchestration regardless of structure
+exclude_patterns = [
+    # "my_adapter",
+    # "convert_*"
+]
+
+# Additional function name patterns to always consider as orchestration
+# These patterns will be considered orchestration if they meet minimum requirements
+include_patterns = [
+    # "workflow_*",
+    # "pipeline_*"
+]

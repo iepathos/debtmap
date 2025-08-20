@@ -1,0 +1,65 @@
+# Example Debtmap Configuration: Orchestration Detection Tuning
+# 
+# This example shows how to configure orchestration detection to reduce
+# false positives for your specific codebase patterns.
+
+[orchestration]
+# Minimum number of meaningful function delegations to be considered orchestration
+# Increase this if you're getting too many false positives on coordinator functions
+min_delegations = 3  # More strict: require at least 3 delegations
+
+# Whether to exclude adapter patterns (single delegation with data transformation)
+# Set to false if you want to flag adapters as potential debt
+exclude_adapters = true
+
+# Whether to recognize functional chains (map/filter/collect) as idiomatic patterns
+# Set to false if you want to flag complex functional chains as orchestration
+allow_functional_chains = true
+
+# Additional function name patterns to exclude from orchestration detection
+# Use this to exclude your project-specific patterns that aren't orchestration
+exclude_patterns = [
+    "adapt",           # Adapter functions
+    "convert",         # Conversion functions
+    "transform",       # Transformation functions
+    "translate",       # Translation functions
+    "wrap",            # Wrapper functions
+    "proxy",           # Proxy functions
+    "facade",          # Facade pattern functions
+    "bridge",          # Bridge pattern functions
+    "decorator",       # Decorator pattern functions
+    "chain",           # Chain of responsibility
+    "visitor",         # Visitor pattern
+    "strategy",        # Strategy pattern
+    "factory",         # Factory pattern (creation, not orchestration)
+    "builder",         # Builder pattern (construction, not orchestration)
+    "to_",             # Conversion functions like to_string, to_json
+    "from_",           # Construction from other types
+    "as_",             # View/reference conversions
+    "into_",           # Consuming conversions
+    "try_",            # Fallible operations
+    "with_",           # Builder-style methods
+]
+
+# Additional function name patterns to always consider as orchestration
+# Use this to ensure certain patterns are always flagged for review
+include_patterns = [
+    "orchestrate",     # Explicit orchestration
+    "coordinate",      # Coordination logic
+    "workflow",        # Workflow management
+    "pipeline",        # Data pipeline coordination
+    "saga",            # Saga pattern orchestration
+    "process_all",     # Batch processing coordination
+    "handle_request",  # Request handling orchestration
+    "dispatch",        # Event/command dispatching
+    "route",           # Request routing
+    "schedule",        # Task scheduling
+    "manage",          # Resource management
+    "control",         # Control flow orchestration
+    "execute_steps",   # Multi-step execution
+    "run_sequence",    # Sequential orchestration
+]
+
+# Note: These patterns are checked in addition to the structural analysis.
+# A function must still meet the min_delegations requirement and other
+# criteria to be flagged as orchestration.
