@@ -1,4 +1,6 @@
 coverage.lcov
+debtmap.json
+debtmap-after.json
 .debtmap
 debtmap-report.json
 .metadata/
