@@ -277,3 +277,178 @@ fn suggest_assertions(analysis: &TestStructureAnalysis) -> Vec<String> {
 
     suggestions
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_suggest_assertions_for_action_without_assertions() {
+        let analysis = TestStructureAnalysis {
+            has_setup: false,
+            has_action: true,
+            has_assertions: false,
+            assertion_count: 0,
+            has_panic: false,
+            has_expect: false,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        assert_eq!(suggestions.len(), 2);
+        assert_eq!(suggestions[0], "Add assertions to verify the behavior");
+        assert_eq!(
+            suggestions[1],
+            "Consider using assert!, assert_eq!, or assert_ne!"
+        );
+    }
+
+    #[test]
+    fn test_suggest_assertions_for_setup_without_action() {
+        let analysis = TestStructureAnalysis {
+            has_setup: true,
+            has_action: false,
+            has_assertions: false,
+            assertion_count: 0,
+            has_panic: false,
+            has_expect: false,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(
+            suggestions[0],
+            "Add action phase - call the method under test"
+        );
+    }
+
+    #[test]
+    fn test_suggest_assertions_for_empty_test() {
+        let analysis = TestStructureAnalysis {
+            has_setup: false,
+            has_action: false,
+            has_assertions: false,
+            assertion_count: 0,
+            has_panic: false,
+            has_expect: false,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(
+            suggestions[0],
+            "Implement complete test structure: setup -> action -> assert"
+        );
+    }
+
+    #[test]
+    fn test_suggest_assertions_for_complete_test() {
+        let analysis = TestStructureAnalysis {
+            has_setup: true,
+            has_action: true,
+            has_assertions: true,
+            assertion_count: 1,
+            has_panic: false,
+            has_expect: false,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(
+            suggestions[0],
+            "Verify that the test is checking expected behavior"
+        );
+    }
+
+    #[test]
+    fn test_suggest_assertions_for_setup_and_action_without_assertions() {
+        let analysis = TestStructureAnalysis {
+            has_setup: true,
+            has_action: true,
+            has_assertions: false,
+            assertion_count: 0,
+            has_panic: false,
+            has_expect: false,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        assert_eq!(suggestions.len(), 2);
+        assert_eq!(suggestions[0], "Add assertions to verify the behavior");
+        assert_eq!(
+            suggestions[1],
+            "Consider using assert!, assert_eq!, or assert_ne!"
+        );
+    }
+
+    #[test]
+    fn test_suggest_assertions_for_test_with_panic() {
+        let analysis = TestStructureAnalysis {
+            has_setup: false,
+            has_action: true,
+            has_assertions: false,
+            assertion_count: 0,
+            has_panic: true,
+            has_expect: false,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        assert_eq!(suggestions.len(), 2);
+        assert_eq!(suggestions[0], "Add assertions to verify the behavior");
+        assert_eq!(
+            suggestions[1],
+            "Consider using assert!, assert_eq!, or assert_ne!"
+        );
+    }
+
+    #[test]
+    fn test_suggest_assertions_for_test_with_expect() {
+        let analysis = TestStructureAnalysis {
+            has_setup: true,
+            has_action: true,
+            has_assertions: true,
+            assertion_count: 0,
+            has_panic: false,
+            has_expect: true,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(
+            suggestions[0],
+            "Verify that the test is checking expected behavior"
+        );
+    }
+
+    #[test]
+    fn test_suggest_assertions_prioritizes_action_without_assertions() {
+        let analysis = TestStructureAnalysis {
+            has_setup: true,
+            has_action: true,
+            has_assertions: false,
+            assertion_count: 0,
+            has_panic: false,
+            has_expect: false,
+            has_unwrap: false,
+        };
+
+        let suggestions = suggest_assertions(&analysis);
+
+        // Should only get the action without assertions suggestions, not the setup without action suggestion
+        assert_eq!(suggestions.len(), 2);
+        assert!(suggestions[0].contains("Add assertions"));
+        assert!(!suggestions.iter().any(|s| s.contains("Add action phase")));
+    }
+}

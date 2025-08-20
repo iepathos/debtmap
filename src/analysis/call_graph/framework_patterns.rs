@@ -554,13 +554,13 @@ impl<'ast> Visit<'ast> for PatternVisitor {
             if let syn::ImplItem::Fn(method) = impl_item {
                 let method_name = method.sig.ident.to_string();
                 let line = self.get_line_number(method.sig.ident.span());
-                
+
                 let func_id = FunctionId {
                     file: self.file_path.clone(),
                     name: method_name.clone(),
                     line,
                 };
-                
+
                 // Check if this is a visitor pattern method
                 if FrameworkPatternDetector::is_visitor_pattern_method(&method_name) {
                     let pattern = FrameworkPattern {
@@ -575,7 +575,7 @@ impl<'ast> Visit<'ast> for PatternVisitor {
                 }
             }
         }
-        
+
         // Continue visiting
         syn::visit::visit_item_impl(self, item);
     }

@@ -244,7 +244,7 @@ fn is_io_orchestration(func: &FunctionMetrics) -> bool {
 fn is_std_or_utility_function(name: &str) -> bool {
     // Check the base name (after :: if present)
     let base_name = name.rsplit("::").next().unwrap_or(name);
-    
+
     matches!(
         base_name,
         // Standard library functions from macro expansion
@@ -263,7 +263,7 @@ fn is_std_or_utility_function(name: &str) -> bool {
         || name.starts_with("core::")
         || name.starts_with("alloc::")
         || name.ends_with("::iter")  // Any type's iter method
-        || name.ends_with("::any")   // Any type's any method
+        || name.ends_with("::any") // Any type's any method
 }
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
@@ -460,12 +460,12 @@ mod tests {
         assert!(is_std_or_utility_function("any"));
         assert!(is_std_or_utility_function("filter"));
         assert!(is_std_or_utility_function("collect"));
-        
+
         // Test qualified method names
         assert!(is_std_or_utility_function("ContextMap::iter"));
         assert!(is_std_or_utility_function("ContextMatcher::any"));
         assert!(is_std_or_utility_function("Vec::iter"));
-        
+
         // Test string utilities
         assert!(is_std_or_utility_function("to_lowercase"));
         assert!(is_std_or_utility_function("starts_with"));
