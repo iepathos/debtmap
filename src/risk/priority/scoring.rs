@@ -44,32 +44,40 @@ impl CriticalityScorer {
     fn pattern_match_score(&self, path: &Path) -> f64 {
         let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
+        // Extract classification logic as pure function
+        Self::classify_file_score(
+            file_name,
+            &path.to_string_lossy().to_lowercase(),
+            &self.patterns,
+        )
+    }
+
+    // Pure function for file classification
+    fn classify_file_score(
+        file_name: &str,
+        path_str: &str,
+        patterns: &HashMap<String, f64>,
+    ) -> f64 {
         match file_name {
-            "main.rs" | "lib.rs" => return 10.0,
-            _ => {}
-        }
+            "main.rs" | "lib.rs" => 10.0,
+            _ => {
+                let file_lower = file_name.to_lowercase();
 
-        let file_lower = file_name.to_lowercase();
-        if let Some(score) = self
-            .patterns
-            .iter()
-            .find(|(pattern, _)| file_lower.contains(*pattern))
-            .map(|(_, score)| *score)
-        {
-            return score;
+                // Use functional chain instead of imperative if-let
+                patterns
+                    .iter()
+                    .find(|(pattern, _)| file_lower.contains(*pattern))
+                    .map(|(_, score)| *score)
+                    .or_else(|| {
+                        // Check path only if filename didn't match
+                        patterns
+                            .iter()
+                            .find(|(pattern, _)| path_str.contains(*pattern))
+                            .map(|(_, score)| *score * 0.8)
+                    })
+                    .unwrap_or(4.0)
+            }
         }
-
-        let path_str = path.to_string_lossy().to_lowercase();
-        if let Some(score) = self
-            .patterns
-            .iter()
-            .find(|(pattern, _)| path_str.contains(*pattern))
-            .map(|(_, score)| *score * 0.8)
-        {
-            return score;
-        }
-
-        4.0
     }
 
     fn dependency_score(&self, target: &TestTarget) -> f64 {
@@ -137,5 +145,118 @@ impl EffortEstimator {
             setup,
             mocking
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_classify_file_score_main_rs() {
+        let patterns = HashMap::new();
+        let score = CriticalityScorer::classify_file_score("main.rs", "src/main.rs", &patterns);
+        assert_eq!(score, 10.0, "main.rs should have maximum score");
+    }
+
+    #[test]
+    fn test_classify_file_score_lib_rs() {
+        let patterns = HashMap::new();
+        let score = CriticalityScorer::classify_file_score("lib.rs", "src/lib.rs", &patterns);
+        assert_eq!(score, 10.0, "lib.rs should have maximum score");
+    }
+
+    #[test]
+    fn test_classify_file_score_filename_pattern_match() {
+        let mut patterns = HashMap::new();
+        patterns.insert("api".to_string(), 7.0);
+        patterns.insert("service".to_string(), 6.0);
+
+        let score = CriticalityScorer::classify_file_score(
+            "api_handler.rs",
+            "src/api_handler.rs",
+            &patterns,
+        );
+        assert_eq!(score, 7.0, "Should match 'api' pattern in filename");
+
+        let score = CriticalityScorer::classify_file_score(
+            "user_service.rs",
+            "src/user_service.rs",
+            &patterns,
+        );
+        assert_eq!(score, 6.0, "Should match 'service' pattern in filename");
+    }
+
+    #[test]
+    fn test_classify_file_score_path_pattern_match() {
+        let mut patterns = HashMap::new();
+        patterns.insert("core".to_string(), 8.0);
+
+        // Pattern in path but not filename should be scored at 80%
+        let score =
+            CriticalityScorer::classify_file_score("utils.rs", "src/core/utils.rs", &patterns);
+        assert_eq!(
+            score,
+            8.0 * 0.8,
+            "Should match 'core' pattern in path with 0.8 factor"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_score_filename_priority_over_path() {
+        let mut patterns = HashMap::new();
+        patterns.insert("test".to_string(), 1.0);
+        patterns.insert("core".to_string(), 8.0);
+
+        // Filename match should take priority over path match
+        let score = CriticalityScorer::classify_file_score(
+            "test_utils.rs",
+            "src/core/test_utils.rs",
+            &patterns,
+        );
+        assert_eq!(
+            score, 1.0,
+            "Filename pattern should take priority over path pattern"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_score_default() {
+        let patterns = HashMap::new();
+        let score =
+            CriticalityScorer::classify_file_score("random.rs", "src/misc/random.rs", &patterns);
+        assert_eq!(
+            score, 4.0,
+            "Should return default score when no patterns match"
+        );
+    }
+
+    #[test]
+    fn test_classify_file_score_case_insensitive() {
+        let mut patterns = HashMap::new();
+        patterns.insert("api".to_string(), 7.0);
+
+        let score = CriticalityScorer::classify_file_score(
+            "API_Handler.rs",
+            "src/API_Handler.rs",
+            &patterns,
+        );
+        assert_eq!(score, 7.0, "Should match patterns case-insensitively");
+    }
+
+    #[test]
+    fn test_pattern_match_score_integration() {
+        let scorer = CriticalityScorer::new();
+
+        // Test with real path
+        let path = PathBuf::from("src/main.rs");
+        let score = scorer.pattern_match_score(&path);
+        assert_eq!(score, 10.0, "main.rs should score 10.0");
+
+        // Test with API path
+        let path = PathBuf::from("src/api/handler.rs");
+        let score = scorer.pattern_match_score(&path);
+        assert!(score > 4.0, "API handler should score higher than default");
     }
 }
