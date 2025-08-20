@@ -38,6 +38,7 @@ allow = [
     "BSL-1.0", 
     "Unlicense",
     "LGPL-3.0-only",  # For malachite crates
+    "Zlib",           # For foldhash crate
 ]
 exceptions = [
     { allow = ["Apache-2.0 WITH LLVM-exception"], name = "linux-raw-sys" },
