@@ -3227,4 +3227,90 @@ mod tests {
         assert!((impact.complexity_reduction - 3.6).abs() < 0.001); // 12 * 0.3
         assert_eq!(impact.risk_reduction, 3.15); // 7.5 * 0.42
     }
+
+    #[test]
+    fn test_calculate_dependency_factor_dead_code() {
+        // Test that functions with no callers get 0 priority (dead code)
+        assert_eq!(calculate_dependency_factor(0), 0.0);
+    }
+
+    #[test]
+    fn test_calculate_dependency_factor_low_criticality() {
+        // Test low criticality range (1-2 callers)
+        assert_eq!(calculate_dependency_factor(1), 2.0);
+        assert_eq!(calculate_dependency_factor(2), 3.0);
+    }
+
+    #[test]
+    fn test_calculate_dependency_factor_medium_criticality() {
+        // Test medium criticality range (3-5 callers)
+        assert_eq!(calculate_dependency_factor(3), 4.0);
+        assert_eq!(calculate_dependency_factor(4), 5.0);
+        assert_eq!(calculate_dependency_factor(5), 6.0);
+    }
+
+    #[test]
+    fn test_calculate_dependency_factor_high_criticality() {
+        // Test high criticality range (6-9 callers)
+        assert_eq!(calculate_dependency_factor(6), 7.0);
+        assert_eq!(calculate_dependency_factor(7), 7.0);
+        assert_eq!(calculate_dependency_factor(8), 8.0);
+        assert_eq!(calculate_dependency_factor(9), 8.0);
+    }
+
+    #[test]
+    fn test_calculate_dependency_factor_critical_path() {
+        // Test critical path range (10+ callers)
+        assert_eq!(calculate_dependency_factor(10), 9.0);
+        assert_eq!(calculate_dependency_factor(12), 9.0);
+        assert_eq!(calculate_dependency_factor(14), 9.0);
+        assert_eq!(calculate_dependency_factor(15), 10.0);
+        assert_eq!(calculate_dependency_factor(20), 10.0);
+        assert_eq!(calculate_dependency_factor(100), 10.0);
+    }
+
+    #[test]
+    fn test_calculate_dependency_factor_boundaries() {
+        // Test boundary conditions to ensure no gaps in coverage
+        // Lower boundaries
+        assert_eq!(calculate_dependency_factor(0), 0.0);
+        assert_eq!(calculate_dependency_factor(1), 2.0);
+        
+        // Mid-range boundaries
+        assert_eq!(calculate_dependency_factor(5), 6.0);
+        assert_eq!(calculate_dependency_factor(6), 7.0);
+        assert_eq!(calculate_dependency_factor(10), 9.0);
+        
+        // Upper boundaries
+        assert_eq!(calculate_dependency_factor(14), 9.0);
+        assert_eq!(calculate_dependency_factor(15), 10.0);
+    }
+
+    #[test]
+    fn test_calculate_dependency_factor_monotonic_increase() {
+        // Test that the function is monotonically increasing (higher input never gives lower output)
+        let mut prev_value = calculate_dependency_factor(0);
+        for i in 1..=20 {
+            let current_value = calculate_dependency_factor(i);
+            assert!(
+                current_value >= prev_value,
+                "Dependency factor should be monotonically increasing: {} callers gave {}, but {} callers gave {}",
+                i - 1, prev_value, i, current_value
+            );
+            prev_value = current_value;
+        }
+    }
+
+    #[test]
+    fn test_calculate_dependency_factor_value_range() {
+        // Test that all outputs are within expected range [0.0, 10.0]
+        for count in 0..=100 {
+            let factor = calculate_dependency_factor(count);
+            assert!(
+                factor >= 0.0 && factor <= 10.0,
+                "Dependency factor {} for {} callers is out of range [0.0, 10.0]",
+                factor, count
+            );
+        }
+    }
 }
