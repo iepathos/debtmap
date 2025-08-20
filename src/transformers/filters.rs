@@ -371,4 +371,175 @@ mod tests {
         assert_eq!(result.debt_items[0].debt_type, DebtType::Fixme);
         assert_eq!(result.debt_items[0].priority, Priority::High);
     }
+
+    #[test]
+    fn test_calculate_total_complexity() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "func1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                cyclomatic: 5,
+                cognitive: 7,
+                nesting: 1,
+                length: 20,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+            },
+            FunctionMetrics {
+                name: "func2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 40,
+                cyclomatic: 3,
+                cognitive: 4,
+                nesting: 2,
+                length: 15,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+            },
+        ];
+
+        let (total_cyc, total_cog) = calculate_total_complexity(&functions);
+        assert_eq!(total_cyc, 8);
+        assert_eq!(total_cog, 11);
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_empty() {
+        let functions = vec![];
+        let (total_cyc, total_cog) = calculate_total_complexity(&functions);
+        assert_eq!(total_cyc, 0);
+        assert_eq!(total_cog, 0);
+    }
+
+    #[test]
+    fn test_exclude_by_pattern() {
+        let metrics = create_test_metrics();
+
+        // Test exclusion pattern that matches
+        let result = exclude_by_pattern(metrics.clone(), vec!["*.rs".to_string()]);
+        assert_eq!(result.complexity.functions.len(), 0);
+        assert_eq!(result.debt_items.len(), 0);
+
+        // Test exclusion pattern that doesn't match
+        let result = exclude_by_pattern(metrics.clone(), vec!["*.py".to_string()]);
+        assert_eq!(result.complexity.functions.len(), 2);
+        assert_eq!(result.debt_items.len(), 2);
+    }
+
+    #[test]
+    fn test_exclude_by_pattern_multiple() {
+        let metrics = create_test_metrics();
+
+        // Test multiple exclusion patterns
+        let result = exclude_by_pattern(
+            metrics.clone(),
+            vec!["*.py".to_string(), "*.js".to_string()],
+        );
+        assert_eq!(result.complexity.functions.len(), 2);
+        assert_eq!(result.debt_items.len(), 2);
+
+        // Test when one pattern matches
+        let result = exclude_by_pattern(metrics, vec!["*.py".to_string(), "test.*".to_string()]);
+        assert_eq!(result.complexity.functions.len(), 0);
+        assert_eq!(result.debt_items.len(), 0);
+    }
+
+    #[test]
+    fn test_compose_filters() {
+        let metrics = create_test_metrics();
+
+        // Create individual filter functions
+        let min_complexity_filter = Box::new(|m: FileMetrics| filter_by_min_complexity(m, 10));
+
+        let max_complexity_filter = Box::new(|m: FileMetrics| filter_by_max_complexity(m, 20));
+
+        // Compose the filters
+        let composed = compose_filters(vec![min_complexity_filter, max_complexity_filter]);
+        let result = composed(metrics);
+
+        // Should only have the high_complexity function (cyclomatic=15, cognitive=20)
+        // which passes min_complexity >= 10 and max_complexity <= 20
+        assert_eq!(result.complexity.functions.len(), 1);
+        assert_eq!(result.complexity.functions[0].name, "high_complexity");
+    }
+
+    #[test]
+    fn test_compose_filters_empty() {
+        let metrics = create_test_metrics();
+        let original_functions = metrics.complexity.functions.len();
+
+        // Compose with no filters should return unchanged metrics
+        let composed = compose_filters(vec![]);
+        let result = composed(metrics);
+
+        assert_eq!(result.complexity.functions.len(), original_functions);
+    }
+
+    #[test]
+    fn test_compose_filters_order() {
+        let metrics = create_test_metrics();
+
+        // Test that filter order matters
+        let filter1 = Box::new(|m: FileMetrics| filter_by_min_complexity(m, 10));
+
+        let filter2 = Box::new(|m: FileMetrics| filter_by_min_priority(m, Priority::High));
+
+        let composed = compose_filters(vec![filter1, filter2]);
+        let result = composed(metrics);
+
+        // First filter reduces to high_complexity function
+        // Second filter reduces debt_items to only High priority
+        assert_eq!(result.complexity.functions.len(), 1);
+        assert_eq!(result.debt_items.len(), 1);
+        assert_eq!(result.debt_items[0].priority, Priority::High);
+    }
+
+    #[test]
+    fn test_apply_exclude_patterns() {
+        let config = FilterConfig {
+            exclude_patterns: Some(vec!["*test*".to_string()]),
+            ..Default::default()
+        };
+
+        let metrics = create_test_metrics();
+        let result = config.apply(metrics);
+
+        // test.rs should be excluded
+        assert_eq!(result.complexity.functions.len(), 0);
+        assert_eq!(result.debt_items.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_by_file_pattern_no_match() {
+        let metrics = create_test_metrics();
+        let result = filter_by_file_pattern(metrics, vec!["*.py".to_string()]);
+
+        assert_eq!(result.complexity.functions.len(), 0);
+        assert_eq!(result.debt_items.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_by_file_pattern_invalid_pattern() {
+        let metrics = create_test_metrics();
+        // Invalid glob pattern should not match
+        let result = filter_by_file_pattern(metrics, vec!["[".to_string()]);
+
+        assert_eq!(result.complexity.functions.len(), 0);
+        assert_eq!(result.debt_items.len(), 0);
+    }
+
+    #[test]
+    fn test_exclude_by_pattern_invalid_pattern() {
+        let metrics = create_test_metrics();
+        // Invalid glob pattern should not exclude (returns original)
+        let result = exclude_by_pattern(metrics.clone(), vec!["[".to_string()]);
+
+        assert_eq!(result.complexity.functions.len(), 2);
+        assert_eq!(result.debt_items.len(), 2);
+    }
 }
