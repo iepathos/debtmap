@@ -97,7 +97,13 @@ impl EntropyAnalyzer {
             return 0.0;
         }
 
-        let repetition_ratio = detector.repeated_patterns as f64 / detector.total_patterns as f64;
+        // Count patterns that appear more than once
+        let repeated_pattern_count: usize = detector.patterns.values()
+            .filter(|&&count| count > 1)
+            .map(|&count| count - 1)  // Subtract 1 to get the number of repetitions
+            .sum();
+        
+        let repetition_ratio = repeated_pattern_count as f64 / detector.total_patterns as f64;
         repetition_ratio.min(1.0)
     }
 
@@ -121,8 +127,17 @@ impl EntropyAnalyzer {
         // High repetition and high similarity = low effective complexity
         // Low entropy = simple patterns
 
-        // Combine factors (lower values indicate simpler code)
-        let simplicity_factor = (1.0 - entropy) * repetition * similarity;
+        // Weight the factors - repetition and entropy are always relevant
+        // Branch similarity is optional (0 when no branches)
+        let base_simplicity = (1.0 - entropy) * repetition;
+        
+        // If we have branch similarity, it reinforces the pattern
+        // Otherwise, use base simplicity alone
+        let simplicity_factor = if similarity > 0.0 {
+            base_simplicity * (0.5 + similarity * 0.5)
+        } else {
+            base_simplicity * 0.7  // Reduce impact when no branches
+        };
 
         // Return effective complexity multiplier (0.1 = very simple, 1.0 = genuinely complex)
         1.0 - (simplicity_factor * 0.9)
@@ -240,7 +255,6 @@ impl<'ast> Visit<'ast> for TokenExtractor {
 struct PatternDetector {
     patterns: HashMap<String, usize>,
     total_patterns: usize,
-    repeated_patterns: usize,
 }
 
 impl PatternDetector {
@@ -248,17 +262,12 @@ impl PatternDetector {
         Self {
             patterns: HashMap::new(),
             total_patterns: 0,
-            repeated_patterns: 0,
         }
     }
 
     fn record_pattern(&mut self, pattern: String) {
         self.total_patterns += 1;
-        let count = self.patterns.entry(pattern).or_insert(0);
-        *count += 1;
-        if *count > 1 {
-            self.repeated_patterns += 1;
-        }
+        *self.patterns.entry(pattern).or_insert(0) += 1;
     }
 
     fn expr_to_pattern(&self, expr: &Expr) -> String {
@@ -267,9 +276,22 @@ impl PatternDetector {
             Expr::If(_) => "if-stmt".to_string(),
             Expr::Match(m) => format!("match-{}", m.arms.len()),
             Expr::MethodCall(m) => format!("call-{}", m.method),
+            Expr::Call(_) => "fn-call".to_string(),
             Expr::Binary(b) => format!("binary-{:?}", b.op),
             Expr::Return(_) => "return".to_string(),
-            _ => "expr".to_string(),
+            Expr::Let(_) => "let-binding".to_string(),
+            Expr::Path(_) => "path-expr".to_string(),
+            Expr::Lit(_) => "literal".to_string(),
+            Expr::Block(_) => "block".to_string(),
+            Expr::Assign(_) => "assign".to_string(),
+            Expr::Field(_) => "field-access".to_string(),
+            Expr::Index(_) => "index".to_string(),
+            Expr::Loop(_) => "loop".to_string(),
+            Expr::While(_) => "while".to_string(),
+            Expr::ForLoop(_) => "for-loop".to_string(),
+            Expr::Break(_) => "break".to_string(),
+            Expr::Continue(_) => "continue".to_string(),
+            _ => "other-expr".to_string(),
         }
     }
 }
