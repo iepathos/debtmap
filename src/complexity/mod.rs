@@ -1,5 +1,6 @@
 pub mod cognitive;
 pub mod cyclomatic;
+pub mod entropy;
 pub mod patterns;
 pub mod python_patterns;
 

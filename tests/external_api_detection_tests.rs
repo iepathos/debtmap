@@ -19,6 +19,7 @@ fn create_function(name: &str, path: &str, visibility: Option<String>) -> Functi
         visibility,
         is_trait_method: false,
         in_test_module: false,
+        entropy_score: None,
     }
 }
 

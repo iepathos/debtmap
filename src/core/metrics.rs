@@ -99,6 +99,7 @@ mod tests {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         }
     }
 

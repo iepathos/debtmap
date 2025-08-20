@@ -125,7 +125,18 @@ pub fn calculate_unified_priority_with_debt(
     }
 
     // Calculate complexity factor (normalized to 0-10)
-    let complexity_factor = normalize_complexity(func.cyclomatic, func.cognitive);
+    // Apply entropy-based dampening if enabled
+    let adjusted_cyclomatic = if let Some(entropy_score) = func.entropy_score.as_ref() {
+        crate::complexity::entropy::apply_entropy_dampening(func.cyclomatic, entropy_score)
+    } else {
+        func.cyclomatic
+    };
+    let adjusted_cognitive = if let Some(entropy_score) = func.entropy_score.as_ref() {
+        crate::complexity::entropy::apply_entropy_dampening(func.cognitive, entropy_score)
+    } else {
+        func.cognitive
+    };
+    let complexity_factor = normalize_complexity(adjusted_cyclomatic, adjusted_cognitive);
 
     // Calculate coverage factor (0-10, higher means more urgent to cover)
     let coverage_factor = if func.is_test {
@@ -2400,6 +2411,7 @@ mod tests {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         }
     }
 

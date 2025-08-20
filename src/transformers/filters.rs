@@ -207,6 +207,7 @@ mod tests {
                         visibility: None,
                         is_trait_method: false,
                         in_test_module: false,
+                        entropy_score: None,
                     },
                     FunctionMetrics {
                         name: "high_complexity".to_string(),
@@ -220,6 +221,7 @@ mod tests {
                         visibility: None,
                         is_trait_method: false,
                         in_test_module: false,
+                        entropy_score: None,
                     },
                 ],
                 cyclomatic_complexity: 17,
@@ -387,6 +389,7 @@ mod tests {
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+                entropy_score: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -400,6 +403,7 @@ mod tests {
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+                entropy_score: None,
             },
         ];
 

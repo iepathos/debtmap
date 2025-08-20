@@ -23,6 +23,7 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         length: 20,
         nesting: 2,
         in_test_module: false,
+        entropy_score: None,
     };
 
     let func_id = FunctionId {
@@ -72,6 +73,7 @@ fn test_visit_trait_pattern_exclusion() {
         length: 30,
         nesting: 3,
         in_test_module: false,
+        entropy_score: None,
     };
 
     let func_id = FunctionId {

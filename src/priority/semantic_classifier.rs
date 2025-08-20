@@ -52,7 +52,7 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
 // Pure function to check if a function is an orchestrator
 fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &CallGraph) -> bool {
     let config = crate::config::get_orchestration_config();
-    
+
     // First check if there are meaningful callees to orchestrate
     let callees = call_graph.get_callees(func_id);
     let meaningful_callees: Vec<_> = callees
@@ -61,19 +61,22 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
         .collect();
 
     // Check if this is a functional chain (all calls are functional methods)
-    if config.allow_functional_chains && !meaningful_callees.is_empty() && callees.len() > meaningful_callees.len() {
+    if config.allow_functional_chains
+        && !meaningful_callees.is_empty()
+        && callees.len() > meaningful_callees.len()
+    {
         // If all non-utility calls are removed, this might be a functional chain
         let functional_chain = callees.iter().all(|f| {
-            is_std_or_utility_function(&f.name) || 
-            f.name.contains("Pipeline") || 
-            f.name.contains("Stream") ||
-            f.name.contains("Iterator")
+            is_std_or_utility_function(&f.name)
+                || f.name.contains("Pipeline")
+                || f.name.contains("Stream")
+                || f.name.contains("Iterator")
         });
         if functional_chain {
             return false;
         }
     }
-    
+
     // Check for single delegation (adapter pattern)
     if config.exclude_adapters && meaningful_callees.len() == 1 {
         // This is likely an adapter/wrapper, not orchestration
@@ -127,7 +130,7 @@ fn is_entry_point_by_name(name: &str) -> bool {
 fn is_orchestrator_by_name(name: &str) -> bool {
     let config = crate::config::get_orchestration_config();
     let name_lower = name.to_lowercase();
-    
+
     // Check custom exclude patterns from config
     for pattern in &config.exclude_patterns {
         if name_lower.contains(&pattern.to_lowercase()) {
@@ -137,14 +140,41 @@ fn is_orchestrator_by_name(name: &str) -> bool {
 
     // Exclude common non-orchestration patterns first
     let exclude_patterns = [
-        "print", "format", "create", "build", "extract", "parse", "new", "from", "to", "into",
-        "write", "read", "display", "render", "emit",
+        "print",
+        "format",
+        "create",
+        "build",
+        "extract",
+        "parse",
+        "new",
+        "from",
+        "to",
+        "into",
+        "write",
+        "read",
+        "display",
+        "render",
+        "emit",
         // Exclude adapter/wrapper patterns
-        "adapt", "wrap", "convert", "transform", "translate",
+        "adapt",
+        "wrap",
+        "convert",
+        "transform",
+        "translate",
         // Exclude functional patterns
-        "map", "filter", "reduce", "fold", "collect", "apply",
+        "map",
+        "filter",
+        "reduce",
+        "fold",
+        "collect",
+        "apply",
         // Exclude single-purpose functions
-        "get", "set", "find", "search", "check", "validate"
+        "get",
+        "set",
+        "find",
+        "search",
+        "check",
+        "validate",
     ];
 
     for pattern in &exclude_patterns {
@@ -152,7 +182,7 @@ fn is_orchestrator_by_name(name: &str) -> bool {
             return false;
         }
     }
-    
+
     // Check custom include patterns from config (these override excludes)
     for pattern in &config.include_patterns {
         if name_lower.contains(&pattern.to_lowercase()) {
@@ -291,13 +321,32 @@ fn is_std_or_utility_function(name: &str) -> bool {
     // Check if it's a functional chain method (like map, filter, collect)
     let is_functional_chain = matches!(
         base_name,
-        "map" | "filter" | "filter_map" | "flat_map" | "fold" | 
-        "collect" | "zip" | "enumerate" | "chain" | "flatten" |
-        "skip" | "take" | "skip_while" | "take_while" |
-        "any" | "all" | "find" | "position" | "for_each" |
-        "reduce" | "scan" | "inspect" | "partition" | "unzip"
+        "map"
+            | "filter"
+            | "filter_map"
+            | "flat_map"
+            | "fold"
+            | "collect"
+            | "zip"
+            | "enumerate"
+            | "chain"
+            | "flatten"
+            | "skip"
+            | "take"
+            | "skip_while"
+            | "take_while"
+            | "any"
+            | "all"
+            | "find"
+            | "position"
+            | "for_each"
+            | "reduce"
+            | "scan"
+            | "inspect"
+            | "partition"
+            | "unzip"
     );
-    
+
     // If it's a functional chain method on any type (e.g., LazyPipeline::map),
     // it's a utility function, not orchestration
     if is_functional_chain {
@@ -384,6 +433,7 @@ mod tests {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         }
     }
 

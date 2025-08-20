@@ -22,6 +22,7 @@ fn create_test_function(name: &str, path: &str, visibility: Option<String>) -> F
         visibility,
         is_trait_method: false,
         in_test_module: false,
+        entropy_score: None,
     }
 }
 

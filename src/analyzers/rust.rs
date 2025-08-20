@@ -273,6 +273,14 @@ impl FunctionVisitor {
             syn::Visibility::Inherited => None,
         };
 
+        // Calculate entropy score if enabled
+        let entropy_score = if crate::config::get_entropy_config().enabled {
+            let analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
+            Some(analyzer.calculate_entropy(&item_fn.block))
+        } else {
+            None
+        };
+
         let metrics = FunctionMetrics {
             name,
             file: self.current_file.clone(),
@@ -285,6 +293,7 @@ impl FunctionVisitor {
             visibility,
             is_trait_method, // Use the parameter passed to this function
             in_test_module: self.in_test_module,
+            entropy_score,
         };
 
         self.functions.push(metrics);
@@ -428,6 +437,14 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                 };
                 let line = self.get_line_number(closure.body.span());
 
+                // Calculate entropy score if enabled
+                let entropy_score = if crate::config::get_entropy_config().enabled {
+                    let analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
+                    Some(analyzer.calculate_entropy(&block))
+                } else {
+                    None
+                };
+
                 let metrics = FunctionMetrics {
                     name,
                     file: self.current_file.clone(),
@@ -440,6 +457,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     visibility: None,             // Closures are always private
                     is_trait_method: false,       // Closures are not trait methods
                     in_test_module: self.in_test_module,
+                    entropy_score,
                 };
 
                 self.functions.push(metrics);

@@ -128,6 +128,7 @@ mod tests {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         }];
         let report = build_complexity_report(&functions, 10);
 
@@ -164,6 +165,7 @@ mod tests {
                         visibility: None,
                         is_trait_method: false,
                         in_test_module: false,
+            entropy_score: None,
                     }],
                     cyclomatic_complexity: 2,
                     cognitive_complexity: 3,
@@ -189,6 +191,7 @@ mod tests {
                             visibility: None,
                             is_trait_method: false,
                             in_test_module: false,
+            entropy_score: None,
                         },
                         FunctionMetrics {
                             name: "func_c".to_string(),
@@ -202,6 +205,7 @@ mod tests {
                             visibility: None,
                             is_trait_method: false,
                             in_test_module: false,
+            entropy_score: None,
                         },
                     ],
                     cyclomatic_complexity: 10,

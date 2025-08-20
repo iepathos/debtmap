@@ -2215,6 +2215,7 @@ end_of_record
                     visibility: None,
                     is_trait_method: false,
                     in_test_module: false,
+            entropy_score: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2275,6 +2276,7 @@ end_of_record
                     visibility: None,
                     is_trait_method: false,
                     in_test_module: false,
+            entropy_score: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2353,6 +2355,7 @@ end_of_record
                     visibility: None,
                     is_trait_method: false,
                     in_test_module: false,
+            entropy_score: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2455,6 +2458,7 @@ end_of_record
                         visibility: None,
                         is_trait_method: false,
                         in_test_module: false,
+            entropy_score: None,
                     },
                     FunctionMetrics {
                         name: "partially_tested".to_string(),
@@ -2468,6 +2472,7 @@ end_of_record
                         visibility: None,
                         is_trait_method: false,
                         in_test_module: false,
+            entropy_score: None,
                     },
                     FunctionMetrics {
                         name: "untested".to_string(),
@@ -2481,6 +2486,7 @@ end_of_record
                         visibility: None,
                         is_trait_method: false,
                         in_test_module: false,
+            entropy_score: None,
                     },
                     FunctionMetrics {
                         name: "test_function".to_string(),
@@ -2494,6 +2500,7 @@ end_of_record
                         visibility: None,
                         is_trait_method: false,
                         in_test_module: false,
+            entropy_score: None,
                     },
                 ],
                 summary: ComplexitySummary {
@@ -3038,6 +3045,7 @@ end_of_record
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+            entropy_score: None,
             },
             FunctionMetrics {
                 name: "test_function".to_string(),
@@ -3051,6 +3059,7 @@ end_of_record
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+            entropy_score: None,
             },
         ];
 
@@ -3091,6 +3100,7 @@ end_of_record
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         }];
 
         let mut call_graph = CallGraph::new();
@@ -3126,6 +3136,7 @@ end_of_record
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+            entropy_score: None,
             },
             FunctionMetrics {
                 name: "test_something".to_string(),
@@ -3139,6 +3150,7 @@ end_of_record
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+            entropy_score: None,
             },
             FunctionMetrics {
                 name: "another_production_function".to_string(),
@@ -3152,6 +3164,7 @@ end_of_record
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+            entropy_score: None,
             },
         ];
 
@@ -4508,6 +4521,7 @@ end_of_record
                     visibility: Some("pub".to_string()),
                     is_trait_method: false,
                     in_test_module: false,
+            entropy_score: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,

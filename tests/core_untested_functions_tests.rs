@@ -27,6 +27,7 @@ fn create_test_metrics_simple() -> FileMetrics {
                 visibility: None,
                 is_trait_method: false,
                 in_test_module: false,
+                entropy_score: None,
             }],
             cyclomatic_complexity: 2,
             cognitive_complexity: 3,
@@ -55,6 +56,7 @@ fn create_test_metrics_complex() -> FileMetrics {
                     visibility: None,
                     is_trait_method: false,
                     in_test_module: false,
+                    entropy_score: None,
                 },
                 FunctionMetrics {
                     name: "complex_func2".to_string(),
@@ -68,6 +70,7 @@ fn create_test_metrics_complex() -> FileMetrics {
                     visibility: None,
                     is_trait_method: false,
                     in_test_module: false,
+                    entropy_score: None,
                 },
             ],
             cyclomatic_complexity: 8,
@@ -248,6 +251,7 @@ mod test_combine_metrics {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         };
 
         let func2 = FunctionMetrics {
@@ -262,6 +266,7 @@ mod test_combine_metrics {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         };
 
         let metrics1 = ComplexityMetrics {
@@ -309,6 +314,7 @@ mod test_combine_metrics {
             visibility: None,
             is_trait_method: false,
             in_test_module: false,
+            entropy_score: None,
         };
 
         let metrics1 = ComplexityMetrics {

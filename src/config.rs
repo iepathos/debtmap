@@ -262,10 +262,14 @@ pub struct DebtmapConfig {
     /// Context-aware detection configuration
     #[serde(default)]
     pub context: Option<ContextConfig>,
-    
+
     /// Orchestration detection configuration
     #[serde(default)]
     pub orchestration: Option<OrchestrationConfig>,
+
+    /// Entropy-based complexity scoring configuration
+    #[serde(default)]
+    pub entropy: Option<EntropyConfig>,
 }
 
 impl DebtmapConfig {
@@ -452,22 +456,69 @@ pub struct OrchestrationConfig {
     /// Minimum number of delegations to be considered orchestration (default: 2)
     #[serde(default = "default_min_delegations")]
     pub min_delegations: usize,
-    
+
     /// Whether to exclude adapter patterns (single delegation with transformation)
     #[serde(default = "default_exclude_adapters")]
     pub exclude_adapters: bool,
-    
+
     /// Whether to recognize functional chains as idiomatic patterns
     #[serde(default = "default_allow_functional_chains")]
     pub allow_functional_chains: bool,
-    
+
     /// Additional function name patterns to exclude from orchestration detection
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
-    
+
     /// Additional function name patterns to include in orchestration detection
     #[serde(default)]
     pub include_patterns: Vec<String>,
+}
+
+/// Entropy-based complexity scoring configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntropyConfig {
+    /// Whether entropy-based scoring is enabled
+    #[serde(default = "default_entropy_enabled")]
+    pub enabled: bool,
+
+    /// Weight of entropy in complexity adjustment (0.0-1.0)
+    #[serde(default = "default_entropy_weight")]
+    pub weight: f64,
+
+    /// Minimum tokens required for entropy calculation
+    #[serde(default = "default_entropy_min_tokens")]
+    pub min_tokens: usize,
+
+    /// Pattern similarity threshold for repetition detection (0.0-1.0)
+    #[serde(default = "default_entropy_pattern_threshold")]
+    pub pattern_threshold: f64,
+}
+
+impl Default for EntropyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_entropy_enabled(),
+            weight: default_entropy_weight(),
+            min_tokens: default_entropy_min_tokens(),
+            pattern_threshold: default_entropy_pattern_threshold(),
+        }
+    }
+}
+
+fn default_entropy_enabled() -> bool {
+    false // Opt-in by default
+}
+
+fn default_entropy_weight() -> f64 {
+    0.5
+}
+
+fn default_entropy_min_tokens() -> usize {
+    20
+}
+
+fn default_entropy_pattern_threshold() -> f64 {
+    0.7
 }
 
 impl Default for OrchestrationConfig {
@@ -622,6 +673,11 @@ pub fn get_scoring_weights() -> &'static ScoringWeights {
 /// Get the orchestration detection configuration (with defaults if not configured)
 pub fn get_orchestration_config() -> OrchestrationConfig {
     get_config().orchestration.clone().unwrap_or_default()
+}
+
+/// Get entropy-based complexity scoring configuration
+pub fn get_entropy_config() -> EntropyConfig {
+    get_config().entropy.clone().unwrap_or_default()
 }
 
 /// Get minimum debt score threshold (default: 1.0)

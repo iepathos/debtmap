@@ -15,6 +15,7 @@ fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> Function
         visibility: None,
         is_trait_method: false,
         in_test_module: false,
+        entropy_score: None,
     }
 }
 
