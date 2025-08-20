@@ -1,3 +1,4 @@
+use super::match_patterns::detect_match_expression;
 use syn::{visit::Visit, Block, Expr, Stmt};
 
 pub fn calculate_cyclomatic(block: &Block) -> u32 {
@@ -7,6 +8,32 @@ pub fn calculate_cyclomatic(block: &Block) -> u32 {
     };
     visitor.visit_block(block);
     visitor.complexity
+}
+
+/// Calculate cyclomatic complexity with pattern adjustments
+pub fn calculate_cyclomatic_adjusted(block: &Block) -> u32 {
+    let base = calculate_cyclomatic(block);
+
+    // Check for match expressions that should use logarithmic scaling
+    for stmt in &block.stmts {
+        if let Stmt::Expr(expr, _) = stmt {
+            if let Some(info) = detect_match_expression(expr) {
+                // Apply logarithmic scaling for pattern-based match expressions
+                let adjusted = (info.condition_count as f32).log2().ceil() as u32;
+                let default_penalty = if !info.has_default { 1 } else { 0 };
+                return adjusted + default_penalty;
+            }
+        }
+    }
+
+    // Check for if-else pattern matching using existing pattern recognizers
+    use super::pattern_adjustments::{PatternMatchRecognizer, PatternRecognizer};
+    let recognizer = PatternMatchRecognizer::new();
+    if let Some(info) = recognizer.detect(block) {
+        return recognizer.adjust_complexity(&info, base);
+    }
+
+    base
 }
 
 struct CyclomaticVisitor {
