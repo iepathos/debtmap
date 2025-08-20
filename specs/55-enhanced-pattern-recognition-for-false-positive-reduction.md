@@ -32,7 +32,8 @@ This leads to noise in the output, making it harder for developers to identify a
 Achieve near-zero false positives by implementing comprehensive pattern recognition that:
 1. Recognizes match expressions as pattern matching (logarithmic complexity)
 2. Applies pattern adjustments to both cyclomatic and cognitive complexity
-3. Dramatically reduces risk scores for well-tested, pattern-based code
+3. **Distinguishes between pattern complexity (expected) and algorithmic complexity (debt)**
+4. Moderately reduces risk for well-tested pattern code while maintaining debt signals for genuine complexity
 
 ## Requirements
 
@@ -49,9 +50,11 @@ Achieve near-zero false positives by implementing comprehensive pattern recognit
    - Ensure consistency between cyclomatic and cognitive adjustments
    - Preserve original values for reporting while using adjusted for scoring
 
-3. **Coverage-Based Risk Elimination**
-   - Functions with >70% coverage AND recognized patterns: 90% risk reduction
-   - Functions with >90% coverage: 95% risk reduction regardless of patterns
+3. **Balanced Risk Scoring**
+   - Pattern-based complexity (match/dispatch): 50-70% complexity reduction
+   - Algorithmic complexity: Minimal reduction even with high coverage
+   - Well-tested patterns: Additional 20-30% risk reduction
+   - Complex algorithms with tests: Still flagged but lower priority
    - Test functions: No coverage penalty applied
 
 ### Non-Functional Requirements
@@ -65,12 +68,13 @@ Achieve near-zero false positives by implementing comprehensive pattern recognit
 
 - [ ] Match expressions recognized and complexity adjusted logarithmically
 - [ ] Pattern adjustments applied to both cyclomatic and cognitive complexity
-- [ ] Risk scores reduced by 90%+ for well-tested pattern-based code
-- [ ] deku_string false positives reduced from 7 to ≤1
+- [ ] Pattern-based functions show 50-70% complexity reduction
+- [ ] Genuinely complex functions remain flagged even with tests
+- [ ] deku_string false positives reduced from 7 to ≤2-3
 - [ ] Performance regression < 5% on large codebases
-- [ ] Verbose mode shows pattern recognition details
+- [ ] Verbose mode shows pattern recognition details and complexity breakdown
 - [ ] Integration tests verify pattern detection accuracy
-- [ ] Documentation updated with pattern recognition behavior
+- [ ] Documentation clearly explains pattern vs algorithmic complexity
 
 ## Technical Details
 
@@ -124,23 +128,46 @@ impl EnhancedRiskStrategy {
     fn calculate_risk_score(&self, context: &RiskContext) -> f64 {
         let base_risk = self.calculate_base_risk(context);
         
-        // Check for pattern recognition
-        if context.is_recognized_pattern {
-            // High coverage + recognized pattern = minimal risk
-            if let Some(cov) = context.coverage {
-                if cov >= 70.0 {
-                    return base_risk * 0.1; // 90% reduction
-                }
-                if cov >= 50.0 {
-                    return base_risk * 0.3; // 70% reduction
+        // Distinguish between pattern complexity and algorithmic complexity
+        let complexity_factor = match context.pattern_type {
+            Some(PatternType::EnumMatching) | 
+            Some(PatternType::StringMatching) => {
+                // Simple dispatch patterns get significant reduction
+                0.3  // 70% reduction for pattern matching
+            }
+            Some(PatternType::TraitDelegation) |
+            Some(PatternType::SerializationDispatch) => {
+                // Boilerplate patterns get moderate reduction
+                0.5  // 50% reduction for necessary boilerplate
+            }
+            _ => {
+                // Algorithmic complexity remains a concern
+                if context.cognitive_complexity > 30 {
+                    0.9  // Only 10% reduction for very complex logic
+                } else if context.cognitive_complexity > 20 {
+                    0.8  // 20% reduction for complex logic
+                } else {
+                    0.7  // 30% reduction for moderate complexity
                 }
             }
-            // Even without coverage, patterns get reduction
-            return base_risk * 0.5; // 50% reduction
-        }
+        };
         
-        // Standard calculation for non-patterns
-        base_risk
+        // Coverage provides additional but limited reduction
+        let coverage_factor = match context.coverage {
+            Some(cov) if cov >= 90.0 => 0.8,  // Well tested: 20% additional reduction
+            Some(cov) if cov >= 70.0 => 0.9,  // Tested: 10% additional reduction
+            _ => 1.0,  // No coverage: no additional reduction
+        };
+        
+        // Combined reduction, but complex code stays visible
+        let final_risk = base_risk * complexity_factor * coverage_factor;
+        
+        // Ensure genuinely complex code maintains minimum risk signal
+        if context.cognitive_complexity > 40 && final_risk < 3.0 {
+            3.0  // Very complex code always has at least medium risk
+        } else {
+            final_risk
+        }
     }
 }
 ```
