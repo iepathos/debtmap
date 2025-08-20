@@ -259,4 +259,282 @@ mod tests {
         let score = scorer.pattern_match_score(&path);
         assert!(score > 4.0, "API handler should score higher than default");
     }
+
+    // Helper function for creating test targets
+    fn create_test_target() -> TestTarget {
+        TestTarget {
+            id: "test".to_string(),
+            path: PathBuf::from("test.rs"),
+            function: None,
+            line: 0,
+            module_type: ModuleType::Unknown,
+            current_coverage: 0.0,
+            current_risk: 0.0,
+            complexity: ComplexityMetrics::default(),
+            dependencies: vec![],
+            dependents: vec![],
+            lines: 0,
+            priority_score: 0.0,
+            debt_items: 0,
+        }
+    }
+
+    // Tests for EffortEstimator
+    #[test]
+    fn test_effort_estimator_new() {
+        let estimator = EffortEstimator::new();
+        // Just verify it can be created
+        assert!(
+            std::mem::size_of_val(&estimator) == 0,
+            "EffortEstimator should be zero-sized"
+        );
+    }
+
+    #[test]
+    fn test_effort_estimator_default() {
+        let estimator = EffortEstimator;
+        assert!(
+            std::mem::size_of_val(&estimator) == 0,
+            "Default should create zero-sized type"
+        );
+    }
+
+    #[test]
+    fn test_complexity_to_test_cases_simple() {
+        let estimator = EffortEstimator::new();
+        let complexity = ComplexityMetrics {
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 10,
+            ..Default::default()
+        };
+
+        // Expected: (5 + 1) * max(10/10, 1.0) = 6 * 1 = 6
+        let cases = estimator.complexity_to_test_cases(&complexity);
+        assert_eq!(
+            cases, 6.0,
+            "Should calculate correct test cases for simple complexity"
+        );
+    }
+
+    #[test]
+    fn test_complexity_to_test_cases_high_cognitive() {
+        let estimator = EffortEstimator::new();
+        let complexity = ComplexityMetrics {
+            cyclomatic_complexity: 3,
+            cognitive_complexity: 30,
+            ..Default::default()
+        };
+
+        // Expected: (3 + 1) * max(30/10, 1.0) = 4 * 3 = 12
+        let cases = estimator.complexity_to_test_cases(&complexity);
+        assert_eq!(cases, 12.0, "Should scale with cognitive complexity");
+    }
+
+    #[test]
+    fn test_complexity_to_test_cases_minimal() {
+        let estimator = EffortEstimator::new();
+        let complexity = ComplexityMetrics {
+            cyclomatic_complexity: 1,
+            cognitive_complexity: 0,
+            ..Default::default()
+        };
+
+        // Expected: (1 + 1) * max(0/10, 1.0) = 2 * 1 = 2
+        let cases = estimator.complexity_to_test_cases(&complexity);
+        assert_eq!(cases, 2.0, "Should handle minimal complexity");
+    }
+
+    #[test]
+    fn test_estimate_setup_complexity_entry_point() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.module_type = ModuleType::EntryPoint;
+
+        let setup = estimator.estimate_setup_complexity(&target);
+        assert_eq!(setup, 5.0, "EntryPoint should have setup effort of 5.0");
+    }
+
+    #[test]
+    fn test_estimate_setup_complexity_io() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.module_type = ModuleType::IO;
+
+        let setup = estimator.estimate_setup_complexity(&target);
+        assert_eq!(setup, 3.0, "IO should have setup effort of 3.0");
+    }
+
+    #[test]
+    fn test_estimate_setup_complexity_api() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.module_type = ModuleType::Api;
+
+        let setup = estimator.estimate_setup_complexity(&target);
+        assert_eq!(setup, 2.0, "Api should have setup effort of 2.0");
+    }
+
+    #[test]
+    fn test_estimate_setup_complexity_core() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.module_type = ModuleType::Core;
+
+        let setup = estimator.estimate_setup_complexity(&target);
+        assert_eq!(setup, 1.0, "Core should have setup effort of 1.0");
+    }
+
+    #[test]
+    fn test_estimate_setup_complexity_other() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.module_type = ModuleType::Utility;
+
+        let setup = estimator.estimate_setup_complexity(&target);
+        assert_eq!(
+            setup, 0.5,
+            "Other module types should have setup effort of 0.5"
+        );
+    }
+
+    #[test]
+    fn test_estimate_mocking_needs_no_dependencies() {
+        let estimator = EffortEstimator::new();
+        let target = create_test_target();
+
+        let mocking = estimator.estimate_mocking_needs(&target);
+        assert_eq!(
+            mocking, 0.0,
+            "No dependencies should mean no mocking effort"
+        );
+    }
+
+    #[test]
+    fn test_estimate_mocking_needs_with_dependencies() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.dependencies = vec!["dep1".to_string(), "dep2".to_string(), "dep3".to_string()];
+
+        // Expected: 3 * 0.5 = 1.5
+        let mocking = estimator.estimate_mocking_needs(&target);
+        assert_eq!(mocking, 1.5, "Should calculate 0.5 effort per dependency");
+    }
+
+    #[test]
+    fn test_estimate_full_calculation() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.complexity = ComplexityMetrics {
+            cyclomatic_complexity: 4,
+            cognitive_complexity: 20,
+            ..Default::default()
+        };
+        target.module_type = ModuleType::Api;
+        target.dependencies = vec!["http".to_string(), "database".to_string()];
+
+        // Base: (4 + 1) * max(20/10, 1.0) = 5 * 2 = 10
+        // Setup: Api = 2.0
+        // Mocking: 2 * 0.5 = 1.0
+        // Total: 10 + 2 + 1 = 13
+        let effort = estimator.estimate(&target);
+        assert_eq!(effort, 13.0, "Should correctly sum all effort components");
+    }
+
+    #[test]
+    fn test_estimate_edge_case_zero_complexity() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.complexity = ComplexityMetrics {
+            cyclomatic_complexity: 0,
+            cognitive_complexity: 0,
+            ..Default::default()
+        };
+        target.module_type = ModuleType::Core;
+
+        // Base: (0 + 1) * max(0/10, 1.0) = 1 * 1 = 1
+        // Setup: Core = 1.0
+        // Mocking: 0 * 0.5 = 0
+        // Total: 1 + 1 + 0 = 2
+        let effort = estimator.estimate(&target);
+        assert_eq!(effort, 2.0, "Should handle zero complexity gracefully");
+    }
+
+    #[test]
+    fn test_explain_format() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.complexity = ComplexityMetrics {
+            cyclomatic_complexity: 3,
+            cognitive_complexity: 15,
+            ..Default::default()
+        };
+        target.module_type = ModuleType::IO;
+        target.dependencies = vec!["fs".to_string()];
+
+        let explanation = estimator.explain(&target);
+
+        // Base: (3 + 1) * max(15/10, 1.0) = 4 * 1.5 = 6
+        // Setup: IO = 3.0
+        // Mocking: 1 * 0.5 = 0.5
+        // Total: 6 + 3 + 0.5 = 9.5, rounded to 10
+
+        assert!(
+            explanation.contains("10"),
+            "Should include total effort rounded"
+        );
+        assert!(
+            explanation.contains("base: 6"),
+            "Should include base effort"
+        );
+        assert!(
+            explanation.contains("setup: 3"),
+            "Should include setup effort"
+        );
+        assert!(
+            explanation.contains("mocking: 0"),
+            "Should include mocking effort"
+        );
+    }
+
+    #[test]
+    fn test_explain_complex_scenario() {
+        let estimator = EffortEstimator::new();
+        let mut target = create_test_target();
+        target.complexity = ComplexityMetrics {
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 50,
+            ..Default::default()
+        };
+        target.module_type = ModuleType::EntryPoint;
+        target.dependencies = vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+            "d".to_string(),
+        ];
+
+        let explanation = estimator.explain(&target);
+
+        // Base: (10 + 1) * max(50/10, 1.0) = 11 * 5 = 55
+        // Setup: EntryPoint = 5.0
+        // Mocking: 4 * 0.5 = 2.0
+        // Total: 55 + 5 + 2 = 62
+
+        assert!(
+            explanation.contains("62"),
+            "Should calculate high effort for complex function"
+        );
+        assert!(
+            explanation.contains("base: 55"),
+            "Should show high base effort"
+        );
+        assert!(
+            explanation.contains("setup: 5"),
+            "Should show entry point setup"
+        );
+        assert!(
+            explanation.contains("mocking: 2"),
+            "Should show mocking for 4 dependencies"
+        );
+    }
 }
