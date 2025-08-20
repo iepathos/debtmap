@@ -3275,12 +3275,12 @@ mod tests {
         // Lower boundaries
         assert_eq!(calculate_dependency_factor(0), 0.0);
         assert_eq!(calculate_dependency_factor(1), 2.0);
-        
+
         // Mid-range boundaries
         assert_eq!(calculate_dependency_factor(5), 6.0);
         assert_eq!(calculate_dependency_factor(6), 7.0);
         assert_eq!(calculate_dependency_factor(10), 9.0);
-        
+
         // Upper boundaries
         assert_eq!(calculate_dependency_factor(14), 9.0);
         assert_eq!(calculate_dependency_factor(15), 10.0);
@@ -3307,9 +3307,10 @@ mod tests {
         for count in 0..=100 {
             let factor = calculate_dependency_factor(count);
             assert!(
-                factor >= 0.0 && factor <= 10.0,
+                (0.0..=10.0).contains(&factor),
                 "Dependency factor {} for {} callers is out of range [0.0, 10.0]",
-                factor, count
+                factor,
+                count
             );
         }
     }
