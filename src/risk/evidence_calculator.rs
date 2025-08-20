@@ -185,6 +185,7 @@ impl EvidenceBasedRiskCalculator {
             FunctionRole::EntryPoint => 1.1,   // Entry points are important
             FunctionRole::Orchestrator => 0.9, // Orchestration is less risky
             FunctionRole::IOWrapper => 0.7,    // I/O wrappers are expected to be simple
+            FunctionRole::PatternMatch => 0.5, // Pattern matching is very low risk
             FunctionRole::Unknown => 1.0,      // Default multiplier
         }
     }
@@ -199,6 +200,7 @@ impl EvidenceBasedRiskCalculator {
         match role {
             FunctionRole::IOWrapper => 1.0,    // More lenient for I/O
             FunctionRole::Orchestrator => 0.5, // Slightly more lenient
+            FunctionRole::PatternMatch => 1.5, // Very lenient for pattern matching
             _ => 0.0,                          // Standard thresholds
         }
     }
@@ -369,6 +371,7 @@ impl EvidenceBasedRiskCalculator {
             FunctionRole::Orchestrator => "orchestrator",
             FunctionRole::IOWrapper => "I/O wrapper",
             FunctionRole::EntryPoint => "entry point",
+            FunctionRole::PatternMatch => "pattern matching",
             FunctionRole::Unknown => "general",
         }
     }

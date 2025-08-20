@@ -8,6 +8,7 @@ pub enum FunctionRole {
     Orchestrator, // Coordinates other functions
     IOWrapper,    // Thin I/O layer
     EntryPoint,   // Main entry points
+    PatternMatch, // Pattern matching function (low complexity)
     Unknown,      // Cannot classify
 }
 
@@ -31,6 +32,11 @@ fn classify_by_rules(
         return Some(FunctionRole::EntryPoint);
     }
 
+    // Check for pattern matching functions (like detect_file_type)
+    if is_pattern_matching_function(func, func_id) {
+        return Some(FunctionRole::PatternMatch);
+    }
+
     // Check I/O wrapper BEFORE orchestration
     if is_io_wrapper(func) {
         return Some(FunctionRole::IOWrapper);
@@ -47,6 +53,44 @@ fn classify_by_rules(
 // Pure function to check if a function is an entry point
 fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
     call_graph.is_entry_point(func_id) || is_entry_point_by_name(&func_id.name)
+}
+
+// Pure function to check if a function is a pattern matching function
+fn is_pattern_matching_function(func: &FunctionMetrics, func_id: &FunctionId) -> bool {
+    // Check for typical pattern matching function names
+    let name_lower = func_id.name.to_lowercase();
+    let pattern_match_names = [
+        "detect",
+        "classify",
+        "identify",
+        "determine",
+        "resolve",
+        "match",
+        "parse_type",
+        "get_type",
+        "find_type",
+    ];
+
+    // Name suggests pattern matching AND has low cyclomatic but high cognitive complexity
+    // (typical of if/else chains or match statements with many branches)
+    let name_matches = pattern_match_names
+        .iter()
+        .any(|pattern| name_lower.contains(pattern));
+
+    // Pattern matching functions typically have:
+    // - Low cyclomatic complexity (1-2, just sequential checks)
+    // - Higher cognitive complexity due to many conditions
+    // - Cognitive/cyclomatic ratio > 5 suggests pattern matching
+    if name_matches && func.cyclomatic <= 2 {
+        let ratio = if func.cyclomatic > 0 {
+            func.cognitive as f32 / func.cyclomatic as f32
+        } else {
+            func.cognitive as f32
+        };
+        return ratio > 5.0;
+    }
+
+    false
 }
 
 // Pure function to check if a function is an orchestrator
@@ -382,6 +426,7 @@ pub fn get_role_multiplier(role: FunctionRole) -> f64 {
         FunctionRole::Orchestrator => 0.2, // Low priority if delegates to tested code
         FunctionRole::IOWrapper => 0.1,    // Very low priority for thin I/O
         FunctionRole::EntryPoint => 0.8,   // Medium priority (integration test focus)
+        FunctionRole::PatternMatch => 0.1, // Very low priority for pattern matching
         FunctionRole::Unknown => 1.0,      // Default multiplier
     }
 }
@@ -397,6 +442,7 @@ pub fn calculate_semantic_priority(
         FunctionRole::Orchestrator => 2.0,
         FunctionRole::IOWrapper => 1.0,
         FunctionRole::EntryPoint => 6.0,
+        FunctionRole::PatternMatch => 1.0,
         FunctionRole::Unknown => 5.0,
     };
 
