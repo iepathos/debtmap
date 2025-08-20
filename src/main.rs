@@ -4379,4 +4379,215 @@ end_of_record
         assert!(result.is_ok());
         assert!(output_path.exists());
     }
+
+    #[test]
+    fn test_format_results_json_output() {
+        // Create test data
+        let results = create_test_analysis_results();
+        let risk_insights = None;
+
+        // Test JSON format
+        let formatted =
+            format_results_to_string(&results, &risk_insights, io::output::OutputFormat::Json);
+        assert!(formatted.is_ok());
+
+        let json_str = formatted.unwrap();
+        assert!(json_str.contains("\"project_path\""));
+        assert!(json_str.contains("\"complexity\""));
+        assert!(json_str.contains("\"technical_debt\""));
+
+        // Verify it's valid JSON
+        let parsed: Result<serde_json::Value, _> = serde_json::from_str(&json_str);
+        assert!(parsed.is_ok());
+    }
+
+    #[test]
+    fn test_format_results_markdown_output() {
+        // Create test data
+        let results = create_test_analysis_results();
+        let risk_insights = None;
+
+        // Test Markdown format
+        let formatted =
+            format_results_to_string(&results, &risk_insights, io::output::OutputFormat::Markdown);
+        assert!(formatted.is_ok());
+
+        let markdown_str = formatted.unwrap();
+        // Markdown should contain some expected structure
+        assert!(!markdown_str.is_empty());
+        // Should not be JSON
+        assert!(!markdown_str.starts_with('{'));
+    }
+
+    #[test]
+    fn test_format_results_terminal_output() {
+        // Create test data
+        let results = create_test_analysis_results();
+        let risk_insights = None;
+
+        // Test Terminal format
+        let formatted =
+            format_results_to_string(&results, &risk_insights, io::output::OutputFormat::Terminal);
+        assert!(formatted.is_ok());
+
+        let terminal_str = formatted.unwrap();
+        assert!(!terminal_str.is_empty());
+    }
+
+    #[test]
+    fn test_format_results_with_risk_insights() {
+        // Create test data with risk insights
+        let results = create_test_analysis_results();
+        let risk_insights = Some(create_test_risk_insights());
+
+        // Test JSON format with risk insights
+        let formatted =
+            format_results_to_string(&results, &risk_insights, io::output::OutputFormat::Json);
+        assert!(formatted.is_ok());
+
+        let json_str = formatted.unwrap();
+        assert!(json_str.contains("\"risk_insights\""));
+
+        // Test Markdown format with risk insights
+        let formatted_md =
+            format_results_to_string(&results, &risk_insights, io::output::OutputFormat::Markdown);
+        assert!(formatted_md.is_ok());
+    }
+
+    #[test]
+    fn test_format_results_edge_cases() {
+        // Test with minimal results
+        let mut results = create_test_analysis_results();
+        results.complexity.metrics.clear();
+        results.technical_debt.items.clear();
+        results.duplications.clear();
+
+        // Should still format successfully even with empty data
+        let formatted = format_results_to_string(&results, &None, io::output::OutputFormat::Json);
+        assert!(formatted.is_ok());
+
+        let json_str = formatted.unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        // Verify empty arrays are properly serialized
+        assert_eq!(
+            parsed["analysis"]["complexity"]["metrics"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            parsed["analysis"]["technical_debt"]["items"]
+                .as_array()
+                .unwrap()
+                .len(),
+            0
+        );
+    }
+
+    // Helper function to create test analysis results
+    fn create_test_analysis_results() -> AnalysisResults {
+        use crate::core::{ComplexitySummary, FunctionMetrics, Priority};
+        use chrono::Utc;
+        use std::collections::HashMap;
+
+        AnalysisResults {
+            project_path: PathBuf::from("/test/project"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "test_func".to_string(),
+                    file: PathBuf::from("test.rs"),
+                    line: 10,
+                    cyclomatic: 5,
+                    cognitive: 8,
+                    nesting: 2,
+                    length: 20,
+                    is_test: false,
+                    visibility: Some("pub".to_string()),
+                    is_trait_method: false,
+                    in_test_module: false,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 5.0,
+                    max_complexity: 5,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![DebtItem {
+                    id: "debt_1".to_string(),
+                    debt_type: DebtType::Complexity,
+                    priority: Priority::Medium,
+                    file: PathBuf::from("test.rs"),
+                    line: 10,
+                    column: Some(0),
+                    message: "Function lacks test coverage".to_string(),
+                    context: Some("test_func".to_string()),
+                }],
+                by_type: HashMap::new(),
+                priorities: vec![Priority::Medium],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        }
+    }
+
+    // Helper function to create test risk insights
+    fn create_test_risk_insights() -> risk::RiskInsight {
+        use im::Vector;
+
+        risk::RiskInsight {
+            top_risks: Vector::from(vec![risk::FunctionRisk {
+                file: PathBuf::from("test.rs"),
+                function_name: "test_func".to_string(),
+                line_range: (10, 50),
+                cyclomatic_complexity: 15,
+                cognitive_complexity: 20,
+                coverage_percentage: Some(0.0),
+                risk_score: 8.5,
+                test_effort: risk::TestEffort {
+                    estimated_difficulty: risk::Difficulty::Complex,
+                    cognitive_load: 20,
+                    branch_count: 8,
+                    recommended_test_cases: 12,
+                },
+                risk_category: risk::RiskCategory::Critical,
+                is_test_function: false,
+            }]),
+            risk_reduction_opportunities: Vector::from(vec![risk::TestingRecommendation {
+                function: "test_func".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                current_risk: 8.5,
+                potential_risk_reduction: 4.0,
+                test_effort_estimate: risk::TestEffort {
+                    estimated_difficulty: risk::Difficulty::Complex,
+                    cognitive_load: 20,
+                    branch_count: 8,
+                    recommended_test_cases: 12,
+                },
+                rationale: "High complexity with no test coverage".to_string(),
+                roi: Some(2.5),
+                dependencies: vec!["dep1".to_string()],
+                dependents: vec!["func2".to_string()],
+            }]),
+            codebase_risk_score: 75.0,
+            complexity_coverage_correlation: Some(-0.65),
+            risk_distribution: risk::RiskDistribution {
+                critical_count: 1,
+                high_count: 2,
+                medium_count: 3,
+                low_count: 4,
+                well_tested_count: 5,
+                total_functions: 15,
+            },
+        }
+    }
 }
