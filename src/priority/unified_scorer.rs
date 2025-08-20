@@ -48,6 +48,16 @@ pub struct UnifiedDebtItem {
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
+    pub entropy_details: Option<EntropyDetails>, // Store entropy information
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntropyDetails {
+    pub entropy_score: f64,
+    pub pattern_repetition: f64,
+    pub original_complexity: u32,
+    pub adjusted_complexity: u32,
+    pub dampening_factor: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -474,6 +484,7 @@ pub fn create_unified_debt_item_enhanced(
         function_length: 0, // Would need to be calculated from AST or additional metadata
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
+        entropy_details: calculate_entropy_details(func),
     }
 }
 
@@ -551,6 +562,7 @@ pub fn create_unified_debt_item_with_aggregator(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
+        entropy_details: calculate_entropy_details(func),
     }
 }
 
@@ -630,7 +642,31 @@ pub fn create_unified_debt_item_with_exclusions(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
+        entropy_details: calculate_entropy_details(func),
     }
+}
+
+/// Helper function to calculate entropy details from FunctionMetrics
+fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
+    func.entropy_score.as_ref().map(|entropy_score| {
+        let adjusted_cyclomatic =
+            crate::complexity::entropy::apply_entropy_dampening(func.cyclomatic, entropy_score);
+        let _adjusted_cognitive =
+            crate::complexity::entropy::apply_entropy_dampening(func.cognitive, entropy_score);
+        let dampening_factor = if func.cyclomatic > 0 {
+            adjusted_cyclomatic as f64 / func.cyclomatic as f64
+        } else {
+            1.0
+        };
+
+        EntropyDetails {
+            entropy_score: entropy_score.token_entropy,
+            pattern_repetition: entropy_score.pattern_repetition,
+            original_complexity: func.cyclomatic,
+            adjusted_complexity: adjusted_cyclomatic,
+            dampening_factor,
+        }
+    })
 }
 
 pub fn create_unified_debt_item(
@@ -677,6 +713,9 @@ pub fn create_unified_debt_item(
         .map(|id| id.name.clone())
         .collect();
 
+    // Calculate entropy details
+    let entropy_details = calculate_entropy_details(func);
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -697,6 +736,7 @@ pub fn create_unified_debt_item(
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
+        entropy_details,
     }
 }
 

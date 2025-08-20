@@ -1647,6 +1647,7 @@ fn convert_error_swallowing_to_unified(
                 function_length: 0,
                 cyclomatic_complexity: 0,
                 cognitive_complexity: 0,
+                entropy_details: None, // Error swallowing items don't have entropy data
             }
         })
         .collect()

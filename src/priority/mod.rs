@@ -341,6 +341,7 @@ impl UnifiedAnalysis {
             function_length: 1,
             cyclomatic_complexity: 1,
             cognitive_complexity: 1,
+            entropy_details: None, // Security items don't have entropy data
         })
     }
 

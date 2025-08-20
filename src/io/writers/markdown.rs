@@ -718,6 +718,7 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: 15,
             cognitive_complexity: 20,
+            entropy_details: None,
         }
     }
 
@@ -895,6 +896,7 @@ mod tests {
             function_length: 20,
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: cyclomatic * 2,
+            entropy_details: None,
         }
     }
 
@@ -947,6 +949,7 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: 20,
+            entropy_details: None,
         }
     }
 
@@ -1371,6 +1374,7 @@ mod tests {
             function_length: 20,
             cyclomatic_complexity: 3,
             cognitive_complexity: 6,
+            entropy_details: None,
         };
 
         let dead_code_item2 = UnifiedDebtItem {
@@ -1418,6 +1422,7 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: 10,
             cognitive_complexity: 20,
+            entropy_details: None,
         };
 
         let analysis = UnifiedAnalysis {
@@ -1535,6 +1540,7 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: 10,
             cognitive_complexity: 20,
+            entropy_details: None,
         };
 
         let testing_gap_item = create_testing_gap_item("test_func", 0.0, 10);

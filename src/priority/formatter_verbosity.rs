@@ -110,14 +110,28 @@ pub fn format_priority_item_with_verbosity(
         let weights = crate::config::get_scoring_weights();
         writeln!(output, "├─ SCORE CALCULATION:").unwrap();
         writeln!(output, "│  ├─ Base Components (Weighted):").unwrap();
-        writeln!(
-            output,
-            "│  │  ├─ Complexity:  {:.1} × {:.0}% = {:.2}",
-            item.unified_score.complexity_factor,
-            weights.complexity * 100.0,
-            item.unified_score.complexity_factor * weights.complexity
-        )
-        .unwrap();
+
+        // Show complexity with entropy adjustment if present
+        if let Some(ref entropy) = item.entropy_details {
+            writeln!(
+                output,
+                "│  │  ├─ Complexity:  {:.1} × {:.0}% = {:.2} (entropy-adjusted from {})",
+                item.unified_score.complexity_factor,
+                weights.complexity * 100.0,
+                item.unified_score.complexity_factor * weights.complexity,
+                entropy.original_complexity
+            )
+            .unwrap();
+        } else {
+            writeln!(
+                output,
+                "│  │  ├─ Complexity:  {:.1} × {:.0}% = {:.2}",
+                item.unified_score.complexity_factor,
+                weights.complexity * 100.0,
+                item.unified_score.complexity_factor * weights.complexity
+            )
+            .unwrap();
+        }
         writeln!(
             output,
             "│  │  ├─ Coverage:    {:.1} × {:.0}% = {:.2}",
@@ -185,6 +199,19 @@ pub fn format_priority_item_with_verbosity(
             + item.unified_score.organization_factor * weights.organization;
 
         writeln!(output, "│  ├─ Base Score: {:.2}", base_score).unwrap();
+
+        // Show entropy impact if present
+        if let Some(ref entropy) = item.entropy_details {
+            writeln!(
+                output,
+                "│  ├─ Entropy Impact: {:.0}% dampening (entropy: {:.2}, repetition: {:.0}%)",
+                (1.0 - entropy.dampening_factor) * 100.0,
+                entropy.entropy_score,
+                entropy.pattern_repetition * 100.0
+            )
+            .unwrap();
+        }
+
         writeln!(
             output,
             "│  ├─ Role Adjustment: ×{:.2}",
@@ -228,15 +255,30 @@ pub fn format_priority_item_with_verbosity(
     let (cyclomatic, cognitive, branch_count, nesting, _length) =
         crate::priority::formatter::extract_complexity_info(item);
     if cyclomatic > 0 || cognitive > 0 {
-        writeln!(
-            output,
-            "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}",
-            cyclomatic.to_string().dimmed(),
-            branch_count.to_string().dimmed(),
-            cognitive.to_string().dimmed(),
-            nesting.to_string().dimmed()
-        )
-        .unwrap();
+        // Include entropy adjustment info if present
+        if let Some(ref entropy) = item.entropy_details {
+            writeln!(
+                output,
+                "├─ COMPLEXITY: cyclomatic={} (adj:{}), branches={}, cognitive={}, nesting={}, entropy={:.2}",
+                cyclomatic.to_string().dimmed(),
+                entropy.adjusted_complexity.to_string().dimmed(),
+                branch_count.to_string().dimmed(),
+                cognitive.to_string().dimmed(),
+                nesting.to_string().dimmed(),
+                entropy.entropy_score
+            )
+            .unwrap();
+        } else {
+            writeln!(
+                output,
+                "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}",
+                cyclomatic.to_string().dimmed(),
+                branch_count.to_string().dimmed(),
+                cognitive.to_string().dimmed(),
+                nesting.to_string().dimmed()
+            )
+            .unwrap();
+        }
     }
 
     // Add dependency information
