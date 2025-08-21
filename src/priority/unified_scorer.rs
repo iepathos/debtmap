@@ -3661,6 +3661,9 @@ mod tests {
             pattern_repetition: 0.7,
             branch_similarity: 0.5,
             effective_complexity: 15.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 0.8,
         });
 
         let graph = CallGraph::new();

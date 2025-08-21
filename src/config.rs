@@ -547,6 +547,30 @@ pub struct EntropyConfig {
     /// Pattern similarity threshold for repetition detection (0.0-1.0)
     #[serde(default = "default_entropy_pattern_threshold")]
     pub pattern_threshold: f64,
+
+    /// Entropy threshold for low entropy detection (0.0-1.0)
+    #[serde(default = "default_entropy_threshold")]
+    pub entropy_threshold: f64,
+
+    /// Branch similarity threshold for detection (0.0-1.0)
+    #[serde(default = "default_branch_threshold")]
+    pub branch_threshold: f64,
+
+    /// Maximum reduction for high repetition (0.0-1.0)
+    #[serde(default = "default_max_repetition_reduction")]
+    pub max_repetition_reduction: f64,
+
+    /// Maximum reduction for low entropy (0.0-1.0)
+    #[serde(default = "default_max_entropy_reduction")]
+    pub max_entropy_reduction: f64,
+
+    /// Maximum reduction for similar branches (0.0-1.0)
+    #[serde(default = "default_max_branch_reduction")]
+    pub max_branch_reduction: f64,
+
+    /// Maximum combined reduction (0.0-1.0)
+    #[serde(default = "default_max_combined_reduction")]
+    pub max_combined_reduction: f64,
 }
 
 impl Default for EntropyConfig {
@@ -556,6 +580,12 @@ impl Default for EntropyConfig {
             weight: default_entropy_weight(),
             min_tokens: default_entropy_min_tokens(),
             pattern_threshold: default_entropy_pattern_threshold(),
+            entropy_threshold: default_entropy_threshold(),
+            branch_threshold: default_branch_threshold(),
+            max_repetition_reduction: default_max_repetition_reduction(),
+            max_entropy_reduction: default_max_entropy_reduction(),
+            max_branch_reduction: default_max_branch_reduction(),
+            max_combined_reduction: default_max_combined_reduction(),
         }
     }
 }
@@ -565,7 +595,7 @@ fn default_entropy_enabled() -> bool {
 }
 
 fn default_entropy_weight() -> f64 {
-    0.5
+    1.0 // Full weight when enabled (user can adjust)
 }
 
 fn default_entropy_min_tokens() -> usize {
@@ -574,6 +604,30 @@ fn default_entropy_min_tokens() -> usize {
 
 fn default_entropy_pattern_threshold() -> f64 {
     0.7
+}
+
+fn default_entropy_threshold() -> f64 {
+    0.4 // Below 0.4 entropy is considered low
+}
+
+fn default_branch_threshold() -> f64 {
+    0.8 // Above 80% branch similarity triggers dampening
+}
+
+fn default_max_repetition_reduction() -> f64 {
+    0.20 // Max 20% reduction for high repetition
+}
+
+fn default_max_entropy_reduction() -> f64 {
+    0.15 // Max 15% reduction for low entropy
+}
+
+fn default_max_branch_reduction() -> f64 {
+    0.25 // Max 25% reduction for similar branches
+}
+
+fn default_max_combined_reduction() -> f64 {
+    0.30 // Max 30% total reduction (cap)
 }
 
 impl Default for OrchestrationConfig {

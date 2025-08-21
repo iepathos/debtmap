@@ -27,6 +27,9 @@ impl JavaScriptEntropyAnalyzer {
             pattern_repetition: patterns,
             branch_similarity: similarity,
             effective_complexity: self.adjust_complexity(entropy, patterns, similarity),
+            unique_variables: 0, // TODO: Implement proper variable counting for JS
+            max_nesting: 0,      // TODO: Implement proper nesting calculation for JS
+            dampening_applied: 1.0, // Will be calculated by apply_entropy_dampening
         }
     }
 

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use syn::{visit::Visit, Block, Expr};
 
@@ -39,6 +39,9 @@ pub struct EntropyScore {
     pub pattern_repetition: f64,   // 0.0-1.0, higher = more repetitive
     pub branch_similarity: f64,    // 0.0-1.0, higher = similar branches
     pub effective_complexity: f64, // Adjusted complexity score
+    pub unique_variables: usize,   // Variable diversity count
+    pub max_nesting: u32,          // Maximum nesting depth
+    pub dampening_applied: f64,    // Actual dampening factor applied
 }
 
 impl Default for EntropyAnalyzer {
@@ -75,12 +78,18 @@ impl EntropyAnalyzer {
         let entropy = self.shannon_entropy(&tokens);
         let patterns = self.detect_pattern_repetition(block);
         let similarity = self.calculate_branch_similarity(block);
+        let (unique_vars, max_nesting) = self.analyze_code_structure(block);
+        let effective = self.adjust_complexity(entropy, patterns, similarity);
+        let dampening = self.calculate_dampening_factor(entropy, patterns, similarity);
 
         EntropyScore {
             token_entropy: entropy,
             pattern_repetition: patterns,
             branch_similarity: similarity,
-            effective_complexity: self.adjust_complexity(entropy, patterns, similarity),
+            effective_complexity: effective,
+            unique_variables: unique_vars,
+            max_nesting,
+            dampening_applied: dampening,
         }
     }
 
@@ -272,6 +281,88 @@ impl EntropyAnalyzer {
 
         // Return effective complexity multiplier (0.1 = very simple, 1.0 = genuinely complex)
         1.0 - (simplicity_factor * 0.9)
+    }
+
+    /// Calculate the dampening factor that will be applied
+    fn calculate_dampening_factor(&self, entropy: f64, repetition: f64, similarity: f64) -> f64 {
+        let config = crate::config::get_entropy_config();
+        if !config.enabled {
+            return 1.0;
+        }
+
+        // Calculate individual dampening factors with graduated approach
+        let repetition_factor = if repetition > config.pattern_threshold {
+            // Graduated dampening based on repetition level (max 20% reduction)
+            let excess = (repetition - config.pattern_threshold) / (1.0 - config.pattern_threshold);
+            1.0 - (excess * 0.20).min(0.20)
+        } else {
+            1.0
+        };
+
+        let entropy_factor = if entropy < 0.4 {
+            // Graduated dampening based on entropy level (max 15% reduction)
+            let deficit = (0.4 - entropy) / 0.4;
+            1.0 - (deficit * 0.15).min(0.15)
+        } else {
+            1.0
+        };
+
+        let branch_factor = if similarity > 0.8 {
+            // Graduated dampening based on branch similarity (max 25% reduction)
+            let excess = (similarity - 0.8) / 0.2;
+            1.0 - (excess * 0.25).min(0.25)
+        } else {
+            1.0
+        };
+
+        // Combine factors with cap at 30% total reduction
+        (repetition_factor * entropy_factor * branch_factor).max(0.7)
+    }
+
+    /// Analyze code structure for additional context
+    fn analyze_code_structure(&self, block: &Block) -> (usize, u32) {
+        struct StructureAnalyzer {
+            unique_variables: HashSet<String>,
+            current_nesting: u32,
+            max_nesting: u32,
+        }
+
+        impl StructureAnalyzer {
+            fn new() -> Self {
+                Self {
+                    unique_variables: HashSet::new(),
+                    current_nesting: 0,
+                    max_nesting: 0,
+                }
+            }
+        }
+
+        impl<'ast> Visit<'ast> for StructureAnalyzer {
+            fn visit_expr(&mut self, expr: &'ast Expr) {
+                match expr {
+                    Expr::Path(path) => {
+                        if let Some(segment) = path.path.segments.first() {
+                            self.unique_variables.insert(segment.ident.to_string());
+                        }
+                    }
+                    Expr::If(_)
+                    | Expr::While(_)
+                    | Expr::ForLoop(_)
+                    | Expr::Loop(_)
+                    | Expr::Match(_) => {
+                        self.current_nesting += 1;
+                        self.max_nesting = self.max_nesting.max(self.current_nesting);
+                        syn::visit::visit_expr(self, expr);
+                        self.current_nesting -= 1;
+                    }
+                    _ => syn::visit::visit_expr(self, expr),
+                }
+            }
+        }
+
+        let mut analyzer = StructureAnalyzer::new();
+        analyzer.visit_block(block);
+        (analyzer.unique_variables.len(), analyzer.max_nesting)
     }
 }
 
@@ -591,23 +682,44 @@ pub fn apply_entropy_dampening(base_complexity: u32, entropy_score: &EntropyScor
         return base_complexity;
     }
 
-    let effective_multiplier = if entropy_score.pattern_repetition > config.pattern_threshold {
-        // High repetition = low actual complexity
-        0.3
-    } else if entropy_score.token_entropy < 0.4 {
-        // Low entropy = simple patterns
-        0.5
-    } else if entropy_score.branch_similarity > 0.8 {
-        // Very similar branches = pattern-based code
-        0.4
+    // Calculate individual dampening factors with graduated approach (more moderate)
+    let repetition_factor = if entropy_score.pattern_repetition > config.pattern_threshold {
+        // Graduated dampening based on repetition level (max 20% reduction)
+        let excess = (entropy_score.pattern_repetition - config.pattern_threshold)
+            / (1.0 - config.pattern_threshold);
+        1.0 - (excess * config.max_repetition_reduction).min(config.max_repetition_reduction)
     } else {
-        // Use the calculated effective complexity
-        entropy_score.effective_complexity
+        1.0
     };
 
+    let entropy_factor = if entropy_score.token_entropy < config.entropy_threshold {
+        // Graduated dampening based on entropy level (max 15% reduction)
+        let deficit =
+            (config.entropy_threshold - entropy_score.token_entropy) / config.entropy_threshold;
+        1.0 - (deficit * config.max_entropy_reduction).min(config.max_entropy_reduction)
+    } else {
+        1.0
+    };
+
+    let branch_factor = if entropy_score.branch_similarity > config.branch_threshold {
+        // Graduated dampening based on branch similarity (max 25% reduction)
+        let excess = (entropy_score.branch_similarity - config.branch_threshold)
+            / (1.0 - config.branch_threshold);
+        1.0 - (excess * config.max_branch_reduction).min(config.max_branch_reduction)
+    } else {
+        1.0
+    };
+
+    // Combine factors with cap at max_combined_reduction (default 30%)
+    let combined_factor = (repetition_factor * entropy_factor * branch_factor)
+        .max(1.0 - config.max_combined_reduction);
+
     // Apply configured weight
-    let weighted_multiplier = 1.0 - (1.0 - effective_multiplier) * config.weight;
-    (base_complexity as f64 * weighted_multiplier) as u32
+    let weighted_multiplier = 1.0 - (1.0 - combined_factor) * config.weight;
+
+    // Apply dampening with minimum complexity preservation
+    let adjusted = (base_complexity as f64 * weighted_multiplier) as u32;
+    adjusted.max(base_complexity / 2) // Never reduce by more than 50% as safety
 }
 
 #[cfg(test)]
@@ -676,6 +788,9 @@ mod tests {
             pattern_repetition: 0.8,
             branch_similarity: 0.6,
             effective_complexity: 0.3,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 0.7,
         };
 
         // With default config (disabled), should return original
@@ -689,8 +804,9 @@ mod tests {
         } else {
             // When enabled, should apply dampening
             assert!(dampened < original);
-            // With effective_complexity of 0.3, expect significant reduction
-            assert!(dampened <= 6);
+            // With new moderate dampening (max 30% reduction), expect at least 70% of original
+            assert!(dampened >= 7); // At least 70% of 10
+            assert!(dampened <= original); // But still some reduction
         }
     }
 
@@ -702,6 +818,9 @@ mod tests {
             pattern_repetition: 0.2,
             branch_similarity: 0.2,
             effective_complexity: 0.9,
+            unique_variables: 15,
+            max_nesting: 4,
+            dampening_applied: 1.0,
         };
 
         // Verify that high effective complexity is recognized
@@ -758,6 +877,77 @@ mod tests {
         // Cache should still have max 2 entries
         let stats = analyzer.get_cache_stats();
         assert_eq!(stats.entries, 2);
+    }
+
+    #[test]
+    fn test_graduated_dampening_with_cap() {
+        // Test that dampening is graduated and capped at 30%
+
+        // High repetition, low entropy, high branch similarity - worst case
+        let extreme_score = EntropyScore {
+            token_entropy: 0.1,       // Very low entropy
+            pattern_repetition: 0.95, // Very high repetition
+            branch_similarity: 0.95,  // Very similar branches
+            effective_complexity: 0.2,
+            unique_variables: 2,
+            max_nesting: 1,
+            dampening_applied: 0.7,
+        };
+
+        // Enable entropy dampening for this test
+        std::env::set_var("DEBTMAP_ENTROPY_ENABLED", "true");
+
+        let original = 20;
+        let dampened = apply_entropy_dampening(original, &extreme_score);
+
+        // Check if entropy is enabled in configuration
+        let config = crate::config::get_entropy_config();
+        if config.enabled {
+            // With max 30% reduction, should be at least 70% of original
+            assert!(
+                dampened >= (original as f64 * 0.7) as u32,
+                "Dampening should be capped at 30%, got {} from {}",
+                dampened,
+                original
+            );
+            // Should not be the full original (some dampening should apply)
+            assert!(
+                dampened < original,
+                "Some dampening should apply, got {} from {}",
+                dampened,
+                original
+            );
+        }
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_ENTROPY_ENABLED");
+    }
+
+    #[test]
+    fn test_moderate_dampening() {
+        // Test moderate dampening for typical pattern-based code
+        let moderate_score = EntropyScore {
+            token_entropy: 0.35,      // Below threshold
+            pattern_repetition: 0.75, // Above threshold
+            branch_similarity: 0.5,   // Below threshold
+            effective_complexity: 0.5,
+            unique_variables: 8,
+            max_nesting: 2,
+            dampening_applied: 0.85,
+        };
+
+        // This should get moderate dampening, not extreme
+        let original = 15;
+        let dampened = apply_entropy_dampening(original, &moderate_score);
+
+        let config = crate::config::get_entropy_config();
+        if config.enabled {
+            // Should get some reduction but not maximum
+            assert!(
+                dampened >= (original as f64 * 0.8) as u32,
+                "Moderate patterns should get moderate dampening"
+            );
+        }
     }
 
     #[test]
