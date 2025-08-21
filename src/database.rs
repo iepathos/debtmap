@@ -142,11 +142,39 @@ mod tests {
     }
 
     #[test]
-    fn test_getter_methods_return_correct_values() {
-        let db = Database::new("postgres://localhost/test".to_string(), 42, 100);
-        assert_eq!(db.connection_string(), "postgres://localhost/test");
-        assert_eq!(db.pool_size(), 42);
-        assert_eq!(db.timeout(), 100);
+    fn test_connection_string_accessor() {
+        let db = Database::new("postgres://user:pass@host/db".to_string(), 10, 30);
+        assert_eq!(db.connection_string(), "postgres://user:pass@host/db");
+    }
+
+    #[test]
+    fn test_pool_size_accessor() {
+        let db = Database::new("postgres://localhost/test".to_string(), 25, 30);
+        assert_eq!(db.pool_size(), 25);
+    }
+
+    #[test]
+    fn test_timeout_accessor() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 45);
+        assert_eq!(db.timeout(), 45);
+    }
+
+    #[test]
+    fn test_cache_accessor() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let cache = db.cache();
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn test_all_accessors_together() {
+        let db = Database::new("postgres://prod/maindb".to_string(), 50, 120);
+
+        // Test all accessor methods work correctly
+        assert_eq!(db.connection_string(), "postgres://prod/maindb");
+        assert_eq!(db.pool_size(), 50);
+        assert_eq!(db.timeout(), 120);
         assert!(db.cache().is_empty());
     }
 
@@ -180,5 +208,26 @@ mod tests {
         let max_db = Database::new("x".to_string(), 10000, 86400);
         assert_eq!(max_db.pool_size, 10000);
         assert_eq!(max_db.timeout, 86400);
+    }
+
+    #[test]
+    fn test_database_clone_with_accessors() {
+        let db1 = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let db2 = db1.clone();
+
+        assert_eq!(db1.connection_string(), db2.connection_string());
+        assert_eq!(db1.pool_size(), db2.pool_size());
+        assert_eq!(db1.timeout(), db2.timeout());
+    }
+
+    #[test]
+    fn test_database_debug_format_with_values() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let debug_str = format!("{:?}", db);
+
+        assert!(debug_str.contains("Database"));
+        assert!(debug_str.contains("postgres://localhost/test"));
+        assert!(debug_str.contains("10"));
+        assert!(debug_str.contains("30"));
     }
 }
