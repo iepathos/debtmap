@@ -148,15 +148,70 @@ mod tests {
     }
 
     #[test]
+    fn test_connection_string_accessor_returns_correct_value() {
+        let db = Database::new("postgres://user:pass@host:5432/db".to_string(), 10, 30);
+        assert_eq!(db.connection_string(), "postgres://user:pass@host:5432/db");
+    }
+
+    #[test]
+    fn test_connection_string_accessor_with_empty_string() {
+        let db = Database::new(String::new(), 10, 30);
+        assert_eq!(db.connection_string(), "");
+    }
+
+    #[test]
+    fn test_connection_string_accessor_with_special_characters() {
+        let special_conn = "postgres://user%40:p%40ss@host/db?param=value&other=123";
+        let db = Database::new(special_conn.to_string(), 10, 30);
+        assert_eq!(db.connection_string(), special_conn);
+    }
+
+    #[test]
     fn test_pool_size_accessor() {
         let db = Database::new("postgres://localhost/test".to_string(), 25, 30);
         assert_eq!(db.pool_size(), 25);
     }
 
     #[test]
+    fn test_pool_size_accessor_returns_correct_value() {
+        let db = Database::new("postgres://localhost/test".to_string(), 25, 30);
+        assert_eq!(db.pool_size(), 25);
+    }
+
+    #[test]
+    fn test_pool_size_accessor_with_zero() {
+        let db = Database::new("postgres://localhost/test".to_string(), 0, 30);
+        assert_eq!(db.pool_size(), 0);
+    }
+
+    #[test]
+    fn test_pool_size_accessor_with_max_value() {
+        let db = Database::new("postgres://localhost/test".to_string(), usize::MAX, 30);
+        assert_eq!(db.pool_size(), usize::MAX);
+    }
+
+    #[test]
     fn test_timeout_accessor() {
         let db = Database::new("postgres://localhost/test".to_string(), 10, 45);
         assert_eq!(db.timeout(), 45);
+    }
+
+    #[test]
+    fn test_timeout_accessor_returns_correct_value() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 45);
+        assert_eq!(db.timeout(), 45);
+    }
+
+    #[test]
+    fn test_timeout_accessor_with_zero() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 0);
+        assert_eq!(db.timeout(), 0);
+    }
+
+    #[test]
+    fn test_timeout_accessor_with_max_value() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, u64::MAX);
+        assert_eq!(db.timeout(), u64::MAX);
     }
 
     #[test]
@@ -168,6 +223,22 @@ mod tests {
     }
 
     #[test]
+    fn test_cache_accessor_returns_empty_hashmap() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        assert!(db.cache().is_empty());
+        assert_eq!(db.cache().len(), 0);
+    }
+
+    #[test]
+    fn test_cache_accessor_returns_reference() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let cache_ref = db.cache();
+        // Verify it's a reference by checking we can use it multiple times
+        assert!(cache_ref.is_empty());
+        assert_eq!(cache_ref.len(), 0);
+    }
+
+    #[test]
     fn test_all_accessors_together() {
         let db = Database::new("postgres://prod/maindb".to_string(), 50, 120);
 
@@ -175,6 +246,20 @@ mod tests {
         assert_eq!(db.connection_string(), "postgres://prod/maindb");
         assert_eq!(db.pool_size(), 50);
         assert_eq!(db.timeout(), 120);
+        assert!(db.cache().is_empty());
+    }
+
+    #[test]
+    fn test_all_accessors_work_together() {
+        let conn_str = "postgres://localhost/integration";
+        let pool = 50;
+        let timeout = 120;
+        let db = Database::new(conn_str.to_string(), pool, timeout);
+        
+        // Test all accessors in sequence
+        assert_eq!(db.connection_string(), conn_str);
+        assert_eq!(db.pool_size(), pool);
+        assert_eq!(db.timeout(), timeout);
         assert!(db.cache().is_empty());
     }
 
@@ -229,5 +314,16 @@ mod tests {
         assert!(debug_str.contains("postgres://localhost/test"));
         assert!(debug_str.contains("10"));
         assert!(debug_str.contains("30"));
+    }
+
+    #[test]
+    fn test_accessors_multiple_calls_return_same_values() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        
+        // Call each accessor multiple times
+        assert_eq!(db.connection_string(), db.connection_string());
+        assert_eq!(db.pool_size(), db.pool_size());
+        assert_eq!(db.timeout(), db.timeout());
+        assert_eq!(db.cache().len(), db.cache().len());
     }
 }
