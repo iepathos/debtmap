@@ -119,4 +119,69 @@ mod tests {
         assert_ne!(db1.pool_size, db2.pool_size);
         assert_ne!(db1.timeout, db2.timeout);
     }
+
+    #[test]
+    fn test_connection_string_accessor() {
+        let db = Database::new("postgres://user:pass@host/db".to_string(), 10, 30);
+        assert_eq!(db.connection_string(), "postgres://user:pass@host/db");
+    }
+
+    #[test]
+    fn test_pool_size_accessor() {
+        let db = Database::new("postgres://localhost/test".to_string(), 25, 30);
+        assert_eq!(db.pool_size(), 25);
+    }
+
+    #[test]
+    fn test_timeout_accessor() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 45);
+        assert_eq!(db.timeout(), 45);
+    }
+
+    #[test]
+    fn test_cache_accessor() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let cache = db.cache();
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn test_all_accessors_together() {
+        let db = Database::new("postgres://prod/maindb".to_string(), 50, 120);
+
+        // Test all accessor methods work correctly
+        assert_eq!(db.connection_string(), "postgres://prod/maindb");
+        assert_eq!(db.pool_size(), 50);
+        assert_eq!(db.timeout(), 120);
+        assert!(db.cache().is_empty());
+    }
+
+    #[test]
+    fn test_new_with_special_characters_in_connection_string() {
+        let special_conn = "postgres://user%40:p@ss!word@host:5432/db?ssl=true".to_string();
+        let db = Database::new(special_conn.clone(), 10, 30);
+        assert_eq!(db.connection_string(), special_conn);
+    }
+
+    #[test]
+    fn test_database_clone() {
+        let db1 = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let db2 = db1.clone();
+
+        assert_eq!(db1.connection_string(), db2.connection_string());
+        assert_eq!(db1.pool_size(), db2.pool_size());
+        assert_eq!(db1.timeout(), db2.timeout());
+    }
+
+    #[test]
+    fn test_database_debug_format() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let debug_str = format!("{:?}", db);
+
+        assert!(debug_str.contains("Database"));
+        assert!(debug_str.contains("postgres://localhost/test"));
+        assert!(debug_str.contains("10"));
+        assert!(debug_str.contains("30"));
+    }
 }
