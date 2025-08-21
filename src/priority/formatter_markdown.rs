@@ -257,14 +257,6 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
     .unwrap();
     writeln!(
         &mut output,
-        "| ROI | {:.1} | {:.0}% | {:.2} |",
-        unified_score.roi_factor,
-        weights.roi * 100.0,
-        unified_score.roi_factor * weights.roi
-    )
-    .unwrap();
-    writeln!(
-        &mut output,
         "| Semantic | {:.1} | {:.0}% | {:.2} |",
         unified_score.semantic_factor,
         weights.semantic * 100.0,
@@ -306,7 +298,6 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
 
     let base_score = unified_score.complexity_factor * weights.complexity
         + unified_score.coverage_factor * weights.coverage
-        + unified_score.roi_factor * weights.roi
         + unified_score.semantic_factor * weights.semantic
         + unified_score.dependency_factor * weights.dependency
         + unified_score.security_factor * weights.security
@@ -340,9 +331,6 @@ fn format_main_factors_with_debt_type(
 
     if unified_score.coverage_factor > 3.0 {
         factors.push(format!("Coverage gap ({:.0}%)", weights.coverage * 100.0));
-    }
-    if unified_score.roi_factor > 7.0 {
-        factors.push(format!("High ROI ({:.0}%)", weights.roi * 100.0));
     }
     if unified_score.dependency_factor > 5.0 {
         factors.push(format!(
@@ -581,7 +569,6 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 5.0,
             coverage_factor: 8.0,
-            roi_factor: 7.5,
             semantic_factor: 3.0,
             dependency_factor: 4.0,
             security_factor: 0.0,
@@ -614,7 +601,6 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 6.0, // Above threshold
             coverage_factor: 4.0,   // Above threshold
-            roi_factor: 8.0,        // Above threshold
             semantic_factor: 2.0,
             dependency_factor: 6.0, // Above threshold
             security_factor: 0.0,
@@ -642,7 +628,6 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 2.0, // Below all thresholds
             coverage_factor: 2.0,
-            roi_factor: 3.0,
             semantic_factor: 1.0,
             dependency_factor: 2.0,
             security_factor: 0.0,

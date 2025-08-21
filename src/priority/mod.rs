@@ -412,7 +412,6 @@ impl UnifiedAnalysis {
         UnifiedScore {
             complexity_factor: 2.0,   // Security issues aren't about complexity
             coverage_factor: 1.0,     // Coverage less relevant for security
-            roi_factor: 8.0,          // High ROI to fix security issues
             semantic_factor: 9.0,     // Very important semantically
             dependency_factor: 3.0,   // Variable depending on code location
             security_factor: 10.0,    // Maximum security factor for security issues

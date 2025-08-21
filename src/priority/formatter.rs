@@ -438,12 +438,6 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     .unwrap();
     writeln!(
         output,
-        "│  ├─ ROI Factor: {:.1}",
-        item.unified_score.roi_factor
-    )
-    .unwrap();
-    writeln!(
-        output,
         "│  └─ Semantic Factor: {:.1}",
         item.unified_score.semantic_factor
     )
@@ -720,7 +714,6 @@ mod tests {
             unified_score: UnifiedScore {
                 complexity_factor: 5.0,
                 coverage_factor: 8.0,
-                roi_factor: 6.0,
                 semantic_factor: 7.0,
                 dependency_factor: 3.0,
                 security_factor: 0.0,

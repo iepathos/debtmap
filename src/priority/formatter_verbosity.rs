@@ -23,9 +23,6 @@ pub fn format_priority_item_with_verbosity(
         if item.unified_score.coverage_factor > 3.0 {
             factors.push(format!("Coverage gap ({:.0}%)", weights.coverage * 100.0));
         }
-        if item.unified_score.roi_factor > 7.0 {
-            factors.push(format!("High ROI ({:.0}%)", weights.roi * 100.0));
-        }
         if item.unified_score.dependency_factor > 5.0 {
             factors.push(format!(
                 "Critical path ({:.0}%)",
@@ -142,14 +139,6 @@ pub fn format_priority_item_with_verbosity(
         .unwrap();
         writeln!(
             output,
-            "│  │  ├─ ROI:        {:.1} × {:.0}% = {:.2}",
-            item.unified_score.roi_factor,
-            weights.roi * 100.0,
-            item.unified_score.roi_factor * weights.roi
-        )
-        .unwrap();
-        writeln!(
-            output,
             "│  │  ├─ Semantic:    {:.1} × {:.0}% = {:.2}",
             item.unified_score.semantic_factor,
             weights.semantic * 100.0,
@@ -192,7 +181,6 @@ pub fn format_priority_item_with_verbosity(
 
         let base_score = item.unified_score.complexity_factor * weights.complexity
             + item.unified_score.coverage_factor * weights.coverage
-            + item.unified_score.roi_factor * weights.roi
             + item.unified_score.semantic_factor * weights.semantic
             + item.unified_score.dependency_factor * weights.dependency
             + item.unified_score.security_factor * weights.security
