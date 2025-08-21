@@ -193,7 +193,7 @@ impl FrameworkPatternDetector {
             entropy_score: None,
         };
 
-        let debt_item = create_unified_debt_item_enhanced(&metrics, &call_graph, None, None, 5.0);
+        let debt_item = create_unified_debt_item_enhanced(&metrics, &call_graph, None, None);
 
         println!("\n=== UnifiedDebtItem for resolve_function ===");
         println!("Upstream callers: {:?}", debt_item.upstream_callers);

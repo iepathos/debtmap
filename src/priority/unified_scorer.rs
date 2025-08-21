@@ -245,7 +245,6 @@ fn normalize_complexity(cyclomatic: u32, cognitive: u32) -> f64 {
     }
 }
 
-
 fn calculate_dependency_factor(upstream_count: usize) -> f64 {
     // Calculate criticality based on number of upstream dependencies (callers)
     // Functions with many callers are on critical paths and should be prioritized
@@ -2400,20 +2399,10 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_roi() {
-        assert_eq!(normalize_roi(0.0), 0.0);
-        assert!(normalize_roi(0.5) < 3.0);
-        assert!(normalize_roi(1.0) <= 3.0);
-        assert!(normalize_roi(3.0) > 3.0);
-        assert!(normalize_roi(3.0) < 7.0);
-        assert!(normalize_roi(10.0) <= 10.0);
-    }
-
-    #[test]
     fn test_unified_scoring() {
         let func = create_test_metrics();
         let graph = CallGraph::new();
-        let score = calculate_unified_priority(&func, &graph, None, 5.0, None, None);
+        let score = calculate_unified_priority(&func, &graph, None, None, None);
 
         assert!(score.complexity_factor > 0.0);
         assert!(score.coverage_factor > 0.0);
@@ -2540,7 +2529,7 @@ mod tests {
         );
 
         // Calculate priority score with coverage
-        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0, None, None);
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None, None);
 
         // Tested simple I/O wrapper should have zero score (not technical debt)
         assert_eq!(score.final_score, 0.0);
@@ -2562,7 +2551,7 @@ mod tests {
         let call_graph = CallGraph::new();
 
         // Calculate priority score without coverage (assume untested)
-        let score = calculate_unified_priority(&func, &call_graph, None, 0.0, None, None);
+        let score = calculate_unified_priority(&func, &call_graph, None, None, None);
 
         // Untested simple I/O wrapper should have a non-zero score (testing gap)
         assert!(
@@ -2595,7 +2584,7 @@ mod tests {
         );
 
         // Calculate priority score with coverage
-        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), 0.0, None, None);
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None, None);
 
         // Tested simple entry point should have zero score (not technical debt)
         assert_eq!(score.final_score, 0.0);
@@ -2613,7 +2602,7 @@ mod tests {
         let call_graph = CallGraph::new();
 
         // Calculate priority score without coverage
-        let score = calculate_unified_priority(&func, &call_graph, None, 0.0, None, None);
+        let score = calculate_unified_priority(&func, &call_graph, None, None, None);
 
         // Untested pure function should have non-zero score (testing gap)
         assert!(
@@ -2634,7 +2623,7 @@ mod tests {
         let call_graph = CallGraph::new();
 
         // Calculate priority score
-        let score = calculate_unified_priority(&func, &call_graph, None, 5.0, None, None);
+        let score = calculate_unified_priority(&func, &call_graph, None, None, None);
 
         // Complex function should have non-zero score (is technical debt)
         assert!(score.final_score > 0.0);
@@ -3547,7 +3536,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 1.0, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -3569,7 +3558,7 @@ mod tests {
 
         let score = calculate_unified_priority_with_debt(
             &func, &graph, None, // No coverage data
-            5.0, None, None, None,
+            None, None, None,
         );
 
         assert!(
@@ -3602,12 +3591,12 @@ mod tests {
         let graph = CallGraph::new();
 
         let score_with_entropy =
-            calculate_unified_priority_with_debt(&func, &graph, None, 3.0, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
 
         // Compare with same function without entropy
         func.entropy_score = None;
         let score_without_entropy =
-            calculate_unified_priority_with_debt(&func, &graph, None, 3.0, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
 
         assert!(
             score_with_entropy.complexity_factor < score_without_entropy.complexity_factor,
@@ -3625,7 +3614,6 @@ mod tests {
             &func,
             &graph,
             None,
-            2.0,
             Some(8.5), // High security issues
             None,
             None,
@@ -3648,7 +3636,6 @@ mod tests {
             &func,
             &graph,
             None,
-            2.0,
             None,
             Some(7.0), // Organization issues
             None,
@@ -3687,8 +3674,7 @@ mod tests {
             });
         }
 
-        let score =
-            calculate_unified_priority_with_debt(&func, &graph, None, 3.0, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
 
         assert!(score.role_multiplier > 0.0);
         assert!(
@@ -3706,8 +3692,7 @@ mod tests {
 
         let graph = CallGraph::new();
 
-        let score =
-            calculate_unified_priority_with_debt(&func, &graph, None, 2.0, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
 
         assert_eq!(
             score.coverage_factor, 0.0,
@@ -3729,7 +3714,6 @@ mod tests {
             &func,
             &graph,
             None,
-            15.0,       // Very high ROI
             Some(10.0), // Max security issues
             Some(10.0), // Max organization issues
             None,
@@ -3762,7 +3746,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 1.0, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -3791,7 +3775,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 1.0, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -3818,7 +3802,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 3.0, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
 
         // Even with some coverage, non-trivial functions should still have priority
         assert!(

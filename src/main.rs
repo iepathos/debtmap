@@ -1368,7 +1368,6 @@ fn should_skip_metric_for_debt_analysis(
     false
 }
 
-
 /// Create a debt item from a metric with framework exclusions
 #[allow(dead_code)]
 fn create_debt_item_from_metric(
@@ -1653,8 +1652,7 @@ fn create_unified_analysis(
             }
         }
 
-        let item =
-            unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data);
+        let item = unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data);
         unified.add_item(item);
     }
 

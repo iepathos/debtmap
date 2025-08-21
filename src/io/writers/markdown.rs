@@ -560,12 +560,6 @@ fn get_dead_code_table_headers() -> (&'static str, &'static str) {
     )
 }
 
-fn calculate_roi(item: &crate::priority::UnifiedDebtItem) -> f64 {
-    // Simple ROI calculation based on score components
-    // ROI has been removed from scoring - return a default
-    0.0
-}
-
 fn estimate_risk_reduction(coverage: f64) -> f64 {
     // Estimate risk reduction from improving coverage
     (1.0 - coverage) * 0.3
@@ -637,13 +631,12 @@ fn format_testing_gap_row(item: &UnifiedDebtItem) -> Option<String> {
         cognitive: _,
     } = &item.debt_type
     {
-        let roi = calculate_roi(item);
         let risk_reduction = estimate_risk_reduction(*coverage);
 
         Some(format!(
             "| `{}` | {:.1} | {} | {:.0}% | {:.0}% |\n",
             item.location.function,
-            roi,
+            0.0,
             cyclomatic,
             coverage * 100.0,
             risk_reduction * 100.0
@@ -996,7 +989,7 @@ mod tests {
         let row = format_testing_gap_row(&item).unwrap();
 
         assert!(row.contains("`test_function`"));
-        assert!(row.contains("| 7.0 |")); // ROI = roi_factor * 10
+        assert!(row.contains("| 0.0 |")); // ROI removed from scoring
         assert!(row.contains("| 12 |")); // Cyclomatic complexity
         assert!(row.contains("| 30% |")); // Coverage
         assert!(row.contains("| 21% |")); // Risk reduction = (1-0.3)*0.3
@@ -1035,15 +1028,6 @@ mod tests {
         assert!(result.contains("`func2`"));
         assert!(result.contains("| 10 |")); // func1 complexity
         assert!(result.contains("| 15 |")); // func2 complexity
-    }
-
-    #[test]
-    fn test_calculate_roi() {
-        let item = create_testing_gap_item("test", 0.3, 10);
-
-        let roi = calculate_roi(&item);
-
-        assert_eq!(roi, 7.0); // roi_factor (0.7) * 10
     }
 
     #[test]
