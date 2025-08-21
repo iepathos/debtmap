@@ -136,6 +136,71 @@ fn default_organization_weight() -> f64 {
     0.05 // Reduced back to maintain sum of 1.0
 }
 
+/// Role multipliers configuration for semantic classification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleMultipliers {
+    /// Multiplier for PureLogic functions (default: 1.5)
+    #[serde(default = "default_pure_logic_multiplier")]
+    pub pure_logic: f64,
+
+    /// Multiplier for Orchestrator functions (default: 0.6)
+    #[serde(default = "default_orchestrator_multiplier")]
+    pub orchestrator: f64,
+
+    /// Multiplier for IOWrapper functions (default: 0.5)
+    #[serde(default = "default_io_wrapper_multiplier")]
+    pub io_wrapper: f64,
+
+    /// Multiplier for EntryPoint functions (default: 0.8)
+    #[serde(default = "default_entry_point_multiplier")]
+    pub entry_point: f64,
+
+    /// Multiplier for PatternMatch functions (default: 0.4)
+    #[serde(default = "default_pattern_match_multiplier")]
+    pub pattern_match: f64,
+
+    /// Multiplier for Unknown functions (default: 1.0)
+    #[serde(default = "default_unknown_multiplier")]
+    pub unknown: f64,
+}
+
+impl Default for RoleMultipliers {
+    fn default() -> Self {
+        Self {
+            pure_logic: default_pure_logic_multiplier(),
+            orchestrator: default_orchestrator_multiplier(),
+            io_wrapper: default_io_wrapper_multiplier(),
+            entry_point: default_entry_point_multiplier(),
+            pattern_match: default_pattern_match_multiplier(),
+            unknown: default_unknown_multiplier(),
+        }
+    }
+}
+
+fn default_pure_logic_multiplier() -> f64 {
+    1.5 // High priority for business logic
+}
+
+fn default_orchestrator_multiplier() -> f64 {
+    0.6 // Moderate reduction instead of extreme 0.2
+}
+
+fn default_io_wrapper_multiplier() -> f64 {
+    0.5 // Half reduction instead of extreme 0.1
+}
+
+fn default_entry_point_multiplier() -> f64 {
+    0.8 // Slight reduction for entry points
+}
+
+fn default_pattern_match_multiplier() -> f64 {
+    0.4 // Significant reduction but not extreme 0.1
+}
+
+fn default_unknown_multiplier() -> f64 {
+    1.0 // No adjustment for unknown functions
+}
+
 /// Context-aware detection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextConfig {
@@ -270,6 +335,10 @@ pub struct DebtmapConfig {
     /// Entropy-based complexity scoring configuration
     #[serde(default)]
     pub entropy: Option<EntropyConfig>,
+
+    /// Role multipliers for semantic classification
+    #[serde(default)]
+    pub role_multipliers: Option<RoleMultipliers>,
 }
 
 impl DebtmapConfig {
@@ -678,6 +747,11 @@ pub fn get_orchestration_config() -> OrchestrationConfig {
 /// Get entropy-based complexity scoring configuration
 pub fn get_entropy_config() -> EntropyConfig {
     get_config().entropy.clone().unwrap_or_default()
+}
+
+/// Get role multipliers configuration
+pub fn get_role_multipliers() -> RoleMultipliers {
+    get_config().role_multipliers.clone().unwrap_or_default()
 }
 
 /// Get minimum debt score threshold (default: 1.0)
