@@ -7,9 +7,9 @@ use syn::visit::Visit;
 use syn::{Block, Expr, ExprCall, ExprIf, ExprLoop, ExprMatch, ExprMethodCall, File, Item, ItemFn};
 
 pub struct TestComplexityDetector {
-    max_test_complexity: u32,
-    max_mock_setups: usize,
-    max_test_length: usize,
+    pub(crate) max_test_complexity: u32,
+    pub(crate) max_mock_setups: usize,
+    pub(crate) max_test_length: usize,
 }
 
 impl Default for TestComplexityDetector {
@@ -105,16 +105,16 @@ impl TestingDetector for TestComplexityDetector {
 }
 
 #[derive(Debug, Default, Clone)]
-struct TestComplexityAnalysis {
-    cyclomatic_complexity: u32,
-    mock_setup_count: usize,
-    line_count: usize,
-    assertion_complexity: u32,
-    total_complexity: u32,
-    sources: Vec<ComplexitySource>,
-    has_loops: bool,
-    has_nested_conditionals: bool,
-    assertion_count: usize,
+pub(crate) struct TestComplexityAnalysis {
+    pub(crate) cyclomatic_complexity: u32,
+    pub(crate) mock_setup_count: usize,
+    pub(crate) line_count: usize,
+    pub(crate) assertion_complexity: u32,
+    pub(crate) total_complexity: u32,
+    pub(crate) sources: Vec<ComplexitySource>,
+    pub(crate) has_loops: bool,
+    pub(crate) has_nested_conditionals: bool,
+    pub(crate) assertion_count: usize,
 }
 
 struct ComplexityAnalyzer {
@@ -248,19 +248,19 @@ impl<'ast> Visit<'ast> for ComplexityAnalyzer {
     }
 }
 
-fn analyze_test_complexity(function: &ItemFn) -> TestComplexityAnalysis {
+pub(crate) fn analyze_test_complexity(function: &ItemFn) -> TestComplexityAnalysis {
     let mut analyzer = ComplexityAnalyzer::new();
     analyzer.visit_item_fn(function);
     analyzer.analysis
 }
 
-fn count_lines_in_block(block: &Block) -> usize {
+pub(crate) fn count_lines_in_block(block: &Block) -> usize {
     // Simple line count based on statements
     // In real implementation, we'd use span information
     block.stmts.len()
 }
 
-fn is_mock_setup_call(name: &str) -> bool {
+pub(crate) fn is_mock_setup_call(name: &str) -> bool {
     let mock_patterns = [
         "mock",
         "when",
@@ -281,7 +281,7 @@ fn is_mock_setup_call(name: &str) -> bool {
     mock_patterns.iter().any(|pattern| name.contains(pattern))
 }
 
-fn is_mock_method_call(name: &str) -> bool {
+pub(crate) fn is_mock_method_call(name: &str) -> bool {
     let mock_methods = [
         "expect",
         "times",
@@ -297,24 +297,27 @@ fn is_mock_method_call(name: &str) -> bool {
     mock_methods.contains(&name)
 }
 
-fn is_assertion_call(name: &str) -> bool {
+pub(crate) fn is_assertion_call(name: &str) -> bool {
     name.starts_with("assert") || name == "panic" || name == "expect"
 }
 
-fn calculate_total_complexity(analysis: &TestComplexityAnalysis) -> u32 {
+pub(crate) fn calculate_total_complexity(analysis: &TestComplexityAnalysis) -> u32 {
     analysis.cyclomatic_complexity
         + (analysis.mock_setup_count as u32 * 2)
         + analysis.assertion_complexity
         + (analysis.line_count as u32 / 10) // Penalty for long tests
 }
 
-fn is_overly_complex(analysis: &TestComplexityAnalysis, detector: &TestComplexityDetector) -> bool {
+pub(crate) fn is_overly_complex(
+    analysis: &TestComplexityAnalysis,
+    detector: &TestComplexityDetector,
+) -> bool {
     analysis.total_complexity > detector.max_test_complexity
         || analysis.mock_setup_count > detector.max_mock_setups
         || analysis.line_count > detector.max_test_length
 }
 
-fn suggest_simplification(
+pub(crate) fn suggest_simplification(
     analysis: &TestComplexityAnalysis,
     detector: &TestComplexityDetector,
 ) -> TestSimplification {
@@ -330,5 +333,291 @@ fn suggest_simplification(
         TestSimplification::ParameterizeTest
     } else {
         TestSimplification::SimplifySetup
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn test_is_mock_setup_call_positive_cases() {
+        assert!(is_mock_setup_call("mock_service"));
+        assert!(is_mock_setup_call("when_called"));
+        assert!(is_mock_setup_call("given_input"));
+        assert!(is_mock_setup_call("expect_call"));
+        assert!(is_mock_setup_call("stub_response"));
+        assert!(is_mock_setup_call("fake_impl"));
+        assert!(is_mock_setup_call("with_return_value"));
+        assert!(is_mock_setup_call("returns_value"));
+        assert!(is_mock_setup_call("with_args_matching"));
+        assert!(is_mock_setup_call("times_called"));
+        assert!(is_mock_setup_call("MockService"));
+        assert!(is_mock_setup_call("StubRepository"));
+        assert!(is_mock_setup_call("FakeDatabase"));
+        assert!(is_mock_setup_call("DoubleClient"));
+    }
+
+    #[test]
+    fn test_is_mock_setup_call_negative_cases() {
+        assert!(!is_mock_setup_call("regular_function"));
+        assert!(!is_mock_setup_call("process_data"));
+        assert!(!is_mock_setup_call("calculate_result"));
+        assert!(!is_mock_setup_call("validate_input"));
+        assert!(!is_mock_setup_call("transform_output"));
+    }
+
+    #[test]
+    fn test_is_mock_setup_call_edge_cases() {
+        assert!(is_mock_setup_call("mockito"));
+        assert!(!is_mock_setup_call("MOCK_CONSTANT")); // Doesn't match - all uppercase
+        assert!(is_mock_setup_call("create_mock"));
+        assert!(!is_mock_setup_call(""));
+        assert!(!is_mock_setup_call("m"));
+    }
+
+    #[test]
+    fn test_is_mock_method_call_positive_cases() {
+        assert!(is_mock_method_call("expect"));
+        assert!(is_mock_method_call("times"));
+        assert!(is_mock_method_call("returning"));
+        assert!(is_mock_method_call("with"));
+        assert!(is_mock_method_call("withf"));
+        assert!(is_mock_method_call("return_once"));
+        assert!(is_mock_method_call("return_const"));
+        assert!(is_mock_method_call("never"));
+        assert!(is_mock_method_call("once"));
+    }
+
+    #[test]
+    fn test_is_mock_method_call_negative_cases() {
+        assert!(!is_mock_method_call("execute"));
+        assert!(!is_mock_method_call("process"));
+        assert!(!is_mock_method_call("validate"));
+        assert!(!is_mock_method_call("transform"));
+        assert!(!is_mock_method_call("calculate"));
+        assert!(!is_mock_method_call(""));
+    }
+
+    #[test]
+    fn test_is_assertion_call_positive_cases() {
+        assert!(is_assertion_call("assert"));
+        assert!(is_assertion_call("assert_eq"));
+        assert!(is_assertion_call("assert_ne"));
+        assert!(is_assertion_call("assert_matches"));
+        assert!(is_assertion_call("panic"));
+        assert!(is_assertion_call("expect"));
+    }
+
+    #[test]
+    fn test_is_assertion_call_negative_cases() {
+        assert!(!is_assertion_call("process"));
+        assert!(!is_assertion_call("validate"));
+        assert!(!is_assertion_call("transform"));
+        assert!(!is_assertion_call("execute"));
+        assert!(!is_assertion_call(""));
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_basic() {
+        let analysis = TestComplexityAnalysis {
+            cyclomatic_complexity: 5,
+            mock_setup_count: 0,
+            assertion_complexity: 0,
+            line_count: 10,
+            ..Default::default()
+        };
+
+        assert_eq!(calculate_total_complexity(&analysis), 6); // 5 + 0 + 0 + 1
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_with_mocks() {
+        let analysis = TestComplexityAnalysis {
+            cyclomatic_complexity: 3,
+            mock_setup_count: 2,
+            assertion_complexity: 1,
+            line_count: 15,
+            ..Default::default()
+        };
+
+        assert_eq!(calculate_total_complexity(&analysis), 9); // 3 + 4 + 1 + 1
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_long_test() {
+        let analysis = TestComplexityAnalysis {
+            cyclomatic_complexity: 2,
+            mock_setup_count: 1,
+            assertion_complexity: 0,
+            line_count: 50,
+            ..Default::default()
+        };
+
+        assert_eq!(calculate_total_complexity(&analysis), 9); // 2 + 2 + 0 + 5
+    }
+
+    #[test]
+    fn test_is_overly_complex_by_total_complexity() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            total_complexity: 11,
+            mock_setup_count: 3,
+            line_count: 30,
+            ..Default::default()
+        };
+
+        assert!(is_overly_complex(&analysis, &detector));
+    }
+
+    #[test]
+    fn test_is_overly_complex_by_mock_count() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            total_complexity: 5,
+            mock_setup_count: 6,
+            line_count: 30,
+            ..Default::default()
+        };
+
+        assert!(is_overly_complex(&analysis, &detector));
+    }
+
+    #[test]
+    fn test_is_overly_complex_by_line_count() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            total_complexity: 5,
+            mock_setup_count: 3,
+            line_count: 51,
+            ..Default::default()
+        };
+
+        assert!(is_overly_complex(&analysis, &detector));
+    }
+
+    #[test]
+    fn test_is_not_overly_complex() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            total_complexity: 8,
+            mock_setup_count: 3,
+            line_count: 30,
+            ..Default::default()
+        };
+
+        assert!(!is_overly_complex(&analysis, &detector));
+    }
+
+    #[test]
+    fn test_suggest_simplification_reduce_mocking() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            mock_setup_count: 6,
+            line_count: 30,
+            assertion_count: 2,
+            cyclomatic_complexity: 3,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            suggest_simplification(&analysis, &detector),
+            TestSimplification::ReduceMocking
+        ));
+    }
+
+    #[test]
+    fn test_suggest_simplification_split_test() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            mock_setup_count: 4,
+            line_count: 60,
+            assertion_count: 5,
+            cyclomatic_complexity: 3,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            suggest_simplification(&analysis, &detector),
+            TestSimplification::SplitTest
+        ));
+    }
+
+    #[test]
+    fn test_suggest_simplification_extract_helper() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            mock_setup_count: 2,
+            line_count: 55,
+            assertion_count: 2,
+            cyclomatic_complexity: 3,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            suggest_simplification(&analysis, &detector),
+            TestSimplification::ExtractHelper
+        ));
+    }
+
+    #[test]
+    fn test_suggest_simplification_parameterize() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            mock_setup_count: 3,
+            line_count: 40,
+            assertion_count: 2,
+            cyclomatic_complexity: 6,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            suggest_simplification(&analysis, &detector),
+            TestSimplification::ParameterizeTest
+        ));
+    }
+
+    #[test]
+    fn test_suggest_simplification_simplify_setup() {
+        let detector = TestComplexityDetector::new();
+        let analysis = TestComplexityAnalysis {
+            mock_setup_count: 3,
+            line_count: 40,
+            assertion_count: 2,
+            cyclomatic_complexity: 3,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            suggest_simplification(&analysis, &detector),
+            TestSimplification::SimplifySetup
+        ));
+    }
+
+    #[test]
+    fn test_count_lines_in_block() {
+        let block: syn::Block = parse_quote! {{
+            let x = 1;
+            let y = 2;
+            assert_eq!(x + y, 3);
+        }};
+
+        assert_eq!(count_lines_in_block(&block), 3);
+    }
+
+    #[test]
+    fn test_count_lines_in_empty_block() {
+        let block: syn::Block = parse_quote! {{}};
+
+        assert_eq!(count_lines_in_block(&block), 0);
+    }
+
+    #[test]
+    fn test_test_complexity_detector_default() {
+        let detector = TestComplexityDetector::default();
+        assert_eq!(detector.max_test_complexity, 10);
+        assert_eq!(detector.max_mock_setups, 5);
+        assert_eq!(detector.max_test_length, 50);
     }
 }
