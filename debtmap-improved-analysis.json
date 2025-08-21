@@ -1,7 +1,0 @@
-error: unexpected argument '--config' found
-
-  tip: to pass '--config' as a value, use '-- --config'
-
-Usage: debtmap analyze <PATH>
-
-For more information, try '--help'.
