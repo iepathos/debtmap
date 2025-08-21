@@ -119,4 +119,66 @@ mod tests {
         assert_ne!(db1.pool_size, db2.pool_size);
         assert_ne!(db1.timeout, db2.timeout);
     }
+
+    #[test]
+    fn test_new_with_special_characters_in_connection_string() {
+        let special_string = "postgres://user:p@$$w0rd@localhost:5432/db?ssl=true".to_string();
+        let db = Database::new(special_string.clone(), 10, 30);
+        assert_eq!(db.connection_string, special_string);
+    }
+
+    #[test]
+    fn test_new_with_unicode_in_connection_string() {
+        let unicode_string = "postgres://用户:密码@主机/数据库".to_string();
+        let db = Database::new(unicode_string.clone(), 10, 30);
+        assert_eq!(db.connection_string, unicode_string);
+    }
+
+    #[test]
+    fn test_new_with_very_long_connection_string() {
+        let long_string = "postgres://".to_string() + &"x".repeat(1000) + "/database";
+        let db = Database::new(long_string.clone(), 10, 30);
+        assert_eq!(db.connection_string, long_string);
+    }
+
+    #[test]
+    fn test_getter_methods_return_correct_values() {
+        let db = Database::new("postgres://localhost/test".to_string(), 42, 100);
+        assert_eq!(db.connection_string(), "postgres://localhost/test");
+        assert_eq!(db.pool_size(), 42);
+        assert_eq!(db.timeout(), 100);
+        assert!(db.cache().is_empty());
+    }
+
+    #[test]
+    fn test_database_implements_debug_trait() {
+        let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let debug_str = format!("{:?}", db);
+        assert!(debug_str.contains("Database"));
+        assert!(debug_str.contains("connection_string"));
+        assert!(debug_str.contains("pool_size"));
+        assert!(debug_str.contains("timeout"));
+    }
+
+    #[test]
+    fn test_database_implements_clone_trait() {
+        let original = Database::new("postgres://localhost/test".to_string(), 10, 30);
+        let cloned = original.clone();
+        assert_eq!(original.connection_string, cloned.connection_string);
+        assert_eq!(original.pool_size, cloned.pool_size);
+        assert_eq!(original.timeout, cloned.timeout);
+    }
+
+    #[test]
+    fn test_new_with_minimum_and_maximum_boundary_values() {
+        // Test with minimum values
+        let min_db = Database::new("x".to_string(), 1, 1);
+        assert_eq!(min_db.pool_size, 1);
+        assert_eq!(min_db.timeout, 1);
+
+        // Test with reasonably large values
+        let max_db = Database::new("x".to_string(), 10000, 86400);
+        assert_eq!(max_db.pool_size, 10000);
+        assert_eq!(max_db.timeout, 86400);
+    }
 }
