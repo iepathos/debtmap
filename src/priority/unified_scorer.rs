@@ -2449,6 +2449,8 @@ fn generate_collection_inefficiency_recommendation(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::priority::call_graph::{CallType, FunctionCall};
+    use crate::risk::lcov::FunctionCoverage;
 
     fn create_test_metrics() -> FunctionMetrics {
         FunctionMetrics {
@@ -3619,5 +3621,307 @@ mod tests {
                 "Factor should produce valid calculations"
             );
         }
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_trivial_tested_function() {
+        // Test that trivial tested functions get zero score
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        func.length = 8;
+
+        let graph = CallGraph::new();
+
+        // Create mock coverage data showing the function is tested
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![FunctionCoverage {
+                name: "test_function".to_string(),
+                start_line: 10,
+                execution_count: 1,
+                coverage_percentage: 100.0,
+            }],
+        );
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 1.0, None, None, None);
+
+        assert_eq!(
+            score.final_score, 0.0,
+            "Trivial tested function should have zero score"
+        );
+        assert_eq!(score.complexity_factor, 0.0);
+        assert_eq!(score.coverage_factor, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_complex_untested() {
+        // Test that complex untested functions get high scores
+        let mut func = create_test_metrics();
+        func.cyclomatic = 15;
+        func.cognitive = 20;
+        func.length = 100;
+
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(
+            &func, &graph, None, // No coverage data
+            5.0, None, None, None,
+        );
+
+        assert!(
+            score.final_score > 5.0,
+            "Complex untested function should have high score"
+        );
+        assert!(score.complexity_factor > 5.0);
+        assert_eq!(
+            score.coverage_factor, 10.0,
+            "No coverage data should assume worst case"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_with_entropy_dampening() {
+        // Test entropy-based complexity dampening
+        let mut func = create_test_metrics();
+        func.cyclomatic = 20;
+        func.cognitive = 25;
+        func.entropy_score = Some(crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.3,
+            pattern_repetition: 0.7,
+            branch_similarity: 0.5,
+            effective_complexity: 15.0,
+        });
+
+        let graph = CallGraph::new();
+
+        let score_with_entropy =
+            calculate_unified_priority_with_debt(&func, &graph, None, 3.0, None, None, None);
+
+        // Compare with same function without entropy
+        func.entropy_score = None;
+        let score_without_entropy =
+            calculate_unified_priority_with_debt(&func, &graph, None, 3.0, None, None, None);
+
+        assert!(
+            score_with_entropy.complexity_factor < score_without_entropy.complexity_factor,
+            "Entropy dampening should reduce complexity factor"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_security_issues() {
+        // Test security factor integration
+        let func = create_test_metrics();
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(
+            &func,
+            &graph,
+            None,
+            2.0,
+            Some(8.5), // High security issues
+            None,
+            None,
+        );
+
+        assert_eq!(score.security_factor, 8.5);
+        assert!(
+            score.final_score > 4.0,
+            "Security issues should increase priority"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_organization_issues() {
+        // Test organization factor integration
+        let func = create_test_metrics();
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(
+            &func,
+            &graph,
+            None,
+            2.0,
+            None,
+            Some(7.0), // Organization issues
+            None,
+        );
+
+        assert_eq!(score.organization_factor, 7.0);
+        assert!(
+            score.final_score > 3.0,
+            "Organization issues should affect priority"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_role_multiplier() {
+        // Test that different function roles get appropriate multipliers
+        let mut func = create_test_metrics();
+        func.cyclomatic = 10;
+        func.cognitive = 12;
+
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            line: func.line,
+        };
+
+        // Add some callers to make it an important function
+        for i in 0..5 {
+            let caller = FunctionId {
+                file: PathBuf::from("caller.rs"),
+                name: format!("caller_{}", i),
+                line: i * 10,
+            };
+            graph.add_call(FunctionCall {
+                caller,
+                callee: func_id.clone(),
+                call_type: CallType::Direct,
+            });
+        }
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, None, 3.0, None, None, None);
+
+        assert!(score.role_multiplier > 0.0);
+        assert!(
+            score.dependency_factor > 0.0,
+            "Function with callers should have dependency factor"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_test_functions() {
+        // Test that test functions get appropriate handling
+        let mut func = create_test_metrics();
+        func.is_test = true;
+        func.cyclomatic = 8;
+
+        let graph = CallGraph::new();
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, None, 2.0, None, None, None);
+
+        assert_eq!(
+            score.coverage_factor, 0.0,
+            "Test functions don't need coverage"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_max_score_capping() {
+        // Test that scores are capped at 10.0
+        let mut func = create_test_metrics();
+        func.cyclomatic = 50;
+        func.cognitive = 60;
+        func.length = 500;
+
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(
+            &func,
+            &graph,
+            None,
+            15.0,       // Very high ROI
+            Some(10.0), // Max security issues
+            Some(10.0), // Max organization issues
+            None,
+        );
+
+        assert!(score.final_score <= 10.0, "Score should be capped at 10.0");
+        assert_eq!(score.security_factor, 10.0);
+        assert_eq!(score.organization_factor, 10.0);
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_io_wrapper_trivial() {
+        // Test that trivial I/O wrappers are handled correctly
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        func.length = 5;
+        func.name = "read_file".to_string(); // Likely an I/O wrapper
+
+        let graph = CallGraph::new();
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![FunctionCoverage {
+                name: "read_file".to_string(),
+                start_line: 1,
+                execution_count: 1,
+                coverage_percentage: 100.0,
+            }],
+        );
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 1.0, None, None, None);
+
+        assert_eq!(
+            score.final_score, 0.0,
+            "Trivial tested I/O wrapper should have zero score"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_entry_point() {
+        // Test entry point functions
+        let mut func = create_test_metrics();
+        func.cyclomatic = 3;
+        func.cognitive = 4;
+        func.name = "main".to_string();
+
+        let graph = CallGraph::new();
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![FunctionCoverage {
+                name: "main".to_string(),
+                start_line: 1,
+                execution_count: 1,
+                coverage_percentage: 100.0,
+            }],
+        );
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 1.0, None, None, None);
+
+        assert_eq!(
+            score.final_score, 0.0,
+            "Trivial tested entry point should have zero score"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_partial_coverage() {
+        // Test function with partial coverage
+        let func = create_test_metrics();
+
+        let graph = CallGraph::new();
+        let mut lcov = LcovData::default();
+        // Add partial coverage (some hits but not full coverage)
+        lcov.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![FunctionCoverage {
+                name: "test_function".to_string(),
+                start_line: 10,
+                execution_count: 1,
+                coverage_percentage: 50.0,
+            }],
+        );
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), 3.0, None, None, None);
+
+        // Even with some coverage, non-trivial functions should still have priority
+        assert!(
+            score.final_score > 0.0,
+            "Non-trivial function should have non-zero score even with coverage"
+        );
     }
 }
