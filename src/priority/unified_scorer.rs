@@ -20,11 +20,10 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
-    pub complexity_factor: f64,   // 0-10, configurable weight (default 15%)
-    pub coverage_factor: f64,     // 0-10, configurable weight (default 35%)
-    pub roi_factor: f64,          // 0-10, configurable weight (default 25%)
+    pub complexity_factor: f64,   // 0-10, configurable weight (default 30%)
+    pub coverage_factor: f64,     // 0-10, configurable weight (default 40%)
     pub semantic_factor: f64,     // 0-10, configurable weight (default 5%)
-    pub dependency_factor: f64,   // 0-10, configurable weight (default 10%)
+    pub dependency_factor: f64,   // 0-10, configurable weight (default 15%)
     pub security_factor: f64,     // 0-10, configurable weight (default 5%)
     pub organization_factor: f64, // 0-10, configurable weight (default 5%)
     pub role_multiplier: f64,     // 0.1-1.5x based on function role
@@ -71,7 +70,6 @@ pub fn calculate_unified_priority(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    roi_score: f64,
     security_issues: Option<f64>,
     organization_issues: Option<f64>,
 ) -> UnifiedScore {
@@ -79,7 +77,6 @@ pub fn calculate_unified_priority(
         func,
         call_graph,
         coverage,
-        roi_score,
         security_issues,
         organization_issues,
         None,
@@ -90,7 +87,6 @@ pub fn calculate_unified_priority_with_debt(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    roi_score: f64,
     security_issues: Option<f64>,
     organization_issues: Option<f64>,
     debt_aggregator: Option<&DebtAggregator>,
@@ -125,7 +121,6 @@ pub fn calculate_unified_priority_with_debt(
         return UnifiedScore {
             complexity_factor: 0.0,
             coverage_factor: 0.0,
-            roi_factor: 0.0,
             semantic_factor: 0.0,
             dependency_factor: 0.0,
             security_factor: 0.0,
@@ -159,9 +154,6 @@ pub fn calculate_unified_priority_with_debt(
         // No coverage data - assume worst case
         10.0
     };
-
-    // Calculate ROI factor (normalized to 0-10)
-    let roi_factor = normalize_roi(roi_score);
 
     // Calculate semantic priority
     let semantic_factor = calculate_semantic_priority(func, role, &func_id, call_graph);
@@ -217,7 +209,6 @@ pub fn calculate_unified_priority_with_debt(
     // Calculate weighted components for transparency
     let weighted_complexity = complexity_factor * weights.complexity;
     let weighted_coverage = coverage_factor * weights.coverage;
-    let weighted_roi = roi_factor * weights.roi;
     let weighted_semantic = semantic_factor * weights.semantic;
     let weighted_dependency = dependency_factor * weights.dependency;
     let weighted_security = security_factor * weights.security;
@@ -231,7 +222,6 @@ pub fn calculate_unified_priority_with_debt(
     // Calculate weighted composite score
     let base_score = weighted_complexity
         + weighted_coverage
-        + weighted_roi
         + weighted_semantic
         + weighted_dependency
         + weighted_security
@@ -246,7 +236,6 @@ pub fn calculate_unified_priority_with_debt(
     UnifiedScore {
         complexity_factor,
         coverage_factor,
-        roi_factor,
         semantic_factor,
         dependency_factor,
         security_factor,
@@ -271,19 +260,6 @@ fn normalize_complexity(cyclomatic: u32, cognitive: u32) -> f64 {
     }
 }
 
-fn normalize_roi(roi: f64) -> f64 {
-    // ROI typically ranges from 0.1 to 10.0
-    // Normalize to 0-10 scale with logarithmic transformation
-    if roi <= 0.0 {
-        0.0
-    } else if roi <= 1.0 {
-        roi * 3.0
-    } else if roi <= 5.0 {
-        3.0 + (roi - 1.0) * 1.0
-    } else {
-        7.0 + ((roi - 5.0) * 0.6).min(3.0)
-    }
-}
 
 fn calculate_dependency_factor(upstream_count: usize) -> f64 {
     // Calculate criticality based on number of upstream dependencies (callers)
@@ -423,7 +399,6 @@ pub fn create_unified_debt_item_enhanced(
     call_graph: &CallGraph,
     _enhanced_call_graph: Option<()>, // Placeholder for future enhanced call graph
     coverage: Option<&LcovData>,
-    roi_score: f64,
 ) -> UnifiedDebtItem {
     let func_id = FunctionId {
         file: func.file.clone(),
@@ -439,7 +414,6 @@ pub fn create_unified_debt_item_enhanced(
         func,
         call_graph,
         coverage,
-        roi_score,
         Some(security_factor),
         Some(organization_factor),
     );
@@ -493,7 +467,6 @@ pub fn create_unified_debt_item_with_aggregator(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    roi_score: f64,
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
@@ -524,7 +497,6 @@ pub fn create_unified_debt_item_with_aggregator(
         func,
         call_graph,
         coverage,
-        roi_score,
         None, // Let the aggregator provide security factor
         None, // Let the aggregator provide organization factor
         Some(debt_aggregator),
@@ -571,7 +543,6 @@ pub fn create_unified_debt_item_with_exclusions(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    roi_score: f64,
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> UnifiedDebtItem {
@@ -605,7 +576,6 @@ pub fn create_unified_debt_item_with_exclusions(
         func,
         call_graph,
         coverage,
-        roi_score,
         Some(security_factor),
         Some(organization_factor),
     );
@@ -674,7 +644,6 @@ pub fn create_unified_debt_item(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    roi_score: f64,
 ) -> UnifiedDebtItem {
     let func_id = FunctionId {
         file: func.file.clone(),
@@ -690,7 +659,6 @@ pub fn create_unified_debt_item(
         func,
         call_graph,
         coverage,
-        roi_score,
         Some(security_factor),
         Some(organization_factor),
     );

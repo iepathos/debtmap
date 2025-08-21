@@ -14,10 +14,6 @@ pub struct ScoringWeights {
     #[serde(default = "default_complexity_weight")]
     pub complexity: f64,
 
-    /// Weight for ROI factor (0.0-1.0)
-    #[serde(default = "default_roi_weight")]
-    pub roi: f64,
-
     /// Weight for semantic factor (0.0-1.0)
     #[serde(default = "default_semantic_weight")]
     pub semantic: f64,
@@ -40,7 +36,6 @@ impl Default for ScoringWeights {
         Self {
             coverage: default_coverage_weight(),
             complexity: default_complexity_weight(),
-            roi: default_roi_weight(),
             semantic: default_semantic_weight(),
             dependency: default_dependency_weight(),
             security: default_security_weight(),
@@ -54,7 +49,6 @@ impl ScoringWeights {
     pub fn validate(&self) -> Result<(), String> {
         let sum = self.coverage
             + self.complexity
-            + self.roi
             + self.semantic
             + self.dependency
             + self.security
@@ -72,9 +66,6 @@ impl ScoringWeights {
         }
         if self.complexity < 0.0 || self.complexity > 1.0 {
             return Err("Complexity weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.roi < 0.0 || self.roi > 1.0 {
-            return Err("ROI weight must be between 0.0 and 1.0".to_string());
         }
         if self.semantic < 0.0 || self.semantic > 1.0 {
             return Err("Semantic weight must be between 0.0 and 1.0".to_string());
@@ -96,7 +87,6 @@ impl ScoringWeights {
     pub fn normalize(&mut self) {
         let sum = self.coverage
             + self.complexity
-            + self.roi
             + self.semantic
             + self.dependency
             + self.security
@@ -104,7 +94,6 @@ impl ScoringWeights {
         if sum > 0.0 {
             self.coverage /= sum;
             self.complexity /= sum;
-            self.roi /= sum;
             self.semantic /= sum;
             self.dependency /= sum;
             self.security /= sum;
@@ -113,27 +102,24 @@ impl ScoringWeights {
     }
 }
 
-// Default weights - prioritize coverage but include dependency criticality
+// Default weights - redistributed after removing ROI
 fn default_coverage_weight() -> f64 {
-    0.30 // Reduced from 0.35 (-0.05) to balance weights
+    0.40 // Increased from 0.30 (+0.10) to absorb ROI weight
 }
 fn default_complexity_weight() -> f64 {
-    0.20 // Increased from 0.15 (+0.05) to absorb some performance weight
-}
-fn default_roi_weight() -> f64 {
-    0.25 // Reduced back to original to maintain sum of 1.0
+    0.30 // Increased from 0.20 (+0.10) to absorb ROI weight
 }
 fn default_semantic_weight() -> f64 {
-    0.05
+    0.05 // Unchanged
 }
 fn default_dependency_weight() -> f64 {
-    0.10 // Unchanged
+    0.15 // Increased from 0.10 (+0.05) to absorb ROI weight
 }
 fn default_security_weight() -> f64 {
     0.05 // Unchanged
 }
 fn default_organization_weight() -> f64 {
-    0.05 // Reduced back to maintain sum of 1.0
+    0.05 // Unchanged
 }
 
 /// Context-aware detection configuration
