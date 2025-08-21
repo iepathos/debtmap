@@ -138,3 +138,90 @@ pub fn enrich_with_context(metrics: FileMetrics) -> FileMetrics {
         ..metrics
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic,
+            cognitive,
+            nesting: 0,
+            length: 10,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+        }
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_empty() {
+        let functions = vec![];
+        let (cyc, cog) = calculate_total_complexity(&functions);
+        assert_eq!(cyc, 0);
+        assert_eq!(cog, 0);
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_single_function() {
+        let functions = vec![create_test_function("test_func", 5, 3)];
+        let (cyc, cog) = calculate_total_complexity(&functions);
+        assert_eq!(cyc, 5);
+        assert_eq!(cog, 3);
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_multiple_functions() {
+        let functions = vec![
+            create_test_function("func1", 5, 3),
+            create_test_function("func2", 10, 7),
+            create_test_function("func3", 2, 1),
+        ];
+        let (cyc, cog) = calculate_total_complexity(&functions);
+        assert_eq!(cyc, 17);
+        assert_eq!(cog, 11);
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_zero_values() {
+        let functions = vec![
+            create_test_function("func1", 0, 0),
+            create_test_function("func2", 0, 0),
+        ];
+        let (cyc, cog) = calculate_total_complexity(&functions);
+        assert_eq!(cyc, 0);
+        assert_eq!(cog, 0);
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_large_values() {
+        let functions = vec![
+            create_test_function("complex_func1", 100, 80),
+            create_test_function("complex_func2", 200, 150),
+            create_test_function("complex_func3", 50, 40),
+        ];
+        let (cyc, cog) = calculate_total_complexity(&functions);
+        assert_eq!(cyc, 350);
+        assert_eq!(cog, 270);
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_mixed_values() {
+        let functions = vec![
+            create_test_function("simple", 1, 1),
+            create_test_function("medium", 10, 8),
+            create_test_function("complex", 25, 20),
+            create_test_function("zero", 0, 0),
+        ];
+        let (cyc, cog) = calculate_total_complexity(&functions);
+        assert_eq!(cyc, 36);
+        assert_eq!(cog, 29);
+    }
+}
