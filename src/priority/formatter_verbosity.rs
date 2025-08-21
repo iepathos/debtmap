@@ -137,11 +137,7 @@ pub fn format_priority_item_with_verbosity(
             item.unified_score.coverage_factor * weights.coverage
         )
         .unwrap();
-        // ROI factor kept for compatibility but not included in scoring per spec 55 and 58
-        // Semantic factor removed per spec 58 - role multipliers provide the only role-based adjustment
-        // Always show all components for consistency
-        let has_security = item.unified_score.security_factor > 0.0;
-
+        
         writeln!(
             output,
             "│  │  ├─ Dependency:  {:.1} × {:.0}% = {:.2}",
@@ -151,21 +147,39 @@ pub fn format_priority_item_with_verbosity(
         )
         .unwrap();
 
-        // Show security if non-zero
-        if has_security {
-            writeln!(
-                output,
-                "│  │  ├─ Security:    {:.1} × {:.0}% = {:.2}",
-                item.unified_score.security_factor,
-                weights.security * 100.0,
-                item.unified_score.security_factor * weights.security
-            )
-            .unwrap();
+        // Always show security factor for consistency
+        writeln!(
+            output,
+            "│  │  ├─ Security:    {:.1} × {:.0}% = {:.2}",
+            item.unified_score.security_factor,
+            weights.security * 100.0,
+            item.unified_score.security_factor * weights.security
+        )
+        .unwrap();
+        
+        // Show semantic and organization with 0% weight for transparency
+        // These were removed per spec 58 but keeping in display for clarity
+        if weights.semantic > 0.0 || weights.organization > 0.0 {
+            if weights.semantic > 0.0 {
+                writeln!(
+                    output,
+                    "│  │  ├─ Semantic:    0.0 × {:.0}% = 0.00 (role multipliers used instead)",
+                    weights.semantic * 100.0
+                )
+                .unwrap();
+            }
+            if weights.organization > 0.0 {
+                writeln!(
+                    output,
+                    "│  │  ├─ Organization: 0.0 × {:.0}% = 0.00 (included in complexity)",
+                    weights.organization * 100.0
+                )
+                .unwrap();
+            }
         }
 
-        // Organization factor removed per spec 58 - redundant with complexity factor
-
-        // New weights after spec 58: complexity 35%, coverage 40%, dependency 20%, security 5%
+        // Calculate base score with actual weights from config
+        // Note: semantic and organization are in config but not used in calculation (always 0)
         let base_score = item.unified_score.complexity_factor * weights.complexity
             + item.unified_score.coverage_factor * weights.coverage
             + item.unified_score.dependency_factor * weights.dependency

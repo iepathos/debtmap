@@ -3,12 +3,13 @@
 [scoring]
 # Weights for different scoring factors (must sum to 1.0)
 # ROI has been removed from scoring - weights redistributed to other factors
+# Semantic and organization factors removed per spec 58 to avoid redundancy
 coverage = 0.40      # Weight for test coverage gaps (40%)
-complexity = 0.30    # Weight for code complexity (30%)
-semantic = 0.05     # Weight for semantic importance (5%)
-dependency = 0.15   # Weight for dependency criticality (15%)
+complexity = 0.35    # Weight for code complexity (35% - includes organization)
+semantic = 0.00     # Removed: role multipliers provide semantic adjustment
+dependency = 0.20   # Weight for dependency criticality (20%)
 security = 0.05     # Weight for security issues (5%)
-organization = 0.05 # Weight for code organization issues (5%)
+organization = 0.00 # Removed: redundant with complexity factor
 
 [thresholds]
 complexity = 10
