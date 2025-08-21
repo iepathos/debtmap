@@ -421,13 +421,16 @@ fn is_std_or_utility_function(name: &str) -> bool {
 }
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
+    // Get multipliers from configuration
+    let config = crate::config::get_role_multipliers();
+
     match role {
-        FunctionRole::PureLogic => 1.5,    // High priority for business logic
-        FunctionRole::Orchestrator => 0.2, // Low priority if delegates to tested code
-        FunctionRole::IOWrapper => 0.1,    // Very low priority for thin I/O
-        FunctionRole::EntryPoint => 0.8,   // Medium priority (integration test focus)
-        FunctionRole::PatternMatch => 0.1, // Very low priority for pattern matching
-        FunctionRole::Unknown => 1.0,      // Default multiplier
+        FunctionRole::PureLogic => config.pure_logic,
+        FunctionRole::Orchestrator => config.orchestrator,
+        FunctionRole::IOWrapper => config.io_wrapper,
+        FunctionRole::EntryPoint => config.entry_point,
+        FunctionRole::PatternMatch => config.pattern_match,
+        FunctionRole::Unknown => config.unknown,
     }
 }
 
@@ -586,10 +589,12 @@ mod tests {
 
     #[test]
     fn test_role_multipliers() {
+        // Test with default configuration values
         assert_eq!(get_role_multiplier(FunctionRole::PureLogic), 1.5);
-        assert_eq!(get_role_multiplier(FunctionRole::Orchestrator), 0.2);
-        assert_eq!(get_role_multiplier(FunctionRole::IOWrapper), 0.1);
+        assert_eq!(get_role_multiplier(FunctionRole::Orchestrator), 0.6);
+        assert_eq!(get_role_multiplier(FunctionRole::IOWrapper), 0.5);
         assert_eq!(get_role_multiplier(FunctionRole::EntryPoint), 0.8);
+        assert_eq!(get_role_multiplier(FunctionRole::PatternMatch), 0.4);
         assert_eq!(get_role_multiplier(FunctionRole::Unknown), 1.0);
     }
 
