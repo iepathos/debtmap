@@ -72,7 +72,6 @@ Remove orchestration as a debt type and instead leverage orchestrator detection 
 ### Non-Functional Requirements
 
 - **Performance**: Architectural tracking should add < 5% overhead
-- **Backwards Compatibility**: Existing ignore patterns should continue working
 - **Clarity**: Output should clearly distinguish architectural insights from debt
 - **Maintainability**: Clean separation between debt detection and architectural analysis
 
@@ -214,7 +213,7 @@ struct UnifiedDebtItem {
 - Test full analysis with orchestrators present
 - Verify architectural insights in output
 - Test performance impact of architectural tracking
-- Test backwards compatibility with existing suppressions
+- Verify orchestration suppressions are properly ignored
 
 ### Validation Tests
 - Run on debtmap codebase and verify 13+ orchestration items no longer flagged
@@ -244,15 +243,9 @@ struct UnifiedDebtItem {
 
 ### Key Considerations
 1. Preserve existing orchestrator detection logic for architectural insights
-2. Ensure smooth migration path for users with orchestration suppressions
-3. Consider making architectural insights optional via CLI flag initially
-4. Focus on actionable context over theoretical categorization
-
-### Migration Path
-1. First release: Add deprecation warning for orchestration debt type
-2. Add architectural insights as supplementary information
-3. Remove orchestration debt type in next major version
-4. Provide migration guide for suppression updates
+2. Focus on actionable context over theoretical categorization
+3. Make architectural insights always enabled (not optional)
+4. Clean removal without deprecation period
 
 ### Performance Optimization
 - Cache architectural role classifications
@@ -262,20 +255,15 @@ struct UnifiedDebtItem {
 ## Migration and Compatibility
 
 ### Breaking Changes
-- `DebtType::Orchestration` removal will break code that pattern matches on it
+- `DebtType::Orchestration` variant will be completely removed
 - JSON output format will change (orchestration items removed)
-- Existing orchestration suppressions will become no-ops
+- Existing orchestration suppressions will be ignored and can be deleted
 
 ### Migration Strategy
-1. Add `--legacy-orchestration` flag for compatibility
-2. Log warnings when orchestration suppressions are encountered
-3. Provide tool to convert orchestration suppressions to appropriate new types
-4. Document in CHANGELOG with clear migration instructions
-
-### Compatibility Measures
-- Maintain backwards compatibility for other debt types
-- Ensure JSON schema version is incremented
-- Provide clear error messages for removed functionality
+1. Remove all orchestration-related code immediately
+2. Update all pattern matches to remove orchestration cases
+3. Document removal in CHANGELOG as a breaking change
+4. No compatibility flags or migration tools needed
 
 ## Success Metrics
 
