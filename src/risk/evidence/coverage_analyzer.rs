@@ -989,4 +989,308 @@ mod tests {
             assert_eq!(path, &format!("Business logic path {}", i + 1));
         }
     }
+
+    #[test]
+    fn test_classify_coverage_level_excellent() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(95.0, &thresholds),
+            ComparisonResult::BelowMedian // Better than median (inverted for coverage)
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(90.0, &thresholds),
+            ComparisonResult::BelowMedian
+        );
+    }
+
+    #[test]
+    fn test_classify_coverage_level_good() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(85.0, &thresholds),
+            ComparisonResult::AboveMedian
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(80.0, &thresholds),
+            ComparisonResult::AboveMedian
+        );
+    }
+
+    #[test]
+    fn test_classify_coverage_level_moderate() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(70.0, &thresholds),
+            ComparisonResult::AboveP75
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(60.0, &thresholds),
+            ComparisonResult::AboveP75
+        );
+    }
+
+    #[test]
+    fn test_classify_coverage_level_poor() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(45.0, &thresholds),
+            ComparisonResult::AboveP90
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(30.0, &thresholds),
+            ComparisonResult::AboveP90
+        );
+    }
+
+    #[test]
+    fn test_classify_coverage_level_critical() {
+        let thresholds = CoverageThresholds {
+            excellent: 90.0,
+            good: 80.0,
+            moderate: 60.0,
+            poor: 30.0,
+            critical: 10.0,
+        };
+
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(20.0, &thresholds),
+            ComparisonResult::AboveP95
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_coverage_level(0.0, &thresholds),
+            ComparisonResult::AboveP95
+        );
+    }
+
+    #[test]
+    fn test_classify_confidence_from_coverage_zero() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_confidence_from_coverage(0.0),
+            0.9 // High confidence that uncovered code is risky
+        );
+    }
+
+    #[test]
+    fn test_classify_confidence_from_coverage_low() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_confidence_from_coverage(25.0),
+            0.85
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_confidence_from_coverage(49.9),
+            0.85
+        );
+    }
+
+    #[test]
+    fn test_classify_confidence_from_coverage_medium() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_confidence_from_coverage(50.0),
+            0.8
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_confidence_from_coverage(79.9),
+            0.8
+        );
+    }
+
+    #[test]
+    fn test_classify_confidence_from_coverage_high() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_confidence_from_coverage(80.0),
+            0.95
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_confidence_from_coverage(100.0),
+            0.95
+        );
+    }
+
+    #[test]
+    fn test_classify_role_weight_pure_logic() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_role_weight(&FunctionRole::PureLogic),
+            1.0
+        );
+    }
+
+    #[test]
+    fn test_classify_role_weight_entry_point() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_role_weight(&FunctionRole::EntryPoint),
+            0.9
+        );
+    }
+
+    #[test]
+    fn test_classify_role_weight_orchestrator() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_role_weight(&FunctionRole::Orchestrator),
+            0.6
+        );
+    }
+
+    #[test]
+    fn test_classify_role_weight_io_wrapper() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_role_weight(&FunctionRole::IOWrapper),
+            0.4
+        );
+    }
+
+    #[test]
+    fn test_classify_role_weight_pattern_match() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_role_weight(&FunctionRole::PatternMatch),
+            0.3
+        );
+    }
+
+    #[test]
+    fn test_classify_role_weight_unknown() {
+        assert_eq!(
+            CoverageRiskAnalyzer::classify_role_weight(&FunctionRole::Unknown),
+            0.8
+        );
+    }
+
+    #[test]
+    fn test_estimate_test_count_zero_coverage() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.estimate_test_count(0.0, 5), 0); // Returns 0 for zero coverage
+        assert_eq!(analyzer.estimate_test_count(0.0, 10), 0);
+    }
+
+    #[test]
+    fn test_estimate_test_count_partial_coverage() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        // Formula: (complexity * coverage_ratio * 1.5).max(1)
+        // 50% coverage: (10 * 0.5 * 1.5) = 7.5 -> 7
+        assert_eq!(analyzer.estimate_test_count(50.0, 10), 7);
+        // 75% coverage: (8 * 0.75 * 1.5) = 9 -> 9
+        assert_eq!(analyzer.estimate_test_count(75.0, 8), 9);
+    }
+
+    #[test]
+    fn test_estimate_test_count_full_coverage() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        // 100% coverage: (10 * 1.0 * 1.5) = 15
+        assert_eq!(analyzer.estimate_test_count(100.0, 10), 15);
+    }
+
+    #[test]
+    fn test_estimate_test_count_boundary_values() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        // 99.9% coverage: (10 * 0.999 * 1.5) = 14.985 -> 14
+        assert_eq!(analyzer.estimate_test_count(99.9, 10), 14);
+        // 0.1% coverage: (10 * 0.001 * 1.5) = 0.015 -> rounds to 0, but max(1) = 1
+        assert_eq!(analyzer.estimate_test_count(0.1, 10), 1);
+    }
+
+    #[test]
+    fn test_score_critical_paths_zero() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_critical_paths(0), 0.0);
+    }
+
+    #[test]
+    fn test_score_critical_paths_low() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_critical_paths(1), 2.5);
+        assert_eq!(analyzer.score_critical_paths(2), 2.5);
+    }
+
+    #[test]
+    fn test_score_critical_paths_medium() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_critical_paths(3), 5.0);
+        assert_eq!(analyzer.score_critical_paths(4), 5.0);
+        assert_eq!(analyzer.score_critical_paths(5), 5.0);
+    }
+
+    #[test]
+    fn test_score_critical_paths_high() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_critical_paths(6), 7.5);
+        assert_eq!(analyzer.score_critical_paths(8), 7.5);
+        assert_eq!(analyzer.score_critical_paths(10), 7.5);
+    }
+
+    #[test]
+    fn test_score_critical_paths_very_high() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_critical_paths(11), 10.0);
+        assert_eq!(analyzer.score_critical_paths(20), 10.0);
+        assert_eq!(analyzer.score_critical_paths(100), 10.0);
+    }
+
+    #[test]
+    fn test_score_quality_excellent() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_quality(&TestQuality::Excellent), 0.0);
+    }
+
+    #[test]
+    fn test_score_quality_good() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_quality(&TestQuality::Good), 2.5);
+    }
+
+    #[test]
+    fn test_score_quality_adequate() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_quality(&TestQuality::Adequate), 5.0);
+    }
+
+    #[test]
+    fn test_score_quality_poor() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_quality(&TestQuality::Poor), 7.5);
+    }
+
+    #[test]
+    fn test_score_quality_missing() {
+        let analyzer = CoverageRiskAnalyzer::new();
+        assert_eq!(analyzer.score_quality(&TestQuality::Missing), 10.0);
+    }
+
+    #[test]
+    fn test_generate_path_name_pattern_match() {
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::PatternMatch, 1),
+            "Pattern branch 1"
+        );
+        assert_eq!(
+            CoverageRiskAnalyzer::generate_path_name(&FunctionRole::PatternMatch, 3),
+            "Pattern branch 3"
+        );
+    }
 }
