@@ -279,7 +279,7 @@ mod tests {
         let pool = 50;
         let timeout = 120;
         let db = Database::new(conn_str.to_string(), pool, timeout);
-        
+
         // Test all accessors in sequence
         assert_eq!(db.connection_string(), conn_str);
         assert_eq!(db.pool_size(), pool);
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn test_accessors_multiple_calls_return_same_values() {
         let db = Database::new("postgres://localhost/test".to_string(), 10, 30);
-        
+
         // Call each accessor multiple times
         assert_eq!(db.connection_string(), db.connection_string());
         assert_eq!(db.pool_size(), db.pool_size());
