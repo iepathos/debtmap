@@ -434,28 +434,8 @@ pub fn get_role_multiplier(role: FunctionRole) -> f64 {
     }
 }
 
-pub fn calculate_semantic_priority(
-    _func: &FunctionMetrics,
-    role: FunctionRole,
-    func_id: &FunctionId,
-    call_graph: &CallGraph,
-) -> f64 {
-    let mut priority = match role {
-        FunctionRole::PureLogic => 8.0,
-        FunctionRole::Orchestrator => 2.0,
-        FunctionRole::IOWrapper => 1.0,
-        FunctionRole::EntryPoint => 6.0,
-        FunctionRole::PatternMatch => 1.0,
-        FunctionRole::Unknown => 5.0,
-    };
-
-    // Adjust based on criticality
-    let criticality = call_graph.calculate_criticality(func_id);
-    priority *= criticality;
-
-    // Cap at 10.0
-    priority.min(10.0)
-}
+// Semantic priority calculation removed per spec 58
+// Role multipliers now provide the only role-based adjustment to avoid double penalties
 
 #[cfg(test)]
 mod tests {

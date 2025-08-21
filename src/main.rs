@@ -1598,11 +1598,9 @@ fn convert_error_swallowing_to_unified(
             let unified_score = UnifiedScore {
                 complexity_factor: 3.0, // Moderate complexity - error handling adds complexity
                 coverage_factor: 5.0,   // Important to test error paths
-                roi_factor: 6.0,        // High ROI - prevents production failures
-                semantic_factor: 7.0,   // High semantic importance - affects reliability
+                roi_factor: 6.0,        // Kept for compatibility but not used in scoring
                 dependency_factor: 4.0, // Moderate dependency impact
                 security_factor: 0.0,   // Not a security issue
-                organization_factor: 0.0, // Not an organization issue
                 role_multiplier: 1.2,   // Slightly elevated importance
                 final_score: 5.5,       // Above average priority
             };

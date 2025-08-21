@@ -268,7 +268,7 @@ mod tests {
             urgency_25
         );
 
-        // Test 50% coverage - should be around 5.0  
+        // Test 50% coverage - should be around 5.0
         // With weight = 0.7, effective coverage = 0.5 * 0.7 = 0.35, gap = 0.65
         let funcs = vec![FunctionCoverage {
             name: "test_func".to_string(),
@@ -306,7 +306,7 @@ mod tests {
             urgency_75
         );
 
-        // Test 90% coverage - should be around 1.3 
+        // Test 90% coverage - should be around 1.3
         // With weight = 0.7, effective coverage = 0.9 * 0.7 = 0.63, gap = 0.37
         let funcs = vec![FunctionCoverage {
             name: "test_func".to_string(),
@@ -387,7 +387,7 @@ mod tests {
             urgency_c1
         );
 
-        // Complexity 5: ln(6)/3 + 0.5 = ~1.09 multiplier  
+        // Complexity 5: ln(6)/3 + 0.5 = ~1.09 multiplier
         let urgency_c5 = calculate_coverage_urgency(&func_id, &graph, &coverage, 5);
         assert!(
             urgency_c5 >= 9.5 && urgency_c5 <= 10.0,
