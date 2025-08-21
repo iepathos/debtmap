@@ -369,40 +369,54 @@ fn detect_prototype_pollution(
     }
 }
 
+// Query for detecting JSON.parse usage
+const JSON_PARSE_QUERY: &str = r#"
+(call_expression
+  function: (member_expression
+    object: (identifier) @obj (#eq? @obj "JSON")
+    property: (property_identifier) @method (#eq? @method "parse")
+  )
+  arguments: (arguments
+    (_) @input
+  )
+) @call
+"#;
+
 fn detect_unsafe_deserialization(
     root: Node,
     source: &str,
     language: &tree_sitter::Language,
     vulnerabilities: &mut Vec<SecurityVulnerability>,
 ) {
-    // Detect JSON.parse without validation
-    let query_str = r#"
-    (call_expression
-      function: (member_expression
-        object: (identifier) @obj (#eq? @obj "JSON")
-        property: (property_identifier) @method (#eq? @method "parse")
-      )
-      arguments: (arguments
-        (_) @input
-      )
-    ) @call
-    "#;
+    let Ok(query) = Query::new(language, JSON_PARSE_QUERY) else {
+        return;
+    };
 
-    if let Ok(query) = Query::new(language, query_str) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(&query, root, source.as_bytes());
 
-        while let Some(match_) = matches.next() {
-            if let Some(input) = match_.captures.iter().find(|c| c.index == 2) {
-                // Check if input is from untrusted source
-                if contains_user_input(input.node, source) {
-                    vulnerabilities.push(SecurityVulnerability::UnsafeDeserialization {
-                        location: SourceLocation::from_node(input.node),
-                        method: "JSON.parse".to_string(),
-                    });
-                }
-            }
+    while let Some(match_) = matches.next() {
+        #[allow(clippy::needless_borrow)]
+        if let Some(vulnerability) = check_unsafe_parse_match(&match_, source) {
+            vulnerabilities.push(vulnerability);
         }
+    }
+}
+
+// Extract match checking logic into a pure function for testability
+fn check_unsafe_parse_match(
+    match_: &tree_sitter::QueryMatch,
+    source: &str,
+) -> Option<SecurityVulnerability> {
+    let input_capture = match_.captures.iter().find(|c| c.index == 2)?;
+
+    if contains_user_input(input_capture.node, source) {
+        Some(SecurityVulnerability::UnsafeDeserialization {
+            location: SourceLocation::from_node(input_capture.node),
+            method: "JSON.parse".to_string(),
+        })
+    } else {
+        None
     }
 }
 
@@ -463,4 +477,169 @@ fn determine_security_context(node: Node, source: &str) -> String {
     }
 
     "unknown".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tree_sitter::{Parser, Tree};
+
+    fn parse_javascript(source: &str) -> (Tree, tree_sitter::Language) {
+        let language = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&language).unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        (tree, language)
+    }
+
+    #[test]
+    fn test_contains_user_input_detects_request_sources() {
+        let test_cases = vec![
+            ("request.body", true),
+            ("req.params.id", true),
+            ("query.search", true),
+            ("body.data", true),
+            ("localStorage.getItem('key')", true),
+            ("sessionStorage.value", true),
+            ("location.href", true),
+            ("window.location.search", true),
+            ("document.referrer", true),
+            ("document.cookie", true),
+            ("constantValue", false),
+            ("Math.random()", false),
+            ("hardcodedString", false),
+        ];
+
+        for (input, expected) in test_cases {
+            let (tree, _) = parse_javascript(input);
+            let result = contains_user_input(tree.root_node(), input);
+            assert_eq!(
+                result, expected,
+                "Failed for input: '{}', expected: {}, got: {}",
+                input, expected, result
+            );
+        }
+    }
+
+    #[test]
+    fn test_detect_unsafe_deserialization_with_user_input() {
+        let source = r#"
+            const data = JSON.parse(request.body);
+            const safe = JSON.parse('{"key": "value"}');
+            const unsafe = JSON.parse(req.params.data);
+        "#;
+
+        let (tree, language) = parse_javascript(source);
+        let mut vulnerabilities = Vec::new();
+        detect_unsafe_deserialization(tree.root_node(), source, &language, &mut vulnerabilities);
+
+        // Should detect 2 unsafe deserializations (request.body and req.params.data)
+        assert_eq!(
+            vulnerabilities.len(),
+            2,
+            "Should detect 2 unsafe deserializations"
+        );
+
+        for vuln in &vulnerabilities {
+            match vuln {
+                SecurityVulnerability::UnsafeDeserialization { method, .. } => {
+                    assert_eq!(method, "JSON.parse");
+                }
+                _ => panic!("Expected UnsafeDeserialization vulnerability"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_detect_unsafe_deserialization_safe_usage() {
+        let source = r#"
+            const config = JSON.parse('{"safe": true}');
+            const data = JSON.parse(staticConfig);
+            const result = JSON.parse(hardcodedValue);
+        "#;
+
+        let (tree, language) = parse_javascript(source);
+        let mut vulnerabilities = Vec::new();
+        detect_unsafe_deserialization(tree.root_node(), source, &language, &mut vulnerabilities);
+
+        // Should not detect any vulnerabilities for safe usage
+        assert_eq!(
+            vulnerabilities.len(),
+            0,
+            "Should not detect vulnerabilities for safe JSON.parse usage"
+        );
+    }
+
+    #[test]
+    fn test_check_unsafe_parse_match_with_user_input() {
+        // Test the extracted pure function
+        let source = "JSON.parse(localStorage.getItem('data'))";
+        let (tree, language) = parse_javascript(source);
+
+        let query = Query::new(&language, JSON_PARSE_QUERY).unwrap();
+        let mut cursor = QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        let first_match = matches.next();
+        assert!(first_match.is_some(), "Should find JSON.parse pattern");
+
+        #[allow(clippy::needless_borrow)]
+        let result = check_unsafe_parse_match(&first_match.unwrap(), source);
+        assert!(
+            result.is_some(),
+            "Should detect unsafe parse with localStorage"
+        );
+
+        if let Some(SecurityVulnerability::UnsafeDeserialization { method, .. }) = result {
+            assert_eq!(method, "JSON.parse");
+        } else {
+            panic!("Expected UnsafeDeserialization vulnerability");
+        }
+    }
+
+    #[test]
+    fn test_check_unsafe_parse_match_without_user_input() {
+        let source = "JSON.parse('{\"safe\": true}')";
+        let (tree, language) = parse_javascript(source);
+
+        let query = Query::new(&language, JSON_PARSE_QUERY).unwrap();
+        let mut cursor = QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        let first_match = matches.next();
+        assert!(first_match.is_some(), "Should find JSON.parse pattern");
+
+        #[allow(clippy::needless_borrow)]
+        let result = check_unsafe_parse_match(&first_match.unwrap(), source);
+        assert!(
+            result.is_none(),
+            "Should not detect vulnerability for safe input"
+        );
+    }
+
+    #[test]
+    fn test_json_parse_query_pattern() {
+        // Test that the query correctly identifies JSON.parse calls
+        let test_cases = vec![
+            ("JSON.parse(data)", true),
+            ("JSON.parse(request.body)", true),
+            ("JSON.stringify(data)", false),
+            ("parse(data)", false),
+            ("obj.parse(data)", false),
+        ];
+
+        for (source, should_match) in test_cases {
+            let (tree, language) = parse_javascript(source);
+            let query = Query::new(&language, JSON_PARSE_QUERY).unwrap();
+            let mut cursor = QueryCursor::new();
+            let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+            let has_match = matches.next().is_some();
+            assert_eq!(
+                has_match, should_match,
+                "Pattern matching failed for: '{}'",
+                source
+            );
+        }
+    }
 }
