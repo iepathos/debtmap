@@ -119,4 +119,94 @@ mod tests {
         assert_ne!(db1.pool_size, db2.pool_size);
         assert_ne!(db1.timeout, db2.timeout);
     }
+
+    #[test]
+    fn test_new_with_special_characters_in_connection_string() {
+        let special_conn =
+            "postgres://user:p@$$w0rd!@localhost:5432/db?sslmode=require".to_string();
+        let db = Database::new(special_conn.clone(), 10, 30);
+        assert_eq!(db.connection_string(), special_conn);
+        assert!(db.cache().is_empty());
+    }
+
+    #[test]
+    fn test_new_with_unicode_in_connection_string() {
+        let unicode_conn = "postgres://用户:密码@localhost/数据库".to_string();
+        let db = Database::new(unicode_conn.clone(), 10, 30);
+        assert_eq!(db.connection_string(), unicode_conn);
+    }
+
+    #[test]
+    fn test_new_with_typical_production_values() {
+        let db = Database::new("postgres://prod.example.com/myapp".to_string(), 50, 300);
+        assert_eq!(db.connection_string(), "postgres://prod.example.com/myapp");
+        assert_eq!(db.pool_size(), 50);
+        assert_eq!(db.timeout(), 300);
+        assert!(db.cache().is_empty());
+    }
+
+    #[test]
+    fn test_getter_methods_return_correct_values() {
+        let conn = "postgresql://localhost:5432/testdb".to_string();
+        let pool = 25;
+        let timeout = 120;
+        let db = Database::new(conn.clone(), pool, timeout);
+
+        assert_eq!(db.connection_string(), conn);
+        assert_eq!(db.pool_size(), pool);
+        assert_eq!(db.timeout(), timeout);
+        assert_eq!(db.cache().len(), 0);
+    }
+
+    #[test]
+    fn test_database_is_cloneable() {
+        let db1 = Database::new("test".to_string(), 10, 30);
+        let db2 = db1.clone();
+
+        assert_eq!(db1.connection_string(), db2.connection_string());
+        assert_eq!(db1.pool_size(), db2.pool_size());
+        assert_eq!(db1.timeout(), db2.timeout());
+    }
+
+    #[test]
+    fn test_database_debug_trait() {
+        let db = Database::new("test".to_string(), 10, 30);
+        let debug_str = format!("{:?}", db);
+
+        assert!(debug_str.contains("Database"));
+        assert!(debug_str.contains("connection_string"));
+        assert!(debug_str.contains("pool_size"));
+        assert!(debug_str.contains("timeout"));
+        assert!(debug_str.contains("cache"));
+    }
+
+    #[test]
+    fn test_new_with_various_pool_sizes() {
+        let test_cases = vec![
+            (1, "single connection pool"),
+            (10, "small pool"),
+            (100, "medium pool"),
+            (1000, "large pool"),
+        ];
+
+        for (size, description) in test_cases {
+            let db = Database::new(format!("test_{}", description), size, 30);
+            assert_eq!(db.pool_size(), size, "Failed for {}", description);
+        }
+    }
+
+    #[test]
+    fn test_new_with_various_timeouts() {
+        let test_cases = vec![
+            (1, "minimal timeout"),
+            (30, "standard timeout"),
+            (300, "long timeout"),
+            (3600, "very long timeout"),
+        ];
+
+        for (timeout, description) in test_cases {
+            let db = Database::new("test".to_string(), 10, timeout);
+            assert_eq!(db.timeout(), timeout, "Failed for {}", description);
+        }
+    }
 }
