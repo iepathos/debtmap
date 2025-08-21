@@ -198,11 +198,13 @@ fn format_score_factors(score: &crate::priority::unified_scorer::UnifiedScore) -
         "- **Priority Score**: {:.2}\n\
          - **Complexity Factor**: {:.2}\n\
          - **Coverage Factor**: {:.2}\n\
-         - **Semantic Factor**: {:.2}\n",
+         - **Dependency Factor**: {:.2}\n\
+         - **Security Factor**: {:.2}\n",
         score.final_score,
         score.complexity_factor,
         score.coverage_factor,
-        score.semantic_factor
+        score.dependency_factor,
+        score.security_factor
     )
 }
 
@@ -684,10 +686,8 @@ mod tests {
                 final_score,
                 complexity_factor: 0.8,
                 coverage_factor: 0.6,
-                semantic_factor: 0.5,
                 dependency_factor: 0.5,
                 security_factor: 0.0,
-                organization_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::ComplexityHotspot {
@@ -726,10 +726,8 @@ mod tests {
             final_score: 7.89,
             complexity_factor: 0.85,
             coverage_factor: 0.65,
-            semantic_factor: 0.55,
             dependency_factor: 0.45,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
         };
 
@@ -738,8 +736,8 @@ mod tests {
         assert!(result.contains("Priority Score**: 7.89"));
         assert!(result.contains("Complexity Factor**: 0.85"));
         assert!(result.contains("Coverage Factor**: 0.65"));
-        assert!(result.contains("ROI Factor**: 0.75"));
-        assert!(result.contains("Semantic Factor**: 0.55"));
+        assert!(result.contains("Dependency Factor**: 0.45"));
+        assert!(result.contains("Security Factor**: 0.00"));
     }
 
     #[test]
@@ -815,10 +813,8 @@ mod tests {
             final_score: 7.899999,
             complexity_factor: 0.855555,
             coverage_factor: 0.654321,
-            semantic_factor: 0.559876,
             dependency_factor: 0.456789,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
         };
 
@@ -828,8 +824,8 @@ mod tests {
         assert!(result.contains("Priority Score**: 7.90"));
         assert!(result.contains("Complexity Factor**: 0.86"));
         assert!(result.contains("Coverage Factor**: 0.65"));
-        assert!(result.contains("ROI Factor**: 0.75"));
-        assert!(result.contains("Semantic Factor**: 0.56"));
+        assert!(result.contains("Dependency Factor**: 0.46"));
+        assert!(result.contains("Security Factor**: 0.00"));
     }
 
     #[test]
@@ -857,10 +853,8 @@ mod tests {
                 final_score: 5.0,
                 complexity_factor: 0.5,
                 coverage_factor: 0.0,
-                semantic_factor: 0.3,
                 dependency_factor: 0.2,
                 security_factor: 0.0,
-                organization_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -910,10 +904,8 @@ mod tests {
                 final_score: 8.0,
                 complexity_factor: 0.8,
                 coverage_factor: 0.6,
-                semantic_factor: 0.5,
                 dependency_factor: 0.5,
                 security_factor: 0.0,
-                organization_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::TestingGap {
@@ -1333,10 +1325,8 @@ mod tests {
                 final_score: 5.0,
                 complexity_factor: 0.5,
                 coverage_factor: 0.0,
-                semantic_factor: 0.3,
                 dependency_factor: 0.2,
                 security_factor: 0.0,
-                organization_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -1380,10 +1370,8 @@ mod tests {
                 final_score: 6.0,
                 complexity_factor: 0.6,
                 coverage_factor: 0.0,
-                semantic_factor: 0.3,
                 dependency_factor: 0.2,
                 security_factor: 0.0,
-                organization_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -1497,10 +1485,8 @@ mod tests {
                 final_score: 5.0,
                 complexity_factor: 0.5,
                 coverage_factor: 0.0,
-                semantic_factor: 0.3,
                 dependency_factor: 0.2,
                 security_factor: 0.0,
-                organization_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {

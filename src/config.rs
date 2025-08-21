@@ -102,24 +102,24 @@ impl ScoringWeights {
     }
 }
 
-// Default weights - redistributed after removing ROI
+// Default weights after spec 58 - removed double penalties and redundant factors
 fn default_coverage_weight() -> f64 {
-    0.40 // Increased from 0.30 (+0.10) to absorb ROI weight
+    0.40 // Increased from 0.30 to prioritize coverage after removing ROI and semantic factors
 }
 fn default_complexity_weight() -> f64 {
-    0.30 // Increased from 0.20 (+0.10) to absorb ROI weight
+    0.35 // Increased from 0.20, absorbing organization factor's 5% (redundant with complexity)
 }
 fn default_semantic_weight() -> f64 {
-    0.05 // Unchanged
+    0.00 // Removed from scoring per spec 58 to avoid double penalty with role multipliers
 }
 fn default_dependency_weight() -> f64 {
-    0.15 // Increased from 0.10 (+0.05) to absorb ROI weight
+    0.20 // Increased from 0.10, absorbing semantic factor's 5%
 }
 fn default_security_weight() -> f64 {
     0.05 // Unchanged
 }
 fn default_organization_weight() -> f64 {
-    0.05 // Unchanged
+    0.00 // Removed from scoring per spec 58 (redundant with complexity factor)
 }
 
 /// Role multipliers configuration for semantic classification

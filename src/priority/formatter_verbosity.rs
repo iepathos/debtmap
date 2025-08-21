@@ -137,14 +137,8 @@ pub fn format_priority_item_with_verbosity(
             item.unified_score.coverage_factor * weights.coverage
         )
         .unwrap();
-        writeln!(
-            output,
-            "│  │  ├─ Semantic:    {:.1} × {:.0}% = {:.2}",
-            item.unified_score.semantic_factor,
-            weights.semantic * 100.0,
-            item.unified_score.semantic_factor * weights.semantic
-        )
-        .unwrap();
+        // ROI factor kept for compatibility but not included in scoring per spec 55 and 58
+        // Semantic factor removed per spec 58 - role multipliers provide the only role-based adjustment
         // Always show all components for consistency
         let has_security = item.unified_score.security_factor > 0.0;
 
@@ -169,22 +163,13 @@ pub fn format_priority_item_with_verbosity(
             .unwrap();
         }
 
-        // Always show organization for consistency (last item)
-        writeln!(
-            output,
-            "│  │  └─ Organization: {:.1} × {:.0}% = {:.2}",
-            item.unified_score.organization_factor,
-            weights.organization * 100.0,
-            item.unified_score.organization_factor * weights.organization
-        )
-        .unwrap();
+        // Organization factor removed per spec 58 - redundant with complexity factor
 
+        // New weights after spec 58: complexity 35%, coverage 40%, dependency 20%, security 5%
         let base_score = item.unified_score.complexity_factor * weights.complexity
             + item.unified_score.coverage_factor * weights.coverage
-            + item.unified_score.semantic_factor * weights.semantic
             + item.unified_score.dependency_factor * weights.dependency
-            + item.unified_score.security_factor * weights.security
-            + item.unified_score.organization_factor * weights.organization;
+            + item.unified_score.security_factor * weights.security;
 
         writeln!(output, "│  ├─ Base Score: {:.2}", base_score).unwrap();
 

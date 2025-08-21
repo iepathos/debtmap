@@ -7,9 +7,7 @@ use crate::priority::{
     },
     debt_aggregator::{DebtAggregator, DebtScores, FunctionId as AggregatorFunctionId},
     external_api_detector::{generate_enhanced_dead_code_hints, is_likely_external_api},
-    semantic_classifier::{
-        calculate_semantic_priority, classify_function_role, get_role_multiplier, FunctionRole,
-    },
+    semantic_classifier::{classify_function_role, get_role_multiplier, FunctionRole},
     ActionableRecommendation, DebtType, FunctionAnalysis, FunctionVisibility, ImpactMetrics,
 };
 use crate::risk::evidence_calculator::EvidenceBasedRiskCalculator;
@@ -20,14 +18,12 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedScore {
-    pub complexity_factor: f64,   // 0-10, configurable weight (default 30%)
-    pub coverage_factor: f64,     // 0-10, configurable weight (default 40%)
-    pub semantic_factor: f64,     // 0-10, configurable weight (default 5%)
-    pub dependency_factor: f64,   // 0-10, configurable weight (default 15%)
-    pub security_factor: f64,     // 0-10, configurable weight (default 5%)
-    pub organization_factor: f64, // 0-10, configurable weight (default 5%)
-    pub role_multiplier: f64,     // 0.1-1.5x based on function role
-    pub final_score: f64,         // Computed composite score
+    pub complexity_factor: f64, // 0-10, configurable weight (default 35%)
+    pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
+    pub dependency_factor: f64, // 0-10, configurable weight (default 20%)
+    pub security_factor: f64,   // 0-10, configurable weight (default 5%)
+    pub role_multiplier: f64,   // 0.1-1.5x based on function role
+    pub final_score: f64,       // Computed composite score
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,7 +84,7 @@ pub fn calculate_unified_priority_with_debt(
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
     security_issues: Option<f64>,
-    organization_issues: Option<f64>,
+    _organization_issues: Option<f64>, // Kept for compatibility but no longer used
     debt_aggregator: Option<&DebtAggregator>,
 ) -> UnifiedScore {
     let func_id = FunctionId {
@@ -121,10 +117,8 @@ pub fn calculate_unified_priority_with_debt(
         return UnifiedScore {
             complexity_factor: 0.0,
             coverage_factor: 0.0,
-            semantic_factor: 0.0,
             dependency_factor: 0.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
         };
@@ -155,8 +149,7 @@ pub fn calculate_unified_priority_with_debt(
         10.0
     };
 
-    // Calculate semantic priority
-    let semantic_factor = calculate_semantic_priority(func, role, &func_id, call_graph);
+    // Get role multiplier (no longer calculate semantic factor - avoid double penalty)
     let role_multiplier = get_role_multiplier(role);
 
     // Calculate dependency factor based on upstream dependencies (functions that call this one)
@@ -176,7 +169,7 @@ pub fn calculate_unified_priority_with_debt(
         DebtScores::default()
     };
 
-    // Security and organization factors (0-10 scale)
+    // Security factor (0-10 scale)
     // Combine pattern-based detection with actual detected issues
     let security_factor = if debt_scores.security > 0.0 {
         // Use actual detected security issues if available
@@ -188,31 +181,27 @@ pub fn calculate_unified_priority_with_debt(
             .min(10.0)
     };
 
-    let organization_factor = if debt_scores.organization > 0.0 {
-        // Use actual detected organization issues if available
-        debt_scores.organization
-    } else {
-        // Fall back to pattern-based detection or provided value
-        organization_issues
-            .unwrap_or_else(|| calculate_organization_factor(func))
-            .min(10.0)
-    };
+    // Organization factor removed - redundant with complexity factor
+    // Organization issues are already captured by complexity metrics
 
     // Add new debt category factors
     let testing_factor = debt_scores.testing.min(10.0);
     let resource_factor = debt_scores.resource.min(10.0);
     let duplication_factor = debt_scores.duplication.min(10.0);
 
-    // Get configurable weights
+    // Get configurable weights (note: after spec 58, only using complexity, coverage, dependency, security)
     let weights = config::get_scoring_weights();
 
     // Calculate weighted components for transparency
+    // New weights after removing semantic, organization, and ROI factors:
+    // - Complexity: 35% (increased from 20%, absorbing organization's 5%)
+    // - Coverage: 40% (increased from 30%, main priority focus)
+    // - Dependency: 20% (increased from 10%, absorbing semantic's 5%)
+    // - Security: 5% (unchanged)
     let weighted_complexity = complexity_factor * weights.complexity;
     let weighted_coverage = coverage_factor * weights.coverage;
-    let weighted_semantic = semantic_factor * weights.semantic;
     let weighted_dependency = dependency_factor * weights.dependency;
     let weighted_security = security_factor * weights.security;
-    let weighted_organization = organization_factor * weights.organization;
 
     // Use smaller weights for additional debt categories
     let weighted_testing = testing_factor * 0.05;
@@ -222,10 +211,8 @@ pub fn calculate_unified_priority_with_debt(
     // Calculate weighted composite score
     let base_score = weighted_complexity
         + weighted_coverage
-        + weighted_semantic
         + weighted_dependency
         + weighted_security
-        + weighted_organization
         + weighted_testing
         + weighted_resource
         + weighted_duplication;
@@ -236,10 +223,8 @@ pub fn calculate_unified_priority_with_debt(
     UnifiedScore {
         complexity_factor,
         coverage_factor,
-        semantic_factor,
         dependency_factor,
         security_factor,
-        organization_factor,
         role_multiplier,
         final_score,
     }
@@ -334,40 +319,8 @@ fn calculate_security_factor(func: &FunctionMetrics) -> f64 {
     score.min(10.0)
 }
 
-/// Calculate organization factor based on function characteristics
-fn calculate_organization_factor(func: &FunctionMetrics) -> f64 {
-    let mut score: f64 = 0.0;
-
-    // Long functions indicate poor organization
-    if func.length > 100 {
-        score += 3.0;
-    } else if func.length > 50 {
-        score += 2.0;
-    }
-
-    // High nesting indicates poor structure
-    if func.nesting > 5 {
-        score += 3.0;
-    } else if func.nesting > 3 {
-        score += 2.0;
-    }
-
-    // High cognitive complexity indicates poor organization
-    if func.cognitive > 20 {
-        score += 3.0;
-    } else if func.cognitive > 15 {
-        score += 2.0;
-    }
-
-    // High cyclomatic complexity also suggests poor organization
-    if func.cyclomatic > 15 {
-        score += 2.0;
-    } else if func.cyclomatic > 10 {
-        score += 1.0;
-    }
-
-    score.min(10.0)
-}
+// Organization factor removed per spec 58 - redundant with complexity factor
+// Organization issues are already captured by complexity metrics
 
 /// Create evidence-based risk assessment for a function
 pub fn create_evidence_based_risk_assessment(
@@ -406,16 +359,16 @@ pub fn create_unified_debt_item_enhanced(
         line: func.line,
     };
 
-    // Calculate security and organization factors
+    // Calculate security factor
     let security_factor = calculate_security_factor(func);
-    let organization_factor = calculate_organization_factor(func);
+    // Organization factor removed per spec 58 - redundant with complexity factor
 
     let unified_score = calculate_unified_priority(
         func,
         call_graph,
         coverage,
         Some(security_factor),
-        Some(organization_factor),
+        None, // Organization factor no longer used
     );
     let role = classify_function_role(func, &func_id, call_graph);
 
@@ -568,16 +521,16 @@ pub fn create_unified_debt_item_with_exclusions(
     );
 
     // Calculate unified score
-    // Calculate security and organization factors
+    // Calculate security factor
     let security_factor = calculate_security_factor(func);
-    let organization_factor = calculate_organization_factor(func);
+    // Organization factor removed per spec 58 - redundant with complexity factor
 
     let unified_score = calculate_unified_priority(
         func,
         call_graph,
         coverage,
         Some(security_factor),
-        Some(organization_factor),
+        None, // Organization factor no longer used
     );
 
     // Determine function role for more accurate analysis
@@ -651,16 +604,16 @@ pub fn create_unified_debt_item(
         line: func.line,
     };
 
-    // Calculate security and organization factors
+    // Calculate security factor
     let security_factor = calculate_security_factor(func);
-    let organization_factor = calculate_organization_factor(func);
+    // Organization factor removed per spec 58 - redundant with complexity factor
 
     let unified_score = calculate_unified_priority(
         func,
         call_graph,
         coverage,
         Some(security_factor),
-        Some(organization_factor),
+        None, // Organization factor no longer used
     );
     let role = classify_function_role(func, &func_id, call_graph);
 
@@ -2464,8 +2417,7 @@ mod tests {
 
         assert!(score.complexity_factor > 0.0);
         assert!(score.coverage_factor > 0.0);
-        assert!(score.roi_factor > 0.0);
-        assert!(score.semantic_factor > 0.0);
+        // ROI and Semantic factors removed per spec 58
         assert!(score.final_score > 0.0);
         assert!(score.final_score <= 10.0);
     }
@@ -2502,11 +2454,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 8.0,
             coverage_factor: 7.0,
-            roi_factor: 6.0,
-            semantic_factor: 5.0,
             dependency_factor: 4.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 6.5,
         };
@@ -2597,8 +2546,7 @@ mod tests {
         assert_eq!(score.final_score, 0.0);
         assert_eq!(score.complexity_factor, 0.0);
         assert_eq!(score.coverage_factor, 0.0);
-        assert_eq!(score.roi_factor, 0.0);
-        assert_eq!(score.semantic_factor, 0.0);
+        // ROI and Semantic factors removed per spec 58
     }
 
     #[test]
@@ -2706,11 +2654,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 5.0,
             coverage_factor: 0.0,
-            roi_factor: 0.0,
-            semantic_factor: 1.0,
             dependency_factor: 0.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };
@@ -3152,11 +3097,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 5.0,
             coverage_factor: 3.0,
-            roi_factor: 2.0,
-            semantic_factor: 1.0,
             dependency_factor: 2.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3187,11 +3129,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 7.0,
             coverage_factor: 5.0,
-            roi_factor: 3.0,
-            semantic_factor: 2.0,
             dependency_factor: 3.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 5.0,
         };
@@ -3216,11 +3155,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 1.0,
             coverage_factor: 6.0,
-            roi_factor: 2.0,
-            semantic_factor: 1.0,
             dependency_factor: 1.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3246,11 +3182,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 5.0,
             coverage_factor: 6.0,
-            roi_factor: 4.0,
-            semantic_factor: 3.0,
             dependency_factor: 2.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.5,
         };
@@ -3721,11 +3654,9 @@ mod tests {
             None,
         );
 
-        assert_eq!(score.organization_factor, 7.0);
-        assert!(
-            score.final_score > 3.0,
-            "Organization issues should affect priority"
-        );
+        // Organization factor removed per spec 58 - redundant with complexity factor
+        // Organization issues are now captured within complexity factor
+        assert!(score.final_score > 0.0, "Score should be calculated");
     }
 
     #[test]
@@ -3806,7 +3737,7 @@ mod tests {
 
         assert!(score.final_score <= 10.0, "Score should be capped at 10.0");
         assert_eq!(score.security_factor, 10.0);
-        assert_eq!(score.organization_factor, 10.0);
+        // Organization factor removed per spec 58 - redundant with complexity factor
     }
 
     #[test]

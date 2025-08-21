@@ -255,14 +255,7 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
         unified_score.coverage_factor * weights.coverage
     )
     .unwrap();
-    writeln!(
-        &mut output,
-        "| Semantic | {:.1} | {:.0}% | {:.2} |",
-        unified_score.semantic_factor,
-        weights.semantic * 100.0,
-        unified_score.semantic_factor * weights.semantic
-    )
-    .unwrap();
+    // Semantic and ROI factors removed per spec 55 and 58
     writeln!(
         &mut output,
         "| Dependency | {:.1} | {:.0}% | {:.2} |",
@@ -284,24 +277,13 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
         .unwrap();
     }
 
-    // Only show organization if non-zero
-    if unified_score.organization_factor > 0.0 {
-        writeln!(
-            &mut output,
-            "| Organization | {:.1} | {:.0}% | {:.2} |",
-            unified_score.organization_factor,
-            weights.organization * 100.0,
-            unified_score.organization_factor * weights.organization
-        )
-        .unwrap();
-    }
+    // Organization factor removed per spec 58 - redundant with complexity factor
 
+    // New weights after spec 58: complexity 35%, coverage 40%, dependency 20%, security 5%
     let base_score = unified_score.complexity_factor * weights.complexity
         + unified_score.coverage_factor * weights.coverage
-        + unified_score.semantic_factor * weights.semantic
         + unified_score.dependency_factor * weights.dependency
-        + unified_score.security_factor * weights.security
-        + unified_score.organization_factor * weights.organization;
+        + unified_score.security_factor * weights.security;
 
     writeln!(&mut output).unwrap();
     writeln!(&mut output, "- **Base Score:** {:.2}", base_score).unwrap();
@@ -347,12 +329,7 @@ fn format_main_factors_with_debt_type(
             weights.security * 100.0
         ));
     }
-    if unified_score.organization_factor > 3.0 {
-        factors.push(format!(
-            "Organization issues ({:.0}%)",
-            weights.organization * 100.0
-        ));
-    }
+    // Organization factor removed per spec 58 - redundant with complexity factor
 
     // Add Security specific factors
     match debt_type {
@@ -569,10 +546,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 5.0,
             coverage_factor: 8.0,
-            semantic_factor: 3.0,
             dependency_factor: 4.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.2,
             final_score: 8.5,
         };
@@ -586,8 +561,7 @@ mod tests {
         // Check for component rows
         assert!(result.contains("| Complexity | 5.0"));
         assert!(result.contains("| Coverage | 8.0"));
-        assert!(result.contains("| ROI | 7.5"));
-        assert!(result.contains("| Semantic | 3.0"));
+        // ROI and Semantic removed from scoring per spec 55 and 58
         assert!(result.contains("| Dependency | 4.0"));
 
         // Check for summary lines (with markdown formatting)
@@ -601,10 +575,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 6.0, // Above threshold
             coverage_factor: 4.0,   // Above threshold
-            semantic_factor: 2.0,
             dependency_factor: 6.0, // Above threshold
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.0,
         };
@@ -618,7 +590,7 @@ mod tests {
 
         assert!(result.contains("Main factors:"));
         assert!(result.contains("Coverage gap"));
-        assert!(result.contains("High ROI"));
+        // ROI removed from scoring per spec 55 and 58
         assert!(result.contains("Critical path"));
         assert!(result.contains("Complexity"));
     }
@@ -628,10 +600,8 @@ mod tests {
         let score = UnifiedScore {
             complexity_factor: 2.0, // Below all thresholds
             coverage_factor: 2.0,
-            semantic_factor: 1.0,
             dependency_factor: 2.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };

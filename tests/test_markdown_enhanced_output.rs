@@ -21,11 +21,9 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
         unified_score: UnifiedScore {
             complexity_factor: 7.5,
             coverage_factor: 8.0,
-            roi_factor: 6.5,
-            semantic_factor: 5.0,
+            roi_factor: 6.5,  // Kept for compatibility but not used in scoring
             dependency_factor: 4.0,
             security_factor: 0.0,
-            organization_factor: 0.0,
             role_multiplier: 1.2,
             final_score: 7.8,
         },
