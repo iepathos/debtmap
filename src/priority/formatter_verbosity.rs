@@ -83,7 +83,7 @@ pub fn format_priority_item_with_verbosity(
             output,
             "#{} {} [{}]",
             rank.to_string().bright_cyan().bold(),
-            format!("SCORE: {:.1}", item.unified_score.final_score).bright_white(),
+            format!("SCORE: {:.2}", item.unified_score.final_score).bright_white(),
             severity.color(severity_color).bold()
         )
         .unwrap();
@@ -96,7 +96,7 @@ pub fn format_priority_item_with_verbosity(
             output,
             "#{} {} [{}]",
             rank.to_string().bright_cyan().bold(),
-            format!("SCORE: {:.1}", item.unified_score.final_score).bright_white(),
+            format!("SCORE: {:.2}", item.unified_score.final_score).bright_white(),
             severity.color(severity_color).bold()
         )
         .unwrap();

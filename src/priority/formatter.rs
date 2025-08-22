@@ -288,7 +288,7 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         output,
         "#{} {} [{}]",
         rank.to_string().bright_cyan().bold(),
-        format!("SCORE: {:.1}", item.unified_score.final_score).bright_white(),
+        format!("SCORE: {:.2}", item.unified_score.final_score).bright_white(),
         severity.color(severity_color).bold()
     )
     .unwrap();
