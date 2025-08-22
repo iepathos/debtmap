@@ -4,7 +4,6 @@
 //! that should use logarithmic complexity scaling instead of linear.
 
 use im::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::time::SystemTime;
 use syn::{File, Item, ItemFn, ItemImpl, Path as SynPath};
 
@@ -47,7 +46,6 @@ pub struct PatternCache {
 /// Main visitor pattern detector
 pub struct VisitorPatternDetector {
     visitor_traits: HashSet<String>,
-    cache: HashMap<PathBuf, PatternCache>,
 }
 
 impl Default for VisitorPatternDetector {
@@ -68,10 +66,7 @@ impl VisitorPatternDetector {
         visitor_traits.insert("Walker".to_string());
         visitor_traits.insert("Traverser".to_string());
 
-        Self {
-            visitor_traits,
-            cache: HashMap::new(),
-        }
+        Self { visitor_traits }
     }
 
     /// Add a custom visitor trait name
@@ -84,10 +79,9 @@ impl VisitorPatternDetector {
         // Check trait implementations
         for item in &file.items {
             if let Item::Impl(impl_block) = item {
-                if self.is_visitor_trait(impl_block)
-                    && self.contains_function(impl_block, func) {
-                        return Some(self.analyze_visitor(func));
-                    }
+                if self.is_visitor_trait(impl_block) && self.contains_function(impl_block, func) {
+                    return Some(self.analyze_visitor(func));
+                }
             }
         }
         None

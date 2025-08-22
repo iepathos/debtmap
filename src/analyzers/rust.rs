@@ -534,11 +534,6 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     }
 }
 
-fn calculate_cyclomatic_syn(block: &syn::Block) -> u32 {
-    // Use the adjusted version that applies pattern recognition
-    calculate_cyclomatic_adjusted(block)
-}
-
 fn calculate_cognitive_syn(block: &syn::Block) -> u32 {
     // Use the enhanced version that includes pattern detection
     let (total, _patterns) = calculate_cognitive_with_patterns(block);
