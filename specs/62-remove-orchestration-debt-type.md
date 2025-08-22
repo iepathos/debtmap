@@ -39,6 +39,7 @@ Remove orchestration as a debt type and instead leverage orchestrator detection 
 - Remove orchestration from debt type classification functions
 - Clean up orchestration-specific recommendation generation
 - Update all pattern matching to handle removal
+- Update `.debtmap.toml` and `.debtmap.toml.example` to remove orchestration-related configurations
 
 #### Phase 2: Reframe Complex Orchestrators as Debt
 - Flag orchestrators only when they have genuine issues:
@@ -87,6 +88,8 @@ Remove orchestration as a debt type and instead leverage orchestrator detection 
 - [ ] No increase in false positive rate for other debt types
 - [ ] Performance impact is less than 5% on large codebases
 - [ ] All existing tests pass with updated expectations
+- [ ] `.debtmap.toml` and `.debtmap.toml.example` no longer contain orchestration configurations
+- [ ] Orchestration thresholds removed from configuration files
 
 ## Technical Details
 
@@ -104,7 +107,16 @@ Remove orchestration as a debt type and instead leverage orchestrator detection 
    }
    ```
 
-2. **Add Architectural Role Tracking**
+2. **Update Configuration Files**
+   ```toml
+   # Remove from .debtmap.toml and .debtmap.toml.example:
+   # [orchestration]
+   # min_delegates = 2
+   # max_complexity = 2
+   # patterns = ["process_", "handle_", "orchestrate_", "coordinate_"]
+   ```
+
+3. **Add Architectural Role Tracking**
    ```rust
    enum ArchitecturalRole {
        Orchestrator {
@@ -125,7 +137,7 @@ Remove orchestration as a debt type and instead leverage orchestrator detection 
    }
    ```
 
-3. **Enhance Classification Logic**
+4. **Enhance Classification Logic**
    ```rust
    fn classify_debt_with_architecture(func: &FunctionMetrics, ...) -> (Option<DebtType>, ArchitecturalRole) {
        let role = classify_function_role(func, func_id, call_graph);
@@ -146,7 +158,7 @@ Remove orchestration as a debt type and instead leverage orchestrator detection 
    }
    ```
 
-4. **Enhance Output with Context**
+5. **Enhance Output with Context**
    ```rust
    fn format_debt_with_architecture(item: &EnhancedDebtItem) -> String {
        let mut output = format_debt_type(&item.debt_type);
