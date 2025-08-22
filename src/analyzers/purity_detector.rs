@@ -85,9 +85,7 @@ impl PurityDetector {
     fn has_mutable_reference(&self, pat: &Pat) -> bool {
         // Check if the pattern contains mutable references
         match pat {
-            Pat::Type(pat_type) => {
-                self.type_has_mutable_reference(&pat_type.ty)
-            }
+            Pat::Type(pat_type) => self.type_has_mutable_reference(&pat_type.ty),
             Pat::Ident(pat_ident) => {
                 // Check if the identifier itself is mutable
                 pat_ident.mutability.is_some()
@@ -208,9 +206,11 @@ impl<'ast> Visit<'ast> for PurityDetector {
                 }
             }
             // Method calls might have side effects
-            Expr::MethodCall(ExprMethodCall { method, receiver, .. }) => {
+            Expr::MethodCall(ExprMethodCall {
+                method, receiver, ..
+            }) => {
                 let method_name = method.to_string();
-                
+
                 // Check if it's a mutation method
                 if self.is_mutation_method(&method_name) {
                     // Check if we're mutating self or external data
@@ -226,7 +226,7 @@ impl<'ast> Visit<'ast> for PurityDetector {
                         self.has_side_effects = true;
                     }
                 }
-                
+
                 // Check for I/O methods
                 if method_name.contains("write")
                     || method_name.contains("print")
@@ -378,7 +378,9 @@ mod tests {
             "#,
         );
         assert!(!analysis.is_pure);
-        assert!(analysis.reasons.contains(&ImpurityReason::MutableParameters));
+        assert!(analysis
+            .reasons
+            .contains(&ImpurityReason::MutableParameters));
     }
 
     #[test]

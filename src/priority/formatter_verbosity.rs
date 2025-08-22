@@ -137,7 +137,7 @@ pub fn format_priority_item_with_verbosity(
             item.unified_score.coverage_factor * weights.coverage
         )
         .unwrap();
-        
+
         writeln!(
             output,
             "│  │  ├─ Dependency:  {:.1} × {:.0}% = {:.2}",
@@ -156,7 +156,7 @@ pub fn format_priority_item_with_verbosity(
             item.unified_score.security_factor * weights.security
         )
         .unwrap();
-        
+
         // Show semantic and organization with 0% weight for transparency
         // These were removed per spec 58 but keeping in display for clarity
         if weights.semantic > 0.0 || weights.organization > 0.0 {

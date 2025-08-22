@@ -24,8 +24,8 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         nesting: 2,
         in_test_module: false,
         entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+        is_pure: None,
+        purity_confidence: None,
     };
 
     let func_id = FunctionId {
@@ -76,8 +76,8 @@ fn test_visit_trait_pattern_exclusion() {
         nesting: 3,
         in_test_module: false,
         entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+        is_pure: None,
+        purity_confidence: None,
     };
 
     let func_id = FunctionId {
@@ -105,8 +105,14 @@ fn test_visit_trait_pattern_exclusion() {
     let exclusions: HashSet<FunctionId> = exclusions_im.into_iter().collect();
 
     // The function should not be classified as dead code when using exclusions
-    let debt_type =
-        classify_debt_type_with_exclusions(&visit_func, &call_graph, &func_id, &exclusions, None, None);
+    let debt_type = classify_debt_type_with_exclusions(
+        &visit_func,
+        &call_graph,
+        &func_id,
+        &exclusions,
+        None,
+        None,
+    );
 
     match debt_type {
         DebtType::DeadCode { .. } => {

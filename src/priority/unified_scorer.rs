@@ -44,8 +44,8 @@ pub struct UnifiedDebtItem {
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
     pub entropy_details: Option<EntropyDetails>, // Store entropy information
-    pub is_pure: Option<bool>,                  // Whether the function is pure
-    pub purity_confidence: Option<f32>,         // Confidence in purity detection
+    pub is_pure: Option<bool>,                   // Whether the function is pure
+    pub purity_confidence: Option<f32>,          // Confidence in purity detection
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,7 +99,7 @@ pub fn calculate_unified_priority_with_debt(
     // Simple I/O wrappers, entry points, and trivial pure functions with low complexity
     // are not technical debt UNLESS they're untested and non-trivial
     let role = classify_function_role(func, &func_id, call_graph);
-    
+
     // Pure functions are inherently less risky and easier to test
     let purity_bonus = if func.is_pure == Some(true) {
         // High confidence pure functions get bigger bonus
@@ -111,7 +111,7 @@ pub fn calculate_unified_priority_with_debt(
     } else {
         1.0 // No reduction for impure functions
     };
-    
+
     let is_trivial = (func.cyclomatic <= 3 && func.cognitive <= 5)
         && (role == FunctionRole::IOWrapper
             || role == FunctionRole::EntryPoint
@@ -151,12 +151,13 @@ pub fn calculate_unified_priority_with_debt(
     } else {
         func.cognitive
     };
-    
+
     // Apply purity bonus to complexity (pure functions are easier to understand and test)
     let purity_adjusted_cyclomatic = (adjusted_cyclomatic as f64 * purity_bonus) as u32;
     let purity_adjusted_cognitive = (adjusted_cognitive as f64 * purity_bonus) as u32;
-    
-    let complexity_factor = normalize_complexity(purity_adjusted_cyclomatic, purity_adjusted_cognitive);
+
+    let complexity_factor =
+        normalize_complexity(purity_adjusted_cyclomatic, purity_adjusted_cognitive);
 
     // Calculate coverage factor (0-10, higher means more urgent to cover)
     let coverage_factor = if func.is_test {
@@ -1471,7 +1472,7 @@ fn generate_testing_gap_recommendation(
     let role_str = format_role_description(role);
 
     let coverage_gap = 100 - coverage_pct;
-    
+
     if is_complex {
         (
             format!("Add tests for {}% coverage gap", coverage_gap),
@@ -1579,7 +1580,10 @@ fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, V
 /// Generate recommendation for infrastructure debt types (orchestration, duplication, risk)
 fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
     match debt_type {
-        DebtType::Orchestration { delegates_to, coverage } => {
+        DebtType::Orchestration {
+            delegates_to,
+            coverage,
+        } => {
             let coverage_pct = coverage.map(|c| (c * 100.0) as i32);
             let (action, rationale) = if let Some(pct) = coverage_pct {
                 if pct < 80 {
@@ -1592,13 +1596,19 @@ fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, Stri
                 } else {
                     (
                         "Refactor to pure functions or extract testable units".to_string(),
-                        format!("Orchestration function delegating to {} functions", delegates_to.len()),
+                        format!(
+                            "Orchestration function delegating to {} functions",
+                            delegates_to.len()
+                        ),
                     )
                 }
             } else {
                 (
                     "Add tests and refactor to pure functions".to_string(),
-                    format!("Orchestration function delegating to {} functions (coverage unknown)", delegates_to.len()),
+                    format!(
+                        "Orchestration function delegating to {} functions (coverage unknown)",
+                        delegates_to.len()
+                    ),
                 )
             };
             (
@@ -2443,8 +2453,8 @@ fn generate_collection_inefficiency_recommendation(
 mod tests {
     use super::*;
     use crate::priority::call_graph::{CallType, FunctionCall};
-    use crate::risk::lcov::FunctionCoverage;
     use crate::priority::coverage_propagation::TransitiveCoverage;
+    use crate::risk::lcov::FunctionCoverage;
     use std::collections::HashSet;
 
     fn create_test_metrics() -> FunctionMetrics {
@@ -2538,39 +2548,27 @@ mod tests {
     #[test]
     fn test_coverage_gap_messaging() {
         // Test with 0% coverage (100% gap)
-        let (action, rationale, _) = generate_testing_gap_recommendation(
-            0.0,
-            5,
-            8,
-            FunctionRole::PureLogic
-        );
+        let (action, rationale, _) =
+            generate_testing_gap_recommendation(0.0, 5, 8, FunctionRole::PureLogic);
         assert_eq!(action, "Add tests for 100% coverage gap");
         assert!(rationale.contains("100% coverage gap"));
         assert!(rationale.contains("currently 0% covered"));
-        
+
         // Test with 40% coverage (60% gap)
-        let (action, rationale, _) = generate_testing_gap_recommendation(
-            0.4,
-            5,
-            8,
-            FunctionRole::Orchestrator
-        );
+        let (action, rationale, _) =
+            generate_testing_gap_recommendation(0.4, 5, 8, FunctionRole::Orchestrator);
         assert_eq!(action, "Add tests for 60% coverage gap");
         assert!(rationale.contains("60% coverage gap"));
         assert!(rationale.contains("currently 40% covered"));
-        
+
         // Test with 75% coverage (25% gap from 100%)
-        let (action, rationale, _) = generate_testing_gap_recommendation(
-            0.75,
-            5,
-            8,
-            FunctionRole::IOWrapper
-        );
+        let (action, rationale, _) =
+            generate_testing_gap_recommendation(0.75, 5, 8, FunctionRole::IOWrapper);
         assert_eq!(action, "Add tests for 25% coverage gap");
         assert!(rationale.contains("25% coverage gap"));
         assert!(rationale.contains("currently 75% covered"));
     }
-    
+
     #[test]
     fn test_orchestration_with_coverage() {
         let mut func = create_test_metrics();
@@ -2578,9 +2576,9 @@ mod tests {
         func.cyclomatic = 1;
         func.cognitive = 2;
         func.length = 15;
-        
+
         let mut call_graph = CallGraph::new();
-        
+
         // Add function to graph
         let func_id = FunctionId {
             file: func.file.clone(),
@@ -2588,14 +2586,22 @@ mod tests {
             line: func.line,
         };
         call_graph.add_function(func_id.clone(), false, false, 1, 15);
-        
+
         // Add some calls it makes
-        let helper1_id = FunctionId { file: PathBuf::from("other.rs"), name: "helper1".to_string(), line: 20 };
-        let helper2_id = FunctionId { file: PathBuf::from("other.rs"), name: "helper2".to_string(), line: 30 };
-        
+        let helper1_id = FunctionId {
+            file: PathBuf::from("other.rs"),
+            name: "helper1".to_string(),
+            line: 20,
+        };
+        let helper2_id = FunctionId {
+            file: PathBuf::from("other.rs"),
+            name: "helper2".to_string(),
+            line: 30,
+        };
+
         call_graph.add_function(helper1_id.clone(), false, false, 3, 10);
         call_graph.add_function(helper2_id.clone(), false, false, 3, 10);
-        
+
         call_graph.add_call(FunctionCall {
             caller: func_id.clone(),
             callee: helper1_id,
@@ -2606,7 +2612,7 @@ mod tests {
             callee: helper2_id,
             call_type: CallType::Direct,
         });
-        
+
         // Test with low coverage
         let coverage = TransitiveCoverage {
             direct: 0.3,
@@ -2620,19 +2626,25 @@ mod tests {
             &func_id,
             &exclusions,
             None,
-            Some(&coverage)
+            Some(&coverage),
         );
-        
+
         match debt_type {
-            DebtType::Orchestration { delegates_to, coverage: cov } => {
+            DebtType::Orchestration {
+                delegates_to,
+                coverage: cov,
+            } => {
                 assert_eq!(delegates_to.len(), 2);
                 assert_eq!(cov, Some(0.3));
-            },
+            }
             DebtType::TestingGap { .. } => panic!("Got TestingGap instead of Orchestration"),
-            _ => panic!("Expected Orchestration debt type with coverage, got: {:?}", debt_type)
+            _ => panic!(
+                "Expected Orchestration debt type with coverage, got: {:?}",
+                debt_type
+            ),
         }
     }
-    
+
     #[test]
     fn test_dead_code_detection() {
         let mut func = create_test_metrics();
@@ -3005,7 +3017,7 @@ mod tests {
         // New format says "Add tests for X% coverage gap"
         assert!(action.contains("Add tests"));
         assert!(action.contains("90%")); // 100 - 10 = 90% gap
-        // Cognitive complexity mention removed in new format
+                                         // Cognitive complexity mention removed in new format
         assert!(
             rationale.contains("Complex business logic")
                 || rationale.contains("high testing priority")

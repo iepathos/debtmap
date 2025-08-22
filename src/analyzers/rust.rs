@@ -277,7 +277,7 @@ impl FunctionVisitor {
 
         // Calculate entropy score if enabled
         let entropy_score = if crate::config::get_entropy_config().enabled {
-            let analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
+            let mut analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
             Some(analyzer.calculate_entropy(&item_fn.block))
         } else {
             None
@@ -450,7 +450,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 
                 // Calculate entropy score if enabled
                 let entropy_score = if crate::config::get_entropy_config().enabled {
-                    let analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
+                    let mut analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
                     Some(analyzer.calculate_entropy(&block))
                 } else {
                     None
@@ -469,7 +469,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     is_trait_method: false,       // Closures are not trait methods
                     in_test_module: self.in_test_module,
                     entropy_score,
-                    is_pure: None,                // TODO: Add purity detection for closures
+                    is_pure: None, // TODO: Add purity detection for closures
                     purity_confidence: None,
                 };
 

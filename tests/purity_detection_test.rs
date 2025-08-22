@@ -26,7 +26,12 @@ fn test_pure_function_detection() {
 
     // All functions should be detected as pure
     for func in &metrics.complexity.functions {
-        assert_eq!(func.is_pure, Some(true), "Function {} should be pure", func.name);
+        assert_eq!(
+            func.is_pure,
+            Some(true),
+            "Function {} should be pure",
+            func.name
+        );
         assert!(
             func.purity_confidence.unwrap() > 0.9,
             "Function {} should have high purity confidence",
@@ -55,7 +60,12 @@ fn test_impure_function_with_print() {
 
     // All functions should be detected as impure due to I/O
     for func in &metrics.complexity.functions {
-        assert_eq!(func.is_pure, Some(false), "Function {} should be impure", func.name);
+        assert_eq!(
+            func.is_pure,
+            Some(false),
+            "Function {} should be impure",
+            func.name
+        );
     }
 }
 
@@ -79,7 +89,12 @@ fn test_impure_function_with_mutable_params() {
 
     // All functions should be detected as impure due to mutable parameters
     for func in &metrics.complexity.functions {
-        assert_eq!(func.is_pure, Some(false), "Function {} should be impure", func.name);
+        assert_eq!(
+            func.is_pure,
+            Some(false),
+            "Function {} should be impure",
+            func.name
+        );
     }
 }
 
@@ -148,7 +163,12 @@ fn test_pure_function_with_complex_logic() {
 
     // Recursive functions should still be pure if they don't have side effects
     for func in &metrics.complexity.functions {
-        assert_eq!(func.is_pure, Some(true), "Function {} should be pure", func.name);
+        assert_eq!(
+            func.is_pure,
+            Some(true),
+            "Function {} should be pure",
+            func.name
+        );
     }
 }
 
@@ -196,9 +216,9 @@ fn test_closure_purity() {
     // Higher-order functions should be pure if they don't have side effects
     for func in &metrics.complexity.functions {
         assert_eq!(
-            func.is_pure, 
-            Some(true), 
-            "Function {} should be pure", 
+            func.is_pure,
+            Some(true),
+            "Function {} should be pure",
             func.name
         );
     }

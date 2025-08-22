@@ -47,7 +47,7 @@ pub struct FunctionMetrics {
     pub is_trait_method: bool,      // Whether this is a trait method implementation
     pub in_test_module: bool,       // Whether this function is inside a #[cfg(test)] module
     pub entropy_score: Option<crate::complexity::entropy::EntropyScore>, // Optional entropy-based complexity score
-    pub is_pure: Option<bool>,      // Whether the function is pure (no side effects)
+    pub is_pure: Option<bool>, // Whether the function is pure (no side effects)
     pub purity_confidence: Option<f32>, // Confidence level of purity detection (0.0 to 1.0)
 }
 

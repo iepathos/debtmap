@@ -5,6 +5,7 @@ pub mod match_patterns;
 pub mod pattern_adjustments;
 pub mod patterns;
 pub mod python_patterns;
+pub mod token_classifier;
 
 use crate::core::FunctionMetrics;
 

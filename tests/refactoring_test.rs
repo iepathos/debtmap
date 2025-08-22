@@ -16,8 +16,8 @@ fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> Function
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+        is_pure: None,
+        purity_confidence: None,
     }
 }
 
