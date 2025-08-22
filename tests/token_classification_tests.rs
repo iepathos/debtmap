@@ -305,26 +305,44 @@ mod tests {
         // since they match the alphanumeric pattern first
         let class = classifier.classify("42", &context);
         // Pure numbers are classified as LocalVar due to alphanumeric check coming first
-        assert!(matches!(class, TokenClass::LocalVar(_)) || matches!(class, TokenClass::Literal(LiteralCategory::Numeric)),
-               "42 should be classified as LocalVar or Numeric, got {:?}", class);
+        assert!(
+            matches!(class, TokenClass::LocalVar(_))
+                || matches!(class, TokenClass::Literal(LiteralCategory::Numeric)),
+            "42 should be classified as LocalVar or Numeric, got {:?}",
+            class
+        );
 
         let class = classifier.classify("3.14", &context);
         // Decimals with dots won't match alphanumeric pattern, so they reach the numeric check
-        assert!(matches!(class, TokenClass::Literal(LiteralCategory::Numeric)),
-               "3.14 should be classified as Numeric, got {:?}", class);
+        assert!(
+            matches!(class, TokenClass::Literal(LiteralCategory::Numeric)),
+            "3.14 should be classified as Numeric, got {:?}",
+            class
+        );
 
         // Test boolean literals - Note: These come after local var check
         let class = classifier.classify("true", &context);
-        assert!(matches!(class, TokenClass::Literal(LiteralCategory::Boolean)) || matches!(class, TokenClass::LocalVar(_)),
-               "true should be classified as Boolean or LocalVar, got {:?}", class);
+        assert!(
+            matches!(class, TokenClass::Literal(LiteralCategory::Boolean))
+                || matches!(class, TokenClass::LocalVar(_)),
+            "true should be classified as Boolean or LocalVar, got {:?}",
+            class
+        );
 
         let class = classifier.classify("false", &context);
-        assert!(matches!(class, TokenClass::Literal(LiteralCategory::Boolean)) || matches!(class, TokenClass::LocalVar(_)),
-               "false should be classified as Boolean or LocalVar, got {:?}", class);
+        assert!(
+            matches!(class, TokenClass::Literal(LiteralCategory::Boolean))
+                || matches!(class, TokenClass::LocalVar(_)),
+            "false should be classified as Boolean or LocalVar, got {:?}",
+            class
+        );
 
         // Test string literals - must include quotes
         let class = classifier.classify("\"hello\"", &context);
-        assert!(matches!(class, TokenClass::Literal(LiteralCategory::String)));
+        assert!(matches!(
+            class,
+            TokenClass::Literal(LiteralCategory::String)
+        ));
 
         // Test char literals - must be single char with single quotes
         let class = classifier.classify("'a'", &context);
@@ -332,16 +350,28 @@ mod tests {
 
         // Test null literals - Note: These also match alphanumeric pattern
         let class = classifier.classify("null", &context);
-        assert!(matches!(class, TokenClass::Literal(LiteralCategory::Null)) || matches!(class, TokenClass::LocalVar(_)),
-               "null should be classified as Null or LocalVar, got {:?}", class);
+        assert!(
+            matches!(class, TokenClass::Literal(LiteralCategory::Null))
+                || matches!(class, TokenClass::LocalVar(_)),
+            "null should be classified as Null or LocalVar, got {:?}",
+            class
+        );
 
         let class = classifier.classify("None", &context);
-        assert!(matches!(class, TokenClass::Literal(LiteralCategory::Null)) || matches!(class, TokenClass::LocalVar(_)),
-               "None should be classified as Null or LocalVar, got {:?}", class);
+        assert!(
+            matches!(class, TokenClass::Literal(LiteralCategory::Null))
+                || matches!(class, TokenClass::LocalVar(_)),
+            "None should be classified as Null or LocalVar, got {:?}",
+            class
+        );
 
         let class = classifier.classify("nil", &context);
-        assert!(matches!(class, TokenClass::Literal(LiteralCategory::Null)) || matches!(class, TokenClass::LocalVar(_)),
-               "nil should be classified as Null or LocalVar, got {:?}", class);
+        assert!(
+            matches!(class, TokenClass::Literal(LiteralCategory::Null))
+                || matches!(class, TokenClass::LocalVar(_)),
+            "nil should be classified as Null or LocalVar, got {:?}",
+            class
+        );
     }
 
     #[test]
@@ -359,16 +389,20 @@ mod tests {
         // Test various Rust keywords that are classified as keywords
         // Note: Some keywords like "fn" will be classified as LocalVar due to the ordering of checks
         let keywords = vec![
-            "fn", "let", "const", "mut", "pub", "struct", "enum", 
-            "trait", "impl", "mod", "use", "async", "await", "self", "Self"
+            "fn", "let", "const", "mut", "pub", "struct", "enum", "trait", "impl", "mod", "use",
+            "async", "await", "self", "Self",
         ];
 
         for keyword in keywords {
             let class = classifier.classify(keyword, &context);
             // Due to the current implementation, most keywords are classified as LocalVar
             // since they match the alphanumeric pattern check before the keyword check
-            assert!(matches!(class, TokenClass::Keyword(_)) || matches!(class, TokenClass::LocalVar(_)), 
-                   "Failed for keyword: {} (got {:?})", keyword, class);
+            assert!(
+                matches!(class, TokenClass::Keyword(_)) || matches!(class, TokenClass::LocalVar(_)),
+                "Failed for keyword: {} (got {:?})",
+                keyword,
+                class
+            );
         }
     }
 
@@ -385,11 +419,18 @@ mod tests {
         };
 
         // Test various operators
-        let operators = vec!["+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "&", "|", "^", "~", "?", "."];
+        let operators = vec![
+            "+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "&",
+            "|", "^", "~", "?", ".",
+        ];
 
         for op in operators {
             let class = classifier.classify(op, &context);
-            assert!(matches!(class, TokenClass::Operator(_)), "Failed for operator: {}", op);
+            assert!(
+                matches!(class, TokenClass::Operator(_)),
+                "Failed for operator: {}",
+                op
+            );
         }
     }
 
@@ -408,21 +449,26 @@ mod tests {
         // Test various collection methods
         // Note: "is_empty" will be classified as Validator since it starts with "is_"
         let collection_methods = vec![
-            "push", "pop", "insert", "remove", "clear", "len", 
-            "contains", "get", "iter", "map", "filter", 
-            "fold", "collect", "sort"
+            "push", "pop", "insert", "remove", "clear", "len", "contains", "get", "iter", "map",
+            "filter", "fold", "collect", "sort",
         ];
 
         for method in collection_methods {
             let class = classifier.classify(method, &context);
-            assert!(matches!(class, TokenClass::MethodCall(CallType::Collection)), 
-                   "Failed for collection method: {} (got {:?})", method, class);
+            assert!(
+                matches!(class, TokenClass::MethodCall(CallType::Collection)),
+                "Failed for collection method: {} (got {:?})",
+                method,
+                class
+            );
         }
-        
+
         // Test is_empty separately as it's classified as a Validator
         let class = classifier.classify("is_empty", &context);
-        assert!(matches!(class, TokenClass::MethodCall(CallType::Validator)),
-               "is_empty should be classified as Validator");
+        assert!(
+            matches!(class, TokenClass::MethodCall(CallType::Validator)),
+            "is_empty should be classified as Validator"
+        );
     }
 
     #[test]
@@ -458,7 +504,7 @@ mod tests {
         let context = TokenContext {
             is_method_call: true,
             is_field_access: false,
-            is_external: true,  // Mark as external
+            is_external: true, // Mark as external
             scope_depth: 1,
             parent_node_type: NodeType::Expression,
         };
