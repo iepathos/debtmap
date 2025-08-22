@@ -104,13 +104,14 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
 
     // Check if this is a functional chain (all calls are functional methods)
     // Default: allow functional chains (they're idiomatic patterns)
-    if true
-        && !meaningful_callees.is_empty()
-        && callees.len() > meaningful_callees.len()
-    {
+    if !meaningful_callees.is_empty() && callees.len() > meaningful_callees.len() {
         // If all non-utility calls are removed, this might be a functional chain
         let functional_chain = callees.iter().all(|f| {
-            is_std_or_utility_function(&f.name)
+            // Check for standard library and utility functions
+            matches!(f.name.as_str(), "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from")
+                || f.name.starts_with("std::")
+                || f.name.starts_with("core::")
+                || f.name.starts_with("alloc::")
                 || f.name.contains("Pipeline")
                 || f.name.contains("Stream")
                 || f.name.contains("Iterator")

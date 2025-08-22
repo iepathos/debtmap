@@ -10,6 +10,12 @@ pub struct PurityDetector {
     modifies_external_state: bool,
 }
 
+impl Default for PurityDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PurityDetector {
     pub fn new() -> Self {
         Self {

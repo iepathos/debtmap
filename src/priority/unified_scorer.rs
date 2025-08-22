@@ -1241,18 +1241,6 @@ fn is_framework_callback(func: &FunctionMetrics) -> bool {
     func.name == "clone"
 }
 
-// Helper to identify standard library and utility functions that shouldn't count as delegation targets
-fn is_std_or_utility_function(name: &str) -> bool {
-    matches!(
-        name,
-        // Standard library functions from macro expansion
-        "format" | "write" | "print" | "println" |
-        // Common utility functions that are too generic
-        "clone" | "to_string" | "into" | "from"
-    ) || name.starts_with("std::")
-        || name.starts_with("core::")
-        || name.starts_with("alloc::")
-}
 
 fn determine_visibility(func: &FunctionMetrics) -> FunctionVisibility {
     // Use the visibility field from FunctionMetrics if available

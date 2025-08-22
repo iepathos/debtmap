@@ -51,8 +51,6 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
         is_pure: None,
         purity_confidence: None,
         entropy_details: None,
-        is_pure: None,
-        purity_confidence: None,
     }
 }
 
