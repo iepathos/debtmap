@@ -35,11 +35,18 @@ The user will provide the shell output from running `just fmt-check && just lint
 2. Run `just lint` to verify linting issues are resolved
 3. Report the verification results
 
-## Phase 5: Summary Report
+## Phase 5: Commit Changes
+1. If any changes were made (formatting or linting fixes):
+   - Stage all changes with `git add -A`
+   - Create a commit with message: "fix: apply formatting and linting fixes"
+   - Include details of what was fixed in the commit body
+
+## Phase 6: Summary Report
 Provide a concise summary:
 - What was fixed (formatting, linting, or both)
 - Whether all issues are resolved
 - Any remaining issues that need manual attention
+- Whether changes were committed
 
 ## Example Usage
 User provides output like:
@@ -63,11 +70,13 @@ You would:
 3. Run `cargo fmt` to fix formatting
 4. Run `cargo clippy --fix` to remove unused import
 5. Verify both issues are resolved
-6. Report success
+6. Commit the changes with `git add -A && git commit -m "fix: apply formatting and linting fixes"`
+7. Report success
 
 ## Important Notes
 - Always run the actual fix commands, don't just report what needs fixing
 - Verify fixes were applied successfully
+- ALWAYS commit changes if any fixes were applied to prevent worktree cleanup issues
 - Be concise in output - focus on what was done and what remains
 - If no issues are found in the provided output, report that clearly
 - Some clippy warnings may not be auto-fixable - report these for manual review
