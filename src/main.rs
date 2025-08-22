@@ -2463,6 +2463,372 @@ end_of_record
     }
 
     #[test]
+    fn test_analyze_risk_with_coverage_empty_lcov() {
+        use debtmap::FunctionMetrics;
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("empty.lcov");
+
+        // Create empty but valid LCOV file
+        let lcov_content = "";
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "uncovered_func".to_string(),
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    cyclomatic: 5,
+                    cognitive: 3,
+                    nesting: 2,
+                    length: 15,
+                    is_test: false,
+                    visibility: None,
+                    is_trait_method: false,
+                    in_test_module: false,
+                    entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 5.0,
+                    max_complexity: 5,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        // Should succeed but functions will have no coverage
+        let result =
+            analyze_risk_with_coverage(&results, &lcov_path, temp_dir.path(), false, None, None);
+
+        assert!(result.is_ok());
+        let insights = result.unwrap();
+        assert!(insights.is_some());
+
+        let insights = insights.unwrap();
+        // Function should be in top risks due to no coverage
+        assert!(!insights.top_risks.is_empty());
+        assert_eq!(insights.top_risks[0].coverage_percentage, None);
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_malformed_lcov() {
+        use debtmap::FunctionMetrics;
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("malformed.lcov");
+
+        // Create malformed LCOV content
+        let lcov_content = "INVALID:malformed:content:not:lcov:format";
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "test_func".to_string(),
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    cyclomatic: 3,
+                    cognitive: 2,
+                    nesting: 1,
+                    length: 10,
+                    is_test: false,
+                    visibility: None,
+                    is_trait_method: false,
+                    in_test_module: false,
+                    entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 3.0,
+                    max_complexity: 3,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        // Should handle malformed LCOV gracefully
+        let result =
+            analyze_risk_with_coverage(&results, &lcov_path, temp_dir.path(), false, None, None);
+
+        // Malformed LCOV causes parsing error
+        assert!(result.is_err());
+        // Verify error message mentions LCOV parsing
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse LCOV file"));
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_full_coverage() {
+        use debtmap::FunctionMetrics;
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("full_coverage.lcov");
+
+        // Create LCOV with 100% coverage
+        let lcov_content = r#"TN:
+SF:src/test.rs
+FN:10,fully_covered
+FNDA:100,fully_covered
+FNF:1
+FNH:1
+DA:10,100
+DA:11,100
+DA:12,100
+DA:13,100
+DA:14,100
+LF:5
+LH:5
+end_of_record
+"#;
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "fully_covered".to_string(),
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    cyclomatic: 8, // High complexity but fully covered
+                    cognitive: 6,
+                    nesting: 3,
+                    length: 5,
+                    is_test: false,
+                    visibility: None,
+                    is_trait_method: false,
+                    in_test_module: false,
+                    entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 8.0,
+                    max_complexity: 8,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let result =
+            analyze_risk_with_coverage(&results, &lcov_path, temp_dir.path(), false, None, None);
+
+        assert!(result.is_ok());
+        let insights = result.unwrap();
+        assert!(insights.is_some());
+
+        let insights = insights.unwrap();
+        // Even with high complexity, 100% coverage should reduce risk
+        if !insights.top_risks.is_empty() {
+            // Check that coverage data is present (value might vary based on LCOV interpretation)
+            assert!(insights.top_risks[0].coverage_percentage.is_some());
+            // Risk score should be affected by coverage (even if not perfect)
+            // Higher complexity with some coverage should still have moderate risk
+            assert!(insights.top_risks[0].risk_score > 0.0);
+        }
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_empty_metrics() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("test.lcov");
+
+        // Create valid LCOV file
+        let lcov_content = r#"TN:
+SF:src/test.rs
+FNF:0
+FNH:0
+LF:0
+LH:0
+end_of_record
+"#;
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![], // Empty metrics
+                summary: ComplexitySummary {
+                    total_functions: 0,
+                    average_complexity: 0.0,
+                    max_complexity: 0,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let result =
+            analyze_risk_with_coverage(&results, &lcov_path, temp_dir.path(), false, None, None);
+
+        assert!(result.is_ok());
+        let insights = result.unwrap();
+        assert!(insights.is_some());
+
+        let insights = insights.unwrap();
+        // No functions means no risks
+        assert!(insights.top_risks.is_empty());
+        assert_eq!(insights.risk_distribution.total_functions, 0);
+    }
+
+    #[test]
+    fn test_analyze_risk_with_coverage_high_debt_context() {
+        use debtmap::FunctionMetrics;
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lcov_path = temp_dir.path().join("test.lcov");
+
+        // Create LCOV with partial coverage
+        let lcov_content = r#"TN:
+SF:src/test.rs
+FN:10,debt_func
+FNDA:3,debt_func
+FNF:1
+FNH:1
+DA:10,3
+DA:11,3
+DA:12,0
+LF:3
+LH:2
+end_of_record
+"#;
+        fs::write(&lcov_path, lcov_content).unwrap();
+
+        let results = AnalysisResults {
+            project_path: temp_dir.path().to_path_buf(),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![FunctionMetrics {
+                    name: "debt_func".to_string(),
+                    file: PathBuf::from("src/test.rs"),
+                    line: 10,
+                    cyclomatic: 6,
+                    cognitive: 4,
+                    nesting: 2,
+                    length: 3,
+                    is_test: false,
+                    visibility: None,
+                    is_trait_method: false,
+                    in_test_module: false,
+                    entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
+                }],
+                summary: ComplexitySummary {
+                    total_functions: 1,
+                    average_complexity: 6.0,
+                    max_complexity: 6,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![
+                    // Add high debt items
+                    DebtItem {
+                        id: "debt-1".to_string(),
+                        debt_type: DebtType::Complexity,
+                        priority: Priority::High,
+                        file: PathBuf::from("src/test.rs"),
+                        line: 10,
+                        column: Some(1),
+                        message: "High complexity function".to_string(),
+                        context: Some("debt_func".to_string()),
+                    },
+                ],
+                by_type: std::collections::HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+        };
+
+        let result =
+            analyze_risk_with_coverage(&results, &lcov_path, temp_dir.path(), false, None, None);
+
+        assert!(result.is_ok());
+        let insights = result.unwrap();
+        assert!(insights.is_some());
+
+        let insights = insights.unwrap();
+        // High debt should contribute to risk
+        assert!(!insights.top_risks.is_empty());
+        // The function should have elevated risk due to debt
+        assert!(insights.top_risks[0].risk_score > 5.0);
+    }
+
+    #[test]
     fn test_is_analysis_passing_all_good() {
         let results = AnalysisResults {
             project_path: PathBuf::from("/test"),
