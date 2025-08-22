@@ -60,8 +60,8 @@ Implement AST-based visitor pattern detection and logarithmic complexity scaling
 ### Non-Functional Requirements
 
 1. **Performance**
-   - AST analysis must add < 5% overhead to analysis time
-   - Pattern detection should be cached per file
+   - AST analysis overhead acceptable during prototype (< 20% ok)
+   - Caching optional for initial implementation
    - Scaling calculations must be O(1)
 
 2. **Accuracy**
@@ -69,10 +69,10 @@ Implement AST-based visitor pattern detection and logarithmic complexity scaling
    - < 5% false positive rate for custom patterns
    - Maintain detection of actually complex functions
 
-3. **Compatibility**
-   - Work with existing entropy and pattern adjustments
-   - Integrate with current scoring pipeline
-   - Support all existing output formats
+3. **Prototype Freedom**
+   - Can refactor existing modules as needed
+   - Breaking changes to internal APIs acceptable
+   - Focus on correctness over performance initially
 
 ## Acceptance Criteria
 
@@ -180,7 +180,7 @@ Implement AST-based visitor pattern detection and logarithmic complexity scaling
 3. **Modified Module**: `src/complexity/cyclomatic.rs`
    - Integration with pattern detectors
    - Scaling application logic
-   - Backward compatibility
+   - Can be completely refactored if needed
 
 ### Data Structures
 
@@ -308,14 +308,15 @@ pub enum ScalingFormula {
 
 ## Migration and Compatibility
 
-- **Breaking Changes**: None - all changes are scoring improvements
-- **Configuration Migration**: 
-  - Existing pattern adjustments remain functional
-  - New configuration options have sensible defaults
+- **Breaking Changes**: Allowed during prototyping phase
+  - Complexity scores will change significantly for visitor patterns
+  - Existing configurations may need adjustment
+  - API changes are acceptable for better design
 - **Score Changes**: 
   - Visitor patterns will see 80-90% score reduction
-  - Other functions maintain similar scores
-  - May affect validation thresholds in CI/CD pipelines
-- **Rollback Strategy**: 
-  - Feature flag `--legacy-complexity` to use old scoring
-  - Configuration option to disable pattern detection
+  - May break existing CI/CD validation thresholds
+  - No compatibility mode needed during prototype
+- **Prototype Approach**: 
+  - Focus on correctness over compatibility
+  - Iterate quickly on scoring algorithms
+  - Refactor existing code as needed
