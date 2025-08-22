@@ -20,6 +20,7 @@
 - shell: "just test"
   on_failure:
     claude: "/mmm-debug-test-failure --spec $ARG --output ${shell.output}"
+    commit_required: true
     max_attempts: 3
     fail_workflow: false  # Continue workflow even if tests can't be fixed
 
@@ -27,5 +28,6 @@
 - shell: "just fmt-check && just lint"
   on_failure:
     claude: "/lint ${shell.output}"
+    commit_required: true
     max_attempts: 3
     fail_workflow: false
