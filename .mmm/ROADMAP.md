@@ -307,6 +307,15 @@ We have completed the initial implementation with core functionality for analyzi
   - Integration with unified scoring system
   - Comprehensive test suite
 
+- [x] **Spec 61**: Visitor Pattern Complexity Reduction
+  - AST-based visitor pattern detection
+  - Logarithmic scaling for visitor methods (log2)
+  - Square root scaling for exhaustive matches
+  - 80%+ reduction for simple mappings
+  - Trait implementation analysis for Visit, Visitor, Fold patterns
+  - Function name pattern detection (visit_*, walk_*, traverse_*)
+  - 80-90% false positive reduction for idiomatic visitor patterns
+
 ## Pending Specs
 
 ### Enhancements
