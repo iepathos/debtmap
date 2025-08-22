@@ -13,6 +13,7 @@ pub mod database;
 pub mod debt;
 pub mod io;
 pub mod organization;
+pub mod patterns;
 pub mod priority;
 pub mod refactoring;
 pub mod resource;
