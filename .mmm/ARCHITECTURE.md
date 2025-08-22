@@ -39,6 +39,7 @@ Complexity metric calculations:
 - `entropy.rs`: Entropy-based complexity scoring using information theory
 - `pattern_adjustments.rs`: Pattern-specific complexity adjustments (pattern matching, simple delegation)
 - `patterns.rs`: Modern pattern complexity detection
+- `visitor_detector.rs`: AST-based visitor pattern detection with logarithmic complexity scaling
 
 ### Debt (`src/debt/`)
 Technical debt detection:
