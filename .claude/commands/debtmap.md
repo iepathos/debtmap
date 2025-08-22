@@ -299,7 +299,7 @@ Complete each step in order:
 - [ ] Initial debtmap analysis completed with top priority identified
 - [ ] Implementation plan created based on the ACTION specified
 - [ ] Fix implemented following the plan
-- [ ] All tests passing (cargo test)
+- [ ] All tests passing (cargo nextest run)
 - [ ] No clippy warnings (cargo clippy)
 - [ ] Code properly formatted (cargo fmt)
 - [ ] Coverage regenerated if tests were added

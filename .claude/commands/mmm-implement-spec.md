@@ -99,7 +99,7 @@ Update .mmm files (skip for temporary iteration specs):
 
 Final steps:
 - Run `cargo fmt` and `cargo clippy`
-- Run `cargo test` if tests exist
+- Run `cargo nextest run` if tests exist
 - **Delete spec file**: Remove the implemented spec file after successful implementation (both permanent and temporary specs)
 - **Report modified files** (for automation tracking):
   - List all files that were created, modified, or deleted

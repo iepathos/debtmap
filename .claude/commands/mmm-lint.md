@@ -26,7 +26,7 @@ Format, lint, and test Rust code to ensure quality standards, then commit any au
 3. Note any remaining warnings that require manual attention
 
 ## Phase 4: Testing
-1. Run `cargo test` to ensure all tests pass
+1. Run `cargo nextest run` to ensure all tests pass
 2. If tests fail:
    - Report which tests are failing
    - Do NOT attempt to fix test failures (that's for implement-spec)

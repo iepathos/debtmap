@@ -17,7 +17,7 @@ Analyze code coverage, identify the file with lowest coverage, and add comprehen
    - Pure functions when possible
    - Immutability principles
    - Property-based testing for complex logic
-5. **Verify tests** - Run `cargo test` to ensure all tests pass
+5. **Verify tests** - Run `cargo nextest run` to ensure all tests pass
 6. **Measure improvement** - Run coverage again to verify improvement
 7. **Commit changes** - Create a clear commit describing the coverage improvement
 

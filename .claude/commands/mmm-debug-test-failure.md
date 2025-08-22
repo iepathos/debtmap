@@ -7,7 +7,7 @@ Fix failing tests by analyzing test output and applying targeted fixes.
 ## Variables
 
 --spec: Optional path to spec file that generated code that introduced regression.
---output: Test failure output from cargo test
+--output: Test failure output from cargo nextest run
 
 ## Execute
 
@@ -45,7 +45,7 @@ Fix failing tests by analyzing test output and applying targeted fixes.
 
 5. **Verify all tests pass**:
    ```bash
-   cargo test  # Run full suite, not just specific tests
+   cargo nextest run  # Run full suite, not just specific tests
    ```
 
 6. **Create a commit** after fixing the tests:
