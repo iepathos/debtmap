@@ -1,6 +1,7 @@
 use debtmap::analyzers::{rust::RustAnalyzer, Analyzer};
 use debtmap::complexity::entropy::EntropyAnalyzer;
 use std::path::PathBuf;
+use syn::{parse_str, Block};
 
 #[test]
 fn test_entropy_reduces_pattern_complexity() {
@@ -174,4 +175,145 @@ fn test_entropy_analyzer_directly() {
         complex_score.pattern_repetition
     );
     assert!(complex_score.effective_complexity > 0.5); // Higher effective complexity
+}
+
+#[test]
+fn test_get_cache_stats_empty_cache() {
+    // Test cache stats with no entries
+    let analyzer = EntropyAnalyzer::new();
+    let stats = analyzer.get_cache_stats();
+
+    assert_eq!(stats.entries, 0);
+    assert_eq!(stats.memory_usage, 0);
+    assert_eq!(stats.hit_rate, 0.0);
+    assert_eq!(stats.miss_rate, 0.0);
+    assert_eq!(stats.evictions, 0);
+}
+
+#[test]
+fn test_get_cache_stats_with_hits_and_misses() {
+    // Test cache stats calculation with actual hits and misses
+    let mut analyzer = EntropyAnalyzer::new();
+
+    // Create a simple block for testing
+    let block_str = "{ let x = 1; let y = 2; x + y }";
+    let block: Block = parse_str(block_str).unwrap();
+
+    // First call - cache miss
+    let _score1 = analyzer.calculate_entropy_cached(&block, "test_hash_1");
+
+    // Check stats after first miss
+    let stats = analyzer.get_cache_stats();
+    assert_eq!(stats.entries, 1);
+    assert_eq!(stats.hit_rate, 0.0); // 0 hits, 1 miss
+    assert_eq!(stats.miss_rate, 1.0); // 0 hits, 1 miss
+    assert_eq!(stats.evictions, 0);
+
+    // Second call with same hash - cache hit
+    let _score2 = analyzer.calculate_entropy_cached(&block, "test_hash_1");
+
+    // Check stats after hit
+    let stats = analyzer.get_cache_stats();
+    assert_eq!(stats.entries, 1);
+    assert_eq!(stats.hit_rate, 0.5); // 1 hit, 1 miss
+    assert_eq!(stats.miss_rate, 0.5); // 1 hit, 1 miss
+    assert_eq!(stats.evictions, 0);
+
+    // Third call with different hash - cache miss
+    let _score3 = analyzer.calculate_entropy_cached(&block, "test_hash_2");
+
+    // Check final stats
+    let stats = analyzer.get_cache_stats();
+    assert_eq!(stats.entries, 2);
+    assert!((stats.hit_rate - 0.333).abs() < 0.01); // 1 hit, 2 misses
+    assert!((stats.miss_rate - 0.667).abs() < 0.01); // 1 hit, 2 misses
+    assert_eq!(stats.evictions, 0);
+}
+
+#[test]
+fn test_get_cache_stats_memory_estimation() {
+    // Test memory usage estimation
+    let mut analyzer = EntropyAnalyzer::with_cache_size(10);
+
+    let block_str = "{ let x = 1; }";
+    let block: Block = parse_str(block_str).unwrap();
+
+    // Add multiple cache entries
+    for i in 0..5 {
+        let hash = format!("test_hash_{}", i);
+        let _score = analyzer.calculate_entropy_cached(&block, &hash);
+    }
+
+    let stats = analyzer.get_cache_stats();
+    assert_eq!(stats.entries, 5);
+    // Each entry is estimated at 128 bytes
+    assert_eq!(stats.memory_usage, 5 * 128);
+}
+
+#[test]
+fn test_get_cache_stats_after_evictions() {
+    // Test stats correctly track evictions
+    let mut analyzer = EntropyAnalyzer::with_cache_size(2); // Small cache to force evictions
+
+    let block_str = "{ let x = 1; }";
+    let block: Block = parse_str(block_str).unwrap();
+
+    // Add 3 entries to force eviction (cache size is 2)
+    for i in 0..3 {
+        let hash = format!("test_hash_{}", i);
+        let _score = analyzer.calculate_entropy_cached(&block, &hash);
+    }
+
+    let stats = analyzer.get_cache_stats();
+    assert_eq!(stats.entries, 2); // Only 2 entries due to cache limit
+    assert_eq!(stats.evictions, 1); // One entry was evicted
+    assert_eq!(stats.miss_rate, 1.0); // All were misses
+    assert_eq!(stats.hit_rate, 0.0);
+}
+
+#[test]
+fn test_get_cache_stats_after_clear() {
+    // Test stats are reset after clearing cache
+    let mut analyzer = EntropyAnalyzer::new();
+
+    let block_str = "{ let x = 1; }";
+    let block: Block = parse_str(block_str).unwrap();
+
+    // Add some cache activity
+    let _score1 = analyzer.calculate_entropy_cached(&block, "test_hash_1");
+    let _score2 = analyzer.calculate_entropy_cached(&block, "test_hash_1"); // Hit
+    let _score3 = analyzer.calculate_entropy_cached(&block, "test_hash_2");
+
+    // Clear the cache
+    analyzer.clear_cache();
+
+    // Check that stats are reset
+    let stats = analyzer.get_cache_stats();
+    assert_eq!(stats.entries, 0);
+    assert_eq!(stats.memory_usage, 0);
+    assert_eq!(stats.hit_rate, 0.0);
+    assert_eq!(stats.miss_rate, 0.0);
+    assert_eq!(stats.evictions, 0);
+}
+
+#[test]
+fn test_get_cache_stats_high_hit_rate() {
+    // Test scenario with high cache hit rate
+    let mut analyzer = EntropyAnalyzer::new();
+
+    let block_str = "{ let x = 1; }";
+    let block: Block = parse_str(block_str).unwrap();
+
+    // First call - miss
+    let _score = analyzer.calculate_entropy_cached(&block, "test_hash");
+
+    // Multiple calls with same hash - all hits
+    for _ in 0..9 {
+        let _score = analyzer.calculate_entropy_cached(&block, "test_hash");
+    }
+
+    let stats = analyzer.get_cache_stats();
+    assert_eq!(stats.entries, 1);
+    assert_eq!(stats.hit_rate, 0.9); // 9 hits, 1 miss
+    assert_eq!(stats.miss_rate, 0.1); // 9 hits, 1 miss
 }
