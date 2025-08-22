@@ -374,23 +374,30 @@ impl FunctionPointerVisitor {
         caller: &FunctionId,
         line: usize,
     ) -> Option<HigherOrderFunctionCall> {
-        if let Expr::Path(path) = &*call.func {
-            if let Some(func_name) = self.extract_function_name_from_path(path) {
-                if self.is_higher_order_function(&func_name) {
-                    let function_arguments = self.extract_function_arguments(call);
+        // Early return if not a path expression
+        let path = match &*call.func {
+            Expr::Path(p) => p,
+            _ => return None,
+        };
 
-                    if !function_arguments.is_empty() {
-                        return Some(HigherOrderFunctionCall {
-                            caller: caller.clone(),
-                            hof_function: func_name,
-                            function_arguments,
-                            line,
-                        });
-                    }
-                }
-            }
+        // Extract and validate function name
+        let func_name = self.extract_function_name_from_path(path)?;
+
+        // Check if it's a higher-order function
+        if !self.is_higher_order_function(&func_name) {
+            return None;
         }
-        None
+
+        // Extract function arguments
+        let function_arguments = self.extract_function_arguments(call);
+
+        // Return HOF call if arguments exist
+        (!function_arguments.is_empty()).then(|| HigherOrderFunctionCall {
+            caller: caller.clone(),
+            hof_function: func_name,
+            function_arguments,
+            line,
+        })
     }
 
     /// Extract function arguments from call expression
@@ -658,6 +665,61 @@ mod tests {
         let result = visitor.extract_hof_call(&call, &caller, 25);
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_hof_call_empty_arguments() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test higher-order function call with no function arguments
+        let call: ExprCall = parse_quote! { map() };
+        let result = visitor.extract_hof_call(&call, &caller, 30);
+
+        // Should return None when no function arguments
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_hof_call_closure_argument() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test call with closure argument (should not extract closure)
+        let call: ExprCall = parse_quote! { map(|x| x + 1) };
+        let result = visitor.extract_hof_call(&call, &caller, 35);
+
+        // Should return None when only closure arguments (not function paths)
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_hof_call_nested_path() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        let caller = FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        };
+
+        // Test higher-order function with nested path argument
+        let call: ExprCall = parse_quote! { filter(module::is_valid) };
+        let result = visitor.extract_hof_call(&call, &caller, 40);
+
+        assert!(result.is_some());
+        let hof_call = result.unwrap();
+        assert_eq!(hof_call.hof_function, "filter");
+        // Should extract the full path as function name
+        assert_eq!(hof_call.function_arguments.len(), 1);
+        assert_eq!(hof_call.function_arguments[0].name, "module::is_valid");
     }
 
     #[test]

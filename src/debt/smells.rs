@@ -171,21 +171,56 @@ pub fn analyze_module_smells(path: &Path, line_count: usize) -> Vec<CodeSmell> {
 /// This is a simplified version that looks for method calls on other objects
 pub fn detect_feature_envy(content: &str, path: &Path) -> Vec<CodeSmell> {
     let mut smells = Vec::new();
+    let mut object_calls: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut self_calls = 0;
 
-    // Simple heuristic: count method calls on other objects vs self
-    for (line_num, line) in content.lines().enumerate() {
-        let other_calls = line.matches('.').count() - line.matches("self.").count();
-        let self_calls = line.matches("self.").count();
+    // Count method calls per object
+    for line in content.lines() {
+        // Count self calls
+        self_calls += line.matches("self.").count();
 
-        if other_calls > 3 && other_calls > self_calls * 2 {
+        // Look for pattern: identifier.method_call
+        // Simple regex-like pattern matching without regex
+        let trimmed = line.trim();
+        if let Some(dot_pos) = trimmed.find('.') {
+            if dot_pos > 0 {
+                let before_dot = &trimmed[..dot_pos];
+                let object_name = before_dot.split_whitespace().last().unwrap_or("");
+
+                // Skip if it's self or if it doesn't look like an identifier
+                if !object_name.is_empty()
+                    && object_name != "self"
+                    && object_name
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_alphabetic() || c == '_')
+                    && !object_name.contains('(')
+                    && !object_name.contains('"')
+                    && !object_name.contains('\'')
+                {
+                    *object_calls.entry(object_name.to_string()).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    // Check if any object is used more than self
+    for (object, count) in object_calls {
+        if count >= 3 && count > self_calls {
             smells.push(CodeSmell {
                 smell_type: SmellType::FeatureEnvy,
                 location: path.to_path_buf(),
-                line: line_num + 1,
+                line: 1, // We don't track specific lines in this simple implementation
                 message: format!(
-                    "Line has {other_calls} external method calls vs {self_calls} self calls"
+                    "Possible feature envy: {} calls to '{}' vs {} self calls",
+                    count, object, self_calls
                 ),
-                severity: Priority::Low,
+                severity: if count > 5 {
+                    Priority::Medium
+                } else {
+                    Priority::Low
+                },
             });
         }
     }
@@ -447,5 +482,301 @@ mod tests {
         assert_eq!(smells[1].line, 50);
         assert!(smells[1].message.contains("func_b"));
         assert!(smells[1].message.contains("func_c"));
+    }
+
+    #[test]
+    fn test_detect_long_parameter_list() {
+        let func = FunctionMetrics {
+            name: "test_func".to_string(),
+            file: PathBuf::from("src/test.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 10,
+            nesting: 2,
+            length: 20,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+
+        // Test with parameter count below threshold
+        let smell = detect_long_parameter_list(&func, 3);
+        assert!(smell.is_none(), "Should not detect smell for 3 parameters");
+
+        // Test with parameter count at threshold
+        let smell = detect_long_parameter_list(&func, 5);
+        assert!(smell.is_none(), "Should not detect smell at threshold");
+
+        // Test with parameter count above threshold
+        let smell = detect_long_parameter_list(&func, 6);
+        assert!(smell.is_some(), "Should detect smell for 6 parameters");
+        let smell = smell.unwrap();
+        assert_eq!(smell.smell_type, SmellType::LongParameterList);
+        assert_eq!(smell.severity, Priority::Medium);
+        assert!(smell.message.contains("6 parameters"));
+
+        // Test with parameter count way above threshold (high severity)
+        let smell = detect_long_parameter_list(&func, 12);
+        assert!(smell.is_some(), "Should detect smell for 12 parameters");
+        let smell = smell.unwrap();
+        assert_eq!(smell.severity, Priority::High);
+    }
+
+    #[test]
+    fn test_detect_large_module() {
+        let path = PathBuf::from("src/large_module.rs");
+
+        // Test with line count below threshold
+        let smell = detect_large_module(&path, 250);
+        assert!(smell.is_none(), "Should not detect smell for 250 lines");
+
+        // Test with line count at threshold
+        let smell = detect_large_module(&path, 300);
+        assert!(smell.is_none(), "Should not detect smell at threshold");
+
+        // Test with line count above threshold
+        let smell = detect_large_module(&path, 350);
+        assert!(smell.is_some(), "Should detect smell for 350 lines");
+        let smell = smell.unwrap();
+        assert_eq!(smell.smell_type, SmellType::LargeClass);
+        assert_eq!(smell.severity, Priority::Medium);
+        assert!(smell.message.contains("350 lines"));
+
+        // Test with line count way above threshold (high severity)
+        let smell = detect_large_module(&path, 700);
+        assert!(smell.is_some(), "Should detect smell for 700 lines");
+        let smell = smell.unwrap();
+        assert_eq!(smell.severity, Priority::High);
+    }
+
+    #[test]
+    fn test_detect_long_method() {
+        let func = FunctionMetrics {
+            name: "long_func".to_string(),
+            file: PathBuf::from("src/test.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 10,
+            nesting: 2,
+            length: 40,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+
+        // Test with length below threshold
+        let smell = detect_long_method(&func);
+        assert!(smell.is_none(), "Should not detect smell for 40 lines");
+
+        // Test with length above threshold
+        let mut long_func = func.clone();
+        long_func.length = 60;
+        let smell = detect_long_method(&long_func);
+        assert!(smell.is_some(), "Should detect smell for 60 lines");
+        let smell = smell.unwrap();
+        assert_eq!(smell.smell_type, SmellType::LongMethod);
+        assert_eq!(smell.severity, Priority::Medium);
+        assert!(smell.message.contains("60 lines"));
+
+        // Test with length way above threshold (high severity)
+        long_func.length = 120;
+        let smell = detect_long_method(&long_func);
+        assert!(smell.is_some(), "Should detect smell for 120 lines");
+        let smell = smell.unwrap();
+        assert_eq!(smell.severity, Priority::High);
+    }
+
+    #[test]
+    fn test_detect_deep_nesting() {
+        let func = FunctionMetrics {
+            name: "nested_func".to_string(),
+            file: PathBuf::from("src/test.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 10,
+            nesting: 3,
+            length: 30,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+
+        // Test with nesting below threshold
+        let smell = detect_deep_nesting(&func);
+        assert!(
+            smell.is_none(),
+            "Should not detect smell for nesting depth 3"
+        );
+
+        // Test with nesting at threshold
+        let mut nested_func = func.clone();
+        nested_func.nesting = 4;
+        let smell = detect_deep_nesting(&nested_func);
+        assert!(smell.is_none(), "Should not detect smell at threshold");
+
+        // Test with nesting above threshold
+        nested_func.nesting = 5;
+        let smell = detect_deep_nesting(&nested_func);
+        assert!(smell.is_some(), "Should detect smell for nesting depth 5");
+        let smell = smell.unwrap();
+        assert_eq!(smell.smell_type, SmellType::DeepNesting);
+        assert_eq!(smell.severity, Priority::Medium);
+        assert!(smell.message.contains("nesting depth of 5"));
+
+        // Test with nesting way above threshold (high severity)
+        nested_func.nesting = 10;
+        let smell = detect_deep_nesting(&nested_func);
+        assert!(smell.is_some(), "Should detect smell for nesting depth 10");
+        let smell = smell.unwrap();
+        assert_eq!(smell.severity, Priority::High);
+    }
+
+    #[test]
+    fn test_analyze_function_smells() {
+        let func = FunctionMetrics {
+            name: "complex_func".to_string(),
+            file: PathBuf::from("src/test.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 10,
+            nesting: 5,
+            length: 60,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+
+        // Test function with multiple smells
+        let smells = analyze_function_smells(&func, 7);
+        assert_eq!(smells.len(), 3, "Should detect 3 smells");
+
+        // Verify each smell type is detected
+        let smell_types: Vec<SmellType> = smells.iter().map(|s| s.smell_type.clone()).collect();
+        assert!(smell_types.contains(&SmellType::LongParameterList));
+        assert!(smell_types.contains(&SmellType::LongMethod));
+        assert!(smell_types.contains(&SmellType::DeepNesting));
+
+        // Test function with no smells
+        let clean_func = FunctionMetrics {
+            name: "clean_func".to_string(),
+            file: PathBuf::from("src/test.rs"),
+            line: 10,
+            cyclomatic: 3,
+            cognitive: 5,
+            nesting: 2,
+            length: 20,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+
+        let smells = analyze_function_smells(&clean_func, 3);
+        assert_eq!(smells.len(), 0, "Clean function should have no smells");
+    }
+
+    #[test]
+    fn test_analyze_module_smells() {
+        let path = PathBuf::from("src/module.rs");
+
+        // Test small module with no smells
+        let smells = analyze_module_smells(&path, 200);
+        assert_eq!(smells.len(), 0, "Small module should have no smells");
+
+        // Test large module
+        let smells = analyze_module_smells(&path, 400);
+        assert_eq!(smells.len(), 1, "Large module should have 1 smell");
+        assert_eq!(smells[0].smell_type, SmellType::LargeClass);
+
+        // Test edge case with exactly threshold
+        let smells = analyze_module_smells(&path, 300);
+        assert_eq!(smells.len(), 0, "Module at threshold should have no smells");
+    }
+
+    #[test]
+    fn test_detect_feature_envy() {
+        let path = PathBuf::from("src/test.rs");
+
+        // Test with no feature envy
+        let content = r#"
+            fn process_data(&self) {
+                self.validate();
+                self.transform();
+                self.save();
+            }
+        "#;
+        let smells = detect_feature_envy(content, &path);
+        assert_eq!(smells.len(), 0, "Should not detect feature envy");
+
+        // Test with feature envy pattern
+        let content = r#"
+            fn process_order(&self, customer: &Customer) {
+                customer.validate_address();
+                customer.check_credit();
+                customer.update_status();
+                customer.send_notification();
+                customer.log_activity();
+                self.save();
+            }
+        "#;
+        let smells = detect_feature_envy(content, &path);
+        assert!(smells.len() > 0, "Should detect feature envy");
+        assert_eq!(smells[0].smell_type, SmellType::FeatureEnvy);
+        assert!(smells[0].message.contains("customer"));
+
+        // Test with multiple objects
+        let content = r#"
+            fn coordinate(&self, order: &Order, payment: &Payment) {
+                order.validate();
+                order.calculate_total();
+                order.apply_discount();
+                payment.process();
+                payment.verify();
+                payment.record();
+            }
+        "#;
+        let smells = detect_feature_envy(content, &path);
+        assert_eq!(
+            smells.len(),
+            2,
+            "Should detect feature envy for both objects"
+        );
+    }
+
+    #[test]
+    fn test_code_smell_to_debt_item() {
+        let smell = CodeSmell {
+            smell_type: SmellType::LongMethod,
+            location: PathBuf::from("src/test.rs"),
+            line: 42,
+            message: "Test message".to_string(),
+            severity: Priority::High,
+        };
+
+        let debt_item = smell.to_debt_item();
+        assert_eq!(debt_item.debt_type, DebtType::CodeSmell);
+        assert_eq!(debt_item.file, PathBuf::from("src/test.rs"));
+        assert_eq!(debt_item.line, 42);
+        assert_eq!(debt_item.message, "Test message");
+        assert_eq!(debt_item.priority, Priority::High);
     }
 }
