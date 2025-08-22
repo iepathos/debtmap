@@ -226,4 +226,216 @@ mod tests {
         assert_eq!(cyc, 36);
         assert_eq!(cog, 29);
     }
+
+    fn create_test_file_metrics(
+        path: &str,
+        cyclomatic: u32,
+        cognitive: u32,
+        num_functions: usize,
+    ) -> FileMetrics {
+        let functions: Vec<FunctionMetrics> = (0..num_functions)
+            .map(|i| {
+                create_test_function(
+                    &format!("func_{}", i),
+                    cyclomatic / num_functions as u32,
+                    cognitive / num_functions as u32,
+                )
+            })
+            .collect();
+
+        FileMetrics {
+            path: PathBuf::from(path),
+            language: crate::core::Language::Rust,
+            complexity: ComplexityMetrics {
+                functions,
+                cyclomatic_complexity: cyclomatic,
+                cognitive_complexity: cognitive,
+            },
+            debt_items: Vec::new(),
+            dependencies: Vec::new(),
+            duplications: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn test_combine_file_metrics_empty() {
+        let metrics = vec![];
+        let combined = combine_file_metrics(metrics);
+
+        assert_eq!(combined.complexity.functions.len(), 0);
+        assert_eq!(combined.complexity.cyclomatic_complexity, 0);
+        assert_eq!(combined.complexity.cognitive_complexity, 0);
+        assert_eq!(combined.debt_items.len(), 0);
+        assert_eq!(combined.dependencies.len(), 0);
+        assert_eq!(combined.duplications.len(), 0);
+    }
+
+    #[test]
+    fn test_combine_file_metrics_single() {
+        let metrics = vec![create_test_file_metrics("test1.rs", 10, 8, 2)];
+        let combined = combine_file_metrics(metrics);
+
+        assert_eq!(combined.complexity.functions.len(), 2);
+        assert_eq!(combined.complexity.cyclomatic_complexity, 10);
+        assert_eq!(combined.complexity.cognitive_complexity, 8);
+    }
+
+    #[test]
+    fn test_combine_file_metrics_multiple() {
+        let metrics = vec![
+            create_test_file_metrics("test1.rs", 10, 8, 2),
+            create_test_file_metrics("test2.rs", 15, 12, 3),
+            create_test_file_metrics("test3.rs", 5, 3, 1),
+        ];
+        let combined = combine_file_metrics(metrics);
+
+        assert_eq!(combined.complexity.functions.len(), 6);
+        assert_eq!(combined.complexity.cyclomatic_complexity, 30);
+        assert_eq!(combined.complexity.cognitive_complexity, 23);
+    }
+
+    #[test]
+    fn test_combine_file_metrics_with_debt_items() {
+        use crate::core::{DebtItem, DebtType, Priority};
+
+        let mut metrics1 = create_test_file_metrics("test1.rs", 10, 8, 1);
+        metrics1.debt_items.push(DebtItem {
+            id: "test1".to_string(),
+            debt_type: DebtType::Complexity,
+            priority: Priority::Low,
+            file: PathBuf::from("test1.rs"),
+            line: 10,
+            column: Some(5),
+            message: "Test debt 1".to_string(),
+            context: None,
+        });
+
+        let mut metrics2 = create_test_file_metrics("test2.rs", 15, 12, 1);
+        metrics2.debt_items.push(DebtItem {
+            id: "test2".to_string(),
+            debt_type: DebtType::Complexity,
+            priority: Priority::Medium,
+            file: PathBuf::from("test2.rs"),
+            line: 20,
+            column: Some(8),
+            message: "Test debt 2".to_string(),
+            context: None,
+        });
+
+        let combined = combine_file_metrics(vec![metrics1, metrics2]);
+
+        assert_eq!(combined.debt_items.len(), 2);
+        assert_eq!(combined.debt_items[0].id, "test1");
+        assert_eq!(combined.debt_items[1].id, "test2");
+    }
+
+    #[test]
+    fn test_combine_file_metrics_with_dependencies() {
+        use crate::core::{Dependency, DependencyKind};
+
+        let mut metrics1 = create_test_file_metrics("test1.rs", 10, 8, 1);
+        metrics1.dependencies.push(Dependency {
+            name: "module1".to_string(),
+            kind: DependencyKind::Module,
+        });
+
+        let mut metrics2 = create_test_file_metrics("test2.rs", 15, 12, 1);
+        metrics2.dependencies.push(Dependency {
+            name: "module2".to_string(),
+            kind: DependencyKind::Import,
+        });
+
+        let combined = combine_file_metrics(vec![metrics1, metrics2]);
+
+        assert_eq!(combined.dependencies.len(), 2);
+        assert_eq!(combined.dependencies[0].name, "module1");
+        assert_eq!(combined.dependencies[1].name, "module2");
+    }
+
+    #[test]
+    fn test_enrich_with_context_no_existing_context() {
+        use crate::core::{DebtItem, DebtType, Priority};
+
+        let mut metrics = create_test_file_metrics("test.rs", 10, 8, 1);
+        metrics.debt_items.push(DebtItem {
+            id: "test1".to_string(),
+            debt_type: DebtType::Complexity,
+            priority: Priority::Medium,
+            file: PathBuf::from("src/main.rs"),
+            line: 10,
+            column: Some(5),
+            message: "Complex function".to_string(),
+            context: None,
+        });
+
+        let enriched = enrich_with_context(metrics);
+
+        assert_eq!(enriched.debt_items.len(), 1);
+        assert!(enriched.debt_items[0].context.is_some());
+        assert_eq!(
+            enriched.debt_items[0].context.as_ref().unwrap(),
+            "Found in src/main.rs"
+        );
+    }
+
+    #[test]
+    fn test_enrich_with_context_preserves_existing_context() {
+        use crate::core::{DebtItem, DebtType, Priority};
+
+        let mut metrics = create_test_file_metrics("test.rs", 10, 8, 1);
+        metrics.debt_items.push(DebtItem {
+            id: "test2".to_string(),
+            debt_type: DebtType::Complexity,
+            priority: Priority::High,
+            file: PathBuf::from("src/lib.rs"),
+            line: 20,
+            column: Some(7),
+            message: "Needs refactoring".to_string(),
+            context: Some("Already has context".to_string()),
+        });
+
+        let enriched = enrich_with_context(metrics);
+
+        assert_eq!(enriched.debt_items.len(), 1);
+        assert_eq!(
+            enriched.debt_items[0].context.as_ref().unwrap(),
+            "Already has context"
+        );
+    }
+
+    #[test]
+    fn test_enrich_with_context_multiple_items() {
+        use crate::core::{DebtItem, DebtType, Priority};
+
+        let mut metrics = create_test_file_metrics("test.rs", 10, 8, 1);
+        metrics.debt_items.push(DebtItem {
+            id: "item1".to_string(),
+            debt_type: DebtType::Complexity,
+            priority: Priority::Low,
+            file: PathBuf::from("src/main.rs"),
+            line: 10,
+            column: Some(5),
+            message: "Item 1".to_string(),
+            context: None,
+        });
+        metrics.debt_items.push(DebtItem {
+            id: "item2".to_string(),
+            debt_type: DebtType::CodeSmell,
+            priority: Priority::Medium,
+            file: PathBuf::from("src/lib.rs"),
+            line: 30,
+            column: Some(8),
+            message: "Item 2".to_string(),
+            context: Some("Existing".to_string()),
+        });
+
+        let enriched = enrich_with_context(metrics);
+
+        assert_eq!(enriched.debt_items.len(), 2);
+        assert_eq!(
+            enriched.debt_items[0].context.as_ref().unwrap(),
+            "Found in src/main.rs"
+        );
+        assert_eq!(enriched.debt_items[1].context.as_ref().unwrap(), "Existing");
+    }
 }
