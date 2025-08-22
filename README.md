@@ -531,6 +531,9 @@ Identifies similar code blocks that could be refactored into shared functions.
 - **Code duplication**: Similar code blocks that could be refactored
 - **High complexity**: Functions with excessive cyclomatic or cognitive complexity
 - **Error swallowing**: Catch blocks that suppress errors without proper handling
+- **Dead code**: Unused functions and modules that can be removed
+- **Testing gaps**: Complex functions lacking adequate test coverage
+- **Risk hotspots**: Functions combining high complexity with low coverage
 
 #### Security Anti-patterns
 - **Hardcoded secrets**: API keys, passwords, and tokens in source code
