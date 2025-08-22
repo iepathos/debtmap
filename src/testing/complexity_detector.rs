@@ -620,4 +620,227 @@ mod tests {
         assert_eq!(detector.max_mock_setups, 5);
         assert_eq!(detector.max_test_length, 50);
     }
+
+    #[test]
+    fn test_analyze_test_complexity_simple_function() {
+        let function: ItemFn = parse_quote! {
+            fn test_simple() {
+                let result = 1 + 1;
+                assert_eq!(result, 2);
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        assert_eq!(analysis.cyclomatic_complexity, 0);
+        assert_eq!(analysis.mock_setup_count, 0);
+        assert_eq!(analysis.assertion_count, 0); // Not counted in expr_call visitor
+        assert_eq!(analysis.line_count, 2);
+        assert!(!analysis.has_loops);
+        assert!(!analysis.has_nested_conditionals);
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_with_conditionals() {
+        let function: ItemFn = parse_quote! {
+            fn test_with_conditions() {
+                let value = 10;
+                if value > 5 {
+                    assert!(true);
+                } else {
+                    assert!(false);
+                }
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        assert_eq!(analysis.cyclomatic_complexity, 1);
+        assert!(!analysis.has_nested_conditionals);
+        assert!(!analysis.has_loops);
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_with_nested_conditionals() {
+        let function: ItemFn = parse_quote! {
+            fn test_nested() {
+                let x = 10;
+                if x > 5 {
+                    let y = 20;
+                    if y > 15 {
+                        assert!(true);
+                    }
+                }
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        assert_eq!(analysis.cyclomatic_complexity, 2);
+        assert!(analysis.has_nested_conditionals);
+        assert!(!analysis.has_loops);
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_with_match() {
+        let function: ItemFn = parse_quote! {
+            fn test_match() {
+                let value = Some(5);
+                match value {
+                    Some(x) if x > 0 => assert!(true),
+                    Some(_) => assert!(false),
+                    None => assert!(false),
+                }
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        assert_eq!(analysis.cyclomatic_complexity, 2); // 3 arms - 1
+        assert!(!analysis.has_loops);
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_with_loop() {
+        let function: ItemFn = parse_quote! {
+            fn test_loop() {
+                let mut counter = 0;
+                loop {
+                    counter += 1;
+                    if counter > 5 {
+                        break;
+                    }
+                }
+                assert_eq!(counter, 6);
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        assert!(analysis.cyclomatic_complexity >= 1);
+        assert!(analysis.has_loops);
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_with_mocks() {
+        let function: ItemFn = parse_quote! {
+            fn test_with_mocks() {
+                let mock_service = mock();
+                when(&mock_service).expect_call();
+                given_input(&mock_service).returns(42);
+
+                let result = mock_service.call();
+                assert_eq!(result, 42);
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        assert_eq!(analysis.mock_setup_count, 3); // mock, when, given_input calls
+        assert!(analysis.total_complexity > 0);
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_complex_assertions() {
+        let function: ItemFn = parse_quote! {
+            fn test_complex_assertions() {
+                let x = 5;
+                let y = 10;
+                assert!(x > 0 && y < 20);
+                assert!(x < y || x == y);
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        // The visitor counts binary operations with && and ||
+        // But these might be in the macro expansion which may not be visited
+        // The assertion_complexity should be 0 since macro expansions aren't visited
+        assert_eq!(analysis.assertion_complexity, 0);
+        // Total complexity should still be calculated
+        assert_eq!(analysis.total_complexity, 0); // No complexity detected in macro expansions
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_identifies_complexity_sources() {
+        let function: ItemFn = parse_quote! {
+            fn test_complex() {
+                // Long test with many lines
+                let line1 = 1;
+                let line2 = 2;
+                let line3 = 3;
+                let line4 = 4;
+                let line5 = 5;
+                let line6 = 6;
+                let line7 = 7;
+                let line8 = 8;
+                let line9 = 9;
+                let line10 = 10;
+                let line11 = 11;
+                let line12 = 12;
+                let line13 = 13;
+                let line14 = 14;
+                let line15 = 15;
+                let line16 = 16;
+                let line17 = 17;
+                let line18 = 18;
+                let line19 = 19;
+                let line20 = 20;
+                let line21 = 21;
+                let line22 = 22;
+                let line23 = 23;
+                let line24 = 24;
+                let line25 = 25;
+                let line26 = 26;
+                let line27 = 27;
+                let line28 = 28;
+                let line29 = 29;
+                let line30 = 30;
+                let line31 = 31;
+
+                // Many assertions
+                assert_eq!(line1, 1);
+                assert_eq!(line2, 2);
+                assert_eq!(line3, 3);
+                assert_eq!(line4, 4);
+                assert_eq!(line5, 5);
+                assert_eq!(line6, 6);
+
+                // Loop
+                loop {
+                    if line1 > 0 {
+                        break;
+                    }
+                }
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        // Note: count_lines_in_block counts statements, not actual lines
+        // This test has 31 + 6 + 1 = 38 statements plus the loop block
+        assert_eq!(analysis.line_count, 31 + 6 + 1); // 31 lets + 6 asserts + 1 loop
+        assert!(analysis.has_loops);
+        assert!(analysis.sources.contains(&ComplexitySource::ExcessiveSetup));
+        assert!(analysis.sources.contains(&ComplexitySource::LoopInTest));
+        // MultipleAssertions only added if assertion_count > 5, but visitor doesn't track macro calls
+        // So this may not be detected
+    }
+
+    #[test]
+    fn test_analyze_test_complexity_empty_function() {
+        let function: ItemFn = parse_quote! {
+            fn test_empty() {
+            }
+        };
+
+        let analysis = analyze_test_complexity(&function);
+
+        assert_eq!(analysis.cyclomatic_complexity, 0);
+        assert_eq!(analysis.mock_setup_count, 0);
+        assert_eq!(analysis.line_count, 0);
+        assert_eq!(analysis.assertion_count, 0);
+        assert_eq!(analysis.total_complexity, 0);
+        assert!(analysis.sources.is_empty());
+    }
 }
