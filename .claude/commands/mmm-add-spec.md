@@ -69,7 +69,7 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
    - **Dependencies**: Prerequisites and related specifications
    - **Testing Strategy**: How the feature will be validated
    - **Documentation**: Required documentation updates
-   - **Migration**: Any migration or compatibility considerations
+   - **Migration**: Any migration considerations (breaking changes allowed during prototype)
 
 3. **Integration Considerations**
    - Define how feature integrates with existing architecture
@@ -134,6 +134,9 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
 ## Specification Template Structure
 
 ### Standard Format
+
+**Note**: During the prototype phase, breaking changes are allowed and backward compatibility is not required. Focus on correctness and optimal design over maintaining compatibility.
+
 ```markdown
 ---
 number: {NUMBER}
@@ -213,7 +216,7 @@ created: {YYYY-MM-DD}
 
 ## Migration and Compatibility
 
-{Any breaking changes, migration requirements, or compatibility considerations}
+{During prototype phase: Breaking changes allowed, focus on correctness over compatibility}
 ```
 
 ## Feature Categories
@@ -238,9 +241,9 @@ created: {YYYY-MM-DD}
 
 ### Compatibility Specifications
 - Integration with external systems
-- API compatibility and versioning
+- API design (breaking changes ok during prototype)
 - Cross-platform support
-- Legacy system integration
+- System integration patterns
 
 ### Testing Specifications
 - Test infrastructure and frameworks
