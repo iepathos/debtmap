@@ -751,7 +751,11 @@ mod tests {
             function_length: 15,
             cyclomatic_complexity: 5,
             cognitive_complexity: 7,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
         }
     }
 

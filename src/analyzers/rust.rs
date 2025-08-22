@@ -1,3 +1,4 @@
+use crate::analyzers::purity_detector::PurityDetector;
 use crate::analyzers::Analyzer;
 use crate::complexity::{
     cognitive::calculate_cognitive_with_patterns,
@@ -282,6 +283,13 @@ impl FunctionVisitor {
             None
         };
 
+        // Detect purity
+        let (is_pure, purity_confidence) = {
+            let mut detector = PurityDetector::new();
+            let analysis = detector.is_pure_function(item_fn);
+            (Some(analysis.is_pure), Some(analysis.confidence))
+        };
+
         let metrics = FunctionMetrics {
             name,
             file: self.current_file.clone(),
@@ -295,6 +303,8 @@ impl FunctionVisitor {
             is_trait_method, // Use the parameter passed to this function
             in_test_module: self.in_test_module,
             entropy_score,
+            is_pure,
+            purity_confidence,
         };
 
         self.functions.push(metrics);
@@ -459,6 +469,8 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     is_trait_method: false,       // Closures are not trait methods
                     in_test_module: self.in_test_module,
                     entropy_score,
+                    is_pure: None,                // TODO: Add purity detection for closures
+                    purity_confidence: None,
                 };
 
                 self.functions.push(metrics);

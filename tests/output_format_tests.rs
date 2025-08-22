@@ -22,6 +22,8 @@ fn test_output_json_format() {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

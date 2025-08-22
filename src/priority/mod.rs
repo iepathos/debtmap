@@ -38,6 +38,8 @@ pub struct FunctionAnalysis {
     pub function_length: usize,
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
+    pub is_pure: Option<bool>,
+    pub purity_confidence: Option<f32>,
     pub nesting_depth: u32,
     pub is_test: bool,
     pub visibility: FunctionVisibility,
@@ -78,6 +80,7 @@ pub enum DebtType {
     },
     Orchestration {
         delegates_to: Vec<String>,
+        coverage: Option<f64>,
     },
     Duplication {
         instances: u32,
@@ -341,6 +344,8 @@ impl UnifiedAnalysis {
             function_length: 1,
             cyclomatic_complexity: 1,
             cognitive_complexity: 1,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None, // Security items don't have entropy data
         })
     }

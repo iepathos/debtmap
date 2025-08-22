@@ -23,6 +23,8 @@ fn create_test_function(name: &str, path: &str, visibility: Option<String>) -> F
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     }
 }
 

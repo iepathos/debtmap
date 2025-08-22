@@ -1520,6 +1520,8 @@ fn convert_error_swallowing_to_unified(
                 cyclomatic_complexity: 0,
                 cognitive_complexity: 0,
                 entropy_details: None, // Error swallowing items don't have entropy data
+                is_pure: None,       // Error swallowing functions are not pure
+                purity_confidence: None,
             }
         })
         .collect()
@@ -2087,6 +2089,8 @@ end_of_record
                     is_trait_method: false,
                     in_test_module: false,
                     entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2148,6 +2152,8 @@ end_of_record
                     is_trait_method: false,
                     in_test_module: false,
                     entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2227,6 +2233,8 @@ end_of_record
                     is_trait_method: false,
                     in_test_module: false,
                     entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,
@@ -2330,6 +2338,8 @@ end_of_record
                         is_trait_method: false,
                         in_test_module: false,
                         entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                     },
                     FunctionMetrics {
                         name: "partially_tested".to_string(),
@@ -2344,6 +2354,8 @@ end_of_record
                         is_trait_method: false,
                         in_test_module: false,
                         entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                     },
                     FunctionMetrics {
                         name: "untested".to_string(),
@@ -2358,6 +2370,8 @@ end_of_record
                         is_trait_method: false,
                         in_test_module: false,
                         entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                     },
                     FunctionMetrics {
                         name: "test_function".to_string(),
@@ -2372,6 +2386,8 @@ end_of_record
                         is_trait_method: false,
                         in_test_module: false,
                         entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                     },
                 ],
                 summary: ComplexitySummary {
@@ -2419,7 +2435,8 @@ end_of_record
         if let Some(well_tested) = all_risks.iter().find(|r| r.function_name == "well_tested") {
             assert!(well_tested.coverage_percentage.is_some());
             // Should have high coverage since all lines are executed
-            assert!(well_tested.coverage_percentage.unwrap() > 50.0);
+            // Coverage is stored as a fraction (0-1), not percentage
+            assert!(well_tested.coverage_percentage.unwrap() > 0.5);
         }
 
         // Partially tested function should have some coverage
@@ -2917,6 +2934,8 @@ end_of_record
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
             },
             FunctionMetrics {
                 name: "test_function".to_string(),
@@ -2931,6 +2950,8 @@ end_of_record
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
             },
         ];
 
@@ -2972,6 +2993,8 @@ end_of_record
             is_trait_method: false,
             in_test_module: false,
             entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
         }];
 
         let mut call_graph = CallGraph::new();
@@ -3008,6 +3031,8 @@ end_of_record
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
             },
             FunctionMetrics {
                 name: "test_something".to_string(),
@@ -3022,6 +3047,8 @@ end_of_record
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
             },
             FunctionMetrics {
                 name: "another_production_function".to_string(),
@@ -3036,6 +3063,8 @@ end_of_record
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
             },
         ];
 
@@ -4393,6 +4422,8 @@ end_of_record
                     is_trait_method: false,
                     in_test_module: false,
                     entropy_score: None,
+                    is_pure: None,
+                    purity_confidence: None,
                 }],
                 summary: ComplexitySummary {
                     total_functions: 1,

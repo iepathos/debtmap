@@ -1,7 +1,5 @@
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -19,522 +17,353 @@ pub struct LcovData {
     pub lines_hit: usize,
 }
 
-// Pure function to parse a line and return its type
-#[derive(Debug, Clone)]
-enum LcovLine {
-    SourceFile(PathBuf),
-    Function { line: usize, name: String },
-    FunctionData { count: u64, name: String },
-    LinesFound(usize),
-    LinesHit(usize),
-    EndOfRecord,
-    Other,
-}
-
-// Helper function to parse comma-separated data
-fn parse_comma_data<T>(data: &str) -> Option<(T, String)>
-where
-    T: std::str::FromStr,
-{
-    data.split_once(',')
-        .and_then(|(first, second)| first.parse::<T>().ok().map(|val| (val, second.to_string())))
-}
-
-// Parse source file line
-fn parse_source_file(line: &str) -> Option<LcovLine> {
-    line.strip_prefix("SF:")
-        .map(|path| LcovLine::SourceFile(PathBuf::from(path)))
-}
-
-// Parse function definition line
-fn parse_function(line: &str) -> Option<LcovLine> {
-    line.strip_prefix("FN:").and_then(|data| {
-        // Handle both formats:
-        // Rust format: line,name
-        // Python format: line_start,line_end,name
-        let parts: Vec<&str> = data.splitn(3, ',').collect();
-        match parts.len() {
-            2 => {
-                // Rust format: line,name
-                parts[0]
-                    .parse::<usize>()
-                    .ok()
-                    .map(|line_num| LcovLine::Function {
-                        line: line_num,
-                        name: parts[1].to_string(),
-                    })
-            }
-            3 => {
-                // Python format: line_start,line_end,name
-                parts[0]
-                    .parse::<usize>()
-                    .ok()
-                    .map(|line_num| LcovLine::Function {
-                        line: line_num,
-                        name: parts[2].to_string(),
-                    })
-            }
-            _ => None,
-        }
-    })
-}
-
-// Parse function data line
-fn parse_function_data(line: &str) -> Option<LcovLine> {
-    line.strip_prefix("FNDA:")
-        .and_then(parse_comma_data::<u64>)
-        .map(|(count, name)| LcovLine::FunctionData { count, name })
-}
-
-fn parse_lcov_line(line: &str) -> LcovLine {
-    let line = line.trim();
-
-    parse_source_file(line)
-        .or_else(|| parse_function(line))
-        .or_else(|| parse_function_data(line))
-        .or_else(|| parse_lines_found(line))
-        .or_else(|| parse_lines_hit(line))
-        .or_else(|| {
-            if line == "end_of_record" {
-                Some(LcovLine::EndOfRecord)
-            } else {
-                None
-            }
-        })
-        .unwrap_or(LcovLine::Other)
-}
-
-// Parse lines found (total lines)
-fn parse_lines_found(line: &str) -> Option<LcovLine> {
-    line.strip_prefix("LF:")
-        .and_then(|count| count.parse::<usize>().ok())
-        .map(LcovLine::LinesFound)
-}
-
-// Parse lines hit (covered lines)
-fn parse_lines_hit(line: &str) -> Option<LcovLine> {
-    line.strip_prefix("LH:")
-        .and_then(|count| count.parse::<usize>().ok())
-        .map(LcovLine::LinesHit)
-}
-
-// State for processing a single file's records
-#[derive(Debug, Default)]
-struct FileRecord {
-    path: Option<PathBuf>,
-    function_lines: HashMap<String, usize>,
-    function_hits: HashMap<String, u64>,
-}
-
-impl FileRecord {
-    fn new(path: PathBuf) -> Self {
-        Self {
-            path: Some(path),
-            function_lines: HashMap::new(),
-            function_hits: HashMap::new(),
-        }
-    }
-
-    fn add_function(&mut self, line: usize, name: String) {
-        self.function_lines.insert(name, line);
-    }
-
-    fn add_function_data(&mut self, count: u64, name: String) {
-        self.function_hits.insert(name, count);
-    }
-
-    fn to_function_coverage(&self) -> Vec<FunctionCoverage> {
-        self.function_lines
-            .iter()
-            .map(|(name, &start_line)| {
-                let execution_count = self.function_hits.get(name).copied().unwrap_or(0);
-                let coverage_percentage = if execution_count > 0 { 100.0 } else { 0.0 };
-
-                FunctionCoverage {
-                    name: name.clone(),
-                    start_line,
-                    execution_count,
-                    coverage_percentage,
-                }
-            })
-            .collect()
-    }
-}
-
-// Process a single parsed line and update the record state
-fn process_lcov_line(line_type: LcovLine, current_record: &mut FileRecord, data: &mut LcovData) {
-    match line_type {
-        LcovLine::SourceFile(path) => {
-            *current_record = FileRecord::new(path);
-        }
-        LcovLine::Function { line, name } => {
-            current_record.add_function(line, name);
-        }
-        LcovLine::FunctionData { count, name } => {
-            current_record.add_function_data(count, name);
-        }
-        LcovLine::LinesFound(count) => {
-            data.total_lines += count;
-        }
-        LcovLine::LinesHit(count) => {
-            data.lines_hit += count;
-        }
-        LcovLine::EndOfRecord => {
-            finalize_record(current_record, data);
-        }
-        LcovLine::Other => {}
-    }
-}
-
-// Finalize the current record and add it to the data
-fn finalize_record(current_record: &mut FileRecord, data: &mut LcovData) {
-    if let Some(file_path) = current_record.path.take() {
-        let functions = current_record.to_function_coverage();
-        if !functions.is_empty() {
-            data.functions.insert(file_path, functions);
-        }
-    }
-    *current_record = FileRecord::default();
-}
-
-// Read and parse lines from the LCOV file
-fn read_lcov_lines(path: &Path) -> Result<Vec<String>> {
-    let file = File::open(path)
-        .with_context(|| format!("Failed to open LCOV file: {}", path.display()))?;
-    let reader = BufReader::new(file);
-    reader
-        .lines()
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Into::into)
-}
-
 pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
-    let lines = read_lcov_lines(path)?;
+    use lcov::{Reader, Record};
+    
+    let reader = Reader::open_file(path)
+        .with_context(|| format!("Failed to open LCOV file: {}", path.display()))?;
+    
     let mut data = LcovData::default();
-    let mut current_record = FileRecord::default();
-
-    lines
-        .iter()
-        .map(|line| parse_lcov_line(line))
-        .for_each(|line_type| process_lcov_line(line_type, &mut current_record, &mut data));
-
+    let mut current_file: Option<PathBuf> = None;
+    let mut file_functions: HashMap<String, FunctionCoverage> = HashMap::new();
+    let mut file_lines: HashMap<usize, u64> = HashMap::new();
+    let mut _lines_found = 0;
+    let mut _lines_hit = 0;
+    
+    for record in reader {
+        let record = record.with_context(|| "Failed to parse LCOV record")?;
+        
+        match record {
+            Record::SourceFile { path } => {
+                // Save previous file's data if any
+                if let Some(file) = current_file.take() {
+                    if !file_functions.is_empty() {
+                        let mut funcs: Vec<FunctionCoverage> = file_functions.drain().map(|(_, v)| v).collect();
+                        funcs.sort_by_key(|f| f.start_line);
+                        data.functions.insert(file, funcs);
+                    }
+                }
+                current_file = Some(path);
+                file_functions.clear();
+                file_lines.clear();
+            }
+            
+            Record::FunctionName { start_line, name } => {
+                file_functions.entry(name.clone()).or_insert_with(|| FunctionCoverage {
+                    name,
+                    start_line: start_line as usize,
+                    execution_count: 0,
+                    coverage_percentage: 0.0,
+                });
+            }
+            
+            Record::FunctionData { name, count } => {
+                if let Some(func) = file_functions.get_mut(&name) {
+                    func.execution_count = count;
+                    // If no line data is available, use execution count to determine coverage
+                    // Functions with count > 0 are considered 100% covered, 0 means 0% covered
+                    if func.coverage_percentage == 0.0 && count > 0 {
+                        func.coverage_percentage = 100.0;
+                    }
+                }
+            }
+            
+            Record::LineData { line, count, .. } => {
+                file_lines.insert(line as usize, count);
+                if count > 0 {
+                    _lines_hit += 1;
+                }
+            }
+            
+            Record::LinesFound { found } => {
+                _lines_found = found as usize;
+                data.total_lines += found as usize;
+            }
+            
+            Record::LinesHit { hit } => {
+                _lines_hit = hit as usize;
+                data.lines_hit += hit as usize;
+            }
+            
+            Record::EndOfRecord => {
+                // Calculate coverage percentage for functions based on line data
+                for func in file_functions.values_mut() {
+                    let func_lines: Vec<_> = file_lines.iter()
+                        .filter(|(line, _)| **line >= func.start_line)
+                        .collect();
+                    
+                    if !func_lines.is_empty() {
+                        let covered = func_lines.iter().filter(|(_, count)| **count > 0).count();
+                        func.coverage_percentage = (covered as f64 / func_lines.len() as f64) * 100.0;
+                    } else if func.execution_count > 0 {
+                        // If we have execution count but no line data, assume it's covered
+                        func.coverage_percentage = 100.0;
+                    }
+                }
+                
+                // Save the file's data
+                if let Some(file) = current_file.take() {
+                    if !file_functions.is_empty() {
+                        let mut funcs: Vec<FunctionCoverage> = file_functions.drain().map(|(_, v)| v).collect();
+                        funcs.sort_by_key(|f| f.start_line);
+                        data.functions.insert(file, funcs);
+                    }
+                }
+                
+                file_functions.clear();
+                file_lines.clear();
+            }
+            
+            _ => {} // Ignore other record types
+        }
+    }
+    
+    // Handle case where file doesn't end with EndOfRecord
+    if let Some(file) = current_file {
+        if !file_functions.is_empty() {
+            let mut funcs: Vec<FunctionCoverage> = file_functions.drain().map(|(_, v)| v).collect();
+            funcs.sort_by_key(|f| f.start_line);
+            data.functions.insert(file, funcs);
+        }
+    }
+    
     Ok(data)
 }
 
 impl LcovData {
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
-        self.generate_path_variations(file)
-            .into_iter()
-            .filter_map(|path| self.functions.get(&path))
-            .find_map(|funcs| self.find_matching_function(funcs, function_name))
-            .map(|func| func.coverage_percentage)
+        self.functions.get(file)
+            .and_then(|funcs| {
+                funcs.iter()
+                    .find(|f| normalize_function_name(&f.name) == normalize_function_name(function_name))
+                    .map(|f| f.coverage_percentage / 100.0) // Convert percentage to fraction
+            })
     }
-
+    
     pub fn get_function_coverage_with_line(
         &self,
         file: &Path,
         function_name: &str,
         line: usize,
     ) -> Option<f64> {
-        // Special handling for closures: they inherit coverage from their parent function
-        if function_name.starts_with("<closure@") {
-            return self.find_closure_coverage(file, line);
+        // Try exact match first
+        if let Some(coverage) = self.get_function_coverage(file, function_name) {
+            return Some(coverage);
         }
-
-        // For regular functions, use the standard matching
-        self.get_function_coverage(file, function_name)
-    }
-
-    fn find_closure_coverage(&self, file: &Path, line: usize) -> Option<f64> {
-        self.generate_path_variations(file)
-            .into_iter()
-            .filter_map(|path| self.functions.get(&path))
-            .find_map(|funcs| self.find_containing_function(funcs, line))
-    }
-
-    fn find_containing_function(&self, functions: &[FunctionCoverage], line: usize) -> Option<f64> {
-        functions
-            .iter()
-            .rev()
-            .find(|func| func.start_line <= line)
-            .map(|func| func.coverage_percentage)
-    }
-
-    // Extract path generation logic to a pure function
-    fn generate_path_variations(&self, file: &Path) -> Vec<PathBuf> {
-        let current_dir = std::env::current_dir().ok();
-
-        vec![
-            Some(file.to_path_buf()),
-            current_dir
-                .as_ref()
-                .map(|dir| dir.join(file.strip_prefix("./").unwrap_or(file))),
-            current_dir.as_ref().map(|dir| {
-                dir.join("src")
-                    .join(file.strip_prefix("./src/").unwrap_or(file))
-            }),
-        ]
-        .into_iter()
-        .flatten()
-        .collect()
-    }
-
-    // Extract function matching logic to a pure function
-    fn find_matching_function<'a>(
-        &self,
-        funcs: &'a [FunctionCoverage],
-        function_name: &str,
-    ) -> Option<&'a FunctionCoverage> {
-        // Chain matchers in order of preference
-        funcs
-            .iter()
-            .find(|f| f.name == function_name)
-            .or_else(|| {
-                funcs
-                    .iter()
-                    .find(|f| f.name.ends_with(&format!("::{function_name}")))
-            })
-            .or_else(|| {
-                if function_name.len() > 3 {
-                    funcs.iter().find(|f| f.name.contains(function_name))
-                } else {
-                    None
-                }
+        
+        // Try to find by line number
+        self.functions.get(file)
+            .and_then(|funcs| {
+                funcs.iter()
+                    .find(|f| f.start_line <= line && line <= f.start_line + 50) // Assume functions are < 50 lines
+                    .map(|f| f.coverage_percentage / 100.0)
             })
     }
-
+    
+    pub fn get_overall_coverage(&self) -> f64 {
+        if self.total_lines == 0 {
+            0.0
+        } else {
+            (self.lines_hit as f64 / self.total_lines as f64) * 100.0
+        }
+    }
+    
     pub fn get_file_coverage(&self, file: &Path) -> Option<f64> {
         self.functions.get(file).map(|funcs| {
             if funcs.is_empty() {
                 0.0
             } else {
-                let covered = funcs.iter().filter(|f| f.execution_count > 0).count();
-                (covered as f64 / funcs.len() as f64) * 100.0
+                let sum: f64 = funcs.iter().map(|f| f.coverage_percentage).sum();
+                sum / funcs.len() as f64 / 100.0 // Convert to fraction
             }
         })
     }
+}
 
-    /// Calculate the overall project coverage percentage
-    /// Uses line coverage if available, falls back to function coverage
-    pub fn get_overall_coverage(&self) -> f64 {
-        // Prefer line coverage if available
-        if self.total_lines > 0 {
-            return (self.lines_hit as f64 / self.total_lines as f64) * 100.0;
-        }
-
-        // Fall back to function coverage
-        let mut total_functions = 0;
-        let mut covered_functions = 0;
-
-        for funcs in self.functions.values() {
-            for func in funcs {
-                total_functions += 1;
-                if func.execution_count > 0 {
-                    covered_functions += 1;
-                }
-            }
-        }
-
-        if total_functions == 0 {
-            0.0
-        } else {
-            (covered_functions as f64 / total_functions as f64) * 100.0
-        }
-    }
+// Normalize function names for better matching
+fn normalize_function_name(name: &str) -> String {
+    // Handle Rust function names with generics and impl blocks
+    name.replace("<", "_")
+        .replace(">", "_")
+        .replace("::", "_")
+        .replace(" ", "_")
+        .replace("'", "")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+    
     #[test]
-    fn test_parse_function_python_format() {
-        // Test Python format with line_start,line_end,name
-        let line = "FN:18,64,create_app";
-        let result = parse_function(line);
-        match result {
-            Some(LcovLine::Function { line, name }) => {
-                assert_eq!(line, 18);
-                assert_eq!(name, "create_app");
-            }
-            _ => panic!("Failed to parse Python format FN line"),
-        }
+    fn test_parse_lcov_file() {
+        let lcov_content = r#"TN:
+SF:/path/to/file.rs
+FN:10,test_function
+FNDA:5,test_function
+FNF:1
+FNH:1
+DA:10,5
+DA:11,5
+DA:12,0
+LF:3
+LH:2
+end_of_record
+"#;
+        
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(lcov_content.as_bytes()).unwrap();
+        
+        let data = parse_lcov_file(temp_file.path()).unwrap();
+        
+        assert_eq!(data.total_lines, 3);
+        assert_eq!(data.lines_hit, 2);
+        
+        let file_path = PathBuf::from("/path/to/file.rs");
+        assert!(data.functions.contains_key(&file_path));
+        
+        let funcs = &data.functions[&file_path];
+        assert_eq!(funcs.len(), 1);
+        assert_eq!(funcs[0].name, "test_function");
+        assert_eq!(funcs[0].execution_count, 5);
     }
-
+    
     #[test]
-    fn test_parse_function_rust_format() {
-        // Test Rust format with line,name
-        let line = "FN:11,collect_file_metrics";
-        let result = parse_function(line);
-        match result {
-            Some(LcovLine::Function { line, name }) => {
-                assert_eq!(line, 11);
-                assert_eq!(name, "collect_file_metrics");
-            }
-            _ => panic!("Failed to parse Rust format FN line"),
-        }
+    fn test_function_name_normalization() {
+        assert_eq!(
+            normalize_function_name("MyStruct::my_function"),
+            normalize_function_name("MyStruct_my_function")
+        );
+        
+        assert_eq!(
+            normalize_function_name("function<T>"),
+            normalize_function_name("function_T_")
+        );
     }
-
+    
     #[test]
-    fn test_find_matching_function_with_qualified_name() {
-        let lcov = LcovData::default();
-        let functions = vec![FunctionCoverage {
-            name: "CallGraphExtractor::classify_call_type".to_string(),
-            start_line: 24,
-            execution_count: 31,
-            coverage_percentage: 100.0,
-        }];
-
-        // Should match when searching for short name
-        let result = lcov.find_matching_function(&functions, "classify_call_type");
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().coverage_percentage, 100.0);
-
-        // Should also match with full name
-        let result =
-            lcov.find_matching_function(&functions, "CallGraphExtractor::classify_call_type");
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().coverage_percentage, 100.0);
+    fn test_coverage_percentage_calculation() {
+        let lcov_content = r#"TN:
+SF:/path/to/file.rs
+FN:10,fully_covered
+FN:20,partially_covered
+FN:30,not_covered
+FNDA:10,fully_covered
+FNDA:5,partially_covered
+FNDA:0,not_covered
+DA:10,10
+DA:11,10
+DA:12,10
+DA:20,5
+DA:21,5
+DA:22,0
+DA:23,0
+DA:30,0
+DA:31,0
+DA:32,0
+LF:10
+LH:5
+end_of_record
+"#;
+        
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(lcov_content.as_bytes()).unwrap();
+        
+        let data = parse_lcov_file(temp_file.path()).unwrap();
+        let file_path = PathBuf::from("/path/to/file.rs");
+        
+        // Test fully covered function (100%)
+        let coverage = data.get_function_coverage(&file_path, "fully_covered");
+        assert_eq!(coverage, Some(1.0));
+        
+        // Test partially covered function (50%)
+        let coverage = data.get_function_coverage(&file_path, "partially_covered");
+        assert_eq!(coverage, Some(0.5));
+        
+        // Test uncovered function (0%)
+        let coverage = data.get_function_coverage(&file_path, "not_covered");
+        assert_eq!(coverage, Some(0.0));
     }
-
+    
     #[test]
-    fn test_get_overall_coverage_empty() {
-        let lcov = LcovData::default();
-        assert_eq!(lcov.get_overall_coverage(), 0.0);
+    fn test_get_function_coverage_with_line() {
+        let lcov_content = r#"TN:
+SF:/path/to/file.rs
+FN:10,function_at_line_10
+FN:50,function_at_line_50
+FNDA:5,function_at_line_10
+FNDA:0,function_at_line_50
+DA:10,5
+DA:11,5
+DA:50,0
+DA:51,0
+LF:4
+LH:2
+end_of_record
+"#;
+        
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(lcov_content.as_bytes()).unwrap();
+        
+        let data = parse_lcov_file(temp_file.path()).unwrap();
+        let file_path = PathBuf::from("/path/to/file.rs");
+        
+        // Test finding function by line number
+        let coverage = data.get_function_coverage_with_line(&file_path, "unknown_name", 10);
+        assert_eq!(coverage, Some(1.0)); // Should find function_at_line_10
+        
+        let coverage = data.get_function_coverage_with_line(&file_path, "unknown_name", 51);
+        assert_eq!(coverage, Some(0.0)); // Should find function_at_line_50
+        
+        // Test line outside any function range
+        let coverage = data.get_function_coverage_with_line(&file_path, "unknown_name", 200);
+        assert_eq!(coverage, None);
     }
-
+    
     #[test]
-    fn test_get_overall_coverage_single_covered_function() {
-        let mut lcov = LcovData::default();
-        lcov.functions.insert(
-            Path::new("src/lib.rs").to_path_buf(),
-            vec![FunctionCoverage {
-                name: "test_func".to_string(),
-                start_line: 10,
-                execution_count: 5,
-                coverage_percentage: 100.0,
-            }],
-        );
-        assert_eq!(lcov.get_overall_coverage(), 100.0);
+    fn test_overall_coverage_calculation() {
+        let lcov_content = r#"TN:
+SF:/path/to/file1.rs
+DA:1,1
+DA:2,1
+DA:3,0
+DA:4,0
+LF:4
+LH:2
+end_of_record
+SF:/path/to/file2.rs
+DA:1,5
+DA:2,5
+DA:3,5
+DA:4,5
+LF:4
+LH:4
+end_of_record
+"#;
+        
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(lcov_content.as_bytes()).unwrap();
+        
+        let data = parse_lcov_file(temp_file.path()).unwrap();
+        
+        // Overall coverage: 6 lines hit out of 8 total = 75%
+        assert_eq!(data.get_overall_coverage(), 75.0);
     }
-
+    
     #[test]
-    fn test_get_overall_coverage_single_uncovered_function() {
-        let mut lcov = LcovData::default();
-        lcov.functions.insert(
-            Path::new("src/lib.rs").to_path_buf(),
-            vec![FunctionCoverage {
-                name: "test_func".to_string(),
-                start_line: 10,
-                execution_count: 0,
-                coverage_percentage: 0.0,
-            }],
-        );
-        assert_eq!(lcov.get_overall_coverage(), 0.0);
-    }
-
-    #[test]
-    fn test_get_overall_coverage_mixed_coverage() {
-        let mut lcov = LcovData::default();
-        lcov.functions.insert(
-            Path::new("src/main.rs").to_path_buf(),
-            vec![
-                FunctionCoverage {
-                    name: "main".to_string(),
-                    start_line: 10,
-                    execution_count: 1,
-                    coverage_percentage: 100.0,
-                },
-                FunctionCoverage {
-                    name: "helper".to_string(),
-                    start_line: 20,
-                    execution_count: 0,
-                    coverage_percentage: 0.0,
-                },
-            ],
-        );
-        lcov.functions.insert(
-            Path::new("src/lib.rs").to_path_buf(),
-            vec![
-                FunctionCoverage {
-                    name: "process".to_string(),
-                    start_line: 5,
-                    execution_count: 10,
-                    coverage_percentage: 100.0,
-                },
-                FunctionCoverage {
-                    name: "validate".to_string(),
-                    start_line: 15,
-                    execution_count: 0,
-                    coverage_percentage: 0.0,
-                },
-            ],
-        );
-        // 2 covered out of 4 total = 50%
-        assert_eq!(lcov.get_overall_coverage(), 50.0);
-    }
-
-    #[test]
-    fn test_get_overall_coverage_all_covered() {
-        let mut lcov = LcovData::default();
-        lcov.functions.insert(
-            Path::new("src/main.rs").to_path_buf(),
-            vec![
-                FunctionCoverage {
-                    name: "main".to_string(),
-                    start_line: 10,
-                    execution_count: 1,
-                    coverage_percentage: 100.0,
-                },
-                FunctionCoverage {
-                    name: "helper".to_string(),
-                    start_line: 20,
-                    execution_count: 5,
-                    coverage_percentage: 100.0,
-                },
-            ],
-        );
-        lcov.functions.insert(
-            Path::new("src/lib.rs").to_path_buf(),
-            vec![FunctionCoverage {
-                name: "process".to_string(),
-                start_line: 5,
-                execution_count: 10,
-                coverage_percentage: 100.0,
-            }],
-        );
-        assert_eq!(lcov.get_overall_coverage(), 100.0);
-    }
-
-    #[test]
-    fn test_get_overall_coverage_none_covered() {
-        let mut lcov = LcovData::default();
-        lcov.functions.insert(
-            Path::new("src/main.rs").to_path_buf(),
-            vec![
-                FunctionCoverage {
-                    name: "main".to_string(),
-                    start_line: 10,
-                    execution_count: 0,
-                    coverage_percentage: 0.0,
-                },
-                FunctionCoverage {
-                    name: "helper".to_string(),
-                    start_line: 20,
-                    execution_count: 0,
-                    coverage_percentage: 0.0,
-                },
-            ],
-        );
-        lcov.functions.insert(
-            Path::new("src/lib.rs").to_path_buf(),
-            vec![FunctionCoverage {
-                name: "process".to_string(),
-                start_line: 5,
-                execution_count: 0,
-                coverage_percentage: 0.0,
-            }],
-        );
-        assert_eq!(lcov.get_overall_coverage(), 0.0);
+    fn test_empty_coverage_data() {
+        let lcov_content = r#"TN:
+SF:/path/to/empty.rs
+end_of_record
+"#;
+        
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(lcov_content.as_bytes()).unwrap();
+        
+        let data = parse_lcov_file(temp_file.path()).unwrap();
+        
+        assert_eq!(data.get_overall_coverage(), 0.0);
+        assert_eq!(data.functions.len(), 0);
     }
 }

@@ -164,6 +164,7 @@ class FileManager:
         &func_id,
         &framework_exclusions_std,
         None,
+        None,
     );
 
     // It should NOT be classified as DeadCode
@@ -390,6 +391,7 @@ class ConversationPanel:
         &call_graph,
         &func_id,
         &framework_exclusions_std,
+        None,
         None,
     );
 

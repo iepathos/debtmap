@@ -326,6 +326,8 @@ mod tests {
                     is_trait_method: false,
                     in_test_module: false,
                     entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -671,6 +673,8 @@ mod tests {
             is_trait_method: false,
             in_test_module: false,
             entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
         });
 
         assert!(!metrics_equal(&metrics1, &metrics2));
@@ -751,6 +755,8 @@ mod tests {
             is_trait_method: false,
             in_test_module: false,
             entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
         });
 
         inc.previous_state = inc

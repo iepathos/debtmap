@@ -4,6 +4,7 @@ use anyhow::Result;
 pub mod context_aware;
 pub mod function_registry;
 pub mod javascript;
+pub mod purity_detector;
 pub mod python;
 pub mod python_detectors;
 pub mod rust;

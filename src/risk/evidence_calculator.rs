@@ -93,6 +93,8 @@ impl EvidenceBasedRiskCalculator {
             is_trait_method: false, // Default to false, can be updated if needed
             in_test_module: false,  // Default to false for risk evidence
             entropy_score: None,    // TODO: Add entropy scoring for risk analysis
+            is_pure: None,          // TODO: Add purity detection for risk analysis
+            purity_confidence: None,
         };
 
         classify_function_role(&func_metrics, &func_id, call_graph)

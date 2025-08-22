@@ -452,6 +452,7 @@ mod tests {
 
         let orchestration = DebtType::Orchestration {
             delegates_to: vec!["func1".to_string(), "func2".to_string()],
+            coverage: None,
         };
         assert_eq!(format_debt_type(&orchestration), "Orchestration");
     }

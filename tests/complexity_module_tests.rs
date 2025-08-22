@@ -21,6 +21,8 @@ fn test_complexity_calculator_new() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(!calc.is_complex(&metrics));
 }
@@ -41,6 +43,8 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -64,6 +68,8 @@ fn test_complexity_calculator_is_complex_cognitive() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -87,6 +93,8 @@ fn test_complexity_calculator_is_complex_both() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -110,6 +118,8 @@ fn test_complexity_calculator_is_not_complex() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(
         !calc.is_complex(&metrics),
@@ -133,6 +143,8 @@ fn test_complexity_calculator_calculate_score_low() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -157,6 +169,8 @@ fn test_complexity_calculator_calculate_score_medium() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -181,6 +195,8 @@ fn test_complexity_calculator_calculate_score_high() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -205,6 +221,8 @@ fn test_complexity_calculator_calculate_score_zero() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(score, 0, "Score should be 0 when metrics are 0");
@@ -308,6 +326,8 @@ fn test_complexity_calculator_boundary_values() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(!calc.is_complex(&metrics_zero));
 
@@ -324,6 +344,8 @@ fn test_complexity_calculator_boundary_values() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(!calc.is_complex(&metrics_one));
 
@@ -340,6 +362,8 @@ fn test_complexity_calculator_boundary_values() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     assert!(calc.is_complex(&metrics_two));
 }
@@ -361,6 +385,8 @@ fn test_complexity_score_proportions() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
     assert_eq!(
@@ -381,6 +407,8 @@ fn test_complexity_score_proportions() {
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
     };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
     assert_eq!(

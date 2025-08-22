@@ -131,6 +131,7 @@ mod tests {
         &func_id,
         &framework_exclusions_std,
         None,
+        None, // No coverage data for this test
     );
 
     // It should NOT be classified as DeadCode

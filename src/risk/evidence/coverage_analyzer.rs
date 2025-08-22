@@ -614,6 +614,8 @@ mod tests {
             nesting_depth: 2,
             is_test: false,
             visibility: FunctionVisibility::Private,
+            is_pure: None,
+            purity_confidence: None,
         };
 
         assert_eq!(
@@ -635,6 +637,8 @@ mod tests {
             nesting_depth: 2,
             is_test: false,
             visibility: FunctionVisibility::Private,
+            is_pure: None,
+            purity_confidence: None,
         };
 
         // 50% coverage means 5 uncovered paths, times 2.0 multiplier = 10
@@ -657,6 +661,8 @@ mod tests {
             nesting_depth: 2,
             is_test: false,
             visibility: FunctionVisibility::Private,
+            is_pure: None,
+            purity_confidence: None,
         };
 
         // 50% coverage means 5 uncovered paths, times 0.5 multiplier = 2

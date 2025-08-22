@@ -457,8 +457,13 @@ fn format_debt_issue(debt_type: &crate::priority::DebtType) -> String {
         DebtType::DeadCode { visibility, .. } => {
             format!("Unused {:?} function", visibility)
         }
-        DebtType::Orchestration { delegates_to } => {
-            format!("Delegates to {} functions", delegates_to.len())
+        DebtType::Orchestration { delegates_to, coverage } => {
+            if let Some(cov) = coverage {
+                let coverage_pct = (cov * 100.0) as i32;
+                format!("Delegates to {} functions, {}% coverage", delegates_to.len(), coverage_pct)
+            } else {
+                format!("Delegates to {} functions", delegates_to.len())
+            }
         }
         DebtType::Duplication {
             instances,
@@ -709,7 +714,11 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: 15,
             cognitive_complexity: 20,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
         }
     }
 
@@ -878,7 +887,11 @@ mod tests {
             function_length: 20,
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: cyclomatic * 2,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
         }
     }
 
@@ -928,7 +941,11 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: cyclomatic,
             cognitive_complexity: 20,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
         }
     }
 
@@ -1341,7 +1358,11 @@ mod tests {
             function_length: 20,
             cyclomatic_complexity: 3,
             cognitive_complexity: 6,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
         };
 
         let dead_code_item2 = UnifiedDebtItem {
@@ -1386,7 +1407,11 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: 10,
             cognitive_complexity: 20,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
         };
 
         let analysis = UnifiedAnalysis {
@@ -1501,7 +1526,11 @@ mod tests {
             function_length: 50,
             cyclomatic_complexity: 10,
             cognitive_complexity: 20,
+            is_pure: None,
+            purity_confidence: None,
             entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
         };
 
         let testing_gap_item = create_testing_gap_item("test_func", 0.0, 10);

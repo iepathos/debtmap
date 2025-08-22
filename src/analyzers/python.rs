@@ -234,6 +234,8 @@ fn extract_functions_from_stmts(
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
                     entropy_score: None, // TODO: Add entropy scoring for Python
+                    is_pure: None, // TODO: Add purity detection for Python
+                    purity_confidence: None,
                 });
 
                 // Recursively look for nested functions
@@ -270,6 +272,8 @@ fn extract_functions_from_stmts(
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
                     entropy_score: None, // TODO: Add entropy scoring for Python
+                    is_pure: None, // TODO: Add purity detection for Python
+                    purity_confidence: None,
                 });
 
                 // Recursively look for nested functions

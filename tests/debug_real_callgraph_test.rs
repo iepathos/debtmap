@@ -191,6 +191,8 @@ impl FrameworkPatternDetector {
             is_trait_method: false,
             in_test_module: false,
             entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
         };
 
         let debt_item = create_unified_debt_item_enhanced(&metrics, &call_graph, None, None);
