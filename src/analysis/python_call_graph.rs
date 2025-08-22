@@ -470,6 +470,13 @@ impl PythonCallGraphAnalyzer {
                         self.analyze_stmt_for_calls(s, file_path, call_graph)?;
                     }
                 }
+                // Also analyze the else and finally blocks
+                for s in &try_stmt.orelse {
+                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
+                }
+                for s in &try_stmt.finalbody {
+                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
+                }
             }
             _ => {}
         }
@@ -745,18 +752,40 @@ impl PythonCallGraphAnalyzer {
         file_path: &Path,
         call_graph: &mut CallGraph,
     ) -> Result<()> {
-        // Analyze context manager expressions (important for self._get_ssh_connection())
-        for item in &with_stmt.items {
+        // Analyze context manager expressions
+        self.analyze_context_managers(&with_stmt.items, file_path, call_graph)?;
+
+        // Analyze body
+        self.analyze_stmt_list(&with_stmt.body, file_path, call_graph)?;
+
+        Ok(())
+    }
+
+    /// Extract context manager analysis logic as a pure-like method
+    fn analyze_context_managers(
+        &mut self,
+        items: &[ast::WithItem],
+        file_path: &Path,
+        call_graph: &mut CallGraph,
+    ) -> Result<()> {
+        for item in items {
             if let ast::Expr::Call(call_expr) = &item.context_expr {
                 self.analyze_call_expr(call_expr, file_path, call_graph)?;
             }
         }
+        Ok(())
+    }
 
-        // Analyze body
-        for stmt in &with_stmt.body {
+    /// Extract statement list analysis as a reusable method
+    fn analyze_stmt_list(
+        &mut self,
+        stmts: &[ast::Stmt],
+        file_path: &Path,
+        call_graph: &mut CallGraph,
+    ) -> Result<()> {
+        for stmt in stmts {
             self.analyze_stmt_for_calls(stmt, file_path, call_graph)?;
         }
-
         Ok(())
     }
 
@@ -1207,6 +1236,293 @@ class Scheduler:
         assert!(
             !call_graph.get_callers(&task_id).is_empty(),
             "task function should have callers because it's passed as a callback"
+        );
+    }
+
+    #[test]
+    fn test_analyze_with_stmt_context_manager_calls() {
+        // Test that with statement analysis doesn't panic and processes correctly
+        let python_code = r#"
+class DatabaseConnection:
+    def __enter__(self):
+        return self.connect()
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+    
+    def connect(self):
+        pass
+    
+    def disconnect(self):
+        pass
+
+def process_data():
+    with DatabaseConnection() as conn:
+        # This would need to be self.execute() to be tracked
+        pass
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        // Should not panic when analyzing with statements
+        let result = analyzer.analyze_module_with_source(
+            &module,
+            Path::new("with_test.py"),
+            python_code,
+            &mut call_graph,
+        );
+
+        assert!(
+            result.is_ok(),
+            "Should successfully analyze with statement without errors"
+        );
+    }
+
+    #[test]
+    fn test_analyze_with_stmt_nested_calls() {
+        // Test that self method calls within with statement body are tracked
+        let python_code = r#"
+class ResourceManager:
+    def open_resource(self, name):
+        return self
+    
+    def read(self):
+        return self.process_data()
+    
+    def process_data(self):
+        return "data"
+    
+    def main(self):
+        with self.open_resource("file.txt") as resource:
+            data = self.read()
+            return data
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        analyzer
+            .analyze_module_with_source(
+                &module,
+                Path::new("nested_with_test.py"),
+                python_code,
+                &mut call_graph,
+            )
+            .unwrap();
+
+        // Check that self.open_resource is called
+        let open_resource_calls = call_graph
+            .get_all_calls()
+            .iter()
+            .filter(|call| call.callee.name == "ResourceManager.open_resource")
+            .count();
+
+        assert!(
+            open_resource_calls > 0,
+            "self.open_resource should be tracked in with statement"
+        );
+
+        // Check that self.read is called within the with block
+        let read_calls = call_graph
+            .get_all_calls()
+            .iter()
+            .filter(|call| call.callee.name == "ResourceManager.read")
+            .count();
+
+        assert!(
+            read_calls > 0,
+            "self.read should be tracked within with block"
+        );
+    }
+
+    #[test]
+    fn test_analyze_with_stmt_multiple_context_managers() {
+        // Test multiple context managers with self method calls
+        let python_code = r#"
+class Manager:
+    def get_connection(self):
+        return self
+    
+    def get_lock(self):
+        return self
+    
+    def query(self):
+        pass
+    
+    def acquire(self):
+        pass
+    
+    def critical_section(self):
+        with self.get_connection() as conn, self.get_lock() as lock:
+            self.acquire()
+            self.query()
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        analyzer
+            .analyze_module_with_source(
+                &module,
+                Path::new("multiple_with_test.py"),
+                python_code,
+                &mut call_graph,
+            )
+            .unwrap();
+
+        // Both context managers should be called
+        let connection_calls = call_graph
+            .get_all_calls()
+            .iter()
+            .filter(|call| call.callee.name == "Manager.get_connection")
+            .count();
+
+        let lock_calls = call_graph
+            .get_all_calls()
+            .iter()
+            .filter(|call| call.callee.name == "Manager.get_lock")
+            .count();
+
+        assert!(
+            connection_calls > 0,
+            "self.get_connection should be tracked in with statement"
+        );
+        assert!(
+            lock_calls > 0,
+            "self.get_lock should be tracked in with statement"
+        );
+    }
+
+    #[test]
+    fn test_analyze_context_managers_non_call_expressions() {
+        // Test that non-call expressions in context managers are handled correctly
+        let python_code = r#"
+existing_resource = Resource()
+
+def use_resource():
+    with existing_resource as resource:
+        resource.process()
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        // Should not panic or error when context manager is not a call expression
+        let result = analyzer.analyze_module_with_source(
+            &module,
+            Path::new("non_call_with_test.py"),
+            python_code,
+            &mut call_graph,
+        );
+
+        assert!(
+            result.is_ok(),
+            "Should handle non-call context manager expressions gracefully"
+        );
+    }
+
+    #[test]
+    fn test_analyze_stmt_list_empty() {
+        // Test that empty statement lists are handled correctly
+        let python_code = r#"
+def empty_with():
+    with get_resource():
+        pass  # Empty body
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        let result = analyzer.analyze_module_with_source(
+            &module,
+            Path::new("empty_with_test.py"),
+            python_code,
+            &mut call_graph,
+        );
+
+        assert!(result.is_ok(), "Should handle empty with statement body");
+    }
+
+    #[test]
+    fn test_analyze_with_stmt_exception_handling() {
+        // Test with statements that include exception handling with self method calls
+        let python_code = r#"
+class FileHandler:
+    def open_file(self, name):
+        return self
+    
+    def read(self):
+        return "data"
+    
+    def process_data(self, data):
+        pass
+    
+    def handle_error(self):
+        pass
+    
+    def cleanup(self):
+        pass
+    
+    def risky_operation(self):
+        with self.open_file("data.txt") as f:
+            try:
+                data = self.read()
+                self.process_data(data)
+            except IOError:
+                self.handle_error()
+            finally:
+                self.cleanup()
+"#;
+
+        let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+        let mut call_graph = CallGraph::new();
+
+        analyzer
+            .analyze_module_with_source(
+                &module,
+                Path::new("exception_with_test.py"),
+                python_code,
+                &mut call_graph,
+            )
+            .unwrap();
+
+        // All self method calls in try/except/finally should be tracked
+        let process_calls = call_graph
+            .get_all_calls()
+            .iter()
+            .filter(|call| call.callee.name == "FileHandler.process_data")
+            .count();
+
+        let error_calls = call_graph
+            .get_all_calls()
+            .iter()
+            .filter(|call| call.callee.name == "FileHandler.handle_error")
+            .count();
+
+        let cleanup_calls = call_graph
+            .get_all_calls()
+            .iter()
+            .filter(|call| call.callee.name == "FileHandler.cleanup")
+            .count();
+
+        assert!(
+            process_calls > 0,
+            "self.process_data should be tracked in try block"
+        );
+        assert!(
+            error_calls > 0,
+            "self.handle_error should be tracked in except block"
+        );
+        assert!(
+            cleanup_calls > 0,
+            "self.cleanup should be tracked in finally block"
         );
     }
 }
