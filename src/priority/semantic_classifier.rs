@@ -95,8 +95,6 @@ fn is_pattern_matching_function(func: &FunctionMetrics, func_id: &FunctionId) ->
 
 // Pure function to check if a function is an orchestrator
 fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &CallGraph) -> bool {
-    let config = crate::config::get_orchestration_config();
-
     // First check if there are meaningful callees to orchestrate
     let callees = call_graph.get_callees(func_id);
     let meaningful_callees: Vec<_> = callees
@@ -105,7 +103,8 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
         .collect();
 
     // Check if this is a functional chain (all calls are functional methods)
-    if config.allow_functional_chains
+    // Default: allow functional chains (they're idiomatic patterns)
+    if true
         && !meaningful_callees.is_empty()
         && callees.len() > meaningful_callees.len()
     {
@@ -122,14 +121,15 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
     }
 
     // Check for single delegation (adapter pattern)
-    if config.exclude_adapters && meaningful_callees.len() == 1 {
+    // Default: exclude adapters (they're not orchestration)
+    if meaningful_callees.len() == 1 {
         // This is likely an adapter/wrapper, not orchestration
         return false;
     }
 
     // Can't be an orchestrator without functions to orchestrate
-    // Use configurable minimum delegation count
-    if meaningful_callees.len() < config.min_delegations {
+    // Default minimum delegation count: 2
+    if meaningful_callees.len() < 2 {
         return false;
     }
 
@@ -172,15 +172,7 @@ fn is_entry_point_by_name(name: &str) -> bool {
 }
 
 fn is_orchestrator_by_name(name: &str) -> bool {
-    let config = crate::config::get_orchestration_config();
     let name_lower = name.to_lowercase();
-
-    // Check custom exclude patterns from config
-    for pattern in &config.exclude_patterns {
-        if name_lower.contains(&pattern.to_lowercase()) {
-            return false;
-        }
-    }
 
     // Exclude common non-orchestration patterns first
     let exclude_patterns = [
@@ -227,9 +219,18 @@ fn is_orchestrator_by_name(name: &str) -> bool {
         }
     }
 
-    // Check custom include patterns from config (these override excludes)
-    for pattern in &config.include_patterns {
-        if name_lower.contains(&pattern.to_lowercase()) {
+    // Check common orchestration patterns that override excludes
+    // (These would have been in include_patterns config)
+    let include_patterns = [
+        "workflow_",
+        "pipeline_",
+        "process_",
+        "orchestrate_",
+        "coordinate_",
+        "execute_flow_",
+    ];
+    for pattern in &include_patterns {
+        if name_lower.starts_with(pattern) {
             return true;
         }
     }

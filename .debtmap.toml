@@ -96,58 +96,6 @@ detect_external_api = false
 api_functions = []
 api_files = []
 
-[orchestration]
-# Configuration for orchestration detection to reduce false positives
-
-# Minimum number of meaningful function delegations to be considered orchestration
-# Increased from 2 to 3 to reduce false positives
-min_delegations = 3
-
-# Whether to exclude adapter patterns (single delegation with data transformation)
-# Default: true (adapters are not considered orchestration)
-exclude_adapters = true
-
-# Whether to recognize functional chains (map/filter/collect) as idiomatic patterns
-# Default: true (functional chains are not considered orchestration)
-allow_functional_chains = true
-
-# Additional function name patterns to exclude from orchestration detection
-# These patterns will never be considered orchestration regardless of structure
-exclude_patterns = [
-    # Simple delegation patterns
-    "*_wrapper",
-    "*_adapter",
-    "convert_*",
-    "transform_*",
-    "map_*",
-    "translate_*",
-    
-    # Proxy/facade patterns
-    "*_proxy",
-    "*_facade",
-    
-    # Factory methods that delegate
-    "create_*",
-    "build_*",
-    "make_*",
-    
-    # Visitor pattern methods
-    "visit_*",
-    "walk_*",
-    "traverse_*",
-]
-
-# Additional function name patterns to always consider as orchestration
-# These patterns will be considered orchestration if they meet minimum requirements
-include_patterns = [
-    "workflow_*",
-    "pipeline_*",
-    "process_*",
-    "orchestrate_*",
-    "coordinate_*",
-    "execute_flow_*",
-]
-
 [entropy]
 enabled = true
 weight = 0.5

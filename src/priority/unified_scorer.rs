@@ -44,8 +44,8 @@ pub struct UnifiedDebtItem {
     pub cyclomatic_complexity: u32,
     pub cognitive_complexity: u32,
     pub entropy_details: Option<EntropyDetails>, // Store entropy information
-    pub is_pure: Option<bool>,                  // Whether the function is pure
-    pub purity_confidence: Option<f32>,         // Confidence in purity detection
+    pub is_pure: Option<bool>,                   // Whether the function is pure
+    pub purity_confidence: Option<f32>,          // Confidence in purity detection
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,7 +99,7 @@ pub fn calculate_unified_priority_with_debt(
     // Simple I/O wrappers, entry points, and trivial pure functions with low complexity
     // are not technical debt UNLESS they're untested and non-trivial
     let role = classify_function_role(func, &func_id, call_graph);
-    
+
     // Pure functions are inherently less risky and easier to test
     let purity_bonus = if func.is_pure == Some(true) {
         // High confidence pure functions get bigger bonus
@@ -111,7 +111,7 @@ pub fn calculate_unified_priority_with_debt(
     } else {
         1.0 // No reduction for impure functions
     };
-    
+
     let is_trivial = (func.cyclomatic <= 3 && func.cognitive <= 5)
         && (role == FunctionRole::IOWrapper
             || role == FunctionRole::EntryPoint
@@ -151,12 +151,13 @@ pub fn calculate_unified_priority_with_debt(
     } else {
         func.cognitive
     };
-    
+
     // Apply purity bonus to complexity (pure functions are easier to understand and test)
     let purity_adjusted_cyclomatic = (adjusted_cyclomatic as f64 * purity_bonus) as u32;
     let purity_adjusted_cognitive = (adjusted_cognitive as f64 * purity_bonus) as u32;
-    
-    let complexity_factor = normalize_complexity(purity_adjusted_cyclomatic, purity_adjusted_cognitive);
+
+    let complexity_factor =
+        normalize_complexity(purity_adjusted_cyclomatic, purity_adjusted_cognitive);
 
     // Calculate coverage factor (0-10, higher means more urgent to cover)
     let coverage_factor = if func.is_test {
@@ -729,22 +730,27 @@ fn determine_debt_type(
         };
     }
 
-    // Check if this is an orchestrator that doesn't need tests
+    // Check if this is a complex orchestrator that should be flagged as complexity hotspot
     let role = classify_function_role(func, func_id, call_graph);
     if role == FunctionRole::Orchestrator {
-        let callees = call_graph.get_callees(func_id);
-        // Filter out standard library functions
-        let meaningful_callees: Vec<_> = callees
-            .iter()
-            .filter(|f| !is_std_or_utility_function(&f.name))
-            .collect();
-        // Only flag as orchestration if there are actual functions being orchestrated
-        if meaningful_callees.len() >= 2 {
-            return DebtType::Orchestration {
-                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
-                coverage: coverage.as_ref().map(|c| c.direct),
+        // Complex orchestrators (complexity > 5) are flagged as complexity hotspots
+        if func.cyclomatic > 5 {
+            return DebtType::ComplexityHotspot {
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
             };
         }
+        // Untested orchestrators with non-trivial complexity are testing gaps
+        if let Some(cov) = coverage {
+            if cov.direct < 0.2 && func.cyclomatic > 2 {
+                return DebtType::TestingGap {
+                    coverage: cov.direct,
+                    cyclomatic: func.cyclomatic,
+                    cognitive: func.cognitive,
+                };
+            }
+        }
+        // Simple orchestrators are not debt - they're good architectural patterns
     }
 
     // Low complexity functions that are I/O wrappers or entry points
@@ -781,23 +787,8 @@ fn determine_debt_type(
         }
     } else {
         // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
-        // Check if they're calling other functions (true delegation)
-        let callees = call_graph.get_callees(func_id);
-        // Filter out standard library functions
-        let meaningful_callees: Vec<_> = callees
-            .iter()
-            .filter(|f| !is_std_or_utility_function(&f.name))
-            .collect();
-        if meaningful_callees.len() >= 2
-            && func.cyclomatic <= 2
-            && role == FunctionRole::Orchestrator
-        {
-            // This is a simple delegation function that was identified as an orchestrator
-            DebtType::Orchestration {
-                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
-                coverage: coverage.as_ref().map(|c| c.direct),
-            }
-        } else if role == FunctionRole::PureLogic {
+        // Simple functions are not debt in themselves
+        if role == FunctionRole::PureLogic {
             // Simple pure functions are not debt - return minimal risk
             DebtType::Risk {
                 risk_score: 0.0,
@@ -980,22 +971,27 @@ pub fn classify_debt_type_with_exclusions(
         };
     }
 
-    // Check if this is an orchestrator that doesn't need tests
+    // Check if this is a complex orchestrator that should be flagged as complexity hotspot
     let role = classify_function_role(func, func_id, call_graph);
     if role == FunctionRole::Orchestrator {
-        let callees = call_graph.get_callees(func_id);
-        // Filter out standard library functions
-        let meaningful_callees: Vec<_> = callees
-            .iter()
-            .filter(|f| !is_std_or_utility_function(&f.name))
-            .collect();
-        // Only flag as orchestration if there are actual functions being orchestrated
-        if meaningful_callees.len() >= 2 {
-            return DebtType::Orchestration {
-                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
-                coverage: coverage.map(|c| c.direct),
+        // Complex orchestrators (complexity > 5) are flagged as complexity hotspots
+        if func.cyclomatic > 5 {
+            return DebtType::ComplexityHotspot {
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
             };
         }
+        // Untested orchestrators with non-trivial complexity are testing gaps
+        if let Some(cov) = coverage {
+            if cov.direct < 0.2 && func.cyclomatic > 2 {
+                return DebtType::TestingGap {
+                    coverage: cov.direct,
+                    cyclomatic: func.cyclomatic,
+                    cognitive: func.cognitive,
+                };
+            }
+        }
+        // Simple orchestrators are not debt - they're good architectural patterns
     }
 
     // Low complexity functions that are I/O wrappers or entry points
@@ -1032,22 +1028,7 @@ pub fn classify_debt_type_with_exclusions(
         }
     } else {
         // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
-        // Check if they're calling other functions (true delegation)
-        let callees = call_graph.get_callees(func_id);
-        // Filter out standard library functions
-        let meaningful_callees: Vec<_> = callees
-            .iter()
-            .filter(|f| !is_std_or_utility_function(&f.name))
-            .collect();
-        if meaningful_callees.len() >= 2
-            && func.cyclomatic <= 2
-            && role == FunctionRole::Orchestrator
         {
-            DebtType::Orchestration {
-                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
-                coverage: None,
-            }
-        } else {
             // Not debt - well-designed simple function
             DebtType::Risk {
                 risk_score: 0.0,
@@ -1097,22 +1078,17 @@ pub fn classify_debt_type_enhanced(
         };
     }
 
-    // Check if this is an orchestrator that doesn't need tests
+    // Check if this is a complex orchestrator that should be flagged as complexity hotspot
     let role = classify_function_role(func, func_id, call_graph);
     if role == FunctionRole::Orchestrator {
-        let callees = call_graph.get_callees(func_id);
-        // Filter out standard library functions
-        let meaningful_callees: Vec<_> = callees
-            .iter()
-            .filter(|f| !is_std_or_utility_function(&f.name))
-            .collect();
-        // Only flag as orchestration if there are actual functions being orchestrated
-        if meaningful_callees.len() >= 2 {
-            return DebtType::Orchestration {
-                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
-                coverage: None, // Coverage not available in this context
+        // Complex orchestrators (complexity > 5) are flagged as complexity hotspots
+        if func.cyclomatic > 5 {
+            return DebtType::ComplexityHotspot {
+                cyclomatic: func.cyclomatic,
+                cognitive: func.cognitive,
             };
         }
+        // Simple orchestrators are not debt - they're good architectural patterns
     }
 
     // Low complexity functions that are I/O wrappers or entry points
@@ -1149,23 +1125,8 @@ pub fn classify_debt_type_enhanced(
         }
     } else {
         // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
-        // Check if they're calling other functions (true delegation)
-        let callees = call_graph.get_callees(func_id);
-        // Filter out standard library functions
-        let meaningful_callees: Vec<_> = callees
-            .iter()
-            .filter(|f| !is_std_or_utility_function(&f.name))
-            .collect();
-        if meaningful_callees.len() >= 2
-            && func.cyclomatic <= 2
-            && role == FunctionRole::Orchestrator
-        {
-            // This is a simple delegation function that was identified as an orchestrator
-            DebtType::Orchestration {
-                delegates_to: meaningful_callees.iter().map(|f| f.name.clone()).collect(),
-                coverage: None,
-            }
-        } else if role == FunctionRole::PureLogic {
+        // Simple functions are not debt in themselves
+        if role == FunctionRole::PureLogic {
             // Simple pure functions are not debt - return minimal risk
             DebtType::Risk {
                 risk_score: 0.0,
@@ -1471,7 +1432,7 @@ fn generate_testing_gap_recommendation(
     let role_str = format_role_description(role);
 
     let coverage_gap = 100 - coverage_pct;
-    
+
     if is_complex {
         (
             format!("Add tests for {}% coverage gap", coverage_gap),
@@ -1579,39 +1540,6 @@ fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, V
 /// Generate recommendation for infrastructure debt types (orchestration, duplication, risk)
 fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
     match debt_type {
-        DebtType::Orchestration { delegates_to, coverage } => {
-            let coverage_pct = coverage.map(|c| (c * 100.0) as i32);
-            let (action, rationale) = if let Some(pct) = coverage_pct {
-                if pct < 80 {
-                    let coverage_gap = 80 - pct;
-                    (
-                        format!("Add tests for {}% coverage gap", coverage_gap),
-                        format!("Orchestration function has {}% coverage gap (currently {}% covered). Delegates to {} functions", 
-                            coverage_gap, pct, delegates_to.len()),
-                    )
-                } else {
-                    (
-                        "Refactor to pure functions or extract testable units".to_string(),
-                        format!("Orchestration function delegating to {} functions", delegates_to.len()),
-                    )
-                }
-            } else {
-                (
-                    "Add tests and refactor to pure functions".to_string(),
-                    format!("Orchestration function delegating to {} functions (coverage unknown)", delegates_to.len()),
-                )
-            };
-            (
-                action,
-                rationale,
-                vec![
-                    "Write unit tests for orchestration logic".to_string(),
-                    "Extract logic into pure functions".to_string(),
-                    "Compose smaller, testable functions".to_string(),
-                    "Add integration tests for function interactions".to_string(),
-                ],
-            )
-        }
         DebtType::Duplication {
             instances,
             total_lines,
@@ -1838,7 +1766,6 @@ fn generate_recommendation(
             cognitive,
         } => generate_testing_gap_recommendation(*coverage, *cyclomatic, *cognitive, role),
         DebtType::ComplexityHotspot { .. }
-        | DebtType::Orchestration { .. }
         | DebtType::Duplication { .. }
         | DebtType::Risk { .. } => generate_infrastructure_recommendation(debt_type),
         DebtType::TestComplexityHotspot { .. }
@@ -1956,9 +1883,7 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::Duplication { .. } => 0.25,
         DebtType::Risk { .. } => 0.2,
         DebtType::TestComplexityHotspot { .. } => 0.15,
-        DebtType::Orchestration { .. }
-        | DebtType::TestTodo { .. }
-        | DebtType::TestDuplication { .. } => 0.1,
+        DebtType::TestTodo { .. } | DebtType::TestDuplication { .. } => 0.1,
         // Security debt types (high risk)
         DebtType::HardcodedSecrets { .. } => 0.8,
         DebtType::SqlInjectionRisk { .. } => 0.9,
@@ -2443,9 +2368,8 @@ fn generate_collection_inefficiency_recommendation(
 mod tests {
     use super::*;
     use crate::priority::call_graph::{CallType, FunctionCall};
-    use crate::risk::lcov::FunctionCoverage;
     use crate::priority::coverage_propagation::TransitiveCoverage;
-    use std::collections::HashSet;
+    use crate::risk::lcov::FunctionCoverage;
 
     fn create_test_metrics() -> FunctionMetrics {
         FunctionMetrics {
@@ -2538,101 +2462,27 @@ mod tests {
     #[test]
     fn test_coverage_gap_messaging() {
         // Test with 0% coverage (100% gap)
-        let (action, rationale, _) = generate_testing_gap_recommendation(
-            0.0,
-            5,
-            8,
-            FunctionRole::PureLogic
-        );
+        let (action, rationale, _) =
+            generate_testing_gap_recommendation(0.0, 5, 8, FunctionRole::PureLogic);
         assert_eq!(action, "Add tests for 100% coverage gap");
         assert!(rationale.contains("100% coverage gap"));
         assert!(rationale.contains("currently 0% covered"));
-        
+
         // Test with 40% coverage (60% gap)
-        let (action, rationale, _) = generate_testing_gap_recommendation(
-            0.4,
-            5,
-            8,
-            FunctionRole::Orchestrator
-        );
+        let (action, rationale, _) =
+            generate_testing_gap_recommendation(0.4, 5, 8, FunctionRole::Orchestrator);
         assert_eq!(action, "Add tests for 60% coverage gap");
         assert!(rationale.contains("60% coverage gap"));
         assert!(rationale.contains("currently 40% covered"));
-        
+
         // Test with 75% coverage (25% gap from 100%)
-        let (action, rationale, _) = generate_testing_gap_recommendation(
-            0.75,
-            5,
-            8,
-            FunctionRole::IOWrapper
-        );
+        let (action, rationale, _) =
+            generate_testing_gap_recommendation(0.75, 5, 8, FunctionRole::IOWrapper);
         assert_eq!(action, "Add tests for 25% coverage gap");
         assert!(rationale.contains("25% coverage gap"));
         assert!(rationale.contains("currently 75% covered"));
     }
-    
-    #[test]
-    fn test_orchestration_with_coverage() {
-        let mut func = create_test_metrics();
-        // Make it simple enough to be an orchestrator
-        func.cyclomatic = 1;
-        func.cognitive = 2;
-        func.length = 15;
-        
-        let mut call_graph = CallGraph::new();
-        
-        // Add function to graph
-        let func_id = FunctionId {
-            file: func.file.clone(),
-            name: func.name.clone(),
-            line: func.line,
-        };
-        call_graph.add_function(func_id.clone(), false, false, 1, 15);
-        
-        // Add some calls it makes
-        let helper1_id = FunctionId { file: PathBuf::from("other.rs"), name: "helper1".to_string(), line: 20 };
-        let helper2_id = FunctionId { file: PathBuf::from("other.rs"), name: "helper2".to_string(), line: 30 };
-        
-        call_graph.add_function(helper1_id.clone(), false, false, 3, 10);
-        call_graph.add_function(helper2_id.clone(), false, false, 3, 10);
-        
-        call_graph.add_call(FunctionCall {
-            caller: func_id.clone(),
-            callee: helper1_id,
-            call_type: CallType::Direct,
-        });
-        call_graph.add_call(FunctionCall {
-            caller: func_id.clone(),
-            callee: helper2_id,
-            call_type: CallType::Direct,
-        });
-        
-        // Test with low coverage
-        let coverage = TransitiveCoverage {
-            direct: 0.3,
-            transitive: 0.3,
-            propagated_from: vec![],
-        };
-        let exclusions = HashSet::new();
-        let debt_type = classify_debt_type_with_exclusions(
-            &func,
-            &call_graph,
-            &func_id,
-            &exclusions,
-            None,
-            Some(&coverage)
-        );
-        
-        match debt_type {
-            DebtType::Orchestration { delegates_to, coverage: cov } => {
-                assert_eq!(delegates_to.len(), 2);
-                assert_eq!(cov, Some(0.3));
-            },
-            DebtType::TestingGap { .. } => panic!("Got TestingGap instead of Orchestration"),
-            _ => panic!("Expected Orchestration debt type with coverage, got: {:?}", debt_type)
-        }
-    }
-    
+
     #[test]
     fn test_dead_code_detection() {
         let mut func = create_test_metrics();
@@ -3005,7 +2855,7 @@ mod tests {
         // New format says "Add tests for X% coverage gap"
         assert!(action.contains("Add tests"));
         assert!(action.contains("90%")); // 100 - 10 = 90% gap
-        // Cognitive complexity mention removed in new format
+                                         // Cognitive complexity mention removed in new format
         assert!(
             rationale.contains("Complex business logic")
                 || rationale.contains("high testing priority")
@@ -3158,12 +3008,6 @@ mod tests {
             threshold: 10,
         };
         assert_eq!(calculate_risk_factor(&test_complexity), 0.15);
-
-        let orchestration = DebtType::Orchestration {
-            delegates_to: vec!["func1".to_string(), "func2".to_string()],
-            coverage: None,
-        };
-        assert_eq!(calculate_risk_factor(&orchestration), 0.1);
     }
 
     #[test]

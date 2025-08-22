@@ -548,7 +548,6 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::TestingGap { .. } => "TEST GAP",
         DebtType::ComplexityHotspot { .. } => "COMPLEXITY",
         DebtType::DeadCode { .. } => "DEAD CODE",
-        DebtType::Orchestration { .. } => "ORCHESTRATION",
         DebtType::Duplication { .. } => "DUPLICATION",
         DebtType::Risk { .. } => "RISK",
         DebtType::TestComplexityHotspot { .. } => "TEST COMPLEXITY",
@@ -601,7 +600,6 @@ fn get_action_verb(debt_type: &DebtType) -> &'static str {
         DebtType::TestingGap { .. } => "Add tests",
         DebtType::ComplexityHotspot { .. } => "Reduce complexity",
         DebtType::DeadCode { .. } => "Remove dead code",
-        DebtType::Orchestration { .. } => "Refactor to pure functions",
         DebtType::Duplication { .. } => "Extract duplication",
         DebtType::Risk { .. } => "Fix debt",
         DebtType::TestComplexityHotspot { .. } => "Simplify test",
@@ -754,8 +752,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
-            is_pure: None,
-            purity_confidence: None,
         }
     }
 

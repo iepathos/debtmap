@@ -422,7 +422,6 @@ fn format_debt_type(debt_type: &crate::priority::DebtType) -> &'static str {
         DebtType::TestingGap { .. } => "Testing Gap",
         DebtType::ComplexityHotspot { .. } => "Complexity",
         DebtType::DeadCode { .. } => "Dead Code",
-        DebtType::Orchestration { .. } => "Orchestration",
         DebtType::Duplication { .. } => "Duplication",
         DebtType::Risk { .. } => "Risk",
         DebtType::TestComplexityHotspot { .. } => "Test Complexity",
@@ -456,14 +455,6 @@ fn format_debt_issue(debt_type: &crate::priority::DebtType) -> String {
         }
         DebtType::DeadCode { visibility, .. } => {
             format!("Unused {:?} function", visibility)
-        }
-        DebtType::Orchestration { delegates_to, coverage } => {
-            if let Some(cov) = coverage {
-                let coverage_pct = (cov * 100.0) as i32;
-                format!("Delegates to {} functions, {}% coverage", delegates_to.len(), coverage_pct)
-            } else {
-                format!("Delegates to {} functions", delegates_to.len())
-            }
         }
         DebtType::Duplication {
             instances,
@@ -717,8 +708,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
-            is_pure: None,
-            purity_confidence: None,
         }
     }
 
@@ -890,8 +879,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
-            is_pure: None,
-            purity_confidence: None,
         }
     }
 
@@ -944,8 +931,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
-            is_pure: None,
-            purity_confidence: None,
         }
     }
 
@@ -1361,8 +1346,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
-            is_pure: None,
-            purity_confidence: None,
         };
 
         let dead_code_item2 = UnifiedDebtItem {
@@ -1410,8 +1393,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
-            is_pure: None,
-            purity_confidence: None,
         };
 
         let analysis = UnifiedAnalysis {
@@ -1529,8 +1510,6 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
-            is_pure: None,
-            purity_confidence: None,
         };
 
         let testing_gap_item = create_testing_gap_item("test_func", 0.0, 10);
