@@ -171,26 +171,30 @@ pub fn analyze_module_smells(path: &Path, line_count: usize) -> Vec<CodeSmell> {
 /// This is a simplified version that looks for method calls on other objects
 pub fn detect_feature_envy(content: &str, path: &Path) -> Vec<CodeSmell> {
     let mut smells = Vec::new();
-    let mut object_calls: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut object_calls: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     let mut self_calls = 0;
 
     // Count method calls per object
     for line in content.lines() {
         // Count self calls
         self_calls += line.matches("self.").count();
-        
+
         // Look for pattern: identifier.method_call
         // Simple regex-like pattern matching without regex
         let trimmed = line.trim();
         if let Some(dot_pos) = trimmed.find('.') {
             if dot_pos > 0 {
                 let before_dot = &trimmed[..dot_pos];
-                let object_name = before_dot.trim().split_whitespace().last().unwrap_or("");
-                
+                let object_name = before_dot.split_whitespace().last().unwrap_or("");
+
                 // Skip if it's self or if it doesn't look like an identifier
-                if !object_name.is_empty() 
-                    && object_name != "self" 
-                    && object_name.chars().next().map_or(false, |c| c.is_alphabetic() || c == '_')
+                if !object_name.is_empty()
+                    && object_name != "self"
+                    && object_name
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_alphabetic() || c == '_')
                     && !object_name.contains('(')
                     && !object_name.contains('"')
                     && !object_name.contains('\'')
@@ -212,7 +216,11 @@ pub fn detect_feature_envy(content: &str, path: &Path) -> Vec<CodeSmell> {
                     "Possible feature envy: {} calls to '{}' vs {} self calls",
                     count, object, self_calls
                 ),
-                severity: if count > 5 { Priority::Medium } else { Priority::Low },
+                severity: if count > 5 {
+                    Priority::Medium
+                } else {
+                    Priority::Low
+                },
             });
         }
     }
@@ -607,7 +615,10 @@ mod tests {
 
         // Test with nesting below threshold
         let smell = detect_deep_nesting(&func);
-        assert!(smell.is_none(), "Should not detect smell for nesting depth 3");
+        assert!(
+            smell.is_none(),
+            "Should not detect smell for nesting depth 3"
+        );
 
         // Test with nesting at threshold
         let mut nested_func = func.clone();
@@ -744,7 +755,11 @@ mod tests {
             }
         "#;
         let smells = detect_feature_envy(content, &path);
-        assert_eq!(smells.len(), 2, "Should detect feature envy for both objects");
+        assert_eq!(
+            smells.len(),
+            2,
+            "Should detect feature envy for both objects"
+        );
     }
 
     #[test]

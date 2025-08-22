@@ -382,7 +382,7 @@ impl FunctionPointerVisitor {
 
         // Extract and validate function name
         let func_name = self.extract_function_name_from_path(path)?;
-        
+
         // Check if it's a higher-order function
         if !self.is_higher_order_function(&func_name) {
             return None;
@@ -390,7 +390,7 @@ impl FunctionPointerVisitor {
 
         // Extract function arguments
         let function_arguments = self.extract_function_arguments(call);
-        
+
         // Return HOF call if arguments exist
         (!function_arguments.is_empty()).then(|| HigherOrderFunctionCall {
             caller: caller.clone(),
