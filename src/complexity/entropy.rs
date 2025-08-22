@@ -987,6 +987,10 @@ pub fn apply_entropy_dampening(base_complexity: u32, entropy_score: &EntropyScor
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::complexity::token_classifier::{
+        CallType, ClassifiedToken, CollectionOp, ErrorType, FlowType, LiteralCategory, NodeType,
+        TokenClass, TokenContext, VarType,
+    };
     use syn::parse_quote;
 
     #[test]
@@ -1236,5 +1240,303 @@ mod tests {
         assert_eq!(stats.entries, 0);
         assert_eq!(analyzer.cache_hits, 0);
         assert_eq!(analyzer.cache_misses, 0);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_empty_tokens() {
+        let analyzer = EntropyAnalyzer::new();
+        let tokens = vec![];
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        assert_eq!(entropy, 0.0);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_single_token() {
+        let analyzer = EntropyAnalyzer::new();
+        let tokens = vec![ClassifiedToken::new(
+            TokenClass::LocalVar(VarType::Other),
+            "x".to_string(),
+            TokenContext {
+                is_method_call: false,
+                is_field_access: false,
+                is_external: false,
+                scope_depth: 0,
+                parent_node_type: NodeType::Expression,
+            },
+            1.0,
+        )];
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        assert_eq!(entropy, 0.0);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_uniform_distribution() {
+        let analyzer = EntropyAnalyzer::new();
+        let context = TokenContext {
+            is_method_call: false,
+            is_field_access: false,
+            is_external: false,
+            scope_depth: 0,
+            parent_node_type: NodeType::Expression,
+        };
+
+        // Create tokens with uniform weights across different classes
+        let tokens = vec![
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "x".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::MethodCall(CallType::Other),
+                "foo".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::ControlFlow(FlowType::If),
+                "if".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::Literal(LiteralCategory::Numeric),
+                "42".to_string(),
+                context.clone(),
+                1.0,
+            ),
+        ];
+
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        // With 4 equally weighted classes, entropy should be 1.0 (maximum)
+        assert!((entropy - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_skewed_distribution() {
+        let analyzer = EntropyAnalyzer::new();
+        let context = TokenContext {
+            is_method_call: false,
+            is_field_access: false,
+            is_external: false,
+            scope_depth: 0,
+            parent_node_type: NodeType::Expression,
+        };
+
+        // Create tokens with heavily skewed weights (one class dominates)
+        let tokens = vec![
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "x".to_string(),
+                context.clone(),
+                10.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "y".to_string(),
+                context.clone(),
+                10.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "z".to_string(),
+                context.clone(),
+                10.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::MethodCall(CallType::Other),
+                "foo".to_string(),
+                context.clone(),
+                0.1,
+            ),
+        ];
+
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        // Entropy should be low due to skewed distribution
+        assert!(entropy < 0.3);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_zero_weights() {
+        let analyzer = EntropyAnalyzer::new();
+        let context = TokenContext {
+            is_method_call: false,
+            is_field_access: false,
+            is_external: false,
+            scope_depth: 0,
+            parent_node_type: NodeType::Expression,
+        };
+
+        // All tokens have zero weight
+        let tokens = vec![
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "x".to_string(),
+                context.clone(),
+                0.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::MethodCall(CallType::Other),
+                "foo".to_string(),
+                context.clone(),
+                0.0,
+            ),
+        ];
+
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        assert_eq!(entropy, 0.0);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_mixed_weights() {
+        let analyzer = EntropyAnalyzer::new();
+        let context = TokenContext {
+            is_method_call: false,
+            is_field_access: false,
+            is_external: false,
+            scope_depth: 0,
+            parent_node_type: NodeType::Expression,
+        };
+
+        // Mixed weights with different token classes
+        let tokens = vec![
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "x".to_string(),
+                context.clone(),
+                2.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::MethodCall(CallType::Other),
+                "foo".to_string(),
+                context.clone(),
+                3.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::ControlFlow(FlowType::If),
+                "if".to_string(),
+                context.clone(),
+                1.5,
+            ),
+        ];
+
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        // Should be between 0 and 1
+        assert!(entropy > 0.0 && entropy <= 1.0);
+        // With 3 classes with different weights, should have moderate entropy
+        assert!(entropy > 0.5 && entropy < 1.0);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_duplicate_classes() {
+        let analyzer = EntropyAnalyzer::new();
+        let context = TokenContext {
+            is_method_call: false,
+            is_field_access: false,
+            is_external: false,
+            scope_depth: 0,
+            parent_node_type: NodeType::Expression,
+        };
+
+        // Multiple tokens of the same class (weights should be summed)
+        let tokens = vec![
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "x".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "y".to_string(),
+                context.clone(),
+                2.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "z".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::MethodCall(CallType::Other),
+                "foo".to_string(),
+                context.clone(),
+                4.0,
+            ),
+        ];
+
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        // Two classes with equal total weight (4.0 each) should give high entropy
+        assert!((entropy - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_weighted_shannon_entropy_normalization() {
+        let analyzer = EntropyAnalyzer::new();
+        let context = TokenContext {
+            is_method_call: false,
+            is_field_access: false,
+            is_external: false,
+            scope_depth: 0,
+            parent_node_type: NodeType::Expression,
+        };
+
+        // Test that entropy is properly normalized (should never exceed 1.0)
+        let tokens = vec![
+            ClassifiedToken::new(
+                TokenClass::LocalVar(VarType::Other),
+                "a".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::MethodCall(CallType::Other),
+                "b".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::ControlFlow(FlowType::If),
+                "c".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::Literal(LiteralCategory::Numeric),
+                "d".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::ErrorHandling(ErrorType::Result),
+                "e".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::Collection(CollectionOp::Access),
+                "f".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::Keyword("let".to_string()),
+                "g".to_string(),
+                context.clone(),
+                1.0,
+            ),
+            ClassifiedToken::new(
+                TokenClass::Operator("+".to_string()),
+                "h".to_string(),
+                context.clone(),
+                1.0,
+            ),
+        ];
+
+        let entropy = analyzer.weighted_shannon_entropy(&tokens);
+        assert!(entropy <= 1.0);
+        assert!(entropy > 0.9); // Should be close to 1.0 with 8 equally weighted classes
     }
 }
