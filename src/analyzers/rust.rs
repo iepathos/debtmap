@@ -320,7 +320,7 @@ impl FunctionVisitor {
 
     fn calculate_cyclomatic_with_visitor(&self, block: &syn::Block, func: &syn::ItemFn) -> u32 {
         use crate::complexity::visitor_detector::detect_visitor_pattern;
-        
+
         // Check if we have the file AST and can detect visitor patterns
         if let Some(ref file_ast) = self.file_ast {
             if let Some(pattern_info) = detect_visitor_pattern(file_ast, func) {
@@ -328,14 +328,14 @@ impl FunctionVisitor {
                 return pattern_info.adjusted_complexity;
             }
         }
-        
+
         // Fall back to standard calculation
         calculate_cyclomatic_adjusted(block)
     }
 
     fn calculate_cognitive_with_visitor(&self, block: &syn::Block, func: &syn::ItemFn) -> u32 {
         use crate::complexity::visitor_detector::detect_visitor_pattern;
-        
+
         // Check if we have the file AST and can detect visitor patterns
         if let Some(ref file_ast) = self.file_ast {
             if let Some(pattern_info) = detect_visitor_pattern(file_ast, func) {
