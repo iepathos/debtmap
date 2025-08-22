@@ -428,4 +428,201 @@ mod tests {
         assert!(resolver.is_potential_trait_method("test_method"));
         assert!(!resolver.is_potential_trait_method("non_existent_method"));
     }
+
+    #[test]
+    fn test_blanket_applies_to_type_no_constraints() {
+        let tracker = Arc::new(TraitImplementationTracker::new());
+        let resolver = TraitResolver::new(tracker);
+
+        // Create a blanket implementation with no constraints
+        let blanket_impl = crate::analyzers::trait_implementation_tracker::Implementation {
+            trait_name: "Display".to_string(),
+            implementing_type: "T".to_string(),
+            methods: HashMap::new(),
+            generic_constraints: Vector::new(),
+            is_blanket: true,
+            is_negative: false,
+            module_path: Vector::new(),
+        };
+
+        // Should apply to any type when there are no constraints
+        assert!(resolver.blanket_applies_to_type(&blanket_impl, "String"));
+        assert!(resolver.blanket_applies_to_type(&blanket_impl, "MyType"));
+        assert!(resolver.blanket_applies_to_type(&blanket_impl, "i32"));
+    }
+
+    #[test]
+    fn test_blanket_applies_to_type_with_constraints() {
+        let mut tracker = TraitImplementationTracker::new();
+
+        // Register that String implements Clone
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "Clone".to_string(),
+                implementing_type: "String".to_string(),
+                methods: HashMap::new(),
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        let resolver = TraitResolver::new(Arc::new(tracker));
+
+        // Create a blanket implementation with a Clone constraint
+        let blanket_impl = crate::analyzers::trait_implementation_tracker::Implementation {
+            trait_name: "Debug".to_string(),
+            implementing_type: "T".to_string(),
+            methods: HashMap::new(),
+            generic_constraints: vec![
+                crate::analyzers::trait_implementation_tracker::WhereClauseItem {
+                    type_param: "T".to_string(),
+                    bounds: vec!["Clone".to_string()].into(),
+                },
+            ]
+            .into(),
+            is_blanket: true,
+            is_negative: false,
+            module_path: Vector::new(),
+        };
+
+        // Should apply to String (implements Clone)
+        assert!(resolver.blanket_applies_to_type(&blanket_impl, "String"));
+
+        // Should not apply to a type that doesn't implement Clone
+        assert!(!resolver.blanket_applies_to_type(&blanket_impl, "UnknownType"));
+    }
+
+    #[test]
+    fn test_blanket_applies_to_type_multiple_constraints() {
+        let mut tracker = TraitImplementationTracker::new();
+
+        // Register that String implements both Clone and Send
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "Clone".to_string(),
+                implementing_type: "String".to_string(),
+                methods: HashMap::new(),
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "Send".to_string(),
+                implementing_type: "String".to_string(),
+                methods: HashMap::new(),
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        // Register that MyType only implements Clone
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "Clone".to_string(),
+                implementing_type: "MyType".to_string(),
+                methods: HashMap::new(),
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        let resolver = TraitResolver::new(Arc::new(tracker));
+
+        // Create a blanket implementation with multiple constraints
+        let blanket_impl = crate::analyzers::trait_implementation_tracker::Implementation {
+            trait_name: "Debug".to_string(),
+            implementing_type: "T".to_string(),
+            methods: HashMap::new(),
+            generic_constraints: vec![
+                crate::analyzers::trait_implementation_tracker::WhereClauseItem {
+                    type_param: "T".to_string(),
+                    bounds: vec!["Clone".to_string(), "Send".to_string()].into(),
+                },
+            ]
+            .into(),
+            is_blanket: true,
+            is_negative: false,
+            module_path: Vector::new(),
+        };
+
+        // Should apply to String (implements both Clone and Send)
+        assert!(resolver.blanket_applies_to_type(&blanket_impl, "String"));
+
+        // Should not apply to MyType (only implements Clone, not Send)
+        assert!(!resolver.blanket_applies_to_type(&blanket_impl, "MyType"));
+
+        // Should not apply to unknown types
+        assert!(!resolver.blanket_applies_to_type(&blanket_impl, "UnknownType"));
+    }
+
+    #[test]
+    fn test_type_satisfies_bound_simple() {
+        let mut tracker = TraitImplementationTracker::new();
+
+        // Register trait implementations
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "Display".to_string(),
+                implementing_type: "String".to_string(),
+                methods: HashMap::new(),
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        let resolver = TraitResolver::new(Arc::new(tracker));
+
+        // Test simple trait bound
+        assert!(resolver.type_satisfies_bound("String", "Display"));
+        assert!(!resolver.type_satisfies_bound("String", "UnknownTrait"));
+        assert!(!resolver.type_satisfies_bound("UnknownType", "Display"));
+    }
+
+    #[test]
+    fn test_type_satisfies_bound_with_path() {
+        let mut tracker = TraitImplementationTracker::new();
+
+        // Register trait implementations
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "IntoIterator".to_string(),
+                implementing_type: "Vec<T>".to_string(),
+                methods: HashMap::new(),
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        let resolver = TraitResolver::new(Arc::new(tracker));
+
+        // Test trait bound with module path (should extract last part)
+        assert!(resolver.type_satisfies_bound("Vec<T>", "std::iter::IntoIterator"));
+        assert!(resolver.type_satisfies_bound("Vec<T>", "core::iter::IntoIterator"));
+        assert!(resolver.type_satisfies_bound("Vec<T>", "IntoIterator"));
+    }
+
+    #[test]
+    fn test_type_satisfies_bound_edge_cases() {
+        let tracker = Arc::new(TraitImplementationTracker::new());
+        let resolver = TraitResolver::new(tracker);
+
+        // Test edge cases
+        assert!(!resolver.type_satisfies_bound("", "Display"));
+        assert!(!resolver.type_satisfies_bound("String", ""));
+        assert!(!resolver.type_satisfies_bound("", ""));
+    }
 }
