@@ -321,6 +321,10 @@ pub struct DebtmapConfig {
     /// Role multipliers for semantic classification
     #[serde(default)]
     pub role_multipliers: Option<RoleMultipliers>,
+
+    /// Complexity thresholds for enhanced detection
+    #[serde(default)]
+    pub complexity_thresholds: Option<crate::complexity::threshold_manager::ComplexityThresholds>,
 }
 
 impl DebtmapConfig {
@@ -815,6 +819,14 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
             .unwrap_or_default(),
         Language::Unknown => LanguageFeatures::default(),
     }
+}
+
+/// Get complexity thresholds configuration
+pub fn get_complexity_thresholds() -> crate::complexity::threshold_manager::ComplexityThresholds {
+    get_config()
+        .complexity_thresholds
+        .clone()
+        .unwrap_or_default()
 }
 
 /// Get smart performance configuration

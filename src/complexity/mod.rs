@@ -1,10 +1,14 @@
 pub mod cognitive;
 pub mod cyclomatic;
 pub mod entropy;
+pub mod if_else_analyzer;
 pub mod match_patterns;
+pub mod message_generator;
 pub mod pattern_adjustments;
 pub mod patterns;
 pub mod python_patterns;
+pub mod recursive_detector;
+pub mod threshold_manager;
 pub mod token_classifier;
 pub mod visitor_detector;
 

@@ -316,6 +316,15 @@ We have completed the initial implementation with core functionality for analyzi
   - Function name pattern detection (visit_*, walk_*, traverse_*)
   - 80-90% false positive reduction for idiomatic visitor patterns
 
+- [x] **Spec 62**: Enhanced Match Detection and Messaging System
+  - Recursive AST traversal finds all match expressions including nested ones
+  - Intelligent complexity thresholds prevent flagging trivial functions
+  - Separation of coverage and complexity concerns in reporting
+  - Enhanced message generation with specific complexity sources
+  - If-else chain detection with refactoring pattern suggestions
+  - Code examples for common refactoring scenarios
+  - Configurable thresholds with role-based multipliers
+
 ## Pending Specs
 
 ### Enhancements

@@ -1,5 +1,6 @@
 use super::pattern_adjustments::calculate_cognitive_adjusted;
 use super::patterns::{analyze_patterns, PatternComplexity};
+use super::recursive_detector::RecursiveMatchDetector;
 use syn::{visit::Visit, Block, Expr};
 
 pub fn calculate_cognitive(block: &Block) -> u32 {
@@ -37,6 +38,34 @@ pub fn calculate_cognitive_with_patterns(block: &Block) -> (u32, PatternComplexi
         base_complexity
     };
     (adjusted_total, patterns)
+}
+
+/// Calculate cognitive complexity with recursive match detection
+pub fn calculate_cognitive_with_recursive_matches(
+    block: &Block,
+) -> (u32, Vec<super::recursive_detector::MatchLocation>) {
+    let mut visitor = CognitiveVisitor {
+        complexity: 0,
+        nesting_level: 0,
+    };
+    visitor.visit_block(block);
+
+    // Use recursive detector to find all matches
+    let mut detector = RecursiveMatchDetector::new();
+    let matches = detector.find_matches_in_block(block);
+
+    // Add pattern-based complexity
+    let patterns = analyze_patterns(block);
+    let base_complexity = visitor.complexity + patterns.total_complexity();
+
+    // Apply adjustments
+    let adjusted_total = if base_complexity > 2 {
+        calculate_cognitive_adjusted(block, base_complexity)
+    } else {
+        base_complexity
+    };
+
+    (adjusted_total, matches)
 }
 
 struct CognitiveVisitor {

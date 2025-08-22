@@ -17,7 +17,7 @@ impl MatchExpressionRecognizer {
 
     /// Check if a match arm is simple (return, break, single expression)
     #[allow(clippy::only_used_in_recursion)]
-    fn is_simple_arm(&self, body: &Expr) -> bool {
+    pub fn is_simple_arm(&self, body: &Expr) -> bool {
         match body {
             // Direct return, break, continue
             Expr::Return(_) | Expr::Break(_) | Expr::Continue(_) => true,

@@ -40,6 +40,10 @@ Complexity metric calculations:
 - `pattern_adjustments.rs`: Pattern-specific complexity adjustments (pattern matching, simple delegation)
 - `patterns.rs`: Modern pattern complexity detection
 - `visitor_detector.rs`: AST-based visitor pattern detection with logarithmic complexity scaling
+- `recursive_detector.rs`: Recursive AST traversal for finding all match expressions
+- `threshold_manager.rs`: Configurable complexity thresholds with role-based multipliers
+- `message_generator.rs`: Enhanced message generation with specific recommendations
+- `if_else_analyzer.rs`: If-else chain detection and refactoring pattern suggestions
 
 ### Debt (`src/debt/`)
 Technical debt detection:
