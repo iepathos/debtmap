@@ -515,8 +515,10 @@ pub fn create_unified_debt_item_with_aggregator(
     };
 
     // Calculate transitive coverage if direct coverage is available
+    // Use exact AST boundaries for more accurate coverage matching
     let transitive_coverage = coverage.and_then(|lcov| {
-        lcov.get_function_coverage_with_line(&func.file, &func.name, func.line)
+        let end_line = func.line + func.length.saturating_sub(1);
+        lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line)
             .map(|_direct| calculate_transitive_coverage(&func_id, call_graph, lcov))
     });
 
@@ -593,8 +595,10 @@ pub fn create_unified_debt_item_with_exclusions(
     };
 
     // Calculate transitive coverage if direct coverage is available
+    // Use exact AST boundaries for more accurate coverage matching
     let transitive_coverage = coverage.and_then(|lcov| {
-        lcov.get_function_coverage_with_line(&func.file, &func.name, func.line)
+        let end_line = func.line + func.length.saturating_sub(1);
+        lcov.get_function_coverage_with_bounds(&func.file, &func.name, func.line, end_line)
             .map(|_direct| calculate_transitive_coverage(&func_id, call_graph, lcov))
     });
 

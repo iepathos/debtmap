@@ -99,7 +99,13 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
     let callees = call_graph.get_callees(func_id);
     let meaningful_callees: Vec<_> = callees
         .iter()
-        .filter(|f| !is_std_or_utility_function(&f.name))
+        .filter(|f| {
+            // Filter out standard library and utility functions
+            !matches!(f.name.as_str(), "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from")
+                && !f.name.starts_with("std::")
+                && !f.name.starts_with("core::")
+                && !f.name.starts_with("alloc::")
+        })
         .collect();
 
     // Check if this is a functional chain (all calls are functional methods)
@@ -276,7 +282,13 @@ fn delegates_to_tested_functions(
     // Filter out standard library functions and common utilities
     let meaningful_callees: Vec<_> = callees
         .iter()
-        .filter(|f| !is_std_or_utility_function(&f.name))
+        .filter(|f| {
+            // Filter out standard library and utility functions
+            !matches!(f.name.as_str(), "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from")
+                && !f.name.starts_with("std::")
+                && !f.name.starts_with("core::")
+                && !f.name.starts_with("alloc::")
+        })
         .collect();
 
     // Orchestrators should coordinate MULTIPLE functions (at least 2)
@@ -359,68 +371,6 @@ fn is_io_orchestration(func: &FunctionMetrics) -> bool {
     has_strong_io_name && func.nesting <= 3
 }
 
-// Helper to identify standard library and utility functions that shouldn't count as delegation targets
-fn is_std_or_utility_function(name: &str) -> bool {
-    // Check the base name (after :: if present)
-    let base_name = name.rsplit("::").next().unwrap_or(name);
-
-    // Check if it's a functional chain method (like map, filter, collect)
-    let is_functional_chain = matches!(
-        base_name,
-        "map"
-            | "filter"
-            | "filter_map"
-            | "flat_map"
-            | "fold"
-            | "collect"
-            | "zip"
-            | "enumerate"
-            | "chain"
-            | "flatten"
-            | "skip"
-            | "take"
-            | "skip_while"
-            | "take_while"
-            | "any"
-            | "all"
-            | "find"
-            | "position"
-            | "for_each"
-            | "reduce"
-            | "scan"
-            | "inspect"
-            | "partition"
-            | "unzip"
-    );
-
-    // If it's a functional chain method on any type (e.g., LazyPipeline::map),
-    // it's a utility function, not orchestration
-    if is_functional_chain {
-        return true;
-    }
-
-    matches!(
-        base_name,
-        // Standard library functions from macro expansion
-        "format" | "write" | "print" | "println" |
-        // Common utility functions that are too generic  
-        "clone" | "to_string" | "into" | "from" | "as_ref" | "as_mut" |
-        "borrow" | "borrow_mut" | "deref" | "deref_mut" |
-        // Iterator methods that are utilities, not business logic
-        "iter" | "into_iter" | "iter_mut" |
-        // String manipulation utilities
-        "to_lowercase" | "to_uppercase" | "trim" | "split" | "join" |
-        // Common pattern checking functions
-        "starts_with" | "ends_with" | "contains" | "is_empty" | "len" |
-        // Memory management
-        "new" | "default" | "drop" | "unwrap" | "expect" |
-        "ok" | "err" | "some" | "none"
-    ) || name.starts_with("std::")
-        || name.starts_with("core::")
-        || name.starts_with("alloc::")
-        || name.ends_with("::iter")  // Any type's iter method
-        || name.ends_with("::any") // Any type's any method
-}
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
     // Get multipliers from configuration
@@ -582,47 +532,6 @@ mod tests {
         assert_eq!(get_role_multiplier(FunctionRole::Unknown), 1.0);
     }
 
-    #[test]
-    fn test_is_std_or_utility_function() {
-        // Test standard library functions from macro expansion
-        assert!(is_std_or_utility_function("format"));
-        assert!(is_std_or_utility_function("write"));
-        assert!(is_std_or_utility_function("print"));
-        assert!(is_std_or_utility_function("println"));
-
-        // Test std library paths
-        assert!(is_std_or_utility_function("std::fmt::format"));
-        assert!(is_std_or_utility_function("core::mem::drop"));
-        assert!(is_std_or_utility_function("alloc::vec::Vec"));
-
-        // Test common utility functions
-        assert!(is_std_or_utility_function("clone"));
-        assert!(is_std_or_utility_function("to_string"));
-        assert!(is_std_or_utility_function("into"));
-        assert!(is_std_or_utility_function("from"));
-
-        // Test iterator methods
-        assert!(is_std_or_utility_function("iter"));
-        assert!(is_std_or_utility_function("any"));
-        assert!(is_std_or_utility_function("filter"));
-        assert!(is_std_or_utility_function("collect"));
-
-        // Test qualified method names
-        assert!(is_std_or_utility_function("ContextMap::iter"));
-        assert!(is_std_or_utility_function("ContextMatcher::any"));
-        assert!(is_std_or_utility_function("Vec::iter"));
-
-        // Test string utilities
-        assert!(is_std_or_utility_function("to_lowercase"));
-        assert!(is_std_or_utility_function("starts_with"));
-        assert!(is_std_or_utility_function("ends_with"));
-
-        // Test non-std functions
-        assert!(!is_std_or_utility_function("calculate_dash_count"));
-        assert!(!is_std_or_utility_function("format_complexity_info"));
-        assert!(!is_std_or_utility_function("my_custom_function"));
-        assert!(!is_std_or_utility_function("is_entry_point_by_name"));
-    }
 
     #[test]
     fn test_formatting_function_not_orchestrator() {
