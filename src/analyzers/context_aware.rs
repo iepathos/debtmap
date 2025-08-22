@@ -219,4 +219,63 @@ mod tests {
         assert_eq!(adjust_priority(Priority::Low, -1), Priority::Low);
         assert_eq!(adjust_priority(Priority::Critical, -999), Priority::Low);
     }
+
+    #[test]
+    fn test_debt_type_to_pattern_security_with_input_validation() {
+        // Test Security debt type with "Input Validation" in message
+        let pattern = debt_type_to_pattern(&DebtType::Security, "Input Validation: missing checks");
+        assert_eq!(pattern, DebtPattern::InputValidation);
+
+        // Test with lowercase "input validation"
+        let pattern = debt_type_to_pattern(&DebtType::Security, "Need input validation here");
+        assert_eq!(pattern, DebtPattern::InputValidation);
+    }
+
+    #[test]
+    fn test_debt_type_to_pattern_security_without_input_validation() {
+        // Test Security debt type without input validation keywords
+        let pattern = debt_type_to_pattern(&DebtType::Security, "SQL injection vulnerability");
+        assert_eq!(pattern, DebtPattern::Security);
+
+        let pattern = debt_type_to_pattern(&DebtType::Security, "Potential XSS attack");
+        assert_eq!(pattern, DebtPattern::Security);
+    }
+
+    #[test]
+    fn test_debt_type_to_pattern_other_types() {
+        // Test Todo debt type
+        let pattern = debt_type_to_pattern(&DebtType::Todo, "Implement this feature");
+        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Todo));
+
+        // Test Fixme debt type
+        let pattern = debt_type_to_pattern(&DebtType::Fixme, "Fix this bug");
+        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Fixme));
+
+        // Test CodeSmell debt type
+        let pattern = debt_type_to_pattern(&DebtType::CodeSmell, "Code smell detected");
+        assert_eq!(pattern, DebtPattern::DebtType(DebtType::CodeSmell));
+
+        // Test Complexity debt type
+        let pattern = debt_type_to_pattern(&DebtType::Complexity, "High cyclomatic complexity");
+        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Complexity));
+
+        // Test Duplication debt type
+        let pattern = debt_type_to_pattern(&DebtType::Duplication, "Duplicate code detected");
+        assert_eq!(pattern, DebtPattern::DebtType(DebtType::Duplication));
+    }
+
+    #[test]
+    fn test_debt_type_to_pattern_edge_cases() {
+        // Test Security with empty message
+        let pattern = debt_type_to_pattern(&DebtType::Security, "");
+        assert_eq!(pattern, DebtPattern::Security);
+
+        // Test Security with partial match (should not trigger)
+        let pattern = debt_type_to_pattern(&DebtType::Security, "Input is valid");
+        assert_eq!(pattern, DebtPattern::Security);
+
+        // Test Security with different casing variations
+        let pattern = debt_type_to_pattern(&DebtType::Security, "INPUT VALIDATION required");
+        assert_eq!(pattern, DebtPattern::Security); // No match since contains() is case-sensitive
+    }
 }

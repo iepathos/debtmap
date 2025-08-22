@@ -20,7 +20,7 @@ pub struct ContextRule {
 }
 
 /// Pattern that a rule matches against
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DebtPattern {
     /// Match a specific debt type
     DebtType(DebtType),
