@@ -183,7 +183,7 @@ end_of_record
     // The lcov crate will fail on malformed input
     let result = parse_lcov_file(&file_path);
     assert!(result.is_err(), "Should fail on malformed LCOV data");
-    
+
     // Test with valid LCOV instead
     let valid_lcov = r#"SF:src/main.rs
 FN:10,valid_function
@@ -192,11 +192,11 @@ FNDA:5,valid_function
 FNDA:3,another_function
 end_of_record
 "#;
-    
+
     fs::write(&file_path, valid_lcov).unwrap();
     let result = parse_lcov_file(&file_path).unwrap();
     let functions = result.functions.get(Path::new("src/main.rs")).unwrap();
-    
+
     assert_eq!(functions.len(), 2);
     assert!(functions.iter().any(|f| f.name == "valid_function"));
     assert!(functions.iter().any(|f| f.name == "another_function"));

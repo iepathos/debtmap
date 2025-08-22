@@ -78,10 +78,6 @@ pub enum DebtType {
         cognitive: u32,
         usage_hints: Vec<String>,
     },
-    Orchestration {
-        delegates_to: Vec<String>,
-        coverage: Option<f64>,
-    },
     Duplication {
         instances: u32,
         total_lines: u32,

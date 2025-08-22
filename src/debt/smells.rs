@@ -284,8 +284,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
             FunctionMetrics {
                 name: "function_b".to_string(),
@@ -300,8 +300,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -328,8 +328,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
             FunctionMetrics {
                 name: "validate_user_data".to_string(),
@@ -344,8 +344,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -380,8 +380,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
             FunctionMetrics {
                 name: "func_b".to_string(),
@@ -396,8 +396,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
             FunctionMetrics {
                 name: "func_c".to_string(),
@@ -412,8 +412,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
             FunctionMetrics {
                 name: "small_func".to_string(),
@@ -428,8 +428,8 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
-            is_pure: None,
-            purity_confidence: None,
+                is_pure: None,
+                purity_confidence: None,
             },
         ];
         let smells = detect_data_clumps(&functions);

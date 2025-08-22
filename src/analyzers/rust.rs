@@ -469,7 +469,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     is_trait_method: false,       // Closures are not trait methods
                     in_test_module: self.in_test_module,
                     entropy_score,
-                    is_pure: None,                // TODO: Add purity detection for closures
+                    is_pure: None, // TODO: Add purity detection for closures
                     purity_confidence: None,
                 };
 
