@@ -195,7 +195,7 @@ fn get_pattern_corpus() -> Vec<PatternExample> {
 #[test]
 fn test_pattern_corpus_detection() {
     let analyzer = RustAnalyzer::new();
-    let entropy_analyzer = EntropyAnalyzer::new();
+    let mut entropy_analyzer = EntropyAnalyzer::new();
 
     for example in get_pattern_corpus() {
         println!("Testing pattern: {}", example.name);
@@ -306,7 +306,7 @@ fn test_false_positive_reduction() {
         // With entropy, effective complexity should be much lower
         if let Ok(file) = syn::parse_str::<syn::File>(validation_code) {
             if let Some(syn::Item::Fn(item_fn)) = file.items.first() {
-                let entropy_analyzer = EntropyAnalyzer::new();
+                let mut entropy_analyzer = EntropyAnalyzer::new();
                 let score = entropy_analyzer.calculate_entropy(&item_fn.block);
 
                 // Should detect the pattern and reduce complexity
@@ -415,7 +415,7 @@ fn test_javascript_entropy_integration() {
 
 #[test]
 fn test_entropy_score_ranges() {
-    let entropy_analyzer = EntropyAnalyzer::new();
+    let mut entropy_analyzer = EntropyAnalyzer::new();
 
     // Test empty block
     let empty_block: syn::Block = syn::parse_quote! {{}};
