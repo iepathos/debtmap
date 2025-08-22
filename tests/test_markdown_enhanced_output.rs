@@ -48,8 +48,6 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
         function_length: 50,
         cyclomatic_complexity: 15,
         cognitive_complexity: 20,
-        is_pure: None,
-        purity_confidence: None,
         entropy_details: None,
         is_pure: None,
         purity_confidence: None,
