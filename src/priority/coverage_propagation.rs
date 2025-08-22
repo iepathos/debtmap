@@ -223,7 +223,7 @@ mod tests {
 
         // Low complexity, no coverage = lower urgency (but still high due to no coverage)
         let urgency = calculate_coverage_urgency(&func_id, &graph, &coverage, 2);
-        assert!(urgency >= 7.0 && urgency <= 10.0);
+        assert!((7.0..=10.0).contains(&urgency));
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod tests {
         // Test 0% coverage - should be ~10.0
         let urgency_0 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(
-            urgency_0 >= 9.0 && urgency_0 <= 10.0,
+            (9.0..=10.0).contains(&urgency_0),
             "0% coverage should score ~10.0, got {}",
             urgency_0
         );
@@ -263,7 +263,7 @@ mod tests {
         let urgency_25 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         // With 25% coverage and our weighted calculation (0.7 direct weight), this should be around 7.5-9.0
         assert!(
-            urgency_25 >= 7.0 && urgency_25 <= 10.0,
+            (7.0..=10.0).contains(&urgency_25),
             "25% coverage should score 7.0-10.0, got {}",
             urgency_25
         );
@@ -282,7 +282,7 @@ mod tests {
 
         let urgency_50 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(
-            urgency_50 >= 5.0 && urgency_50 <= 7.5,
+            (5.0..=7.5).contains(&urgency_50),
             "50% coverage should score 5.0-7.5, got {}",
             urgency_50
         );
@@ -301,7 +301,7 @@ mod tests {
 
         let urgency_75 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(
-            urgency_75 >= 3.0 && urgency_75 <= 5.5,
+            (3.0..=5.5).contains(&urgency_75),
             "75% coverage should score 3.0-5.5, got {}",
             urgency_75
         );
@@ -320,7 +320,7 @@ mod tests {
 
         let urgency_90 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(
-            urgency_90 >= 1.0 && urgency_90 <= 4.5,
+            (1.0..=4.5).contains(&urgency_90),
             "90% coverage should score 1.0-4.5, got {}",
             urgency_90
         );
@@ -382,7 +382,7 @@ mod tests {
         // Complexity 1: ln(2)/3 + 0.5 = ~0.73 multiplier
         let urgency_c1 = calculate_coverage_urgency(&func_id, &graph, &coverage, 1);
         assert!(
-            urgency_c1 >= 6.5 && urgency_c1 <= 8.0,
+            (6.5..=8.0).contains(&urgency_c1),
             "Complexity 1 should score 6.5-8.0, got {}",
             urgency_c1
         );
@@ -390,7 +390,7 @@ mod tests {
         // Complexity 5: ln(6)/3 + 0.5 = ~1.09 multiplier
         let urgency_c5 = calculate_coverage_urgency(&func_id, &graph, &coverage, 5);
         assert!(
-            urgency_c5 >= 9.5 && urgency_c5 <= 10.0,
+            (9.5..=10.0).contains(&urgency_c5),
             "Complexity 5 should score 9.5-10.0, got {}",
             urgency_c5
         );
@@ -398,7 +398,7 @@ mod tests {
         // Complexity 10: should have ~1.0x multiplier
         let urgency_c10 = calculate_coverage_urgency(&func_id, &graph, &coverage, 10);
         assert!(
-            urgency_c10 >= 9.0 && urgency_c10 <= 10.0,
+            (9.0..=10.0).contains(&urgency_c10),
             "Complexity 10 should score ~10.0, got {}",
             urgency_c10
         );

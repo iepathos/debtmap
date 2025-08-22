@@ -5,8 +5,10 @@ mod tests {
     use syn::parse_str;
 
     fn create_test_classifier(enabled: bool) -> TokenClassifier {
-        let mut config = ClassificationConfig::default();
-        config.enabled = enabled;
+        let config = ClassificationConfig {
+            enabled,
+            ..Default::default()
+        };
         TokenClassifier::new(config)
     }
 
@@ -192,8 +194,10 @@ mod tests {
         };
 
         // Test with classification enabled
-        let mut config = ClassificationConfig::default();
-        config.enabled = true;
+        let config = ClassificationConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let mut analyzer = EntropyAnalyzer::new_with_config(1000, config);
 
         let score = analyzer.calculate_entropy(&item_fn.block);
@@ -240,8 +244,10 @@ mod tests {
             _ => panic!("Expected function"),
         };
 
-        let mut config = ClassificationConfig::default();
-        config.enabled = true;
+        let config = ClassificationConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let mut analyzer = EntropyAnalyzer::new_with_config(1000, config);
 
         let score1 = analyzer.calculate_entropy(&item_fn1.block);

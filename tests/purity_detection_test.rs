@@ -1,7 +1,5 @@
-use debtmap::analyzers::purity_detector::{ImpurityReason, PurityDetector};
 use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::analyzers::Analyzer;
-use debtmap::core::ast::Ast;
 use std::path::PathBuf;
 
 #[test]
