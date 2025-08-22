@@ -1,3 +1,6 @@
+use crate::complexity::message_generator::{
+    EnhancedComplexityMessage, Severity as ComplexitySeverity,
+};
 use crate::priority::UnifiedDebtItem;
 use colored::*;
 use std::fmt::Write;
