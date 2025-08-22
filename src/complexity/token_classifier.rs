@@ -417,14 +417,10 @@ impl TokenClassifier {
         TokenClass::MethodCall(CallType::Other)
     }
 
-    fn classify_field_access(&self, _token: &str, context: &TokenContext) -> TokenClass {
+    fn classify_field_access(&self, _token: &str, _context: &TokenContext) -> TokenClass {
         // Simple classification based on context
         // Could be enhanced with more sophisticated analysis
-        if context.parent_node_type == NodeType::Pattern {
-            TokenClass::FieldAccess(AccessType::Getter)
-        } else {
-            TokenClass::FieldAccess(AccessType::Getter)
-        }
+        TokenClass::FieldAccess(AccessType::Getter)
     }
 
     fn classify_local_var(&self, token: &str) -> TokenClass {

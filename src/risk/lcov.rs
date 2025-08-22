@@ -90,10 +90,8 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
 
             Record::EndOfRecord => {
                 // Collect all function start lines for boundary detection
-                let func_start_lines: Vec<usize> = file_functions
-                    .values()
-                    .map(|f| f.start_line)
-                    .collect();
+                let func_start_lines: Vec<usize> =
+                    file_functions.values().map(|f| f.start_line).collect();
 
                 // Calculate coverage percentage for functions based on line data
                 for func in file_functions.values_mut() {
@@ -103,12 +101,12 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                         .filter(|line| **line > func.start_line)
                         .min()
                         .copied();
-                    
+
                     let func_lines: Vec<_> = file_lines
                         .iter()
                         .filter(|(line, _)| {
-                            **line >= func.start_line && 
-                            next_func_line.map_or(true, |next| **line < next)
+                            **line >= func.start_line
+                                && next_func_line.is_none_or(|next| **line < next)
                         })
                         .collect();
 
@@ -181,7 +179,7 @@ impl LcovData {
             // Sort functions by start line to determine boundaries
             let mut sorted_funcs: Vec<_> = funcs.iter().collect();
             sorted_funcs.sort_by_key(|f| f.start_line);
-            
+
             for (i, func) in sorted_funcs.iter().enumerate() {
                 let start_line = func.start_line;
                 // Determine end line based on next function's start line
@@ -192,7 +190,7 @@ impl LcovData {
                     // Most functions are reasonably sized, so use start + 50 as a fallback
                     start_line + 50
                 };
-                
+
                 if start_line <= line && line <= end_line {
                     return Some(func.coverage_percentage / 100.0);
                 }
@@ -341,7 +339,7 @@ end_of_record
         let data = parse_lcov_file(temp_file.path()).unwrap();
         let file_path = PathBuf::from("/path/to/file.rs");
 
-        // Test fully covered function (100%) 
+        // Test fully covered function (100%)
         let coverage = data.get_function_coverage(&file_path, "fully_covered");
         assert_eq!(coverage, Some(1.0));
 

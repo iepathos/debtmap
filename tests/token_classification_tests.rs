@@ -251,8 +251,8 @@ mod tests {
         // Both should have scores, and they should be different
         assert!(score1.token_entropy >= 0.0);
         assert!(score2.token_entropy >= 0.0);
-        
-        // We can't guarantee which will be higher without deeper analysis, 
+
+        // We can't guarantee which will be higher without deeper analysis,
         // but we can verify that the scoring mechanism is working
         println!("Score1: {:?}", score1);
         println!("Score2: {:?}", score2);

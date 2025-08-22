@@ -123,7 +123,7 @@ impl EntropyAnalyzer {
             (
                 classified
                     .into_iter()
-                    .map(|c| TokenType::from_classified(c))
+                    .map(TokenType::from_classified)
                     .collect(),
                 weighted_entropy,
             )

@@ -101,8 +101,10 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
         .iter()
         .filter(|f| {
             // Filter out standard library and utility functions
-            !matches!(f.name.as_str(), "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from")
-                && !f.name.starts_with("std::")
+            !matches!(
+                f.name.as_str(),
+                "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from"
+            ) && !f.name.starts_with("std::")
                 && !f.name.starts_with("core::")
                 && !f.name.starts_with("alloc::")
         })
@@ -114,8 +116,10 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
         // If all non-utility calls are removed, this might be a functional chain
         let functional_chain = callees.iter().all(|f| {
             // Check for standard library and utility functions
-            matches!(f.name.as_str(), "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from")
-                || f.name.starts_with("std::")
+            matches!(
+                f.name.as_str(),
+                "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from"
+            ) || f.name.starts_with("std::")
                 || f.name.starts_with("core::")
                 || f.name.starts_with("alloc::")
                 || f.name.contains("Pipeline")
@@ -284,8 +288,10 @@ fn delegates_to_tested_functions(
         .iter()
         .filter(|f| {
             // Filter out standard library and utility functions
-            !matches!(f.name.as_str(), "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from")
-                && !f.name.starts_with("std::")
+            !matches!(
+                f.name.as_str(),
+                "format" | "write" | "print" | "println" | "clone" | "to_string" | "into" | "from"
+            ) && !f.name.starts_with("std::")
                 && !f.name.starts_with("core::")
                 && !f.name.starts_with("alloc::")
         })
@@ -370,7 +376,6 @@ fn is_io_orchestration(func: &FunctionMetrics) -> bool {
     // but not deep business logic
     has_strong_io_name && func.nesting <= 3
 }
-
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
     // Get multipliers from configuration
@@ -531,7 +536,6 @@ mod tests {
         assert_eq!(get_role_multiplier(FunctionRole::PatternMatch), 0.6);
         assert_eq!(get_role_multiplier(FunctionRole::Unknown), 1.0);
     }
-
 
     #[test]
     fn test_formatting_function_not_orchestrator() {
