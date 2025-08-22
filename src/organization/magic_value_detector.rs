@@ -219,3 +219,370 @@ impl<'ast> Visit<'ast> for LiteralVisitor {
         syn::visit::visit_expr(self, node);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn test_should_ignore_common_numeric_values() {
+        let detector = MagicValueDetector::new();
+
+        // Common values should be ignored by default
+        assert!(detector.should_ignore_numeric_value("0"));
+        assert!(detector.should_ignore_numeric_value("1"));
+        assert!(detector.should_ignore_numeric_value("-1"));
+        assert!(detector.should_ignore_numeric_value("100"));
+        assert!(detector.should_ignore_numeric_value("0.5"));
+
+        // Non-common values should not be ignored
+        assert!(!detector.should_ignore_numeric_value("42"));
+        assert!(!detector.should_ignore_numeric_value("3.14"));
+        assert!(!detector.should_ignore_numeric_value("256"));
+        assert!(!detector.should_ignore_numeric_value("-42"));
+    }
+
+    #[test]
+    fn test_should_not_ignore_when_disabled() {
+        let mut detector = MagicValueDetector::new();
+        detector.ignore_common_values = false;
+
+        // Even common values should not be ignored when disabled
+        assert!(!detector.should_ignore_numeric_value("0"));
+        assert!(!detector.should_ignore_numeric_value("1"));
+        assert!(!detector.should_ignore_numeric_value("100"));
+    }
+
+    #[test]
+    fn test_should_ignore_common_string_values() {
+        let detector = MagicValueDetector::new();
+
+        // Common strings should be ignored
+        assert!(detector.should_ignore_string_value(""));
+        assert!(detector.should_ignore_string_value(" "));
+        assert!(detector.should_ignore_string_value("\n"));
+        assert!(detector.should_ignore_string_value("\t"));
+
+        // Non-common strings should not be ignored
+        assert!(!detector.should_ignore_string_value("hello"));
+        assert!(!detector.should_ignore_string_value("config"));
+        assert!(!detector.should_ignore_string_value("error message"));
+    }
+
+    #[test]
+    fn test_value_to_identifier_conversion() {
+        let detector = MagicValueDetector::new();
+
+        assert_eq!(detector.value_to_identifier("42"), "42");
+        assert_eq!(detector.value_to_identifier("3.14"), "3_DOT_14");
+        assert_eq!(detector.value_to_identifier("-1"), "NEG_1");
+        assert_eq!(detector.value_to_identifier("hello world"), "HELLO_WORLD");
+        assert_eq!(detector.value_to_identifier("\"quoted\""), "QUOTED");
+        assert_eq!(detector.value_to_identifier("-3.5"), "NEG_3_DOT_5");
+    }
+
+    #[test]
+    fn test_infer_context_timeout() {
+        let detector = MagicValueDetector::new();
+
+        assert!(matches!(
+            detector.infer_context("timeout_value"),
+            ValueContext::Timeout
+        ));
+        assert!(matches!(
+            detector.infer_context("delay_ms"),
+            ValueContext::Timeout
+        ));
+        assert!(matches!(
+            detector.infer_context("duration_seconds"),
+            ValueContext::Timeout
+        ));
+    }
+
+    #[test]
+    fn test_infer_context_buffer_size() {
+        let detector = MagicValueDetector::new();
+
+        assert!(matches!(
+            detector.infer_context("buffer_size"),
+            ValueContext::BufferSize
+        ));
+        assert!(matches!(
+            detector.infer_context("capacity"),
+            ValueContext::BufferSize
+        ));
+        assert!(matches!(
+            detector.infer_context("max_size"),
+            ValueContext::BufferSize
+        ));
+    }
+
+    #[test]
+    fn test_infer_context_array_indexing() {
+        let detector = MagicValueDetector::new();
+
+        assert!(matches!(
+            detector.infer_context("arr[3]"),
+            ValueContext::ArrayIndexing
+        ));
+        assert!(matches!(
+            detector.infer_context("get_index"),
+            ValueContext::ArrayIndexing
+        ));
+    }
+
+    #[test]
+    fn test_infer_context_comparison() {
+        let detector = MagicValueDetector::new();
+
+        assert!(matches!(
+            detector.infer_context("value == 42"),
+            ValueContext::Comparison
+        ));
+        assert!(matches!(
+            detector.infer_context("x > 100"),
+            ValueContext::Comparison
+        ));
+        assert!(matches!(
+            detector.infer_context("y != 0"),
+            ValueContext::Comparison
+        ));
+    }
+
+    #[test]
+    fn test_infer_context_calculation() {
+        let detector = MagicValueDetector::new();
+
+        assert!(matches!(
+            detector.infer_context("x + 5"),
+            ValueContext::Calculation
+        ));
+        assert!(matches!(
+            detector.infer_context("y * 2"),
+            ValueContext::Calculation
+        ));
+        assert!(matches!(
+            detector.infer_context("z / 10"),
+            ValueContext::Calculation
+        ));
+    }
+
+    #[test]
+    fn test_suggest_constant_name() {
+        let detector = MagicValueDetector::new();
+
+        assert_eq!(
+            detector.suggest_constant_name("5000", &ValueContext::Timeout),
+            "TIMEOUT_5000_MS"
+        );
+        assert_eq!(
+            detector.suggest_constant_name("1024", &ValueContext::BufferSize),
+            "BUFFER_SIZE_1024"
+        );
+        assert_eq!(
+            detector.suggest_constant_name("3", &ValueContext::ArrayIndexing),
+            "INDEX_3"
+        );
+        assert_eq!(
+            detector.suggest_constant_name("100", &ValueContext::Comparison),
+            "THRESHOLD_100"
+        );
+        assert_eq!(
+            detector.suggest_constant_name("0.5", &ValueContext::Calculation),
+            "FACTOR_0_DOT_5"
+        );
+        assert_eq!(
+            detector.suggest_constant_name("42", &ValueContext::BusinessLogic),
+            "BUSINESS_RULE_42"
+        );
+    }
+
+    #[test]
+    fn test_estimate_maintainability_impact_high() {
+        let detector = MagicValueDetector::new();
+
+        let pattern = OrganizationAntiPattern::MagicValue {
+            value_type: MagicValueType::NumericLiteral,
+            value: "42".to_string(),
+            occurrence_count: 6,
+            suggested_constant_name: "CONSTANT_42".to_string(),
+            context: ValueContext::BusinessLogic,
+            locations: vec![],
+        };
+
+        assert!(matches!(
+            detector.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::High
+        ));
+    }
+
+    #[test]
+    fn test_estimate_maintainability_impact_medium() {
+        let detector = MagicValueDetector::new();
+
+        let pattern = OrganizationAntiPattern::MagicValue {
+            value_type: MagicValueType::NumericLiteral,
+            value: "100".to_string(),
+            occurrence_count: 3,
+            suggested_constant_name: "TIMEOUT_100_MS".to_string(),
+            context: ValueContext::Timeout,
+            locations: vec![],
+        };
+
+        assert!(matches!(
+            detector.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::Medium
+        ));
+    }
+
+    #[test]
+    fn test_estimate_maintainability_impact_low() {
+        let detector = MagicValueDetector::new();
+
+        let pattern = OrganizationAntiPattern::MagicValue {
+            value_type: MagicValueType::NumericLiteral,
+            value: "2".to_string(),
+            occurrence_count: 3,
+            suggested_constant_name: "FACTOR_2".to_string(),
+            context: ValueContext::Calculation,
+            locations: vec![],
+        };
+
+        assert!(matches!(
+            detector.estimate_maintainability_impact(&pattern),
+            MaintainabilityImpact::Low
+        ));
+    }
+
+    #[test]
+    fn test_detect_numeric_magic_values() {
+        let detector = MagicValueDetector::new();
+
+        let file: syn::File = parse_quote! {
+            fn calculate() {
+                let x = 42;
+                let y = 42;
+                let z = 42;
+            }
+        };
+
+        let patterns = detector.detect_anti_patterns(&file);
+
+        // Should detect 42 appearing 3 times
+        assert!(!patterns.is_empty());
+        let first_pattern = &patterns[0];
+
+        if let OrganizationAntiPattern::MagicValue {
+            value,
+            occurrence_count,
+            value_type,
+            ..
+        } = first_pattern
+        {
+            assert_eq!(value, "42");
+            assert_eq!(*occurrence_count, 3);
+            assert!(matches!(value_type, MagicValueType::NumericLiteral));
+        } else {
+            panic!("Expected MagicValue pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_string_magic_values() {
+        let detector = MagicValueDetector::new();
+
+        let file: syn::File = parse_quote! {
+            fn process() {
+                let msg1 = "error occurred";
+                let msg2 = "error occurred";
+                let msg3 = "error occurred";
+            }
+        };
+
+        let patterns = detector.detect_anti_patterns(&file);
+
+        // Should detect "error occurred" appearing 3 times
+        assert!(!patterns.is_empty());
+
+        let string_pattern = patterns.iter().find(|p| {
+            matches!(
+                p,
+                OrganizationAntiPattern::MagicValue {
+                    value_type: MagicValueType::StringLiteral,
+                    ..
+                }
+            )
+        });
+
+        assert!(string_pattern.is_some());
+
+        if let Some(OrganizationAntiPattern::MagicValue {
+            value,
+            occurrence_count,
+            ..
+        }) = string_pattern
+        {
+            assert_eq!(value, "error occurred");
+            assert_eq!(*occurrence_count, 3);
+        }
+    }
+
+    #[test]
+    fn test_ignores_common_values() {
+        let detector = MagicValueDetector::new();
+
+        let file: syn::File = parse_quote! {
+            fn common_values() {
+                let a = 0;
+                let b = 0;
+                let c = 1;
+                let d = 1;
+                let e = 1;
+            }
+        };
+
+        let patterns = detector.detect_anti_patterns(&file);
+
+        // Should not detect 0 and 1 as magic values (they're common)
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_threshold_behavior() {
+        let mut detector = MagicValueDetector::new();
+        detector.min_occurrence_threshold = 3;
+
+        let file: syn::File = parse_quote! {
+            fn threshold_test() {
+                let x = 99;
+                let y = 99;  // Only 2 occurrences
+            }
+        };
+
+        let patterns = detector.detect_anti_patterns(&file);
+
+        // Should not detect 99 since it appears only 2 times (below threshold of 3)
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_literal_visitor() {
+        let mut visitor = LiteralVisitor::new();
+
+        let expr: syn::Expr = parse_quote! { 42 };
+        visitor.visit_expr(&expr);
+        assert_eq!(visitor.numeric_literals.len(), 1);
+        assert_eq!(visitor.numeric_literals[0].0, "42");
+
+        let expr: syn::Expr = parse_quote! { 3.14 };
+        visitor.visit_expr(&expr);
+        assert_eq!(visitor.numeric_literals.len(), 2);
+        assert_eq!(visitor.numeric_literals[1].0, "3.14");
+
+        let expr: syn::Expr = parse_quote! { "hello" };
+        visitor.visit_expr(&expr);
+        assert_eq!(visitor.string_literals.len(), 1);
+        assert_eq!(visitor.string_literals[0].0, "hello");
+    }
+}
