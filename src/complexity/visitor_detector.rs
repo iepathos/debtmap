@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_visitor_trait_detection() {
-        let mut detector = VisitorPatternDetector::new();
+        let detector = VisitorPatternDetector::new();
 
         let impl_block: ItemImpl = parse_quote! {
             impl Visit for MyVisitor {
