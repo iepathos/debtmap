@@ -573,12 +573,12 @@ mod tests {
 
     #[test]
     fn test_role_multipliers() {
-        // Test with default configuration values
-        assert_eq!(get_role_multiplier(FunctionRole::PureLogic), 1.5);
-        assert_eq!(get_role_multiplier(FunctionRole::Orchestrator), 0.6);
-        assert_eq!(get_role_multiplier(FunctionRole::IOWrapper), 0.5);
-        assert_eq!(get_role_multiplier(FunctionRole::EntryPoint), 0.8);
-        assert_eq!(get_role_multiplier(FunctionRole::PatternMatch), 0.4);
+        // Test with updated configuration values (spec 63)
+        assert_eq!(get_role_multiplier(FunctionRole::PureLogic), 1.2);
+        assert_eq!(get_role_multiplier(FunctionRole::Orchestrator), 0.8);
+        assert_eq!(get_role_multiplier(FunctionRole::IOWrapper), 0.7);
+        assert_eq!(get_role_multiplier(FunctionRole::EntryPoint), 0.9);
+        assert_eq!(get_role_multiplier(FunctionRole::PatternMatch), 0.6);
         assert_eq!(get_role_multiplier(FunctionRole::Unknown), 1.0);
     }
 

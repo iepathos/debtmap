@@ -164,23 +164,23 @@ impl Default for RoleMultipliers {
 }
 
 fn default_pure_logic_multiplier() -> f64 {
-    1.5 // High priority for business logic
+    1.2 // Prioritized but not extreme (was 1.5)
 }
 
 fn default_orchestrator_multiplier() -> f64 {
-    0.6 // Moderate reduction instead of extreme 0.2
+    0.8 // Reduced but not severely (was 0.6)
 }
 
 fn default_io_wrapper_multiplier() -> f64 {
-    0.5 // Half reduction instead of extreme 0.1
+    0.7 // Minor reduction (was 0.5)
 }
 
 fn default_entry_point_multiplier() -> f64 {
-    0.8 // Slight reduction for entry points
+    0.9 // Slight reduction (was 0.8)
 }
 
 fn default_pattern_match_multiplier() -> f64 {
-    0.4 // Significant reduction but not extreme 0.1
+    0.6 // Moderate reduction (was 0.4)
 }
 
 fn default_unknown_multiplier() -> f64 {
