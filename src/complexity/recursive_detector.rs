@@ -1,5 +1,5 @@
 use super::match_patterns::MatchExpressionRecognizer;
-use syn::{visit::Visit, Block, Expr, ExprMatch, ImplItem, Item, ItemImpl, Stmt};
+use syn::{visit::Visit, Block, Expr, ExprMatch, ImplItem, Item, Stmt};
 
 /// Location information for a match expression found in the AST
 #[derive(Debug, Clone)]
@@ -35,6 +35,12 @@ pub struct RecursiveMatchDetector {
     complexity_context: ComplexityContext,
     in_closure: bool,
     in_async: bool,
+}
+
+impl Default for RecursiveMatchDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RecursiveMatchDetector {

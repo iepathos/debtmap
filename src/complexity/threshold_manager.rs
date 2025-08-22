@@ -304,8 +304,8 @@ mod tests {
 
         let mut high =
             FunctionMetrics::new("high".to_string(), std::path::PathBuf::from("test.rs"), 1);
-        high.cyclomatic = 10;
-        high.cognitive = 15;
+        high.cyclomatic = 8;
+        high.cognitive = 12;
         assert_eq!(
             thresholds.get_complexity_level(&high),
             ComplexityLevel::High

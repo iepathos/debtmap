@@ -26,6 +26,7 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - **Actionable Refactoring Guidance**: Provides specific recommendations like "extract nested conditions" or "split this 80-line function" rather than just flagging issues
 - **Quantified Impact**: Provides concrete metrics like "refactoring this will reduce complexity by 60%" or "testing this will reduce risk by 5%"
 - **Language-Agnostic Coverage Integration**: Works with any tool that generates LCOV format (Jest, pytest, cargo-tarpaulin, etc.)
+- **Context-Aware False Positive Reduction**: Intelligently reduces false positives by understanding code context and patterns (enabled by default)
 
 **Speed:**
 - Written in Rust for 10-100x faster analysis than Java/Python-based competitors
@@ -34,12 +35,16 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 
 ## Features
 
-- **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript with Go support coming soon
+- **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript
 - **Comprehensive debt detection** - Identifies technical debt across security, organization, testing, and resource management
 - **Security vulnerability detection** - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns
 - **Resource management analysis** - Identifies inefficient allocations, nested loops, and blocking I/O patterns
 - **Code organization analysis** - Detects god objects, feature envy, primitive obsession, and magic values
 - **Testing quality assessment** - Analyzes test complexity, flaky patterns, and assertion quality
+- **Context-aware analysis** - Reduces false positives through intelligent context detection (enabled by default)
+- **Enhanced scoring system** - Advanced scoring differentiation for better prioritization
+- **Macro expansion support** - Handles Rust macro expansions with configurable warnings and statistics
+- **Verbosity controls** - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail
 - **Resource management review** - Finds async/await misuse, resource leaks, and collection inefficiencies
 - **Coverage-based risk analysis** - Uniquely correlates complexity with test coverage to identify truly risky code
 - **ROI-driven testing recommendations** - Prioritizes testing efforts by calculating risk reduction per test case
@@ -110,6 +115,15 @@ debtmap analyze ./src --format json --output report.json
 # Analyze specific languages only
 debtmap analyze . --languages rust,python
 
+# Show only top 10 high-priority issues with verbose scoring
+debtmap analyze . --top 10 -vv
+
+# Focus on security issues only
+debtmap analyze . --security-enhanced
+
+# Group results by debt category
+debtmap analyze . --group-by-category --min-priority high
+
 # Initialize configuration file
 debtmap init
 
@@ -132,14 +146,33 @@ Options:
   --threshold-duplication <N>        Duplication threshold in lines [default: 50]
   --languages <LANGS>                Comma-separated list of languages to analyze
   --coverage-file <FILE>             LCOV coverage file for risk analysis (alias: --lcov)
-  --context                          Enable context-aware risk analysis
+  --context                          Enable context-aware risk analysis (alias: --enable-context)
   --context-providers <PROVIDERS>    Context providers to use (critical_path, dependency, git_history)
   --disable-context <PROVIDERS>      Disable specific context providers
-  --top <N>                          Show only top N priority items
+  --top <N>                          Show only top N priority items (alias: --head)
+  --tail <N>                         Show only bottom N priority items (lowest priority)
   --priorities-only                  Show priorities only (minimal output)
   --detailed                         Show detailed analysis with priority breakdown
   --semantic-off                     Disable semantic analysis (fallback mode)
-  --explain-score                    Show score breakdown for debugging
+  -v, --verbose                      Increase verbosity level (can be repeated: -v, -vv, -vvv)
+                                     -v: Show main score factors
+                                     -vv: Show detailed calculations
+                                     -vvv: Show all debug information
+  --verbose-macro-warnings           Show verbose macro parsing warnings
+  --show-macro-stats                 Show macro expansion statistics
+  --comprehensive                    Enable comprehensive debt analysis (all categories)
+  --security-only                    Enable security analysis only
+  --security-enhanced                Enable enhanced security analysis with additional detectors
+  --organization-only                Enable organization analysis only
+  --testing-only                     Enable testing quality analysis only
+  --resource-only                    Enable resource management analysis only
+  --group-by-category                Group output by debt category
+  --min-priority <PRIORITY>          Minimum priority to display (low, medium, high, critical)
+  --filter <CATEGORIES>              Filter by debt categories (comma-separated)
+  --enhanced-scoring                 Enable enhanced scoring differentiation (default: enabled)
+  --legacy-scoring                   Use legacy scoring algorithm
+  --exclude-tests                    Exclude test code from analysis
+  --no-context-aware                 Disable context-aware false positive reduction (enabled by default)
 ```
 
 ### `init`
@@ -166,11 +199,48 @@ Options:
   --context                           Enable context-aware risk analysis
   --context-providers <PROVIDERS>     Context providers to use
   --disable-context <PROVIDERS>       Disable specific context providers
-  --top <N>                           Show only top N priority items
+  --top <N>                           Show only top N priority items (alias: --head)
+  --tail <N>                          Show only bottom N priority items (lowest priority)
   --priorities-only                   Show priorities only (minimal output)
   --detailed                          Show detailed analysis
   --semantic-off                      Disable semantic analysis
-  --explain-score                     Show score breakdown
+  -v, --verbose                       Increase verbosity level (replaces deprecated --explain-score)
+  --verbose-macro-warnings            Show verbose macro parsing warnings
+  --show-macro-stats                  Show macro expansion statistics
+  --comprehensive                     Enable comprehensive debt analysis
+  --security-only                     Enable security analysis only
+  --security-enhanced                 Enable enhanced security analysis
+  --organization-only                 Enable organization analysis only
+  --testing-only                      Enable testing quality analysis only
+  --resource-only                     Enable resource management analysis only
+  --group-by-category                 Group output by debt category
+  --min-priority <PRIORITY>           Minimum priority to display
+  --filter <CATEGORIES>               Filter by debt categories
+  --enhanced-scoring                  Enable enhanced scoring differentiation (default)
+  --legacy-scoring                    Use legacy scoring algorithm
+  --exclude-tests                     Exclude test code from analysis
+  --no-context-aware                  Disable context-aware false positive reduction
+```
+
+## Verbosity Levels
+
+Control the amount of detail in the output using the `-v` flag:
+
+```bash
+# Standard output (no verbosity)
+debtmap analyze .
+
+# Level 1 (-v): Show main score factors
+debtmap analyze . -v
+
+# Level 2 (-vv): Show detailed calculations
+debtmap analyze . -vv
+
+# Level 3 (-vvv): Show all debug information
+debtmap analyze . -vvv
+
+# Show macro expansion warnings and statistics
+debtmap analyze . --verbose-macro-warnings --show-macro-stats
 ```
 
 ## Example Output
@@ -262,6 +332,46 @@ debtmap analyze . --lcov target/coverage/lcov.info --top 3
     "coverage_improvement": 18.5
   }
 }
+```
+
+## Analysis Modes
+
+Debtmap offers several specialized analysis modes for focused technical debt assessment:
+
+### Comprehensive Analysis (Default)
+Runs all analyzers across all categories to provide a complete technical debt assessment:
+```bash
+debtmap analyze . --comprehensive
+```
+
+### Category-Specific Analysis
+Focus on specific aspects of technical debt:
+```bash
+# Security-focused analysis
+debtmap analyze . --security-only
+debtmap analyze . --security-enhanced  # Includes additional security detectors
+
+# Code organization analysis
+debtmap analyze . --organization-only
+
+# Testing quality analysis
+debtmap analyze . --testing-only
+
+# Resource management analysis
+debtmap analyze . --resource-only
+```
+
+### Combined Filtering
+Combine multiple options for precise analysis:
+```bash
+# High-priority security issues only
+debtmap analyze . --security-enhanced --min-priority high --top 10
+
+# Group by category with coverage data
+debtmap analyze . --lcov coverage.info --group-by-category
+
+# Filter specific debt categories
+debtmap analyze . --filter Security,Complexity,TestQuality
 ```
 
 ## How Debtmap Works
@@ -417,6 +527,10 @@ Identifies similar code blocks that could be refactored into shared functions.
 - **Large files**: Files that have grown too large to maintain easily
 - **Circular dependencies**: Modules that depend on each other
 - **High coupling**: Excessive dependencies between modules
+- **TODO/FIXME/HACK markers**: Development debt markers requiring attention
+- **Code duplication**: Similar code blocks that could be refactored
+- **High complexity**: Functions with excessive cyclomatic or cognitive complexity
+- **Error swallowing**: Catch blocks that suppress errors without proper handling
 
 #### Security Anti-patterns
 - **Hardcoded secrets**: API keys, passwords, and tokens in source code
@@ -569,6 +683,15 @@ minimum_cyclomatic_complexity = 2     # Skip functions with cyclomatic <= this v
 minimum_cognitive_complexity = 3      # Skip functions with cognitive <= this value (default: 3)
 minimum_risk_score = 1.0              # Minimum risk score for Risk debt types (default: 1.0)
 
+[scoring]
+# Customize scoring weights (must sum to 1.0)
+coverage = 0.35                       # Weight for coverage factor
+complexity = 0.25                     # Weight for complexity factor
+semantic = 0.15                       # Weight for semantic factor
+dependency = 0.10                     # Weight for dependency criticality
+security = 0.10                       # Weight for security issues
+organization = 0.05                   # Weight for code organization issues
+
 [ignore]
 # File and directory patterns to ignore during analysis (glob patterns)
 patterns = [
@@ -608,6 +731,30 @@ api_files = [
     "src/public/*.rs",         # Glob pattern for multiple files
     "**/api/*.rs",             # Recursive glob pattern
 ]
+```
+
+### Customizing Scoring Weights
+
+You can customize how debtmap prioritizes different aspects of technical debt by adjusting the scoring weights in your configuration file. These weights must sum to 1.0:
+
+```toml
+[scoring]
+# Default weights (must sum to 1.0)
+coverage = 0.35      # Weight for test coverage gaps (35%)
+complexity = 0.25    # Weight for code complexity (25%)
+semantic = 0.15      # Weight for semantic importance (15%)
+dependency = 0.10    # Weight for dependency criticality (10%)
+security = 0.10      # Weight for security issues (10%)
+organization = 0.05  # Weight for code organization issues (5%)
+
+# Example: Prioritize security and coverage
+# [scoring]
+# security = 0.30
+# coverage = 0.30
+# complexity = 0.20
+# semantic = 0.10
+# dependency = 0.05
+# organization = 0.05
 ```
 
 ## Output Examples
@@ -815,13 +962,13 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 ## Roadmap
 
 ### Language Support
-- [x] Rust - Full support with AST parsing
+- [x] Rust - Full support with AST parsing and macro expansion
 - [x] Python - Full support via rustpython-parser
 - [x] JavaScript/TypeScript - Full support via tree-sitter
-- [ ] Go - In development (Q4 2025)
-- [ ] C/C++ - Planned (Q4 2025)
-- [ ] C# - Planned (Q1 2026)
-- [ ] Java - Planned (Q2 2026)
+- [ ] Go - Planned
+- [ ] C/C++ - Planned
+- [ ] C# - Planned
+- [ ] Java - Planned
 
 ### Core Features
 - [x] Inline suppression comments

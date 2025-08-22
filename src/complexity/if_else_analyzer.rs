@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use syn::{visit::Visit, Block, Expr, ExprIf, Pat, Stmt};
+use syn::{visit::Visit, Block, Expr, ExprIf, Stmt};
 
 /// Information about an if-else chain
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,6 +133,12 @@ enum ReturnType {
     Constructor,
     SideEffect,
     None,
+}
+
+impl Default for IfElseChainAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IfElseChainAnalyzer {
