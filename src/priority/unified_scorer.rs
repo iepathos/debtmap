@@ -1525,7 +1525,7 @@ fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, V
     }
 }
 
-/// Generate recommendation for infrastructure debt types (orchestration, duplication, risk)
+/// Generate recommendation for infrastructure debt types (duplication, risk)
 fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
     match debt_type {
         DebtType::Duplication {

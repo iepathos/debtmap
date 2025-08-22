@@ -524,6 +524,10 @@ pub struct EntropyConfig {
     #[serde(default = "default_entropy_threshold")]
     pub entropy_threshold: f64,
 
+    /// Whether to use smarter token classification (false by default for backward compatibility)
+    #[serde(default)]
+    pub use_classification: Option<bool>,
+
     /// Branch similarity threshold for detection (0.0-1.0)
     #[serde(default = "default_branch_threshold")]
     pub branch_threshold: f64,
@@ -553,6 +557,7 @@ impl Default for EntropyConfig {
             min_tokens: default_entropy_min_tokens(),
             pattern_threshold: default_entropy_pattern_threshold(),
             entropy_threshold: default_entropy_threshold(),
+            use_classification: None, // Default to None for backward compatibility
             branch_threshold: default_branch_threshold(),
             max_repetition_reduction: default_max_repetition_reduction(),
             max_entropy_reduction: default_max_entropy_reduction(),

@@ -3,6 +3,10 @@ use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 use syn::{visit::Visit, Block, Expr};
 
+use super::token_classifier::{
+    ClassificationConfig, ClassifiedToken, NodeType, TokenClass, TokenClassifier, TokenContext,
+};
+
 /// Cache entry with metadata for entropy scores
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheEntry {
@@ -23,13 +27,14 @@ pub struct CacheStats {
 }
 
 /// Entropy-based complexity analyzer using information theory
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EntropyAnalyzer {
     token_cache: HashMap<String, CacheEntry>,
     cache_hits: usize,
     cache_misses: usize,
     cache_evictions: usize,
     max_cache_size: usize,
+    token_classifier: TokenClassifier,
 }
 
 /// Score representing the entropy (randomness/variety) of code patterns
@@ -50,32 +55,84 @@ impl Default for EntropyAnalyzer {
     }
 }
 
+impl Clone for EntropyAnalyzer {
+    fn clone(&self) -> Self {
+        Self::new_with_config(self.max_cache_size, ClassificationConfig::default())
+    }
+}
+
 impl EntropyAnalyzer {
     pub fn new() -> Self {
+        let mut config = ClassificationConfig::default();
+        // Enable classification if entropy is enabled
+        let entropy_config = crate::config::get_entropy_config();
+        config.enabled =
+            entropy_config.enabled && entropy_config.use_classification.unwrap_or(false);
+
         Self {
             token_cache: HashMap::new(),
             cache_hits: 0,
             cache_misses: 0,
             cache_evictions: 0,
             max_cache_size: 1000, // Default max cache size
+            token_classifier: TokenClassifier::new(config),
         }
     }
 
     /// Create analyzer with custom cache size
     pub fn with_cache_size(max_cache_size: usize) -> Self {
+        let mut config = ClassificationConfig::default();
+        let entropy_config = crate::config::get_entropy_config();
+        config.enabled =
+            entropy_config.enabled && entropy_config.use_classification.unwrap_or(false);
+
         Self {
             token_cache: HashMap::new(),
             cache_hits: 0,
             cache_misses: 0,
             cache_evictions: 0,
             max_cache_size,
+            token_classifier: TokenClassifier::new(config),
+        }
+    }
+
+    /// Create analyzer with custom configuration
+    pub fn new_with_config(
+        max_cache_size: usize,
+        classification_config: ClassificationConfig,
+    ) -> Self {
+        Self {
+            token_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
+            cache_evictions: 0,
+            max_cache_size,
+            token_classifier: TokenClassifier::new(classification_config),
         }
     }
 
     /// Calculate entropy score for a function block
-    pub fn calculate_entropy(&self, block: &Block) -> EntropyScore {
-        let tokens = self.extract_tokens(block);
-        let entropy = self.shannon_entropy(&tokens);
+    pub fn calculate_entropy(&mut self, block: &Block) -> EntropyScore {
+        let entropy_config = crate::config::get_entropy_config();
+        let use_classification =
+            entropy_config.enabled && entropy_config.use_classification.unwrap_or(false);
+
+        let (_tokens, entropy) = if use_classification {
+            let classified = self.extract_classified_tokens(block);
+            let weighted_entropy = self.weighted_shannon_entropy(&classified);
+            (
+                classified
+                    .into_iter()
+                    .map(|c| TokenType::from_classified(c))
+                    .collect(),
+                weighted_entropy,
+            )
+        } else {
+            let tokens = self.extract_tokens(block);
+            let entropy = self.shannon_entropy(&tokens);
+            (tokens, entropy)
+        };
+
         let patterns = self.detect_pattern_repetition(block);
         let similarity = self.calculate_branch_similarity(block);
         let (unique_vars, max_nesting) = self.analyze_code_structure(block);
@@ -188,6 +245,55 @@ impl EntropyAnalyzer {
         let mut extractor = TokenExtractor::new();
         extractor.visit_block(block);
         extractor.tokens
+    }
+
+    /// Extract classified tokens from AST for weighted entropy calculation
+    fn extract_classified_tokens(&mut self, block: &Block) -> Vec<ClassifiedToken> {
+        let mut extractor = ClassifiedTokenExtractor::new(&mut self.token_classifier);
+        extractor.visit_block(block);
+        extractor.tokens
+    }
+
+    /// Calculate weighted Shannon entropy using classified tokens
+    fn weighted_shannon_entropy(&self, tokens: &[ClassifiedToken]) -> f64 {
+        if tokens.is_empty() || tokens.len() == 1 {
+            return 0.0;
+        }
+
+        // Group tokens by class and sum weights
+        let mut class_weights: HashMap<String, f64> = HashMap::new();
+        let mut total_weight = 0.0;
+
+        for token in tokens {
+            let class_key = format!("{:?}", token.class);
+            *class_weights.entry(class_key).or_insert(0.0) += token.weight;
+            total_weight += token.weight;
+        }
+
+        if total_weight == 0.0 {
+            return 0.0;
+        }
+
+        // Calculate weighted entropy
+        let entropy: f64 = class_weights
+            .values()
+            .map(|&weight| {
+                let p = weight / total_weight;
+                if p > 0.0 {
+                    -p * p.log2()
+                } else {
+                    0.0
+                }
+            })
+            .sum();
+
+        // Normalize by maximum possible entropy
+        let max_entropy = (class_weights.len() as f64).log2();
+        if max_entropy > 0.0 {
+            (entropy / max_entropy).min(1.0)
+        } else {
+            0.0
+        }
     }
 
     /// Calculate Shannon entropy of token distribution
@@ -383,9 +489,67 @@ enum LiteralType {
     Char,
 }
 
+impl TokenType {
+    /// Convert from classified token to simple token type for compatibility
+    fn from_classified(classified: ClassifiedToken) -> Self {
+        match classified.class {
+            TokenClass::Keyword(s) => TokenType::Keyword(s),
+            TokenClass::Operator(s) => TokenType::Operator(s),
+            TokenClass::ControlFlow(flow) => {
+                TokenType::Keyword(format!("{:?}", flow).to_lowercase())
+            }
+            TokenClass::Literal(lit) => TokenType::Literal(match lit {
+                super::token_classifier::LiteralCategory::Numeric => LiteralType::Number,
+                super::token_classifier::LiteralCategory::String => LiteralType::String,
+                super::token_classifier::LiteralCategory::Boolean => LiteralType::Bool,
+                super::token_classifier::LiteralCategory::Char => LiteralType::Char,
+                super::token_classifier::LiteralCategory::Null => LiteralType::String,
+            }),
+            _ => TokenType::Identifier(classified.raw_token),
+        }
+    }
+}
+
 /// Visitor to extract tokens from AST
 struct TokenExtractor {
     tokens: Vec<TokenType>,
+}
+
+/// Classified token extractor visitor that uses the token classifier
+struct ClassifiedTokenExtractor<'a> {
+    tokens: Vec<ClassifiedToken>,
+    classifier: &'a mut TokenClassifier,
+    scope_depth: usize,
+}
+
+impl<'a> ClassifiedTokenExtractor<'a> {
+    fn new(classifier: &'a mut TokenClassifier) -> Self {
+        Self {
+            tokens: Vec::new(),
+            classifier,
+            scope_depth: 0,
+        }
+    }
+
+    fn add_token(&mut self, token: &str, is_method: bool, is_field: bool, parent_type: NodeType) {
+        let context = TokenContext {
+            is_method_call: is_method,
+            is_field_access: is_field,
+            is_external: false, // Will be enhanced later
+            scope_depth: self.scope_depth,
+            parent_node_type: parent_type,
+        };
+
+        let class = self.classifier.classify(token, &context);
+        let weight = self.classifier.get_weight(&class);
+
+        self.tokens.push(ClassifiedToken::new(
+            class,
+            token.to_string(),
+            context,
+            weight,
+        ));
+    }
 }
 
 impl TokenExtractor {
@@ -463,6 +627,104 @@ impl<'ast> Visit<'ast> for TokenExtractor {
                     _ => LiteralType::String,
                 };
                 self.tokens.push(TokenType::Literal(lit_type));
+            }
+
+            _ => {}
+        }
+
+        syn::visit::visit_expr(self, expr);
+    }
+}
+
+impl<'ast> Visit<'ast> for ClassifiedTokenExtractor<'ast> {
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        match expr {
+            Expr::If(_) => self.add_token("if", false, false, NodeType::Statement),
+            Expr::While(_) => self.add_token("while", false, false, NodeType::Statement),
+            Expr::ForLoop(_) => self.add_token("for", false, false, NodeType::Statement),
+            Expr::Loop(_) => self.add_token("loop", false, false, NodeType::Statement),
+            Expr::Match(_) => self.add_token("match", false, false, NodeType::Statement),
+            Expr::Return(_) => self.add_token("return", false, false, NodeType::Statement),
+            Expr::Break(_) => self.add_token("break", false, false, NodeType::Statement),
+            Expr::Continue(_) => self.add_token("continue", false, false, NodeType::Statement),
+            Expr::Try(_) => self.add_token("try", false, false, NodeType::Statement),
+            Expr::Async(_) => self.add_token("async", false, false, NodeType::Expression),
+            Expr::Await(_) => self.add_token("await", false, false, NodeType::Expression),
+            Expr::Unsafe(_) => self.add_token("unsafe", false, false, NodeType::Block),
+
+            Expr::MethodCall(method) => {
+                self.add_token(
+                    &method.method.to_string(),
+                    true,
+                    false,
+                    NodeType::Expression,
+                );
+                syn::visit::visit_expr(self, expr);
+                return;
+            }
+
+            Expr::Field(field) => {
+                if let syn::Member::Named(ident) = &field.member {
+                    self.add_token(&ident.to_string(), false, true, NodeType::Expression);
+                }
+                syn::visit::visit_expr(self, expr);
+                return;
+            }
+
+            Expr::Path(path) => {
+                if let Some(segment) = path.path.segments.last() {
+                    self.add_token(
+                        &segment.ident.to_string(),
+                        false,
+                        false,
+                        NodeType::Expression,
+                    );
+                }
+            }
+
+            Expr::Binary(binary) => {
+                let op_str = match &binary.op {
+                    syn::BinOp::Add(_) => "+",
+                    syn::BinOp::Sub(_) => "-",
+                    syn::BinOp::Mul(_) => "*",
+                    syn::BinOp::Div(_) => "/",
+                    syn::BinOp::Rem(_) => "%",
+                    syn::BinOp::And(_) => "&&",
+                    syn::BinOp::Or(_) => "||",
+                    syn::BinOp::Eq(_) => "==",
+                    syn::BinOp::Ne(_) => "!=",
+                    syn::BinOp::Lt(_) => "<",
+                    syn::BinOp::Le(_) => "<=",
+                    syn::BinOp::Gt(_) => ">",
+                    syn::BinOp::Ge(_) => ">=",
+                    _ => "op",
+                };
+                self.add_token(op_str, false, false, NodeType::Expression);
+            }
+
+            Expr::Lit(lit) => {
+                let lit_str = match &lit.lit {
+                    syn::Lit::Str(_) => "\"string\"",
+                    syn::Lit::Int(i) => &i.to_string(),
+                    syn::Lit::Float(f) => &f.to_string(),
+                    syn::Lit::Bool(b) => {
+                        if b.value() {
+                            "true"
+                        } else {
+                            "false"
+                        }
+                    }
+                    syn::Lit::Char(_) => "'c'",
+                    _ => "literal",
+                };
+                self.add_token(lit_str, false, false, NodeType::Expression);
+            }
+
+            Expr::Block(_) => {
+                self.scope_depth += 1;
+                syn::visit::visit_expr(self, expr);
+                self.scope_depth -= 1;
+                return;
             }
 
             _ => {}

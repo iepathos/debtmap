@@ -136,7 +136,7 @@ fn test_entropy_for_switch_like_patterns() {
 fn test_entropy_analyzer_directly() {
     use syn::parse_quote;
 
-    let analyzer = EntropyAnalyzer::new();
+    let mut analyzer = EntropyAnalyzer::new();
 
     // Test with repetitive pattern
     let repetitive_block: syn::Block = parse_quote! {{
