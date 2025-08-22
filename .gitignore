@@ -1,4 +1,6 @@
-coverage.lcov
+
+
+*.lcov
 debtmap.json
 debtmap-after.json
 .debtmap
