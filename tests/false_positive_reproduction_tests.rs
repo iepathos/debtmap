@@ -1,7 +1,10 @@
+mod common;
+
+use common::subprocess_converter::analyze_as_text;
 use std::fs;
+use std::path::Path;
 /// Tests that reproduce the exact false positives from production
 /// These tests verify the bugs we're seeing with Input Validation in test functions
-use std::process::Command;
 
 #[test]
 fn test_exact_parameter_analyzer_false_positive() {
@@ -41,30 +44,16 @@ mod tests {
 
     fs::write("test_param_analyzer.rs", code).unwrap();
 
-    // Run with --no-context-aware (context-aware is now default)
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--",
-            "analyze",
-            "test_param_analyzer.rs",
-            "--no-context-aware",
-        ])
-        .output()
-        .expect("Failed to run debtmap");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Analyze with context-aware disabled
+    let stdout = analyze_as_text(Path::new("test_param_analyzer.rs"), false)
+        .expect("Failed to analyze without context-aware");
 
     // Check for Input Validation issues
     let has_input_validation = stdout.contains("Input Validation");
 
-    // Run with default (context-aware enabled)
-    let output_aware = Command::new("cargo")
-        .args(["run", "--", "analyze", "test_param_analyzer.rs"])
-        .output()
-        .expect("Failed to run debtmap");
-
-    let stdout_aware = String::from_utf8_lossy(&output_aware.stdout);
+    // Analyze with context-aware enabled
+    let stdout_aware = analyze_as_text(Path::new("test_param_analyzer.rs"), true)
+        .expect("Failed to analyze with context-aware");
     let has_input_validation_aware = stdout_aware.contains("Input Validation");
 
     fs::remove_file("test_param_analyzer.rs").ok();
@@ -114,12 +103,8 @@ mod tests {
 
     fs::write("test_call_graph.rs", code).unwrap();
 
-    let output = Command::new("cargo")
-        .args(["run", "--", "analyze", "test_call_graph.rs"])
-        .output()
-        .expect("Failed to run debtmap");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = analyze_as_text(Path::new("test_call_graph.rs"), true)
+        .expect("Failed to analyze test_call_graph.rs");
 
     fs::remove_file("test_call_graph.rs").ok();
 
@@ -153,12 +138,8 @@ impl GlobalTypeRegistry {
 
     fs::write("test_type_registry.rs", code).unwrap();
 
-    let output = Command::new("cargo")
-        .args(["run", "--", "analyze", "test_type_registry.rs"])
-        .output()
-        .expect("Failed to run debtmap");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = analyze_as_text(Path::new("test_type_registry.rs"), true)
+        .expect("Failed to analyze test_type_registry.rs");
 
     fs::remove_file("test_type_registry.rs").ok();
 
@@ -234,12 +215,8 @@ fn test_comprehensive_false_positive_patterns() {
         let filename = format!("test_{}.rs", name.replace(' ', "_"));
         fs::write(&filename, code).unwrap();
 
-        let output = Command::new("cargo")
-            .args(["run", "--", "analyze", &filename])
-            .output()
-            .expect("Failed to run debtmap");
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = analyze_as_text(Path::new(&filename), true)
+            .expect("Failed to analyze file");
 
         fs::remove_file(&filename).ok();
 

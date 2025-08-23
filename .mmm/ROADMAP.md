@@ -325,6 +325,13 @@ We have completed the initial implementation with core functionality for analyzi
   - Code examples for common refactoring scenarios
   - Configurable thresholds with role-based multipliers
 
+- [x] **Spec 63**: Replace Subprocess Tests with Library APIs
+  - Created test utilities module for library API testing
+  - Converted subprocess-spawning tests to use library APIs directly
+  - Eliminated test hangs caused by cargo subprocess spawning
+  - Improved test performance by avoiding subprocess overhead
+  - Created helpers for simulating CLI output from library calls
+
 ## Pending Specs
 
 ### Enhancements

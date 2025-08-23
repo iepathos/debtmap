@@ -1,5 +1,8 @@
+mod common;
+
+use common::subprocess_converter::analyze_as_text;
 use std::fs;
-use std::process::Command;
+use std::path::Path;
 
 #[test]
 fn test_context_aware_filters_test_functions() {
@@ -41,27 +44,13 @@ impl ParameterAnalyzer {
     // Write test file
     fs::write("test_context_aware_temp.rs", test_content).unwrap();
 
-    // Run with --no-context-aware
-    let output_without = Command::new("cargo")
-        .args([
-            "run",
-            "--",
-            "analyze",
-            "test_context_aware_temp.rs",
-            "--no-context-aware",
-        ])
-        .output()
-        .expect("Failed to run debtmap");
+    // Analyze with context-aware disabled
+    let stdout_without = analyze_as_text(Path::new("test_context_aware_temp.rs"), false)
+        .expect("Failed to analyze without context-aware");
 
-    let stdout_without = String::from_utf8_lossy(&output_without.stdout);
-
-    // Run with default (context-aware enabled)
-    let output_with = Command::new("cargo")
-        .args(["run", "--", "analyze", "test_context_aware_temp.rs"])
-        .output()
-        .expect("Failed to run debtmap");
-
-    let stdout_with = String::from_utf8_lossy(&output_with.stdout);
+    // Analyze with context-aware enabled
+    let stdout_with = analyze_as_text(Path::new("test_context_aware_temp.rs"), true)
+        .expect("Failed to analyze with context-aware");
 
     // Clean up
     fs::remove_file("test_context_aware_temp.rs").ok();
