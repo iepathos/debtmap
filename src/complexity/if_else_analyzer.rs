@@ -330,6 +330,7 @@ impl<'ast> Visit<'ast> for IfElseChainAnalyzer {
                     // Final else block
                     if let Some(builder) = &mut self.current_chain {
                         builder.has_final_else = true;
+                        builder.length += 1; // Count the final else as a branch
                         builder
                             .return_types
                             .push(Self::analyze_block_return(&block.block));
@@ -390,7 +391,7 @@ mod tests {
         let chains = analyzer.analyze_block(&block);
 
         assert_eq!(chains.len(), 1);
-        assert_eq!(chains[0].length, 3);
+        assert_eq!(chains[0].length, 4); // 3 if conditions + 1 else
         assert!(chains[0].has_final_else);
         assert_eq!(chains[0].return_pattern, ReturnPattern::SimpleValues);
     }

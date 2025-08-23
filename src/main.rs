@@ -59,6 +59,7 @@ struct AnalyzeConfig {
     exclude_tests: bool,
     #[allow(dead_code)]
     no_context_aware: bool,
+    threshold_preset: Option<cli::ThresholdPreset>,
 }
 
 struct ValidateConfig {
@@ -138,6 +139,7 @@ fn main() -> Result<()> {
             legacy_scoring,
             exclude_tests,
             no_context_aware,
+            threshold_preset,
         } => {
             // Set enhanced scoring environment variable
             if legacy_scoring {
@@ -182,6 +184,7 @@ fn main() -> Result<()> {
                 filter_categories,
                 exclude_tests,
                 no_context_aware,
+                threshold_preset,
             };
             handle_analyze(config)
         }
@@ -234,6 +237,19 @@ fn main() -> Result<()> {
 }
 
 fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
+    // Set threshold preset if provided
+    if let Some(preset) = config.threshold_preset {
+        match preset {
+            cli::ThresholdPreset::Strict => std::env::set_var("DEBTMAP_THRESHOLD_PRESET", "strict"),
+            cli::ThresholdPreset::Balanced => {
+                std::env::set_var("DEBTMAP_THRESHOLD_PRESET", "balanced")
+            }
+            cli::ThresholdPreset::Lenient => {
+                std::env::set_var("DEBTMAP_THRESHOLD_PRESET", "lenient")
+            }
+        }
+    }
+
     let languages = parse_languages(config.languages);
     let results = analyze_project(
         config.path.clone(),

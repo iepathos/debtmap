@@ -739,7 +739,7 @@ mod tests {
             }
         "#;
         let smells = detect_feature_envy(content, &path);
-        assert!(smells.len() > 0, "Should detect feature envy");
+        assert!(!smells.is_empty(), "Should detect feature envy");
         assert_eq!(smells[0].smell_type, SmellType::FeatureEnvy);
         assert!(smells[0].message.contains("customer"));
 

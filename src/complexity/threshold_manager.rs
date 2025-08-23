@@ -1,6 +1,17 @@
 use crate::core::FunctionMetrics;
 use serde::{Deserialize, Serialize};
 
+/// Preset threshold configurations
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum ThresholdPreset {
+    /// Strict thresholds for high code quality standards
+    Strict,
+    /// Balanced thresholds for typical projects
+    Balanced,
+    /// Lenient thresholds for legacy or complex domains
+    Lenient,
+}
+
 /// Complexity threshold configuration for determining when to flag functions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplexityThresholds {
@@ -105,18 +116,51 @@ pub enum ComplexityLevel {
 }
 
 impl ComplexityThresholds {
+    /// Create thresholds from a preset configuration
+    pub fn from_preset(preset: ThresholdPreset) -> Self {
+        match preset {
+            ThresholdPreset::Strict => Self {
+                minimum_total_complexity: 5,
+                minimum_cyclomatic_complexity: 3,
+                minimum_cognitive_complexity: 7,
+                minimum_match_arms: 3,
+                minimum_if_else_chain: 2,
+                minimum_function_length: 15,
+                entry_point_multiplier: 1.2,
+                core_logic_multiplier: 1.0,
+                utility_multiplier: 0.6,
+                test_function_multiplier: 3.0,  // More lenient for test functions
+            },
+            ThresholdPreset::Balanced => Self::default(),
+            ThresholdPreset::Lenient => Self {
+                minimum_total_complexity: 15,
+                minimum_cyclomatic_complexity: 10,
+                minimum_cognitive_complexity: 20,
+                minimum_match_arms: 8,
+                minimum_if_else_chain: 5,
+                minimum_function_length: 50,
+                entry_point_multiplier: 2.0,
+                core_logic_multiplier: 1.0,
+                utility_multiplier: 1.0,
+                test_function_multiplier: 3.0,
+            },
+        }
+    }
+
     /// Check if a function should be flagged based on thresholds
     pub fn should_flag_function(&self, metrics: &FunctionMetrics, role: FunctionRole) -> bool {
         let multiplier = self.get_role_multiplier(role);
 
-        let adjusted_cyclomatic = (metrics.cyclomatic as f64 * multiplier) as u32;
-        let adjusted_cognitive = (metrics.cognitive as f64 * multiplier) as u32;
+        // Apply multiplier to thresholds (higher multiplier = more lenient)
+        let adjusted_cyclomatic_threshold = (self.minimum_cyclomatic_complexity as f64 * multiplier) as u32;
+        let adjusted_cognitive_threshold = (self.minimum_cognitive_complexity as f64 * multiplier) as u32;
+        let adjusted_total_threshold = (self.minimum_total_complexity as f64 * multiplier) as u32;
 
-        // Must exceed ALL minimum thresholds to be flagged
-        adjusted_cyclomatic >= self.minimum_cyclomatic_complexity
-            && adjusted_cognitive >= self.minimum_cognitive_complexity
+        // Must exceed ALL adjusted thresholds to be flagged
+        metrics.cyclomatic >= adjusted_cyclomatic_threshold
+            && metrics.cognitive >= adjusted_cognitive_threshold
             && metrics.length >= self.minimum_function_length
-            && (adjusted_cyclomatic + adjusted_cognitive) >= self.minimum_total_complexity
+            && (metrics.cyclomatic + metrics.cognitive) >= adjusted_total_threshold
     }
 
     /// Get the complexity level for given metrics

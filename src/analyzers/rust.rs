@@ -3,6 +3,10 @@ use crate::analyzers::Analyzer;
 use crate::complexity::{
     cognitive::calculate_cognitive_with_patterns,
     cyclomatic::{calculate_cyclomatic, calculate_cyclomatic_adjusted},
+    if_else_analyzer::{IfElseChain, IfElseChainAnalyzer},
+    message_generator::{generate_enhanced_message, EnhancedComplexityMessage},
+    recursive_detector::{MatchLocation, RecursiveMatchDetector},
+    threshold_manager::{ComplexityThresholds, ThresholdPreset},
 };
 use crate::core::{
     ast::{Ast, RustAst},
@@ -29,12 +33,24 @@ use syn::{visit::Visit, Item};
 
 pub struct RustAnalyzer {
     complexity_threshold: u32,
+    enhanced_thresholds: ComplexityThresholds,
+    use_enhanced_detection: bool,
 }
 
 impl RustAnalyzer {
     pub fn new() -> Self {
         Self {
             complexity_threshold: 10,
+            enhanced_thresholds: ComplexityThresholds::from_preset(ThresholdPreset::Balanced),
+            use_enhanced_detection: true,
+        }
+    }
+
+    pub fn with_threshold_preset(preset: ThresholdPreset) -> Self {
+        Self {
+            complexity_threshold: 10,
+            enhanced_thresholds: ComplexityThresholds::from_preset(preset),
+            use_enhanced_detection: true,
         }
     }
 }
@@ -53,7 +69,12 @@ impl Analyzer for RustAnalyzer {
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
         match ast {
-            Ast::Rust(rust_ast) => analyze_rust_file(rust_ast, self.complexity_threshold),
+            Ast::Rust(rust_ast) => analyze_rust_file(
+                rust_ast,
+                self.complexity_threshold,
+                &self.enhanced_thresholds,
+                self.use_enhanced_detection,
+            ),
             _ => FileMetrics {
                 path: PathBuf::new(),
                 language: Language::Rust,
@@ -77,10 +98,16 @@ pub fn extract_rust_call_graph(ast: &RustAst) -> CallGraph {
 
 // Expansion function removed - now using enhanced token parsing instead
 
-fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
+fn analyze_rust_file(
+    ast: &RustAst,
+    threshold: u32,
+    enhanced_thresholds: &ComplexityThresholds,
+    _use_enhanced: bool,
+) -> FileMetrics {
     let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
     let mut visitor = FunctionVisitor::new(ast.path.clone(), source_content.clone());
     visitor.file_ast = Some(ast.file.clone());
+    visitor.enhanced_thresholds = enhanced_thresholds.clone();
     visitor.visit_file(&ast.file);
 
     let debt_items = create_debt_items(
@@ -89,6 +116,7 @@ fn analyze_rust_file(ast: &RustAst, threshold: u32) -> FileMetrics {
         threshold,
         &visitor.functions,
         &source_content,
+        &visitor.enhanced_analysis,
     );
     let dependencies = extract_dependencies(&ast.file);
 
@@ -117,6 +145,7 @@ fn create_debt_items(
     threshold: u32,
     functions: &[FunctionMetrics],
     source_content: &str,
+    enhanced_analysis: &[EnhancedFunctionAnalysis],
 ) -> Vec<DebtItem> {
     let suppression_context = parse_suppression_comments(source_content, Language::Rust, path);
 
@@ -129,6 +158,7 @@ fn create_debt_items(
         functions,
         source_content,
         &suppression_context,
+        enhanced_analysis,
     )
 }
 
@@ -139,9 +169,10 @@ fn collect_all_rust_debt_items(
     functions: &[FunctionMetrics],
     source_content: &str,
     suppression_context: &SuppressionContext,
+    enhanced_analysis: &[EnhancedFunctionAnalysis],
 ) -> Vec<DebtItem> {
     [
-        extract_debt_items(file, path, threshold, functions),
+        extract_debt_items_with_enhanced(file, path, threshold, functions, enhanced_analysis),
         find_todos_and_fixmes_with_suppression(source_content, path, Some(suppression_context)),
         find_code_smells_with_suppression(source_content, path, Some(suppression_context)),
         extract_rust_module_smell_items(path, source_content, suppression_context),
@@ -194,6 +225,15 @@ fn report_rust_unclosed_blocks(suppression_context: &SuppressionContext) {
         });
 }
 
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+struct EnhancedFunctionAnalysis {
+    function_name: String,
+    matches: Vec<MatchLocation>,
+    if_else_chains: Vec<IfElseChain>,
+    enhanced_message: Option<EnhancedComplexityMessage>,
+}
+
 struct FunctionVisitor {
     functions: Vec<FunctionMetrics>,
     current_file: PathBuf,
@@ -204,6 +244,8 @@ struct FunctionVisitor {
     current_impl_type: Option<String>,
     current_impl_is_trait: bool,
     file_ast: Option<syn::File>,
+    enhanced_analysis: Vec<EnhancedFunctionAnalysis>,
+    enhanced_thresholds: ComplexityThresholds,
 }
 
 impl FunctionVisitor {
@@ -229,6 +271,8 @@ impl FunctionVisitor {
             current_impl_type: None,
             current_impl_is_trait: false,
             file_ast: None,
+            enhanced_analysis: Vec::new(),
+            enhanced_thresholds: ComplexityThresholds::from_preset(ThresholdPreset::Balanced),
         }
     }
 
@@ -249,12 +293,22 @@ impl FunctionVisitor {
         let entropy_score = Self::calculate_entropy_if_enabled(&item_fn.block);
         let (is_pure, purity_confidence) = Self::detect_purity(item_fn);
 
+        let cyclomatic = self.calculate_cyclomatic_with_visitor(&item_fn.block, item_fn);
+        let cognitive = self.calculate_cognitive_with_visitor(&item_fn.block, item_fn);
+
+        // Perform enhanced complexity analysis
+        let mut match_detector = RecursiveMatchDetector::new();
+        let matches = match_detector.find_matches_in_block(&item_fn.block);
+
+        let mut if_else_analyzer = IfElseChainAnalyzer::new();
+        let if_else_chains = if_else_analyzer.analyze_block(&item_fn.block);
+
         let metrics = FunctionMetrics {
-            name,
+            name: name.clone(),
             file: self.current_file.clone(),
             line,
-            cyclomatic: self.calculate_cyclomatic_with_visitor(&item_fn.block, item_fn),
-            cognitive: self.calculate_cognitive_with_visitor(&item_fn.block, item_fn),
+            cyclomatic,
+            cognitive,
             nesting: calculate_nesting(&item_fn.block),
             length: count_function_lines(item_fn),
             is_test,
@@ -265,6 +319,43 @@ impl FunctionVisitor {
             is_pure,
             purity_confidence,
         };
+
+        // Check if function should be flagged based on enhanced thresholds
+        let role = if is_test {
+            crate::complexity::threshold_manager::FunctionRole::Test
+        } else if name == "main" {
+            crate::complexity::threshold_manager::FunctionRole::EntryPoint
+        } else {
+            crate::complexity::threshold_manager::FunctionRole::CoreLogic
+        };
+
+        if self
+            .enhanced_thresholds
+            .should_flag_function(&metrics, role.clone())
+        {
+            // Generate enhanced message for complex functions
+            let enhanced_msg = generate_enhanced_message(
+                &metrics,
+                &matches,
+                &if_else_chains,
+                &self.enhanced_thresholds,
+            );
+
+            self.enhanced_analysis.push(EnhancedFunctionAnalysis {
+                function_name: name.clone(),
+                matches,
+                if_else_chains,
+                enhanced_message: Some(enhanced_msg),
+            });
+        } else {
+            // Store analysis even if not flagged, for statistics
+            self.enhanced_analysis.push(EnhancedFunctionAnalysis {
+                function_name: name.clone(),
+                matches,
+                if_else_chains,
+                enhanced_message: None,
+            });
+        }
 
         self.functions.push(metrics);
     }
@@ -591,6 +682,72 @@ fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
     }
 }
 
+fn extract_debt_items_with_enhanced(
+    _file: &syn::File,
+    _path: &Path,
+    threshold: u32,
+    functions: &[FunctionMetrics],
+    enhanced_analysis: &[EnhancedFunctionAnalysis],
+) -> Vec<DebtItem> {
+    functions
+        .iter()
+        .filter(|func| func.is_complex(threshold))
+        .map(|func| {
+            // Find corresponding enhanced analysis if available
+            let enhanced = enhanced_analysis
+                .iter()
+                .find(|e| e.function_name == func.name);
+
+            if let Some(analysis) = enhanced {
+                if let Some(ref enhanced_msg) = analysis.enhanced_message {
+                    // Create debt item with enhanced message
+                    DebtItem {
+                        id: format!("complexity-{}-{}", func.file.display(), func.line),
+                        debt_type: DebtType::Complexity,
+                        priority: if func.cyclomatic > threshold * 2 {
+                            Priority::High
+                        } else {
+                            Priority::Medium
+                        },
+                        file: func.file.clone(),
+                        line: func.line,
+                        column: None,
+                        message: enhanced_msg.summary.clone(),
+                        context: Some(format_enhanced_context(enhanced_msg)),
+                    }
+                } else {
+                    create_complexity_debt_item(func, threshold)
+                }
+            } else {
+                create_complexity_debt_item(func, threshold)
+            }
+        })
+        .collect()
+}
+
+fn format_enhanced_context(msg: &EnhancedComplexityMessage) -> String {
+    let mut context = String::new();
+
+    // Add details
+    if !msg.details.is_empty() {
+        context.push_str("\n\nComplexity Issues:");
+        for detail in &msg.details {
+            context.push_str(&format!("\n  • {}", detail.description));
+        }
+    }
+
+    // Add recommendations
+    if !msg.recommendations.is_empty() {
+        context.push_str("\n\nRecommendations:");
+        for rec in &msg.recommendations {
+            context.push_str(&format!("\n  • {}: {}", rec.title, rec.description));
+        }
+    }
+
+    context
+}
+
+#[allow(dead_code)]
 fn extract_debt_items(
     _file: &syn::File,
     _path: &Path,

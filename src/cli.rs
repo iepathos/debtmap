@@ -1,6 +1,16 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ThresholdPreset {
+    /// Strict thresholds for high code quality standards
+    Strict,
+    /// Balanced thresholds for typical projects (default)
+    Balanced,
+    /// Lenient thresholds for legacy or complex domains
+    Lenient,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "debtmap")]
 #[command(about = "Code complexity and technical debt analyzer", long_about = None)]
@@ -143,6 +153,10 @@ pub enum Commands {
         /// Disable context-aware false positive reduction (enabled by default)
         #[arg(long = "no-context-aware")]
         no_context_aware: bool,
+
+        /// Complexity threshold preset (strict, balanced, lenient)
+        #[arg(long = "threshold-preset", value_enum)]
+        threshold_preset: Option<ThresholdPreset>,
     },
 
     /// Initialize configuration file
