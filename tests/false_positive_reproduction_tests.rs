@@ -215,8 +215,7 @@ fn test_comprehensive_false_positive_patterns() {
         let filename = format!("test_{}.rs", name.replace(' ', "_"));
         fs::write(&filename, code).unwrap();
 
-        let stdout = analyze_as_text(Path::new(&filename), true)
-            .expect("Failed to analyze file");
+        let stdout = analyze_as_text(Path::new(&filename), true).expect("Failed to analyze file");
 
         fs::remove_file(&filename).ok();
 

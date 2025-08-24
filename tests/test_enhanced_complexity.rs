@@ -213,9 +213,12 @@ fn test_depth_limit_protection() {
             let mut detector = RecursiveMatchDetector::new();
             let matches = detector.find_matches_in_block(&func.block);
             // Should complete without stack overflow and find some matches
-            assert!(matches.len() > 0, "Should find at least some matches");
+            assert!(!matches.is_empty(), "Should find at least some matches");
             // Should find a reasonable number of matches
-            assert!(matches.len() >= 10, "Should find a reasonable number of matches");
+            assert!(
+                matches.len() >= 10,
+                "Should find a reasonable number of matches"
+            );
             // The exact count depends on how depth is tracked
             eprintln!("Found {} matches out of 45 nested levels", matches.len());
         }

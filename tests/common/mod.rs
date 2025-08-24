@@ -1,4 +1,6 @@
 // Test utility module for debtmap integration tests
+#![allow(dead_code)]
+
 pub mod analysis_helpers;
 pub mod subprocess_converter;
 
@@ -6,7 +8,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 // Re-export commonly used types
-pub use analysis_helpers::{analyze_code_snippet, analyze_file_directly, run_with_timeout};
+#[allow(unused_imports)]
+pub use analysis_helpers::{analyze_code_snippet, analyze_file_directly};
 
 // Test fixture management
 #[derive(Debug, Clone)]

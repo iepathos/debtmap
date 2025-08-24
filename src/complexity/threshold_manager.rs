@@ -129,7 +129,7 @@ impl ComplexityThresholds {
                 entry_point_multiplier: 1.2,
                 core_logic_multiplier: 1.0,
                 utility_multiplier: 0.6,
-                test_function_multiplier: 3.0,  // More lenient for test functions
+                test_function_multiplier: 3.0, // More lenient for test functions
             },
             ThresholdPreset::Balanced => Self::default(),
             ThresholdPreset::Lenient => Self {
@@ -152,8 +152,10 @@ impl ComplexityThresholds {
         let multiplier = self.get_role_multiplier(role);
 
         // Apply multiplier to thresholds (higher multiplier = more lenient)
-        let adjusted_cyclomatic_threshold = (self.minimum_cyclomatic_complexity as f64 * multiplier) as u32;
-        let adjusted_cognitive_threshold = (self.minimum_cognitive_complexity as f64 * multiplier) as u32;
+        let adjusted_cyclomatic_threshold =
+            (self.minimum_cyclomatic_complexity as f64 * multiplier) as u32;
+        let adjusted_cognitive_threshold =
+            (self.minimum_cognitive_complexity as f64 * multiplier) as u32;
         let adjusted_total_threshold = (self.minimum_total_complexity as f64 * multiplier) as u32;
 
         // Must exceed ALL adjusted thresholds to be flagged

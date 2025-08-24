@@ -1,7 +1,7 @@
 mod common;
 
-use common::{analyze_code_snippet, create_test_file};
-use debtmap::core::{DebtType, Language};
+use common::analyze_code_snippet;
+use debtmap::core::Language;
 use tempfile::TempDir;
 
 #[test]
@@ -58,12 +58,11 @@ fn function_returning_result() -> Result<(), std::io::Error> {
 
     // Analyze using library API
     let content = std::fs::read_to_string(&test_file).expect("Failed to read test file");
-    let metrics = analyze_code_snippet(&content, Language::Rust)
-        .expect("Failed to analyze code");
-    
+    let _metrics = analyze_code_snippet(&content, Language::Rust).expect("Failed to analyze code");
+
     // Since analyze_code_snippet returns FileMetrics, we need to check for debt items
     // in a different way. For now, we'll use a simple check.
-    let debt_items = Vec::new(); // Placeholder - the debt detection needs to be integrated
+    let debt_items: Vec<serde_json::Value> = Vec::new(); // Placeholder - the debt detection needs to be integrated
 
     // Check if any items were found at all
     if debt_items.is_empty() {
@@ -153,12 +152,11 @@ fn another_function() -> Result<(), std::io::Error> {
 
     // Analyze using library API
     let content = std::fs::read_to_string(&test_file).expect("Failed to read test file");
-    let metrics = analyze_code_snippet(&content, Language::Rust)
-        .expect("Failed to analyze code");
-    
+    let _metrics = analyze_code_snippet(&content, Language::Rust).expect("Failed to analyze code");
+
     // Since analyze_code_snippet returns FileMetrics, we need to check for debt items
     // in a different way. For now, we'll use a simple check.
-    let debt_items = Vec::new(); // Placeholder - the debt detection needs to be integrated
+    let debt_items: Vec<serde_json::Value> = Vec::new(); // Placeholder - the debt detection needs to be integrated
 
     // Check if any items were found at all
     if debt_items.is_empty() {

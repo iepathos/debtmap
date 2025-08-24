@@ -198,7 +198,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                     }
                 }
                 self.depth_tracker -= 1;
-                return; // Prevent double-visiting
             }
             Expr::Closure(closure) => {
                 let was_in_closure = self.in_closure;
@@ -213,7 +212,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                 self.depth_tracker -= 1;
                 self.complexity_context.in_closure = was_in_closure;
                 self.in_closure = was_in_closure;
-                return; // Prevent double-visiting
             }
             Expr::Async(async_block) => {
                 let was_in_async = self.in_async;
@@ -228,7 +226,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                 self.depth_tracker -= 1;
                 self.complexity_context.in_async = was_in_async;
                 self.in_async = was_in_async;
-                return; // Prevent double-visiting
             }
             Expr::Block(expr_block) => {
                 self.depth_tracker += 1;
@@ -236,7 +233,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                     self.visit_block(&expr_block.block);
                 }
                 self.depth_tracker -= 1;
-                return; // Prevent double-visiting
             }
             Expr::If(if_expr) => {
                 self.depth_tracker += 1;
@@ -248,7 +244,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                     }
                 }
                 self.depth_tracker -= 1;
-                return; // Prevent double-visiting
             }
             Expr::While(while_expr) => {
                 self.depth_tracker += 1;
@@ -257,7 +252,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                     self.visit_block(&while_expr.body);
                 }
                 self.depth_tracker -= 1;
-                return; // Prevent double-visiting
             }
             Expr::ForLoop(for_loop) => {
                 self.depth_tracker += 1;
@@ -266,7 +260,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                     self.visit_block(&for_loop.body);
                 }
                 self.depth_tracker -= 1;
-                return; // Prevent double-visiting
             }
             Expr::Loop(loop_expr) => {
                 self.depth_tracker += 1;
@@ -274,7 +267,6 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
                     self.visit_block(&loop_expr.body);
                 }
                 self.depth_tracker -= 1;
-                return; // Prevent double-visiting
             }
             _ => {
                 // For other expressions, manually traverse common nested expressions
@@ -340,7 +332,7 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
         if !self.check_depth_limit() {
             return;
         }
-        
+
         for stmt in &block.stmts {
             if !self.check_depth_limit() {
                 break;
@@ -354,7 +346,7 @@ impl<'ast> Visit<'ast> for RecursiveMatchDetector {
         if !self.check_depth_limit() {
             return;
         }
-        
+
         match stmt {
             Stmt::Expr(expr, _) => {
                 self.visit_expr(expr);

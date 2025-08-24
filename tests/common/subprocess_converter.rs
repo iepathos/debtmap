@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use debtmap::config::DebtmapConfig;
-use debtmap::core::{AnalysisResults, Language};
+use debtmap::core::DebtType;
 use debtmap::io::walker::find_project_files_with_config;
 use serde_json::Value;
 use std::path::Path;
@@ -11,9 +11,9 @@ use std::path::Path;
 /// Simulates running `cargo run -- analyze <path> --format json`
 /// Returns JSON-like structure similar to CLI output
 pub fn analyze_as_json(path: &Path) -> Result<Value> {
-    let config = DebtmapConfig::default();
+    let _config = DebtmapConfig::default();
     let results = super::analyze_file_directly(path)?;
-    
+
     // Convert results to JSON format similar to CLI output
     let json = serde_json::json!({
         "path": path.to_str().unwrap_or(""),
@@ -29,7 +29,7 @@ pub fn analyze_as_json(path: &Path) -> Result<Value> {
         }).collect::<Vec<_>>(),
         "total_debt_items": results.technical_debt.items.len(),
     });
-    
+
     Ok(json)
 }
 
@@ -42,25 +42,25 @@ pub fn analyze_as_text(path: &Path, context_aware: bool) -> Result<String> {
     } else {
         std::env::set_var("DEBTMAP_CONTEXT_AWARE", "false");
     }
-    
+
     let results = super::analyze_file_directly(path)?;
-    
+
     // Clean up env var
     std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
-    
+
     // Format results as text similar to CLI output
     let mut output = String::new();
-    
+
     for item in &results.technical_debt.items {
         let type_str = match &item.debt_type {
-            debtmap::core::DebtType::Security => "SECURITY",
-            debtmap::core::DebtType::Complexity => "COMPLEXITY",
-            debtmap::core::DebtType::Todo => "TODO",
-            debtmap::core::DebtType::Smell(_) => "SMELL",
-            debtmap::core::DebtType::Duplication => "DUPLICATION",
+            DebtType::Security => "SECURITY",
+            DebtType::Complexity => "COMPLEXITY",
+            DebtType::Todo => "TODO",
+            DebtType::CodeSmell => "SMELL",
+            DebtType::Duplication => "DUPLICATION",
             _ => "DEBT",
         };
-        
+
         output.push_str(&format!(
             "{}: {} at {}:{}\n",
             type_str,
@@ -69,41 +69,45 @@ pub fn analyze_as_text(path: &Path, context_aware: bool) -> Result<String> {
             item.line
         ));
     }
-    
+
     if results.technical_debt.items.is_empty() {
         output.push_str("No issues found.\n");
     } else {
-        output.push_str(&format!("\nTOTAL DEBT SCORE: {}\n", results.technical_debt.items.len()));
+        output.push_str(&format!(
+            "\nTOTAL DEBT SCORE: {}\n",
+            results.technical_debt.items.len()
+        ));
     }
-    
+
     Ok(output)
 }
 
 /// Analyze multiple files in a directory
 pub fn analyze_directory(dir: &Path, context_aware: bool) -> Result<String> {
     let config = DebtmapConfig::default();
-    
+
     // Set context-aware flag
     if context_aware {
         std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
     } else {
         std::env::set_var("DEBTMAP_CONTEXT_AWARE", "false");
     }
-    
-    let files = find_project_files_with_config(dir, &config)?;
+
+    let files = find_project_files_with_config(dir, vec![], &config)?;
     let mut total_output = String::new();
     let mut total_debt_items = 0;
-    
-    for file in files.iter().take(10) { // Limit for performance in tests
+
+    for file in files.iter().take(10) {
+        // Limit for performance in tests
         if let Ok(results) = super::analyze_file_directly(file) {
             total_debt_items += results.technical_debt.items.len();
-            
+
             for item in &results.technical_debt.items {
                 let type_str = match &item.debt_type {
-                    debtmap::core::DebtType::Security => "SECURITY",
+                    DebtType::Security => "SECURITY",
                     _ => "DEBT",
                 };
-                
+
                 total_output.push_str(&format!(
                     "{}: {} at {}:{}\n",
                     type_str,
@@ -114,10 +118,10 @@ pub fn analyze_directory(dir: &Path, context_aware: bool) -> Result<String> {
             }
         }
     }
-    
+
     // Clean up env var
     std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
-    
+
     total_output.push_str(&format!("\nTOTAL DEBT ITEMS: {}\n", total_debt_items));
     Ok(total_output)
 }
