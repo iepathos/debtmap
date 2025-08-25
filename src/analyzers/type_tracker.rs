@@ -883,7 +883,10 @@ mod tests {
         let code = "let x: HashMap<String, i32> = HashMap::new();";
         let stmt: syn::Stmt = syn::parse_str(code).unwrap();
         if let syn::Stmt::Local(local) = stmt {
-            let result = extract_type_from_pattern(&local.pat, &local.init.as_ref().map(|init| Box::new(*init.expr.clone())));
+            let result = extract_type_from_pattern(
+                &local.pat,
+                &local.init.as_ref().map(|init| Box::new(*init.expr.clone())),
+            );
             assert!(result.is_some());
             let resolved_type = result.unwrap();
             // The function currently only extracts the base type name without generics
@@ -898,7 +901,10 @@ mod tests {
         let code = "let graph = DependencyGraph::new();";
         let stmt: syn::Stmt = syn::parse_str(code).unwrap();
         if let syn::Stmt::Local(local) = stmt {
-            let result = extract_type_from_pattern(&local.pat, &local.init.as_ref().map(|init| Box::new(*init.expr.clone())));
+            let result = extract_type_from_pattern(
+                &local.pat,
+                &local.init.as_ref().map(|init| Box::new(*init.expr.clone())),
+            );
             assert!(result.is_some());
             let resolved_type = result.unwrap();
             assert_eq!(resolved_type.type_name, "DependencyGraph");
@@ -912,7 +918,10 @@ mod tests {
         let code = "let x;";
         let stmt: syn::Stmt = syn::parse_str(code).unwrap();
         if let syn::Stmt::Local(local) = stmt {
-            let result = extract_type_from_pattern(&local.pat, &local.init.as_ref().map(|init| Box::new(*init.expr.clone())));
+            let result = extract_type_from_pattern(
+                &local.pat,
+                &local.init.as_ref().map(|init| Box::new(*init.expr.clone())),
+            );
             assert!(result.is_none());
         }
     }

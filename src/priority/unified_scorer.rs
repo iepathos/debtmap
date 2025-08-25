@@ -4499,9 +4499,9 @@ mod tests {
     fn test_calculate_score_dampening_factor_no_dampening() {
         // Test case where no dampening should be applied
         let entropy_score = crate::complexity::entropy::EntropyScore {
-            token_entropy: 0.8, // Above threshold
+            token_entropy: 0.8,      // Above threshold
             pattern_repetition: 0.5, // Below threshold
-            branch_similarity: 0.5, // Below threshold
+            branch_similarity: 0.5,  // Below threshold
             effective_complexity: 1.0,
             unique_variables: 5,
             max_nesting: 2,
@@ -4523,7 +4523,10 @@ mod tests {
         };
 
         let factor = calculate_score_dampening_factor(&entropy_score, &config);
-        assert_eq!(factor, 1.0, "No dampening should be applied when all metrics are good");
+        assert_eq!(
+            factor, 1.0,
+            "No dampening should be applied when all metrics are good"
+        );
     }
 
     #[test]
@@ -4618,7 +4621,10 @@ mod tests {
         };
 
         let factor = calculate_score_dampening_factor(&entropy_score, &config);
-        assert!(factor < 1.0, "High branch similarity should cause dampening");
+        assert!(
+            factor < 1.0,
+            "High branch similarity should cause dampening"
+        );
         assert!(factor >= 0.7, "Dampening should be capped at 30% reduction");
     }
 
@@ -4626,9 +4632,9 @@ mod tests {
     fn test_calculate_score_dampening_factor_combined_issues() {
         // Test with multiple issues that should compound
         let entropy_score = crate::complexity::entropy::EntropyScore {
-            token_entropy: 0.2, // Low entropy
+            token_entropy: 0.2,      // Low entropy
             pattern_repetition: 0.8, // High repetition
-            branch_similarity: 0.8, // High branch similarity
+            branch_similarity: 0.8,  // High branch similarity
             effective_complexity: 1.0,
             unique_variables: 5,
             max_nesting: 2,
@@ -4651,7 +4657,10 @@ mod tests {
 
         let factor = calculate_score_dampening_factor(&entropy_score, &config);
         assert!(factor < 0.9, "Multiple issues should cause more dampening");
-        assert!(factor >= 0.7, "Dampening should still be capped at 30% reduction");
+        assert!(
+            factor >= 0.7,
+            "Dampening should still be capped at 30% reduction"
+        );
     }
 
     #[test]
@@ -4682,7 +4691,10 @@ mod tests {
         };
 
         let factor = calculate_score_dampening_factor(&entropy_score, &config);
-        assert!(factor > 0.7, "Partial weight should reduce dampening effect");
+        assert!(
+            factor > 0.7,
+            "Partial weight should reduce dampening effect"
+        );
         assert!(factor < 1.0, "Some dampening should still be applied");
     }
 
@@ -4690,9 +4702,9 @@ mod tests {
     fn test_calculate_score_dampening_factor_edge_cases() {
         // Test with extreme values at boundaries
         let entropy_score = crate::complexity::entropy::EntropyScore {
-            token_entropy: 0.0, // Minimum entropy
+            token_entropy: 0.0,      // Minimum entropy
             pattern_repetition: 1.0, // Maximum repetition
-            branch_similarity: 1.0, // Maximum similarity
+            branch_similarity: 1.0,  // Maximum similarity
             effective_complexity: 1.0,
             unique_variables: 0,
             max_nesting: 10,
@@ -4714,7 +4726,10 @@ mod tests {
         };
 
         let factor = calculate_score_dampening_factor(&entropy_score, &config);
-        assert_eq!(factor, 0.7, "Maximum dampening should be exactly 30% reduction");
+        assert_eq!(
+            factor, 0.7,
+            "Maximum dampening should be exactly 30% reduction"
+        );
     }
 
     #[test]
@@ -4745,12 +4760,15 @@ mod tests {
         };
 
         let factor1 = calculate_score_dampening_factor(&entropy_score, &config);
-        
+
         // Increase repetition
         entropy_score.pattern_repetition = 0.9;
         let factor2 = calculate_score_dampening_factor(&entropy_score, &config);
-        
+
         assert!(factor1 < 1.0, "Above threshold should cause some dampening");
-        assert!(factor2 < factor1, "Higher repetition should cause more dampening");
+        assert!(
+            factor2 < factor1,
+            "Higher repetition should cause more dampening"
+        );
     }
 }

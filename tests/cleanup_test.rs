@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod cleanup_tests {
-    use std::path::PathBuf;
     use std::collections::HashSet;
+    use std::path::PathBuf;
 
     // Mock function to demonstrate testing pattern
     fn cleanup_worktrees(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
