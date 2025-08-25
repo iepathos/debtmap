@@ -1,6 +1,6 @@
 ---
 name: mmm-compare-debt-results
-description: Compare before/after debtmap results to measure debt reduction improvements
+description: Compare before/after debtmap results and create a commit documenting improvements
 args:
   - name: before
     required: true
@@ -17,12 +17,15 @@ args:
   - name: failed
     required: false
     description: Number of items that failed to fix
+  - name: total
+    required: false
+    description: Total number of items processed in the map phase
 ---
 
-# Compare Debt Results
+# Compare Debt Results and Create Commit
 
 ## Purpose
-Analyze the difference between before and after debtmap results to quantify technical debt improvements made during the MapReduce workflow.
+Analyze the difference between before and after debtmap results to quantify technical debt improvements made during the MapReduce workflow, then create a git commit documenting these improvements.
 
 ## Usage
 ```
@@ -90,6 +93,24 @@ Analyze the difference between before and after debtmap results to quantify tech
    - NEW: src/api.rs::send_data: score 38
    ```
 
+7. **Create Git Commit**
+   - Stage all changes with `git add -A`
+   - Create a commit with the message:
+   ```
+   fix: eliminate <successful> technical debt items via MapReduce
+   
+   Processed <total> debt items in parallel:
+   - Successfully fixed: <successful> items
+   - Failed to fix: <failed> items
+   
+   Technical Debt Improvements:
+   [Include the generated debt analysis summary from step 5]
+   
+   [Include any regressions from step 6 if present]
+   
+   This commit represents the aggregated work of multiple parallel agents.
+   ```
+
 ## Output Format
 Generate a concise, markdown-formatted summary suitable for inclusion in a git commit message. Focus on:
 - Quantitative improvements (percentages and counts)
@@ -139,4 +160,6 @@ print(f"- Items resolved: {len(resolved)} of {successful + failed} targeted")
 ```
 
 ## Integration Notes
-This command is designed to be called from the reduce phase of the MapReduce workflow. The output should be captured and included in the final commit message to document the quantitative improvements achieved.
+This command is designed to be called from the reduce phase of the MapReduce workflow. It will analyze the debt improvements and automatically create a git commit documenting the results.
+
+The command always creates a commit after analysis to ensure the improvements are properly documented in the git history.
