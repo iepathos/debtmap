@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod cleanup_tests {
-    use std::collections::HashSet;
     use std::path::PathBuf;
 
     // Mock function to demonstrate testing pattern
