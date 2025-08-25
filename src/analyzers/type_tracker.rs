@@ -822,4 +822,204 @@ mod tests {
             assert!(result.is_none());
         }
     }
+
+    #[test]
+    fn test_extract_self_param_with_reference() {
+        // Test &self
+        let code = "fn method(&self) {}";
+        let item_fn: syn::ItemFn = syn::parse_str(code).unwrap();
+        let result = extract_self_param(&item_fn.sig);
+        assert!(result.is_some());
+        let self_param = result.unwrap();
+        assert!(self_param.is_reference);
+        assert!(!self_param.is_mutable);
+    }
+
+    #[test]
+    fn test_extract_self_param_with_mutable_reference() {
+        // Test &mut self
+        let code = "fn method(&mut self) {}";
+        let item_fn: syn::ItemFn = syn::parse_str(code).unwrap();
+        let result = extract_self_param(&item_fn.sig);
+        assert!(result.is_some());
+        let self_param = result.unwrap();
+        assert!(self_param.is_reference);
+        assert!(self_param.is_mutable);
+    }
+
+    #[test]
+    fn test_extract_self_param_owned() {
+        // Test self (owned)
+        let code = "fn method(self) {}";
+        let item_fn: syn::ItemFn = syn::parse_str(code).unwrap();
+        let result = extract_self_param(&item_fn.sig);
+        assert!(result.is_some());
+        let self_param = result.unwrap();
+        assert!(!self_param.is_reference);
+        assert!(!self_param.is_mutable);
+    }
+
+    #[test]
+    fn test_extract_self_param_no_self() {
+        // Test function without self
+        let code = "fn function(x: i32) {}";
+        let item_fn: syn::ItemFn = syn::parse_str(code).unwrap();
+        let result = extract_self_param(&item_fn.sig);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_self_param_static_method() {
+        // Test static method (no self, but part of impl block)
+        let code = "fn new() -> Self {}";
+        let item_fn: syn::ItemFn = syn::parse_str(code).unwrap();
+        let result = extract_self_param(&item_fn.sig);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_type_from_pattern_with_explicit_type() {
+        // Test explicit type annotation
+        let code = "let x: HashMap<String, i32> = HashMap::new();";
+        let stmt: syn::Stmt = syn::parse_str(code).unwrap();
+        if let syn::Stmt::Local(local) = stmt {
+            let result = extract_type_from_pattern(&local.pat, &local.init.as_ref().map(|init| Box::new(*init.expr.clone())));
+            assert!(result.is_some());
+            let resolved_type = result.unwrap();
+            // The function currently only extracts the base type name without generics
+            assert_eq!(resolved_type.type_name, "HashMap");
+            assert_eq!(resolved_type.source, TypeSource::Annotation);
+        }
+    }
+
+    #[test]
+    fn test_extract_type_from_pattern_with_inference() {
+        // Test type inference from initializer
+        let code = "let graph = DependencyGraph::new();";
+        let stmt: syn::Stmt = syn::parse_str(code).unwrap();
+        if let syn::Stmt::Local(local) = stmt {
+            let result = extract_type_from_pattern(&local.pat, &local.init.as_ref().map(|init| Box::new(*init.expr.clone())));
+            assert!(result.is_some());
+            let resolved_type = result.unwrap();
+            assert_eq!(resolved_type.type_name, "DependencyGraph");
+            assert_eq!(resolved_type.source, TypeSource::Constructor);
+        }
+    }
+
+    #[test]
+    fn test_extract_type_from_pattern_no_type_info() {
+        // Test pattern without type information
+        let code = "let x;";
+        let stmt: syn::Stmt = syn::parse_str(code).unwrap();
+        if let syn::Stmt::Local(local) = stmt {
+            let result = extract_type_from_pattern(&local.pat, &local.init.as_ref().map(|init| Box::new(*init.expr.clone())));
+            assert!(result.is_none());
+        }
+    }
+
+    #[test]
+    fn test_extract_type_from_type_simple() {
+        // Test simple type
+        let ty: syn::Type = syn::parse_str("String").unwrap();
+        let result = extract_type_from_type(&ty);
+        assert_eq!(result.type_name, "String");
+        assert_eq!(result.source, TypeSource::Annotation);
+    }
+
+    #[test]
+    fn test_extract_type_from_type_path() {
+        // Test path type
+        let ty: syn::Type = syn::parse_str("std::collections::HashMap").unwrap();
+        let result = extract_type_from_type(&ty);
+        assert_eq!(result.type_name, "std::collections::HashMap");
+        assert_eq!(result.source, TypeSource::Annotation);
+    }
+
+    #[test]
+    fn test_extract_type_from_type_generic() {
+        // Test generic type
+        let ty: syn::Type = syn::parse_str("Vec<String>").unwrap();
+        let result = extract_type_from_type(&ty);
+        // The function currently only extracts the base type name without generics
+        assert_eq!(result.type_name, "Vec");
+        assert_eq!(result.source, TypeSource::Annotation);
+    }
+
+    #[test]
+    fn test_extract_type_from_type_reference() {
+        // Test reference type
+        let ty: syn::Type = syn::parse_str("&str").unwrap();
+        let result = extract_type_from_type(&ty);
+        // References are not path types, so they return "Unknown"
+        assert_eq!(result.type_name, "Unknown");
+        assert_eq!(result.source, TypeSource::Annotation);
+    }
+
+    #[test]
+    fn test_extract_type_from_expr_constructor() {
+        // Test constructor call
+        let expr: syn::Expr = syn::parse_str("HashMap::new()").unwrap();
+        let result = extract_type_from_expr(&expr);
+        assert!(result.is_some());
+        let resolved_type = result.unwrap();
+        assert_eq!(resolved_type.type_name, "HashMap");
+        assert_eq!(resolved_type.source, TypeSource::Constructor);
+    }
+
+    #[test]
+    fn test_extract_type_from_expr_nested_constructor() {
+        // Test nested module constructor
+        let expr: syn::Expr = syn::parse_str("std::collections::HashMap::new()").unwrap();
+        let result = extract_type_from_expr(&expr);
+        assert!(result.is_some());
+        let resolved_type = result.unwrap();
+        assert_eq!(resolved_type.type_name, "std::collections::HashMap");
+        assert_eq!(resolved_type.source, TypeSource::Constructor);
+    }
+
+    #[test]
+    fn test_extract_type_from_expr_struct_literal() {
+        // Test struct literal
+        let expr: syn::Expr = syn::parse_str("Point { x: 0, y: 0 }").unwrap();
+        let result = extract_type_from_expr(&expr);
+        assert!(result.is_some());
+        let resolved_type = result.unwrap();
+        assert_eq!(resolved_type.type_name, "Point");
+        assert_eq!(resolved_type.source, TypeSource::StructLiteral);
+    }
+
+    #[test]
+    fn test_extract_type_from_expr_module_struct_literal() {
+        // Test module path struct literal
+        let expr: syn::Expr = syn::parse_str("geometry::Point { x: 0, y: 0 }").unwrap();
+        let result = extract_type_from_expr(&expr);
+        assert!(result.is_some());
+        let resolved_type = result.unwrap();
+        assert_eq!(resolved_type.type_name, "geometry::Point");
+        assert_eq!(resolved_type.source, TypeSource::StructLiteral);
+    }
+
+    #[test]
+    fn test_extract_type_from_expr_non_constructor() {
+        // Test non-constructor function call
+        let expr: syn::Expr = syn::parse_str("process_data()").unwrap();
+        let result = extract_type_from_expr(&expr);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_type_from_expr_literal() {
+        // Test literal expression
+        let expr: syn::Expr = syn::parse_str("42").unwrap();
+        let result = extract_type_from_expr(&expr);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_type_from_expr_binary() {
+        // Test binary expression
+        let expr: syn::Expr = syn::parse_str("x + y").unwrap();
+        let result = extract_type_from_expr(&expr);
+        assert!(result.is_none());
+    }
 }
