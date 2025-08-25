@@ -407,6 +407,20 @@ fn detect_async_test_issues(
     }
 }
 
+fn is_snapshot_method(method_name: &str) -> bool {
+    method_name == "toMatchSnapshot" || method_name == "toMatchInlineSnapshot"
+}
+
+fn count_snapshot_methods(query: &Query, root: Node, source: &str) -> usize {
+    let mut cursor = QueryCursor::new();
+    let matches = cursor.matches(query, root, source.as_bytes());
+
+    matches
+        .filter_map(|match_| match_.captures.iter().find(|c| c.index == 0))
+        .filter(|method| is_snapshot_method(get_node_text(method.node, source)))
+        .count()
+}
+
 fn detect_snapshot_overuse(
     root: Node,
     source: &str,
@@ -421,27 +435,15 @@ fn detect_snapshot_overuse(
     ) @snapshot_call
     "#;
 
-    let mut snapshot_count = 0;
-
     if let Ok(query) = Query::new(language, snapshot_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
+        let snapshot_count = count_snapshot_methods(&query, root, source);
 
-        while let Some(match_) = matches.next() {
-            if let Some(method) = match_.captures.iter().find(|c| c.index == 0) {
-                let method_name = get_node_text(method.node, source);
-                if method_name == "toMatchSnapshot" || method_name == "toMatchInlineSnapshot" {
-                    snapshot_count += 1;
-                }
-            }
+        if snapshot_count > 5 {
+            issues.push(TestingAntiPattern::SnapshotOveruse {
+                location: SourceLocation::from_node(root),
+                snapshot_count,
+            });
         }
-    }
-
-    if snapshot_count > 5 {
-        issues.push(TestingAntiPattern::SnapshotOveruse {
-            location: SourceLocation::from_node(root),
-            snapshot_count,
-        });
     }
 }
 
@@ -519,3 +521,97 @@ fn contains_async_operations(body: &str) -> bool {
         && !body.contains("done()")
 }
 // debtmap:ignore-end
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tree_sitter::Parser;
+
+    #[test]
+    fn test_is_snapshot_method_match_snapshot() {
+        assert!(is_snapshot_method("toMatchSnapshot"));
+    }
+
+    #[test]
+    fn test_is_snapshot_method_inline_snapshot() {
+        assert!(is_snapshot_method("toMatchInlineSnapshot"));
+    }
+
+    #[test]
+    fn test_is_snapshot_method_non_snapshot() {
+        assert!(!is_snapshot_method("toBe"));
+        assert!(!is_snapshot_method("toEqual"));
+        assert!(!is_snapshot_method("toContain"));
+    }
+
+    #[test]
+    fn test_is_snapshot_method_empty_string() {
+        assert!(!is_snapshot_method(""));
+    }
+
+    #[test]
+    fn test_detect_snapshot_overuse_threshold() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        // Test with exactly 5 snapshots (should not trigger)
+        let source_5 = r#"
+            test('test1', () => {
+                expect(result1).toMatchSnapshot();
+                expect(result2).toMatchSnapshot();
+                expect(result3).toMatchSnapshot();
+                expect(result4).toMatchSnapshot();
+                expect(result5).toMatchSnapshot();
+            });
+        "#;
+
+        let tree = parser.parse(source_5, None).unwrap();
+        let mut issues = Vec::new();
+        detect_snapshot_overuse(tree.root_node(), source_5, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "5 snapshots should not trigger overuse");
+
+        // Test with 6 snapshots (should trigger)
+        let source_6 = r#"
+            test('test2', () => {
+                expect(result1).toMatchSnapshot();
+                expect(result2).toMatchSnapshot();
+                expect(result3).toMatchInlineSnapshot();
+                expect(result4).toMatchSnapshot();
+                expect(result5).toMatchSnapshot();
+                expect(result6).toMatchInlineSnapshot();
+            });
+        "#;
+
+        let tree = parser.parse(source_6, None).unwrap();
+        let mut issues = Vec::new();
+        detect_snapshot_overuse(tree.root_node(), source_6, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "6 snapshots should trigger overuse");
+
+        if let TestingAntiPattern::SnapshotOveruse { snapshot_count, .. } = &issues[0] {
+            assert_eq!(*snapshot_count, 6, "Should count 6 snapshots");
+        } else {
+            panic!("Expected SnapshotOveruse pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_snapshot_overuse_no_snapshots() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('regular test', () => {
+                expect(result).toBe(42);
+                expect(name).toEqual('test');
+                expect(array).toContain('item');
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_snapshot_overuse(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "No snapshots should not trigger");
+    }
+}
