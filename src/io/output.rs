@@ -211,4 +211,276 @@ mod tests {
         assert!(output.contains("# Debtmap Analysis Report"));
         assert!(output.contains("Executive Summary"));
     }
+
+    #[test]
+    fn test_complexity_status_low() {
+        assert_eq!(complexity_status(0.0), "✅ Low");
+        assert_eq!(complexity_status(2.5), "✅ Low");
+        assert_eq!(complexity_status(5.0), "✅ Low");
+    }
+
+    #[test]
+    fn test_complexity_status_moderate() {
+        assert_eq!(complexity_status(5.1), "🔶 Moderate");
+        assert_eq!(complexity_status(7.5), "🔶 Moderate");
+        assert_eq!(complexity_status(10.0), "🔶 Moderate");
+    }
+
+    #[test]
+    fn test_complexity_status_medium() {
+        assert_eq!(complexity_status(10.1), "⚠️ Medium");
+        assert_eq!(complexity_status(12.5), "⚠️ Medium");
+        assert_eq!(complexity_status(15.0), "⚠️ Medium");
+    }
+
+    #[test]
+    fn test_complexity_status_high() {
+        assert_eq!(complexity_status(15.1), "❌ High");
+        assert_eq!(complexity_status(20.0), "❌ High");
+        assert_eq!(complexity_status(100.0), "❌ High");
+    }
+
+    #[test]
+    fn test_debt_status_low() {
+        assert_eq!(debt_status(0), "✅ Low");
+        assert_eq!(debt_status(5), "✅ Low");
+        assert_eq!(debt_status(10), "✅ Low");
+    }
+
+    #[test]
+    fn test_debt_status_moderate() {
+        assert_eq!(debt_status(11), "🔶 Moderate");
+        assert_eq!(debt_status(15), "🔶 Moderate");
+        assert_eq!(debt_status(20), "🔶 Moderate");
+    }
+
+    #[test]
+    fn test_debt_status_medium() {
+        assert_eq!(debt_status(21), "⚠️ Medium");
+        assert_eq!(debt_status(35), "⚠️ Medium");
+        assert_eq!(debt_status(50), "⚠️ Medium");
+    }
+
+    #[test]
+    fn test_debt_status_high() {
+        assert_eq!(debt_status(51), "❌ High");
+        assert_eq!(debt_status(100), "❌ High");
+        assert_eq!(debt_status(1000), "❌ High");
+    }
+
+    #[test]
+    fn test_high_complexity_status_good() {
+        assert_eq!(high_complexity_status(0), "✅ Good");
+    }
+
+    #[test]
+    fn test_high_complexity_status_fair() {
+        assert_eq!(high_complexity_status(1), "🔶 Fair");
+        assert_eq!(high_complexity_status(3), "🔶 Fair");
+        assert_eq!(high_complexity_status(5), "🔶 Fair");
+    }
+
+    #[test]
+    fn test_high_complexity_status_poor() {
+        assert_eq!(high_complexity_status(6), "❌ Poor");
+        assert_eq!(high_complexity_status(10), "❌ Poor");
+        assert_eq!(high_complexity_status(100), "❌ Poor");
+    }
+
+    #[test]
+    fn test_debt_score_status_good() {
+        assert_eq!(debt_score_status(25, 100), "✅ Good");
+        assert_eq!(debt_score_status(49, 100), "✅ Good");
+        assert_eq!(debt_score_status(0, 100), "✅ Good");
+    }
+
+    #[test]
+    fn test_debt_score_status_medium() {
+        assert_eq!(debt_score_status(50, 100), "✅ Good");
+        assert_eq!(debt_score_status(51, 100), "⚠️ Medium");
+        assert_eq!(debt_score_status(75, 100), "⚠️ Medium");
+        assert_eq!(debt_score_status(100, 100), "⚠️ Medium");
+    }
+
+    #[test]
+    fn test_debt_score_status_high() {
+        assert_eq!(debt_score_status(101, 100), "❌ High");
+        assert_eq!(debt_score_status(150, 100), "❌ High");
+        assert_eq!(debt_score_status(1000, 100), "❌ High");
+    }
+
+    #[test]
+    fn test_debt_score_status_boundary_conditions() {
+        // Test exact boundary values
+        assert_eq!(debt_score_status(50, 100), "✅ Good"); // Exactly half
+        assert_eq!(debt_score_status(100, 100), "⚠️ Medium"); // Exactly at threshold
+        assert_eq!(debt_score_status(101, 100), "❌ High"); // Just over threshold
+    }
+
+    #[test]
+    fn test_get_recommendation_acceptable() {
+        let func = FunctionMetrics {
+            name: "simple_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 5,
+            cognitive: 8,
+            nesting: 1,
+            length: 15,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+        assert_eq!(get_recommendation(&func), "Acceptable");
+    }
+
+    #[test]
+    fn test_get_recommendation_consider_simplifying() {
+        let func = FunctionMetrics {
+            name: "moderate_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 11,
+            cognitive: 9,
+            nesting: 2,
+            length: 30,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+        assert_eq!(get_recommendation(&func), "Consider simplifying");
+    }
+
+    #[test]
+    fn test_get_recommendation_refactor_recommended() {
+        let func = FunctionMetrics {
+            name: "complex_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 16,
+            cognitive: 18,
+            nesting: 3,
+            length: 50,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+        assert_eq!(get_recommendation(&func), "Refactor recommended");
+    }
+
+    #[test]
+    fn test_get_recommendation_urgent_refactoring() {
+        let func = FunctionMetrics {
+            name: "very_complex_func".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic: 25,
+            cognitive: 30,
+            nesting: 4,
+            length: 100,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        };
+        assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
+    }
+
+    #[test]
+    fn test_get_top_complex_functions() {
+        let mut metrics = vec![];
+
+        // Add functions with varying complexity
+        for i in 1..=10 {
+            metrics.push(FunctionMetrics {
+                name: format!("func_{}", i),
+                file: PathBuf::from("test.rs"),
+                line: i * 10,
+                cyclomatic: i as u32 * 2,
+                cognitive: i as u32 * 3,
+                nesting: 1,
+                length: 20,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+            });
+        }
+
+        let top_3 = get_top_complex_functions(&metrics, 3);
+        assert_eq!(top_3.len(), 3);
+
+        // Should get functions with highest complexity (cognitive is higher)
+        assert_eq!(top_3[0].name, "func_10"); // cognitive: 30
+        assert_eq!(top_3[1].name, "func_9"); // cognitive: 27
+        assert_eq!(top_3[2].name, "func_8"); // cognitive: 24
+    }
+
+    #[test]
+    fn test_get_top_complex_functions_empty() {
+        let metrics = vec![];
+        let top_5 = get_top_complex_functions(&metrics, 5);
+        assert_eq!(top_5.len(), 0);
+    }
+
+    #[test]
+    fn test_get_top_complex_functions_fewer_than_requested() {
+        let metrics = vec![
+            FunctionMetrics {
+                name: "func_1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                cyclomatic: 5,
+                cognitive: 7,
+                nesting: 1,
+                length: 20,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+            },
+            FunctionMetrics {
+                name: "func_2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 10,
+                cyclomatic: 10,
+                cognitive: 8,
+                nesting: 1,
+                length: 20,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: None,
+                purity_confidence: None,
+            },
+        ];
+
+        let top_5 = get_top_complex_functions(&metrics, 5);
+        assert_eq!(top_5.len(), 2); // Only 2 functions available
+        assert_eq!(top_5[0].name, "func_2"); // cyclomatic: 10 is higher
+        assert_eq!(top_5[1].name, "func_1"); // cyclomatic: 5, cognitive: 7
+    }
 }

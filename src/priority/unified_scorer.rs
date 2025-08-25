@@ -4196,4 +4196,579 @@ mod tests {
             "Non-trivial function should have non-zero score even with coverage"
         );
     }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_pure_function_high_confidence() {
+        // Test that pure functions with high confidence get complexity reduction
+        let mut func = create_test_metrics();
+        func.cyclomatic = 12;
+        func.cognitive = 15;
+        func.is_pure = Some(true);
+        func.purity_confidence = Some(0.9); // High confidence
+
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+
+        // Verify purity bonus was applied (30% reduction for high confidence)
+        // Original cyclomatic 12 * 0.7 = 8.4
+        assert!(
+            score.complexity_factor < normalize_complexity(12, 15),
+            "High confidence pure function should have reduced complexity"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_pure_function_low_confidence() {
+        // Test that pure functions with low confidence get smaller reduction
+        let mut func = create_test_metrics();
+        func.cyclomatic = 12;
+        func.cognitive = 15;
+        func.is_pure = Some(true);
+        func.purity_confidence = Some(0.5); // Low confidence
+
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+
+        // Verify smaller purity bonus was applied (15% reduction for low confidence)
+        // Original cyclomatic 12 * 0.85 = 10.2
+        assert!(
+            score.complexity_factor < normalize_complexity(12, 15),
+            "Low confidence pure function should have some complexity reduction"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_impure_function() {
+        // Test that impure functions get no reduction
+        let mut func = create_test_metrics();
+        func.cyclomatic = 12;
+        func.cognitive = 15;
+        func.is_pure = Some(false);
+        func.purity_confidence = Some(0.9);
+
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+
+        // Verify no purity bonus for impure functions
+        assert_eq!(
+            score.complexity_factor,
+            normalize_complexity(12, 15),
+            "Impure function should get no complexity reduction"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_with_debt_aggregator() {
+        // Test integration with DebtAggregator for additional debt scores
+        let func = create_test_metrics();
+        let graph = CallGraph::new();
+
+        // Create a mock debt aggregator
+        let debt_aggregator = DebtAggregator::new();
+
+        // Note: We can't easily set specific debt scores without modifying DebtAggregator
+        // but we can test that the function handles the aggregator correctly
+        let score_with_aggregator = calculate_unified_priority_with_debt(
+            &func,
+            &graph,
+            None,
+            None,
+            None,
+            Some(&debt_aggregator),
+        );
+
+        let score_without_aggregator =
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+
+        // The scores might be the same if aggregator has no data for this function
+        // but the function should handle both cases without panicking
+        assert!(score_with_aggregator.final_score >= 0.0);
+        assert!(score_without_aggregator.final_score >= 0.0);
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_upstream_dependencies() {
+        // Test that functions with many upstream dependencies get higher scores
+        let func = create_test_metrics();
+        let mut graph = CallGraph::new();
+
+        let func_id = FunctionId {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            line: func.line,
+        };
+
+        // Add 10 upstream callers
+        for i in 0..10 {
+            let caller = FunctionId {
+                file: PathBuf::from("caller.rs"),
+                name: format!("upstream_{}", i),
+                line: i * 10,
+            };
+            graph.add_call(FunctionCall {
+                caller,
+                callee: func_id.clone(),
+                call_type: CallType::Direct,
+            });
+        }
+
+        let score_with_deps =
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+
+        // Test with no dependencies
+        let empty_graph = CallGraph::new();
+        let score_no_deps =
+            calculate_unified_priority_with_debt(&func, &empty_graph, None, None, None, None);
+
+        assert!(
+            score_with_deps.dependency_factor > score_no_deps.dependency_factor,
+            "Functions with upstream dependencies should have higher dependency factor"
+        );
+        assert!(
+            score_with_deps.final_score > score_no_deps.final_score,
+            "Functions with upstream dependencies should have higher priority"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_pattern_match_role() {
+        // Test that pattern match functions get appropriate handling
+        let mut func = create_test_metrics();
+        func.cyclomatic = 3;
+        func.cognitive = 4;
+        func.length = 8;
+        func.name = "match_type".to_string(); // Likely a pattern match function
+
+        let graph = CallGraph::new();
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![FunctionCoverage {
+                name: "match_type".to_string(),
+                start_line: 10,
+                execution_count: 1,
+                coverage_percentage: 100.0,
+            }],
+        );
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+
+        assert_eq!(
+            score.final_score, 0.0,
+            "Trivial tested pattern match function should have zero score"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_boundary_conditions() {
+        // Test boundary conditions for complexity thresholds
+        let mut func = create_test_metrics();
+
+        // Test at exactly trivial boundary (cyclomatic = 3, cognitive = 5)
+        func.cyclomatic = 3;
+        func.cognitive = 5;
+        func.length = 10;
+
+        let graph = CallGraph::new();
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![FunctionCoverage {
+                name: "test_function".to_string(),
+                start_line: 10,
+                execution_count: 1,
+                coverage_percentage: 100.0,
+            }],
+        );
+
+        let score =
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+
+        assert_eq!(
+            score.final_score, 0.0,
+            "Function at trivial boundary with coverage should have zero score"
+        );
+
+        // Test just above trivial boundary
+        func.cyclomatic = 4; // Just above trivial threshold
+        let score_above =
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+
+        assert!(
+            score_above.final_score > 0.0,
+            "Function above trivial boundary should have non-zero score"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_zero_values() {
+        // Test handling of zero/minimal values
+        let mut func = create_test_metrics();
+        func.cyclomatic = 0;
+        func.cognitive = 0;
+        func.length = 0;
+        func.nesting = 0;
+
+        let graph = CallGraph::new();
+
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+
+        // Even with zero complexity, lack of coverage should give some score
+        assert_eq!(
+            score.complexity_factor, 0.0,
+            "Zero complexity should give zero complexity factor"
+        );
+        assert_eq!(
+            score.coverage_factor, 10.0,
+            "No coverage data should assume worst case"
+        );
+        assert!(
+            score.final_score > 0.0,
+            "Should still have non-zero score due to no coverage"
+        );
+    }
+
+    #[test]
+    fn test_calculate_unified_priority_with_debt_all_factors_combined() {
+        // Test with all factors present
+        let mut func = create_test_metrics();
+        func.cyclomatic = 15;
+        func.cognitive = 20;
+        func.is_pure = Some(true);
+        func.purity_confidence = Some(0.85);
+        func.entropy_score = Some(crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.4,
+            pattern_repetition: 0.6,
+            branch_similarity: 0.5,
+            effective_complexity: 12.0,
+            unique_variables: 8,
+            max_nesting: 3,
+            dampening_applied: 0.75,
+        });
+
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            line: func.line,
+        };
+
+        // Add dependencies
+        for i in 0..3 {
+            let caller = FunctionId {
+                file: PathBuf::from("dep.rs"),
+                name: format!("dep_{}", i),
+                line: i * 20,
+            };
+            graph.add_call(FunctionCall {
+                caller,
+                callee: func_id.clone(),
+                call_type: CallType::Direct,
+            });
+        }
+
+        let score = calculate_unified_priority_with_debt(
+            &func,
+            &graph,
+            None,
+            Some(3.0), // Some security issues
+            None,
+            None,
+        );
+
+        // Verify all factors are present
+        assert!(
+            score.complexity_factor > 0.0,
+            "Should have complexity factor"
+        );
+        assert!(score.coverage_factor > 0.0, "Should have coverage factor");
+        assert!(
+            score.dependency_factor > 0.0,
+            "Should have dependency factor"
+        );
+        assert_eq!(score.security_factor, 3.0, "Should have security factor");
+        assert!(score.role_multiplier > 0.0, "Should have role multiplier");
+        assert!(score.final_score > 0.0, "Should have final score");
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_no_dampening() {
+        // Test case where no dampening should be applied
+        let entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.8,      // Above threshold
+            pattern_repetition: 0.5, // Below threshold
+            branch_similarity: 0.5,  // Below threshold
+            effective_complexity: 1.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 1.0,
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor = calculate_score_dampening_factor(&entropy_score, &config);
+        assert_eq!(
+            factor, 1.0,
+            "No dampening should be applied when all metrics are good"
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_high_repetition() {
+        // Test dampening due to high pattern repetition
+        let entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.8,
+            pattern_repetition: 0.9, // Very high repetition
+            branch_similarity: 0.5,
+            effective_complexity: 1.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 1.0,
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor = calculate_score_dampening_factor(&entropy_score, &config);
+        assert!(factor < 1.0, "High repetition should cause dampening");
+        assert!(factor >= 0.7, "Dampening should be capped at 30% reduction");
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_low_entropy() {
+        // Test dampening due to low entropy
+        let entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.2, // Low entropy
+            pattern_repetition: 0.5,
+            branch_similarity: 0.5,
+            effective_complexity: 1.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 1.0,
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor = calculate_score_dampening_factor(&entropy_score, &config);
+        assert!(factor < 1.0, "Low entropy should cause dampening");
+        assert!(factor >= 0.7, "Dampening should be capped at 30% reduction");
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_high_branch_similarity() {
+        // Test dampening due to high branch similarity
+        let entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.8,
+            pattern_repetition: 0.5,
+            branch_similarity: 0.9, // High branch similarity
+            effective_complexity: 1.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 1.0,
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor = calculate_score_dampening_factor(&entropy_score, &config);
+        assert!(
+            factor < 1.0,
+            "High branch similarity should cause dampening"
+        );
+        assert!(factor >= 0.7, "Dampening should be capped at 30% reduction");
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_combined_issues() {
+        // Test with multiple issues that should compound
+        let entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.2,      // Low entropy
+            pattern_repetition: 0.8, // High repetition
+            branch_similarity: 0.8,  // High branch similarity
+            effective_complexity: 1.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 1.0,
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor = calculate_score_dampening_factor(&entropy_score, &config);
+        assert!(factor < 0.9, "Multiple issues should cause more dampening");
+        assert!(
+            factor >= 0.7,
+            "Dampening should still be capped at 30% reduction"
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_partial_weight() {
+        // Test with partial weight configuration
+        let entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.2, // Low entropy
+            pattern_repetition: 0.5,
+            branch_similarity: 0.5,
+            effective_complexity: 1.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 0.5, // Only apply 50% of dampening
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor = calculate_score_dampening_factor(&entropy_score, &config);
+        assert!(
+            factor > 0.7,
+            "Partial weight should reduce dampening effect"
+        );
+        assert!(factor < 1.0, "Some dampening should still be applied");
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_edge_cases() {
+        // Test with extreme values at boundaries
+        let entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.0,      // Minimum entropy
+            pattern_repetition: 1.0, // Maximum repetition
+            branch_similarity: 1.0,  // Maximum similarity
+            effective_complexity: 1.0,
+            unique_variables: 0,
+            max_nesting: 10,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 1.0,
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor = calculate_score_dampening_factor(&entropy_score, &config);
+        assert_eq!(
+            factor, 0.7,
+            "Maximum dampening should be exactly 30% reduction"
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_dampening_factor_graduated_repetition() {
+        // Test graduated dampening for repetition
+        let mut entropy_score = crate::complexity::entropy::EntropyScore {
+            token_entropy: 0.8,
+            pattern_repetition: 0.7, // Just above threshold
+            branch_similarity: 0.5,
+            effective_complexity: 1.0,
+            unique_variables: 5,
+            max_nesting: 2,
+            dampening_applied: 1.0,
+        };
+
+        let config = crate::config::EntropyConfig {
+            enabled: true,
+            weight: 1.0,
+            min_tokens: 10,
+            pattern_threshold: 0.6,
+            entropy_threshold: 0.4,
+            use_classification: Some(true),
+            branch_threshold: 0.7,
+            max_repetition_reduction: 0.3,
+            max_entropy_reduction: 0.3,
+            max_branch_reduction: 0.3,
+            max_combined_reduction: 0.3,
+        };
+
+        let factor1 = calculate_score_dampening_factor(&entropy_score, &config);
+
+        // Increase repetition
+        entropy_score.pattern_repetition = 0.9;
+        let factor2 = calculate_score_dampening_factor(&entropy_score, &config);
+
+        assert!(factor1 < 1.0, "Above threshold should cause some dampening");
+        assert!(
+            factor2 < factor1,
+            "Higher repetition should cause more dampening"
+        );
+    }
 }
