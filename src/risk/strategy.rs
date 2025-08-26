@@ -159,7 +159,11 @@ impl EnhancedRiskStrategy {
             0.0 // Test functions don't need test coverage
         } else {
             match context.coverage {
-                Some(cov) => (100.0 - cov) / 100.0 * self.weights.coverage,
+                Some(cov) => {
+                    // Convert fraction to percentage if needed (coverage is 0.0-1.0)
+                    let cov_percentage = if cov <= 1.0 { cov * 100.0 } else { cov };
+                    (100.0 - cov_percentage) / 100.0 * self.weights.coverage
+                }
                 None => 0.0, // Don't add coverage weight when coverage is unknown
             }
         };
@@ -186,11 +190,17 @@ impl EnhancedRiskStrategy {
     fn calculate_coverage_penalty(&self, coverage: Option<f64>) -> f64 {
         match coverage {
             None => 1.0, // No penalty when coverage is unknown (not untested, just unknown)
-            Some(c) if c < 20.0 => 3.0,
-            Some(c) if c < 40.0 => 2.0,
-            Some(c) if c < 60.0 => 1.5,
-            Some(c) if c < 80.0 => 1.2,
-            Some(_) => 0.8,
+            Some(c) => {
+                // Convert fraction to percentage if needed (coverage is 0.0-1.0)
+                let cov_percentage = if c <= 1.0 { c * 100.0 } else { c };
+                match cov_percentage {
+                    c if c < 20.0 => 3.0,
+                    c if c < 40.0 => 2.0,
+                    c if c < 60.0 => 1.5,
+                    c if c < 80.0 => 1.2,
+                    _ => 0.8,
+                }
+            }
         }
     }
 
@@ -229,9 +239,18 @@ impl EnhancedRiskStrategy {
         }
 
         match context.coverage {
-            Some(cov) if cov >= 90.0 => 0.8, // Well tested: 20% additional reduction
-            Some(cov) if cov >= 70.0 => 0.9, // Tested: 10% additional reduction
-            _ => 1.0,                        // No coverage: no additional reduction
+            Some(cov) => {
+                // Convert fraction to percentage if needed (coverage is 0.0-1.0)
+                let cov_percentage = if cov <= 1.0 { cov * 100.0 } else { cov };
+                if cov_percentage >= 90.0 {
+                    0.8 // Well tested: 20% additional reduction
+                } else if cov_percentage >= 70.0 {
+                    0.9 // Tested: 10% additional reduction
+                } else {
+                    1.0 // No additional reduction
+                }
+            }
+            None => 1.0, // No coverage: no additional reduction
         }
     }
 

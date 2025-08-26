@@ -1777,13 +1777,7 @@ fn output_unified_priorities(
     } else if is_markdown_file(&output_file) {
         output_markdown(&analysis, top, tail, verbosity, output_file)
     } else {
-        output_terminal(
-            &analysis,
-            top,
-            tail,
-            verbosity,
-            output_file,
-        )
+        output_terminal(&analysis, top, tail, verbosity, output_file)
     }
 }
 
@@ -2912,8 +2906,6 @@ end_of_record
         let _ = passing;
     }
 
-
-
     #[test]
     fn test_determine_priority_output_format_top() {
         use priority::formatter::OutputFormat;
@@ -3907,7 +3899,7 @@ end_of_record
         let mut file = std::fs::File::create(&test_file).unwrap();
         writeln!(file, "fn covered_function() {{ let x = 1 + 1; }}").unwrap();
 
-        // Create a simple LCOV file
+        // Create a simple LCOV file with full coverage
         let lcov_file = temp_dir.path().join("coverage.lcov");
         let mut lcov = std::fs::File::create(&lcov_file).unwrap();
         writeln!(lcov, "TN:").unwrap();
@@ -3916,6 +3908,9 @@ end_of_record
         writeln!(lcov, "FNDA:1,covered_function").unwrap();
         writeln!(lcov, "FNF:1").unwrap();
         writeln!(lcov, "FNH:1").unwrap();
+        writeln!(lcov, "DA:1,1").unwrap(); // Line 1 executed once
+        writeln!(lcov, "LF:1").unwrap(); // 1 line total
+        writeln!(lcov, "LH:1").unwrap(); // 1 line hit
         writeln!(lcov, "end_of_record").unwrap();
 
         // Create config with coverage file
@@ -4436,13 +4431,7 @@ end_of_record
             overall_coverage: Some(75.0),
         };
 
-        let result = output_terminal(
-            &analysis,
-            None,
-            Some(5),
-            2,
-            Some(output_path.clone()),
-        );
+        let result = output_terminal(&analysis, None, Some(5), 2, Some(output_path.clone()));
         assert!(result.is_ok());
         assert!(output_path.exists());
     }
@@ -4503,14 +4492,8 @@ end_of_record
             overall_coverage: Some(75.0),
         };
 
-        let result = output_unified_priorities(
-            analysis,
-            Some(5),
-            None,
-            1,
-            Some(output_path.clone()),
-            None,
-        );
+        let result =
+            output_unified_priorities(analysis, Some(5), None, 1, Some(output_path.clone()), None);
         assert!(result.is_ok());
         assert!(output_path.exists());
 
@@ -4539,14 +4522,8 @@ end_of_record
             overall_coverage: Some(75.0),
         };
 
-        let result = output_unified_priorities(
-            analysis,
-            None,
-            Some(3),
-            2,
-            Some(output_path.clone()),
-            None,
-        );
+        let result =
+            output_unified_priorities(analysis, None, Some(3), 2, Some(output_path.clone()), None);
         assert!(result.is_ok());
         assert!(output_path.exists());
     }

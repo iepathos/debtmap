@@ -71,8 +71,6 @@ pub enum Commands {
         #[arg(long = "tail")]
         tail: Option<usize>,
 
-
-
         /// Disable semantic analysis (fallback mode)
         #[arg(long = "semantic-off")]
         semantic_off: bool,
@@ -96,14 +94,9 @@ pub enum Commands {
         #[arg(long = "show-macro-stats")]
         show_macro_stats: bool,
 
-
-
         /// Enable enhanced security analysis with additional detectors
         #[arg(long = "security-enhanced")]
         security_enhanced: bool,
-
-
-
 
         /// Group output by debt category
         #[arg(long = "group-by-category")]
@@ -116,7 +109,6 @@ pub enum Commands {
         /// Filter by debt categories (comma-separated)
         #[arg(long = "filter", value_delimiter = ',')]
         filter_categories: Option<Vec<String>>,
-
 
         /// Disable context-aware false positive reduction (enabled by default)
         #[arg(long = "no-context-aware")]
@@ -174,8 +166,6 @@ pub enum Commands {
         /// Show only bottom N priority items (lowest priority)
         #[arg(long = "tail")]
         tail: Option<usize>,
-
-
 
         /// Disable semantic analysis (fallback mode)
         #[arg(long = "semantic-off")]

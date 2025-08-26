@@ -10,9 +10,9 @@ use self::verbosity::format_priority_item_with_verbosity;
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
-    Default,        // Top 10 with clean formatting
-    Top(usize),     // Top N items
-    Tail(usize),    // Bottom N items (lowest priority)
+    Default,     // Top 10 with clean formatting
+    Top(usize),  // Top N items
+    Tail(usize), // Bottom N items (lowest priority)
 }
 
 pub fn format_priorities(analysis: &UnifiedAnalysis, format: OutputFormat) -> String {
@@ -90,7 +90,6 @@ fn format_default_with_verbosity(
 fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     format_default_with_verbosity(analysis, limit, 0)
 }
-
 
 fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u8) -> String {
     let mut output = String::new();
@@ -178,7 +177,6 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
 
     output
 }
-
 
 #[allow(dead_code)]
 fn format_detailed(analysis: &UnifiedAnalysis) -> String {
@@ -518,7 +516,6 @@ fn format_role(role: FunctionRole) -> &'static str {
     }
 }
 
-
 pub fn get_severity_label(score: f64) -> &'static str {
     if score >= 8.0 {
         "CRITICAL"
@@ -638,7 +635,6 @@ mod tests {
             entropy_details: None,
         }
     }
-
 
     #[test]
     fn test_format_default() {
