@@ -60,12 +60,16 @@ fn format_priority_item_markdown(
 
     // Show score breakdown for verbosity >= 2
     if verbosity >= 2 {
-        output.push_str(&format_score_breakdown(&item.unified_score));
+        output.push_str(&format_score_breakdown_with_coverage(
+            &item.unified_score,
+            item.transitive_coverage.as_ref(),
+        ));
     } else if verbosity >= 1 {
         // Show main contributing factors for verbosity >= 1
-        output.push_str(&format_main_factors_with_debt_type(
+        output.push_str(&format_main_factors_with_coverage(
             &item.unified_score,
             &item.debt_type,
+            item.transitive_coverage.as_ref(),
         ));
     }
 
@@ -231,33 +235,52 @@ fn extract_complexity_info(debt_type: &DebtType) -> Option<String> {
     }
 }
 
-fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> String {
+fn format_score_breakdown_with_coverage(
+    unified_score: &crate::priority::UnifiedScore,
+    transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
+) -> String {
     let weights = crate::config::get_scoring_weights();
     let mut output = String::new();
 
     writeln!(&mut output, "\n#### Score Calculation\n").unwrap();
-    writeln!(&mut output, "| Component | Value | Weight | Contribution |").unwrap();
-    writeln!(&mut output, "|-----------|-------|--------|--------------|").unwrap();
     writeln!(
         &mut output,
-        "| Complexity | {:.1} | {:.0}% | {:.2} |",
+        "| Component | Value | Weight | Contribution | Details |"
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "|-----------|-------|--------|--------------|----------|"
+    )
+    .unwrap();
+    writeln!(
+        &mut output,
+        "| Complexity | {:.1} | {:.0}% | {:.2} | |",
         unified_score.complexity_factor,
         weights.complexity * 100.0,
         unified_score.complexity_factor * weights.complexity
     )
     .unwrap();
+
+    // Add coverage details if available
+    let coverage_details = if let Some(trans_cov) = transitive_coverage {
+        format!("Line: {:.2}%", trans_cov.direct * 100.0)
+    } else {
+        "No data".to_string()
+    };
     writeln!(
         &mut output,
-        "| Coverage | {:.1} | {:.0}% | {:.2} |",
+        "| Coverage | {:.1} | {:.0}% | {:.2} | {} |",
         unified_score.coverage_factor,
         weights.coverage * 100.0,
-        unified_score.coverage_factor * weights.coverage
+        unified_score.coverage_factor * weights.coverage,
+        coverage_details
     )
     .unwrap();
     // Semantic and ROI factors removed per spec 55 and 58
     writeln!(
         &mut output,
-        "| Dependency | {:.1} | {:.0}% | {:.2} |",
+        "| Dependency | {:.1} | {:.0}% | {:.2} | |",
         unified_score.dependency_factor,
         weights.dependency * 100.0,
         unified_score.dependency_factor * weights.dependency
@@ -268,7 +291,7 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
     if unified_score.security_factor > 0.0 {
         writeln!(
             &mut output,
-            "| Security | {:.1} | {:.0}% | {:.2} |",
+            "| Security | {:.1} | {:.0}% | {:.2} | |",
             unified_score.security_factor,
             weights.security * 100.0,
             unified_score.security_factor * weights.security
@@ -303,24 +326,48 @@ fn format_score_breakdown(unified_score: &crate::priority::UnifiedScore) -> Stri
     output
 }
 
-fn format_main_factors_with_debt_type(
+fn format_main_factors_with_coverage(
     unified_score: &crate::priority::UnifiedScore,
     debt_type: &crate::priority::DebtType,
+    transitive_coverage: Option<&crate::priority::coverage_propagation::TransitiveCoverage>,
 ) -> String {
     let weights = crate::config::get_scoring_weights();
     let mut factors = vec![];
 
-    if unified_score.coverage_factor > 3.0 {
-        factors.push(format!("Coverage gap ({:.0}%)", weights.coverage * 100.0));
-    }
-    if unified_score.dependency_factor > 5.0 {
+    // Show coverage info - both good and bad coverage are important factors
+    if let Some(trans_cov) = transitive_coverage {
+        let coverage_pct = trans_cov.direct * 100.0;
+        if coverage_pct >= 95.0 {
+            factors.push(format!("Excellent coverage {:.1}%", coverage_pct));
+        } else if coverage_pct >= 80.0 {
+            factors.push(format!("Good coverage {:.1}%", coverage_pct));
+        } else if unified_score.coverage_factor > 3.0 {
+            factors.push(format!(
+                "Line coverage {:.1}% (weight: {:.0}%)",
+                coverage_pct,
+                weights.coverage * 100.0
+            ));
+        }
+    } else if unified_score.coverage_factor > 3.0 {
         factors.push(format!(
-            "Critical path ({:.0}%)",
-            weights.dependency * 100.0
+            "No coverage data (weight: {:.0}%)",
+            weights.coverage * 100.0
         ));
     }
     if unified_score.complexity_factor > 5.0 {
-        factors.push(format!("Complexity ({:.0}%)", weights.complexity * 100.0));
+        factors.push(format!(
+            "Complexity (weight: {:.0}%)",
+            weights.complexity * 100.0
+        ));
+    } else if unified_score.complexity_factor > 3.0 {
+        factors.push("Moderate complexity".to_string());
+    }
+
+    if unified_score.dependency_factor > 5.0 {
+        factors.push(format!(
+            "Critical path (weight: {:.0}%)",
+            weights.dependency * 100.0
+        ));
     }
     if unified_score.security_factor > 3.0 {
         factors.push(format!(
@@ -546,7 +593,7 @@ mod tests {
             final_score: 8.5,
         };
 
-        let result = format_score_breakdown(&score);
+        let result = format_score_breakdown_with_coverage(&score, None);
 
         // Check for table headers
         assert!(result.contains("Score Calculation"));
@@ -580,10 +627,10 @@ mod tests {
             factors: vec!["Test factor".to_string()],
         };
 
-        let result = format_main_factors_with_debt_type(&score, &debt_type);
+        let result = format_main_factors_with_coverage(&score, &debt_type, None);
 
         assert!(result.contains("Main factors:"));
-        assert!(result.contains("Coverage gap"));
+        assert!(result.contains("No coverage data") || result.contains("Line coverage"));
         // ROI removed from scoring per spec 55 and 58
         assert!(result.contains("Critical path"));
         assert!(result.contains("Complexity"));
@@ -605,7 +652,7 @@ mod tests {
             factors: vec!["Test factor".to_string()],
         };
 
-        let result = format_main_factors_with_debt_type(&score, &debt_type);
+        let result = format_main_factors_with_coverage(&score, &debt_type, None);
         assert_eq!(result, "");
     }
 

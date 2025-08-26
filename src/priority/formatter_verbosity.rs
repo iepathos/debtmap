@@ -20,17 +20,44 @@ pub fn format_priority_item_with_verbosity(
         // Calculate main contributing factors
         let mut factors = vec![];
 
-        if item.unified_score.coverage_factor > 3.0 {
-            factors.push(format!("Coverage gap ({:.0}%)", weights.coverage * 100.0));
-        }
-        if item.unified_score.dependency_factor > 5.0 {
+        // Show coverage info - both good and bad coverage are important factors
+        if let Some(ref trans_cov) = item.transitive_coverage {
+            let coverage_pct = trans_cov.direct * 100.0;
+            if coverage_pct >= 95.0 {
+                // Excellent coverage - show as positive factor
+                factors.push(format!("Excellent coverage {:.1}%", coverage_pct));
+            } else if coverage_pct >= 80.0 {
+                // Good coverage
+                factors.push(format!("Good coverage {:.1}%", coverage_pct));
+            } else if item.unified_score.coverage_factor > 3.0 {
+                // Poor coverage - show as negative factor with weight
+                factors.push(format!(
+                    "Line coverage {:.1}% (weight: {:.0}%)",
+                    coverage_pct,
+                    weights.coverage * 100.0
+                ));
+            }
+        } else if item.unified_score.coverage_factor > 3.0 {
+            // No coverage data but high coverage factor
             factors.push(format!(
-                "Critical path ({:.0}%)",
-                weights.dependency * 100.0
+                "No coverage data (weight: {:.0}%)",
+                weights.coverage * 100.0
             ));
         }
         if item.unified_score.complexity_factor > 5.0 {
-            factors.push(format!("Complexity ({:.0}%)", weights.complexity * 100.0));
+            factors.push(format!(
+                "Complexity (weight: {:.0}%)",
+                weights.complexity * 100.0
+            ));
+        } else if item.unified_score.complexity_factor > 3.0 {
+            factors.push("Moderate complexity".to_string());
+        }
+
+        if item.unified_score.dependency_factor > 5.0 {
+            factors.push(format!(
+                "Critical path (weight: {:.0}%)",
+                weights.dependency * 100.0
+            ));
         }
 
         // Add Security and Performance specific factors
@@ -129,12 +156,19 @@ pub fn format_priority_item_with_verbosity(
             )
             .unwrap();
         }
+        // Show coverage with actual percentage if available
+        let coverage_detail = if let Some(ref trans_cov) = item.transitive_coverage {
+            format!(" (actual: {:.2}% line coverage)", trans_cov.direct * 100.0)
+        } else {
+            String::new()
+        };
         writeln!(
             output,
-            "│  │  ├─ Coverage:    {:.1} × {:.0}% = {:.2}",
+            "│  │  ├─ Coverage:    {:.1} × {:.0}% = {:.2}{}",
             item.unified_score.coverage_factor,
             weights.coverage * 100.0,
-            item.unified_score.coverage_factor * weights.coverage
+            item.unified_score.coverage_factor * weights.coverage,
+            coverage_detail
         )
         .unwrap();
 

@@ -153,14 +153,15 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
 
 impl LcovData {
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
-        self.functions.get(file).and_then(|funcs| {
-            funcs
-                .iter()
-                .find(|f| {
-                    normalize_function_name(&f.name) == normalize_function_name(function_name)
-                })
-                .map(|f| f.coverage_percentage / 100.0) // Convert percentage to fraction
-        })
+        // Try exact match first, then use path normalization
+        self.functions
+            .get(file)
+            .or_else(|| find_functions_by_path(&self.functions, file))
+            .and_then(|funcs| {
+                // Use a functional approach with multiple matching strategies
+                find_function_by_name(funcs, function_name).map(|f| f.coverage_percentage / 100.0)
+                // Convert percentage to fraction
+            })
     }
 
     pub fn get_function_coverage_with_line(
@@ -169,34 +170,16 @@ impl LcovData {
         function_name: &str,
         line: usize,
     ) -> Option<f64> {
-        // Try exact match first
-        if let Some(coverage) = self.get_function_coverage(file, function_name) {
-            return Some(coverage);
-        }
-
-        // Try to find by line number using function boundaries
-        self.functions.get(file).and_then(|funcs| {
-            // Sort functions by start line to determine boundaries
-            let mut sorted_funcs: Vec<_> = funcs.iter().collect();
-            sorted_funcs.sort_by_key(|f| f.start_line);
-
-            for (i, func) in sorted_funcs.iter().enumerate() {
-                let start_line = func.start_line;
-                // Determine end line based on next function's start line
-                let end_line = if i + 1 < sorted_funcs.len() {
-                    sorted_funcs[i + 1].start_line - 1
-                } else {
-                    // For the last function, use a reasonable bound based on function size
-                    // Most functions are reasonably sized, so use start + 50 as a fallback
-                    start_line + 50
-                };
-
-                if start_line <= line && line <= end_line {
-                    return Some(func.coverage_percentage / 100.0);
-                }
-            }
-            None
-        })
+        // Try exact match first, then use path normalization
+        self.functions
+            .get(file)
+            .or_else(|| find_functions_by_path(&self.functions, file))
+            .and_then(|funcs| {
+                // Try multiple strategies in order of preference
+                find_function_by_name(funcs, function_name)
+                    .or_else(|| find_function_by_line_with_tolerance(funcs, line, 2))
+                    .map(|f| f.coverage_percentage / 100.0)
+            })
     }
 
     /// Get function coverage using exact boundaries from AST analysis
@@ -206,24 +189,18 @@ impl LcovData {
         file: &Path,
         function_name: &str,
         start_line: usize,
-        end_line: usize,
+        _end_line: usize,
     ) -> Option<f64> {
-        // Try exact match first
-        if let Some(coverage) = self.get_function_coverage(file, function_name) {
-            return Some(coverage);
-        }
-
-        // If name doesn't match, calculate coverage from line data within the exact bounds
-        self.functions.get(file).and_then(|funcs| {
-            // Find any function that overlaps with the given bounds
-            funcs
-                .iter()
-                .find(|f| {
-                    // Check if this LCOV function overlaps with our AST function bounds
-                    f.start_line >= start_line && f.start_line <= end_line
-                })
-                .map(|f| f.coverage_percentage / 100.0)
-        })
+        // Try exact match first, then use path normalization
+        self.functions
+            .get(file)
+            .or_else(|| find_functions_by_path(&self.functions, file))
+            .and_then(|funcs| {
+                // Chain multiple matching strategies using functional composition
+                find_function_by_name(funcs, function_name)
+                    .or_else(|| find_function_by_line_with_tolerance(funcs, start_line, 2))
+                    .map(|f| f.coverage_percentage / 100.0)
+            })
     }
 
     pub fn get_overall_coverage(&self) -> f64 {
@@ -246,14 +223,97 @@ impl LcovData {
     }
 }
 
-// Normalize function names for better matching
+/// Find a function by name using multiple matching strategies
+/// Returns the first match found using these strategies in order:
+/// 1. Exact match
+/// 2. Normalized match (handling generics and special characters)
+/// 3. Suffix match (for module-qualified names)
+fn find_function_by_name<'a>(
+    funcs: &'a [FunctionCoverage],
+    target_name: &str,
+) -> Option<&'a FunctionCoverage> {
+    // Strategy 1: Exact match
+    funcs
+        .iter()
+        .find(|f| f.name == target_name)
+        // Strategy 2: Normalized match
+        .or_else(|| {
+            let normalized_target = normalize_function_name(target_name);
+            funcs
+                .iter()
+                .find(|f| normalize_function_name(&f.name) == normalized_target)
+        })
+        // Strategy 3: Suffix match (e.g., "module::function" matches "function")
+        .or_else(|| {
+            funcs
+                .iter()
+                .find(|f| f.name.ends_with(target_name) || target_name.ends_with(&f.name))
+        })
+}
+
+/// Find a function by line number with tolerance for AST/LCOV discrepancies
+/// Pure function that searches for functions within a line range
+fn find_function_by_line_with_tolerance(
+    funcs: &[FunctionCoverage],
+    target_line: usize,
+    tolerance: usize,
+) -> Option<&FunctionCoverage> {
+    funcs
+        .iter()
+        .filter(|f| {
+            let line_diff = (f.start_line as i32 - target_line as i32).abs();
+            line_diff <= tolerance as i32
+        })
+        // If multiple matches within tolerance, prefer the closest one
+        .min_by_key(|f| (f.start_line as i32 - target_line as i32).abs())
+}
+
+/// Normalize function names for matching
+/// This is now a pure function used internally by the matching strategies
 fn normalize_function_name(name: &str) -> String {
     // Handle Rust function names with generics and impl blocks
-    name.replace("<", "_")
-        .replace(">", "_")
+    name.replace(['<', '>'], "_")
         .replace("::", "_")
-        .replace(" ", "_")
-        .replace("'", "")
+        .replace(' ', "_")
+        .replace('\'', "")
+}
+
+/// Find functions by normalizing and matching paths
+/// This handles cases where LCOV has relative paths but queries use absolute paths, or vice versa
+fn find_functions_by_path<'a>(
+    functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
+    query_path: &Path,
+) -> Option<&'a Vec<FunctionCoverage>> {
+    // Strategy 1: Direct lookup (already tried by caller)
+
+    // Strategy 2: Check if query path ends with any LCOV path (absolute query, relative LCOV)
+    functions
+        .iter()
+        .find(|(lcov_path, _)| query_path.ends_with(lcov_path))
+        .map(|(_, funcs)| funcs)
+        .or_else(|| {
+            // Strategy 3: Check if any LCOV path ends with query path (relative query, absolute LCOV)
+            functions
+                .iter()
+                .find(|(lcov_path, _)| lcov_path.ends_with(query_path))
+                .map(|(_, funcs)| funcs)
+        })
+        .or_else(|| {
+            // Strategy 4: Strip leading ./ from either path and compare
+            let normalized_query = normalize_path(query_path);
+            functions
+                .iter()
+                .find(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
+                .map(|(_, funcs)| funcs)
+        })
+}
+
+/// Normalize a path by removing leading ./ and resolving components
+fn normalize_path(path: &Path) -> PathBuf {
+    // Convert to string, remove leading ./
+    let path_str = path.to_string_lossy();
+    let cleaned = path_str.strip_prefix("./").unwrap_or(&path_str);
+    PathBuf::from(cleaned)
 }
 
 #[cfg(test)]
