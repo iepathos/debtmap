@@ -11,8 +11,6 @@ use self::verbosity::format_priority_item_with_verbosity;
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
     Default,        // Top 10 with clean formatting
-    PrioritiesOnly, // Minimal list
-    Detailed,       // Full analysis with priority overlay
     Top(usize),     // Top N items
     Tail(usize),    // Bottom N items (lowest priority)
 }
@@ -28,10 +26,6 @@ pub fn format_priorities_with_verbosity(
 ) -> String {
     match format {
         OutputFormat::Default => format_default_with_verbosity(analysis, 10, verbosity),
-        OutputFormat::PrioritiesOnly => {
-            format_priorities_only_with_verbosity(analysis, 10, verbosity)
-        }
-        OutputFormat::Detailed => format_detailed_with_verbosity(analysis, verbosity),
         OutputFormat::Top(n) => format_default_with_verbosity(analysis, n, verbosity),
         OutputFormat::Tail(n) => format_tail_with_verbosity(analysis, n, verbosity),
     }
@@ -97,35 +91,6 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     format_default_with_verbosity(analysis, limit, 0)
 }
 
-fn format_priorities_only_with_verbosity(
-    analysis: &UnifiedAnalysis,
-    limit: usize,
-    _verbosity: u8,
-) -> String {
-    // Use the original format_priorities_only for backward compatibility
-    format_priorities_only(analysis, limit)
-}
-
-fn format_detailed_with_verbosity(analysis: &UnifiedAnalysis, verbosity: u8) -> String {
-    let mut output = String::new();
-
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
-    writeln!(
-        output,
-        "    {}",
-        "UNIFIED PRIORITY ANALYSIS".bright_white().bold()
-    )
-    .unwrap();
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
-    writeln!(output).unwrap();
-
-    for (idx, item) in analysis.items.iter().enumerate() {
-        format_priority_item_with_verbosity(&mut output, idx + 1, item, verbosity);
-        writeln!(output).unwrap();
-    }
-
-    output
-}
 
 fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u8) -> String {
     let mut output = String::new();
@@ -214,48 +179,6 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     output
 }
 
-fn format_priorities_only(analysis: &UnifiedAnalysis, limit: usize) -> String {
-    let mut output = String::new();
-
-    writeln!(output, "{}", "TOP PRIORITIES:".bright_white().bold()).unwrap();
-
-    let top_items = analysis.get_top_priorities(limit);
-    for (idx, item) in top_items.iter().enumerate() {
-        if idx >= limit {
-            break;
-        }
-        writeln!(
-            output,
-            "{}. {}: {}:{} {}()",
-            idx + 1,
-            get_action_verb(&item.debt_type),
-            item.location.file.display(),
-            item.location.line,
-            item.location.function
-        )
-        .unwrap();
-    }
-
-    writeln!(output).unwrap();
-
-    let critical_count = top_items
-        .iter()
-        .filter(|i| i.unified_score.final_score >= 8.0)
-        .count();
-    let high_count = top_items
-        .iter()
-        .filter(|i| i.unified_score.final_score >= 6.0 && i.unified_score.final_score < 8.0)
-        .count();
-
-    writeln!(
-        output,
-        "High-impact items: {critical_count} critical, {high_count} high priority"
-    )
-    .unwrap();
-    writeln!(output, "Focus on measurable code quality improvements").unwrap();
-
-    output
-}
 
 #[allow(dead_code)]
 fn format_detailed(analysis: &UnifiedAnalysis) -> String {
@@ -595,45 +518,6 @@ fn format_role(role: FunctionRole) -> &'static str {
     }
 }
 
-fn get_action_verb(debt_type: &DebtType) -> &'static str {
-    match debt_type {
-        DebtType::TestingGap { .. } => "Add tests",
-        DebtType::ComplexityHotspot { .. } => "Reduce complexity",
-        DebtType::DeadCode { .. } => "Remove dead code",
-        DebtType::Duplication { .. } => "Extract duplication",
-        DebtType::Risk { .. } => "Fix debt",
-        DebtType::TestComplexityHotspot { .. } => "Simplify test",
-        DebtType::TestTodo { .. } => "Complete TODO",
-        DebtType::TestDuplication { .. } => "Remove test duplication",
-        DebtType::ErrorSwallowing { .. } => "Fix error swallowing",
-        // Security debt types
-        DebtType::HardcodedSecrets { .. } => "Remove hardcoded secrets",
-        DebtType::WeakCryptography { .. } => "Upgrade cryptography",
-        DebtType::SqlInjectionRisk { .. } => "Secure SQL queries",
-        DebtType::UnsafeCode { .. } => "Justify or remove unsafe",
-        DebtType::InputValidationGap { .. } => "Add input validation",
-        // Resource Management debt types
-        DebtType::AllocationInefficiency { .. } => "Optimize allocations",
-        DebtType::StringConcatenation { .. } => "Use string builder",
-        DebtType::NestedLoops { .. } => "Reduce loop complexity",
-        DebtType::BlockingIO { .. } => "Make async",
-        DebtType::SuboptimalDataStructure { .. } => "Change data structure",
-        // Organization debt types
-        DebtType::GodObject { .. } => "Split responsibilities",
-        DebtType::FeatureEnvy { .. } => "Move method",
-        DebtType::PrimitiveObsession { .. } => "Create domain type",
-        DebtType::MagicValues { .. } => "Extract constants",
-        // Testing quality debt types
-        DebtType::AssertionComplexity { .. } => "Simplify assertions",
-        DebtType::FlakyTestPattern { .. } => "Fix test reliability",
-        // Resource management debt types
-        DebtType::AsyncMisuse { .. } => "Fix async pattern",
-        DebtType::ResourceLeak { .. } => "Add cleanup",
-        DebtType::CollectionInefficiency { .. } => "Optimize collection usage",
-        // Basic Security debt type
-        DebtType::BasicSecurity { .. } => "Fix security issue",
-    }
-}
 
 pub fn get_severity_label(score: f64) -> &'static str {
     if score >= 8.0 {
@@ -755,21 +639,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_format_priorities_only() {
-        let mut analysis = UnifiedAnalysis::new(CallGraph::new());
-        analysis.add_item(create_test_item(9.0));
-        analysis.add_item(create_test_item(7.0));
-        analysis.add_item(create_test_item(5.0));
-        analysis.sort_by_priority();
-
-        let output = format_priorities(&analysis, OutputFormat::PrioritiesOnly);
-        let output_plain = strip_ansi_codes(&output);
-
-        assert!(output_plain.contains("TOP PRIORITIES:"));
-        assert!(output_plain.contains("1. Add tests"));
-        assert!(output_plain.contains("High-impact items"));
-    }
 
     #[test]
     fn test_format_default() {

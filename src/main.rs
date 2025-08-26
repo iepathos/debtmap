@@ -31,32 +31,18 @@ struct AnalyzeConfig {
     _disable_context: Option<Vec<String>>,
     top: Option<usize>,
     tail: Option<usize>,
-    priorities_only: bool,
-    detailed: bool,
     semantic_off: bool,
     verbosity: u8,
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
     #[allow(dead_code)]
-    comprehensive: bool,
-    #[allow(dead_code)]
-    security_only: bool,
-    #[allow(dead_code)]
     security_enhanced: bool,
-    #[allow(dead_code)]
-    organization_only: bool,
-    #[allow(dead_code)]
-    testing_only: bool,
-    #[allow(dead_code)]
-    resource_only: bool,
     #[allow(dead_code)]
     group_by_category: bool,
     #[allow(dead_code)]
     min_priority: Option<String>,
     #[allow(dead_code)]
     filter_categories: Option<Vec<String>>,
-    #[allow(dead_code)]
-    exclude_tests: bool,
     #[allow(dead_code)]
     no_context_aware: bool,
     threshold_preset: Option<cli::ThresholdPreset>,
@@ -76,10 +62,6 @@ struct ValidateConfig {
     top: Option<usize>,
     #[allow(dead_code)]
     tail: Option<usize>,
-    #[allow(dead_code)]
-    priorities_only: bool,
-    #[allow(dead_code)]
-    detailed: bool,
     #[allow(dead_code)]
     semantic_off: bool,
     verbosity: u8,
@@ -119,35 +101,19 @@ fn main() -> Result<()> {
             disable_context,
             top,
             tail,
-            priorities_only,
-            detailed,
             semantic_off,
             explain_score: _,
             verbosity,
             verbose_macro_warnings,
             show_macro_stats,
-            comprehensive,
-            security_only,
             security_enhanced,
-            organization_only,
-            testing_only,
-            resource_only,
             group_by_category,
             min_priority,
             filter_categories,
-            enhanced_scoring,
-            legacy_scoring,
-            exclude_tests,
             no_context_aware,
             threshold_preset,
         } => {
-            // Set enhanced scoring environment variable
-            if legacy_scoring {
-                std::env::set_var("DEBTMAP_ENHANCED_SCORING", "false");
-            } else if enhanced_scoring {
-                std::env::set_var("DEBTMAP_ENHANCED_SCORING", "true");
-            }
-            // Default is true (enhanced scoring enabled)
+            // Enhanced scoring is always enabled (no need for environment variable)
 
             // Set context-aware environment variable (enabled by default)
             if !no_context_aware {
@@ -167,22 +133,14 @@ fn main() -> Result<()> {
                 _disable_context: disable_context,
                 top,
                 tail,
-                priorities_only,
-                detailed,
                 semantic_off,
                 verbosity,
                 verbose_macro_warnings,
                 show_macro_stats,
-                comprehensive,
-                security_only,
                 security_enhanced,
-                organization_only,
-                testing_only,
-                resource_only,
                 group_by_category,
                 min_priority,
                 filter_categories,
-                exclude_tests,
                 no_context_aware,
                 threshold_preset,
             };
@@ -200,8 +158,6 @@ fn main() -> Result<()> {
             disable_context,
             top,
             tail,
-            priorities_only,
-            detailed,
             semantic_off,
             explain_score: _,
             verbosity,
@@ -218,8 +174,6 @@ fn main() -> Result<()> {
                 disable_context,
                 top,
                 tail,
-                priorities_only,
-                detailed,
                 semantic_off,
             };
             validate_project(config)
@@ -274,8 +228,6 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         unified_analysis,
         config.top,
         config.tail,
-        config.priorities_only,
-        config.detailed,
         config.verbosity,
         config.output,
         Some(config.format),
@@ -1420,54 +1372,39 @@ fn create_debt_item_from_metric_with_aggregator(
     use priority::unified_scorer;
     use std::collections::HashSet;
 
-    // Check if enhanced scoring is enabled
-    let use_enhanced_scoring =
-        std::env::var("DEBTMAP_ENHANCED_SCORING").unwrap_or_else(|_| "true".to_string()) == "true";
+    // Always use enhanced scoring
+    // Create scoring context
+    let mut scoring_context = ScoringContext::new(call_graph.clone());
 
-    if use_enhanced_scoring {
-        // Create scoring context
-        let mut scoring_context = ScoringContext::new(call_graph.clone());
-
-        // Add coverage data if available
-        if let Some(lcov) = coverage_data {
-            scoring_context = scoring_context.with_coverage(lcov.clone());
-        }
-
-        // Identify test files
-        let test_files: HashSet<std::path::PathBuf> = HashSet::new();
-        scoring_context = scoring_context.with_test_files(test_files);
-
-        // Create enhanced scorer
-        let scorer = EnhancedScorer::new(&scoring_context);
-
-        // Score the function
-        let score_breakdown = scorer.score_function_with_aggregator(metric, debt_aggregator);
-
-        // Convert to UnifiedDebtItem with enhanced score
-        let mut item = unified_scorer::create_unified_debt_item_with_aggregator(
-            metric,
-            call_graph,
-            coverage_data,
-            framework_exclusions,
-            function_pointer_used_functions,
-            debt_aggregator,
-        );
-
-        // Override the final score with enhanced score
-        item.unified_score.final_score = score_breakdown.total;
-
-        item
-    } else {
-        // Use original scoring
-        unified_scorer::create_unified_debt_item_with_aggregator(
-            metric,
-            call_graph,
-            coverage_data,
-            framework_exclusions,
-            function_pointer_used_functions,
-            debt_aggregator,
-        )
+    // Add coverage data if available
+    if let Some(lcov) = coverage_data {
+        scoring_context = scoring_context.with_coverage(lcov.clone());
     }
+
+    // Identify test files
+    let test_files: HashSet<std::path::PathBuf> = HashSet::new();
+    scoring_context = scoring_context.with_test_files(test_files);
+
+    // Create enhanced scorer
+    let scorer = EnhancedScorer::new(&scoring_context);
+
+    // Score the function
+    let score_breakdown = scorer.score_function_with_aggregator(metric, debt_aggregator);
+
+    // Convert to UnifiedDebtItem with enhanced score
+    let mut item = unified_scorer::create_unified_debt_item_with_aggregator(
+        metric,
+        call_graph,
+        coverage_data,
+        framework_exclusions,
+        function_pointer_used_functions,
+        debt_aggregator,
+    );
+
+    // Override the final score with enhanced score
+    item.unified_score.final_score = score_breakdown.total;
+
+    item
 }
 
 /// Convert error swallowing debt items to unified debt items
@@ -1729,18 +1666,12 @@ fn perform_unified_analysis(
 
 /// Determines the priority output format based on command line flags
 fn determine_priority_output_format(
-    priorities_only: bool,
-    detailed: bool,
     top: Option<usize>,
     tail: Option<usize>,
 ) -> priority::formatter::OutputFormat {
     use priority::formatter::OutputFormat;
 
-    if priorities_only {
-        OutputFormat::PrioritiesOnly
-    } else if detailed {
-        OutputFormat::Detailed
-    } else if let Some(n) = tail {
+    if let Some(n) = tail {
         OutputFormat::Tail(n)
     } else if let Some(n) = top {
         OutputFormat::Top(n)
@@ -1811,8 +1742,6 @@ fn output_markdown(
 /// Handles terminal format output
 fn output_terminal(
     analysis: &priority::UnifiedAnalysis,
-    priorities_only: bool,
-    detailed: bool,
     top: Option<usize>,
     tail: Option<usize>,
     verbosity: u8,
@@ -1821,7 +1750,7 @@ fn output_terminal(
     use std::fs;
     use std::io::Write;
 
-    let format = determine_priority_output_format(priorities_only, detailed, top, tail);
+    let format = determine_priority_output_format(top, tail);
     let output = priority::formatter::format_priorities_with_verbosity(analysis, format, verbosity);
 
     if let Some(path) = output_file {
@@ -1838,8 +1767,6 @@ fn output_unified_priorities(
     analysis: priority::UnifiedAnalysis,
     top: Option<usize>,
     tail: Option<usize>,
-    priorities_only: bool,
-    detailed: bool,
     verbosity: u8,
     output_file: Option<PathBuf>,
     output_format: Option<cli::OutputFormat>,
@@ -1852,8 +1779,6 @@ fn output_unified_priorities(
     } else {
         output_terminal(
             &analysis,
-            priorities_only,
-            detailed,
             top,
             tail,
             verbosity,
@@ -2987,41 +2912,19 @@ end_of_record
         let _ = passing;
     }
 
-    #[test]
-    fn test_determine_priority_output_format_priorities_only() {
-        use priority::formatter::OutputFormat;
 
-        let format = determine_priority_output_format(true, false, None, None);
-        assert!(matches!(format, OutputFormat::PrioritiesOnly));
-
-        // priorities_only takes precedence over other flags
-        let format = determine_priority_output_format(true, true, Some(5), None);
-        assert!(matches!(format, OutputFormat::PrioritiesOnly));
-    }
-
-    #[test]
-    fn test_determine_priority_output_format_detailed() {
-        use priority::formatter::OutputFormat;
-
-        let format = determine_priority_output_format(false, true, None, None);
-        assert!(matches!(format, OutputFormat::Detailed));
-
-        // detailed takes precedence over top when priorities_only is false
-        let format = determine_priority_output_format(false, true, Some(5), None);
-        assert!(matches!(format, OutputFormat::Detailed));
-    }
 
     #[test]
     fn test_determine_priority_output_format_top() {
         use priority::formatter::OutputFormat;
 
-        let format = determine_priority_output_format(false, false, Some(5), None);
+        let format = determine_priority_output_format(Some(5), None);
         assert!(matches!(format, OutputFormat::Top(5)));
 
-        let format = determine_priority_output_format(false, false, Some(10), None);
+        let format = determine_priority_output_format(Some(10), None);
         assert!(matches!(format, OutputFormat::Top(10)));
 
-        let format = determine_priority_output_format(false, false, Some(1), None);
+        let format = determine_priority_output_format(Some(1), None);
         assert!(matches!(format, OutputFormat::Top(1)));
     }
 
@@ -3029,7 +2932,7 @@ end_of_record
     fn test_determine_priority_output_format_default() {
         use priority::formatter::OutputFormat;
 
-        let format = determine_priority_output_format(false, false, None, None);
+        let format = determine_priority_output_format(None, None);
         assert!(matches!(format, OutputFormat::Default));
     }
 
@@ -3037,18 +2940,19 @@ end_of_record
     fn test_determine_priority_output_format_precedence_order() {
         use priority::formatter::OutputFormat;
 
-        // Test full precedence: priorities_only > detailed > top > default
-        let format = determine_priority_output_format(true, true, Some(5), None);
-        assert!(matches!(format, OutputFormat::PrioritiesOnly));
-
-        let format = determine_priority_output_format(false, true, Some(5), None);
-        assert!(matches!(format, OutputFormat::Detailed));
-
-        let format = determine_priority_output_format(false, false, Some(5), None);
+        // Test precedence: tail > top > default
+        let format = determine_priority_output_format(Some(5), None);
         assert!(matches!(format, OutputFormat::Top(5)));
 
-        let format = determine_priority_output_format(false, false, None, None);
+        let format = determine_priority_output_format(None, None);
         assert!(matches!(format, OutputFormat::Default));
+
+        let format = determine_priority_output_format(None, Some(3));
+        assert!(matches!(format, OutputFormat::Tail(3)));
+
+        // tail takes precedence over top
+        let format = determine_priority_output_format(Some(5), Some(3));
+        assert!(matches!(format, OutputFormat::Tail(3)));
     }
 
     #[test]
@@ -3056,19 +2960,15 @@ end_of_record
         use priority::formatter::OutputFormat;
 
         // tail should work when specified alone
-        let format = determine_priority_output_format(false, false, None, Some(5));
+        let format = determine_priority_output_format(None, Some(5));
         assert!(matches!(format, OutputFormat::Tail(5)));
 
         // tail with different values
-        let format = determine_priority_output_format(false, false, None, Some(10));
+        let format = determine_priority_output_format(None, Some(10));
         assert!(matches!(format, OutputFormat::Tail(10)));
 
-        // tail should be overridden by detailed
-        let format = determine_priority_output_format(false, true, None, Some(5));
-        assert!(matches!(format, OutputFormat::Detailed));
-
         // tail should take precedence over top when both are specified
-        let format = determine_priority_output_format(false, false, Some(3), Some(5));
+        let format = determine_priority_output_format(Some(3), Some(5));
         assert!(matches!(format, OutputFormat::Tail(5)));
     }
 
@@ -3115,8 +3015,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
         assert_eq!(
@@ -3139,8 +3037,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
         assert_eq!(
@@ -3163,8 +3059,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
         // Format takes precedence over output
@@ -3188,8 +3082,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
         assert_eq!(determine_output_format(&config), None);
@@ -3996,8 +3888,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
 
@@ -4041,8 +3931,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
 
@@ -4077,8 +3965,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
 
@@ -4146,8 +4032,6 @@ end_of_record
             disable_context: None,
             top: None,
             tail: None,
-            priorities_only: false,
-            detailed: false,
             semantic_off: false,
         };
 
@@ -4528,7 +4412,7 @@ end_of_record
         };
 
         // Test terminal output without error
-        let result = output_terminal(&analysis, false, false, Some(5), None, 0, None);
+        let result = output_terminal(&analysis, Some(5), None, 0, None);
         assert!(result.is_ok());
     }
 
@@ -4554,8 +4438,6 @@ end_of_record
 
         let result = output_terminal(
             &analysis,
-            true,
-            false,
             None,
             Some(5),
             2,
@@ -4589,8 +4471,6 @@ end_of_record
             analysis,
             None,
             None,
-            false,
-            false,
             0,
             Some(output_path.clone()),
             Some(cli::OutputFormat::Json),
@@ -4627,8 +4507,6 @@ end_of_record
             analysis,
             Some(5),
             None,
-            false,
-            false,
             1,
             Some(output_path.clone()),
             None,
@@ -4665,8 +4543,6 @@ end_of_record
             analysis,
             None,
             Some(3),
-            false,
-            true,
             2,
             Some(output_path.clone()),
             None,

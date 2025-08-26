@@ -71,13 +71,7 @@ pub enum Commands {
         #[arg(long = "tail")]
         tail: Option<usize>,
 
-        /// Show priorities only (minimal output)
-        #[arg(long = "priorities-only")]
-        priorities_only: bool,
 
-        /// Show detailed analysis with priority breakdown
-        #[arg(long = "detailed")]
-        detailed: bool,
 
         /// Disable semantic analysis (fallback mode)
         #[arg(long = "semantic-off")]
@@ -102,29 +96,14 @@ pub enum Commands {
         #[arg(long = "show-macro-stats")]
         show_macro_stats: bool,
 
-        /// Enable comprehensive debt analysis (all categories)
-        #[arg(long = "comprehensive")]
-        comprehensive: bool,
 
-        /// Enable security analysis only
-        #[arg(long = "security-only")]
-        security_only: bool,
 
         /// Enable enhanced security analysis with additional detectors
         #[arg(long = "security-enhanced")]
         security_enhanced: bool,
 
-        /// Enable organization analysis only
-        #[arg(long = "organization-only")]
-        organization_only: bool,
 
-        /// Enable testing quality analysis only
-        #[arg(long = "testing-only")]
-        testing_only: bool,
 
-        /// Enable resource management analysis only
-        #[arg(long = "resource-only")]
-        resource_only: bool,
 
         /// Group output by debt category
         #[arg(long = "group-by-category")]
@@ -138,17 +117,6 @@ pub enum Commands {
         #[arg(long = "filter", value_delimiter = ',')]
         filter_categories: Option<Vec<String>>,
 
-        /// Enable enhanced scoring differentiation (default: enabled)
-        #[arg(long = "enhanced-scoring")]
-        enhanced_scoring: bool,
-
-        /// Use legacy scoring algorithm
-        #[arg(long = "legacy-scoring")]
-        legacy_scoring: bool,
-
-        /// Exclude test code from analysis
-        #[arg(long = "exclude-tests")]
-        exclude_tests: bool,
 
         /// Disable context-aware false positive reduction (enabled by default)
         #[arg(long = "no-context-aware")]
@@ -207,13 +175,7 @@ pub enum Commands {
         #[arg(long = "tail")]
         tail: Option<usize>,
 
-        /// Show priorities only (minimal output)
-        #[arg(long = "priorities-only")]
-        priorities_only: bool,
 
-        /// Show detailed analysis with priority breakdown
-        #[arg(long = "detailed")]
-        detailed: bool,
 
         /// Disable semantic analysis (fallback mode)
         #[arg(long = "semantic-off")]
