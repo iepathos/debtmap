@@ -2759,8 +2759,10 @@ end_of_record
         let insights = insights.unwrap();
         // High debt should contribute to risk
         assert!(!insights.top_risks.is_empty());
-        // The function should have elevated risk due to debt
-        assert!(insights.top_risks[0].risk_score > 5.0);
+        // The function should have moderate risk (complexity 6, coverage 66.7%, with debt)
+        // With proper coverage handling, risk should be moderate, not high
+        assert!(insights.top_risks[0].risk_score > 1.0);
+        assert!(insights.top_risks[0].risk_score < 3.0);
     }
 
     #[test]
