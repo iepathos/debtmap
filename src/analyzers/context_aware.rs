@@ -208,8 +208,6 @@ mod tests {
         assert_eq!(adjust_priority(Priority::Critical, -999), Priority::Low);
     }
 
-
-
     #[test]
     fn test_debt_type_to_pattern_other_types() {
         // Test Todo debt type
@@ -232,5 +230,4 @@ mod tests {
         let pattern = debt_type_to_pattern(&DebtType::Duplication, "Duplicate code detected");
         assert_eq!(pattern, DebtPattern::DebtType(DebtType::Duplication));
     }
-
 }

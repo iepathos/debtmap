@@ -8,6 +8,7 @@ pub mod complexity;
 pub mod config;
 pub mod context;
 pub mod core;
+pub mod data_flow;
 pub mod database;
 pub mod debt;
 pub mod extraction_patterns;

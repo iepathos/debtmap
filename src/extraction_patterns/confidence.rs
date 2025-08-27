@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_confidence_scoring() {
-        let scorer = ConfidenceScorer::new();
+        let _scorer = ConfidenceScorer::new();
 
         // Test accumulation loop pattern
         let pattern = ExtractablePattern::AccumulationLoop {

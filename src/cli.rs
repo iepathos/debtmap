@@ -94,7 +94,6 @@ pub enum Commands {
         #[arg(long = "show-macro-stats")]
         show_macro_stats: bool,
 
-
         /// Group output by debt category
         #[arg(long = "group-by-category")]
         group_by_category: bool,

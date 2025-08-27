@@ -26,6 +26,7 @@ pub struct UnifiedAnalysis {
     pub total_impact: ImpactMetrics,
     pub total_debt_score: f64,
     pub call_graph: CallGraph,
+    pub data_flow_graph: crate::data_flow::DataFlowGraph,
     pub overall_coverage: Option<f64>,
 }
 
@@ -176,6 +177,9 @@ pub enum FunctionVisibility {
 
 impl UnifiedAnalysis {
     pub fn new(call_graph: CallGraph) -> Self {
+        // Create DataFlowGraph from the CallGraph
+        let data_flow_graph = crate::data_flow::DataFlowGraph::from_call_graph(call_graph.clone());
+
         Self {
             items: Vector::new(),
             total_impact: ImpactMetrics {
@@ -186,6 +190,7 @@ impl UnifiedAnalysis {
             },
             total_debt_score: 0.0,
             call_graph,
+            data_flow_graph,
             overall_coverage: None,
         }
     }
@@ -239,15 +244,6 @@ impl UnifiedAnalysis {
             self.items.push_back(item);
         }
     }
-
-
-
-
-
-
-
-
-
 
     pub fn sort_by_priority(&mut self) {
         let mut items_vec: Vec<UnifiedDebtItem> = self.items.iter().cloned().collect();
@@ -312,11 +308,62 @@ impl UnifiedAnalysis {
             self.items.iter().skip(total_items - n).cloned().collect()
         }
     }
+
+    /// Get a reference to the data flow graph
+    pub fn data_flow_graph(&self) -> &crate::data_flow::DataFlowGraph {
+        &self.data_flow_graph
+    }
+
+    /// Get a mutable reference to the data flow graph
+    pub fn data_flow_graph_mut(&mut self) -> &mut crate::data_flow::DataFlowGraph {
+        &mut self.data_flow_graph
+    }
+
+    /// Populate the data flow graph with purity analysis data from function metrics
+    pub fn populate_purity_analysis(&mut self, metrics: &[crate::core::FunctionMetrics]) {
+        use crate::data_flow::PurityInfo;
+        use crate::priority::call_graph::FunctionId;
+
+        for metric in metrics {
+            let func_id = FunctionId {
+                file: metric.file.clone(),
+                name: metric.name.clone(),
+                line: metric.line,
+            };
+
+            let purity_info = PurityInfo {
+                is_pure: metric.is_pure.unwrap_or(false),
+                confidence: metric.purity_confidence.unwrap_or(0.0),
+                impurity_reasons: if !metric.is_pure.unwrap_or(false) {
+                    vec!["Function may have side effects".to_string()]
+                } else {
+                    vec![]
+                },
+            };
+
+            self.data_flow_graph.set_purity_info(func_id, purity_info);
+        }
+    }
+
+    /// Add I/O operation detected during analysis
+    pub fn add_io_operation(
+        &mut self,
+        func_id: call_graph::FunctionId,
+        operation: crate::data_flow::IoOperation,
+    ) {
+        self.data_flow_graph.add_io_operation(func_id, operation);
+    }
+
+    /// Add variable dependencies for a function
+    pub fn add_variable_dependencies(
+        &mut self,
+        func_id: call_graph::FunctionId,
+        variables: std::collections::HashSet<String>,
+    ) {
+        self.data_flow_graph
+            .add_variable_dependencies(func_id, variables);
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::priority::CallGraph;
-
-}
+mod tests {}

@@ -312,20 +312,36 @@ fn detect_language(path: &std::path::Path) -> String {
 }
 
 fn detect_side_effects(func: &FunctionMetrics, data_flow: Option<&DataFlowGraph>) -> bool {
-    // Simple heuristic for now - can be enhanced with data flow analysis
-    if let Some(_flow) = data_flow {
-        // Check for I/O operations, mutations, etc.
-        false // Placeholder
+    if let Some(flow) = data_flow {
+        // Create a FunctionId from the function metrics for lookup
+        let func_id = crate::priority::call_graph::FunctionId {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            line: func.line,
+        };
+
+        // Use data flow analysis to detect side effects
+        flow.has_side_effects(&func_id)
     } else {
         // Conservative estimate based on function metrics
+        // Functions with high complexity are more likely to have side effects
         func.cyclomatic > 10
     }
 }
 
-fn extract_dependencies(_func: &FunctionMetrics, data_flow: Option<&DataFlowGraph>) -> Vec<String> {
-    // Extract variable dependencies from data flow graph
-    if let Some(_flow) = data_flow {
-        Vec::new() // Placeholder
+fn extract_dependencies(func: &FunctionMetrics, data_flow: Option<&DataFlowGraph>) -> Vec<String> {
+    if let Some(flow) = data_flow {
+        // Create a FunctionId from the function metrics for lookup
+        let func_id = crate::priority::call_graph::FunctionId {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            line: func.line,
+        };
+
+        // Extract variable dependencies from data flow graph
+        flow.get_variable_dependencies(&func_id)
+            .map(|deps| deps.iter().cloned().collect())
+            .unwrap_or_default()
     } else {
         Vec::new()
     }

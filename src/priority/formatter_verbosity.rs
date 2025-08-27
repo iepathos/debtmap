@@ -152,7 +152,6 @@ pub fn format_priority_item_with_verbosity(
         )
         .unwrap();
 
-
         // Show semantic and organization with 0% weight for transparency
         // These were removed per spec 58 but keeping in display for clarity
         if weights.semantic > 0.0 || weights.organization > 0.0 {

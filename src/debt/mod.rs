@@ -128,7 +128,6 @@ mod tests {
         assert_eq!(type_weight(&DebtType::Complexity), 5);
     }
 
-
     #[test]
     fn test_type_weight_all_variants() {
         // Test all debt type variants to ensure complete coverage
@@ -160,7 +159,6 @@ mod tests {
         let low_todo = create_test_item(DebtType::Todo, Priority::Low);
         assert_eq!(calculate_debt_score(&low_todo), 1); // 1 * 1
 
-
         let critical_complexity = create_test_item(DebtType::Complexity, Priority::Critical);
         assert_eq!(calculate_debt_score(&critical_complexity), 50); // 10 * 5
 
@@ -169,7 +167,6 @@ mod tests {
 
         let complexity_high = create_test_item(DebtType::Complexity, Priority::High);
         assert_eq!(calculate_debt_score(&complexity_high), 25); // 5 * 5
-
     }
 
     #[test]

@@ -40,7 +40,7 @@ impl FunctionDebtProfile {
     }
 
     pub fn total_issues(&self) -> usize {
- self.organization_issues.len()
+        self.organization_issues.len()
             + self.testing_issues.len()
             + self.resource_issues.len()
             + self.duplication_issues.len()
@@ -58,10 +58,10 @@ pub enum DebtCategory {
 impl DebtCategory {
     pub fn severity_weight(&self) -> f64 {
         match self {
-            DebtCategory::Resource => 2.5,     // High priority (error handling, leaks)
+            DebtCategory::Resource => 2.5, // High priority (error handling, leaks)
             DebtCategory::Organization => 1.5, // Medium priority
-            DebtCategory::Testing => 1.0,      // Lower priority
-            DebtCategory::Duplication => 1.2,  // Medium-low priority
+            DebtCategory::Testing => 1.0,  // Lower priority
+            DebtCategory::Duplication => 1.2, // Medium-low priority
         }
     }
 }

@@ -75,7 +75,6 @@ impl JavaScriptDetectorVisitor {
         );
     }
 
-
     fn detect_resource_patterns(&mut self, root: Node) {
         resource::detect_resource_patterns(
             root,
@@ -103,7 +102,6 @@ impl JavaScriptDetectorVisitor {
         for pattern in &self.organization_patterns {
             items.push(pattern.to_debt_item(&self.path));
         }
-
 
         // Convert resource issues
         for issue in &self.resource_issues {

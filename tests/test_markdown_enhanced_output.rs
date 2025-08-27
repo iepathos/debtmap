@@ -22,7 +22,6 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
             complexity_factor: 7.5,
             coverage_factor: 8.0,
             dependency_factor: 4.0,
-            security_factor: 0.0,
             role_multiplier: 1.2,
             final_score: 7.8,
         },

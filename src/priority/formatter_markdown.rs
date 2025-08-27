@@ -279,7 +279,6 @@ fn format_score_breakdown_with_coverage(
     )
     .unwrap();
 
-
     // Organization factor removed per spec 58 - redundant with complexity factor
 
     // New weights after removing security: complexity, coverage, dependency

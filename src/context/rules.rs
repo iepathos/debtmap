@@ -324,7 +324,6 @@ impl ContextRuleEngine {
             reason: Some("Test functions use literal strings for test cases".to_string()),
         });
 
-
         // Build scripts have different constraints
         self.add_rule(ContextRule {
             pattern: DebtPattern::All,
@@ -454,7 +453,6 @@ mod tests {
         let regular_context = FunctionContext::new().with_role(FunctionRole::Unknown);
         let action = engine.evaluate(&DebtPattern::BlockingIO, &regular_context);
         assert_eq!(action, RuleAction::Deny);
-
     }
 
     #[test]

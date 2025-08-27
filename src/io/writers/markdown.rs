@@ -200,10 +200,7 @@ fn format_score_factors(score: &crate::priority::unified_scorer::UnifiedScore) -
          - **Coverage Factor**: {:.2}\n\
          - **Dependency Factor**: {:.2}\n\
 ",
-        score.final_score,
-        score.complexity_factor,
-        score.coverage_factor,
-        score.dependency_factor
+        score.final_score, score.complexity_factor, score.coverage_factor, score.dependency_factor
     )
 }
 
@@ -675,7 +672,6 @@ mod tests {
                 complexity_factor: 0.8,
                 coverage_factor: 0.6,
                 dependency_factor: 0.5,
-                security_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::ComplexityHotspot {
@@ -717,7 +713,6 @@ mod tests {
             complexity_factor: 0.85,
             coverage_factor: 0.65,
             dependency_factor: 0.45,
-            security_factor: 0.0,
             role_multiplier: 1.0,
         };
 
@@ -727,7 +722,6 @@ mod tests {
         assert!(result.contains("Complexity Factor**: 0.85"));
         assert!(result.contains("Coverage Factor**: 0.65"));
         assert!(result.contains("Dependency Factor**: 0.45"));
-        assert!(result.contains("Security Factor**: 0.00"));
     }
 
     #[test]
@@ -804,7 +798,6 @@ mod tests {
             complexity_factor: 0.855555,
             coverage_factor: 0.654321,
             dependency_factor: 0.456789,
-            security_factor: 0.0,
             role_multiplier: 1.0,
         };
 
@@ -815,7 +808,6 @@ mod tests {
         assert!(result.contains("Complexity Factor**: 0.86"));
         assert!(result.contains("Coverage Factor**: 0.65"));
         assert!(result.contains("Dependency Factor**: 0.46"));
-        assert!(result.contains("Security Factor**: 0.00"));
     }
 
     #[test]
@@ -844,7 +836,6 @@ mod tests {
                 complexity_factor: 0.5,
                 coverage_factor: 0.0,
                 dependency_factor: 0.2,
-                security_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -897,7 +888,6 @@ mod tests {
                 complexity_factor: 0.8,
                 coverage_factor: 0.6,
                 dependency_factor: 0.5,
-                security_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::TestingGap {
@@ -1058,6 +1048,7 @@ mod tests {
             },
             total_debt_score: 100.0,
             call_graph: CallGraph::new(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(0.75),
         };
 
@@ -1096,6 +1087,7 @@ mod tests {
             },
             total_debt_score: 50.0,
             call_graph: CallGraph::new(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(0.85),
         };
 
@@ -1132,6 +1124,7 @@ mod tests {
             },
             total_debt_score: 100.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -1156,6 +1149,7 @@ mod tests {
             },
             total_debt_score: 50.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -1311,7 +1305,6 @@ mod tests {
                 complexity_factor: 0.5,
                 coverage_factor: 0.0,
                 dependency_factor: 0.2,
-                security_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -1358,7 +1351,6 @@ mod tests {
                 complexity_factor: 0.6,
                 coverage_factor: 0.0,
                 dependency_factor: 0.2,
-                security_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -1404,6 +1396,7 @@ mod tests {
             },
             total_debt_score: 150.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -1445,6 +1438,7 @@ mod tests {
             },
             total_debt_score: 0.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -1475,7 +1469,6 @@ mod tests {
                 complexity_factor: 0.5,
                 coverage_factor: 0.0,
                 dependency_factor: 0.2,
-                security_factor: 0.0,
                 role_multiplier: 1.0,
             },
             debt_type: DebtType::DeadCode {
@@ -1523,6 +1516,7 @@ mod tests {
             },
             total_debt_score: 100.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -1552,6 +1546,7 @@ mod tests {
             },
             total_debt_score: 0.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(100.0),
         };
 
@@ -1572,6 +1567,7 @@ mod tests {
             },
             total_debt_score: 100.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -1679,6 +1675,7 @@ mod tests {
             },
             total_debt_score: 100.0,
             call_graph: Default::default(),
+            data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 

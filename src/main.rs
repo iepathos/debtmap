@@ -1493,6 +1493,9 @@ fn create_unified_analysis_with_exclusions(
 
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
+    // Populate the data flow graph with purity analysis data
+    unified.populate_purity_analysis(metrics);
+
     // Create debt aggregator and aggregate all debt items
     let mut debt_aggregator = DebtAggregator::new();
     if let Some(debt_items) = debt_items {
@@ -1539,7 +1542,6 @@ fn create_unified_analysis_with_exclusions(
         for item in error_swallowing_items {
             unified.add_item(item);
         }
-
     }
 
     unified.sort_by_priority();
@@ -4299,6 +4301,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4324,6 +4327,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4349,6 +4353,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4374,6 +4379,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4398,6 +4404,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4423,6 +4430,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4448,6 +4456,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4484,6 +4493,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
@@ -4514,6 +4524,7 @@ end_of_record
             },
             total_debt_score: 100.0,
             call_graph: priority::call_graph::CallGraph::default(),
+            data_flow_graph: debtmap::data_flow::DataFlowGraph::new(),
             overall_coverage: Some(75.0),
         };
 
