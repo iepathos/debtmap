@@ -348,9 +348,71 @@ fn extract_dependencies(func: &FunctionMetrics, data_flow: Option<&DataFlowGraph
 }
 
 fn parse_function_ast(func: &FunctionMetrics, language: &str) -> Option<syn::File> {
-    // This would need to extract the function source and parse it
-    // For now, returning None as placeholder
-    let _ = (func, language);
+    // Read the source file
+    let source = crate::io::read_file(&func.file).ok()?;
+    
+    match language {
+        "rust" => {
+            // For Rust, extract the function and create a minimal syn::File
+            extract_rust_function_ast(&source, func)
+        }
+        "python" => {
+            // Python patterns don't use syn::File, they need different handling
+            // For now, return None as Python pattern matching uses different AST
+            None
+        }
+        "javascript" | "typescript" => {
+            // JavaScript/TypeScript patterns also don't use syn::File
+            // They would use tree-sitter AST instead
+            None
+        }
+        _ => None,
+    }
+}
+
+fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn::File> {
+    use syn::{parse_str, Item, ItemFn};
+    
+    // Parse the entire file
+    let file = parse_str::<syn::File>(source).ok()?;
+    
+    // Find the function by name and approximate line number
+    for item in &file.items {
+        if let Item::Fn(item_fn) = item {
+            if item_fn.sig.ident.to_string() == func.name {
+                // Create a new File with just this function
+                let single_fn_file = syn::File {
+                    shebang: None,
+                    attrs: vec![],
+                    items: vec![Item::Fn(item_fn.clone())],
+                };
+                return Some(single_fn_file);
+            }
+        }
+        // Also check inside impl blocks
+        if let Item::Impl(item_impl) = item {
+            for impl_item in &item_impl.items {
+                if let syn::ImplItem::Fn(method) = impl_item {
+                    if method.sig.ident.to_string() == func.name {
+                        // Convert method to standalone function for analysis
+                        let item_fn = ItemFn {
+                            attrs: method.attrs.clone(),
+                            vis: method.vis.clone(),
+                            sig: method.sig.clone(),
+                            block: Box::new(method.block.clone()),
+                        };
+                        let single_fn_file = syn::File {
+                            shebang: None,
+                            attrs: vec![],
+                            items: vec![Item::Fn(item_fn)],
+                        };
+                        return Some(single_fn_file);
+                    }
+                }
+            }
+        }
+    }
+    
     None
 }
 

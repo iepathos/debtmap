@@ -1363,6 +1363,7 @@ fn create_debt_item_from_metric_with_aggregator(
         &std::collections::HashSet<priority::call_graph::FunctionId>,
     >,
     debt_aggregator: &priority::debt_aggregator::DebtAggregator,
+    data_flow: Option<&debtmap::data_flow::DataFlowGraph>,
 ) -> priority::UnifiedDebtItem {
     use debtmap::scoring::{EnhancedScorer, ScoringContext};
     use priority::unified_scorer;
@@ -1388,13 +1389,14 @@ fn create_debt_item_from_metric_with_aggregator(
     let score_breakdown = scorer.score_function_with_aggregator(metric, debt_aggregator);
 
     // Convert to UnifiedDebtItem with enhanced score
-    let mut item = unified_scorer::create_unified_debt_item_with_aggregator(
+    let mut item = unified_scorer::create_unified_debt_item_with_aggregator_and_data_flow(
         metric,
         call_graph,
         coverage_data,
         framework_exclusions,
         function_pointer_used_functions,
         debt_aggregator,
+        data_flow,
     );
 
     // Override the final score with enhanced score
@@ -1531,6 +1533,7 @@ fn create_unified_analysis_with_exclusions(
             framework_exclusions,
             function_pointer_used_functions,
             &debt_aggregator,
+            Some(&unified.data_flow_graph),
         );
         unified.add_item(item);
     }
