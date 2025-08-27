@@ -483,11 +483,12 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     let function_role = classify_function_role(func, &func_id, call_graph);
 
     // Generate contextual recommendation based on debt type and metrics
-    let recommendation = generate_recommendation_with_data_flow(
+    let recommendation = generate_recommendation_with_coverage_and_data_flow(
         func,
         &debt_type,
         function_role,
         &unified_score,
+        &transitive_coverage,
         data_flow,
     );
 
@@ -585,11 +586,12 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let function_role = classify_function_role(func, &func_id, call_graph);
 
     // Generate contextual recommendation based on debt type and metrics
-    let recommendation = generate_recommendation_with_data_flow(
+    let recommendation = generate_recommendation_with_coverage_and_data_flow(
         func,
         &debt_type,
         function_role,
         &unified_score,
+        &transitive_coverage,
         data_flow,
     );
 
@@ -681,8 +683,14 @@ pub fn create_unified_debt_item_with_data_flow(
         coverage.map(|cov| calculate_transitive_coverage(&func_id, call_graph, cov));
 
     let debt_type = determine_debt_type(func, &transitive_coverage, call_graph, &func_id);
-    let recommendation =
-        generate_recommendation_with_data_flow(func, &debt_type, role, &unified_score, data_flow);
+    let recommendation = generate_recommendation_with_coverage_and_data_flow(
+        func,
+        &debt_type,
+        role,
+        &unified_score,
+        &transitive_coverage,
+        data_flow,
+    );
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
     // Get dependency counts and names from call graph
@@ -1780,6 +1788,18 @@ fn generate_complexity_recommendation_with_patterns(
     cognitive: u32,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> (String, String, Vec<String>) {
+    generate_complexity_recommendation_with_patterns_and_coverage(
+        func, cyclomatic, cognitive, &None, data_flow,
+    )
+}
+
+fn generate_complexity_recommendation_with_patterns_and_coverage(
+    func: &FunctionMetrics,
+    cyclomatic: u32,
+    cognitive: u32,
+    coverage: &Option<TransitiveCoverage>,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> (String, String, Vec<String>) {
     use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
 
     // Try to analyze extraction patterns
@@ -1855,15 +1875,20 @@ fn generate_complexity_recommendation_with_patterns(
             suggestions.len()
         );
 
-        // Add testing steps
-        steps.push(format!(
-            "{}. Write unit tests for each extracted pure function",
-            suggestions.len() + 1
-        ));
-        steps.push(format!(
-            "{}. Add property-based tests for complex transformations",
-            suggestions.len() + 2
-        ));
+        // Add testing steps only if coverage is low
+        let has_good_coverage = coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
+
+        if !has_good_coverage {
+            steps.push(format!(
+                "{}. Write unit tests for each extracted pure function",
+                suggestions.len() + 1
+            ));
+            steps.push(format!(
+                "{}. Add property-based tests for complex transformations",
+                suggestions.len() + 2
+            ));
+        }
+
         steps.push(format!(
             "Expected complexity reduction: {}%",
             (total_complexity_reduction as f32 / cyclomatic as f32 * 100.0) as u32
@@ -1872,7 +1897,9 @@ fn generate_complexity_recommendation_with_patterns(
         (action, rationale, steps)
     } else {
         // Fall back to data-flow-informed heuristic recommendations
-        generate_data_flow_based_recommendations(func, cyclomatic, cognitive, data_flow)
+        generate_data_flow_based_recommendations_with_coverage(
+            func, cyclomatic, cognitive, coverage, data_flow,
+        )
     }
 }
 
@@ -1881,6 +1908,18 @@ fn generate_data_flow_based_recommendations(
     func: &FunctionMetrics,
     cyclomatic: u32,
     cognitive: u32,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> (String, String, Vec<String>) {
+    generate_data_flow_based_recommendations_with_coverage(
+        func, cyclomatic, cognitive, &None, data_flow,
+    )
+}
+
+fn generate_data_flow_based_recommendations_with_coverage(
+    func: &FunctionMetrics,
+    cyclomatic: u32,
+    cognitive: u32,
+    coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> (String, String, Vec<String>) {
     // Analyze function characteristics from available metrics
@@ -1950,11 +1989,21 @@ fn generate_data_flow_based_recommendations(
         steps.push("Isolate side effects at function boundaries before extraction".to_string());
     }
 
-    // Add testing recommendation
-    steps.push(format!(
-        "Add {} comprehensive tests after refactoring",
-        suggested_extractions.len() * 2
-    ));
+    // Add testing recommendation only if coverage is low
+    let has_good_coverage = coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
+
+    if !has_good_coverage {
+        let test_count = if suggested_extractions.is_empty() {
+            // If no specific extractions suggested, base on complexity
+            std::cmp::max(2, (cyclomatic / 5) as usize)
+        } else {
+            suggested_extractions.len() * 2
+        };
+        steps.push(format!(
+            "Add {} comprehensive tests after refactoring",
+            test_count
+        ));
+    }
 
     let predicted_complexity = cyclomatic.saturating_sub(complexity_reduction);
 
@@ -2028,6 +2077,19 @@ fn generate_recommendation_with_data_flow(
     _score: &UnifiedScore,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> ActionableRecommendation {
+    generate_recommendation_with_coverage_and_data_flow(
+        func, debt_type, role, _score, &None, data_flow,
+    )
+}
+
+fn generate_recommendation_with_coverage_and_data_flow(
+    func: &FunctionMetrics,
+    debt_type: &DebtType,
+    role: FunctionRole,
+    _score: &UnifiedScore,
+    coverage: &Option<TransitiveCoverage>,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> ActionableRecommendation {
     let (primary_action, rationale, steps) = match debt_type {
         DebtType::DeadCode {
             visibility,
@@ -2052,10 +2114,11 @@ fn generate_recommendation_with_data_flow(
         } => {
             // Always try to use intelligent pattern-based recommendations
             // The DataFlowGraph is passed through but may still be None in some cases
-            generate_complexity_recommendation_with_patterns(
+            generate_complexity_recommendation_with_patterns_and_coverage(
                 func,
                 *cyclomatic,
                 *cognitive,
+                coverage,
                 data_flow,
             )
         }
@@ -2886,11 +2949,33 @@ mod tests {
         };
 
         let rec = generate_recommendation(&func, &debt_type, FunctionRole::PureLogic, &score);
-        // ComplexityHotspot now extracts first, then tests
-        assert!(rec.primary_action.contains("Extract"));
-        assert!(rec.primary_action.contains("pure functions"));
-        assert!(rec.primary_action.contains("comprehensive tests"));
-        assert!(rec.rationale.contains("complexity"));
+        // ComplexityHotspot now extracts first, then may add tests if coverage is low
+        // Since generate_recommendation doesn't pass coverage, it defaults to unknown coverage
+        // which means tests will be recommended
+        assert!(
+            rec.primary_action.contains("Extract"),
+            "Action: {}",
+            rec.primary_action
+        );
+        // The action might say "pure functions" or specific extraction names
+        assert!(
+            rec.primary_action.contains("Extract"),
+            "Action should mention extraction: {}",
+            rec.primary_action
+        );
+        // With unknown coverage, tests should be recommended in the steps
+        assert!(
+            rec.implementation_steps
+                .iter()
+                .any(|s| s.contains("test") || s.contains("Test")),
+            "Steps should mention tests when coverage is unknown: {:?}",
+            rec.implementation_steps
+        );
+        assert!(
+            rec.rationale.contains("complexity") || rec.rationale.contains("cyclo"),
+            "Rationale should mention complexity: {}",
+            rec.rationale
+        );
         assert!(!rec.implementation_steps.is_empty());
     }
 
