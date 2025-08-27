@@ -20,6 +20,8 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
 
 **Unique Capabilities:**
+- **Entropy-Based Complexity Analysis**: Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%
+- **Advanced Token Classification**: Categorizes and weights different token types (variables, methods, literals) for more accurate complexity assessment
 - **Cognitive Complexity Analysis**: Goes beyond cyclomatic complexity to measure how hard code is to understand, identifying functions that need refactoring to reduce mental load
 - **Coverage-Risk Correlation**: The only tool that combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
 - **ROI-Driven Prioritization**: Calculates actual return on investment for both refactoring and testing efforts, showing which changes will have the most impact
@@ -36,6 +38,8 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 ## Features
 
 - **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript
+- **Entropy-based complexity analysis** - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory
+- **Token classification system** - Advanced token categorization with weighted entropy for more accurate complexity assessment
 - **Comprehensive debt detection** - Identifies technical debt across security, organization, testing, and resource management
 - **Security vulnerability detection** - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns
 - **Resource management analysis** - Identifies inefficient allocations, nested loops, and blocking I/O patterns
@@ -151,8 +155,6 @@ Options:
   --disable-context <PROVIDERS>      Disable specific context providers
   --top <N>                          Show only top N priority items (alias: --head)
   --tail <N>                         Show only bottom N priority items (lowest priority)
-  --priorities-only                  Show priorities only (minimal output)
-  --detailed                         Show detailed analysis with priority breakdown
   --semantic-off                     Disable semantic analysis (fallback mode)
   -v, --verbose                      Increase verbosity level (can be repeated: -v, -vv, -vvv)
                                      -v: Show main score factors
@@ -160,18 +162,10 @@ Options:
                                      -vvv: Show all debug information
   --verbose-macro-warnings           Show verbose macro parsing warnings
   --show-macro-stats                 Show macro expansion statistics
-  --comprehensive                    Enable comprehensive debt analysis (all categories)
-  --security-only                    Enable security analysis only
   --security-enhanced                Enable enhanced security analysis with additional detectors
-  --organization-only                Enable organization analysis only
-  --testing-only                     Enable testing quality analysis only
-  --resource-only                    Enable resource management analysis only
   --group-by-category                Group output by debt category
   --min-priority <PRIORITY>          Minimum priority to display (low, medium, high, critical)
   --filter <CATEGORIES>              Filter by debt categories (comma-separated)
-  --enhanced-scoring                 Enable enhanced scoring differentiation (default: enabled)
-  --legacy-scoring                   Use legacy scoring algorithm
-  --exclude-tests                    Exclude test code from analysis
   --no-context-aware                 Disable context-aware false positive reduction (enabled by default)
 ```
 
@@ -201,24 +195,14 @@ Options:
   --disable-context <PROVIDERS>       Disable specific context providers
   --top <N>                           Show only top N priority items (alias: --head)
   --tail <N>                          Show only bottom N priority items (lowest priority)
-  --priorities-only                   Show priorities only (minimal output)
-  --detailed                          Show detailed analysis
   --semantic-off                      Disable semantic analysis
   -v, --verbose                       Increase verbosity level (replaces deprecated --explain-score)
   --verbose-macro-warnings            Show verbose macro parsing warnings
   --show-macro-stats                  Show macro expansion statistics
-  --comprehensive                     Enable comprehensive debt analysis
-  --security-only                     Enable security analysis only
   --security-enhanced                 Enable enhanced security analysis
-  --organization-only                 Enable organization analysis only
-  --testing-only                      Enable testing quality analysis only
-  --resource-only                     Enable resource management analysis only
   --group-by-category                 Group output by debt category
   --min-priority <PRIORITY>           Minimum priority to display
   --filter <CATEGORIES>               Filter by debt categories
-  --enhanced-scoring                  Enable enhanced scoring differentiation (default)
-  --legacy-scoring                    Use legacy scoring algorithm
-  --exclude-tests                     Exclude test code from analysis
   --no-context-aware                  Disable context-aware false positive reduction
 ```
 
@@ -244,6 +228,22 @@ debtmap analyze . --verbose-macro-warnings --show-macro-stats
 ```
 
 ## Example Output
+
+### With Entropy Analysis Enabled
+When entropy analysis is enabled, pattern-based complexity is automatically dampened:
+
+```bash
+# Traditional analysis (without entropy)
+debtmap analyze . --no-entropy
+# validate_input: Complexity: 15, Priority: HIGH
+
+# With entropy analysis (enabled by default)
+debtmap analyze .
+# validate_input: Complexity: 5 (dampened by 67%), Priority: LOW
+#   ├─ Token Entropy: 0.3 (repetitive patterns detected)
+#   ├─ Pattern Repetition: 0.8 (high repetition)
+#   └─ Branch Similarity: 0.9 (similar validation checks)
+```
 
 ### Unified Priority Output (Default)
 ```
@@ -338,27 +338,24 @@ debtmap analyze . --lcov target/coverage/lcov.info --top 3
 
 Debtmap offers several specialized analysis modes for focused technical debt assessment:
 
-### Comprehensive Analysis (Default)
-Runs all analyzers across all categories to provide a complete technical debt assessment:
-```bash
-debtmap analyze . --comprehensive
-```
-
 ### Category-Specific Analysis
-Focus on specific aspects of technical debt:
+Focus on specific aspects of technical debt using the filter option:
 ```bash
 # Security-focused analysis
-debtmap analyze . --security-only
+debtmap analyze . --filter Security
 debtmap analyze . --security-enhanced  # Includes additional security detectors
 
 # Code organization analysis
-debtmap analyze . --organization-only
+debtmap analyze . --filter Organization
 
 # Testing quality analysis
-debtmap analyze . --testing-only
+debtmap analyze . --filter TestQuality
 
 # Resource management analysis
-debtmap analyze . --resource-only
+debtmap analyze . --filter Resource
+
+# Multiple categories at once
+debtmap analyze . --filter Security,Complexity,TestQuality
 ```
 
 ### Combined Filtering
@@ -370,8 +367,8 @@ debtmap analyze . --security-enhanced --min-priority high --top 10
 # Group by category with coverage data
 debtmap analyze . --lcov coverage.info --group-by-category
 
-# Filter specific debt categories
-debtmap analyze . --filter Security,Complexity,TestQuality
+# Filter specific debt categories with coverage
+debtmap analyze . --filter Security,Complexity --lcov coverage.info
 ```
 
 ## How Debtmap Works
@@ -515,6 +512,30 @@ Measures the number of linearly independent paths through code. Higher values in
 
 ### Cognitive Complexity
 Measures how difficult code is to understand. Unlike cyclomatic complexity, it considers nesting depth and control flow interruptions.
+
+### Entropy-Based Complexity Analysis
+Uses information theory to distinguish between genuinely complex code and pattern-based repetitive code:
+
+- **Shannon Entropy**: Measures the variety and unpredictability of code patterns (0.0-1.0)
+- **Pattern Repetition**: Detects repetitive structures in the AST (0.0-1.0)
+- **Branch Similarity**: Analyzes similarity between conditional branches (0.0-1.0)
+- **Effective Complexity**: Adjusts raw complexity scores based on entropy analysis
+- **Token Classification**: Categorizes tokens by type (variables, methods, literals) with weighted importance
+
+This significantly reduces false positives for:
+- Validation functions with repetitive checks
+- Dispatcher/command patterns with similar handlers
+- Configuration parsers with uniform processing
+- Switch statements with consistent case handling
+
+Enable in `.debtmap.toml`:
+```toml
+[entropy]
+enabled = true              # Enable entropy analysis
+weight = 0.5               # Weight in complexity adjustment (0.0-1.0)
+use_classification = true  # Enable advanced token classification
+pattern_threshold = 0.7    # Threshold for pattern detection
+```
 
 ### Code Duplication
 Identifies similar code blocks that could be refactored into shared functions.
@@ -685,6 +706,16 @@ minimum_debt_score = 1.0              # Minimum unified score to include (0.0-10
 minimum_cyclomatic_complexity = 2     # Skip functions with cyclomatic <= this value (default: 2)
 minimum_cognitive_complexity = 3      # Skip functions with cognitive <= this value (default: 3)
 minimum_risk_score = 1.0              # Minimum risk score for Risk debt types (default: 1.0)
+
+[entropy]
+enabled = true                         # Enable entropy-based complexity analysis
+weight = 0.5                          # Weight of entropy in complexity adjustment (0.0-1.0)
+min_tokens = 10                       # Minimum tokens required for entropy calculation
+pattern_threshold = 0.7               # Pattern similarity threshold for detection
+use_classification = true             # Enable advanced token classification
+entropy_threshold = 0.4               # Entropy level below which dampening is applied
+branch_threshold = 0.8                # Branch similarity above which dampening is applied
+max_combined_reduction = 0.3          # Maximum combined complexity reduction (30%)
 
 [scoring]
 # Customize scoring weights (must sum to 1.0)
@@ -894,6 +925,11 @@ just coverage    # Generate test coverage report
 # See all available commands
 just --list
 ```
+
+### Documentation
+
+For detailed documentation on specific features:
+- [Entropy-Based Complexity Scoring](docs/entropy.md) - Complete guide to entropy analysis and configuration
 
 ### Automated Technical Debt Reduction
 
