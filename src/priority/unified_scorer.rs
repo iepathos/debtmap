@@ -1,5 +1,6 @@
 use crate::config;
 use crate::core::FunctionMetrics;
+use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer, VerbosityLevel};
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::{
@@ -1407,6 +1408,47 @@ fn generate_combined_testing_refactoring_steps(
             cyclomatic, cognitive
         ),
     ]
+}
+
+/// Generate intelligent extraction recommendations using pattern analysis
+#[allow(dead_code)]
+fn generate_intelligent_extraction_recommendations(
+    func: &FunctionMetrics,
+    verbosity: VerbosityLevel,
+) -> Vec<String> {
+    let analyzer = UnifiedExtractionAnalyzer::new();
+
+    // Analyze function for extractable patterns
+    // Create a dummy file metrics for now (since we don't have the actual file context here)
+    let file_metrics = crate::core::FileMetrics {
+        path: func.file.clone(),
+        language: crate::core::Language::Rust, // Default to Rust
+        complexity: crate::core::ComplexityMetrics::default(),
+        debt_items: vec![],
+        dependencies: vec![],
+        duplications: vec![],
+    };
+    let suggestions = analyzer.analyze_function(
+        func,
+        &file_metrics,
+        None, // No data flow graph for now
+    );
+
+    if suggestions.is_empty() {
+        // Fallback to simple calculation
+        let functions_to_extract = calculate_functions_to_extract(func.cyclomatic, func.cognitive);
+        vec![format!(
+            "Extract {} pure functions to reduce complexity",
+            functions_to_extract
+        )]
+    } else {
+        // Generate specific recommendations
+        suggestions
+            .iter()
+            .take(3) // Limit to top 3 suggestions
+            .map(|s| analyzer.generate_recommendation(s, verbosity))
+            .collect()
+    }
 }
 
 /// Generate recommendation for testing gap debt type

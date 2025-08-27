@@ -10,6 +10,7 @@ pub mod context;
 pub mod core;
 pub mod database;
 pub mod debt;
+pub mod extraction_patterns;
 pub mod io;
 pub mod organization;
 pub mod patterns;
