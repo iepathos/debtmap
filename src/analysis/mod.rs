@@ -7,6 +7,7 @@
 //! - Cross-module dependency tracking
 
 pub mod call_graph;
+pub mod function_visitor;
 pub mod python_call_graph;
 
 pub use call_graph::{
