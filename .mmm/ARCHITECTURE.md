@@ -158,6 +158,16 @@ Macro expansion for perfect call graph analysis:
 - `cache.rs`: Expansion caching system
 - `source_map.rs`: Source location mapping
 
+### Extraction Patterns (`src/extraction_patterns/`)
+Intelligent function extraction recommendations:
+- `mod.rs`: Core pattern definitions and unified analyzer
+- `confidence.rs`: Confidence scoring for extraction feasibility
+- `naming.rs`: Intelligent function name generation
+- `language_specific/`: Language-specific pattern matchers
+  - `rust_patterns.rs`: Rust AST pattern detection
+  - `python_patterns.rs`: Python pattern detection
+  - `javascript_patterns.rs`: JavaScript pattern detection
+
 ### Testing (`src/testing/`)
 Testing quality pattern detection:
 - `mod.rs`: Core types and trait for testing anti-patterns

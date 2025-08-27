@@ -332,6 +332,15 @@ We have completed the initial implementation with core functionality for analyzi
   - Improved test performance by avoiding subprocess overhead
   - Created helpers for simulating CLI output from library calls
 
+- [x] **Spec 65**: Intelligent Function Extraction Recommendations
+  - Pattern detection engine for extractable code blocks
+  - Accumulation loops, guard chains, transformation pipelines identified
+  - Language-specific pattern matchers for Rust, Python, JavaScript
+  - Confidence scoring based on side effects and dependencies
+  - Intelligent function name generation from operations
+  - Realistic complexity reduction estimates
+  - Line-specific extraction suggestions with examples
+
 ## Pending Specs
 
 ### Enhancements
