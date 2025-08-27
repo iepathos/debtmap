@@ -209,68 +209,77 @@ impl FunctionContext {
     }
 }
 
-/// Detect file type from path
+/// Detect file type from path using pattern matching
 pub fn detect_file_type(path: &Path) -> FileType {
     let path_str = path.to_string_lossy();
 
-    // Check for test files
-    if path_str.contains("/tests/")
-        || path_str.contains("\\tests\\")
-        || path_str.ends_with("_test.rs")
-        || path_str.ends_with("_tests.rs")
-        || path_str.ends_with("test.py")
-        || path_str.ends_with("_test.py")
-        || path_str.ends_with(".test.js")
-        || path_str.ends_with(".test.ts")
-        || path_str.ends_with(".spec.js")
-        || path_str.ends_with(".spec.ts")
-    {
-        return FileType::Test;
+    // Use pattern matching with guards for cleaner classification
+    match () {
+        _ if is_test_file(&path_str) => FileType::Test,
+        _ if is_benchmark_file(&path_str) => FileType::Benchmark,
+        _ if is_example_file(&path_str) => FileType::Example,
+        _ if path_str.ends_with("build.rs") => FileType::BuildScript,
+        _ if is_documentation_file(&path_str) => FileType::Documentation,
+        _ if is_configuration_file(&path_str) => FileType::Configuration,
+        _ => FileType::Production,
     }
+}
 
-    // Check for benchmark files
-    if path_str.contains("/benches/")
-        || path_str.contains("\\benches\\")
-        || path_str.contains("/benchmarks/")
-        || path_str.contains("\\benchmarks\\")
-        || path_str.ends_with("_bench.rs")
-        || path_str.ends_with("_benchmark.rs")
-    {
-        return FileType::Benchmark;
-    }
+// Pure classification functions for testability
+fn is_test_file(path: &str) -> bool {
+    const TEST_PATTERNS_DIR: &[&str] = &["tests/", "tests\\"];
+    const TEST_PATTERNS_FILE: &[&str] = &[
+        "_test.rs",
+        "_tests.rs",
+        "test.py",
+        "_test.py",
+        ".test.js",
+        ".test.ts",
+        ".spec.js",
+        ".spec.ts",
+    ];
 
-    // Check for example files
-    if path_str.contains("/examples/")
-        || path_str.contains("\\examples\\")
-        || path_str.ends_with("_example.rs")
-        || path_str.ends_with("example.py")
-    {
-        return FileType::Example;
-    }
+    TEST_PATTERNS_DIR
+        .iter()
+        .any(|pattern| path.contains(pattern))
+        || TEST_PATTERNS_FILE
+            .iter()
+            .any(|pattern| path.ends_with(pattern))
+}
 
-    // Check for build scripts
-    if path_str.ends_with("build.rs") {
-        return FileType::BuildScript;
-    }
+fn is_benchmark_file(path: &str) -> bool {
+    const BENCHMARK_PATTERNS_DIR: &[&str] =
+        &["benches/", "benches\\", "benchmarks/", "benchmarks\\"];
+    const BENCHMARK_PATTERNS_FILE: &[&str] = &["_bench.rs", "_benchmark.rs"];
 
-    // Check for documentation
-    if path_str.ends_with(".md") || path_str.ends_with(".rst") {
-        return FileType::Documentation;
-    }
+    BENCHMARK_PATTERNS_DIR
+        .iter()
+        .any(|pattern| path.contains(pattern))
+        || BENCHMARK_PATTERNS_FILE
+            .iter()
+            .any(|pattern| path.ends_with(pattern))
+}
 
-    // Check for configuration
-    if path_str.ends_with(".toml")
-        || path_str.ends_with(".yaml")
-        || path_str.ends_with(".yml")
-        || path_str.ends_with(".json")
-        || path_str.ends_with(".ini")
-        || path_str.ends_with(".cfg")
-    {
-        return FileType::Configuration;
-    }
+fn is_example_file(path: &str) -> bool {
+    const EXAMPLE_PATTERNS_DIR: &[&str] = &["examples/", "examples\\"];
+    const EXAMPLE_PATTERNS_FILE: &[&str] = &["_example.rs", "example.py"];
 
-    // Default to production
-    FileType::Production
+    EXAMPLE_PATTERNS_DIR
+        .iter()
+        .any(|pattern| path.contains(pattern))
+        || EXAMPLE_PATTERNS_FILE
+            .iter()
+            .any(|pattern| path.ends_with(pattern))
+}
+
+fn is_documentation_file(path: &str) -> bool {
+    path.ends_with(".md") || path.ends_with(".rst")
+}
+
+fn is_configuration_file(path: &str) -> bool {
+    const CONFIG_EXTENSIONS: &[&str] = &[".toml", ".yaml", ".yml", ".json", ".ini", ".cfg"];
+
+    CONFIG_EXTENSIONS.iter().any(|ext| path.ends_with(ext))
 }
 
 /// Detect function role from name and patterns
@@ -434,5 +443,175 @@ mod tests {
             .with_async(true);
         assert!(async_handler.is_entry_point());
         assert!(!async_handler.allows_blocking_io());
+    }
+
+    #[test]
+    fn test_is_test_file() {
+        use super::is_test_file;
+
+        // Test directory patterns
+        assert!(is_test_file("tests/module.rs"));
+        assert!(is_test_file("/src/tests/module.rs"));
+        assert!(is_test_file("C:\\project\\tests\\file.rs"));
+
+        // Test file suffixes for Rust
+        assert!(is_test_file("mod_test.rs"));
+        assert!(is_test_file("mod_tests.rs"));
+
+        // Test file suffixes for Python
+        assert!(is_test_file("test.py"));
+        assert!(is_test_file("module_test.py"));
+
+        // Test file suffixes for JavaScript/TypeScript
+        assert!(is_test_file("component.test.js"));
+        assert!(is_test_file("component.test.ts"));
+        assert!(is_test_file("component.spec.js"));
+        assert!(is_test_file("component.spec.ts"));
+
+        // Negative cases
+        assert!(!is_test_file("src/main.rs"));
+        assert!(!is_test_file("lib.rs"));
+        assert!(!is_test_file("testing_utils.rs"));
+    }
+
+    #[test]
+    fn test_is_benchmark_file() {
+        use super::is_benchmark_file;
+
+        // Test directory patterns
+        assert!(is_benchmark_file("benches/perf.rs"));
+        assert!(is_benchmark_file("/src/benches/perf.rs"));
+        assert!(is_benchmark_file("C:\\project\\benches\\perf.rs"));
+        assert!(is_benchmark_file("benchmarks/perf.rs"));
+        assert!(is_benchmark_file("/src/benchmarks/perf.rs"));
+        assert!(is_benchmark_file("C:\\project\\benchmarks\\perf.rs"));
+
+        // Test file suffixes
+        assert!(is_benchmark_file("perf_bench.rs"));
+        assert!(is_benchmark_file("perf_benchmark.rs"));
+
+        // Negative cases
+        assert!(!is_benchmark_file("bench.rs"));
+        assert!(!is_benchmark_file("src/main.rs"));
+        assert!(!is_benchmark_file("benches.toml"));
+    }
+
+    #[test]
+    fn test_is_example_file() {
+        use super::is_example_file;
+
+        // Test directory patterns
+        assert!(is_example_file("examples/demo.rs"));
+        assert!(is_example_file("/src/examples/demo.rs"));
+        assert!(is_example_file("C:\\project\\examples\\demo.rs"));
+
+        // Test file suffixes
+        assert!(is_example_file("demo_example.rs"));
+        assert!(is_example_file("example.py"));
+
+        // Negative cases
+        assert!(!is_example_file("examples.rs"));
+        assert!(!is_example_file("src/main.rs"));
+        assert!(!is_example_file("example.txt"));
+    }
+
+    #[test]
+    fn test_is_documentation_file() {
+        use super::is_documentation_file;
+
+        assert!(is_documentation_file("README.md"));
+        assert!(is_documentation_file("docs/guide.md"));
+        assert!(is_documentation_file("api.rst"));
+        assert!(is_documentation_file("docs/tutorial.rst"));
+
+        assert!(!is_documentation_file("main.rs"));
+        assert!(!is_documentation_file("config.toml"));
+    }
+
+    #[test]
+    fn test_is_configuration_file() {
+        use super::is_configuration_file;
+
+        assert!(is_configuration_file("Cargo.toml"));
+        assert!(is_configuration_file("config.yaml"));
+        assert!(is_configuration_file("settings.yml"));
+        assert!(is_configuration_file("package.json"));
+        assert!(is_configuration_file("setup.ini"));
+        assert!(is_configuration_file("app.cfg"));
+
+        assert!(!is_configuration_file("main.rs"));
+        assert!(!is_configuration_file("README.md"));
+        assert!(!is_configuration_file("config.rs"));
+    }
+
+    #[test]
+    fn test_detect_file_type_comprehensive() {
+        use std::path::Path;
+
+        // Test files
+        assert_eq!(
+            detect_file_type(Path::new("tests/integration.rs")),
+            FileType::Test
+        );
+        assert_eq!(
+            detect_file_type(Path::new("module_test.rs")),
+            FileType::Test
+        );
+        assert_eq!(detect_file_type(Path::new("app.test.js")), FileType::Test);
+        assert_eq!(detect_file_type(Path::new("app.spec.ts")), FileType::Test);
+
+        // Benchmark files
+        assert_eq!(
+            detect_file_type(Path::new("benches/perf.rs")),
+            FileType::Benchmark
+        );
+        assert_eq!(
+            detect_file_type(Path::new("perf_bench.rs")),
+            FileType::Benchmark
+        );
+
+        // Example files
+        assert_eq!(
+            detect_file_type(Path::new("examples/demo.rs")),
+            FileType::Example
+        );
+        assert_eq!(
+            detect_file_type(Path::new("demo_example.rs")),
+            FileType::Example
+        );
+
+        // Build scripts
+        assert_eq!(
+            detect_file_type(Path::new("build.rs")),
+            FileType::BuildScript
+        );
+
+        // Documentation
+        assert_eq!(
+            detect_file_type(Path::new("README.md")),
+            FileType::Documentation
+        );
+        assert_eq!(
+            detect_file_type(Path::new("api.rst")),
+            FileType::Documentation
+        );
+
+        // Configuration
+        assert_eq!(
+            detect_file_type(Path::new("Cargo.toml")),
+            FileType::Configuration
+        );
+        assert_eq!(
+            detect_file_type(Path::new("config.yaml")),
+            FileType::Configuration
+        );
+
+        // Production (default)
+        assert_eq!(
+            detect_file_type(Path::new("src/main.rs")),
+            FileType::Production
+        );
+        assert_eq!(detect_file_type(Path::new("lib.rs")), FileType::Production);
+        assert_eq!(detect_file_type(Path::new("app.py")), FileType::Production);
     }
 }
