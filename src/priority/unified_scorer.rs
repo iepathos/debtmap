@@ -21,7 +21,6 @@ pub struct UnifiedScore {
     pub complexity_factor: f64, // 0-10, configurable weight (default 35%)
     pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
     pub dependency_factor: f64, // 0-10, configurable weight (default 20%)
-    pub security_factor: f64,   // 0-10, configurable weight (default 5%)
     pub role_multiplier: f64,   // 0.1-1.5x based on function role
     pub final_score: f64,       // Computed composite score
 }
@@ -68,14 +67,12 @@ pub fn calculate_unified_priority(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    security_issues: Option<f64>,
     organization_issues: Option<f64>,
 ) -> UnifiedScore {
     calculate_unified_priority_with_debt(
         func,
         call_graph,
         coverage,
-        security_issues,
         organization_issues,
         None,
     )
@@ -85,7 +82,6 @@ pub fn calculate_unified_priority_with_debt(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-    security_issues: Option<f64>,
     _organization_issues: Option<f64>, // Kept for compatibility but no longer used
     debt_aggregator: Option<&DebtAggregator>,
 ) -> UnifiedScore {
@@ -133,7 +129,6 @@ pub fn calculate_unified_priority_with_debt(
             complexity_factor: 0.0,
             coverage_factor: 0.0,
             dependency_factor: 0.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
         };
@@ -178,17 +173,6 @@ pub fn calculate_unified_priority_with_debt(
         DebtScores::default()
     };
 
-    // Security factor (0-10 scale)
-    // Combine pattern-based detection with actual detected issues
-    let security_factor = if debt_scores.security > 0.0 {
-        // Use actual detected security issues if available
-        debt_scores.security
-    } else {
-        // Fall back to pattern-based detection or provided value
-        security_issues
-            .unwrap_or_else(|| calculate_security_factor(func))
-            .min(10.0)
-    };
 
     // Organization factor removed - redundant with complexity factor
     // Organization issues are already captured by complexity metrics
@@ -198,19 +182,17 @@ pub fn calculate_unified_priority_with_debt(
     let resource_factor = debt_scores.resource.min(10.0);
     let duplication_factor = debt_scores.duplication.min(10.0);
 
-    // Get configurable weights (note: after spec 58, only using complexity, coverage, dependency, security)
+    // Get configurable weights (note: after spec 64, only using complexity, coverage, dependency)
     let weights = config::get_scoring_weights();
 
     // Calculate weighted components for transparency
-    // New weights after removing semantic, organization, and ROI factors:
+    // New weights after removing semantic, organization, security, and ROI factors:
     // - Complexity: 35% (increased from 20%, absorbing organization's 5%)
     // - Coverage: 40% (increased from 30%, main priority focus)
-    // - Dependency: 20% (increased from 10%, absorbing semantic's 5%)
-    // - Security: 5% (unchanged)
+    // - Dependency: 25% (increased from 10%, absorbing semantic's 5% and security's 5%)
     let weighted_complexity = complexity_factor * weights.complexity;
     let weighted_coverage = coverage_factor * weights.coverage;
     let weighted_dependency = dependency_factor * weights.dependency;
-    let weighted_security = security_factor * weights.security;
 
     // Use smaller weights for additional debt categories
     let weighted_testing = testing_factor * 0.05;
@@ -221,7 +203,6 @@ pub fn calculate_unified_priority_with_debt(
     let base_score = weighted_complexity
         + weighted_coverage
         + weighted_dependency
-        + weighted_security
         + weighted_testing
         + weighted_resource
         + weighted_duplication;
@@ -240,7 +221,6 @@ pub fn calculate_unified_priority_with_debt(
         complexity_factor,
         coverage_factor,
         dependency_factor,
-        security_factor,
         role_multiplier,
         final_score,
     }
@@ -349,55 +329,6 @@ fn calculate_dependency_factor(upstream_count: usize) -> f64 {
     }
 }
 
-/// Calculate security factor based on function characteristics and patterns
-fn calculate_security_factor(func: &FunctionMetrics) -> f64 {
-    let mut score: f64 = 0.0;
-
-    // Check for security-related patterns in function name
-    let name_lower = func.name.to_lowercase();
-
-    // Security-critical function names
-    if name_lower.contains("auth")
-        || name_lower.contains("crypt")
-        || name_lower.contains("token")
-        || name_lower.contains("password")
-        || name_lower.contains("secret")
-        || name_lower.contains("permission")
-        || name_lower.contains("sanitize")
-        || name_lower.contains("validate")
-    {
-        score += 5.0;
-    }
-
-    // Functions that might handle user input
-    if name_lower.contains("parse")
-        || name_lower.contains("deserialize")
-        || name_lower.contains("decode")
-        || name_lower.contains("input")
-        || name_lower.contains("request")
-        || name_lower.contains("query")
-    {
-        score += 3.0;
-    }
-
-    // Functions dealing with file/network operations
-    if name_lower.contains("read_file")
-        || name_lower.contains("write_file")
-        || name_lower.contains("exec")
-        || name_lower.contains("system")
-        || name_lower.contains("sql")
-        || name_lower.contains("database")
-    {
-        score += 4.0;
-    }
-
-    // High complexity in security-sensitive functions is more risky
-    if score > 0.0 && func.cyclomatic > 10 {
-        score += 2.0;
-    }
-
-    score.min(10.0)
-}
 
 // Organization factor removed per spec 58 - redundant with complexity factor
 // Organization issues are already captured by complexity metrics
@@ -441,15 +372,13 @@ pub fn create_unified_debt_item_enhanced(
         line: func.line,
     };
 
-    // Calculate security factor
-    let security_factor = calculate_security_factor(func);
+    // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
 
     let unified_score = calculate_unified_priority(
         func,
         call_graph,
         coverage,
-        Some(security_factor),
         None, // Organization factor no longer used
     );
     let role = classify_function_role(func, &func_id, call_graph);
@@ -537,7 +466,6 @@ pub fn create_unified_debt_item_with_aggregator(
         func,
         call_graph,
         coverage,
-        None, // Let the aggregator provide security factor
         None, // Let the aggregator provide organization factor
         Some(debt_aggregator),
     );
@@ -613,15 +541,13 @@ pub fn create_unified_debt_item_with_exclusions(
     );
 
     // Calculate unified score
-    // Calculate security factor
-    let security_factor = calculate_security_factor(func);
+    // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
 
     let unified_score = calculate_unified_priority(
         func,
         call_graph,
         coverage,
-        Some(security_factor),
         None, // Organization factor no longer used
     );
 
@@ -698,15 +624,13 @@ pub fn create_unified_debt_item(
         line: func.line,
     };
 
-    // Calculate security factor
-    let security_factor = calculate_security_factor(func);
+    // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
 
     let unified_score = calculate_unified_priority(
         func,
         call_graph,
         coverage,
-        Some(security_factor),
         None, // Organization factor no longer used
     );
     let role = classify_function_role(func, &func_id, call_graph);
@@ -1840,26 +1764,6 @@ fn generate_recommendation(
             generate_error_swallowing_recommendation(pattern, context)
         }
         // Security debt types
-        DebtType::HardcodedSecrets {
-            secret_type,
-            severity,
-        } => generate_security_recommendation("hardcoded_secrets", secret_type, severity),
-        DebtType::WeakCryptography {
-            algorithm,
-            recommendation,
-        } => generate_security_recommendation("weak_crypto", algorithm, recommendation),
-        DebtType::SqlInjectionRisk {
-            query_pattern,
-            risk_level,
-        } => generate_security_recommendation("sql_injection", query_pattern, risk_level),
-        DebtType::UnsafeCode {
-            justification,
-            safety_concern,
-        } => generate_unsafe_code_recommendation(justification, safety_concern),
-        DebtType::InputValidationGap {
-            input_type,
-            validation_missing,
-        } => generate_security_recommendation("input_validation", input_type, validation_missing),
         // Resource Management debt types
         DebtType::AllocationInefficiency { pattern, impact } => {
             generate_resource_management_recommendation("allocation", pattern, impact)
@@ -1917,12 +1821,6 @@ fn generate_recommendation(
             collection_type,
             inefficiency_type,
         } => generate_collection_inefficiency_recommendation(collection_type, inefficiency_type),
-        // Basic Security and Performance debt types
-        DebtType::BasicSecurity {
-            vulnerability_type,
-            severity,
-            description: _,
-        } => generate_security_recommendation("basic", vulnerability_type, severity),
     };
 
     ActionableRecommendation {
@@ -1949,12 +1847,6 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::Risk { .. } => 0.2,
         DebtType::TestComplexityHotspot { .. } => 0.15,
         DebtType::TestTodo { .. } | DebtType::TestDuplication { .. } => 0.1,
-        // Security debt types (high risk)
-        DebtType::HardcodedSecrets { .. } => 0.8,
-        DebtType::SqlInjectionRisk { .. } => 0.9,
-        DebtType::UnsafeCode { .. } => 0.7,
-        DebtType::WeakCryptography { .. } => 0.65,
-        DebtType::InputValidationGap { .. } => 0.6,
         // Resource Management debt types (medium risk)
         DebtType::BlockingIO { .. } => 0.45,
         DebtType::NestedLoops { .. } => 0.4,
@@ -1973,13 +1865,6 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::ResourceLeak { .. } => 0.5,
         DebtType::AsyncMisuse { .. } => 0.4,
         DebtType::CollectionInefficiency { .. } => 0.2,
-        // Basic Security and Performance debt types
-        DebtType::BasicSecurity { severity, .. } => match severity.as_str() {
-            "Critical" | "HIGH" => 0.9,
-            "High" | "MEDIUM" => 0.7,
-            "Medium" | "LOW" => 0.5,
-            _ => 0.4,
-        },
     }
 }
 
@@ -2010,11 +1895,6 @@ fn calculate_lines_reduction(debt_type: &DebtType) -> u32 {
             total_lines,
             ..
         } => *total_lines - (*total_lines / instances),
-        // Security debt types - often require minimal code changes
-        DebtType::HardcodedSecrets { .. } => 2, // Move to config
-        DebtType::InputValidationGap { .. } => 5, // Add validation
-        DebtType::UnsafeCode { .. } => 3,       // Add documentation or safety
-        DebtType::BasicSecurity { .. } => 3,    // Security fixes typically small
         _ => 0,
     }
 }
@@ -2078,97 +1958,6 @@ fn calculate_expected_impact(
 
 // New recommendation generators for expanded debt types
 
-fn generate_security_recommendation(
-    sec_type: &str,
-    detail1: &str,
-    detail2: &str,
-) -> (String, String, Vec<String>) {
-    match sec_type {
-        "hardcoded_secrets" => (
-            format!("Remove {} secret and use secure configuration", detail1),
-            format!(
-                "Severity {}: Hardcoded {} exposes sensitive data",
-                detail2, detail1
-            ),
-            vec![
-                "Move secret to environment variable or config file".to_string(),
-                "Use secure credential management system".to_string(),
-                "Add secret to .gitignore patterns".to_string(),
-                "Review git history for leaked secrets".to_string(),
-            ],
-        ),
-        "weak_crypto" => (
-            format!("Replace {} with {}", detail1, detail2),
-            format!("Algorithm {} is cryptographically weak", detail1),
-            vec![
-                format!("Upgrade to {}", detail2),
-                "Review all cryptographic dependencies".to_string(),
-                "Test compatibility with new algorithms".to_string(),
-                "Update security documentation".to_string(),
-            ],
-        ),
-        "sql_injection" => (
-            "Use parameterized queries to prevent SQL injection".to_string(),
-            format!(
-                "Risk level {}: Pattern {} vulnerable to injection",
-                detail2, detail1
-            ),
-            vec![
-                "Replace string concatenation with parameterized queries".to_string(),
-                "Use ORM or query builder for type safety".to_string(),
-                "Validate and sanitize all user inputs".to_string(),
-                "Add automated security testing".to_string(),
-            ],
-        ),
-        "input_validation" => (
-            format!("Add validation for {} input", detail1),
-            format!("Missing validation: {}", detail2),
-            vec![
-                "Implement input sanitization".to_string(),
-                "Add boundary and type checking".to_string(),
-                "Use validation library for consistency".to_string(),
-                "Add unit tests for edge cases".to_string(),
-            ],
-        ),
-        "basic" => (
-            format!("Address {} security issue", detail1),
-            format!("Security vulnerability detected ({}): {}", detail2, detail1),
-            vec![
-                "Review and fix security vulnerability".to_string(),
-                "Apply security best practices".to_string(),
-                "Consider security impact assessment".to_string(),
-                "Add security testing for this area".to_string(),
-            ],
-        ),
-        _ => (
-            "Fix security issue".to_string(),
-            "Security vulnerability detected".to_string(),
-            vec!["Review security best practices".to_string()],
-        ),
-    }
-}
-
-fn generate_unsafe_code_recommendation(
-    justification: &Option<String>,
-    safety_concern: &str,
-) -> (String, String, Vec<String>) {
-    let action = if justification.is_some() {
-        "Review unsafe block justification"
-    } else {
-        "Add safety documentation or remove unsafe"
-    };
-
-    (
-        action.to_string(),
-        format!("Safety concern: {}", safety_concern),
-        vec![
-            "Document safety invariants and preconditions".to_string(),
-            "Consider safe alternatives if available".to_string(),
-            "Add comprehensive safety comments".to_string(),
-            "Review with security team".to_string(),
-        ],
-    )
-}
 
 fn generate_resource_management_recommendation(
     resource_type: &str,
@@ -2788,7 +2577,6 @@ mod tests {
             complexity_factor: 8.0,
             coverage_factor: 7.0,
             dependency_factor: 4.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 6.5,
         };
@@ -3012,7 +2800,6 @@ mod tests {
             complexity_factor: 5.0,
             coverage_factor: 0.0,
             dependency_factor: 0.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };
@@ -3456,7 +3243,6 @@ mod tests {
             complexity_factor: 5.0,
             coverage_factor: 3.0,
             dependency_factor: 2.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3488,7 +3274,6 @@ mod tests {
             complexity_factor: 7.0,
             coverage_factor: 5.0,
             dependency_factor: 3.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 5.0,
         };
@@ -3514,7 +3299,6 @@ mod tests {
             complexity_factor: 1.0,
             coverage_factor: 6.0,
             dependency_factor: 1.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 3.0,
         };
@@ -3541,7 +3325,6 @@ mod tests {
             complexity_factor: 5.0,
             coverage_factor: 6.0,
             dependency_factor: 2.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.5,
         };
@@ -3905,7 +3688,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -3927,7 +3710,7 @@ mod tests {
 
         let score = calculate_unified_priority_with_debt(
             &func, &graph, None, // No coverage data
-            None, None, None,
+            None, None,
         );
 
         assert!(
@@ -3963,12 +3746,12 @@ mod tests {
         let graph = CallGraph::new();
 
         let score_with_entropy =
-            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // Compare with same function without entropy
         func.entropy_score = None;
         let score_without_entropy =
-            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // Clean up
         std::env::remove_var("DEBTMAP_ENTROPY_ENABLED");
@@ -3990,27 +3773,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_calculate_unified_priority_with_debt_security_issues() {
-        // Test security factor integration
-        let func = create_test_metrics();
-        let graph = CallGraph::new();
-
-        let score = calculate_unified_priority_with_debt(
-            &func,
-            &graph,
-            None,
-            Some(8.5), // High security issues
-            None,
-            None,
-        );
-
-        assert_eq!(score.security_factor, 8.5);
-        assert!(
-            score.final_score > 4.0,
-            "Security issues should increase priority"
-        );
-    }
 
     #[test]
     fn test_calculate_unified_priority_with_debt_organization_issues() {
@@ -4060,7 +3822,7 @@ mod tests {
             });
         }
 
-        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         assert!(score.role_multiplier > 0.0);
         assert!(
@@ -4078,7 +3840,7 @@ mod tests {
 
         let graph = CallGraph::new();
 
-        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         assert_eq!(
             score.coverage_factor, 0.0,
@@ -4100,14 +3862,14 @@ mod tests {
             &func,
             &graph,
             None,
-            Some(10.0), // Max security issues
             Some(10.0), // Max organization issues
             None,
         );
 
         assert!(score.final_score <= 10.0, "Score should be capped at 10.0");
-        assert_eq!(score.security_factor, 10.0);
+        assert_eq!(score.security_factor, 0.0);
         // Organization factor removed per spec 58 - redundant with complexity factor
+        // Security factor removed per spec 64
     }
 
     #[test]
@@ -4132,7 +3894,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -4161,7 +3923,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -4188,7 +3950,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None);
 
         // Even with some coverage, non-trivial functions should still have priority
         assert!(
@@ -4208,7 +3970,7 @@ mod tests {
 
         let graph = CallGraph::new();
 
-        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // Verify purity bonus was applied (30% reduction for high confidence)
         // Original cyclomatic 12 * 0.7 = 8.4
@@ -4229,7 +3991,7 @@ mod tests {
 
         let graph = CallGraph::new();
 
-        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // Verify smaller purity bonus was applied (15% reduction for low confidence)
         // Original cyclomatic 12 * 0.85 = 10.2
@@ -4250,7 +4012,7 @@ mod tests {
 
         let graph = CallGraph::new();
 
-        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // Verify no purity bonus for impure functions
         assert_eq!(
@@ -4281,7 +4043,7 @@ mod tests {
         );
 
         let score_without_aggregator =
-            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // The scores might be the same if aggregator has no data for this function
         // but the function should handle both cases without panicking
@@ -4316,12 +4078,12 @@ mod tests {
         }
 
         let score_with_deps =
-            calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // Test with no dependencies
         let empty_graph = CallGraph::new();
         let score_no_deps =
-            calculate_unified_priority_with_debt(&func, &empty_graph, None, None, None, None);
+            calculate_unified_priority_with_debt(&func, &empty_graph, None, None, None);
 
         assert!(
             score_with_deps.dependency_factor > score_no_deps.dependency_factor,
@@ -4355,7 +4117,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -4386,7 +4148,7 @@ mod tests {
         );
 
         let score =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None);
 
         assert_eq!(
             score.final_score, 0.0,
@@ -4396,7 +4158,7 @@ mod tests {
         // Test just above trivial boundary
         func.cyclomatic = 4; // Just above trivial threshold
         let score_above =
-            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None, None);
+            calculate_unified_priority_with_debt(&func, &graph, Some(&lcov), None, None);
 
         assert!(
             score_above.final_score > 0.0,
@@ -4415,7 +4177,7 @@ mod tests {
 
         let graph = CallGraph::new();
 
-        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None, None);
+        let score = calculate_unified_priority_with_debt(&func, &graph, None, None, None);
 
         // Even with zero complexity, lack of coverage should give some score
         assert_eq!(
@@ -4475,7 +4237,6 @@ mod tests {
             &func,
             &graph,
             None,
-            Some(3.0), // Some security issues
             None,
             None,
         );
@@ -4490,7 +4251,7 @@ mod tests {
             score.dependency_factor > 0.0,
             "Should have dependency factor"
         );
-        assert_eq!(score.security_factor, 3.0, "Should have security factor");
+        assert_eq!(score.security_factor, 0.0, "Security factor should be 0.0 per spec 64");
         assert!(score.role_multiplier > 0.0, "Should have role multiplier");
         assert!(score.final_score > 0.0, "Should have final score");
     }

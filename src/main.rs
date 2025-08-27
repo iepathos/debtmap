@@ -36,8 +36,6 @@ struct AnalyzeConfig {
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
     #[allow(dead_code)]
-    security_enhanced: bool,
-    #[allow(dead_code)]
     group_by_category: bool,
     #[allow(dead_code)]
     min_priority: Option<String>,
@@ -106,7 +104,6 @@ fn main() -> Result<()> {
             verbosity,
             verbose_macro_warnings,
             show_macro_stats,
-            security_enhanced,
             group_by_category,
             min_priority,
             filter_categories,
@@ -137,7 +134,6 @@ fn main() -> Result<()> {
                 verbosity,
                 verbose_macro_warnings,
                 show_macro_stats,
-                security_enhanced,
                 group_by_category,
                 min_priority,
                 filter_categories,
@@ -1427,7 +1423,6 @@ fn convert_error_swallowing_to_unified(
                 complexity_factor: 3.0, // Moderate complexity - error handling adds complexity
                 coverage_factor: 5.0,   // Important to test error paths
                 dependency_factor: 4.0, // Moderate dependency impact
-                security_factor: 0.0,   // Not a security issue
                 role_multiplier: 1.2,   // Slightly elevated importance
                 final_score: 5.5,       // Above average priority
             };
@@ -1545,8 +1540,6 @@ fn create_unified_analysis_with_exclusions(
             unified.add_item(item);
         }
 
-        // Convert Security debt items to unified format
-        unified.add_security_items(debt_items, call_graph);
     }
 
     unified.sort_by_priority();

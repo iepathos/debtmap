@@ -332,6 +332,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Improved test performance by avoiding subprocess overhead
   - Created helpers for simulating CLI output from library calls
 
+- [x] **Spec 64**: Remove Security Detection Subsystem
+  - Removed security module and all its detectors
+  - Removed security-specific data flow analysis
+  - Updated unified scoring to remove security factors
+  - Cleaned up security-related CLI options
+  - Updated tests to remove security-specific assertions
+  - Refocused tool on core technical debt detection
+
 ## Pending Specs
 
 ### Enhancements

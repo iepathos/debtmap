@@ -28,8 +28,6 @@ pub enum DebtPattern {
     BlockingIO,
     /// Match input validation issues
     InputValidation,
-    /// Match security issues
-    Security,
     /// Match all patterns
     All,
 }
@@ -182,7 +180,6 @@ impl ContextRuleEngine {
         let pattern = match config.pattern.as_str() {
             "blocking_io" => DebtPattern::BlockingIO,
             "input_validation" => DebtPattern::InputValidation,
-            "security" => DebtPattern::Security,
             "all" => DebtPattern::All,
             _ => return None, // Unknown pattern
         };
@@ -327,23 +324,6 @@ impl ContextRuleEngine {
             reason: Some("Test functions use literal strings for test cases".to_string()),
         });
 
-        // Security checks can be skipped in test files
-        self.add_rule(ContextRule {
-            pattern: DebtPattern::Security,
-            context_matcher: ContextMatcher::for_file_type(FileType::Test),
-            action: RuleAction::Skip,
-            priority: 90,
-            reason: Some("Security is not a concern in test code".to_string()),
-        });
-
-        // Security checks can be skipped in examples
-        self.add_rule(ContextRule {
-            pattern: DebtPattern::Security,
-            context_matcher: ContextMatcher::for_file_type(FileType::Example),
-            action: RuleAction::Skip,
-            priority: 90,
-            reason: Some("Examples often demonstrate concepts without security".to_string()),
-        });
 
         // Build scripts have different constraints
         self.add_rule(ContextRule {
@@ -398,7 +378,6 @@ impl ContextRuleEngine {
             }
             (DebtPattern::BlockingIO, DebtPattern::BlockingIO) => true,
             (DebtPattern::InputValidation, DebtPattern::InputValidation) => true,
-            (DebtPattern::Security, DebtPattern::Security) => true,
             _ => false,
         }
     }
@@ -476,19 +455,15 @@ mod tests {
         let action = engine.evaluate(&DebtPattern::BlockingIO, &regular_context);
         assert_eq!(action, RuleAction::Deny);
 
-        // Test security in test file
-        let test_context = FunctionContext::new().with_file_type(FileType::Test);
-        let action = engine.evaluate(&DebtPattern::Security, &test_context);
-        assert_eq!(action, RuleAction::Skip);
     }
 
     #[test]
     fn test_custom_rules() {
         let mut engine = ContextRuleEngine::new();
 
-        // Add a custom rule for testing
+        // Add a custom rule for testing using InputValidation instead
         engine.add_rule(ContextRule {
-            pattern: DebtPattern::Security,
+            pattern: DebtPattern::InputValidation,
             context_matcher: ContextMatcher {
                 role: None,
                 file_type: None,
@@ -504,7 +479,7 @@ mod tests {
         // Test the custom rule
         let benchmark_context =
             FunctionContext::new().with_function_name("run_benchmark".to_string());
-        let action = engine.evaluate(&DebtPattern::Security, &benchmark_context);
+        let action = engine.evaluate(&DebtPattern::InputValidation, &benchmark_context);
         assert_eq!(action, RuleAction::Skip);
     }
 }

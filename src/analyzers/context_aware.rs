@@ -167,21 +167,9 @@ impl Analyzer for ContextAwareAnalyzer {
 }
 
 /// Convert a debt type to a debt pattern for rule matching
-fn debt_type_to_pattern(debt_type: &DebtType, message: &str) -> DebtPattern {
-    match debt_type {
-        // Security patterns - check message for specific types
-        DebtType::Security => {
-            // Check if it's an input validation issue
-            if message.contains("Input Validation") || message.contains("input validation") {
-                DebtPattern::InputValidation
-            } else {
-                DebtPattern::Security
-            }
-        }
-
-        // All other debt types
-        _ => DebtPattern::DebtType(*debt_type),
-    }
+fn debt_type_to_pattern(debt_type: &DebtType, _message: &str) -> DebtPattern {
+    // All debt types are mapped directly to DebtPattern::DebtType
+    DebtPattern::DebtType(*debt_type)
 }
 
 /// Adjust priority based on severity adjustment
@@ -220,26 +208,7 @@ mod tests {
         assert_eq!(adjust_priority(Priority::Critical, -999), Priority::Low);
     }
 
-    #[test]
-    fn test_debt_type_to_pattern_security_with_input_validation() {
-        // Test Security debt type with "Input Validation" in message
-        let pattern = debt_type_to_pattern(&DebtType::Security, "Input Validation: missing checks");
-        assert_eq!(pattern, DebtPattern::InputValidation);
 
-        // Test with lowercase "input validation"
-        let pattern = debt_type_to_pattern(&DebtType::Security, "Need input validation here");
-        assert_eq!(pattern, DebtPattern::InputValidation);
-    }
-
-    #[test]
-    fn test_debt_type_to_pattern_security_without_input_validation() {
-        // Test Security debt type without input validation keywords
-        let pattern = debt_type_to_pattern(&DebtType::Security, "SQL injection vulnerability");
-        assert_eq!(pattern, DebtPattern::Security);
-
-        let pattern = debt_type_to_pattern(&DebtType::Security, "Potential XSS attack");
-        assert_eq!(pattern, DebtPattern::Security);
-    }
 
     #[test]
     fn test_debt_type_to_pattern_other_types() {
@@ -264,18 +233,4 @@ mod tests {
         assert_eq!(pattern, DebtPattern::DebtType(DebtType::Duplication));
     }
 
-    #[test]
-    fn test_debt_type_to_pattern_edge_cases() {
-        // Test Security with empty message
-        let pattern = debt_type_to_pattern(&DebtType::Security, "");
-        assert_eq!(pattern, DebtPattern::Security);
-
-        // Test Security with partial match (should not trigger)
-        let pattern = debt_type_to_pattern(&DebtType::Security, "Input is valid");
-        assert_eq!(pattern, DebtPattern::Security);
-
-        // Test Security with different casing variations
-        let pattern = debt_type_to_pattern(&DebtType::Security, "INPUT VALIDATION required");
-        assert_eq!(pattern, DebtPattern::Security); // No match since contains() is case-sensitive
-    }
 }
