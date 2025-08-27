@@ -1394,7 +1394,6 @@ fn generate_combined_testing_refactoring_steps(
 }
 
 /// Generate intelligent extraction recommendations using pattern analysis
-#[allow(dead_code)]
 fn generate_intelligent_extraction_recommendations(
     func: &FunctionMetrics,
     verbosity: VerbosityLevel,
@@ -1755,11 +1754,156 @@ fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, Stri
     }
 }
 
+/// Generate complexity recommendation using pattern analysis when available
+fn generate_complexity_recommendation_with_patterns(
+    func: &FunctionMetrics,
+    cyclomatic: u32,
+    cognitive: u32,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> (String, String, Vec<String>) {
+    use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
+
+    // Try to analyze extraction patterns
+    let analyzer = UnifiedExtractionAnalyzer::new();
+
+    // Create a minimal FileMetrics for the analyzer
+    let file_metrics = crate::core::FileMetrics {
+        path: func.file.clone(),
+        language: detect_file_language(&func.file),
+        complexity: crate::core::ComplexityMetrics::default(),
+        debt_items: vec![],
+        dependencies: vec![],
+        duplications: vec![],
+    };
+
+    let suggestions = analyzer.analyze_function(func, &file_metrics, data_flow);
+
+    if !suggestions.is_empty() {
+        // Generate pattern-based recommendation
+        let mut action_parts = vec![];
+        let mut steps = vec![];
+        let mut total_complexity_reduction = 0u32;
+
+        for (i, suggestion) in suggestions.iter().enumerate().take(3) {
+            // Include top 3 patterns
+            action_parts.push(format!(
+                "{} (confidence: {:.0}%)",
+                suggestion.suggested_name,
+                suggestion.confidence * 100.0
+            ));
+
+            steps.push(format!(
+                "{}. Extract {} pattern at lines {}-{} as '{}' ({} complexity → {})",
+                i + 1,
+                pattern_type_name(&suggestion.pattern_type),
+                suggestion.start_line,
+                suggestion.end_line,
+                suggestion.suggested_name,
+                suggestion.complexity_reduction.current_cyclomatic,
+                suggestion.complexity_reduction.predicted_cyclomatic
+            ));
+
+            total_complexity_reduction += suggestion
+                .complexity_reduction
+                .current_cyclomatic
+                .saturating_sub(suggestion.complexity_reduction.predicted_cyclomatic);
+        }
+
+        let predicted_complexity = cyclomatic.saturating_sub(total_complexity_reduction);
+
+        let action = format!(
+            "Extract {} identified patterns to reduce complexity from {} to {}",
+            suggestions.len(),
+            cyclomatic,
+            predicted_complexity
+        );
+
+        let rationale = format!(
+            "High complexity function (cyclo={}, cog={}) has {} extractable patterns with high confidence",
+            cyclomatic,
+            cognitive,
+            suggestions.len()
+        );
+
+        // Add testing steps
+        steps.push(format!(
+            "{}. Write unit tests for each extracted pure function",
+            suggestions.len() + 1
+        ));
+        steps.push(format!(
+            "{}. Add property-based tests for complex transformations",
+            suggestions.len() + 2
+        ));
+        steps.push(format!(
+            "Expected complexity reduction: {}%",
+            (total_complexity_reduction as f32 / cyclomatic as f32 * 100.0) as u32
+        ));
+
+        (action, rationale, steps)
+    } else {
+        // Fall back to heuristic-based recommendation
+        let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
+        (
+            format!(
+                "Extract {} pure functions to reduce complexity from {} to <10, then add comprehensive tests",
+                functions_to_extract,
+                cyclomatic
+            ),
+            format!(
+                "High complexity function (cyclo={}, cog={}) likely with low coverage - needs testing and refactoring",
+                cyclomatic,
+                cognitive
+            ),
+            vec![
+                format!("Identify {} logical sections in function", functions_to_extract),
+                "Extract pure functions for each section (no side effects)".to_string(),
+                "Move I/O and side effects to orchestrator function".to_string(),
+                format!("Write {} unit tests for extracted pure functions", functions_to_extract * 3),
+                "Add property-based tests for complex logic".to_string(),
+            ],
+        )
+    }
+}
+
+/// Helper function to get pattern type name for display
+fn pattern_type_name(pattern: &crate::extraction_patterns::ExtractablePattern) -> &str {
+    use crate::extraction_patterns::ExtractablePattern;
+    match pattern {
+        ExtractablePattern::AccumulationLoop { .. } => "accumulation loop",
+        ExtractablePattern::GuardChainSequence { .. } => "guard chain",
+        ExtractablePattern::TransformationPipeline { .. } => "transformation pipeline",
+        ExtractablePattern::SimilarBranches { .. } => "similar branches",
+        ExtractablePattern::NestedExtraction { .. } => "nested pattern",
+    }
+}
+
+/// Helper function to detect file language
+fn detect_file_language(path: &std::path::Path) -> crate::core::Language {
+    let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+
+    match extension {
+        "rs" => crate::core::Language::Rust,
+        "py" => crate::core::Language::Python,
+        "js" | "jsx" | "ts" | "tsx" => crate::core::Language::JavaScript,
+        _ => crate::core::Language::Rust, // Default to Rust
+    }
+}
+
 fn generate_recommendation(
     func: &FunctionMetrics,
     debt_type: &DebtType,
     role: FunctionRole,
     _score: &UnifiedScore,
+) -> ActionableRecommendation {
+    generate_recommendation_with_data_flow(func, debt_type, role, _score, None)
+}
+
+fn generate_recommendation_with_data_flow(
+    func: &FunctionMetrics,
+    debt_type: &DebtType,
+    role: FunctionRole,
+    _score: &UnifiedScore,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> ActionableRecommendation {
     let (primary_action, rationale, steps) = match debt_type {
         DebtType::DeadCode {
@@ -1779,9 +1923,25 @@ fn generate_recommendation(
             cyclomatic,
             cognitive,
         } => generate_testing_gap_recommendation(*coverage, *cyclomatic, *cognitive, role),
-        DebtType::ComplexityHotspot { .. }
-        | DebtType::Duplication { .. }
-        | DebtType::Risk { .. } => generate_infrastructure_recommendation(debt_type),
+        DebtType::ComplexityHotspot {
+            cyclomatic,
+            cognitive,
+        } => {
+            // Try to use intelligent pattern-based recommendations if available
+            if let Some(df) = data_flow {
+                generate_complexity_recommendation_with_patterns(
+                    func,
+                    *cyclomatic,
+                    *cognitive,
+                    Some(df),
+                )
+            } else {
+                generate_infrastructure_recommendation(debt_type)
+            }
+        }
+        DebtType::Duplication { .. } | DebtType::Risk { .. } => {
+            generate_infrastructure_recommendation(debt_type)
+        }
         DebtType::TestComplexityHotspot { .. }
         | DebtType::TestTodo { .. }
         | DebtType::TestDuplication { .. } => generate_test_debt_recommendation(debt_type),
