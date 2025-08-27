@@ -42,7 +42,7 @@ impl PatternMatchRecognizer {
     }
 
     /// Check if an expression has an immediate return
-    fn has_immediate_return(&self, block: &Block) -> bool {
+    pub fn has_immediate_return(&self, block: &Block) -> bool {
         // Check if the block has only one or two statements and includes a return
         if block.stmts.is_empty() || block.stmts.len() > 2 {
             return false;
@@ -56,7 +56,7 @@ impl PatternMatchRecognizer {
     }
 
     /// Extract the variable being tested in a condition
-    fn extract_tested_variable(&self, expr: &Expr) -> Option<String> {
+    pub fn extract_tested_variable(&self, expr: &Expr) -> Option<String> {
         match expr {
             // path.ends_with(), path.starts_with(), etc.
             Expr::MethodCall(method) => {
@@ -97,7 +97,7 @@ impl PatternMatchRecognizer {
     }
 
     /// Extract field path like self.field or obj.field
-    fn extract_field_path(&self, expr: &Expr) -> Option<String> {
+    pub fn extract_field_path(&self, expr: &Expr) -> Option<String> {
         let mut path_parts = Vec::new();
         let mut current = expr;
 
@@ -126,7 +126,7 @@ impl PatternMatchRecognizer {
     }
 
     /// Detect the type of pattern being matched
-    fn detect_pattern_type(&self, expr: &Expr) -> PatternType {
+    pub fn detect_pattern_type(&self, expr: &Expr) -> PatternType {
         match expr {
             Expr::MethodCall(method) => {
                 let method_name = method.method.to_string();
@@ -201,7 +201,7 @@ impl PatternMatchRecognizer {
     }
 
     /// Analyze an if-else chain to see if it's pattern matching
-    fn analyze_if_chain(
+    pub fn analyze_if_chain(
         &self,
         if_expr: &ExprIf,
         tracked_var: &mut Option<String>,
