@@ -95,7 +95,7 @@ Analyze the difference between before and after debtmap results to quantify tech
 
 7. **Create Git Commit**
    - Stage all changes with `git add -A`
-   - Create a commit with the message:
+   - Create a commit with the message (explicitly without Claude signature):
    ```
    fix: eliminate <successful> technical debt items via MapReduce
    
@@ -110,6 +110,8 @@ Analyze the difference between before and after debtmap results to quantify tech
    
    This commit represents the aggregated work of multiple parallel agents.
    ```
+   
+   **IMPORTANT**: Do NOT include the Claude signature ("🤖 Generated with Claude Code" or "Co-Authored-By: Claude") in this commit message to avoid bloating the commit history.
 
 ## Output Format
 Generate a concise, markdown-formatted summary suitable for inclusion in a git commit message. Focus on:
