@@ -349,6 +349,14 @@ We have completed the initial implementation with core functionality for analyzi
   - Realistic complexity reduction estimates
   - Line-specific extraction suggestions with examples
 
+- [x] **Spec 66**: Integrate Extraction Patterns into Output
+  - Removed dead code flag from generate_intelligent_extraction_recommendations
+  - Wired pattern analysis to ComplexityHotspot debt type handling
+  - Pattern-specific recommendations replace generic "Extract N functions" advice
+  - Confidence scores and line numbers included in output
+  - Falls back to heuristic recommendations when no patterns detected
+  - Enhanced recommendation steps with specific pattern details
+
 ## Pending Specs
 
 ### Enhancements
