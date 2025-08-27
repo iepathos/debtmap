@@ -60,37 +60,8 @@ pub fn format_priority_item_with_verbosity(
             ));
         }
 
-        // Add Security and Performance specific factors
+        // Add Performance specific factors
         match &item.debt_type {
-            crate::priority::DebtType::BasicSecurity {
-                severity,
-                vulnerability_type,
-                ..
-            } => {
-                factors.push(format!("Security vulnerability ({})", severity));
-                if !vulnerability_type.is_empty() && vulnerability_type != "Security Issue" {
-                    factors.push(format!("{} detected", vulnerability_type));
-                }
-            }
-            crate::priority::DebtType::HardcodedSecrets {
-                severity,
-                secret_type,
-            } => {
-                factors.push(format!("Security vulnerability ({})", severity));
-                factors.push(format!("Hardcoded {} detected", secret_type));
-            }
-            crate::priority::DebtType::SqlInjectionRisk { risk_level, .. } => {
-                factors.push(format!("Security vulnerability ({})", risk_level));
-                factors.push("SQL injection risk detected".to_string());
-            }
-            crate::priority::DebtType::UnsafeCode { safety_concern, .. } => {
-                factors.push("Security vulnerability (High)".to_string());
-                factors.push(format!("Unsafe code: {}", safety_concern));
-            }
-            crate::priority::DebtType::WeakCryptography { algorithm, .. } => {
-                factors.push("Security vulnerability (High)".to_string());
-                factors.push(format!("Weak crypto: {}", algorithm));
-            }
             crate::priority::DebtType::NestedLoops { depth, .. } => {
                 factors.push("Performance impact (High)".to_string());
                 factors.push(format!("{} level nested loops", depth));
@@ -181,15 +152,6 @@ pub fn format_priority_item_with_verbosity(
         )
         .unwrap();
 
-        // Always show security factor for consistency
-        writeln!(
-            output,
-            "│  │  ├─ Security:    {:.1} × {:.0}% = {:.2}",
-            item.unified_score.security_factor,
-            weights.security * 100.0,
-            item.unified_score.security_factor * weights.security
-        )
-        .unwrap();
 
         // Show semantic and organization with 0% weight for transparency
         // These were removed per spec 58 but keeping in display for clarity
@@ -216,8 +178,7 @@ pub fn format_priority_item_with_verbosity(
         // Note: semantic and organization are in config but not used in calculation (always 0)
         let base_score = item.unified_score.complexity_factor * weights.complexity
             + item.unified_score.coverage_factor * weights.coverage
-            + item.unified_score.dependency_factor * weights.dependency
-            + item.unified_score.security_factor * weights.security;
+            + item.unified_score.dependency_factor * weights.dependency;
 
         writeln!(output, "│  ├─ Base Score: {:.2}", base_score).unwrap();
 

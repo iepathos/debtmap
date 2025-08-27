@@ -70,7 +70,6 @@ fn type_weight(debt_type: &DebtType) -> u32 {
         | DebtType::TestQuality => 3,
         DebtType::Duplication | DebtType::ErrorSwallowing | DebtType::ResourceManagement => 4,
         DebtType::Complexity => 5,
-        DebtType::Security => 10,
     }
 }
 
@@ -129,10 +128,6 @@ mod tests {
         assert_eq!(type_weight(&DebtType::Complexity), 5);
     }
 
-    #[test]
-    fn test_type_weight_security() {
-        assert_eq!(type_weight(&DebtType::Security), 10);
-    }
 
     #[test]
     fn test_type_weight_all_variants() {
@@ -146,7 +141,6 @@ mod tests {
         assert_eq!(type_weight(&DebtType::ErrorSwallowing), 4);
         assert_eq!(type_weight(&DebtType::ResourceManagement), 4);
         assert_eq!(type_weight(&DebtType::CodeOrganization), 3);
-        assert_eq!(type_weight(&DebtType::Security), 10);
         assert_eq!(type_weight(&DebtType::TestComplexity), 2);
         assert_eq!(type_weight(&DebtType::TestTodo), 1);
         assert_eq!(type_weight(&DebtType::TestDuplication), 2);
@@ -166,8 +160,6 @@ mod tests {
         let low_todo = create_test_item(DebtType::Todo, Priority::Low);
         assert_eq!(calculate_debt_score(&low_todo), 1); // 1 * 1
 
-        let high_security = create_test_item(DebtType::Security, Priority::High);
-        assert_eq!(calculate_debt_score(&high_security), 50); // 5 * 10
 
         let critical_complexity = create_test_item(DebtType::Complexity, Priority::Critical);
         assert_eq!(calculate_debt_score(&critical_complexity), 50); // 10 * 5
@@ -178,8 +170,6 @@ mod tests {
         let complexity_high = create_test_item(DebtType::Complexity, Priority::High);
         assert_eq!(calculate_debt_score(&complexity_high), 25); // 5 * 5
 
-        let security_critical = create_test_item(DebtType::Security, Priority::Critical);
-        assert_eq!(calculate_debt_score(&security_critical), 100); // 10 * 10
     }
 
     #[test]
@@ -187,9 +177,9 @@ mod tests {
         let items = vec![
             create_test_item(DebtType::Todo, Priority::Low),
             create_test_item(DebtType::Fixme, Priority::Medium),
-            create_test_item(DebtType::Security, Priority::Critical),
+            create_test_item(DebtType::Complexity, Priority::Critical),
         ];
-        assert_eq!(total_debt_score(&items), 1 + 6 + 100); // 107
+        assert_eq!(total_debt_score(&items), 1 + 6 + 50); // 57
     }
 
     #[test]

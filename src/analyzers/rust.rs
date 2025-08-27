@@ -180,7 +180,6 @@ fn collect_all_rust_debt_items(
         detect_error_swallowing(file, path, Some(suppression_context)),
         analyze_resource_patterns(file, path),
         analyze_organization_patterns(file, path),
-        analyze_security_patterns(file, path, suppression_context),
         testing::analyze_testing_patterns(file, path),
     ]
     .into_iter()
@@ -808,16 +807,6 @@ fn analyze_resource_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
     resource_items
 }
 
-fn analyze_security_patterns(
-    file: &syn::File,
-    path: &Path,
-    suppression_context: &SuppressionContext,
-) -> Vec<DebtItem> {
-    crate::security::analyze_security_patterns(file, path)
-        .into_iter()
-        .filter(|item| !suppression_context.is_suppressed(item.line, &item.debt_type))
-        .collect()
-}
 
 fn analyze_organization_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem> {
     let detectors: Vec<Box<dyn OrganizationDetector>> = vec![

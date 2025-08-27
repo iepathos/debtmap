@@ -13,7 +13,6 @@ pub struct FunctionId {
 #[derive(Debug, Clone)]
 pub struct FunctionDebtProfile {
     pub function_id: FunctionId,
-    pub security_issues: Vec<DebtItem>,
     pub organization_issues: Vec<DebtItem>,
     pub testing_issues: Vec<DebtItem>,
     pub resource_issues: Vec<DebtItem>,
@@ -24,7 +23,6 @@ impl FunctionDebtProfile {
     pub fn new(function_id: FunctionId) -> Self {
         Self {
             function_id,
-            security_issues: Vec::new(),
             organization_issues: Vec::new(),
             testing_issues: Vec::new(),
             resource_issues: Vec::new(),
@@ -34,7 +32,6 @@ impl FunctionDebtProfile {
 
     pub fn add_debt_item(&mut self, item: DebtItem) {
         match categorize_debt_type(&item.debt_type) {
-            DebtCategory::Security => self.security_issues.push(item),
             DebtCategory::Organization => self.organization_issues.push(item),
             DebtCategory::Testing => self.testing_issues.push(item),
             DebtCategory::Resource => self.resource_issues.push(item),
@@ -43,8 +40,7 @@ impl FunctionDebtProfile {
     }
 
     pub fn total_issues(&self) -> usize {
-        self.security_issues.len()
-            + self.organization_issues.len()
+ self.organization_issues.len()
             + self.testing_issues.len()
             + self.resource_issues.len()
             + self.duplication_issues.len()
@@ -53,7 +49,6 @@ impl FunctionDebtProfile {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DebtCategory {
-    Security,
     Organization,
     Testing,
     Resource,
@@ -63,7 +58,6 @@ pub enum DebtCategory {
 impl DebtCategory {
     pub fn severity_weight(&self) -> f64 {
         match self {
-            DebtCategory::Security => 3.0,     // Highest priority
             DebtCategory::Resource => 2.5,     // High priority (error handling, leaks)
             DebtCategory::Organization => 1.5, // Medium priority
             DebtCategory::Testing => 1.0,      // Lower priority
@@ -74,9 +68,6 @@ impl DebtCategory {
 
 pub fn categorize_debt_type(debt_type: &DebtType) -> DebtCategory {
     match debt_type {
-        // Security issues
-        DebtType::Security => DebtCategory::Security,
-
         // Complexity is an organization/maintainability issue
         DebtType::Complexity => DebtCategory::Organization,
 
@@ -148,10 +139,6 @@ impl DebtAggregator {
         self.profiles
             .get(func_id)
             .map(|profile| DebtScores {
-                security: calculate_category_score(
-                    &profile.security_issues,
-                    DebtCategory::Security,
-                ),
                 organization: calculate_category_score(
                     &profile.organization_issues,
                     DebtCategory::Organization,
@@ -198,7 +185,6 @@ fn calculate_category_score(issues: &[DebtItem], category: DebtCategory) -> f64 
 
 #[derive(Debug, Clone, Default)]
 pub struct DebtScores {
-    pub security: f64,
     pub organization: f64,
     pub testing: f64,
     pub resource: f64,
@@ -207,7 +193,7 @@ pub struct DebtScores {
 
 impl DebtScores {
     pub fn total(&self) -> f64 {
-        self.security + self.organization + self.testing + self.resource + self.duplication
+        self.organization + self.testing + self.resource + self.duplication
     }
 }
 
@@ -218,10 +204,6 @@ mod tests {
 
     #[test]
     fn test_debt_categorization() {
-        assert_eq!(
-            categorize_debt_type(&DebtType::Security),
-            DebtCategory::Security
-        );
         assert_eq!(
             categorize_debt_type(&DebtType::ErrorSwallowing),
             DebtCategory::Resource
@@ -257,16 +239,6 @@ mod tests {
 
         let debt_items = vec![
             DebtItem {
-                id: "1".to_string(),
-                file: PathBuf::from("test.rs"),
-                line: 15,
-                column: None,
-                debt_type: DebtType::Security,
-                message: "Security issue".to_string(),
-                priority: crate::core::Priority::High,
-                context: None,
-            },
-            DebtItem {
                 id: "2".to_string(),
                 file: PathBuf::from("test.rs"),
                 line: 18,
@@ -292,10 +264,9 @@ mod tests {
         aggregator.aggregate_debt(debt_items, &[(func_id.clone(), 10, 20)]);
 
         let profile = aggregator.get_profile(&func_id).unwrap();
-        assert_eq!(profile.security_issues.len(), 1);
         assert_eq!(profile.organization_issues.len(), 1);
         assert_eq!(profile.resource_issues.len(), 0); // Outside range
-        assert_eq!(profile.total_issues(), 2);
+        assert_eq!(profile.total_issues(), 1);
     }
 
     #[test]
@@ -315,8 +286,8 @@ mod tests {
                 file: PathBuf::from("test.rs"),
                 line: 10,
                 column: None,
-                debt_type: DebtType::Security,
-                message: "Critical security issue".to_string(),
+                debt_type: DebtType::Todo,
+                message: "Critical todo issue".to_string(),
                 priority: crate::core::Priority::Critical,
                 context: None,
             },
@@ -325,8 +296,8 @@ mod tests {
                 file: PathBuf::from("test.rs"),
                 line: 20,
                 column: None,
-                debt_type: DebtType::Security,
-                message: "High security issue".to_string(),
+                debt_type: DebtType::Todo,
+                message: "High todo issue".to_string(),
                 priority: crate::core::Priority::High,
                 context: None,
             },
@@ -335,7 +306,7 @@ mod tests {
         aggregator.aggregate_debt(debt_items, &[(func_id.clone(), 1, 50)]);
 
         let scores = aggregator.calculate_debt_scores(&func_id);
-        assert!(scores.security > 0.0);
-        assert!(scores.security <= 10.0);
+        assert!(scores.organization > 0.0);
+        assert!(scores.organization <= 10.0);
     }
 }

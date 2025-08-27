@@ -199,12 +199,11 @@ fn format_score_factors(score: &crate::priority::unified_scorer::UnifiedScore) -
          - **Complexity Factor**: {:.2}\n\
          - **Coverage Factor**: {:.2}\n\
          - **Dependency Factor**: {:.2}\n\
-         - **Security Factor**: {:.2}\n",
+",
         score.final_score,
         score.complexity_factor,
         score.coverage_factor,
-        score.dependency_factor,
-        score.security_factor
+        score.dependency_factor
     )
 }
 

@@ -8,7 +8,6 @@ pub mod complexity;
 pub mod config;
 pub mod context;
 pub mod core;
-pub mod data_flow;
 pub mod database;
 pub mod debt;
 pub mod io;
@@ -19,7 +18,6 @@ pub mod refactoring;
 pub mod resource;
 pub mod risk;
 pub mod scoring;
-pub mod security;
 pub mod testing;
 pub mod transformers;
 

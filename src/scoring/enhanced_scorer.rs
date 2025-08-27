@@ -193,7 +193,6 @@ impl<'a> EnhancedScorer<'a> {
         breakdown.add_component("dependency", dependency_factor);
         breakdown.add_component("frequency", frequency_factor);
         breakdown.add_component("test_weight", test_weight);
-        breakdown.add_component("security_debt", debt_scores.security);
         breakdown.add_component("organization_debt", debt_scores.organization);
 
         let explanation = format!(
@@ -219,7 +218,6 @@ impl<'a> EnhancedScorer<'a> {
 
         // Map debt types to base severity scores based on type and priority
         let base = match item.debt_type {
-            DebtType::Security => 8.5,
             DebtType::ErrorSwallowing => 7.5,
             DebtType::Complexity => 6.5,
             DebtType::Duplication => 6.0,
@@ -246,7 +244,6 @@ impl<'a> EnhancedScorer<'a> {
         debt_scores: &crate::priority::debt_aggregator::DebtScores,
     ) -> f64 {
         // Combine all debt categories into a base score
-        let security_weight = if debt_scores.security > 0.0 { 2.0 } else { 0.0 };
         let organization_weight = if debt_scores.organization > 0.0 {
             1.0
         } else {
@@ -255,14 +252,13 @@ impl<'a> EnhancedScorer<'a> {
         let testing_weight = if debt_scores.testing > 0.0 { 1.2 } else { 0.0 };
         let resource_weight = if debt_scores.resource > 0.0 { 1.3 } else { 0.0 };
 
-        let total_weight = security_weight + organization_weight + testing_weight + resource_weight;
+        let total_weight = organization_weight + testing_weight + resource_weight;
 
         if total_weight == 0.0 {
             return 0.0;
         }
 
-        let weighted_sum = debt_scores.security * security_weight
-            + debt_scores.organization * organization_weight
+        let weighted_sum = debt_scores.organization * organization_weight
             + debt_scores.testing * testing_weight
             + debt_scores.resource * resource_weight;
 
@@ -365,7 +361,6 @@ impl<'a> EnhancedScorer<'a> {
 
         match item.debt_type {
             DebtType::Todo | DebtType::Fixme => 1.0, // Direct text match
-            DebtType::Security => 0.9,               // Usually high confidence
             DebtType::Duplication => 0.95,           // Hash-based
             DebtType::CodeSmell => 0.85,             // Pattern-based
             DebtType::TestQuality => 0.8,            // Heuristic-based
@@ -430,7 +425,6 @@ impl<'a> EnhancedScorer<'a> {
         use crate::core::DebtType;
 
         match debt_type {
-            DebtType::Security => "Security",
             DebtType::Todo => "TODO",
             DebtType::Fixme => "FIXME",
             DebtType::CodeSmell => "Code smell",

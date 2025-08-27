@@ -3,7 +3,6 @@
 
 pub mod organization;
 pub mod resource;
-pub mod security;
 pub mod testing;
 
 use crate::core::DebtItem;
@@ -41,7 +40,6 @@ pub struct JavaScriptDetectorVisitor {
 
     // Collected patterns
     pub organization_patterns: Vec<organization::OrganizationAntiPattern>,
-    pub security_vulnerabilities: Vec<security::SecurityVulnerability>,
     pub resource_issues: Vec<resource::ResourceManagementIssue>,
     pub testing_issues: Vec<testing::TestingAntiPattern>,
 }
@@ -53,7 +51,6 @@ impl JavaScriptDetectorVisitor {
             path,
             language,
             organization_patterns: Vec::new(),
-            security_vulnerabilities: Vec::new(),
             resource_issues: Vec::new(),
             testing_issues: Vec::new(),
         }
@@ -65,7 +62,6 @@ impl JavaScriptDetectorVisitor {
 
         // Run all detector modules
         self.detect_organization_patterns(root_node);
-        self.detect_security_patterns(root_node);
         self.detect_resource_patterns(root_node);
         self.detect_testing_patterns(root_node);
     }
@@ -79,14 +75,6 @@ impl JavaScriptDetectorVisitor {
         );
     }
 
-    fn detect_security_patterns(&mut self, root: Node) {
-        security::detect_security_patterns(
-            root,
-            &self.source_content,
-            &self.language,
-            &mut self.security_vulnerabilities,
-        );
-    }
 
     fn detect_resource_patterns(&mut self, root: Node) {
         resource::detect_resource_patterns(
@@ -116,10 +104,6 @@ impl JavaScriptDetectorVisitor {
             items.push(pattern.to_debt_item(&self.path));
         }
 
-        // Convert security vulnerabilities
-        for vuln in &self.security_vulnerabilities {
-            items.push(vuln.to_debt_item(&self.path));
-        }
 
         // Convert resource issues
         for issue in &self.resource_issues {

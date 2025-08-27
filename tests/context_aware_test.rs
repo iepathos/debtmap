@@ -74,13 +74,13 @@ fn production_code() {
         debt_count_with_context
     );
 
-    // Check that no security issues are in test functions when context-aware is enabled
-    let security_in_tests = metrics.debt_items.iter().any(|item| {
-        matches!(item.debt_type, debtmap::core::DebtType::Security) && item.message.contains("test")
+    // Check that no complexity issues are in test functions when context-aware is enabled
+    let complexity_in_tests = metrics.debt_items.iter().any(|item| {
+        matches!(item.debt_type, debtmap::core::DebtType::Complexity) && item.message.contains("test")
     });
     assert!(
-        !security_in_tests,
-        "Context-aware should filter security issues in test functions"
+        !complexity_in_tests,
+        "Context-aware should filter complexity issues in test functions"
     );
 
     // Clean up

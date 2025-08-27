@@ -23,25 +23,25 @@ fn test_context_aware_filters_parameter_analyzer() {
         analyze_file_directly(&file_path).expect("Failed to analyze parameter_analyzer.rs");
     std::env::remove_var("DEBTMAP_CONTEXT_AWARE");
 
-    // Count security issues
-    let security_without = results_without
+    // Count complexity issues (changed from security)
+    let complexity_without = results_without
         .technical_debt
         .items
         .iter()
-        .filter(|item| matches!(item.debt_type, DebtType::Security))
+        .filter(|item| matches!(item.debt_type, DebtType::Complexity))
         .count();
-    let security_with = results_with
+    let complexity_with = results_with
         .technical_debt
         .items
         .iter()
-        .filter(|item| matches!(item.debt_type, DebtType::Security))
+        .filter(|item| matches!(item.debt_type, DebtType::Complexity))
         .count();
 
     println!(
-        "Security issues without context-aware: {}",
-        security_without
+        "Complexity issues without context-aware: {}",
+        complexity_without
     );
-    println!("Security issues with context-aware: {}", security_with);
+    println!("Complexity issues with context-aware: {}", complexity_with);
 
     // Check for specific test function issues
     let test_function_patterns = [
@@ -76,8 +76,8 @@ fn test_context_aware_filters_parameter_analyzer() {
     }
 
     // Context-aware should reduce or eliminate test function issues
-    if security_with >= security_without && security_without > 0 {
-        println!("WARNING: context-aware did not reduce security issues");
+    if complexity_with >= complexity_without && complexity_without > 0 {
+        println!("WARNING: context-aware did not reduce complexity issues");
     }
 }
 
@@ -118,16 +118,16 @@ fn test_context_aware_filters_rust_call_graph() {
         }
     }
 
-    // Count total security issues
-    let security_count = results
+    // Count total complexity issues
+    let complexity_count = results
         .technical_debt
         .items
         .iter()
-        .filter(|item| matches!(item.debt_type, DebtType::Security))
+        .filter(|item| matches!(item.debt_type, DebtType::Complexity))
         .count();
     println!(
-        "Total security issues in rust_call_graph.rs: {}",
-        security_count
+        "Total complexity issues in rust_call_graph.rs: {}",
+        complexity_count
     );
 }
 

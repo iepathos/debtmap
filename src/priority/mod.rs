@@ -105,27 +105,6 @@ pub enum DebtType {
         pattern: String,
         context: Option<String>,
     },
-    // Security debt types
-    HardcodedSecrets {
-        secret_type: String,
-        severity: String,
-    },
-    WeakCryptography {
-        algorithm: String,
-        recommendation: String,
-    },
-    SqlInjectionRisk {
-        query_pattern: String,
-        risk_level: String,
-    },
-    UnsafeCode {
-        justification: Option<String>,
-        safety_concern: String,
-    },
-    InputValidationGap {
-        input_type: String,
-        validation_missing: String,
-    },
     // Resource Management debt types
     AllocationInefficiency {
         pattern: String,
@@ -186,12 +165,6 @@ pub enum DebtType {
         collection_type: String,
         inefficiency_type: String,
     },
-    // Basic Security debt types (for core::DebtType integration)
-    BasicSecurity {
-        vulnerability_type: String,
-        severity: String,
-        description: String,
-    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -243,7 +216,6 @@ impl UnifiedAnalysis {
             DebtType::TestComplexityHotspot { .. }
                 | DebtType::TestTodo { .. }
                 | DebtType::TestDuplication { .. }
-                | DebtType::BasicSecurity { .. }
         ) && item.cyclomatic_complexity <= min_cyclomatic
             && item.cognitive_complexity <= min_cognitive
         {
@@ -268,198 +240,14 @@ impl UnifiedAnalysis {
         }
     }
 
-    /// Convert core::DebtItem (Security) to UnifiedDebtItem for unified analysis
-    pub fn add_security_items(
-        &mut self,
-        debt_items: &[crate::core::DebtItem],
-        call_graph: &CallGraph,
-    ) {
-        for debt_item in debt_items {
-            if let Some(unified_item) = self.convert_debt_item_to_unified(debt_item, call_graph) {
-                self.add_item(unified_item);
-            }
-        }
-    }
 
-    fn convert_debt_item_to_unified(
-        &self,
-        debt_item: &crate::core::DebtItem,
-        call_graph: &CallGraph,
-    ) -> Option<UnifiedDebtItem> {
-        use crate::core::DebtType as CoreDebtType;
 
-        // Only process Security debt items
-        match debt_item.debt_type {
-            CoreDebtType::Security => self.create_security_unified_item(debt_item, call_graph),
-            _ => None,
-        }
-    }
 
-    fn create_security_unified_item(
-        &self,
-        debt_item: &crate::core::DebtItem,
-        call_graph: &CallGraph,
-    ) -> Option<UnifiedDebtItem> {
-        // Extract security details from the message
-        let (vulnerability_type, severity) = self.parse_security_details(&debt_item.message);
 
-        let debt_type = DebtType::BasicSecurity {
-            vulnerability_type: vulnerability_type.clone(),
-            severity: severity.clone(),
-            description: debt_item.message.clone(),
-        };
 
-        // Security issues don't need synthetic function metrics
 
-        // Calculate unified score with security priority boost
-        let unified_score = self.calculate_security_score(&severity, &debt_item.priority);
 
-        // Try to find the actual function name at this location
-        let function_name = call_graph
-            .find_function_at_location(&debt_item.file, debt_item.line)
-            .map(|func_id| func_id.name)
-            .unwrap_or_else(|| format!("security_issue_at_line_{}", debt_item.line));
 
-        Some(UnifiedDebtItem {
-            location: Location {
-                file: debt_item.file.clone(),
-                function: function_name,
-                line: debt_item.line,
-            },
-            debt_type,
-            unified_score,
-            function_role: FunctionRole::Unknown,
-            recommendation: self.create_security_recommendation(&vulnerability_type, &severity),
-            expected_impact: self.create_security_impact(&severity),
-            transitive_coverage: None,
-            upstream_dependencies: 0,
-            downstream_dependencies: 0,
-            upstream_callers: vec![],
-            downstream_callees: vec![],
-            nesting_depth: 0,
-            function_length: 1,
-            cyclomatic_complexity: 1,
-            cognitive_complexity: 1,
-            is_pure: None,
-            purity_confidence: None,
-            entropy_details: None, // Security items don't have entropy data
-        })
-    }
-
-    // Helper methods for Security debt conversion
-
-    /// Classifies a security message into a vulnerability type
-    fn classify_vulnerability_type(message: &str) -> &'static str {
-        let lower_msg = message.to_lowercase();
-        match () {
-            _ if lower_msg.contains("unsafe") => "Unsafe Code",
-            _ if lower_msg.contains("sql injection") || lower_msg.contains("sql") => {
-                "SQL Injection"
-            }
-            _ if lower_msg.contains("secret")
-                || lower_msg.contains("password")
-                || lower_msg.contains("api key")
-                || lower_msg.contains("private key") =>
-            {
-                "Hardcoded Secret"
-            }
-            _ if lower_msg.contains("crypto") || lower_msg.contains("encryption") => {
-                "Weak Cryptography"
-            }
-            _ if lower_msg.contains("validation") || lower_msg.contains("input") => {
-                "Input Validation"
-            }
-            _ => "Security Issue",
-        }
-    }
-
-    /// Determines the severity level for a given vulnerability type
-    fn determine_severity(vulnerability_type: &str) -> &'static str {
-        match vulnerability_type {
-            "SQL Injection" | "Hardcoded Secret" => "Critical",
-            "Unsafe Code" | "Weak Cryptography" => "High",
-            _ => "Medium",
-        }
-    }
-
-    fn parse_security_details(&self, message: &str) -> (String, String) {
-        let vulnerability_type = Self::classify_vulnerability_type(message);
-        let severity = Self::determine_severity(vulnerability_type);
-        (vulnerability_type.to_string(), severity.to_string())
-    }
-
-    fn calculate_security_score(
-        &self,
-        severity: &str,
-        priority: &crate::core::Priority,
-    ) -> UnifiedScore {
-        use crate::core::Priority;
-
-        // Security issues get high base scores regardless of function complexity
-        let base_score: f64 = match severity {
-            "Critical" => 9.5,
-            "High" => 8.5,
-            "Medium" => 7.0,
-            _ => 5.0,
-        };
-
-        let priority_boost: f64 = match priority {
-            Priority::Critical => 1.0,
-            Priority::High => 0.8,
-            Priority::Medium => 0.5,
-            Priority::Low => 0.2,
-        };
-
-        UnifiedScore {
-            complexity_factor: 2.0, // Security issues aren't about complexity
-            coverage_factor: 1.0,   // Coverage less relevant for security
-            dependency_factor: 3.0, // Variable depending on code location
-            security_factor: 10.0,  // Maximum security factor for security issues
-            role_multiplier: 1.5,   // Security issues are always important
-            final_score: (base_score + priority_boost).min(10.0_f64),
-        }
-    }
-
-    fn create_security_recommendation(
-        &self,
-        vulnerability_type: &str,
-        severity: &str,
-    ) -> ActionableRecommendation {
-        let primary_action = format!("Fix {} security vulnerability", vulnerability_type);
-        let rationale = format!(
-            "Security vulnerability ({}) detected: {}",
-            severity, vulnerability_type
-        );
-        let implementation_steps = vec![
-            "Review security vulnerability details".to_string(),
-            "Apply security best practices".to_string(),
-            "Test fix thoroughly".to_string(),
-            "Consider security review".to_string(),
-        ];
-
-        ActionableRecommendation {
-            primary_action,
-            rationale,
-            implementation_steps,
-            related_items: vec![],
-        }
-    }
-
-    fn create_security_impact(&self, severity: &str) -> ImpactMetrics {
-        let risk_reduction = match severity {
-            "Critical" => 9.0,
-            "High" => 7.0,
-            "Medium" => 5.0,
-            _ => 3.0,
-        };
-
-        ImpactMetrics {
-            coverage_improvement: 0.0, // Security fixes don't typically improve coverage
-            lines_reduction: 3,        // Security fixes usually involve small code changes
-            complexity_reduction: 0.0, // Security fixes don't reduce complexity
-            risk_reduction,
-        }
-    }
 
     pub fn sort_by_priority(&mut self) {
         let mut items_vec: Vec<UnifiedDebtItem> = self.items.iter().cloned().collect();
@@ -531,121 +319,4 @@ mod tests {
     use super::*;
     use crate::priority::CallGraph;
 
-    #[test]
-    fn test_classify_vulnerability_type_unsafe_code() {
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Found unsafe block in function"),
-            "Unsafe Code"
-        );
-    }
-
-    #[test]
-    fn test_classify_vulnerability_type_sql_injection() {
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Potential SQL injection vulnerability"),
-            "SQL Injection"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Direct sql query construction"),
-            "SQL Injection"
-        );
-    }
-
-    #[test]
-    fn test_classify_vulnerability_type_hardcoded_secret() {
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Found hardcoded secret in code"),
-            "Hardcoded Secret"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Password stored in plaintext"),
-            "Hardcoded Secret"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("API key exposed in source"),
-            "Hardcoded Secret"
-        );
-    }
-
-    #[test]
-    fn test_classify_vulnerability_type_weak_crypto() {
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Using weak crypto algorithm"),
-            "Weak Cryptography"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Insecure encryption method"),
-            "Weak Cryptography"
-        );
-    }
-
-    #[test]
-    fn test_classify_vulnerability_type_input_validation() {
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Missing input validation"),
-            "Input Validation"
-        );
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("No validation on user input"),
-            "Input Validation"
-        );
-    }
-
-    #[test]
-    fn test_classify_vulnerability_type_generic() {
-        assert_eq!(
-            UnifiedAnalysis::classify_vulnerability_type("Some other security concern"),
-            "Security Issue"
-        );
-    }
-
-    #[test]
-    fn test_determine_severity_critical() {
-        assert_eq!(
-            UnifiedAnalysis::determine_severity("SQL Injection"),
-            "Critical"
-        );
-        assert_eq!(
-            UnifiedAnalysis::determine_severity("Hardcoded Secret"),
-            "Critical"
-        );
-    }
-
-    #[test]
-    fn test_determine_severity_high() {
-        assert_eq!(UnifiedAnalysis::determine_severity("Unsafe Code"), "High");
-        assert_eq!(
-            UnifiedAnalysis::determine_severity("Weak Cryptography"),
-            "High"
-        );
-    }
-
-    #[test]
-    fn test_determine_severity_medium() {
-        assert_eq!(
-            UnifiedAnalysis::determine_severity("Input Validation"),
-            "Medium"
-        );
-        assert_eq!(
-            UnifiedAnalysis::determine_severity("Security Issue"),
-            "Medium"
-        );
-        assert_eq!(
-            UnifiedAnalysis::determine_severity("Unknown Issue"),
-            "Medium"
-        );
-    }
-
-    #[test]
-    fn test_parse_security_details_integration() {
-        let analysis = UnifiedAnalysis::new(CallGraph::default());
-
-        let (vuln_type, severity) = analysis.parse_security_details("SQL injection found");
-        assert_eq!(vuln_type, "SQL Injection");
-        assert_eq!(severity, "Critical");
-
-        let (vuln_type, severity) = analysis.parse_security_details("unsafe code block");
-        assert_eq!(vuln_type, "Unsafe Code");
-        assert_eq!(severity, "High");
-    }
 }

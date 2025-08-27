@@ -148,12 +148,6 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::TestTodo { .. } => "Test TODO",
         DebtType::TestDuplication { .. } => "Test Duplication",
         DebtType::ErrorSwallowing { .. } => "Error Swallowing",
-        // Security debt types
-        DebtType::HardcodedSecrets { .. } => "Hardcoded Secrets",
-        DebtType::WeakCryptography { .. } => "Weak Cryptography",
-        DebtType::SqlInjectionRisk { .. } => "SQL Injection Risk",
-        DebtType::UnsafeCode { .. } => "Unsafe Code",
-        DebtType::InputValidationGap { .. } => "Input Validation Gap",
         // Resource Management debt types
         DebtType::AllocationInefficiency { .. } => "Allocation Inefficiency",
         DebtType::StringConcatenation { .. } => "String Concatenation",
@@ -172,8 +166,6 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "Async Misuse",
         DebtType::ResourceLeak { .. } => "Resource Leak",
         DebtType::CollectionInefficiency { .. } => "Collection Inefficiency",
-        // Basic Security debt type
-        DebtType::BasicSecurity { .. } => "Security",
     }
 }
 
@@ -287,25 +279,13 @@ fn format_score_breakdown_with_coverage(
     )
     .unwrap();
 
-    // Only show security if non-zero
-    if unified_score.security_factor > 0.0 {
-        writeln!(
-            &mut output,
-            "| Security | {:.1} | {:.0}% | {:.2} | |",
-            unified_score.security_factor,
-            weights.security * 100.0,
-            unified_score.security_factor * weights.security
-        )
-        .unwrap();
-    }
 
     // Organization factor removed per spec 58 - redundant with complexity factor
 
-    // New weights after spec 58: complexity 35%, coverage 40%, dependency 20%, security 5%
+    // New weights after removing security: complexity, coverage, dependency
     let base_score = unified_score.complexity_factor * weights.complexity
         + unified_score.coverage_factor * weights.coverage
-        + unified_score.dependency_factor * weights.dependency
-        + unified_score.security_factor * weights.security;
+        + unified_score.dependency_factor * weights.dependency;
 
     writeln!(&mut output).unwrap();
     writeln!(&mut output, "- **Base Score:** {:.2}", base_score).unwrap();
@@ -369,45 +349,10 @@ fn format_main_factors_with_coverage(
             weights.dependency * 100.0
         ));
     }
-    if unified_score.security_factor > 3.0 {
-        factors.push(format!(
-            "Security issues ({:.0}%)",
-            weights.security * 100.0
-        ));
-    }
     // Organization factor removed per spec 58 - redundant with complexity factor
 
-    // Add Security specific factors
+    // Add specific factors for various debt types
     match debt_type {
-        crate::priority::DebtType::BasicSecurity {
-            severity,
-            vulnerability_type,
-            ..
-        } => {
-            factors.push(format!("Security vulnerability ({})", severity));
-            if !vulnerability_type.is_empty() && vulnerability_type != "Security Issue" {
-                factors.push(format!("{} detected", vulnerability_type));
-            }
-        }
-        crate::priority::DebtType::HardcodedSecrets {
-            severity,
-            secret_type,
-        } => {
-            factors.push(format!("Security vulnerability ({})", severity));
-            factors.push(format!("Hardcoded {} detected", secret_type));
-        }
-        crate::priority::DebtType::SqlInjectionRisk { risk_level, .. } => {
-            factors.push(format!("Security vulnerability ({})", risk_level));
-            factors.push("SQL injection risk detected".to_string());
-        }
-        crate::priority::DebtType::UnsafeCode { safety_concern, .. } => {
-            factors.push("Security vulnerability (High)".to_string());
-            factors.push(format!("Unsafe code: {}", safety_concern));
-        }
-        crate::priority::DebtType::WeakCryptography { algorithm, .. } => {
-            factors.push("Security vulnerability (High)".to_string());
-            factors.push(format!("Weak crypto: {}", algorithm));
-        }
         crate::priority::DebtType::NestedLoops { depth, .. } => {
             factors.push("Complexity impact (High)".to_string());
             factors.push(format!("{} level nested loops", depth));
@@ -588,7 +533,6 @@ mod tests {
             complexity_factor: 5.0,
             coverage_factor: 8.0,
             dependency_factor: 4.0,
-            security_factor: 0.0,
             role_multiplier: 1.2,
             final_score: 8.5,
         };
@@ -617,7 +561,6 @@ mod tests {
             complexity_factor: 6.0, // Above threshold
             coverage_factor: 4.0,   // Above threshold
             dependency_factor: 6.0, // Above threshold
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 7.0,
         };
@@ -642,7 +585,6 @@ mod tests {
             complexity_factor: 2.0, // Below all thresholds
             coverage_factor: 2.0,
             dependency_factor: 2.0,
-            security_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 2.0,
         };

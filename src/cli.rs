@@ -94,9 +94,6 @@ pub enum Commands {
         #[arg(long = "show-macro-stats")]
         show_macro_stats: bool,
 
-        /// Enable enhanced security analysis with additional detectors
-        #[arg(long = "security-enhanced")]
-        security_enhanced: bool,
 
         /// Group output by debt category
         #[arg(long = "group-by-category")]

@@ -363,12 +363,6 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         item.unified_score.dependency_factor
     )
     .unwrap();
-    writeln!(
-        output,
-        "│  └─ Security Factor: {:.1}",
-        item.unified_score.security_factor
-    )
-    .unwrap();
 
     writeln!(
         output,
@@ -475,12 +469,6 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::TestTodo { .. } => "TEST TODO",
         DebtType::TestDuplication { .. } => "TEST DUPLICATION",
         DebtType::ErrorSwallowing { .. } => "ERROR SWALLOWING",
-        // Security debt types
-        DebtType::HardcodedSecrets { .. } => "HARDCODED SECRETS",
-        DebtType::WeakCryptography { .. } => "WEAK CRYPTO",
-        DebtType::SqlInjectionRisk { .. } => "SQL INJECTION",
-        DebtType::UnsafeCode { .. } => "UNSAFE CODE",
-        DebtType::InputValidationGap { .. } => "INPUT VALIDATION",
         // Resource Management debt types
         DebtType::AllocationInefficiency { .. } => "ALLOCATION",
         DebtType::StringConcatenation { .. } => "STRING CONCAT",
@@ -499,8 +487,6 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "ASYNC MISUSE",
         DebtType::ResourceLeak { .. } => "RESOURCE LEAK",
         DebtType::CollectionInefficiency { .. } => "COLLECTION INEFFICIENCY",
-        // Basic Security debt type (for core::DebtType integration)
-        DebtType::BasicSecurity { .. } => "SECURITY",
     }
 }
 
@@ -600,7 +586,6 @@ mod tests {
                 complexity_factor: 5.0,
                 coverage_factor: 8.0,
                 dependency_factor: 3.0,
-                security_factor: 0.0,
                 role_multiplier: 1.0,
                 final_score: score,
             },
