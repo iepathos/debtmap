@@ -451,4 +451,201 @@ mod tests {
         assert!(suggestions[0].contains("Add assertions"));
         assert!(!suggestions.iter().any(|s| s.contains("Add action phase")));
     }
+
+    #[test]
+    fn test_is_assertion_macro_recognizes_assert() {
+        assert!(is_assertion_macro("assert"));
+        assert!(is_assertion_macro("assert_eq"));
+        assert!(is_assertion_macro("assert_ne"));
+        assert!(is_assertion_macro("assert_matches"));
+        assert!(is_assertion_macro("debug_assert"));
+        assert!(is_assertion_macro("debug_assert_eq"));
+        assert!(is_assertion_macro("debug_assert_ne"));
+    }
+
+    #[test]
+    fn test_is_assertion_macro_rejects_non_assertions() {
+        assert!(!is_assertion_macro("println"));
+        assert!(!is_assertion_macro("panic"));
+        assert!(!is_assertion_macro("format"));
+        assert!(!is_assertion_macro("vec"));
+        assert!(!is_assertion_macro(""));
+        assert!(!is_assertion_macro("assert_foo"));
+        assert!(!is_assertion_macro("my_assert"));
+    }
+
+    #[test]
+    fn test_is_assertion_function_recognizes_assertions() {
+        assert!(is_assertion_function("assert"));
+        assert!(is_assertion_function("assert_eq"));
+        assert!(is_assertion_function("assert_ne"));
+        assert!(is_assertion_function("assert_that"));
+        assert!(is_assertion_function("expect"));
+    }
+
+    #[test]
+    fn test_is_assertion_function_rejects_non_assertions() {
+        assert!(!is_assertion_function("test"));
+        assert!(!is_assertion_function("run"));
+        assert!(!is_assertion_function("check"));
+        assert!(!is_assertion_function("verify"));
+        assert!(!is_assertion_function(""));
+        assert!(!is_assertion_function("assert_something"));
+        assert!(!is_assertion_function("my_expect"));
+    }
+
+    #[test]
+    fn test_is_setup_function_recognizes_setup_patterns() {
+        assert!(is_setup_function("create_test_data"));
+        assert!(is_setup_function("new_instance"));
+        assert!(is_setup_function("setup_environment"));
+        assert!(is_setup_function("build_context"));
+        assert!(is_setup_function("new"));
+        assert!(is_setup_function("default"));
+    }
+
+    #[test]
+    fn test_is_setup_function_rejects_non_setup_functions() {
+        assert!(!is_setup_function("test_something"));
+        assert!(!is_setup_function("assert_equal"));
+        assert!(!is_setup_function("run"));
+        assert!(!is_setup_function("execute"));
+        assert!(!is_setup_function(""));
+        assert!(!is_setup_function("newer"));
+        assert!(!is_setup_function("my_default"));
+    }
+
+    #[test]
+    fn test_analyze_test_structure_simple_test() {
+        use syn::parse_quote;
+
+        let function: ItemFn = parse_quote! {
+            #[test]
+            fn test_simple() {
+                let value = 42;
+                assert_eq!(value, 42);
+            }
+        };
+
+        let analysis = analyze_test_structure(&function);
+
+        assert!(analysis.has_setup);
+        assert!(analysis.has_assertions);
+        assert_eq!(analysis.assertion_count, 1);
+        assert!(!analysis.has_panic);
+        assert!(!analysis.has_expect);
+        assert!(!analysis.has_unwrap);
+    }
+
+    #[test]
+    fn test_analyze_test_structure_test_without_assertions() {
+        use syn::parse_quote;
+
+        let function: ItemFn = parse_quote! {
+            #[test]
+            fn test_no_assertions() {
+                let value = 42;
+                let result = value * 2;
+            }
+        };
+
+        let analysis = analyze_test_structure(&function);
+
+        assert!(analysis.has_setup);
+        assert!(!analysis.has_assertions);
+        assert_eq!(analysis.assertion_count, 0);
+        assert!(!analysis.has_panic);
+        assert!(!analysis.has_expect);
+        assert!(!analysis.has_unwrap);
+    }
+
+    #[test]
+    fn test_analyze_test_structure_with_expect() {
+        use syn::parse_quote;
+
+        let function: ItemFn = parse_quote! {
+            #[test]
+            fn test_with_expect() {
+                let result: Result<i32, &str> = Ok(42);
+                let value = result.expect("Should have value");
+            }
+        };
+
+        let analysis = analyze_test_structure(&function);
+
+        assert!(analysis.has_setup);
+        assert!(analysis.has_action);
+        assert!(analysis.has_assertions);
+        assert!(analysis.has_expect);
+        assert!(!analysis.has_panic);
+        assert!(!analysis.has_unwrap);
+    }
+
+    #[test]
+    fn test_analyze_test_structure_with_unwrap() {
+        use syn::parse_quote;
+
+        let function: ItemFn = parse_quote! {
+            #[test]
+            fn test_with_unwrap() {
+                let result: Result<i32, &str> = Ok(42);
+                let value = result.unwrap();
+            }
+        };
+
+        let analysis = analyze_test_structure(&function);
+
+        assert!(analysis.has_setup);
+        assert!(analysis.has_action);
+        assert!(analysis.has_assertions);
+        assert!(analysis.has_unwrap);
+        assert!(!analysis.has_panic);
+        assert!(!analysis.has_expect);
+    }
+
+    #[test]
+    fn test_analyze_test_structure_with_multiple_assertions() {
+        use syn::parse_quote;
+
+        let function: ItemFn = parse_quote! {
+            #[test]
+            fn test_multiple_assertions() {
+                let x = 10;
+                let y = 20;
+                assert!(x < y);
+                assert_eq!(x + y, 30);
+                assert_ne!(x, y);
+            }
+        };
+
+        let analysis = analyze_test_structure(&function);
+
+        assert!(analysis.has_setup);
+        assert!(analysis.has_assertions);
+        assert_eq!(analysis.assertion_count, 3);
+        assert!(!analysis.has_panic);
+        assert!(!analysis.has_expect);
+        assert!(!analysis.has_unwrap);
+    }
+
+    #[test]
+    fn test_analyze_test_structure_empty_test() {
+        use syn::parse_quote;
+
+        let function: ItemFn = parse_quote! {
+            #[test]
+            fn test_empty() {
+            }
+        };
+
+        let analysis = analyze_test_structure(&function);
+
+        assert!(!analysis.has_setup);
+        assert!(!analysis.has_action);
+        assert!(!analysis.has_assertions);
+        assert_eq!(analysis.assertion_count, 0);
+        assert!(!analysis.has_panic);
+        assert!(!analysis.has_expect);
+        assert!(!analysis.has_unwrap);
+    }
 }
