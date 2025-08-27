@@ -138,11 +138,7 @@ These features should remain as they detect code quality issues:
 3. **Missing validation patterns**: Keep as code organization issue, not security
 
 ### Migration Path for Users
-Users currently relying on security detection should be directed to:
-- **Rust**: cargo-audit, cargo-deny, clippy with security lints
-- **Python**: bandit, safety, pylint security checks
-- **JavaScript**: eslint-plugin-security, npm audit, snyk
-- **General**: Semgrep, SonarQube, CodeQL
+Users currently relying on security detection should use dedicated security analysis tools, as debtmap will focus exclusively on technical debt detection.
 
 ### Simplification Benefits
 1. **Reduced scope**: Focus on core technical debt mission
