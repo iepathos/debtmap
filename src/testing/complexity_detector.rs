@@ -321,18 +321,24 @@ pub(crate) fn suggest_simplification(
     analysis: &TestComplexityAnalysis,
     detector: &TestComplexityDetector,
 ) -> TestSimplification {
-    if analysis.mock_setup_count > detector.max_mock_setups {
-        TestSimplification::ReduceMocking
-    } else if analysis.line_count > detector.max_test_length {
-        if analysis.assertion_count > 3 && analysis.mock_setup_count > 3 {
-            TestSimplification::SplitTest
-        } else {
-            TestSimplification::ExtractHelper
+    match () {
+        _ if analysis.mock_setup_count > detector.max_mock_setups => {
+            TestSimplification::ReduceMocking
         }
-    } else if analysis.cyclomatic_complexity > 5 {
-        TestSimplification::ParameterizeTest
-    } else {
-        TestSimplification::SimplifySetup
+        _ if analysis.line_count > detector.max_test_length => {
+            classify_length_based_simplification(analysis)
+        }
+        _ if analysis.cyclomatic_complexity > 5 => TestSimplification::ParameterizeTest,
+        _ => TestSimplification::SimplifySetup,
+    }
+}
+
+fn classify_length_based_simplification(analysis: &TestComplexityAnalysis) -> TestSimplification {
+    match () {
+        _ if analysis.assertion_count > 3 && analysis.mock_setup_count > 3 => {
+            TestSimplification::SplitTest
+        }
+        _ => TestSimplification::ExtractHelper,
     }
 }
 
@@ -575,6 +581,70 @@ mod tests {
         assert!(matches!(
             suggest_simplification(&analysis, &detector),
             TestSimplification::ParameterizeTest
+        ));
+    }
+
+    #[test]
+    fn test_classify_length_based_simplification_split_test() {
+        let analysis = TestComplexityAnalysis {
+            assertion_count: 4,
+            mock_setup_count: 4,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            classify_length_based_simplification(&analysis),
+            TestSimplification::SplitTest
+        ));
+    }
+
+    #[test]
+    fn test_classify_length_based_simplification_extract_helper() {
+        let analysis = TestComplexityAnalysis {
+            assertion_count: 2,
+            mock_setup_count: 2,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            classify_length_based_simplification(&analysis),
+            TestSimplification::ExtractHelper
+        ));
+    }
+
+    #[test]
+    fn test_classify_length_based_simplification_edge_cases() {
+        let analysis = TestComplexityAnalysis {
+            assertion_count: 3,
+            mock_setup_count: 3,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            classify_length_based_simplification(&analysis),
+            TestSimplification::ExtractHelper
+        ));
+
+        let analysis = TestComplexityAnalysis {
+            assertion_count: 4,
+            mock_setup_count: 3,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            classify_length_based_simplification(&analysis),
+            TestSimplification::ExtractHelper
+        ));
+
+        let analysis = TestComplexityAnalysis {
+            assertion_count: 3,
+            mock_setup_count: 4,
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            classify_length_based_simplification(&analysis),
+            TestSimplification::ExtractHelper
         ));
     }
 
