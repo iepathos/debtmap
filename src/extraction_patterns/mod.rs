@@ -350,7 +350,7 @@ fn extract_dependencies(func: &FunctionMetrics, data_flow: Option<&DataFlowGraph
 fn parse_function_ast(func: &FunctionMetrics, language: &str) -> Option<syn::File> {
     // Read the source file
     let source = crate::io::read_file(&func.file).ok()?;
-    
+
     match language {
         "rust" => {
             // For Rust, extract the function and create a minimal syn::File
@@ -372,14 +372,14 @@ fn parse_function_ast(func: &FunctionMetrics, language: &str) -> Option<syn::Fil
 
 fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn::File> {
     use syn::{parse_str, Item, ItemFn};
-    
+
     // Parse the entire file
     let file = parse_str::<syn::File>(source).ok()?;
-    
+
     // Find the function by name and approximate line number
     for item in &file.items {
         if let Item::Fn(item_fn) = item {
-            if item_fn.sig.ident.to_string() == func.name {
+            if item_fn.sig.ident == func.name {
                 // Create a new File with just this function
                 let single_fn_file = syn::File {
                     shebang: None,
@@ -393,7 +393,7 @@ fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn
         if let Item::Impl(item_impl) = item {
             for impl_item in &item_impl.items {
                 if let syn::ImplItem::Fn(method) = impl_item {
-                    if method.sig.ident.to_string() == func.name {
+                    if method.sig.ident == func.name {
                         // Convert method to standalone function for analysis
                         let item_fn = ItemFn {
                             attrs: method.attrs.clone(),
@@ -412,7 +412,7 @@ fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn
             }
         }
     }
-    
+
     None
 }
 

@@ -1,6 +1,5 @@
 use crate::config;
 use crate::core::FunctionMetrics;
-use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer, VerbosityLevel};
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::{
@@ -409,8 +408,8 @@ pub fn create_unified_debt_item_enhanced(
         downstream_dependencies: downstream_callees.len(),
         upstream_callers: upstream_caller_names,
         downstream_callees: downstream_callee_names,
-        nesting_depth: 0,   // Would need to be calculated from AST
-        function_length: 0, // Would need to be calculated from AST or additional metadata
+        nesting_depth: func.nesting,
+        function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
         entropy_details: calculate_entropy_details(func),
@@ -484,7 +483,13 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     let function_role = classify_function_role(func, &func_id, call_graph);
 
     // Generate contextual recommendation based on debt type and metrics
-    let recommendation = generate_recommendation_with_data_flow(func, &debt_type, function_role, &unified_score, data_flow);
+    let recommendation = generate_recommendation_with_data_flow(
+        func,
+        &debt_type,
+        function_role,
+        &unified_score,
+        data_flow,
+    );
 
     // Calculate expected impact
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
@@ -509,7 +514,7 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
         downstream_dependencies: downstream.len(),
         upstream_callers: upstream.iter().map(|f| f.name.clone()).collect(),
         downstream_callees: downstream.iter().map(|f| f.name.clone()).collect(),
-        nesting_depth: 0, // FunctionMetrics doesn't have nesting_depth field
+        nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
@@ -580,7 +585,13 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let function_role = classify_function_role(func, &func_id, call_graph);
 
     // Generate contextual recommendation based on debt type and metrics
-    let recommendation = generate_recommendation_with_data_flow(func, &debt_type, function_role, &unified_score, data_flow);
+    let recommendation = generate_recommendation_with_data_flow(
+        func,
+        &debt_type,
+        function_role,
+        &unified_score,
+        data_flow,
+    );
 
     // Calculate expected impact
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
@@ -605,7 +616,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         downstream_dependencies: downstream.len(),
         upstream_callers: upstream.iter().map(|f| f.name.clone()).collect(),
         downstream_callees: downstream.iter().map(|f| f.name.clone()).collect(),
-        nesting_depth: 0, // FunctionMetrics doesn't have nesting_depth field
+        nesting_depth: func.nesting,
         function_length: func.length,
         cyclomatic_complexity: func.cyclomatic,
         cognitive_complexity: func.cognitive,
@@ -670,7 +681,8 @@ pub fn create_unified_debt_item_with_data_flow(
         coverage.map(|cov| calculate_transitive_coverage(&func_id, call_graph, cov));
 
     let debt_type = determine_debt_type(func, &transitive_coverage, call_graph, &func_id);
-    let recommendation = generate_recommendation_with_data_flow(func, &debt_type, role, &unified_score, data_flow);
+    let recommendation =
+        generate_recommendation_with_data_flow(func, &debt_type, role, &unified_score, data_flow);
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
     // Get dependency counts and names from call graph
@@ -1440,46 +1452,6 @@ fn generate_combined_testing_refactoring_steps(
     ]
 }
 
-/// Generate intelligent extraction recommendations using pattern analysis
-fn generate_intelligent_extraction_recommendations(
-    func: &FunctionMetrics,
-    verbosity: VerbosityLevel,
-) -> Vec<String> {
-    let analyzer = UnifiedExtractionAnalyzer::new();
-
-    // Analyze function for extractable patterns
-    // Create a dummy file metrics for now (since we don't have the actual file context here)
-    let file_metrics = crate::core::FileMetrics {
-        path: func.file.clone(),
-        language: crate::core::Language::Rust, // Default to Rust
-        complexity: crate::core::ComplexityMetrics::default(),
-        debt_items: vec![],
-        dependencies: vec![],
-        duplications: vec![],
-    };
-    let suggestions = analyzer.analyze_function(
-        func,
-        &file_metrics,
-        None, // No data flow graph for now
-    );
-
-    if suggestions.is_empty() {
-        // Fallback to simple calculation
-        let functions_to_extract = calculate_functions_to_extract(func.cyclomatic, func.cognitive);
-        vec![format!(
-            "Extract {} pure functions to reduce complexity",
-            functions_to_extract
-        )]
-    } else {
-        // Generate specific recommendations
-        suggestions
-            .iter()
-            .take(3) // Limit to top 3 suggestions
-            .map(|s| analyzer.generate_recommendation(s, verbosity))
-            .collect()
-    }
-}
-
 /// Generate recommendation for testing gap debt type
 fn generate_testing_gap_recommendation(
     coverage: f64,
@@ -1916,7 +1888,7 @@ fn generate_data_flow_based_recommendations(
     let has_deep_nesting = func.nesting > 3;
     let is_pure = func.is_pure.unwrap_or(false);
     let purity_confidence = func.purity_confidence.unwrap_or(0.0);
-    
+
     // Get variable dependencies if data flow is available
     let num_dependencies = if let Some(df) = data_flow {
         let func_id = crate::priority::call_graph::FunctionId {
@@ -1930,51 +1902,65 @@ fn generate_data_flow_based_recommendations(
     } else {
         0
     };
-    
+
     // Generate targeted recommendations based on patterns
     let mut steps = Vec::new();
     let mut suggested_extractions = Vec::new();
     let mut complexity_reduction = 0;
-    
+
     if has_high_branching {
         suggested_extractions.push("validation logic");
-        steps.push(format!("Extract validation checks into separate pure function (reduces ~{} complexity)", cyclomatic / 4));
+        steps.push(format!(
+            "Extract validation checks into separate pure function (reduces ~{} complexity)",
+            cyclomatic / 4
+        ));
         complexity_reduction += cyclomatic / 4;
     }
-    
+
     if has_deep_nesting {
         suggested_extractions.push("nested loop processing");
-        steps.push("Flatten nested structures using functional transformations (map/filter/reduce)".to_string());
+        steps.push(
+            "Flatten nested structures using functional transformations (map/filter/reduce)"
+                .to_string(),
+        );
         complexity_reduction += 2;
     }
-    
+
     if cognitive > cyclomatic * 2 {
         suggested_extractions.push("complex calculations");
         steps.push("Extract complex business logic into named helper functions".to_string());
         complexity_reduction += cognitive / 5;
     }
-    
+
     if num_dependencies > 5 {
         suggested_extractions.push("data transformation pipeline");
-        steps.push(format!("Create data transformation pipeline to manage {} dependencies", num_dependencies));
+        steps.push(format!(
+            "Create data transformation pipeline to manage {} dependencies",
+            num_dependencies
+        ));
         complexity_reduction += 1;
     }
-    
-    
+
     if is_pure && purity_confidence > 0.8 {
-        steps.push("Function is likely pure - focus on breaking down into smaller pure functions".to_string());
+        steps.push(
+            "Function is likely pure - focus on breaking down into smaller pure functions"
+                .to_string(),
+        );
     } else if purity_confidence < 0.3 {
         steps.push("Isolate side effects at function boundaries before extraction".to_string());
     }
-    
+
     // Add testing recommendation
-    steps.push(format!("Add {} comprehensive tests after refactoring", suggested_extractions.len() * 2));
-    
+    steps.push(format!(
+        "Add {} comprehensive tests after refactoring",
+        suggested_extractions.len() * 2
+    ));
+
     let predicted_complexity = cyclomatic.saturating_sub(complexity_reduction);
-    
+
     let action = if !suggested_extractions.is_empty() {
         format!(
-            "Extract {} to reduce complexity from {} to ~{}", 
+            "Extract {} to reduce complexity from {} to ~{}",
             suggested_extractions.join(", "),
             cyclomatic,
             predicted_complexity
@@ -1986,15 +1972,19 @@ fn generate_data_flow_based_recommendations(
             cyclomatic
         )
     };
-    
+
     let rationale = format!(
         "Function has cyclomatic complexity {} and cognitive complexity {}{}{}",
         cyclomatic,
         cognitive,
         "",
-        if is_pure { " (likely pure function)" } else { "" }
+        if is_pure {
+            " (likely pure function)"
+        } else {
+            ""
+        }
     );
-    
+
     (action, rationale, steps)
 }
 

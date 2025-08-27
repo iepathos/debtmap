@@ -636,12 +636,71 @@ fn calculate_nesting(block: &syn::Block) -> u32 {
         max_depth: u32,
     }
 
-    impl<'ast> Visit<'ast> for NestingVisitor {
-        fn visit_block(&mut self, block: &'ast syn::Block) {
+    impl NestingVisitor {
+        // Helper function to visit nested content
+        fn visit_nested<F>(&mut self, f: F)
+        where
+            F: FnOnce(&mut Self),
+        {
             self.current_depth += 1;
             self.max_depth = self.max_depth.max(self.current_depth);
-            syn::visit::visit_block(self, block);
+            f(self);
             self.current_depth -= 1;
+        }
+    }
+
+    impl<'ast> Visit<'ast> for NestingVisitor {
+        fn visit_expr_if(&mut self, i: &'ast syn::ExprIf) {
+            self.visit_nested(|v| syn::visit::visit_expr_if(v, i));
+        }
+
+        fn visit_expr_while(&mut self, i: &'ast syn::ExprWhile) {
+            self.visit_nested(|v| syn::visit::visit_expr_while(v, i));
+        }
+
+        fn visit_expr_for_loop(&mut self, i: &'ast syn::ExprForLoop) {
+            self.visit_nested(|v| syn::visit::visit_expr_for_loop(v, i));
+        }
+
+        fn visit_expr_loop(&mut self, i: &'ast syn::ExprLoop) {
+            self.visit_nested(|v| syn::visit::visit_expr_loop(v, i));
+        }
+
+        fn visit_expr_match(&mut self, i: &'ast syn::ExprMatch) {
+            // Match itself increases nesting
+            self.current_depth += 1;
+            self.max_depth = self.max_depth.max(self.current_depth);
+
+            // Visit the expression being matched
+            self.visit_expr(&i.expr);
+
+            // Visit each arm (arms will handle their own nesting)
+            for arm in &i.arms {
+                self.visit_arm(arm);
+            }
+
+            self.current_depth -= 1;
+        }
+
+        fn visit_arm(&mut self, i: &'ast syn::Arm) {
+            // Don't increase nesting for match arms themselves
+            // The match already increased nesting
+            // Just visit the patterns and body
+            for attr in &i.attrs {
+                self.visit_attribute(attr);
+            }
+            self.visit_pat(&i.pat);
+            if let Some((_, guard)) = &i.guard {
+                self.visit_expr(guard);
+            }
+            self.visit_expr(&i.body);
+        }
+
+        // Don't count blocks themselves as they're part of control structures
+        // Only count control flow structures
+        fn visit_block(&mut self, block: &'ast syn::Block) {
+            // Just visit the statements, don't increase depth for blocks
+            syn::visit::visit_block(self, block);
         }
     }
 
@@ -649,7 +708,12 @@ fn calculate_nesting(block: &syn::Block) -> u32 {
         current_depth: 0,
         max_depth: 0,
     };
-    visitor.visit_block(block);
+
+    // Visit the block's statements directly
+    for stmt in &block.stmts {
+        visitor.visit_stmt(stmt);
+    }
+
     visitor.max_depth
 }
 
