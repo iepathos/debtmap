@@ -70,15 +70,15 @@ fn test_format_dependency_info() {
 #[test]
 fn test_calculate_dash_count() {
     // Total width is 82, accounting for "┌─ " (3) + " ─┐" (3) + 2 spaces = 8
-    assert_eq!(calculate_dash_count(2, 7), 65); // #1 + ROI: 1.0
-    assert_eq!(calculate_dash_count(3, 10), 61); // #10 + ROI: 100.0
+    assert_eq!(calculate_dash_count(2, 7), 65); // #1 + Priority: 1.0
+    assert_eq!(calculate_dash_count(3, 10), 61); // #10 + Priority: 100.0
 }
 
 #[test]
 fn test_format_recommendation_box_header() {
     let header = format_recommendation_box_header(0, "5.0");
     assert!(header.contains("#1"));
-    assert!(header.contains("ROI: 5.0"));
+    assert!(header.contains("Priority: 5.0"));
     assert!(header.starts_with("┌─"));
     assert!(header.ends_with("─┐\n"));
 }
@@ -114,7 +114,7 @@ fn test_format_recommendations_with_single_item() {
     let result = format_recommendations(&recommendations);
 
     assert!(result.contains("🎯 TOP 5 TESTING RECOMMENDATIONS"));
-    assert!(result.contains("ROI: 5.0"));
+    assert!(result.contains("Priority: 5.0"));
     assert!(result.contains("test_func()"));
     assert!(result.contains("test.rs:10"));
     assert!(result.contains("Risk: HIGH (8.5)"));
@@ -213,7 +213,7 @@ fn test_format_recommendations_with_low_risk() {
 
     assert!(result.contains("Risk: LOW"));
     assert!(result.contains("Impact: -<1%"));
-    assert!(result.contains("ROI: 0.5"));
+    assert!(result.contains("Priority: 0.5"));
     assert!(result.contains("Complexity: trivial"));
 }
 
@@ -240,7 +240,7 @@ fn test_format_recommendations_with_high_roi() {
 
     let result = format_recommendations(&recommendations);
 
-    assert!(result.contains("ROI: 16")); // 15.5 rounds to 16 for display
+    assert!(result.contains("Priority: 16")); // 15.5 rounds to 16 for display
     assert!(result.contains("Risk: HIGH (10.0)"));
     assert!(result.contains("Impact: -8%"));
     assert!(result.contains("Complexity: very complex"));
@@ -270,5 +270,5 @@ fn test_format_recommendations_with_none_roi() {
 
     let result = format_recommendations(&recommendations);
 
-    assert!(result.contains("ROI: 0.1")); // Default value when None
+    assert!(result.contains("Priority: 0.1")); // Default value when None
 }
