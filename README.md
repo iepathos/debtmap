@@ -9,7 +9,7 @@
 
 > 🚧 **Early Prototype** - This project is under active development and APIs may change
 
-A fast, language-agnostic code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven ROI calculations for both.
+A fast, language-agnostic code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.
 
 ## Why Debtmap?
 
@@ -24,7 +24,7 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - **Advanced Token Classification**: Categorizes and weights different token types (variables, methods, literals) for more accurate complexity assessment
 - **Cognitive Complexity Analysis**: Goes beyond cyclomatic complexity to measure how hard code is to understand, identifying functions that need refactoring to reduce mental load
 - **Coverage-Risk Correlation**: The only tool that combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
-- **ROI-Driven Prioritization**: Calculates actual return on investment for both refactoring and testing efforts, showing which changes will have the most impact
+- **Risk-Driven Prioritization**: Prioritizes refactoring and testing efforts based on complexity, coverage, and dependency factors to show which changes will have the most impact
 - **Actionable Refactoring Guidance**: Provides specific recommendations like "extract nested conditions" or "split this 80-line function" rather than just flagging issues
 - **Quantified Impact**: Provides concrete metrics like "refactoring this will reduce complexity by 60%" or "testing this will reduce risk by 5%"
 - **Language-Agnostic Coverage Integration**: Works with any tool that generates LCOV format (Jest, pytest, cargo-tarpaulin, etc.)
@@ -51,7 +51,7 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - **Verbosity controls** - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail
 - **Resource management review** - Finds async/await misuse, resource leaks, and collection inefficiencies
 - **Coverage-based risk analysis** - Uniquely correlates complexity with test coverage to identify truly risky code
-- **ROI-driven testing recommendations** - Prioritizes testing efforts by calculating risk reduction per test case
+- **Risk-driven testing recommendations** - Prioritizes testing efforts based on complexity-coverage correlation and dependency impact
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
 - **Multiple output formats** - JSON, TOML, and human-readable table formats
 - **Configurable thresholds** - Customize complexity and duplication thresholds to match your standards
@@ -297,8 +297,7 @@ debtmap analyze . --lcov target/coverage/lcov.info --top 3
       "unified_score": {
         "complexity_factor": 3.2,
         "coverage_factor": 10.0,
-        "roi_factor": 8.5,
-        "semantic_factor": 7.0,
+        "dependency_factor": 2.5,
         "role_multiplier": 1.2,
         "final_score": 9.4
       },
@@ -411,15 +410,13 @@ graph TD
     U --> V[Unified Scoring]
     V --> W[Calculate Factors]
     
-    W --> X[Complexity Factor: 25%]
-    W --> Y[Coverage Factor: 35%]
-    W --> Z[ROI Factor: 25%]
-    W --> AA[Semantic Factor: 15%]
+    W --> X[Complexity Factor: 35%]
+    W --> Y[Coverage Factor: 40%]
+    W --> Z[Dependency Factor: 25%]
     
     X --> AB[Final Score]
     Y --> AB
     Z --> AB
-    AA --> AB
     
     AB --> AC[Apply Role Multiplier]
     AC --> AD[Sort by Priority]
@@ -433,30 +430,28 @@ Debtmap uses a sophisticated multi-factor scoring system to prioritize technical
 
 #### 1. Base Score Calculation
 
-Each function receives a score from 0-10 based on four weighted factors:
+Each function receives a score from 0-10 based on three weighted factors:
 
 ```
-Base Score = (Complexity × 0.25) + (Coverage × 0.35) + (ROI × 0.25) + (Semantic × 0.15)
+Base Score = (Complexity × 0.35) + (Coverage × 0.40) + (Dependency × 0.25)
 ```
 
 **Factor Breakdown:**
 
-- **Complexity Factor (25%)**: Combines cyclomatic and cognitive complexity
+- **Complexity Factor (35%)**: Combines cyclomatic and cognitive complexity
   - Normalized using: `min(10, (cyclomatic / 10 + cognitive / 20) × 5)`
   - Higher complexity = higher score = higher priority
 
-- **Coverage Factor (35%)**: Urgency of adding test coverage
+- **Coverage Factor (40%)**: Urgency of adding test coverage
   - Test functions: 0 (they don't need coverage)
   - With coverage data: `10 × (1 - coverage_percentage) × complexity_weight`
   - Without coverage data: 10 (assume worst case)
   - Considers transitive coverage through call graph
 
-- **ROI Factor (25%)**: Return on investment for fixing
-  - Based on: function size, downstream dependencies, change frequency
+- **Dependency Factor (25%)**: Impact based on how many functions depend on this code
+  - Based on: upstream dependencies (callers) and downstream impact
   - Normalized to 0-10 scale
-  - Higher ROI = higher priority
-
-- **Semantic Factor (15%)**: Importance based on function role
+  - More dependencies = higher priority
   - Entry points: 8-10 (critical path)
   - Business logic: 6-8 (core functionality)
   - Data access: 5-7 (important but stable)
@@ -598,7 +593,7 @@ Functions are scored based on complexity-coverage correlation:
 - **Low Risk (5-9)**: Well-tested or simple functions
 
 #### Testing Recommendations
-- **ROI-based prioritization**: Functions ranked by risk reduction potential
+- **Risk-based prioritization**: Functions ranked by complexity-coverage correlation
 - **Test effort estimation**: Complexity-based test case recommendations
 - **Actionable insights**: Concrete steps to reduce overall codebase risk
 
@@ -846,7 +841,7 @@ Debtmap is built with a functional, modular architecture designed for extensibil
   - Call graph construction and analysis
   - Coverage propagation through dependencies
   - Semantic function classification (entry points, business logic, utilities)
-  - ROI-based scoring and recommendations
+  - Risk-based scoring and recommendations
 
 - **`risk/`** - Risk analysis and coverage integration
   - LCOV parser for coverage data
@@ -1012,7 +1007,7 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 ### Core Features
 - [x] Inline suppression comments
 - [x] LCOV coverage integration with risk analysis
-- [x] ROI-based testing prioritization
+- [x] Risk-based testing prioritization
 - [x] Comprehensive debt detection (20+ pattern types)
 - [x] Security vulnerability detection
 - [x] Resource management analysis

@@ -211,19 +211,27 @@ impl ExtractionAnalyzer for UnifiedExtractionAnalyzer {
             data_dependencies: extract_dependencies(func, data_flow),
         };
 
-        if let Some(matcher) = self.matchers.get(&language) {
+        if self.matchers.contains_key(&language) {
             // Parse the function AST based on language
             if let Some(ast) = parse_function_ast(func, &language) {
-                let patterns = matcher.match_patterns(&ast, &context);
-                patterns
-                    .into_iter()
-                    .map(|pattern| {
-                        let confidence = matcher.score_confidence(&pattern, &context);
-                        let mut pattern = pattern;
-                        pattern.confidence = confidence;
-                        matcher.generate_extraction(&pattern)
-                    })
-                    .collect()
+                // Read source and create context-aware matcher
+                if let Ok(source) = crate::io::read_file(&func.file) {
+                    use crate::extraction_patterns::language_specific::RustPatternMatcher;
+                    let matcher =
+                        RustPatternMatcher::with_source_context(&source, func.line);
+                    let patterns = matcher.match_patterns(&ast, &context);
+                    patterns
+                        .into_iter()
+                        .map(|pattern| {
+                            let confidence = matcher.score_confidence(&pattern, &context);
+                            let mut pattern = pattern;
+                            pattern.confidence = confidence;
+                            matcher.generate_extraction(&pattern)
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                }
             } else {
                 Vec::new()
             }

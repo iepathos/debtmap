@@ -34,14 +34,14 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Risk scoring based on complexity-coverage correlation
   - Critical risk function identification
   - Test effort estimation based on cognitive complexity
-  - ROI-based testing recommendations
+  - Risk-based testing recommendations
   - Risk distribution visualization
   - Works without coverage data - provides complexity-based recommendations
 - ✅ Enhanced Testing Prioritization (spec 08):
   - Multi-stage prioritization pipeline
   - Zero-coverage priority boost with entry point detection
   - Module criticality scoring based on file patterns and dependencies
-  - Dynamic ROI calculation with cascade effects
+  - Dynamic risk calculation with cascade effects
   - Effort estimation based on complexity and module type
   - Smart recommendations with clear rationale
 - ✅ Fixed Complexity Calculations (spec 09):
@@ -57,14 +57,14 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Pluggable context provider architecture
   - Weighted risk calculation with context contributions
   - Optional via --context CLI flag
-- ✅ Dependency-Aware ROI Calculation (spec 14):
+- ✅ Dependency-Aware Risk Calculation (spec 14):
   - Builds dependency graph from module relationships
   - Cascade impact based on actual dependent modules
   - Module type bonuses (EntryPoint: 2x, Core: 1.5x, Api: 1.2x)
-  - Dependency factor increases ROI for highly-depended code
+  - Dependency factor increases priority for highly-depended code
   - Exponential decay for cascade propagation (70% per level)
   - Diminishing returns model for realistic risk reduction
-  - Enhanced ROI formula with meaningful variation (0.1 to 10.0 range)
+  - Enhanced priority formula with meaningful variation (0.1 to 10.0 range)
 - ✅ Intelligent Test Function Debt Handling (spec 18):
   - Test functions excluded from main debt score calculation
   - Test functions no longer penalized for lack of code coverage
@@ -73,7 +73,7 @@ Progress: 100% of spec 01, spec 02, spec 03, spec 05, spec 07, spec 08, spec 09,
   - Test debt tracked and reported separately with specific recommendations
   - Prevents debt score inflation when adding tests to the codebase
 - ✅ Unified Debt Prioritization with Semantic Analysis (spec 19):
-  - Single priority score combining complexity, coverage, ROI, and semantics
+  - Single priority score combining complexity, coverage, and dependencies
   - Semantic function classification (PureLogic, Orchestrator, IOWrapper, EntryPoint)
   - Coverage propagation through call graph for delegation patterns
   - Role-based priority multipliers to reduce false positives

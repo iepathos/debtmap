@@ -7,6 +7,7 @@ pub struct TransitiveCoverage {
     pub direct: f64,
     pub transitive: f64,
     pub propagated_from: Vec<FunctionId>,
+    pub uncovered_lines: Vec<usize>,
 }
 
 pub fn calculate_transitive_coverage(
@@ -16,6 +17,7 @@ pub fn calculate_transitive_coverage(
 ) -> TransitiveCoverage {
     // Get direct coverage for this function
     let direct = get_function_coverage(func_id, coverage);
+    let uncovered_lines = get_uncovered_lines(func_id, coverage);
 
     // If function has direct coverage, no need to calculate transitive
     if direct > 0.0 {
@@ -23,6 +25,7 @@ pub fn calculate_transitive_coverage(
             direct,
             transitive: direct,
             propagated_from: vec![],
+            uncovered_lines,
         };
     }
 
@@ -33,6 +36,7 @@ pub fn calculate_transitive_coverage(
             direct: 0.0,
             transitive: 0.0,
             propagated_from: vec![],
+            uncovered_lines,
         };
     }
 
@@ -57,6 +61,7 @@ pub fn calculate_transitive_coverage(
         direct,
         transitive,
         propagated_from: covered_callees,
+        uncovered_lines,
     }
 }
 
@@ -66,6 +71,13 @@ fn get_function_coverage(func_id: &FunctionId, coverage: &LcovData) -> f64 {
     coverage
         .get_function_coverage_with_line(&func_id.file, &func_id.name, func_id.line)
         .unwrap_or(0.0)
+}
+
+fn get_uncovered_lines(func_id: &FunctionId, coverage: &LcovData) -> Vec<usize> {
+    // Get uncovered lines for a function from LCOV data
+    coverage
+        .get_function_uncovered_lines(&func_id.file, &func_id.name, func_id.line)
+        .unwrap_or_default()
 }
 
 /// Calculates coverage urgency using a smooth gradient approach.
@@ -152,6 +164,7 @@ mod tests {
             start_line: 10,
             execution_count: 5,
             coverage_percentage: 50.0,
+            uncovered_lines: vec![],
         }];
         coverage.functions.insert(PathBuf::from("test.rs"), funcs);
 
@@ -255,6 +268,7 @@ mod tests {
             start_line: 10,
             execution_count: 1,
             coverage_percentage: 25.0,
+            uncovered_lines: vec![],
         }];
         coverage
             .functions
@@ -275,6 +289,7 @@ mod tests {
             start_line: 10,
             execution_count: 1,
             coverage_percentage: 50.0,
+            uncovered_lines: vec![],
         }];
         coverage
             .functions
@@ -294,6 +309,7 @@ mod tests {
             start_line: 10,
             execution_count: 1,
             coverage_percentage: 75.0,
+            uncovered_lines: vec![],
         }];
         coverage
             .functions
@@ -313,6 +329,7 @@ mod tests {
             start_line: 10,
             execution_count: 1,
             coverage_percentage: 90.0,
+            uncovered_lines: vec![],
         }];
         coverage
             .functions
@@ -331,6 +348,7 @@ mod tests {
             start_line: 10,
             execution_count: 1,
             coverage_percentage: 100.0,
+            uncovered_lines: vec![],
         }];
         coverage
             .functions

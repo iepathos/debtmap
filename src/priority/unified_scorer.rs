@@ -769,28 +769,8 @@ fn determine_debt_type(
         };
     }
 
-    // Check if this is a complex orchestrator that should be flagged as complexity hotspot
+    // Get role for later checks
     let role = classify_function_role(func, func_id, call_graph);
-    if role == FunctionRole::Orchestrator {
-        // Complex orchestrators (complexity > 5) are flagged as complexity hotspots
-        if func.cyclomatic > 5 {
-            return DebtType::ComplexityHotspot {
-                cyclomatic: func.cyclomatic,
-                cognitive: func.cognitive,
-            };
-        }
-        // Untested orchestrators with non-trivial complexity are testing gaps
-        if let Some(cov) = coverage {
-            if cov.direct < 0.2 && func.cyclomatic > 2 {
-                return DebtType::TestingGap {
-                    coverage: cov.direct,
-                    cyclomatic: func.cyclomatic,
-                    cognitive: func.cognitive,
-                };
-            }
-        }
-        // Simple orchestrators are not debt - they're good architectural patterns
-    }
 
     // Low complexity functions that are I/O wrappers or entry points
     // should not be flagged as technical debt
@@ -986,8 +966,9 @@ pub fn classify_debt_type_with_exclusions(
         }
     }
 
-    // Check for complexity hotspots
-    if func.cyclomatic > 10 || func.cognitive > 15 {
+    // Check for complexity hotspots - include moderate complexity functions
+    // Any function with cyclomatic > 5 or cognitive > 8 is a complexity candidate
+    if func.cyclomatic > 5 || func.cognitive > 8 {
         return DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
@@ -1010,28 +991,8 @@ pub fn classify_debt_type_with_exclusions(
         };
     }
 
-    // Check if this is a complex orchestrator that should be flagged as complexity hotspot
+    // Get role for later checks
     let role = classify_function_role(func, func_id, call_graph);
-    if role == FunctionRole::Orchestrator {
-        // Complex orchestrators (complexity > 5) are flagged as complexity hotspots
-        if func.cyclomatic > 5 {
-            return DebtType::ComplexityHotspot {
-                cyclomatic: func.cyclomatic,
-                cognitive: func.cognitive,
-            };
-        }
-        // Untested orchestrators with non-trivial complexity are testing gaps
-        if let Some(cov) = coverage {
-            if cov.direct < 0.2 && func.cyclomatic > 2 {
-                return DebtType::TestingGap {
-                    coverage: cov.direct,
-                    cyclomatic: func.cyclomatic,
-                    cognitive: func.cognitive,
-                };
-            }
-        }
-        // Simple orchestrators are not debt - they're good architectural patterns
-    }
 
     // Low complexity functions that are I/O wrappers or entry points
     // should not be flagged as technical debt
@@ -1059,21 +1020,11 @@ pub fn classify_debt_type_with_exclusions(
         }
     }
 
-    // Only flag as risk-based debt if there's actual complexity or other indicators
-    if func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50 {
-        DebtType::Risk {
-            risk_score: calculate_risk_score(func),
-            factors: identify_risk_factors(func, &None),
-        }
-    } else {
-        // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
-        {
-            // Not debt - well-designed simple function
-            DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Well-designed simple function - not technical debt".to_string()],
-            }
-        }
+    // At this point, we have simple functions (cyclo <= 5, cog <= 8)
+    // These are not technical debt - return minimal risk
+    DebtType::Risk {
+        risk_score: 0.0,
+        factors: vec!["Well-designed simple function - not technical debt".to_string()],
     }
 }
 
@@ -1422,14 +1373,19 @@ fn generate_testing_gap_steps(is_complex: bool) -> Vec<String> {
 }
 
 /// Calculate number of functions to extract based on complexity
+/// Algorithm: Divide max complexity by target (3-5) to get number of functions needed
+/// to achieve manageable complexity per function
 fn calculate_functions_to_extract(cyclomatic: u32, cognitive: u32) -> u32 {
     let max_complexity = cyclomatic.max(cognitive);
+    // Target complexity per function is 3-5
+    // Calculate how many functions needed to achieve this
     match max_complexity {
-        0..=10 => 1,
-        11..=15 => 2,
-        16..=20 => 3,
-        21..=30 => 4,
-        _ => 5,
+        0..=10 => 2,                      // Extract 2 functions: 10/2 = 5 complexity each
+        11..=15 => 3,                     // Extract 3 functions: 15/3 = 5 complexity each
+        16..=20 => 4,                     // Extract 4 functions: 20/4 = 5 complexity each
+        21..=25 => 5,                     // Extract 5 functions: 25/5 = 5 complexity each
+        26..=30 => 6,                     // Extract 6 functions: 30/6 = 5 complexity each
+        _ => (max_complexity / 5).max(6), // For very high complexity, aim for ~5 per function
     }
 }
 
@@ -1439,45 +1395,107 @@ fn generate_combined_testing_refactoring_steps(
     cognitive: u32,
     coverage_pct: i32,
 ) -> Vec<String> {
+    let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
+    let target_complexity = (cyclomatic / functions_to_extract).max(3);
+    let uncovered_branches = ((100 - coverage_pct) as f32 / 100.0 * cyclomatic as f32) as u32;
+
     vec![
         format!(
-            "Write {} tests for critical uncovered paths (current coverage: {}%)",
-            cyclomatic.max(3),
-            coverage_pct
+            "Currently ~{} of {} branches are uncovered ({}% coverage)",
+            uncovered_branches, cyclomatic, coverage_pct
         ),
-        "Identify and test edge cases and error conditions".to_string(),
         format!(
-            "Extract {} pure functions to reduce complexity from cyclo={} to <10",
-            calculate_functions_to_extract(cyclomatic, cognitive),
-            cyclomatic
+            "Write {} tests to cover critical uncovered branches first",
+            uncovered_branches.min(cyclomatic / 2)
         ),
-        "Add property-based tests for extracted pure functions".to_string(),
-        format!("Achieve 80%+ coverage through comprehensive testing"),
         format!(
-            "Goal: Reduce cyclomatic from {} to <10, cognitive from {} to <15",
-            cyclomatic, cognitive
+            "Extract {} pure functions from {} branches:",
+            functions_to_extract, cyclomatic
+        ),
+        format!(
+            "  • Group ~{} related branches per function",
+            cyclomatic / functions_to_extract.max(1)
+        ),
+        format!(
+            "  • Target complexity ≤{} per extracted function",
+            target_complexity
+        ),
+        "Extraction patterns to look for:".to_string(),
+        "  • Validation logic → validate_input()".to_string(),
+        "  • Complex calculations → calculate_result()".to_string(),
+        "  • Error handling → handle_errors()".to_string(),
+        format!("Write ~{} tests per extracted function", target_complexity),
+        "Add property-based tests for complex logic".to_string(),
+        format!(
+            "Final goal: {}+ functions with ≤{} complexity each, 80%+ coverage",
+            functions_to_extract, target_complexity
         ),
     ]
 }
 
 /// Generate recommendation for testing gap debt type
 fn generate_testing_gap_recommendation(
-    coverage: f64,
+    coverage_pct: f64,
     cyclomatic: u32,
     cognitive: u32,
     role: FunctionRole,
+    func: &FunctionMetrics,
+    transitive_coverage: &Option<TransitiveCoverage>,
 ) -> (String, String, Vec<String>) {
     let is_complex = cyclomatic > 10 || cognitive > 15;
-    let coverage_pct = (coverage * 100.0) as i32;
+    let coverage_pct_int = (coverage_pct * 100.0) as i32;
     let role_str = format_role_description(role);
-
-    let coverage_gap = 100 - coverage_pct;
+    let coverage_gap = 100 - coverage_pct_int;
+    
+    // If function is fully covered, no testing gap exists
+    if coverage_gap == 0 {
+        return (
+            "Maintain test coverage".to_string(),
+            format!("Function is currently 100% covered. {}", role_str),
+            vec![
+                "Keep tests up to date with code changes".to_string(),
+                "Consider property-based testing for edge cases".to_string(),
+                "Monitor coverage in CI/CD pipeline".to_string(),
+            ],
+        );
+    }
 
     if is_complex {
+        let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
+
+        // Calculate test cases needed
+        let current_test_cases = if coverage_pct_int > 0 {
+            (cyclomatic as f64 * coverage_pct).ceil() as u32
+        } else {
+            0
+        };
+        let needed_test_cases = cyclomatic.saturating_sub(current_test_cases);
+
+        // Explain why both testing and refactoring are needed
+        let complexity_explanation = format!(
+            "Cyclomatic complexity of {} requires at least {} test cases for full path coverage. After extracting {} functions, each will need only 3-5 tests",
+            cyclomatic, cyclomatic, functions_to_extract
+        );
+
+        // Add uncovered lines info if available
+        let mut steps =
+            generate_combined_testing_refactoring_steps(cyclomatic, cognitive, coverage_pct_int);
+        if let Some(cov) = transitive_coverage {
+            if !cov.uncovered_lines.is_empty() {
+                let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
+                // Insert uncovered lines info at the beginning of steps
+                for (i, rec) in uncovered_recommendations.into_iter().enumerate() {
+                    steps.insert(i, rec);
+                }
+            }
+        }
+
         (
-            format!("Add tests for {}% coverage gap", coverage_gap),
-            format!("Complex {role_str} lacks test coverage ({coverage_gap}% gap). Complexity: cyclo={cyclomatic}, cog={cognitive}. Consider refactoring after adding tests"),
-            generate_combined_testing_refactoring_steps(cyclomatic, cognitive, coverage_pct),
+            format!("Add {} tests for {}% coverage gap, then refactor complexity {} into {} functions", 
+                   needed_test_cases, coverage_gap, cyclomatic, functions_to_extract),
+            format!("Complex {role_str} with {coverage_gap}% gap. {}. Testing before refactoring ensures no regressions",
+                   complexity_explanation),
+            steps,
         )
     } else {
         let role_display = match role {
@@ -1488,10 +1506,37 @@ fn generate_testing_gap_recommendation(
             FunctionRole::PatternMatch => "Pattern matching",
             FunctionRole::Unknown => "Function",
         };
+
+        // Calculate approximate test cases needed
+        let test_cases_needed = ((cyclomatic as f64 * (1.0 - coverage_pct)).ceil() as u32).max(1);
+
+        let coverage_explanation = if coverage_pct_int == 0 {
+            format!("Completely untested {} function needs {} test cases to cover all {} execution paths",
+                   role_display.to_lowercase(), test_cases_needed, cyclomatic)
+        } else {
+            format!("{role_display} needs {} more test cases to reach 80% coverage target from current {coverage_pct_int}%",
+                   test_cases_needed)
+        };
+
+        // Add uncovered lines info if available
+        let mut steps = generate_testing_gap_steps(false);
+        if let Some(cov) = transitive_coverage {
+            if !cov.uncovered_lines.is_empty() {
+                let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
+                // Insert uncovered lines info at the beginning of steps
+                for (i, rec) in uncovered_recommendations.into_iter().enumerate() {
+                    steps.insert(i, rec);
+                }
+            }
+        }
+
         (
-            format!("Add tests for {}% coverage gap", coverage_gap),
-            format!("{role_display} has {coverage_gap}% coverage gap (currently {coverage_pct}% covered, needs 80%+)"),
-            generate_testing_gap_steps(false),
+            format!(
+                "Add {} tests for {}% coverage gap",
+                test_cases_needed, coverage_gap
+            ),
+            coverage_explanation,
+            steps,
         )
     }
 }
@@ -1578,10 +1623,6 @@ fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, V
 }
 
 /// Generate recommendation for infrastructure debt types (duplication, risk)
-fn generate_infrastructure_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
-    generate_infrastructure_recommendation_with_coverage(debt_type, &None)
-}
-
 fn generate_infrastructure_recommendation_with_coverage(
     debt_type: &DebtType,
     coverage: &Option<TransitiveCoverage>,
@@ -1642,31 +1683,41 @@ fn generate_infrastructure_recommendation_with_coverage(
                     let target_complexity = 3;
 
                     // Check if coverage is already good before recommending tests
-                    let has_good_coverage = coverage
-                        .as_ref()
-                        .map(|c| c.direct >= 0.8)
-                        .unwrap_or(false);
-                    
+                    let has_good_coverage =
+                        coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
+
                     let action = if has_good_coverage {
-                        format!("Extract {} pure functions (complexity {} → {})", 
-                                functions_to_extract, cyclo, target_complexity)
+                        format!(
+                            "Extract {} pure functions (complexity {} → {})",
+                            functions_to_extract, cyclo, target_complexity
+                        )
                     } else {
-                        format!("Extract {} pure functions (complexity {} → {}), then add {} comprehensive tests", 
-                                functions_to_extract, cyclo, target_complexity, functions_to_extract * 3)
+                        format!(
+                            "Extract {} pure functions (complexity {} → ~{})",
+                            functions_to_extract, cyclo, target_complexity
+                        )
                     };
 
                     let mut steps = vec![
                         format!(
-                            "Identify {} logical sections in the function",
-                            functions_to_extract
+                            "Identify {} logical sections from {} branches:",
+                            functions_to_extract, cyclo
                         ),
-                        "Extract each section as a pure function (no side effects)".to_string(),
-                        "Replace nested if/else with pattern matching or early returns"
-                            .to_string(),
-                        "Convert imperative loops to .map(), .filter(), .fold()".to_string(),
+                        format!(
+                            "  • Look for groups of ~{} related conditions",
+                            cyclo / functions_to_extract.max(1)
+                        ),
+                        format!(
+                            "  • Each extracted function should have complexity ≤{}",
+                            target_complexity
+                        ),
+                        "Extraction candidates:".to_string(),
+                        "  • Validation logic → validate_preconditions()".to_string(),
+                        "  • Complex calculations → calculate_specific()".to_string(),
+                        "  • Loop processing → process_items()".to_string(),
                         "Move all I/O operations to a single orchestrator function".to_string(),
                     ];
-                    
+
                     // Only add testing steps if coverage is low
                     if !has_good_coverage {
                         steps.push(format!(
@@ -1677,15 +1728,19 @@ fn generate_infrastructure_recommendation_with_coverage(
                             steps.push("Achieve 80%+ test coverage for all functions".to_string());
                         }
                     }
-                    
+
                     if !has_coverage_issue && has_good_coverage {
                         steps.push(format!(
                             "Goal: Reduce cyclomatic complexity from {} to <={}",
                             cyclo, target_complexity
                         ));
                     }
-                    
-                    (action, format!("Risk score {:.1}: {}", risk_score, factors.join(", ")), steps)
+
+                    (
+                        action,
+                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
+                        steps,
+                    )
                 } else if cyclo > 10 {
                     // High complexity - needs more aggressive refactoring
                     let has_coverage_issue = factors.iter().any(|f| {
@@ -1696,14 +1751,14 @@ fn generate_infrastructure_recommendation_with_coverage(
                     let target_complexity = 5;
 
                     // Check if coverage is already good before recommending tests
-                    let has_good_coverage = coverage
-                        .as_ref()
-                        .map(|c| c.direct >= 0.8)
-                        .unwrap_or(false);
-                    
+                    let has_good_coverage =
+                        coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
+
                     let action = if has_good_coverage {
-                        format!("Decompose into {} pure functions (complexity {} → {})", 
-                                functions_to_extract, cyclo, target_complexity)
+                        format!(
+                            "Decompose into {} pure functions (complexity {} → {})",
+                            functions_to_extract, cyclo, target_complexity
+                        )
                     } else {
                         format!("Decompose into {} pure functions (complexity {} → {}), then add {} comprehensive tests", 
                                 functions_to_extract, cyclo, target_complexity, functions_to_extract * 4)
@@ -1720,7 +1775,7 @@ fn generate_infrastructure_recommendation_with_coverage(
                         "Transform data mutations into immutable transformations".to_string(),
                         "Isolate side effects in a thin orchestration layer".to_string(),
                     ];
-                    
+
                     // Only add testing steps if coverage is low
                     if !has_good_coverage {
                         steps.push(format!(
@@ -1728,7 +1783,7 @@ fn generate_infrastructure_recommendation_with_coverage(
                             functions_to_extract * 4
                         ));
                     }
-                    
+
                     if has_coverage_issue && !has_good_coverage {
                         steps.push(format!(
                             "Target: Each function ≤{} complexity with 80%+ coverage",
@@ -1740,8 +1795,12 @@ fn generate_infrastructure_recommendation_with_coverage(
                             target_complexity
                         ));
                     }
-                    
-                    (action, format!("Risk score {:.1}: {}", risk_score, factors.join(", ")), steps)
+
+                    (
+                        action,
+                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
+                        steps,
+                    )
                 } else {
                     // Low complexity but still flagged - likely other issues including coverage
                     let has_coverage_issue = factors.iter().any(|f| {
@@ -1788,25 +1847,31 @@ fn generate_infrastructure_recommendation_with_coverage(
             cyclomatic,
             cognitive,
         } => {
-            // Note: We should check coverage here too, but ComplexityHotspot doesn't store it
-            // For now, emphasize both testing and refactoring
+            // Calculate extraction based on complexity distribution
             let functions_to_extract = calculate_functions_to_extract(*cyclomatic, *cognitive);
+            let target_per_function = (*cyclomatic / functions_to_extract).max(3);
             (
                 format!(
-                    "Extract {} pure functions to reduce complexity from {} to <10, then add comprehensive tests",
+                    "Extract {} pure functions, each handling ~{} branches (complexity {} → ~{})",
                     functions_to_extract,
-                    cyclomatic
+                    *cyclomatic / functions_to_extract.max(1),
+                    cyclomatic,
+                    target_per_function
                 ),
                 format!(
                     "High complexity function (cyclo={cyclomatic}, cog={cognitive}) likely with low coverage - needs testing and refactoring"
                 ),
                 vec![
-                    format!("Identify {} logical sections in function", functions_to_extract),
-                    "Extract pure functions for each section (no side effects)".to_string(),
-                    "Move I/O and side effects to orchestrator function".to_string(),
-                    format!("Write {} unit tests for extracted pure functions", functions_to_extract * 3),
-                    "Add property-based tests for complex logic".to_string(),
-                    format!("Goal: 80%+ coverage with each function <10 cyclomatic complexity"),
+                    format!("Identify {} branch clusters from {} total branches:", functions_to_extract, cyclomatic),
+                    format!("  • Each cluster should handle ~{} related conditions", cyclomatic / functions_to_extract.max(1)),
+                    "Common extraction patterns:".to_string(),
+                    "  • Early validation checks → validate_preconditions()".to_string(),
+                    "  • Complex calculations in branches → calculate_[specific]()".to_string(),  
+                    "  • Data processing in loops → process_[item_type]()".to_string(),
+                    "  • Error handling branches → handle_[error_case]()".to_string(),
+                    format!("Each extracted function should have cyclomatic complexity ≤{}", target_per_function),
+                    format!("Write ~{} tests per extracted function for full branch coverage", target_per_function),
+                    "Use property-based testing for complex logic validation".to_string(),
                 ],
             )
         }
@@ -1815,17 +1880,6 @@ fn generate_infrastructure_recommendation_with_coverage(
 }
 
 /// Generate complexity recommendation using pattern analysis when available
-fn generate_complexity_recommendation_with_patterns(
-    func: &FunctionMetrics,
-    cyclomatic: u32,
-    cognitive: u32,
-    data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> (String, String, Vec<String>) {
-    generate_complexity_recommendation_with_patterns_and_coverage(
-        func, cyclomatic, cognitive, &None, data_flow,
-    )
-}
-
 fn generate_complexity_recommendation_with_patterns_and_coverage(
     func: &FunctionMetrics,
     cyclomatic: u32,
@@ -1901,24 +1955,55 @@ fn generate_complexity_recommendation_with_patterns_and_coverage(
             )
         };
 
+        // Provide detailed explanation of why these extractions are recommended
+        let pattern_benefits = match suggestions.len() {
+            1 => "This extraction will create a focused, testable unit".to_string(),
+            2 => "These extractions will separate distinct concerns into testable units".to_string(),
+            _ => format!("These {} extractions will decompose the function into smaller, focused units that are easier to test and understand", suggestions.len()),
+        };
+
+        let complexity_explanation = if cyclomatic > 15 {
+            format!("Cyclomatic complexity of {} indicates {} independent execution paths, requiring at least {} test cases for full path coverage", 
+                    cyclomatic, cyclomatic, cyclomatic)
+        } else if cyclomatic > 10 {
+            format!("Cyclomatic complexity of {} indicates {} independent paths through the code, making thorough testing difficult", 
+                    cyclomatic, cyclomatic)
+        } else if cyclomatic > 5 {
+            format!("Cyclomatic complexity of {} indicates {} independent paths requiring {} test cases minimum - extraction will reduce this to 3-5 tests per function",
+                    cyclomatic, cyclomatic, cyclomatic)
+        } else {
+            format!("Cyclomatic complexity of {} indicates moderate complexity that can be improved through extraction", cyclomatic)
+        };
+
         let rationale = format!(
-            "High complexity function (cyclo={}, cog={}) has {} extractable patterns with high confidence",
-            cyclomatic,
-            cognitive,
-            suggestions.len()
+            "{}. Function has {} extractable patterns that can be isolated. {}. Target complexity per function is 5 or less for optimal maintainability.",
+            complexity_explanation,
+            suggestions.len(),
+            pattern_benefits
         );
 
         // Add testing steps only if coverage is low
         let has_good_coverage = coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
 
         if !has_good_coverage {
+            // Add uncovered lines information if available
+            if let Some(cov) = coverage {
+                if !cov.uncovered_lines.is_empty() {
+                    let uncovered_recommendations =
+                        analyze_uncovered_lines(func, &cov.uncovered_lines);
+                    for (i, rec) in uncovered_recommendations.into_iter().enumerate() {
+                        steps.insert(i, rec);
+                    }
+                }
+            }
+
             steps.push(format!(
                 "{}. Write unit tests for each extracted pure function",
-                suggestions.len() + 1
+                suggestions.len() + 2
             ));
             steps.push(format!(
                 "{}. Add property-based tests for complex transformations",
-                suggestions.len() + 2
+                suggestions.len() + 3
             ));
         }
 
@@ -1929,26 +2014,76 @@ fn generate_complexity_recommendation_with_patterns_and_coverage(
 
         (action, rationale, steps)
     } else {
-        // Fall back to data-flow-informed heuristic recommendations
-        generate_data_flow_based_recommendations_with_coverage(
+        // Fall back to heuristic recommendations with estimated line ranges
+        generate_heuristic_recommendations_with_line_estimates(
             func, cyclomatic, cognitive, coverage, data_flow,
         )
     }
 }
 
-/// Generate recommendations based on data flow analysis when AST is unavailable
-fn generate_data_flow_based_recommendations(
-    func: &FunctionMetrics,
-    cyclomatic: u32,
-    cognitive: u32,
-    data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> (String, String, Vec<String>) {
-    generate_data_flow_based_recommendations_with_coverage(
-        func, cyclomatic, cognitive, &None, data_flow,
-    )
+/// Analyze uncovered lines to provide specific testing recommendations
+fn analyze_uncovered_lines(func: &FunctionMetrics, uncovered_lines: &[usize]) -> Vec<String> {
+    let mut recommendations = Vec::new();
+
+    if uncovered_lines.is_empty() {
+        return recommendations;
+    }
+
+    // Group consecutive lines into ranges for better readability
+    let mut ranges = Vec::new();
+    let mut current_start = uncovered_lines[0];
+    let mut current_end = uncovered_lines[0];
+
+    for &line in &uncovered_lines[1..] {
+        if line == current_end + 1 {
+            current_end = line;
+        } else {
+            ranges.push((current_start, current_end));
+            current_start = line;
+            current_end = line;
+        }
+    }
+    ranges.push((current_start, current_end));
+
+    // Format line ranges
+    let range_strings: Vec<String> = ranges
+        .iter()
+        .take(5)
+        .map(|(start, end)| {
+            if start == end {
+                format!("{}", start)
+            } else {
+                format!("{}-{}", start, end)
+            }
+        })
+        .collect();
+
+    let more = if ranges.len() > 5 {
+        format!(" and {} more ranges", ranges.len() - 5)
+    } else {
+        String::new()
+    };
+
+    recommendations.push(format!(
+        "Add tests for uncovered lines: {}{}",
+        range_strings.join(", "),
+        more
+    ));
+
+    // Provide specific guidance based on the function characteristics
+    if func.cyclomatic > 5 {
+        recommendations.push(format!(
+            "Focus on testing {} decision points to cover all {} execution paths",
+            func.cyclomatic - 1,
+            func.cyclomatic
+        ));
+    }
+
+    recommendations
 }
 
-fn generate_data_flow_based_recommendations_with_coverage(
+/// Generate recommendations based on data flow analysis when AST is unavailable
+fn generate_heuristic_recommendations_with_line_estimates(
     func: &FunctionMetrics,
     cyclomatic: u32,
     cognitive: u32,
@@ -1983,24 +2118,27 @@ fn generate_data_flow_based_recommendations_with_coverage(
     if has_high_branching {
         suggested_extractions.push("validation logic");
         steps.push(format!(
-            "Extract validation checks into separate pure function (reduces ~{} complexity)",
+            "Identify validation checks from {} branches → extract as validate_*()",
             cyclomatic / 4
         ));
         complexity_reduction += cyclomatic / 4;
     }
 
     if has_deep_nesting {
-        suggested_extractions.push("nested loop processing");
-        steps.push(
-            "Flatten nested structures using functional transformations (map/filter/reduce)"
-                .to_string(),
-        );
+        suggested_extractions.push("nested processing");
+        steps.push(format!(
+            "Extract nested logic (depth {}) → process_*() functions",
+            func.nesting
+        ));
         complexity_reduction += 2;
     }
 
     if cognitive > cyclomatic * 2 {
         suggested_extractions.push("complex calculations");
-        steps.push("Extract complex business logic into named helper functions".to_string());
+        steps.push(format!(
+            "Extract calculations from {} cognitive complexity → calculate_*()",
+            cognitive / 5
+        ));
         complexity_reduction += cognitive / 5;
     }
 
@@ -2025,6 +2163,17 @@ fn generate_data_flow_based_recommendations_with_coverage(
     // Add testing recommendation only if coverage is low
     let has_good_coverage = coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
 
+    // Add uncovered lines info if available
+    if let Some(cov) = coverage {
+        if !cov.uncovered_lines.is_empty() && !has_good_coverage {
+            let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
+            // Add uncovered lines info at the beginning
+            for rec in uncovered_recommendations.into_iter().rev() {
+                steps.insert(0, rec);
+            }
+        }
+    }
+
     if !has_good_coverage {
         let test_count = if suggested_extractions.is_empty() {
             // If no specific extractions suggested, base on complexity
@@ -2040,31 +2189,54 @@ fn generate_data_flow_based_recommendations_with_coverage(
 
     let predicted_complexity = cyclomatic.saturating_sub(complexity_reduction);
 
+    let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
     let action = if !suggested_extractions.is_empty() {
         format!(
-            "Extract {} to reduce complexity from {} to ~{}",
-            suggested_extractions.join(", "),
-            cyclomatic,
-            predicted_complexity
+            "Extract {} pure functions to reduce complexity from {} to ~{}",
+            functions_to_extract, cyclomatic, predicted_complexity
         )
     } else {
         format!(
-            "Extract {} pure functions to reduce complexity from {} to <10",
-            calculate_functions_to_extract(cyclomatic, cognitive),
+            "Extract {} pure functions (complexity {} → ~{})",
+            functions_to_extract,
+            cyclomatic,
+            predicted_complexity.min(10)
+        )
+    };
+
+    // Provide detailed explanation based on complexity level
+    let complexity_impact = if cyclomatic > 15 {
+        format!("Cyclomatic complexity of {} indicates {} independent execution paths, requiring at least {} test cases for full coverage", 
+                cyclomatic, cyclomatic, cyclomatic)
+    } else if cyclomatic > 10 {
+        format!("Cyclomatic complexity of {} indicates {} independent paths, making comprehensive testing difficult",
+                cyclomatic, cyclomatic)
+    } else if cyclomatic > 5 {
+        format!("Cyclomatic complexity of {} means at least {} test cases needed for full path coverage - extraction reduces this to 3-5 tests per function",
+                cyclomatic, cyclomatic)
+    } else {
+        format!(
+            "Cyclomatic complexity of {} is manageable but can be improved through extraction",
             cyclomatic
         )
     };
 
+    let extraction_reasoning = format!(
+        "Extracting {} functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases",
+        functions_to_extract
+    );
+
+    let purity_note = if is_pure && purity_confidence > 0.8 {
+        " Pure function extraction will create easily testable units with no side effects."
+    } else if is_pure {
+        " Function appears pure, making extraction safer."
+    } else {
+        " Consider isolating side effects during extraction."
+    };
+
     let rationale = format!(
-        "Function has cyclomatic complexity {} and cognitive complexity {}{}{}",
-        cyclomatic,
-        cognitive,
-        "",
-        if is_pure {
-            " (likely pure function)"
-        } else {
-            ""
-        }
+        "{}. {}{}",
+        complexity_impact, extraction_reasoning, purity_note
     );
 
     (action, rationale, steps)
@@ -2137,10 +2309,17 @@ fn generate_recommendation_with_coverage_and_data_flow(
             *cognitive,
         ),
         DebtType::TestingGap {
-            coverage,
+            coverage: coverage_val,
             cyclomatic,
             cognitive,
-        } => generate_testing_gap_recommendation(*coverage, *cyclomatic, *cognitive, role),
+        } => generate_testing_gap_recommendation(
+            *coverage_val,
+            *cyclomatic,
+            *cognitive,
+            role,
+            func,
+            coverage,
+        ),
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
@@ -2951,6 +3130,7 @@ mod tests {
             direct: 0.1,
             transitive: 0.1,
             propagated_from: vec![],
+            uncovered_lines: vec![],
         });
 
         let call_graph = CallGraph::new();
@@ -3012,26 +3192,36 @@ mod tests {
         assert!(!rec.implementation_steps.is_empty());
     }
 
+    fn test_generate_testing_gap_recommendation_helper(
+        coverage: f64,
+        cyclomatic: u32,
+        cognitive: u32,
+        role: FunctionRole,
+    ) -> (String, String, Vec<String>) {
+        let func = create_test_metrics();
+        generate_testing_gap_recommendation(coverage, cyclomatic, cognitive, role, &func, &None)
+    }
+
     #[test]
     fn test_coverage_gap_messaging() {
         // Test with 0% coverage (100% gap)
         let (action, rationale, _) =
-            generate_testing_gap_recommendation(0.0, 5, 8, FunctionRole::PureLogic);
-        assert_eq!(action, "Add tests for 100% coverage gap");
+            test_generate_testing_gap_recommendation_helper(0.0, 5, 8, FunctionRole::PureLogic);
+        assert_eq!(action, "Add 5 tests for 100% coverage gap");
         assert!(rationale.contains("100% coverage gap"));
         assert!(rationale.contains("currently 0% covered"));
 
         // Test with 40% coverage (60% gap)
         let (action, rationale, _) =
-            generate_testing_gap_recommendation(0.4, 5, 8, FunctionRole::Orchestrator);
-        assert_eq!(action, "Add tests for 60% coverage gap");
+            test_generate_testing_gap_recommendation_helper(0.4, 5, 8, FunctionRole::Orchestrator);
+        assert_eq!(action, "Add 5 tests for 60% coverage gap");
         assert!(rationale.contains("60% coverage gap"));
         assert!(rationale.contains("currently 40% covered"));
 
         // Test with 75% coverage (25% gap from 100%)
         let (action, rationale, _) =
-            generate_testing_gap_recommendation(0.75, 5, 8, FunctionRole::IOWrapper);
-        assert_eq!(action, "Add tests for 25% coverage gap");
+            test_generate_testing_gap_recommendation_helper(0.75, 5, 8, FunctionRole::IOWrapper);
+        assert_eq!(action, "Add 5 tests for 25% coverage gap");
         assert!(rationale.contains("25% coverage gap"));
         assert!(rationale.contains("currently 75% covered"));
     }
@@ -3103,6 +3293,7 @@ mod tests {
                 start_line: func.line,
                 execution_count: 18,
                 coverage_percentage: 100.0,
+                uncovered_lines: vec![],
             }],
         );
 
@@ -3158,6 +3349,7 @@ mod tests {
                 start_line: func.line,
                 execution_count: 1,
                 coverage_percentage: 100.0,
+                uncovered_lines: vec![],
             }],
         );
 
@@ -3277,16 +3469,16 @@ mod tests {
 
     #[test]
     fn test_generate_testing_gap_recommendation_complex_high_cyclomatic() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
+        let (action, rationale, steps) = test_generate_testing_gap_recommendation_helper(
             0.25,
             15, // high cyclomatic (> 10)
             10, // normal cognitive
             FunctionRole::PureLogic,
         );
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
-        assert!(action.contains("coverage gap"));
+        // With high complexity, should include refactoring recommendation
+        assert!(action.contains("Add") && action.contains("tests"));
+        assert!(action.contains("75%")); // 100 - 25 = 75% gap
         assert!(
             rationale.contains("Complex business logic")
                 || rationale.contains("high testing priority")
@@ -3298,16 +3490,16 @@ mod tests {
 
     #[test]
     fn test_generate_testing_gap_recommendation_complex_high_cognitive() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
+        let (action, rationale, steps) = test_generate_testing_gap_recommendation_helper(
             0.5,
             8,  // normal cyclomatic
             20, // high cognitive (> 15)
             FunctionRole::Orchestrator,
         );
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
-        assert!(action.contains("coverage gap"));
+        // With high complexity, should include refactoring recommendation
+        assert!(action.contains("Add") && action.contains("tests"));
+        assert!(action.contains("75%")); // 100 - 25 = 75% gap
         assert!(
             rationale.contains("Complex orchestration")
                 || rationale.contains("high testing priority")
@@ -3319,16 +3511,15 @@ mod tests {
 
     #[test]
     fn test_generate_testing_gap_recommendation_simple_pure_logic() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
+        let (action, rationale, steps) = test_generate_testing_gap_recommendation_helper(
             0.0,
             5, // low complexity
             8, // low cognitive
             FunctionRole::PureLogic,
         );
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
-        assert!(action.contains("100%")); // 100% gap for 0% coverage
+        // New format says "Add X tests for Y% coverage gap"
+        assert_eq!(action, "Add 5 tests for 100% coverage gap");
         assert!(rationale.contains("Business logic"));
         assert!(rationale.contains("100%"));
         assert_eq!(steps.len(), 3);
@@ -3338,11 +3529,10 @@ mod tests {
     #[test]
     fn test_generate_testing_gap_recommendation_simple_orchestrator() {
         let (action, rationale, steps) =
-            generate_testing_gap_recommendation(0.75, 3, 5, FunctionRole::Orchestrator);
+            test_generate_testing_gap_recommendation_helper(0.75, 3, 5, FunctionRole::Orchestrator);
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
-        assert!(action.contains("25%")); // 100 - 75 = 25% gap
+        // New format says "Add X tests for Y% coverage gap"
+        assert_eq!(action, "Add 3 tests for 25% coverage gap");
         assert!(rationale.contains("Orchestration"));
         assert!(rationale.contains("25%"));
         assert_eq!(steps.len(), 3);
@@ -3352,11 +3542,10 @@ mod tests {
     #[test]
     fn test_generate_testing_gap_recommendation_simple_io_wrapper() {
         let (action, rationale, steps) =
-            generate_testing_gap_recommendation(0.33, 2, 3, FunctionRole::IOWrapper);
+            test_generate_testing_gap_recommendation_helper(0.33, 2, 3, FunctionRole::IOWrapper);
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
-        assert!(action.contains("coverage gap"));
+        // New format says "Add X tests for Y% coverage gap"
+        assert_eq!(action, "Add 2 tests for 67% coverage gap");
         assert!(rationale.contains("I/O wrapper"));
         assert!(rationale.contains("67%")); // 100 - 33 = 67% gap
         assert_eq!(steps.len(), 3);
@@ -3366,29 +3555,26 @@ mod tests {
     #[test]
     fn test_generate_testing_gap_recommendation_simple_entry_point() {
         let (action, rationale, steps) =
-            generate_testing_gap_recommendation(1.0, 1, 1, FunctionRole::EntryPoint);
+            test_generate_testing_gap_recommendation_helper(1.0, 1, 1, FunctionRole::EntryPoint);
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
-        assert!(action.contains("coverage gap")); // max(1, 2) = 2
+        // With 100% coverage, action is to maintain coverage
+        assert_eq!(action, "Maintain test coverage");
+        assert!(rationale.contains("100% covered"));
         assert!(rationale.contains("Entry point"));
-        // With 100% coverage (1.0), there's 0% gap
-        assert!(rationale.contains("0%") || rationale.contains("100%"));
         assert_eq!(steps.len(), 3);
     }
 
     #[test]
     fn test_generate_testing_gap_recommendation_simple_unknown_role() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
+        let (action, rationale, steps) = test_generate_testing_gap_recommendation_helper(
             0.0,
             0, // will use max(0, 2) = 2
             0,
             FunctionRole::Unknown,
         );
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
-        assert!(action.contains("coverage gap"));
+        // New format says "Add X tests for Y% coverage gap"
+        assert_eq!(action, "Add 2 tests for 100% coverage gap");
         assert!(rationale.contains("Function"));
         // With 0% coverage, there's 100% gap
         assert!(rationale.contains("100%"));
@@ -3397,22 +3583,21 @@ mod tests {
 
     #[test]
     fn test_generate_testing_gap_recommendation_both_high_complexity() {
-        let (action, rationale, steps) = generate_testing_gap_recommendation(
+        let (action, rationale, steps) = test_generate_testing_gap_recommendation_helper(
             0.1,
             25, // very high cyclomatic
             30, // very high cognitive
             FunctionRole::PureLogic,
         );
 
-        // New format says "Add tests for X% coverage gap"
-        assert!(action.contains("Add tests"));
+        // With high complexity, should include refactoring recommendation
+        assert!(action.contains("Add") && action.contains("tests"));
         assert!(action.contains("90%")); // 100 - 10 = 90% gap
-                                         // Cognitive complexity mention removed in new format
         assert!(
             rationale.contains("Complex business logic")
                 || rationale.contains("high testing priority")
         );
-        assert!(rationale.contains("90% gap")); // 100 - 10 = 90% gap
+        assert!(rationale.contains("90%")); // 100 - 10 = 90% gap
         assert_eq!(steps.len(), 6);
         // Steps have changed format, checking for test-related content
         assert!(steps
@@ -3678,18 +3863,29 @@ mod tests {
         assert!(rec.rationale.contains("Moderate complexity"));
         // With unknown coverage, we have 5 refactoring steps + 2 testing steps = 7
         // The actual number of steps depends on coverage logic
-        assert!(rec.implementation_steps.len() >= 5, "Expected at least 5 steps, got {}: {:?}", 
-                rec.implementation_steps.len(), rec.implementation_steps);
+        assert!(
+            rec.implementation_steps.len() >= 5,
+            "Expected at least 5 steps, got {}: {:?}",
+            rec.implementation_steps.len(),
+            rec.implementation_steps
+        );
         assert!(rec.implementation_steps[0].contains("3 logical sections"));
         assert!(rec.implementation_steps[2].contains("pattern matching"));
         assert!(rec.implementation_steps[3].contains(".map(), .filter(), .fold()"));
         // Check that test step exists when coverage is unknown
-        let has_test_step = rec.implementation_steps.iter().any(|s| s.contains("unit tests"));
-        assert!(has_test_step, "Should have test step when coverage is unknown");
-        // Check for goal/target step
-        let _has_goal = rec.implementation_steps.iter().any(|s| 
-            s.contains("Goal") || s.contains("complexity from") || s.contains("80%+")
+        let has_test_step = rec
+            .implementation_steps
+            .iter()
+            .any(|s| s.contains("unit tests"));
+        assert!(
+            has_test_step,
+            "Should have test step when coverage is unknown"
         );
+        // Check for goal/target step
+        let _has_goal = rec
+            .implementation_steps
+            .iter()
+            .any(|s| s.contains("Goal") || s.contains("complexity from") || s.contains("80%+"));
     }
 
     #[test]
@@ -4113,6 +4309,7 @@ mod tests {
                 start_line: 10,
                 execution_count: 1,
                 coverage_percentage: 100.0,
+                uncovered_lines: vec![],
             }],
         );
 
@@ -4315,6 +4512,7 @@ mod tests {
                 start_line: 1,
                 execution_count: 1,
                 coverage_percentage: 100.0,
+                uncovered_lines: vec![],
             }],
         );
 
@@ -4343,6 +4541,7 @@ mod tests {
                 start_line: 1,
                 execution_count: 1,
                 coverage_percentage: 100.0,
+                uncovered_lines: vec![],
             }],
         );
 
@@ -4369,6 +4568,7 @@ mod tests {
                 start_line: 10,
                 execution_count: 1,
                 coverage_percentage: 50.0,
+                uncovered_lines: vec![12, 14, 15, 16, 18],
             }],
         );
 
@@ -4528,6 +4728,7 @@ mod tests {
                 start_line: 10,
                 execution_count: 1,
                 coverage_percentage: 100.0,
+                uncovered_lines: vec![],
             }],
         );
 
@@ -4558,6 +4759,7 @@ mod tests {
                 start_line: 10,
                 execution_count: 1,
                 coverage_percentage: 100.0,
+                uncovered_lines: vec![],
             }],
         );
 

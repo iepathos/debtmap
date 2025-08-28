@@ -2,10 +2,13 @@ use crate::extraction_patterns::{
     AccumulationOp, AnalysisContext, ComplexityImpact, ExtractablePattern, ExtractionSuggestion,
     GuardCheck, MatchedPattern, Parameter, PatternMatcher, ReturnType, TransformStage,
 };
+use quote::ToTokens;
 use syn::{visit::Visit, Expr, File, Pat, Stmt};
 
 pub struct RustPatternMatcher {
     patterns: Vec<ExtractablePattern>,
+    source_lines: Vec<String>,
+    function_start_line: usize,
 }
 
 impl Default for RustPatternMatcher {
@@ -18,23 +21,36 @@ impl RustPatternMatcher {
     pub fn new() -> Self {
         Self {
             patterns: Vec::new(),
+            source_lines: Vec::new(),
+            function_start_line: 0,
+        }
+    }
+
+    pub fn with_source_context(source: &str, function_start_line: usize) -> Self {
+        Self {
+            patterns: Vec::new(),
+            source_lines: source.lines().map(|s| s.to_string()).collect(),
+            function_start_line,
         }
     }
 
     fn detect_accumulation_loops(&mut self, file: &File) {
-        let mut visitor = AccumulationLoopVisitor::new();
+        let mut visitor =
+            AccumulationLoopVisitor::with_context(&self.source_lines, self.function_start_line);
         visitor.visit_file(file);
         self.patterns.extend(visitor.patterns);
     }
 
     fn detect_guard_chains(&mut self, file: &File) {
-        let mut visitor = GuardChainVisitor::new();
+        let mut visitor =
+            GuardChainVisitor::with_context(&self.source_lines, self.function_start_line);
         visitor.visit_file(file);
         self.patterns.extend(visitor.patterns);
     }
 
     fn detect_transformation_pipelines(&mut self, file: &File) {
-        let mut visitor = PipelineVisitor::new();
+        let mut visitor =
+            PipelineVisitor::with_context(&self.source_lines, self.function_start_line);
         visitor.visit_file(file);
         self.patterns.extend(visitor.patterns);
     }
@@ -236,21 +252,32 @@ impl RustPatternMatcher {
     }
 }
 
-struct AccumulationLoopVisitor {
+struct AccumulationLoopVisitor<'a> {
     patterns: Vec<ExtractablePattern>,
-    current_line: usize,
+    source_lines: &'a [String],
+    function_start_line: usize,
 }
 
-impl AccumulationLoopVisitor {
-    fn new() -> Self {
+impl<'a> AccumulationLoopVisitor<'a> {
+    fn with_context(source_lines: &'a [String], function_start_line: usize) -> Self {
         Self {
             patterns: Vec::new(),
-            current_line: 0,
+            source_lines,
+            function_start_line,
         }
+    }
+
+    fn find_line_for_pattern(&self, pattern: &str) -> usize {
+        for (i, line) in self.source_lines.iter().enumerate() {
+            if line.contains(pattern) {
+                return self.function_start_line + i;
+            }
+        }
+        self.function_start_line
     }
 }
 
-impl<'ast> Visit<'ast> for AccumulationLoopVisitor {
+impl<'ast, 'a> Visit<'ast> for AccumulationLoopVisitor<'a> {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         if let Expr::ForLoop(for_loop) = expr {
             // Check if this is an accumulation pattern
@@ -267,14 +294,22 @@ impl<'ast> Visit<'ast> for AccumulationLoopVisitor {
                 }
 
                 if has_accumulation {
+                    // Find the actual line where the for loop starts
+                    let start_line =
+                        self.find_line_for_pattern(&format!("for {}", iterator_binding));
+
+                    // Count lines in the loop body
+                    let loop_body_lines = for_loop.body.stmts.len() + 2; // +2 for braces
+                    let end_line = start_line + loop_body_lines;
+
                     self.patterns.push(ExtractablePattern::AccumulationLoop {
                         iterator_binding,
                         accumulator: "acc".to_string(),
                         operation: AccumulationOp::Sum,
                         filter: None,
                         transform: None,
-                        start_line: self.current_line,
-                        end_line: self.current_line + 5, // Estimate
+                        start_line,
+                        end_line,
                     });
                 }
             }
@@ -284,23 +319,36 @@ impl<'ast> Visit<'ast> for AccumulationLoopVisitor {
     }
 }
 
-struct GuardChainVisitor {
+struct GuardChainVisitor<'a> {
     patterns: Vec<ExtractablePattern>,
     current_guards: Vec<GuardCheck>,
     in_function: bool,
+    source_lines: &'a [String],
+    function_start_line: usize,
 }
 
-impl GuardChainVisitor {
-    fn new() -> Self {
+impl<'a> GuardChainVisitor<'a> {
+    fn with_context(source_lines: &'a [String], function_start_line: usize) -> Self {
         Self {
             patterns: Vec::new(),
             current_guards: Vec::new(),
             in_function: false,
+            source_lines,
+            function_start_line,
         }
+    }
+
+    fn find_line_for_pattern(&self, pattern: &str) -> usize {
+        for (i, line) in self.source_lines.iter().enumerate() {
+            if line.contains(pattern) {
+                return self.function_start_line + i;
+            }
+        }
+        self.function_start_line
     }
 }
 
-impl<'ast> Visit<'ast> for GuardChainVisitor {
+impl<'ast, 'a> Visit<'ast> for GuardChainVisitor<'a> {
     fn visit_item_fn(&mut self, func: &'ast syn::ItemFn) {
         self.in_function = true;
         self.current_guards.clear();
@@ -310,14 +358,26 @@ impl<'ast> Visit<'ast> for GuardChainVisitor {
 
         // Check if we found guard chains
         if self.current_guards.len() >= 2 {
+            // Calculate actual line range for the guard sequence
+            let start_line = self
+                .current_guards
+                .first()
+                .map(|g| g.line)
+                .unwrap_or(self.function_start_line);
+            let end_line = self
+                .current_guards
+                .last()
+                .map(|g| g.line + 3) // Guard typically spans ~3 lines
+                .unwrap_or(start_line + 10);
+
             self.patterns.push(ExtractablePattern::GuardChainSequence {
                 checks: self.current_guards.clone(),
                 early_return: ReturnType {
                     type_name: "Result<()>".to_string(),
                     is_early_return: true,
                 },
-                start_line: 0,
-                end_line: 10,
+                start_line,
+                end_line,
             });
         }
 
@@ -336,10 +396,18 @@ impl<'ast> Visit<'ast> for GuardChainVisitor {
                     .any(|s| matches!(s, Stmt::Expr(Expr::Return(_), _)));
 
                 if has_early_return {
+                    // Extract a snippet of the condition for line searching
+                    let condition_snippet = if_expr.cond.to_token_stream().to_string();
+                    // Simplify the condition text for searching (remove spaces)
+                    let _condition_text = condition_snippet.replace(" ", "");
+
+                    // Find the actual line number, ensure at least line 1
+                    let line = self.find_line_for_pattern("if").max(1);
+
                     self.current_guards.push(GuardCheck {
-                        condition: "condition".to_string(), // Would extract actual condition
+                        condition: condition_snippet,
                         return_value: Some("Error".to_string()),
-                        line: 0,
+                        line,
                     });
                 }
             }
@@ -349,19 +417,32 @@ impl<'ast> Visit<'ast> for GuardChainVisitor {
     }
 }
 
-struct PipelineVisitor {
+struct PipelineVisitor<'a> {
     patterns: Vec<ExtractablePattern>,
+    source_lines: &'a [String],
+    function_start_line: usize,
 }
 
-impl PipelineVisitor {
-    fn new() -> Self {
+impl<'a> PipelineVisitor<'a> {
+    fn with_context(source_lines: &'a [String], function_start_line: usize) -> Self {
         Self {
             patterns: Vec::new(),
+            source_lines,
+            function_start_line,
         }
+    }
+
+    fn find_line_for_pattern(&self, pattern: &str) -> usize {
+        for (i, line) in self.source_lines.iter().enumerate() {
+            if line.contains(pattern) {
+                return self.function_start_line + i;
+            }
+        }
+        self.function_start_line
     }
 }
 
-impl<'ast> Visit<'ast> for PipelineVisitor {
+impl<'ast, 'a> Visit<'ast> for PipelineVisitor<'a> {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         if let Expr::MethodCall(_method) = expr {
             // Check for iterator chain patterns like .map().filter().collect()
@@ -382,13 +463,22 @@ impl<'ast> Visit<'ast> for PipelineVisitor {
             }
 
             if stages.len() >= 2 {
+                // Get a snippet of the pipeline to find its location
+                let pipeline_snippet = expr.to_token_stream().to_string();
+                let search_pattern = pipeline_snippet.chars().take(30).collect::<String>();
+
+                // Find the actual line numbers, ensure at least line 1
+                let start_line = self.find_line_for_pattern(&search_pattern).max(1);
+                let pipeline_lines = stages.len() + 2; // Estimate based on stage count
+                let end_line = start_line + pipeline_lines;
+
                 self.patterns
                     .push(ExtractablePattern::TransformationPipeline {
                         stages,
                         input_binding: "input".to_string(),
                         output_type: "Vec<T>".to_string(),
-                        start_line: 0,
-                        end_line: 5,
+                        start_line,
+                        end_line,
                     });
             }
         }

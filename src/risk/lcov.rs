@@ -8,6 +8,7 @@ pub struct FunctionCoverage {
     pub start_line: usize,
     pub execution_count: u64,
     pub coverage_percentage: f64,
+    pub uncovered_lines: Vec<usize>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -57,6 +58,7 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                         start_line: start_line as usize,
                         execution_count: 0,
                         coverage_percentage: 0.0,
+                        uncovered_lines: Vec::new(),
                     });
             }
 
@@ -114,11 +116,19 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                         let covered = func_lines.iter().filter(|(_, count)| **count > 0).count();
                         func.coverage_percentage =
                             (covered as f64 / func_lines.len() as f64) * 100.0;
+
+                        // Collect uncovered lines
+                        func.uncovered_lines = func_lines
+                            .iter()
+                            .filter(|(_, count)| **count == 0)
+                            .map(|(line, _)| **line)
+                            .collect();
                     } else if func.execution_count > 0 {
                         // If we have execution count but no line data, assume it's covered
                         func.coverage_percentage = 100.0;
+                        func.uncovered_lines.clear();
                     }
-                    // If no line data and no execution count, coverage remains 0.0
+                    // If no line data and no execution count, coverage remains 0.0 with no specific uncovered lines
                 }
 
                 // Save the file's data
@@ -220,6 +230,25 @@ impl LcovData {
                 sum / funcs.len() as f64 / 100.0 // Convert to fraction
             }
         })
+    }
+
+    /// Get uncovered lines for a specific function
+    pub fn get_function_uncovered_lines(
+        &self,
+        file: &Path,
+        function_name: &str,
+        line: usize,
+    ) -> Option<Vec<usize>> {
+        // Try exact match first, then use path normalization
+        self.functions
+            .get(file)
+            .or_else(|| find_functions_by_path(&self.functions, file))
+            .and_then(|funcs| {
+                // Try multiple matching strategies
+                find_function_by_name(funcs, function_name)
+                    .or_else(|| find_function_by_line_with_tolerance(funcs, line, 2))
+                    .map(|f| f.uncovered_lines.clone())
+            })
     }
 }
 

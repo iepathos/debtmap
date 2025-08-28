@@ -107,6 +107,14 @@ pub fn format_roi_display(roi_score: f64) -> String {
     }
 }
 
+pub fn format_priority_display(priority_score: f64) -> String {
+    if priority_score >= 10.0 {
+        format!("{priority_score:.0}")
+    } else {
+        format!("{priority_score:.1}")
+    }
+}
+
 pub fn determine_risk_level(current_risk: f64) -> &'static str {
     if current_risk >= 8.0 {
         "HIGH"
@@ -139,14 +147,14 @@ pub fn calculate_dash_count(header_len: usize, roi_label_len: usize) -> usize {
     82 - header_len - roi_label_len - 8 // Account for "┌─ " + " ─┐" + spaces
 }
 
-pub fn format_recommendation_box_header(index: usize, roi_display: &str) -> String {
+pub fn format_recommendation_box_header(index: usize, priority_display: &str) -> String {
     let index_num = index + 1;
     let header = format!("#{index_num}");
-    let roi_label = format!("ROI: {roi_display}");
-    let dash_count = calculate_dash_count(header.len(), roi_label.len());
+    let priority_label = format!("Priority: {priority_display}");
+    let dash_count = calculate_dash_count(header.len(), priority_label.len());
 
     let dashes = "─".repeat(dash_count);
-    format!("┌─ {header} {dashes} {roi_label} ─┐\n")
+    format!("┌─ {header} {dashes} {priority_label} ─┐\n")
 }
 
 pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -> String {
@@ -157,13 +165,13 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
     }
 
     output.push_str("🎯 TOP 5 TESTING RECOMMENDATIONS\n");
-    output.push_str("Ordered by ROI (Risk Reduction / Test Effort)\n");
+    output.push_str("Ordered by Risk Priority (Complexity × Coverage Gap × Dependencies)\n");
     output.push('\n');
 
     for (i, rec) in recommendations.iter().take(5).enumerate() {
-        let roi_score = rec.roi.unwrap_or(0.1);
+        let priority_score = rec.roi.unwrap_or(0.1); // Using existing field but treating as priority
         let risk_reduction = format_risk_reduction(rec.potential_risk_reduction);
-        let roi_display = format_roi_display(roi_score);
+        let priority_display = format_priority_display(priority_score);
 
         // Format file path with line number
         let file_str = rec.file.to_string_lossy();
@@ -184,7 +192,7 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
         let deps_info = format_dependency_info(rec.dependencies.len(), rec.dependents.len());
 
         // Create the top border with proper spacing
-        output.push_str(&format_recommendation_box_header(i, &roi_display));
+        output.push_str(&format_recommendation_box_header(i, &priority_display));
 
         // Function and location line - pad to 78 chars (82 - 4 for "│ " and " │")
         let func_name = &rec.function;
