@@ -217,8 +217,7 @@ impl ExtractionAnalyzer for UnifiedExtractionAnalyzer {
                 // Read source and create context-aware matcher
                 if let Ok(source) = crate::io::read_file(&func.file) {
                     use crate::extraction_patterns::language_specific::RustPatternMatcher;
-                    let matcher =
-                        RustPatternMatcher::with_source_context(&source, func.line);
+                    let matcher = RustPatternMatcher::with_source_context(&source, func.line);
                     let patterns = matcher.match_patterns(&ast, &context);
                     patterns
                         .into_iter()

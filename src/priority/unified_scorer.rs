@@ -1446,7 +1446,7 @@ fn generate_testing_gap_recommendation(
     let coverage_pct_int = (coverage_pct * 100.0) as i32;
     let role_str = format_role_description(role);
     let coverage_gap = 100 - coverage_pct_int;
-    
+
     // If function is fully covered, no testing gap exists
     if coverage_gap == 0 {
         let role_display = match role {
@@ -1457,7 +1457,7 @@ fn generate_testing_gap_recommendation(
             FunctionRole::PatternMatch => "Pattern matching",
             FunctionRole::Unknown => "Function",
         };
-        
+
         return (
             "Maintain test coverage".to_string(),
             format!("{} function is currently 100% covered", role_display),
@@ -1517,7 +1517,8 @@ fn generate_testing_gap_recommendation(
         };
 
         // Calculate approximate test cases needed (minimum 2 for basic happy/error paths)
-        let test_cases_needed = ((cyclomatic.max(2) as f64 * (1.0 - coverage_pct)).ceil() as u32).max(2);
+        let test_cases_needed =
+            ((cyclomatic.max(2) as f64 * (1.0 - coverage_pct)).ceil() as u32).max(2);
 
         let coverage_explanation = if coverage_pct_int == 0 {
             format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} test cases to cover all {} execution paths",
@@ -3494,7 +3495,7 @@ mod tests {
         );
         assert!(rationale.contains("75% gap")); // 100 - 25 = 75% gap
         assert_eq!(steps.len(), 12); // Complex functions generate more detailed steps
-        // Step checking removed as step order may vary
+                                     // Step checking removed as step order may vary
     }
 
     #[test]
@@ -3515,7 +3516,7 @@ mod tests {
         );
         assert!(rationale.contains("50% gap")); // 100 - 50 = 50% gap
         assert_eq!(steps.len(), 12); // Complex functions generate more detailed steps
-        // Step checking removed as step order may vary
+                                     // Step checking removed as step order may vary
     }
 
     #[test]
@@ -3540,7 +3541,7 @@ mod tests {
         let (action, rationale, steps) =
             test_generate_testing_gap_recommendation_helper(0.75, 3, 5, FunctionRole::Orchestrator);
 
-        // New format says "Add X tests for Y% coverage gap" 
+        // New format says "Add X tests for Y% coverage gap"
         // With cyclomatic 3 and 75% coverage, needs (3 * 0.25) = 0.75 → 1, but min is 2
         assert_eq!(action, "Add 2 tests for 25% coverage gap");
         assert!(rationale.contains("Orchestration"));
@@ -3610,7 +3611,7 @@ mod tests {
         );
         assert!(rationale.contains("90%")); // 100 - 10 = 90% gap
         assert_eq!(steps.len(), 12); // Complex functions generate more detailed steps
-        // Steps have changed format, checking for test-related content
+                                     // Steps have changed format, checking for test-related content
         assert!(steps
             .iter()
             .any(|s| s.contains("test") || s.contains("Test")));
@@ -3881,9 +3882,15 @@ mod tests {
             rec.implementation_steps
         );
         // Verify key content exists somewhere in steps
-        assert!(rec.implementation_steps.iter().any(|s| s.contains("logical sections") || s.contains("function")));
+        assert!(rec
+            .implementation_steps
+            .iter()
+            .any(|s| s.contains("logical sections") || s.contains("function")));
         // Pattern matching may not always be present depending on complexity analysis
-        assert!(rec.implementation_steps.iter().any(|s| s.contains(".map()") || s.contains("pure functions")));
+        assert!(rec
+            .implementation_steps
+            .iter()
+            .any(|s| s.contains(".map()") || s.contains("pure functions")));
         // Check that test step exists when coverage is unknown
         let has_test_step = rec
             .implementation_steps

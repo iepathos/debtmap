@@ -305,20 +305,20 @@ pub fn format_priority_item_with_verbosity(
     // Add coverage details section when coverage data is available and function has incomplete coverage
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
-        
+
         // Show coverage details for functions with less than 100% coverage that have uncovered lines
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() {
             writeln!(output, "├─ COVERAGE DETAILS:").unwrap();
-            
+
             // Sort the uncovered lines first
             let mut sorted_lines = trans_cov.uncovered_lines.clone();
             sorted_lines.sort_unstable();
-            
+
             // Group consecutive lines into ranges for better readability
             let mut ranges = Vec::new();
             let mut current_start = sorted_lines[0];
             let mut current_end = sorted_lines[0];
-            
+
             for &line in &sorted_lines[1..] {
                 if line == current_end + 1 {
                     current_end = line;
@@ -329,27 +329,32 @@ pub fn format_priority_item_with_verbosity(
                 }
             }
             ranges.push((current_start, current_end));
-            
+
             // Format uncovered lines/ranges
-            let formatted_ranges: Vec<String> = ranges.iter().map(|&(start, end)| {
-                if start == end {
-                    format!("{}", start)
-                } else {
-                    format!("{}-{}", start, end)
-                }
-            }).collect();
-            
+            let formatted_ranges: Vec<String> = ranges
+                .iter()
+                .map(|&(start, end)| {
+                    if start == end {
+                        format!("{}", start)
+                    } else {
+                        format!("{}-{}", start, end)
+                    }
+                })
+                .collect();
+
             // Display uncovered lines in a compact format
             let lines_str = if formatted_ranges.len() <= 10 {
                 formatted_ranges.join(", ")
             } else {
-                format!("{}, ... ({} total uncovered lines)", 
+                format!(
+                    "{}, ... ({} total uncovered lines)",
                     formatted_ranges[..10].join(", "),
-                    sorted_lines.len())
+                    sorted_lines.len()
+                )
             };
-            
+
             writeln!(output, "│  ├─ Uncovered lines: {}", lines_str.bright_red()).unwrap();
-            
+
             // Provide specific branch coverage recommendations based on pattern
             let branch_recommendations = analyze_coverage_gaps(&sorted_lines, item);
             if !branch_recommendations.is_empty() {
@@ -360,7 +365,7 @@ pub fn format_priority_item_with_verbosity(
             }
         }
     }
-    
+
     // Add rationale
     writeln!(output, "└─ WHY: {}", item.recommendation.rationale.dimmed()).unwrap();
 }
@@ -368,58 +373,74 @@ pub fn format_priority_item_with_verbosity(
 /// Analyze coverage gaps to provide specific testing recommendations
 fn analyze_coverage_gaps(uncovered_lines: &[usize], item: &UnifiedDebtItem) -> Vec<String> {
     let mut recommendations = Vec::new();
-    
+
     // Check for patterns in uncovered lines
     let line_count = uncovered_lines.len();
-    
+
     // Large contiguous blocks suggest untested branches
     let mut max_consecutive = 0;
     let mut current_consecutive = 1;
     for i in 1..uncovered_lines.len() {
-        if uncovered_lines[i] == uncovered_lines[i-1] + 1 {
+        if uncovered_lines[i] == uncovered_lines[i - 1] + 1 {
             current_consecutive += 1;
             max_consecutive = max_consecutive.max(current_consecutive);
         } else {
             current_consecutive = 1;
         }
     }
-    
+
     if max_consecutive >= 5 {
-        recommendations.push(format!("Large uncovered block ({} consecutive lines) - likely an entire conditional branch", max_consecutive));
+        recommendations.push(format!(
+            "Large uncovered block ({} consecutive lines) - likely an entire conditional branch",
+            max_consecutive
+        ));
     }
-    
+
     // Many scattered lines suggest missing edge cases
     if line_count > 10 && max_consecutive < 3 {
-        recommendations.push("Scattered uncovered lines - consider testing edge cases and error conditions".to_string());
+        recommendations.push(
+            "Scattered uncovered lines - consider testing edge cases and error conditions"
+                .to_string(),
+        );
     }
-    
+
     // Check complexity vs coverage
     if item.cyclomatic_complexity > 10 && line_count > 0 {
-        let branch_coverage_estimate = 1.0 - (line_count as f32 / (item.cyclomatic_complexity * 2) as f32);
+        let branch_coverage_estimate =
+            1.0 - (line_count as f32 / (item.cyclomatic_complexity * 2) as f32);
         if branch_coverage_estimate < 0.5 {
-            recommendations.push(format!("Low branch coverage (est. <50%) with {} branches - prioritize testing main paths", item.cyclomatic_complexity));
+            recommendations.push(format!(
+                "Low branch coverage (est. <50%) with {} branches - prioritize testing main paths",
+                item.cyclomatic_complexity
+            ));
         }
     }
-    
+
     // Specific recommendations based on debt type
     match &item.debt_type {
         crate::priority::DebtType::ComplexityHotspot { .. } => {
             if line_count > 0 {
-                recommendations.push("Complex function - focus tests on boundary conditions and error paths".to_string());
+                recommendations.push(
+                    "Complex function - focus tests on boundary conditions and error paths"
+                        .to_string(),
+                );
             }
         }
         crate::priority::DebtType::Risk { .. } => {
             if line_count > 0 {
-                recommendations.push("High-risk function - ensure all error handling paths are tested".to_string());
+                recommendations.push(
+                    "High-risk function - ensure all error handling paths are tested".to_string(),
+                );
             }
         }
         crate::priority::DebtType::TestingGap { .. } => {
             if line_count > 0 {
-                recommendations.push("Testing gap - add tests covering the uncovered branches".to_string());
+                recommendations
+                    .push("Testing gap - add tests covering the uncovered branches".to_string());
             }
         }
         _ => {}
     }
-    
+
     recommendations
 }
