@@ -51,13 +51,13 @@ clean:
 
 # === TESTING ===
 
-# Run all tests (using cargo test instead of nextest due to hanging issues)
+# Run all tests with nextest for faster execution
 test:
     cargo build
-    @echo "Running tests with cargo test..."
-    SKIP_INTEGRATION_TESTS=1 cargo test --lib
+    @echo "Running tests with cargo nextest..."
+    SKIP_INTEGRATION_TESTS=1 cargo nextest run --lib
     @echo "Running safe integration tests..."
-    SKIP_INTEGRATION_TESTS=1 cargo test --test analyzer_tests \
+    SKIP_INTEGRATION_TESTS=1 cargo nextest run --test analyzer_tests \
         --test complexity_tests --test core_metrics_tests \
         --test debt_tests --test entropy_tests
 

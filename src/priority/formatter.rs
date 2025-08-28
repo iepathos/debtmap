@@ -200,8 +200,7 @@ fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     output
 }
 
-#[allow(dead_code)]
-fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
+pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
     let severity = get_severity_label(item.unified_score.final_score);
     let severity_color = get_severity_color(item.unified_score.final_score);
 
@@ -209,14 +208,15 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         output,
         "#{} {} [{}]",
         rank.to_string().bright_cyan().bold(),
-        format!("SCORE: {:.2}", item.unified_score.final_score).bright_white(),
+        format!("SCORE: {:.2}", item.unified_score.final_score).bright_yellow(),
         severity.color(severity_color).bold()
     )
     .unwrap();
 
     writeln!(
         output,
-        "├─ LOCATION: {}:{} {}()",
+        "{} {}:{} {}()",
+        "├─ LOCATION:".bright_blue(),
         item.location.file.display(),
         item.location.line,
         item.location.function.bright_green()
@@ -225,14 +225,16 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
 
     writeln!(
         output,
-        "├─ ACTION: {}",
-        item.recommendation.primary_action.bright_white()
+        "{} {}",
+        "├─ ACTION:".bright_blue(),
+        item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
 
     writeln!(
         output,
-        "├─ IMPACT: {}",
+        "{} {}",
+        "├─ IMPACT:".bright_blue(),
         format_impact(&item.expected_impact).bright_cyan()
     )
     .unwrap();
@@ -242,11 +244,12 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     if cyclomatic > 0 || cognitive > 0 {
         writeln!(
             output,
-            "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}",
-            cyclomatic.to_string().dimmed(),
-            branch_count.to_string().dimmed(),
-            cognitive.to_string().dimmed(),
-            nesting.to_string().dimmed()
+            "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
+            "├─ COMPLEXITY:".bright_blue(),
+            cyclomatic.to_string().yellow(),
+            branch_count.to_string().yellow(),
+            cognitive.to_string().yellow(),
+            nesting.to_string().yellow()
         )
         .unwrap();
     }
@@ -256,9 +259,10 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
     if upstream > 0 || downstream > 0 {
         writeln!(
             output,
-            "├─ DEPENDENCIES: {} upstream, {} downstream",
-            upstream.to_string().dimmed(),
-            downstream.to_string().dimmed()
+            "{} {} upstream, {} downstream",
+            "├─ DEPENDENCIES:".bright_blue(),
+            upstream.to_string().cyan(),
+            downstream.to_string().cyan()
         )
         .unwrap();
 
@@ -273,7 +277,7 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
                     item.upstream_callers.len() - 3
                 )
             };
-            writeln!(output, "│  ├─ CALLERS: {}", callers_display.bright_blue()).unwrap();
+            writeln!(output, "│  ├─ CALLERS: {}", callers_display.cyan()).unwrap();
         }
 
         // Add downstream callees if present
@@ -287,7 +291,7 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
                     item.downstream_callees.len() - 3
                 )
             };
-            writeln!(output, "│  └─ CALLS: {}", callees_display.bright_green()).unwrap();
+            writeln!(output, "│  └─ CALLS: {}", callees_display.bright_magenta()).unwrap();
         }
     }
 
@@ -306,11 +310,17 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         .unwrap();
 
         for hint in usage_hints {
-            writeln!(output, "│  • {}", hint.dimmed()).unwrap();
+            writeln!(output, "│  • {}", hint.bright_white()).unwrap();
         }
     }
 
-    writeln!(output, "└─ WHY: {}", item.recommendation.rationale.dimmed()).unwrap();
+    writeln!(
+        output,
+        "{} {}",
+        "└─ WHY:".bright_blue(),
+        item.recommendation.rationale
+    )
+    .unwrap();
 }
 
 #[allow(dead_code)]

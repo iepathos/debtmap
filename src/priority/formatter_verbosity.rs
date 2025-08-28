@@ -81,20 +81,25 @@ pub fn format_priority_item_with_verbosity(
             output,
             "#{} {} [{}]",
             rank.to_string().bright_cyan().bold(),
-            format!("SCORE: {:.2}", item.unified_score.final_score).bright_white(),
+            format!("SCORE: {:.2}", item.unified_score.final_score).bright_yellow(),
             severity.color(severity_color).bold()
         )
         .unwrap();
 
         if !factors.is_empty() {
-            writeln!(output, "   ↳ Main factors: {}", factors.join(", ").dimmed()).unwrap();
+            writeln!(
+                output,
+                "   ↳ Main factors: {}",
+                factors.join(", ").bright_white()
+            )
+            .unwrap();
         }
     } else {
         writeln!(
             output,
             "#{} {} [{}]",
             rank.to_string().bright_cyan().bold(),
-            format!("SCORE: {:.2}", item.unified_score.final_score).bright_white(),
+            format!("SCORE: {:.2}", item.unified_score.final_score).bright_yellow(),
             severity.color(severity_color).bold()
         )
         .unwrap();
@@ -210,7 +215,8 @@ pub fn format_priority_item_with_verbosity(
     // Rest of the item formatting remains the same
     writeln!(
         output,
-        "├─ LOCATION: {}:{} {}()",
+        "{} {}:{} {}()",
+        "├─ LOCATION:".bright_blue(),
         item.location.file.display(),
         item.location.line,
         item.location.function.bright_green()
@@ -219,14 +225,16 @@ pub fn format_priority_item_with_verbosity(
 
     writeln!(
         output,
-        "├─ ACTION: {}",
-        item.recommendation.primary_action.bright_white()
+        "{} {}",
+        "├─ ACTION:".bright_blue(),
+        item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
 
     writeln!(
         output,
-        "├─ IMPACT: {}",
+        "{} {}",
+        "├─ IMPACT:".bright_blue(),
         crate::priority::formatter::format_impact(&item.expected_impact).bright_cyan()
     )
     .unwrap();
@@ -239,23 +247,25 @@ pub fn format_priority_item_with_verbosity(
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "├─ COMPLEXITY: cyclomatic={} (adj:{}), branches={}, cognitive={}, nesting={}, entropy={:.2}",
-                cyclomatic.to_string().dimmed(),
-                entropy.adjusted_complexity.to_string().dimmed(),
-                branch_count.to_string().dimmed(),
-                cognitive.to_string().dimmed(),
-                nesting.to_string().dimmed(),
+                "{} cyclomatic={} (adj:{}), branches={}, cognitive={}, nesting={}, entropy={:.2}",
+                "├─ COMPLEXITY:".bright_blue(),
+                cyclomatic.to_string().yellow(),
+                entropy.adjusted_complexity.to_string().yellow(),
+                branch_count.to_string().yellow(),
+                cognitive.to_string().yellow(),
+                nesting.to_string().yellow(),
                 entropy.entropy_score
             )
             .unwrap();
         } else {
             writeln!(
                 output,
-                "├─ COMPLEXITY: cyclomatic={}, branches={}, cognitive={}, nesting={}",
-                cyclomatic.to_string().dimmed(),
-                branch_count.to_string().dimmed(),
-                cognitive.to_string().dimmed(),
-                nesting.to_string().dimmed()
+                "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
+                "├─ COMPLEXITY:".bright_blue(),
+                cyclomatic.to_string().yellow(),
+                branch_count.to_string().yellow(),
+                cognitive.to_string().yellow(),
+                nesting.to_string().yellow()
             )
             .unwrap();
         }
@@ -266,9 +276,10 @@ pub fn format_priority_item_with_verbosity(
     if upstream > 0 || downstream > 0 {
         writeln!(
             output,
-            "├─ DEPENDENCIES: {} upstream, {} downstream",
-            upstream.to_string().dimmed(),
-            downstream.to_string().dimmed()
+            "{} {} upstream, {} downstream",
+            "├─ DEPENDENCIES:".bright_blue(),
+            upstream.to_string().cyan(),
+            downstream.to_string().cyan()
         )
         .unwrap();
 
@@ -283,7 +294,7 @@ pub fn format_priority_item_with_verbosity(
                     item.upstream_callers.len() - 3
                 )
             };
-            writeln!(output, "│  ├─ CALLERS: {}", callers_display.bright_blue()).unwrap();
+            writeln!(output, "│  ├─ CALLERS: {}", callers_display.cyan()).unwrap();
         }
 
         // Add downstream callees if present
@@ -307,7 +318,7 @@ pub fn format_priority_item_with_verbosity(
 
         // Show coverage details for functions with less than 100% coverage that have uncovered lines
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() {
-            writeln!(output, "├─ COVERAGE DETAILS:").unwrap();
+            writeln!(output, "{}", "├─ COVERAGE DETAILS:".bright_blue()).unwrap();
 
             // Sort the uncovered lines first
             let mut sorted_lines = trans_cov.uncovered_lines.clone();
@@ -366,7 +377,13 @@ pub fn format_priority_item_with_verbosity(
     }
 
     // Add rationale
-    writeln!(output, "└─ WHY: {}", item.recommendation.rationale.dimmed()).unwrap();
+    writeln!(
+        output,
+        "{} {}",
+        "└─ WHY:".bright_blue(),
+        item.recommendation.rationale
+    )
+    .unwrap();
 }
 
 /// Analyze coverage gaps to provide specific testing recommendations
