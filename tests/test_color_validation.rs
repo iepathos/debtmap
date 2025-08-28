@@ -43,57 +43,79 @@ fn test_why_text_is_not_dimmed() {
 }
 
 #[test]
-fn verify_formatter_uses_bright_white() {
+fn verify_formatter_uses_correct_colors() {
     use std::fs;
 
-    // Read the formatter source files to verify they use bright_white for WHY
+    // Read the formatter source files to verify color usage
     let formatter_content =
         fs::read_to_string("src/priority/formatter.rs").expect("Could not read formatter.rs");
     let formatter_verbosity_content = fs::read_to_string("src/priority/formatter_verbosity.rs")
         .expect("Could not read formatter_verbosity.rs");
 
-    // Check that WHY uses bright_white, not dimmed
-    let formatter_has_bright_white = formatter_content.contains("rationale.bright_white()");
+    // Check that WHY label uses bright_blue and rationale uses no color (plain text)
+    let formatter_why_label_blue = formatter_content.contains("\"└─ WHY:\".bright_blue()");
     let formatter_has_dimmed = formatter_content.contains("rationale.dimmed()");
-
-    let verbosity_has_bright_white =
-        formatter_verbosity_content.contains("rationale.bright_white()");
+    let formatter_has_bright_white = formatter_content.contains("rationale.bright_white()");
+    
+    let verbosity_why_label_blue = formatter_verbosity_content.contains("\"└─ WHY:\".bright_blue()");
     let verbosity_has_dimmed = formatter_verbosity_content.contains("rationale.dimmed()");
+    let verbosity_has_bright_white = formatter_verbosity_content.contains("rationale.bright_white()");
 
     println!("Formatter check:");
     println!(
-        "  formatter.rs uses bright_white for rationale: {}",
-        formatter_has_bright_white
+        "  formatter.rs WHY label uses bright_blue: {}",
+        formatter_why_label_blue
     );
     println!(
         "  formatter.rs uses dimmed for rationale: {}",
         formatter_has_dimmed
     );
     println!(
-        "  formatter_verbosity.rs uses bright_white for rationale: {}",
-        verbosity_has_bright_white
+        "  formatter.rs uses bright_white for rationale: {}",
+        formatter_has_bright_white
+    );
+    println!(
+        "  formatter_verbosity.rs WHY label uses bright_blue: {}",
+        verbosity_why_label_blue
     );
     println!(
         "  formatter_verbosity.rs uses dimmed for rationale: {}",
         verbosity_has_dimmed
     );
+    println!(
+        "  formatter_verbosity.rs uses bright_white for rationale: {}",
+        verbosity_has_bright_white
+    );
 
+    // Verify correct implementation:
+    // - WHY label should use bright_blue
+    // - Rationale should NOT use dimmed (hard to read)
+    // - Rationale should use plain text (no color modifier) for best readability
     assert!(
-        formatter_has_bright_white,
-        "formatter.rs should use bright_white() for rationale"
+        formatter_why_label_blue,
+        "formatter.rs should use bright_blue() for WHY label"
     );
     assert!(
         !formatter_has_dimmed,
         "formatter.rs should NOT use dimmed() for rationale"
     );
     assert!(
-        verbosity_has_bright_white,
-        "formatter_verbosity.rs should use bright_white() for rationale"
+        !formatter_has_bright_white,
+        "formatter.rs should NOT use bright_white() for rationale (appears grey on some terminals)"
+    );
+    
+    assert!(
+        verbosity_why_label_blue,
+        "formatter_verbosity.rs should use bright_blue() for WHY label"
     );
     assert!(
         !verbosity_has_dimmed,
         "formatter_verbosity.rs should NOT use dimmed() for rationale"
     );
+    assert!(
+        !verbosity_has_bright_white,
+        "formatter_verbosity.rs should NOT use bright_white() for rationale (appears grey on some terminals)"
+    );
 
-    println!("\n✓ Both formatters correctly use bright_white() for WHY text");
+    println!("\n✓ Both formatters correctly use bright_blue for labels and plain text for rationale");
 }
