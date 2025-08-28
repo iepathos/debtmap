@@ -572,7 +572,7 @@ impl Default for EntropyConfig {
 }
 
 fn default_entropy_enabled() -> bool {
-    false // Opt-in by default
+    true // Enabled by default for better match statement handling
 }
 
 fn default_entropy_weight() -> f64 {

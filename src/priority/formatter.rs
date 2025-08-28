@@ -37,12 +37,13 @@ fn format_default_with_verbosity(
     verbosity: u8,
 ) -> String {
     let mut output = String::new();
+    let version = env!("CARGO_PKG_VERSION");
 
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
-        "PRIORITY TECHNICAL DEBT FIXES".bright_white().bold()
+        format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
@@ -93,12 +94,13 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
 
 fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u8) -> String {
     let mut output = String::new();
+    let version = env!("CARGO_PKG_VERSION");
 
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
-        "LOWEST PRIORITY ITEMS".bright_white().bold()
+        format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
@@ -118,12 +120,13 @@ fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u
 #[allow(dead_code)]
 fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     let mut output = String::new();
+    let version = env!("CARGO_PKG_VERSION");
 
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
-        "LOWEST PRIORITY TECHNICAL DEBT".bright_white().bold()
+        format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
@@ -181,12 +184,13 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
 #[allow(dead_code)]
 fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     let mut output = String::new();
+    let version = env!("CARGO_PKG_VERSION");
 
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
-        "UNIFIED PRIORITY ANALYSIS".bright_white().bold()
+        format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
     writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
@@ -643,7 +647,7 @@ mod tests {
         // Strip ANSI color codes for testing
         let output_plain = strip_ansi_codes(&output);
 
-        assert!(output_plain.contains("PRIORITY TECHNICAL DEBT FIXES"));
+        assert!(output_plain.contains("Debtmap v"));
         assert!(output_plain.contains("TOP 2 RECOMMENDATIONS"));
         assert!(output_plain.contains("SCORE: 9.0"));
         assert!(output_plain.contains("[CRITICAL]"));

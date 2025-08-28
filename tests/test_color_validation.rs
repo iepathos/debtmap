@@ -56,10 +56,12 @@ fn verify_formatter_uses_correct_colors() {
     let formatter_why_label_blue = formatter_content.contains("\"└─ WHY:\".bright_blue()");
     let formatter_has_dimmed = formatter_content.contains("rationale.dimmed()");
     let formatter_has_bright_white = formatter_content.contains("rationale.bright_white()");
-    
-    let verbosity_why_label_blue = formatter_verbosity_content.contains("\"└─ WHY:\".bright_blue()");
+
+    let verbosity_why_label_blue =
+        formatter_verbosity_content.contains("\"└─ WHY:\".bright_blue()");
     let verbosity_has_dimmed = formatter_verbosity_content.contains("rationale.dimmed()");
-    let verbosity_has_bright_white = formatter_verbosity_content.contains("rationale.bright_white()");
+    let verbosity_has_bright_white =
+        formatter_verbosity_content.contains("rationale.bright_white()");
 
     println!("Formatter check:");
     println!(
@@ -103,7 +105,7 @@ fn verify_formatter_uses_correct_colors() {
         !formatter_has_bright_white,
         "formatter.rs should NOT use bright_white() for rationale (appears grey on some terminals)"
     );
-    
+
     assert!(
         verbosity_why_label_blue,
         "formatter_verbosity.rs should use bright_blue() for WHY label"
@@ -117,5 +119,7 @@ fn verify_formatter_uses_correct_colors() {
         "formatter_verbosity.rs should NOT use bright_white() for rationale (appears grey on some terminals)"
     );
 
-    println!("\n✓ Both formatters correctly use bright_blue for labels and plain text for rationale");
+    println!(
+        "\n✓ Both formatters correctly use bright_blue for labels and plain text for rationale"
+    );
 }
