@@ -2231,7 +2231,7 @@ fn generate_heuristic_recommendations_with_line_estimates(
     };
 
     let extraction_reasoning = format!(
-        "Extracting {} functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases",
+        "Extracting {} functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases.",
         functions_to_extract
     );
 
