@@ -216,8 +216,7 @@ fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
 
     writeln!(
         output,
-        "├─ {}: {}:{} {}()",
-        format_debt_type(&item.debt_type).bright_yellow(),
+        "├─ LOCATION: {}:{} {}()",
         item.location.file.display(),
         item.location.line,
         item.location.function.bright_green()

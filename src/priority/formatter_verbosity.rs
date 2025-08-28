@@ -210,8 +210,7 @@ pub fn format_priority_item_with_verbosity(
     // Rest of the item formatting remains the same
     writeln!(
         output,
-        "├─ {}: {}:{} {}()",
-        crate::priority::formatter::format_debt_type(&item.debt_type).bright_yellow(),
+        "├─ LOCATION: {}:{} {}()",
         item.location.file.display(),
         item.location.line,
         item.location.function.bright_green()
