@@ -113,6 +113,14 @@ pub enum Commands {
         /// Complexity threshold preset (strict, balanced, lenient)
         #[arg(long = "threshold-preset", value_enum)]
         threshold_preset: Option<ThresholdPreset>,
+
+        /// Enable enhanced markdown format with rich features
+        #[arg(long = "markdown-enhanced")]
+        markdown_enhanced: bool,
+
+        /// Detail level for enhanced markdown (summary, standard, detailed, complete)
+        #[arg(long = "markdown-detail", default_value = "standard")]
+        markdown_detail: String,
     },
 
     /// Initialize configuration file
