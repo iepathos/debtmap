@@ -2,6 +2,106 @@ use crate::priority::{call_graph::CallGraph, call_graph::FunctionId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+mod function_id_serde {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap as StdHashMap;
+
+    pub fn serialize<S, V>(
+        map: &HashMap<FunctionId, V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        V: Serialize,
+    {
+        let string_map: StdHashMap<String, &V> = map
+            .iter()
+            .map(|(k, v)| (format!("{}:{}:{}", k.file.display(), k.name, k.line), v))
+            .collect();
+        string_map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<HashMap<FunctionId, V>, D::Error>
+    where
+        D: Deserializer<'de>,
+        V: Deserialize<'de>,
+    {
+        let string_map: StdHashMap<String, V> = StdHashMap::deserialize(deserializer)?;
+        let mut result = HashMap::new();
+        for (key, value) in string_map {
+            let parts: Vec<&str> = key.rsplitn(3, ':').collect();
+            if parts.len() == 3 {
+                let func_id = FunctionId {
+                    file: parts[2].into(),
+                    name: parts[1].to_string(),
+                    line: parts[0].parse().unwrap_or(0),
+                };
+                result.insert(func_id, value);
+            }
+        }
+        Ok(result)
+    }
+}
+
+mod function_id_tuple_serde {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap as StdHashMap;
+
+    pub fn serialize<S, V>(
+        map: &HashMap<(FunctionId, FunctionId), V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        V: Serialize,
+    {
+        let string_map: StdHashMap<String, &V> = map
+            .iter()
+            .map(|((k1, k2), v)| {
+                let key = format!(
+                    "{}:{}:{}|{}:{}:{}",
+                    k1.file.display(), k1.name, k1.line,
+                    k2.file.display(), k2.name, k2.line
+                );
+                (key, v)
+            })
+            .collect();
+        string_map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<HashMap<(FunctionId, FunctionId), V>, D::Error>
+    where
+        D: Deserializer<'de>,
+        V: Deserialize<'de>,
+    {
+        let string_map: StdHashMap<String, V> = StdHashMap::deserialize(deserializer)?;
+        let mut result = HashMap::new();
+        for (key, value) in string_map {
+            let parts: Vec<&str> = key.split('|').collect();
+            if parts.len() == 2 {
+                let parts1: Vec<&str> = parts[0].rsplitn(3, ':').collect();
+                let parts2: Vec<&str> = parts[1].rsplitn(3, ':').collect();
+                if parts1.len() == 3 && parts2.len() == 3 {
+                    let func_id1 = FunctionId {
+                        file: parts1[2].into(),
+                        name: parts1[1].to_string(),
+                        line: parts1[0].parse().unwrap_or(0),
+                    };
+                    let func_id2 = FunctionId {
+                        file: parts2[2].into(),
+                        name: parts2[1].to_string(),
+                        line: parts2[0].parse().unwrap_or(0),
+                    };
+                    result.insert((func_id1, func_id2), value);
+                }
+            }
+        }
+        Ok(result)
+    }
+}
+
 /// DataFlowGraph provides data flow analysis capabilities built on top of the CallGraph.
 /// It tracks variable dependencies, data transformations, and information flow between functions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,12 +109,16 @@ pub struct DataFlowGraph {
     /// The underlying call graph that tracks function relationships
     call_graph: CallGraph,
     /// Variable dependencies within each function (function_id -> set of variables)
+    #[serde(with = "function_id_serde")]
     variable_deps: HashMap<FunctionId, HashSet<String>>,
     /// Data transformations tracked between functions
+    #[serde(with = "function_id_tuple_serde")]
     data_transformations: HashMap<(FunctionId, FunctionId), DataTransformation>,
     /// I/O operations detected in functions
+    #[serde(with = "function_id_serde")]
     io_operations: HashMap<FunctionId, Vec<IoOperation>>,
     /// Pure function analysis results
+    #[serde(with = "function_id_serde")]
     purity_analysis: HashMap<FunctionId, PurityInfo>,
 }
 
