@@ -7,10 +7,7 @@ mod function_id_serde {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::collections::HashMap as StdHashMap;
 
-    pub fn serialize<S, V>(
-        map: &HashMap<FunctionId, V>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S, V>(map: &HashMap<FunctionId, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
         V: Serialize,
@@ -62,8 +59,12 @@ mod function_id_tuple_serde {
             .map(|((k1, k2), v)| {
                 let key = format!(
                     "{}:{}:{}|{}:{}:{}",
-                    k1.file.display(), k1.name, k1.line,
-                    k2.file.display(), k2.name, k2.line
+                    k1.file.display(),
+                    k1.name,
+                    k1.line,
+                    k2.file.display(),
+                    k2.name,
+                    k2.line
                 );
                 (key, v)
             })
@@ -71,7 +72,9 @@ mod function_id_tuple_serde {
         string_map.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D, V>(deserializer: D) -> Result<HashMap<(FunctionId, FunctionId), V>, D::Error>
+    pub fn deserialize<'de, D, V>(
+        deserializer: D,
+    ) -> Result<HashMap<(FunctionId, FunctionId), V>, D::Error>
     where
         D: Deserializer<'de>,
         V: Deserialize<'de>,
