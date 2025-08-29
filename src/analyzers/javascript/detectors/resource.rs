@@ -412,11 +412,11 @@ fn extract_observer_locations(
     let mut observer_count = HashMap::new();
     let mut cursor = QueryCursor::new();
     let mut matches = cursor.matches(query, root, source.as_bytes());
-    
+
     while let Some(match_) = matches.next() {
         if let Some(constructor) = match_.captures.iter().find(|c| c.index == 0) {
             let constructor_name = get_node_text(constructor.node, source);
-            
+
             if is_observer_type(constructor_name) {
                 let location = SourceLocation::from_node(match_.captures.last().unwrap().node);
                 observer_count
@@ -426,7 +426,7 @@ fn extract_observer_locations(
             }
         }
     }
-    
+
     observer_count
 }
 
@@ -450,10 +450,12 @@ fn identify_leaked_observers(
         .into_iter()
         .filter(|(_, locations)| locations.len() > disconnect_count)
         .filter_map(|(observer_type, locations)| {
-            locations.first().map(|location| ResourceManagementIssue::ObserverLeak {
-                location: location.clone(),
-                observer_type,
-            })
+            locations
+                .first()
+                .map(|location| ResourceManagementIssue::ObserverLeak {
+                    location: location.clone(),
+                    observer_type,
+                })
         })
         .collect()
 }
@@ -563,7 +565,7 @@ mod tests {
         assert!(is_observer_type("IntersectionObserver"));
         assert!(is_observer_type("ResizeObserver"));
         assert!(is_observer_type("PerformanceObserver"));
-        
+
         // Test invalid observer types
         assert!(!is_observer_type("Observer"));
         assert!(!is_observer_type("CustomObserver"));
@@ -583,7 +585,7 @@ mod tests {
                 end_column: Some(15),
             }],
         );
-        
+
         // One observer, one disconnect - no leak
         let leaked = identify_leaked_observers(observer_count, 1);
         assert!(leaked.is_empty());
@@ -602,11 +604,11 @@ mod tests {
             "MutationObserver".to_string(),
             vec![location.clone(), location.clone()],
         );
-        
+
         // Two observers, one disconnect - one leak
         let leaked = identify_leaked_observers(observer_count, 1);
         assert_eq!(leaked.len(), 1);
-        
+
         if let ResourceManagementIssue::ObserverLeak { observer_type, .. } = &leaked[0] {
             assert_eq!(observer_type, "MutationObserver");
         } else {
@@ -617,7 +619,7 @@ mod tests {
     #[test]
     fn test_identify_leaked_observers_multiple_types() {
         let mut observer_count = HashMap::new();
-        
+
         let location1 = SourceLocation {
             line: 10,
             column: Some(5),
@@ -630,21 +632,18 @@ mod tests {
             end_line: Some(20),
             end_column: Some(15),
         };
-        
+
         // Two mutation observers, one resize observer
         observer_count.insert(
             "MutationObserver".to_string(),
             vec![location1.clone(), location1.clone()],
         );
-        observer_count.insert(
-            "ResizeObserver".to_string(),
-            vec![location2],
-        );
-        
+        observer_count.insert("ResizeObserver".to_string(), vec![location2]);
+
         // One disconnect - both types leak
         let leaked = identify_leaked_observers(observer_count, 0);
         assert_eq!(leaked.len(), 2);
-        
+
         let observer_types: Vec<String> = leaked
             .iter()
             .map(|issue| {
@@ -655,7 +654,7 @@ mod tests {
                 }
             })
             .collect();
-        
+
         assert!(observer_types.contains(&"MutationObserver".to_string()));
         assert!(observer_types.contains(&"ResizeObserver".to_string()));
     }
@@ -666,14 +665,19 @@ mod tests {
         assert!(contains_external_references("this.property = value"));
         assert!(contains_external_references("window.location.href"));
         assert!(contains_external_references("document.getElementById"));
-        
+
         // Test case with large closure (>20 lines)
-        let large_text = (0..25).map(|i| format!("line {}", i)).collect::<Vec<_>>().join("\n");
+        let large_text = (0..25)
+            .map(|i| format!("line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n");
         assert!(contains_external_references(&large_text));
-        
+
         // Test cases without external references
         assert!(!contains_external_references("const x = 5;"));
-        assert!(!contains_external_references("function add(a, b) { return a + b; }"));
+        assert!(!contains_external_references(
+            "function add(a, b) { return a + b; }"
+        ));
         assert!(!contains_external_references(""));
     }
 }

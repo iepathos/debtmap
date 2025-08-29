@@ -270,7 +270,9 @@ fn is_external_service_call(path: &str) -> bool {
         "diesel",
     ];
 
-    EXTERNAL_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    EXTERNAL_PATTERNS
+        .iter()
+        .any(|pattern| path.contains(pattern))
 }
 
 fn is_filesystem_call(path: &str) -> bool {
@@ -306,7 +308,9 @@ fn is_network_call(path: &str) -> bool {
         "recv_from",
     ];
 
-    NETWORK_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    NETWORK_PATTERNS
+        .iter()
+        .any(|pattern| path.contains(pattern))
 }
 
 #[cfg(test)]
@@ -429,7 +433,7 @@ mod tests {
         // These tests ensure our pattern matching is working as expected
         assert!(!is_timing_function("SLEEP")); // case sensitive
         assert!(is_timing_function("sleep")); // lowercase matches
-        
+
         assert!(!is_random_function("RAND")); // case sensitive
         assert!(is_random_function("rand")); // lowercase matches
     }

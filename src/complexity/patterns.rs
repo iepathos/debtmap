@@ -213,7 +213,7 @@ impl PatternDetector {
             }
         }
     }
-    
+
     /// Check if the expression is a direct path call to the given function name
     fn is_recursive_call(func_expr: &Expr, func_name: &str) -> bool {
         match func_expr {
@@ -221,7 +221,7 @@ impl PatternDetector {
             _ => false,
         }
     }
-    
+
     /// Check if a path's last segment matches the given function name
     fn path_matches_function(path: &syn::Path, func_name: &str) -> bool {
         path.segments
@@ -419,17 +419,29 @@ mod tests {
         // Test matching function name
         let path: syn::Path = parse_quote!(my_function);
         assert!(PatternDetector::path_matches_function(&path, "my_function"));
-        assert!(!PatternDetector::path_matches_function(&path, "other_function"));
+        assert!(!PatternDetector::path_matches_function(
+            &path,
+            "other_function"
+        ));
 
         // Test with qualified path
         let qualified_path: syn::Path = parse_quote!(module::my_function);
-        assert!(PatternDetector::path_matches_function(&qualified_path, "my_function"));
-        assert!(!PatternDetector::path_matches_function(&qualified_path, "module"));
-        
+        assert!(PatternDetector::path_matches_function(
+            &qualified_path,
+            "my_function"
+        ));
+        assert!(!PatternDetector::path_matches_function(
+            &qualified_path,
+            "module"
+        ));
+
         // Test with deeply nested path
         let nested_path: syn::Path = parse_quote!(crate::module::submodule::func);
         assert!(PatternDetector::path_matches_function(&nested_path, "func"));
-        assert!(!PatternDetector::path_matches_function(&nested_path, "submodule"));
+        assert!(!PatternDetector::path_matches_function(
+            &nested_path,
+            "submodule"
+        ));
     }
 
     #[test]
@@ -438,17 +450,26 @@ mod tests {
 
         // Test direct function call
         let direct_call: Expr = parse_quote!(my_function);
-        assert!(PatternDetector::is_recursive_call(&direct_call, "my_function"));
-        assert!(!PatternDetector::is_recursive_call(&direct_call, "other_function"));
+        assert!(PatternDetector::is_recursive_call(
+            &direct_call,
+            "my_function"
+        ));
+        assert!(!PatternDetector::is_recursive_call(
+            &direct_call,
+            "other_function"
+        ));
 
         // Test qualified function call
         let qualified_call: Expr = parse_quote!(Self::my_function);
-        assert!(PatternDetector::is_recursive_call(&qualified_call, "my_function"));
+        assert!(PatternDetector::is_recursive_call(
+            &qualified_call,
+            "my_function"
+        ));
 
         // Test non-path expression (should return false)
         let method_call: Expr = parse_quote!(obj.method());
         assert!(!PatternDetector::is_recursive_call(&method_call, "method"));
-        
+
         // Test literal expression (should return false)
         let literal: Expr = parse_quote!(42);
         assert!(!PatternDetector::is_recursive_call(&literal, "any_name"));
@@ -490,7 +511,7 @@ mod tests {
 
         let call: syn::ExprCall = syn::parse_quote!(some_function(x));
         detector.check_recursive_function_call(&call);
-        
+
         // Should not increment recursive_calls when there's no current function
         assert_eq!(detector.patterns.recursive_calls, 0);
     }

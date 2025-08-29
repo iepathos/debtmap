@@ -479,28 +479,79 @@ mod tests {
 
     #[test]
     fn test_debt_type_base_severity() {
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::ErrorSwallowing), 7.5);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Complexity), 6.5);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Duplication), 6.0);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::ResourceManagement), 6.0);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Dependency), 5.5);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::CodeSmell), 5.0);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestQuality), 4.5);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Todo), 4.0);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Fixme), 4.0);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::CodeOrganization), 3.5);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestComplexity), 3.0);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestTodo), 3.0);
-        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestDuplication), 3.0);
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::ErrorSwallowing),
+            7.5
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::Complexity),
+            6.5
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::Duplication),
+            6.0
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::ResourceManagement),
+            6.0
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::Dependency),
+            5.5
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::CodeSmell),
+            5.0
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::TestQuality),
+            4.5
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::Todo),
+            4.0
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::Fixme),
+            4.0
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::CodeOrganization),
+            3.5
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::TestComplexity),
+            3.0
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::TestTodo),
+            3.0
+        );
+        assert_eq!(
+            EnhancedScorer::debt_type_base_severity(&DebtType::TestDuplication),
+            3.0
+        );
     }
 
     #[test]
     fn test_apply_priority_multiplier() {
         let base = 5.0;
-        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::Critical), 7.5);
-        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::High), 6.0);
-        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::Medium), 5.0);
-        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::Low), 3.5);
+        assert_eq!(
+            EnhancedScorer::apply_priority_multiplier(base, &Priority::Critical),
+            7.5
+        );
+        assert_eq!(
+            EnhancedScorer::apply_priority_multiplier(base, &Priority::High),
+            6.0
+        );
+        assert_eq!(
+            EnhancedScorer::apply_priority_multiplier(base, &Priority::Medium),
+            5.0
+        );
+        assert_eq!(
+            EnhancedScorer::apply_priority_multiplier(base, &Priority::Low),
+            3.5
+        );
     }
 
     #[test]
@@ -548,7 +599,7 @@ mod tests {
     #[test]
     fn test_calculate_base_score_integration() {
         use crate::priority::call_graph::CallGraph;
-        
+
         let call_graph = CallGraph::new();
         let context = ScoringContext::new(call_graph);
         let scorer = EnhancedScorer::new(&context);
