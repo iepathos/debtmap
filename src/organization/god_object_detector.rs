@@ -1,7 +1,7 @@
 use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
 };
-use crate::common::{SourceLocation, UnifiedLocationExtractor};
+use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -361,14 +361,6 @@ impl<'ast> Visit<'ast> for TypeVisitor {
         if let Some(type_name) = Self::extract_type_name(&node.self_ty) {
             self.update_type_info(&type_name, node);
         }
-    }
-}
-
-fn capitalize_first(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
     }
 }
 
