@@ -207,7 +207,7 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
 }
 
 fn is_timing_function(path: &str) -> bool {
-    let timing_patterns = [
+    const TIMING_PATTERNS: &[&str] = &[
         "thread::sleep",
         "sleep",
         "delay",
@@ -220,11 +220,11 @@ fn is_timing_function(path: &str) -> bool {
         "async_std::task::sleep",
     ];
 
-    timing_patterns.iter().any(|pattern| path.contains(pattern))
+    TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
 }
 
 fn is_timing_method(method: &str) -> bool {
-    let timing_methods = [
+    const TIMING_METHODS: &[&str] = &[
         "elapsed",
         "duration_since",
         "checked_duration_since",
@@ -233,11 +233,11 @@ fn is_timing_method(method: &str) -> bool {
         "wait_timeout",
     ];
 
-    timing_methods.contains(&method)
+    TIMING_METHODS.contains(&method)
 }
 
 fn is_random_function(path: &str) -> bool {
-    let random_patterns = [
+    const RANDOM_PATTERNS: &[&str] = &[
         "rand",
         "random",
         "thread_rng",
@@ -249,11 +249,11 @@ fn is_random_function(path: &str) -> bool {
         "choose",
     ];
 
-    random_patterns.iter().any(|pattern| path.contains(pattern))
+    RANDOM_PATTERNS.iter().any(|pattern| path.contains(pattern))
 }
 
 fn is_external_service_call(path: &str) -> bool {
-    let external_patterns = [
+    const EXTERNAL_PATTERNS: &[&str] = &[
         "reqwest",
         "hyper",
         "http",
@@ -270,13 +270,11 @@ fn is_external_service_call(path: &str) -> bool {
         "diesel",
     ];
 
-    external_patterns
-        .iter()
-        .any(|pattern| path.contains(pattern))
+    EXTERNAL_PATTERNS.iter().any(|pattern| path.contains(pattern))
 }
 
 fn is_filesystem_call(path: &str) -> bool {
-    let fs_patterns = [
+    const FS_PATTERNS: &[&str] = &[
         "fs::",
         "File::",
         "std::fs",
@@ -292,11 +290,11 @@ fn is_filesystem_call(path: &str) -> bool {
         "metadata",
     ];
 
-    fs_patterns.iter().any(|pattern| path.contains(pattern))
+    FS_PATTERNS.iter().any(|pattern| path.contains(pattern))
 }
 
 fn is_network_call(path: &str) -> bool {
-    let network_patterns = [
+    const NETWORK_PATTERNS: &[&str] = &[
         "TcpStream",
         "TcpListener",
         "UdpSocket",
@@ -308,7 +306,140 @@ fn is_network_call(path: &str) -> bool {
         "recv_from",
     ];
 
-    network_patterns
-        .iter()
-        .any(|pattern| path.contains(pattern))
+    NETWORK_PATTERNS.iter().any(|pattern| path.contains(pattern))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_timing_function_detects_sleep() {
+        assert!(is_timing_function("thread::sleep"));
+        assert!(is_timing_function("some_function_with_sleep_in_name"));
+        assert!(is_timing_function("tokio::time::sleep"));
+        assert!(is_timing_function("async_std::task::sleep"));
+    }
+
+    #[test]
+    fn test_is_timing_function_detects_time_operations() {
+        assert!(is_timing_function("Instant::now"));
+        assert!(is_timing_function("SystemTime::now"));
+        assert!(is_timing_function("Duration::from_secs"));
+        assert!(is_timing_function("timeout_handler"));
+    }
+
+    #[test]
+    fn test_is_timing_function_ignores_non_timing() {
+        assert!(!is_timing_function("process_data"));
+        assert!(!is_timing_function("calculate_result"));
+        assert!(!is_timing_function("handle_request"));
+    }
+
+    #[test]
+    fn test_is_timing_method_detects_timing_methods() {
+        assert!(is_timing_method("elapsed"));
+        assert!(is_timing_method("duration_since"));
+        assert!(is_timing_method("wait"));
+        assert!(is_timing_method("wait_timeout"));
+    }
+
+    #[test]
+    fn test_is_timing_method_ignores_non_timing() {
+        assert!(!is_timing_method("process"));
+        assert!(!is_timing_method("calculate"));
+        assert!(!is_timing_method("handle"));
+    }
+
+    #[test]
+    fn test_is_random_function_detects_random_operations() {
+        assert!(is_random_function("rand::thread_rng"));
+        assert!(is_random_function("random_number"));
+        assert!(is_random_function("StdRng::new"));
+        assert!(is_random_function("gen_range"));
+        assert!(is_random_function("shuffle_items"));
+    }
+
+    #[test]
+    fn test_is_random_function_ignores_non_random() {
+        assert!(!is_random_function("deterministic_function"));
+        assert!(!is_random_function("calculate_sum"));
+        assert!(!is_random_function("process_data"));
+    }
+
+    #[test]
+    fn test_is_external_service_call_detects_http_clients() {
+        assert!(is_external_service_call("reqwest::Client"));
+        assert!(is_external_service_call("hyper::Client"));
+        assert!(is_external_service_call("http::request"));
+        assert!(is_external_service_call("ApiClient::new"));
+    }
+
+    #[test]
+    fn test_is_external_service_call_detects_databases() {
+        assert!(is_external_service_call("postgres::connect"));
+        assert!(is_external_service_call("mysql::query"));
+        assert!(is_external_service_call("redis::get"));
+        assert!(is_external_service_call("mongodb::find"));
+        assert!(is_external_service_call("sqlx::query"));
+        assert!(is_external_service_call("diesel::connection"));
+    }
+
+    #[test]
+    fn test_is_external_service_call_ignores_internal_calls() {
+        assert!(!is_external_service_call("internal_function"));
+        assert!(!is_external_service_call("process_locally"));
+        assert!(!is_external_service_call("calculate_value"));
+    }
+
+    #[test]
+    fn test_is_filesystem_call_detects_fs_operations() {
+        assert!(is_filesystem_call("std::fs::read_to_string"));
+        assert!(is_filesystem_call("File::open"));
+        assert!(is_filesystem_call("tokio::fs::write"));
+        assert!(is_filesystem_call("remove_file"));
+        assert!(is_filesystem_call("create_dir"));
+    }
+
+    #[test]
+    fn test_is_filesystem_call_ignores_non_fs() {
+        assert!(!is_filesystem_call("calculate"));
+        assert!(!is_filesystem_call("process"));
+        assert!(!is_filesystem_call("transform"));
+    }
+
+    #[test]
+    fn test_is_network_call_detects_network_operations() {
+        assert!(is_network_call("TcpStream::connect"));
+        assert!(is_network_call("TcpListener::bind"));
+        assert!(is_network_call("UdpSocket::bind"));
+        assert!(is_network_call("socket.send_to"));
+        assert!(is_network_call("listener.accept"));
+    }
+
+    #[test]
+    fn test_is_network_call_ignores_non_network() {
+        assert!(!is_network_call("process_data"));
+        assert!(!is_network_call("calculate_result"));
+        assert!(!is_network_call("transform_input"));
+    }
+
+    #[test]
+    fn test_pattern_matching_is_case_sensitive() {
+        // These tests ensure our pattern matching is working as expected
+        assert!(!is_timing_function("SLEEP")); // case sensitive
+        assert!(is_timing_function("sleep")); // lowercase matches
+        
+        assert!(!is_random_function("RAND")); // case sensitive
+        assert!(is_random_function("rand")); // lowercase matches
+    }
+
+    #[test]
+    fn test_partial_matches_work() {
+        // Ensure contains() logic works for partial matches
+        assert!(is_timing_function("my_sleep_function"));
+        assert!(is_timing_function("function_with_timeout_logic"));
+        assert!(is_network_call("MyTcpStream"));
+        assert!(is_filesystem_call("custom_fs::operation"));
+    }
 }
