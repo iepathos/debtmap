@@ -6,7 +6,7 @@ use crate::risk::{RiskDistribution, RiskInsight};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::Path;
 
 /// Configuration for enhanced markdown output
 #[derive(Debug, Clone)]
@@ -65,6 +65,7 @@ pub struct EnhancedMarkdownWriter<W: Write> {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TocEntry {
     level: usize,
     title: String,
@@ -169,7 +170,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         writeln!(self.writer, "| Metric | Value | Status | Trend |")?;
         writeln!(self.writer, "|--------|-------|--------|-------|")?;
 
-        let debt_score = debt::total_debt_score(&results.technical_debt.items);
+        let _debt_score = debt::total_debt_score(&results.technical_debt.items);
         let avg_complexity = self.calculate_average_complexity(results);
         let test_coverage = unified_analysis
             .and_then(|a| a.overall_coverage)
@@ -556,7 +557,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         let categories_with_severity: Vec<_> = categories
             .into_iter()
             .map(|(category, items)| {
-                let items_refs: Vec<_> = items.iter().map(|i| *i).collect();
+                let items_refs: Vec<_> = items.to_vec();
                 let severity = self.calculate_category_severity(&items_refs);
                 (category, items, severity)
             })
@@ -689,7 +690,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
 
     fn write_recommendations(
         &mut self,
-        results: &AnalysisResults,
+        _results: &AnalysisResults,
         unified_analysis: Option<&UnifiedAnalysis>,
     ) -> Result<()> {
         self.add_toc_entry(2, "Recommendations");
@@ -953,7 +954,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         deps
     }
 
-    fn get_module_from_path(&self, path: &PathBuf) -> String {
+    fn get_module_from_path(&self, path: &Path) -> String {
         path.components()
             .take(2)
             .map(|c| c.as_os_str().to_string_lossy())
@@ -1048,10 +1049,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
                 crate::core::DebtType::TestDuplication => "Test Duplication",
                 crate::core::DebtType::TestQuality => "Test Quality",
             };
-            categories
-                .entry(category)
-                .or_insert_with(Vec::new)
-                .push(item);
+            categories.entry(category).or_default().push(item);
         }
 
         categories

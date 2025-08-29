@@ -12,6 +12,7 @@ pub mod data_flow;
 pub mod database;
 pub mod debt;
 pub mod extraction_patterns;
+pub mod formatting;
 pub mod io;
 pub mod organization;
 pub mod patterns;

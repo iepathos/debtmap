@@ -121,6 +121,22 @@ pub enum Commands {
         /// Detail level for enhanced markdown (summary, standard, detailed, complete)
         #[arg(long = "markdown-detail", default_value = "standard")]
         markdown_detail: String,
+
+        /// Color output mode (auto, always, never)
+        #[arg(long = "color", default_value = "auto")]
+        color: String,
+
+        /// Disable colors (shorthand for --color=never)
+        #[arg(long = "no-color")]
+        no_color: bool,
+
+        /// Emoji output mode (auto, always, never)
+        #[arg(long = "emoji", default_value = "auto")]
+        emoji: String,
+
+        /// Disable emoji (shorthand for --emoji=never)
+        #[arg(long = "no-emoji")]
+        no_emoji: bool,
     },
 
     /// Initialize configuration file
