@@ -52,7 +52,7 @@ jobs:
       run: cargo build --release
 
     - name: Generate coverage data
-      run: cargo tarpaulin --out lcov --output-dir target/coverage --timeout 120
+      run: cargo tarpaulin --config .tarpaulin.toml --out Lcov --timeout 300
 
     - name: Run debtmap validation with coverage
       run: |

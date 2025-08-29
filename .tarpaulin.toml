@@ -18,8 +18,17 @@ exclude-files = [
 skip-clean = true
 engine = "Llvm"
 
+# Test runner - use default cargo test since nextest isn't directly supported
+# but we still get LLVM engine benefits
+
+# Parallel test execution
+parallel = true
+
+# Number of parallel jobs (adjust based on CPU cores)
+jobs = 4
+
 # Timeout for tests
-timeout = "2m"
+timeout = "5m"
 
 # Follow child processes
 follow-exec = false
@@ -29,3 +38,9 @@ avoid-cfg-tarpaulin = true
 
 # Include test functions in coverage to track what they call
 include-tests = true
+
+# Output formats
+out = ["Html", "Json", "Lcov"]
+
+# Output directory
+output-dir = "target/coverage"

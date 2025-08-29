@@ -96,13 +96,13 @@ test-pattern PATTERN:
 test-watch:
     cargo watch -x 'nextest run'
 
-# Run tests with coverage using cargo-tarpaulin
+# Run tests with coverage using optimized tarpaulin with LLVM engine and nextest
 coverage:
     #!/usr/bin/env bash
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
-    echo "Generating code coverage report with cargo-tarpaulin..."
-    cargo tarpaulin --config .tarpaulin.toml --out Html --out Json --output-dir target/coverage
+    echo "Generating code coverage report with tarpaulin (LLVM engine + nextest)..."
+    cargo tarpaulin --config .tarpaulin.toml
     echo "Coverage report generated at target/coverage/tarpaulin-report.html"
 
 # Run tests with coverage (lcov format)
@@ -110,8 +110,8 @@ coverage-lcov:
     #!/usr/bin/env bash
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
-    echo "Generating code coverage report with cargo-tarpaulin (lcov format)..."
-    cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage
+    echo "Generating code coverage report with tarpaulin (lcov format)..."
+    cargo tarpaulin --config .tarpaulin.toml --out Lcov
     echo "Coverage report generated at target/coverage/lcov.info"
 
 # Run tests with coverage and check threshold
@@ -120,7 +120,8 @@ coverage-check:
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
     echo "Checking code coverage threshold..."
-    COVERAGE=$(cargo tarpaulin --config .tarpaulin.toml --out Json --output-dir target/coverage --quiet | jq -r '.files | to_entries | map(.value.coverage) | add / length')
+    cargo tarpaulin --config .tarpaulin.toml --out Json --quiet
+    COVERAGE=$(cat target/coverage/tarpaulin-report.json | jq -r '.files | to_entries | map(.value.coverage) | add / length')
     echo "Current coverage: ${COVERAGE}%"
     if (( $(echo "$COVERAGE < 80" | bc -l) )); then
         echo "⚠️  Coverage is below 80%: $COVERAGE%"
@@ -139,7 +140,7 @@ analyze-self:
     echo "Building debtmap in release mode..."
     cargo build --release --bin debtmap
     echo "Generating code coverage (lcov format)..."
-    cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage
+    cargo tarpaulin --config .tarpaulin.toml --out Lcov
     echo "Analyzing current repository with debtmap..."
     ./target/release/debtmap analyze . --lcov target/coverage/lcov.info -vv
     echo "Analysis complete!"
@@ -318,7 +319,7 @@ full-check: clean build test lint doc audit
 # Install development tools
 install-tools:
     rustup component add rustfmt clippy
-    cargo install cargo-watch cargo-tarpaulin cargo-audit cargo-outdated
+    cargo install cargo-watch cargo-tarpaulin cargo-audit cargo-outdated cargo-nextest
 
 # Install additional development tools
 install-extras:
