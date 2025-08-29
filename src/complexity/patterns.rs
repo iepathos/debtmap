@@ -419,6 +419,26 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_called_function_name() {
+        use syn::parse_quote;
+
+        // Test with simple function call
+        let call: syn::ExprCall = parse_quote!(my_function());
+        let target = PatternDetector::extract_called_function_name(&call);
+        assert_eq!(target, Some("my_function".to_string()));
+
+        // Test with module path
+        let call: syn::ExprCall = parse_quote!(module::function());
+        let target = PatternDetector::extract_called_function_name(&call);
+        assert_eq!(target, Some("function".to_string()));
+
+        // Test with closure call
+        let call: syn::ExprCall = parse_quote!((|| 42)());
+        let target = PatternDetector::extract_called_function_name(&call);
+        assert_eq!(target, None); // Not a path expression
+    }
+
+    #[test]
     fn test_is_recursive_call() {
         use syn::parse_quote;
 
@@ -431,32 +451,14 @@ mod tests {
         let non_recursive_call: syn::ExprCall = parse_quote!(other_func());
         assert!(!PatternDetector::is_recursive_call(&non_recursive_call, "my_function"));
         assert!(PatternDetector::is_recursive_call(&non_recursive_call, "other_func"));
-    }
 
-    #[test]
-    fn test_extract_called_function_name() {
-        use syn::parse_quote;
+        // Test with factorial example
+        let factorial_call: syn::ExprCall = parse_quote!(factorial(n - 1));
+        assert!(PatternDetector::is_recursive_call(&factorial_call, "factorial"));
 
-        // Test simple function call
-        let simple_call: syn::ExprCall = parse_quote!(foo());
-        assert_eq!(
-            PatternDetector::extract_called_function_name(&simple_call),
-            Some("foo".to_string())
-        );
-
-        // Test qualified path call
-        let qualified_call: syn::ExprCall = parse_quote!(module::submodule::function());
-        assert_eq!(
-            PatternDetector::extract_called_function_name(&qualified_call),
-            Some("function".to_string())
-        );
-
-        // Test method call (should return None as it's not a path)
-        let method_call: syn::ExprCall = parse_quote!((obj.method)());
-        assert_eq!(
-            PatternDetector::extract_called_function_name(&method_call),
-            None
-        );
+        // Test with module path (should match since we only check the last segment)
+        let module_call: syn::ExprCall = parse_quote!(other::factorial());
+        assert!(PatternDetector::is_recursive_call(&module_call, "factorial"));
     }
 
     #[test]
@@ -506,5 +508,45 @@ mod tests {
         let another_recursive: syn::ExprCall = parse_quote!(factorial(n - 2));
         detector.check_recursive_function_call(&another_recursive);
         assert_eq!(detector.patterns.recursive_calls, 2); // Should increment to 2
+    }
+
+    #[test]
+    fn test_recursive_function_detection_in_code() {
+        let code = r#"
+            fn factorial(n: u32) -> u32 {
+                if n <= 1 {
+                    1
+                } else {
+                    n * factorial(n - 1)
+                }
+            }
+        "#;
+
+        let file = syn::parse_file(code).unwrap();
+        let mut detector = PatternDetector::default();
+        detector.visit_file(&file);
+
+        // Should detect one recursive call
+        assert_eq!(detector.patterns.recursive_calls, 1);
+    }
+
+    #[test]
+    fn test_non_recursive_function() {
+        let code = r#"
+            fn helper(n: u32) -> u32 {
+                n * 2
+            }
+            
+            fn calculate(n: u32) -> u32 {
+                helper(n) + 1
+            }
+        "#;
+
+        let file = syn::parse_file(code).unwrap();
+        let mut detector = PatternDetector::default();
+        detector.visit_file(&file);
+
+        // Should detect no recursive calls
+        assert_eq!(detector.patterns.recursive_calls, 0);
     }
 }
