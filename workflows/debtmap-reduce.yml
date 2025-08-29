@@ -19,7 +19,6 @@ map:
       # Fix the specific debt item with the full JSON context
       - claude: |
           /fix-debt-item --json '${item}'
-        capture_output: true
         commit_required: true
         timeout: 300
       
