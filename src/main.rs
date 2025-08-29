@@ -1288,10 +1288,11 @@ fn process_python_files_for_call_graph(
 fn should_skip_metric_for_debt_analysis(
     metric: &debtmap::FunctionMetrics,
     call_graph: &priority::CallGraph,
+    test_only_functions: &std::collections::HashSet<priority::call_graph::FunctionId>,
 ) -> bool {
     // Skip test functions from debt score calculation
     // Test functions are analyzed separately to avoid inflating debt scores
-    if metric.is_test {
+    if metric.is_test || metric.in_test_module {
         return true;
     }
 
@@ -1307,23 +1308,19 @@ fn should_skip_metric_for_debt_analysis(
         line: metric.line,
     };
 
-    // Skip test helper functions (functions only called by test functions)
-    // based on the call graph analysis
-    let callers = call_graph.get_callers(&func_id);
-    if !callers.is_empty()
-        && callers
-            .iter()
-            .all(|caller| caller.name.starts_with("test_"))
-    {
+    // Skip functions that are only reachable from test functions
+    // These are test infrastructure (mocks, helpers, fixtures)
+    // This is 100% accurate - if something is only called from tests, it's not production code
+    if test_only_functions.contains(&func_id) {
         return true;
     }
 
-    // Skip trivial wrappers that only delegate to a single function
-    // Unless they have high complexity (cyclomatic > 3)
-    if metric.cyclomatic <= 3 {
+    // Skip only truly trivial delegation functions
+    // These have minimal complexity AND delegate to exactly one other function
+    if metric.cyclomatic == 1 && metric.cognitive == 0 && metric.length <= 3 {
         let callees = call_graph.get_callees(&func_id);
-        if callees.len() <= 1 {
-            // This is either a trivial wrapper or a simple getter/setter
+        if callees.len() == 1 {
+            // This is a one-line delegation like: fn foo() { bar() }
             // Not worth tracking as technical debt
             return true;
         }
@@ -1498,6 +1495,10 @@ fn create_unified_analysis_with_exclusions(
     // Populate the data flow graph with purity analysis data
     unified.populate_purity_analysis(metrics);
 
+    // Identify test-only functions using call graph reachability
+    let test_only_functions: std::collections::HashSet<_> =
+        call_graph.find_test_only_functions().into_iter().collect();
+
     // Create debt aggregator and aggregate all debt items
     let mut debt_aggregator = DebtAggregator::new();
     if let Some(debt_items) = debt_items {
@@ -1522,7 +1523,7 @@ fn create_unified_analysis_with_exclusions(
     }
 
     for metric in metrics {
-        if should_skip_metric_for_debt_analysis(metric, call_graph) {
+        if should_skip_metric_for_debt_analysis(metric, call_graph, &test_only_functions) {
             continue;
         }
 
@@ -1569,42 +1570,17 @@ fn create_unified_analysis(
 
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
+    // Identify test-only functions using call graph reachability
+    let test_only_functions: std::collections::HashSet<_> =
+        call_graph.find_test_only_functions().into_iter().collect();
+
     for metric in metrics {
-        // Skip test functions from debt score calculation
-        // Test functions are analyzed separately to avoid inflating debt scores
-        if metric.is_test {
+        // Use the centralized skip logic
+        if should_skip_metric_for_debt_analysis(metric, call_graph, &test_only_functions) {
             continue;
         }
 
-        // Skip closures - they're part of their parent function's implementation
-        // Their complexity already contributes to the parent function's metrics
-        if metric.name.contains("<closure@") {
-            continue;
-        }
-
-        // Skip test helper functions (functions only called by test functions)
-        let func_id = priority::call_graph::FunctionId {
-            file: metric.file.clone(),
-            name: metric.name.clone(),
-            line: metric.line,
-        };
-
-        if call_graph.is_test_helper(&func_id) {
-            continue;
-        }
-
-        // Skip trivial functions with minimal complexity and no real logic
-        // These are typically simple getters, setters, or one-line delegations
-        if metric.cyclomatic == 1 && metric.cognitive == 0 && metric.length <= 5 {
-            // Check if it's a simple delegation (calls exactly one function)
-            let callees = call_graph.get_callees(&func_id);
-            if callees.len() <= 1 {
-                // This is either a trivial wrapper or a simple getter/setter
-                // Not worth tracking as technical debt
-                continue;
-            }
-        }
-
+        // Create the unified debt item
         let item = unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data);
         unified.add_item(item);
     }

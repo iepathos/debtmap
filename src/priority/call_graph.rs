@@ -371,6 +371,59 @@ impl CallGraph {
         self.nodes.keys().cloned().collect()
     }
 
+    /// Identify functions that are only reachable from test functions
+    /// These are test infrastructure functions (mocks, helpers, fixtures, etc.)
+    pub fn find_test_only_functions(&self) -> HashSet<FunctionId> {
+        // Step 1: Identify all test functions
+        let test_functions: HashSet<FunctionId> = self
+            .nodes
+            .iter()
+            .filter(|(_, node)| node.is_test)
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        // Step 2: Find all functions reachable from test functions (including tests themselves)
+        let mut reachable_from_tests = test_functions.clone();
+        for test_fn in &test_functions {
+            // Get all transitive callees (functions called by this test)
+            let callees = self.get_transitive_callees(test_fn, usize::MAX);
+            reachable_from_tests.extend(callees);
+        }
+
+        // Step 3: Find all functions reachable from non-test code
+        let mut reachable_from_production = HashSet::new();
+        for (id, node) in &self.nodes {
+            // Skip test functions entirely
+            if node.is_test {
+                continue;
+            }
+
+            // Non-test functions that are either:
+            // 1. Marked as entry points
+            // 2. Have no callers (top-level functions)
+            if node.is_entry_point || self.get_callers(id).is_empty() {
+                reachable_from_production.insert(id.clone());
+                let callees = self.get_transitive_callees(id, usize::MAX);
+                reachable_from_production.extend(callees);
+            }
+        }
+
+        // Step 4: Test-only functions are those reachable from tests but NOT from production
+        // This excludes test functions themselves (they're not infrastructure, they ARE tests)
+        let test_only: HashSet<FunctionId> = reachable_from_tests
+            .into_iter()
+            .filter(|id| {
+                // Must be:
+                // 1. NOT in production reachable set
+                // 2. NOT a test function itself (test functions are not infrastructure)
+                !reachable_from_production.contains(id)
+                    && self.nodes.get(id).map_or(false, |node| !node.is_test)
+            })
+            .collect();
+
+        test_only
+    }
+
     pub fn get_function_calls(&self, func_id: &FunctionId) -> Vec<FunctionCall> {
         self.edges
             .iter()

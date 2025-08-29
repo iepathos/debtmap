@@ -276,9 +276,20 @@ impl FunctionVisitor {
             let path_str = file.to_string_lossy();
             path_str.contains("/tests/") 
                 || path_str.contains("/test/")
+                || path_str.contains("/testing/")
+                || path_str.contains("/mocks/")
+                || path_str.contains("/mock/")
+                || path_str.contains("/fixtures/")
+                || path_str.contains("/fixture/")
+                || path_str.contains("/test_helpers/")
+                || path_str.contains("/test_utils/")
                 || path_str.ends_with("_test.rs")
                 || path_str.ends_with("_tests.rs")
+                || path_str.ends_with("/tests.rs")
+                || path_str.ends_with("/test.rs")
                 || path_str.contains("/test_")
+                || path_str.contains("/mock")
+                || path_str.contains("/scenario")  // Mock scenarios
                 || path_str.contains("\\tests\\")  // Windows paths
                 || path_str.contains("\\test\\") // Windows paths
         };
@@ -462,7 +473,15 @@ impl FunctionVisitor {
         let has_test_name =
             name.starts_with("test_") || name.starts_with("it_") || name.starts_with("should_");
 
-        has_test_attribute || has_test_name
+        // Check if it's a mock/stub/fake function based on name
+        let is_mock_function = name.contains("Mock")
+            || name.contains("mock")
+            || name.contains("Stub")
+            || name.contains("stub")
+            || name.contains("Fake")
+            || name.contains("fake");
+
+        has_test_attribute || has_test_name || is_mock_function
     }
 
     fn extract_visibility(vis: &syn::Visibility) -> Option<String> {
