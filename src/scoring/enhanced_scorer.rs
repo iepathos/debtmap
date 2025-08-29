@@ -214,24 +214,30 @@ impl<'a> EnhancedScorer<'a> {
     }
 
     fn calculate_base_score(&self, item: &DebtItem) -> f64 {
-        use crate::core::{DebtType, Priority};
+        let base = Self::debt_type_base_severity(&item.debt_type);
+        Self::apply_priority_multiplier(base, &item.priority)
+    }
 
-        // Map debt types to base severity scores based on type and priority
-        let base = match item.debt_type {
+    fn debt_type_base_severity(debt_type: &crate::core::DebtType) -> f64 {
+        use crate::core::DebtType;
+
+        match debt_type {
             DebtType::ErrorSwallowing => 7.5,
             DebtType::Complexity => 6.5,
-            DebtType::Duplication => 6.0,
+            DebtType::Duplication | DebtType::ResourceManagement => 6.0,
             DebtType::Dependency => 5.5,
             DebtType::CodeSmell => 5.0,
             DebtType::TestQuality => 4.5,
             DebtType::Todo | DebtType::Fixme => 4.0,
             DebtType::CodeOrganization => 3.5,
-            DebtType::ResourceManagement => 6.0,
             DebtType::TestComplexity | DebtType::TestTodo | DebtType::TestDuplication => 3.0,
-        };
+        }
+    }
 
-        // Adjust based on priority
-        match item.priority {
+    fn apply_priority_multiplier(base: f64, priority: &crate::core::Priority) -> f64 {
+        use crate::core::Priority;
+
+        match priority {
             Priority::Critical => base * 1.5,
             Priority::High => base * 1.2,
             Priority::Medium => base,
@@ -387,38 +393,39 @@ impl<'a> EnhancedScorer<'a> {
     }
 
     fn explain_score(&self, score: &EnhancedScore, item: &DebtItem) -> String {
-        let mut parts = Vec::new();
-
-        // Severity
-        parts.push(format!(
+        let mut parts = vec![format!(
             "{}: base {:.1}",
             Self::debt_type_name(&item.debt_type),
             score.base_score
-        ));
+        )];
 
-        // Major factors
-        if score.criticality > 1.3 {
-            parts.push(format!("critical path ({:.1}x)", score.criticality));
-        }
-        if score.complexity_factor > 1.3 {
-            parts.push(format!("high complexity ({:.1}x)", score.complexity_factor));
-        }
-        if score.coverage_factor > 1.3 {
-            parts.push(format!("low coverage ({:.1}x)", score.coverage_factor));
-        }
-        if score.dependency_factor > 1.3 {
-            parts.push(format!("high impact ({:.1}x)", score.dependency_factor));
-        }
-        if score.frequency_factor > 1.3 {
-            parts.push(format!("frequently used ({:.1}x)", score.frequency_factor));
-        }
-
-        // Test code
-        if score.test_weight < 1.0 {
-            parts.push("test code (0.3x)".to_string());
-        }
-
+        parts.extend(Self::collect_factor_explanations(score));
         parts.join(", ")
+    }
+
+    fn collect_factor_explanations(score: &EnhancedScore) -> Vec<String> {
+        const THRESHOLD: f64 = 1.3;
+        let mut explanations = Vec::new();
+
+        let factors = [
+            (score.criticality, "critical path"),
+            (score.complexity_factor, "high complexity"),
+            (score.coverage_factor, "low coverage"),
+            (score.dependency_factor, "high impact"),
+            (score.frequency_factor, "frequently used"),
+        ];
+
+        for (value, label) in factors {
+            if value > THRESHOLD {
+                explanations.push(format!("{} ({:.1}x)", label, value));
+            }
+        }
+
+        if score.test_weight < 1.0 {
+            explanations.push("test code (0.3x)".to_string());
+        }
+
+        explanations
     }
 
     fn debt_type_name(debt_type: &crate::core::DebtType) -> &'static str {
@@ -461,5 +468,103 @@ impl<'a> EnhancedScorer<'a> {
         func.name.hash(&mut hasher);
         func.line.hash(&mut hasher);
         hasher.finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{DebtItem, DebtType, Priority};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_debt_type_base_severity() {
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::ErrorSwallowing), 7.5);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Complexity), 6.5);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Duplication), 6.0);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::ResourceManagement), 6.0);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Dependency), 5.5);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::CodeSmell), 5.0);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestQuality), 4.5);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Todo), 4.0);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::Fixme), 4.0);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::CodeOrganization), 3.5);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestComplexity), 3.0);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestTodo), 3.0);
+        assert_eq!(EnhancedScorer::debt_type_base_severity(&DebtType::TestDuplication), 3.0);
+    }
+
+    #[test]
+    fn test_apply_priority_multiplier() {
+        let base = 5.0;
+        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::Critical), 7.5);
+        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::High), 6.0);
+        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::Medium), 5.0);
+        assert_eq!(EnhancedScorer::apply_priority_multiplier(base, &Priority::Low), 3.5);
+    }
+
+    #[test]
+    fn test_collect_factor_explanations() {
+        let score = EnhancedScore {
+            base_score: 5.0,
+            criticality: 1.5,
+            complexity_factor: 1.1,
+            coverage_factor: 1.4,
+            dependency_factor: 1.0,
+            frequency_factor: 1.6,
+            test_weight: 1.0,
+            confidence: 0.9,
+            final_score: 7.5,
+            raw_score: 7.0,
+        };
+
+        let explanations = EnhancedScorer::collect_factor_explanations(&score);
+        assert_eq!(explanations.len(), 3);
+        assert!(explanations.contains(&"critical path (1.5x)".to_string()));
+        assert!(explanations.contains(&"low coverage (1.4x)".to_string()));
+        assert!(explanations.contains(&"frequently used (1.6x)".to_string()));
+    }
+
+    #[test]
+    fn test_collect_factor_explanations_with_test_weight() {
+        let score = EnhancedScore {
+            base_score: 5.0,
+            criticality: 1.0,
+            complexity_factor: 1.0,
+            coverage_factor: 1.0,
+            dependency_factor: 1.0,
+            frequency_factor: 1.0,
+            test_weight: 0.3,
+            confidence: 0.9,
+            final_score: 1.5,
+            raw_score: 1.5,
+        };
+
+        let explanations = EnhancedScorer::collect_factor_explanations(&score);
+        assert_eq!(explanations.len(), 1);
+        assert!(explanations.contains(&"test code (0.3x)".to_string()));
+    }
+
+    #[test]
+    fn test_calculate_base_score_integration() {
+        use crate::priority::call_graph::CallGraph;
+        
+        let call_graph = CallGraph::new();
+        let context = ScoringContext::new(call_graph);
+        let scorer = EnhancedScorer::new(&context);
+
+        let item = DebtItem {
+            id: "test_item".to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 10,
+            column: Some(5),
+            debt_type: DebtType::Complexity,
+            priority: Priority::High,
+            message: "Test message".to_string(),
+            context: None,
+        };
+
+        let score = scorer.calculate_base_score(&item);
+        assert_eq!(score, 7.8); // 6.5 * 1.2
     }
 }
