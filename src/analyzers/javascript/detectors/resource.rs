@@ -395,6 +395,69 @@ fn detect_worker_leaks(
     }
 }
 
+// Pure function to check if a constructor is an observer type
+fn is_observer_type(constructor_name: &str) -> bool {
+    matches!(
+        constructor_name,
+        "MutationObserver" | "IntersectionObserver" | "ResizeObserver" | "PerformanceObserver"
+    )
+}
+
+// Pure function to extract observer locations from query matches
+fn extract_observer_locations(
+    query: &Query,
+    root: Node,
+    source: &str,
+) -> HashMap<String, Vec<SourceLocation>> {
+    let mut observer_count = HashMap::new();
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(query, root, source.as_bytes());
+    
+    while let Some(match_) = matches.next() {
+        if let Some(constructor) = match_.captures.iter().find(|c| c.index == 0) {
+            let constructor_name = get_node_text(constructor.node, source);
+            
+            if is_observer_type(constructor_name) {
+                let location = SourceLocation::from_node(match_.captures.last().unwrap().node);
+                observer_count
+                    .entry(constructor_name.to_string())
+                    .or_insert(Vec::new())
+                    .push(location);
+            }
+        }
+    }
+    
+    observer_count
+}
+
+// Pure function to count disconnect calls
+fn count_disconnect_calls(query: &Query, root: Node, source: &str) -> usize {
+    let mut cursor = QueryCursor::new();
+    let mut matches = cursor.matches(query, root, source.as_bytes());
+    let mut count = 0;
+    while matches.next().is_some() {
+        count += 1;
+    }
+    count
+}
+
+// Pure function to identify leaked observers
+fn identify_leaked_observers(
+    observer_count: HashMap<String, Vec<SourceLocation>>,
+    disconnect_count: usize,
+) -> Vec<ResourceManagementIssue> {
+    observer_count
+        .into_iter()
+        .filter(|(_, locations)| locations.len() > disconnect_count)
+        .filter_map(|(observer_type, locations)| {
+            locations.first().map(|location| ResourceManagementIssue::ObserverLeak {
+                location: location.clone(),
+                observer_type,
+            })
+        })
+        .collect()
+}
+
 fn detect_observer_leaks(
     root: Node,
     source: &str,
@@ -415,52 +478,23 @@ fn detect_observer_leaks(
     ) @disconnect_call
     "#;
 
-    let observer_types = [
-        "MutationObserver",
-        "IntersectionObserver",
-        "ResizeObserver",
-        "PerformanceObserver",
-    ];
-    let mut observer_count = HashMap::new();
-    let mut disconnect_count = 0;
+    // Extract observer locations
+    let observer_count = if let Ok(query) = Query::new(language, observer_query) {
+        extract_observer_locations(&query, root, source)
+    } else {
+        HashMap::new()
+    };
 
-    if let Ok(query) = Query::new(language, observer_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
+    // Count disconnect calls
+    let disconnect_count = if let Ok(query) = Query::new(language, disconnect_query) {
+        count_disconnect_calls(&query, root, source)
+    } else {
+        0
+    };
 
-        while let Some(match_) = matches.next() {
-            if let Some(constructor) = match_.captures.iter().find(|c| c.index == 0) {
-                let constructor_name = get_node_text(constructor.node, source);
-
-                if observer_types.contains(&constructor_name) {
-                    let location = SourceLocation::from_node(match_.captures.last().unwrap().node);
-                    observer_count
-                        .entry(constructor_name.to_string())
-                        .or_insert(Vec::new())
-                        .push(location);
-                }
-            }
-        }
-    }
-
-    if let Ok(query) = Query::new(language, disconnect_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
-        while matches.next().is_some() {
-            disconnect_count += 1;
-        }
-    }
-
-    for (observer_type, locations) in observer_count {
-        if locations.len() > disconnect_count {
-            if let Some(location) = locations.first() {
-                issues.push(ResourceManagementIssue::ObserverLeak {
-                    location: location.clone(),
-                    observer_type,
-                });
-            }
-        }
-    }
+    // Identify and report leaked observers
+    let leaked_observers = identify_leaked_observers(observer_count, disconnect_count);
+    issues.extend(leaked_observers);
 }
 
 fn detect_memory_retention(
@@ -516,4 +550,130 @@ fn contains_external_references(text: &str) -> bool {
         || text.contains("window.")
         || text.contains("document.")
         || text.lines().count() > 20 // Large closures likely capture external scope
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_observer_type() {
+        // Test valid observer types
+        assert!(is_observer_type("MutationObserver"));
+        assert!(is_observer_type("IntersectionObserver"));
+        assert!(is_observer_type("ResizeObserver"));
+        assert!(is_observer_type("PerformanceObserver"));
+        
+        // Test invalid observer types
+        assert!(!is_observer_type("Observer"));
+        assert!(!is_observer_type("CustomObserver"));
+        assert!(!is_observer_type(""));
+        assert!(!is_observer_type("MutationListener"));
+    }
+
+    #[test]
+    fn test_identify_leaked_observers_no_leaks() {
+        let mut observer_count = HashMap::new();
+        observer_count.insert(
+            "MutationObserver".to_string(),
+            vec![SourceLocation {
+                line: 10,
+                column: Some(5),
+                end_line: Some(10),
+                end_column: Some(15),
+            }],
+        );
+        
+        // One observer, one disconnect - no leak
+        let leaked = identify_leaked_observers(observer_count, 1);
+        assert!(leaked.is_empty());
+    }
+
+    #[test]
+    fn test_identify_leaked_observers_with_leaks() {
+        let mut observer_count = HashMap::new();
+        let location = SourceLocation {
+            line: 10,
+            column: Some(5),
+            end_line: Some(10),
+            end_column: Some(15),
+        };
+        observer_count.insert(
+            "MutationObserver".to_string(),
+            vec![location.clone(), location.clone()],
+        );
+        
+        // Two observers, one disconnect - one leak
+        let leaked = identify_leaked_observers(observer_count, 1);
+        assert_eq!(leaked.len(), 1);
+        
+        if let ResourceManagementIssue::ObserverLeak { observer_type, .. } = &leaked[0] {
+            assert_eq!(observer_type, "MutationObserver");
+        } else {
+            panic!("Expected ObserverLeak issue");
+        }
+    }
+
+    #[test]
+    fn test_identify_leaked_observers_multiple_types() {
+        let mut observer_count = HashMap::new();
+        
+        let location1 = SourceLocation {
+            line: 10,
+            column: Some(5),
+            end_line: Some(10),
+            end_column: Some(15),
+        };
+        let location2 = SourceLocation {
+            line: 20,
+            column: Some(5),
+            end_line: Some(20),
+            end_column: Some(15),
+        };
+        
+        // Two mutation observers, one resize observer
+        observer_count.insert(
+            "MutationObserver".to_string(),
+            vec![location1.clone(), location1.clone()],
+        );
+        observer_count.insert(
+            "ResizeObserver".to_string(),
+            vec![location2],
+        );
+        
+        // One disconnect - both types leak
+        let leaked = identify_leaked_observers(observer_count, 0);
+        assert_eq!(leaked.len(), 2);
+        
+        let observer_types: Vec<String> = leaked
+            .iter()
+            .map(|issue| {
+                if let ResourceManagementIssue::ObserverLeak { observer_type, .. } = issue {
+                    observer_type.clone()
+                } else {
+                    String::new()
+                }
+            })
+            .collect();
+        
+        assert!(observer_types.contains(&"MutationObserver".to_string()));
+        assert!(observer_types.contains(&"ResizeObserver".to_string()));
+    }
+
+    #[test]
+    fn test_contains_external_references() {
+        // Test cases with external references
+        assert!(contains_external_references("this.property = value"));
+        assert!(contains_external_references("window.location.href"));
+        assert!(contains_external_references("document.getElementById"));
+        
+        // Test case with large closure (>20 lines)
+        let large_text = (0..25).map(|i| format!("line {}", i)).collect::<Vec<_>>().join("\n");
+        assert!(contains_external_references(&large_text));
+        
+        // Test cases without external references
+        assert!(!contains_external_references("const x = 5;"));
+        assert!(!contains_external_references("function add(a, b) { return a + b; }"));
+        assert!(!contains_external_references(""));
+    }
 }
