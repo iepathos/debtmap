@@ -5,6 +5,7 @@ use debtmap::cli;
 use debtmap::config;
 use debtmap::core;
 use debtmap::debt;
+use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
 use debtmap::io;
 use debtmap::priority;
 use debtmap::risk;
@@ -46,6 +47,7 @@ struct AnalyzeConfig {
     threshold_preset: Option<cli::ThresholdPreset>,
     markdown_enhanced: bool,
     markdown_detail: String,
+    formatting_config: FormattingConfig,
 }
 
 struct ValidateConfig {
@@ -113,12 +115,29 @@ fn main() -> Result<()> {
             threshold_preset,
             markdown_enhanced,
             markdown_detail,
+            color,
+            no_color,
+            emoji,
+            no_emoji,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
 
             // Set context-aware environment variable (enabled by default)
             if !no_context_aware {
                 std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
+            }
+
+            // Parse formatting configuration
+            let mut formatting_config = FormattingConfig::from_env();
+            if no_color {
+                formatting_config.color = ColorMode::Never;
+            } else if let Some(mode) = ColorMode::parse(&color) {
+                formatting_config.color = mode;
+            }
+            if no_emoji {
+                formatting_config.emoji = EmojiMode::Never;
+            } else if let Some(mode) = EmojiMode::parse(&emoji) {
+                formatting_config.emoji = mode;
             }
 
             let config = AnalyzeConfig {
@@ -145,6 +164,7 @@ fn main() -> Result<()> {
                 threshold_preset,
                 markdown_enhanced,
                 markdown_detail,
+                formatting_config,
             };
             handle_analyze(config)
         }
@@ -193,6 +213,12 @@ fn main() -> Result<()> {
 }
 
 fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
+    // Configure colored output based on formatting config
+    if config.formatting_config.color.should_use_color() {
+        colored::control::set_override(true);
+    } else {
+        colored::control::set_override(false);
+    }
     // Set threshold preset if provided
     if let Some(preset) = config.threshold_preset {
         match preset {
@@ -237,6 +263,7 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         &config.markdown_detail,
         &results,
         config.coverage_file.as_ref(),
+        config.formatting_config,
     )?;
 
     // Analyze command should only fail on actual errors, not thresholds
@@ -1750,14 +1777,8 @@ fn output_enhanced_markdown(
 
     // Calculate risk insights if coverage available
     let risk_insights = if let Some(lcov_path) = coverage_file {
-        match analyze_risk_with_coverage(
-            results,
-            lcov_path,
-            &PathBuf::from("."),
-            false,
-            None,
-            None,
-        ) {
+        match analyze_risk_with_coverage(results, lcov_path, &PathBuf::from("."), false, None, None)
+        {
             Ok(insights) => insights,
             Err(e) => {
                 log::warn!("Failed to calculate risk insights: {}", e);
@@ -1836,6 +1857,7 @@ fn output_unified_priorities_with_config(
     markdown_detail: &str,
     results: &AnalysisResults,
     coverage_file: Option<&PathBuf>,
+    formatting_config: FormattingConfig,
 ) -> Result<()> {
     // Check if enhanced markdown is requested
     if markdown_enhanced && matches!(output_format, Some(cli::OutputFormat::Markdown)) {

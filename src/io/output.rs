@@ -19,7 +19,7 @@ pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
     match format {
         OutputFormat::Json => Box::new(JsonWriter::new(io::stdout())),
         OutputFormat::Markdown => Box::new(MarkdownWriter::new(io::stdout())),
-        OutputFormat::Terminal => Box::new(TerminalWriter::new()),
+        OutputFormat::Terminal => Box::new(TerminalWriter::default()),
     }
 }
 

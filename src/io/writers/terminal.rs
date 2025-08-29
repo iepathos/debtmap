@@ -1,21 +1,31 @@
 use crate::core::{AnalysisResults, FunctionMetrics, Priority};
 use crate::debt::total_debt_score;
+use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::io::output::OutputWriter;
 use crate::refactoring::{ComplexityLevel, PatternRecognitionEngine};
 use crate::risk::{RiskDistribution, RiskInsight};
 use colored::*;
 
-pub struct TerminalWriter;
+pub struct TerminalWriter {
+    #[allow(dead_code)]
+    formatter: ColoredFormatter,
+}
 
 impl Default for TerminalWriter {
     fn default() -> Self {
-        Self::new()
+        Self::new(FormattingConfig::default())
     }
 }
 
 impl TerminalWriter {
-    pub fn new() -> Self {
-        Self
+    pub fn new(config: FormattingConfig) -> Self {
+        Self {
+            formatter: ColoredFormatter::new(config),
+        }
+    }
+
+    pub fn with_formatting(config: FormattingConfig) -> Self {
+        Self::new(config)
     }
 }
 
@@ -381,7 +391,7 @@ mod tests {
 
     #[test]
     fn test_write_risk_insights_complete_output() {
-        let mut writer = TerminalWriter::new();
+        let mut writer = TerminalWriter::default();
         let insights = create_test_risk_insight();
 
         // Test that the method completes without error
@@ -391,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_write_risk_insights_low_risk() {
-        let mut writer = TerminalWriter::new();
+        let mut writer = TerminalWriter::default();
         let mut insights = create_test_risk_insight();
         insights.codebase_risk_score = 25.0;
 
@@ -401,7 +411,7 @@ mod tests {
 
     #[test]
     fn test_write_risk_insights_high_risk() {
-        let mut writer = TerminalWriter::new();
+        let mut writer = TerminalWriter::default();
         let mut insights = create_test_risk_insight();
         insights.codebase_risk_score = 75.0;
 
@@ -411,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_write_risk_insights_no_correlation() {
-        let mut writer = TerminalWriter::new();
+        let mut writer = TerminalWriter::default();
         let mut insights = create_test_risk_insight();
         insights.complexity_coverage_correlation = None;
 
@@ -421,7 +431,7 @@ mod tests {
 
     #[test]
     fn test_write_risk_insights_empty_recommendations() {
-        let mut writer = TerminalWriter::new();
+        let mut writer = TerminalWriter::default();
         let mut insights = create_test_risk_insight();
         insights.risk_reduction_opportunities = Vector::new();
         insights.top_risks = Vector::new();
