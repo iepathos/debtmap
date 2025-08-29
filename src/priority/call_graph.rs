@@ -417,7 +417,7 @@ impl CallGraph {
                 // 1. NOT in production reachable set
                 // 2. NOT a test function itself (test functions are not infrastructure)
                 !reachable_from_production.contains(id)
-                    && self.nodes.get(id).map_or(false, |node| !node.is_test)
+                    && self.nodes.get(id).is_some_and(|node| !node.is_test)
             })
             .collect();
 
