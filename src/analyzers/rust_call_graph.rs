@@ -144,143 +144,190 @@ impl CallGraphExtractor {
         same_file_hint: bool,
     ) -> Option<FunctionId> {
         let all_functions = self.call_graph.find_all_functions();
+        let resolved_name = Self::normalize_path_prefix(name);
 
-        // Handle special path prefixes
-        let resolved_name = if name.starts_with("crate::") {
-            // crate:: refers to the root of the current crate
-            name.strip_prefix("crate::").unwrap().to_string()
-        } else if name.starts_with("super::") {
-            // super:: refers to the parent module
-            // For simplicity, we'll just strip it and try to match
-            name.strip_prefix("super::").unwrap().to_string()
-        } else {
-            name.to_string()
-        };
-
-        // First try exact match in same file
+        // Try same-file resolution first if hinted
         if same_file_hint {
-            if let Some(func) = all_functions
-                .iter()
-                .find(|f| (f.name == resolved_name || f.name == name) && f.file == caller.file)
+            if let Some(func) =
+                self.resolve_in_same_file(&resolved_name, name, caller, &all_functions)
             {
-                return Some(func.clone());
-            }
-
-            // For method calls, try with type prefix
-            if let Some(impl_type) = self.extract_impl_type_from_caller(&caller.name) {
-                let qualified_name = format!("{}::{}", impl_type, resolved_name);
-                if let Some(func) = all_functions
-                    .iter()
-                    .find(|f| f.name == qualified_name && f.file == caller.file)
-                {
-                    return Some(func.clone());
-                }
+                return Some(func);
             }
         }
 
-        // Enhanced cross-module resolution with prioritization
+        // Find all matching functions
         let mut matches: Vec<_> = all_functions
             .iter()
-            .filter(|f| {
-                // Exact match (highest priority)
-                if f.name == resolved_name || f.name == name {
-                    return true;
-                }
-
-                // Function name ends with the target (e.g., "SomeType::new" matches "new")
-                if f.name.ends_with(&format!("::{}", resolved_name)) {
-                    return true;
-                }
-
-                // Cross-module associated function call resolution:
-                // For calls like "ContextualRisk::new", match against functions with exactly that name
-                // even if they're in different files
-                if name.contains("::") && f.name == name {
-                    return true;
-                }
-
-                // Module-qualified match: strip common module prefixes and try to match
-                // BUT only if the type names also match to avoid false matches
-                if let Some(base_name) = name.split("::").last() {
-                    if let Some(func_base_name) = f.name.split("::").last() {
-                        if base_name == func_base_name {
-                            // Additional check: if both have type prefixes, they should match
-                            let name_parts: Vec<&str> = name.split("::").collect();
-                            let func_parts: Vec<&str> = f.name.split("::").collect();
-
-                            if name_parts.len() >= 2 && func_parts.len() >= 2 {
-                                // Both have type::method format, check if types match
-                                return name_parts[0] == func_parts[0];
-                            } else {
-                                // At least one is unqualified, allow the match
-                                return true;
-                            }
-                        }
-                    }
-                }
-
-                false
-            })
+            .filter(|f| Self::matches_function_name(f, &resolved_name, name))
             .collect();
 
-        // Sort matches to prioritize qualified names over unqualified ones
-        // This helps resolve ambiguity between "method_name" and "Type::method_name"
+        // Sort by qualification preference
+        Self::sort_by_qualification(&mut matches);
+
+        // Disambiguate multiple matches
+        Self::disambiguate_matches(matches, name, &resolved_name, caller)
+    }
+
+    /// Normalize path prefixes (crate::, super::) to standard form
+    fn normalize_path_prefix(name: &str) -> String {
+        match () {
+            _ if name.starts_with("crate::") => name.strip_prefix("crate::").unwrap().to_string(),
+            _ if name.starts_with("super::") => name.strip_prefix("super::").unwrap().to_string(),
+            _ => name.to_string(),
+        }
+    }
+
+    /// Try to resolve function in the same file as the caller
+    fn resolve_in_same_file(
+        &self,
+        resolved_name: &str,
+        original_name: &str,
+        caller: &FunctionId,
+        all_functions: &[FunctionId],
+    ) -> Option<FunctionId> {
+        // Try exact match in same file
+        if let Some(func) = all_functions
+            .iter()
+            .find(|f| (f.name == resolved_name || f.name == original_name) && f.file == caller.file)
+        {
+            return Some(func.clone());
+        }
+
+        // Try with type prefix for method calls
+        if let Some(impl_type) = self.extract_impl_type_from_caller(&caller.name) {
+            let qualified_name = format!("{}::{}", impl_type, resolved_name);
+            if let Some(func) = all_functions
+                .iter()
+                .find(|f| f.name == qualified_name && f.file == caller.file)
+            {
+                return Some(func.clone());
+            }
+        }
+
+        None
+    }
+
+    /// Check if a function matches the search criteria
+    fn matches_function_name(func: &&FunctionId, resolved_name: &str, original_name: &str) -> bool {
+        // Exact match
+        if func.name == resolved_name || func.name == original_name {
+            return true;
+        }
+
+        // Ends with target (e.g., "Type::method" matches "method")
+        if func.name.ends_with(&format!("::{}", resolved_name)) {
+            return true;
+        }
+
+        // Cross-module qualified match
+        if original_name.contains("::") && func.name == original_name {
+            return true;
+        }
+
+        // Base name match with type checking
+        Self::matches_base_name_with_type_check(func.name.as_str(), original_name)
+    }
+
+    /// Check if base names match, considering type prefixes
+    fn matches_base_name_with_type_check(func_name: &str, search_name: &str) -> bool {
+        let Some(search_base) = search_name.split("::").last() else {
+            return false;
+        };
+        let Some(func_base) = func_name.split("::").last() else {
+            return false;
+        };
+
+        if search_base != func_base {
+            return false;
+        }
+
+        // Check type prefix compatibility
+        let search_parts: Vec<&str> = search_name.split("::").collect();
+        let func_parts: Vec<&str> = func_name.split("::").collect();
+
+        match (search_parts.len() >= 2, func_parts.len() >= 2) {
+            (true, true) => search_parts[0] == func_parts[0], // Both qualified: types must match
+            _ => true, // At least one unqualified: allow match
+        }
+    }
+
+    /// Sort matches by qualification (qualified names first)
+    fn sort_by_qualification(matches: &mut Vec<&FunctionId>) {
         matches.sort_by(|a, b| {
             let a_qualified = a.name.contains("::");
             let b_qualified = b.name.contains("::");
             match (a_qualified, b_qualified) {
-                (true, false) => std::cmp::Ordering::Less, // Prefer qualified names
+                (true, false) => std::cmp::Ordering::Less,
                 (false, true) => std::cmp::Ordering::Greater,
                 _ => std::cmp::Ordering::Equal,
             }
         });
+    }
 
+    /// Disambiguate multiple matching functions
+    fn disambiguate_matches(
+        matches: Vec<&FunctionId>,
+        original_name: &str,
+        resolved_name: &str,
+        caller: &FunctionId,
+    ) -> Option<FunctionId> {
         match matches.len() {
-            1 => Some(matches[0].clone()), // Unique match across all files
-            0 => None,                     // No match found
-            _ => {
-                // Multiple matches - use sophisticated disambiguation
+            0 => None,
+            1 => Some(matches[0].clone()),
+            _ => Self::apply_disambiguation_strategies(
+                &matches,
+                original_name,
+                resolved_name,
+                caller,
+            ),
+        }
+    }
 
-                // For unqualified method names (like "calculate_coupling_metrics"),
-                // prefer qualified matches (like "Type::calculate_coupling_metrics")
-                // over standalone functions with the same name.
-                // This helps resolve method calls correctly.
-
-                // 1. If the name doesn't contain "::" (unqualified), prefer qualified matches
-                if !name.contains("::") {
-                    // Look for qualified matches first (Type::method)
-                    if let Some(qualified_match) = matches
-                        .iter()
-                        .find(|f| f.name.contains("::") && f.name.ends_with(&format!("::{}", name)))
-                    {
-                        return Some((*qualified_match).clone());
-                    }
-                }
-
-                // 2. Prefer exact name match
-                if let Some(exact_match) = matches
-                    .iter()
-                    .find(|f| f.name == name || f.name == resolved_name)
-                {
-                    return Some((*exact_match).clone());
-                }
-
-                // 3. Prefer same file if available
-                if let Some(same_file_match) = matches.iter().find(|f| f.file == caller.file) {
-                    return Some((*same_file_match).clone());
-                }
-
-                // 4. For associated function calls (Type::method), prefer the match that looks most like an impl
-                if name.contains("::") {
-                    if let Some(impl_match) = matches.iter().find(|f| f.name == name) {
-                        return Some((*impl_match).clone());
-                    }
-                }
-
-                // 5. Fall back to the first match (after sorting)
-                matches.first().map(|f| (*f).clone())
+    /// Apply disambiguation strategies in order of preference
+    fn apply_disambiguation_strategies(
+        matches: &[&FunctionId],
+        original_name: &str,
+        resolved_name: &str,
+        caller: &FunctionId,
+    ) -> Option<FunctionId> {
+        // Strategy 1: Prefer qualified matches for unqualified names
+        if !original_name.contains("::") {
+            if let Some(qualified) = matches.iter().find(|f| {
+                f.name.contains("::") && f.name.ends_with(&format!("::{}", original_name))
+            }) {
+                return Some((*qualified).clone());
             }
         }
+
+        // Strategy 2: Exact name match with same-file preference
+        let exact_matches: Vec<_> = matches
+            .iter()
+            .filter(|f| f.name == original_name || f.name == resolved_name)
+            .collect();
+
+        if !exact_matches.is_empty() {
+            // Prefer same file among exact matches
+            if let Some(same_file_exact) = exact_matches.iter().find(|f| f.file == caller.file) {
+                return Some((**same_file_exact).clone());
+            }
+            // Otherwise return first exact match
+            return Some((*exact_matches[0]).clone());
+        }
+
+        // Strategy 3: Same file preference (for non-exact matches)
+        if let Some(same_file) = matches.iter().find(|f| f.file == caller.file) {
+            return Some((*same_file).clone());
+        }
+
+        // Strategy 4: For qualified calls, prefer exact impl match
+        if original_name.contains("::") {
+            if let Some(impl_match) = matches.iter().find(|f| f.name == original_name) {
+                return Some((*impl_match).clone());
+            }
+        }
+
+        // Strategy 5: Fall back to first match
+        matches.first().map(|f| (*f).clone())
     }
 
     /// Extract impl type from a function name like "TypeName::method"
@@ -1161,6 +1208,136 @@ mod tests {
 
     fn parse_rust_code(code: &str) -> syn::File {
         syn::parse_str(code).expect("Failed to parse code")
+    }
+
+    #[test]
+    fn test_normalize_path_prefix() {
+        // Test crate:: prefix removal
+        assert_eq!(
+            CallGraphExtractor::normalize_path_prefix("crate::module::func"),
+            "module::func"
+        );
+
+        // Test super:: prefix removal
+        assert_eq!(
+            CallGraphExtractor::normalize_path_prefix("super::parent::func"),
+            "parent::func"
+        );
+
+        // Test no prefix
+        assert_eq!(
+            CallGraphExtractor::normalize_path_prefix("regular::func"),
+            "regular::func"
+        );
+
+        // Test simple name
+        assert_eq!(
+            CallGraphExtractor::normalize_path_prefix("simple_func"),
+            "simple_func"
+        );
+    }
+
+    #[test]
+    fn test_matches_base_name_with_type_check() {
+        // Both qualified with matching types
+        assert!(CallGraphExtractor::matches_base_name_with_type_check(
+            "MyType::method",
+            "MyType::method"
+        ));
+
+        // Both qualified with different types
+        assert!(!CallGraphExtractor::matches_base_name_with_type_check(
+            "TypeA::method",
+            "TypeB::method"
+        ));
+
+        // One qualified, one not - should match
+        assert!(CallGraphExtractor::matches_base_name_with_type_check(
+            "MyType::method",
+            "method"
+        ));
+
+        // Different base names
+        assert!(!CallGraphExtractor::matches_base_name_with_type_check(
+            "MyType::foo",
+            "MyType::bar"
+        ));
+    }
+
+    #[test]
+    fn test_sort_by_qualification() {
+        let func1 = FunctionId {
+            name: "unqualified".to_string(),
+            file: PathBuf::new(),
+            line: 1,
+        };
+        let func2 = FunctionId {
+            name: "Type::qualified".to_string(),
+            file: PathBuf::new(),
+            line: 2,
+        };
+        let func3 = FunctionId {
+            name: "another_unqualified".to_string(),
+            file: PathBuf::new(),
+            line: 3,
+        };
+
+        let mut matches = vec![&func1, &func2, &func3];
+        CallGraphExtractor::sort_by_qualification(&mut matches);
+
+        // Qualified should come first
+        assert_eq!(matches[0].name, "Type::qualified");
+        assert!(!matches[1].name.contains("::"));
+        assert!(!matches[2].name.contains("::"));
+    }
+
+    #[test]
+    fn test_apply_disambiguation_strategies() {
+        let caller = FunctionId {
+            name: "caller::func".to_string(),
+            file: PathBuf::from("src/mod.rs"),
+            line: 10,
+        };
+
+        let func1 = FunctionId {
+            name: "Type::method".to_string(),
+            file: PathBuf::from("src/other.rs"),
+            line: 20,
+        };
+        let func2 = FunctionId {
+            name: "method".to_string(),
+            file: PathBuf::from("src/mod.rs"),
+            line: 30,
+        };
+
+        let matches = vec![&func1, &func2];
+
+        // Test unqualified name preferring qualified match
+        let result = CallGraphExtractor::apply_disambiguation_strategies(
+            &matches, "method", "method", &caller,
+        );
+        assert_eq!(result.unwrap().name, "Type::method");
+
+        // Test same file preference
+        let func3 = FunctionId {
+            name: "exact_match".to_string(),
+            file: PathBuf::from("src/mod.rs"),
+            line: 40,
+        };
+        let func4 = FunctionId {
+            name: "exact_match".to_string(),
+            file: PathBuf::from("src/other.rs"),
+            line: 50,
+        };
+        let matches2 = vec![&func4, &func3];
+
+        let result2 = CallGraphExtractor::apply_disambiguation_strategies(
+            &matches2,
+            "exact_match",
+            "exact_match",
+            &caller,
+        );
+        assert_eq!(result2.unwrap().file, PathBuf::from("src/mod.rs"));
     }
 
     #[test]
