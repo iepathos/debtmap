@@ -233,6 +233,28 @@ struct EnhancedFunctionAnalysis {
     enhanced_message: Option<EnhancedComplexityMessage>,
 }
 
+// Helper structs for refactored code
+#[derive(Clone)]
+struct FunctionMetadata {
+    is_test: bool,
+    visibility: Option<String>,
+    entropy_score: Option<crate::complexity::entropy::EntropyScore>,
+    purity_info: (Option<bool>, Option<f32>),
+}
+
+struct ComplexityMetricsData {
+    cyclomatic: u32,
+    cognitive: u32,
+}
+
+struct FunctionContext {
+    name: String,
+    file: PathBuf,
+    line: usize,
+    is_trait_method: bool,
+    in_test_module: bool,
+}
+
 struct FunctionVisitor {
     functions: Vec<FunctionMetrics>,
     current_file: PathBuf,
@@ -287,76 +309,142 @@ impl FunctionVisitor {
         line: usize,
         is_trait_method: bool,
     ) {
-        let is_test = Self::is_test_function(&name, item_fn);
-        let visibility = Self::extract_visibility(&item_fn.vis);
-        let entropy_score = Self::calculate_entropy_if_enabled(&item_fn.block);
-        let (is_pure, purity_confidence) = Self::detect_purity(item_fn);
+        // Extract basic function metadata
+        let metadata = Self::extract_function_metadata(&name, item_fn);
 
-        let cyclomatic = self.calculate_cyclomatic_with_visitor(&item_fn.block, item_fn);
-        let cognitive = self.calculate_cognitive_with_visitor(&item_fn.block, item_fn);
+        // Calculate complexity metrics
+        let complexity_metrics = self.calculate_complexity_metrics(&item_fn.block, item_fn);
 
         // Perform enhanced complexity analysis
-        let mut match_detector = RecursiveMatchDetector::new();
-        let matches = match_detector.find_matches_in_block(&item_fn.block);
+        let enhanced_analysis = Self::perform_enhanced_analysis(&item_fn.block);
 
-        let mut if_else_analyzer = IfElseChainAnalyzer::new();
-        let if_else_chains = if_else_analyzer.analyze_block(&item_fn.block);
-
-        let metrics = FunctionMetrics {
+        // Build complete metrics
+        let context = FunctionContext {
             name: name.clone(),
             file: self.current_file.clone(),
             line,
-            cyclomatic,
-            cognitive,
-            nesting: calculate_nesting(&item_fn.block),
-            length: count_function_lines(item_fn),
-            is_test,
-            visibility,
             is_trait_method,
             in_test_module: self.in_test_module,
-            entropy_score,
-            is_pure,
-            purity_confidence,
         };
+        let metrics = Self::build_function_metrics(
+            context,
+            metadata.clone(),
+            complexity_metrics,
+            &item_fn.block,
+            item_fn,
+        );
 
-        // Check if function should be flagged based on enhanced thresholds
-        let role = if is_test {
-            crate::complexity::threshold_manager::FunctionRole::Test
-        } else if name == "main" {
-            crate::complexity::threshold_manager::FunctionRole::EntryPoint
-        } else {
-            crate::complexity::threshold_manager::FunctionRole::CoreLogic
-        };
+        // Determine function role and check if it should be flagged
+        let role = Self::classify_function_role(&name, metadata.is_test);
 
-        if self
-            .enhanced_thresholds
-            .should_flag_function(&metrics, role.clone())
-        {
-            // Generate enhanced message for complex functions
-            let enhanced_msg = generate_enhanced_message(
-                &metrics,
+        // Create and store analysis results
+        let analysis_result =
+            self.create_analysis_result(name.clone(), &metrics, role, enhanced_analysis);
+
+        self.enhanced_analysis.push(analysis_result);
+        self.functions.push(metrics);
+    }
+
+    // Pure function to extract metadata
+    fn extract_function_metadata(name: &str, item_fn: &syn::ItemFn) -> FunctionMetadata {
+        FunctionMetadata {
+            is_test: Self::is_test_function(name, item_fn),
+            visibility: Self::extract_visibility(&item_fn.vis),
+            entropy_score: Self::calculate_entropy_if_enabled(&item_fn.block),
+            purity_info: Self::detect_purity(item_fn),
+        }
+    }
+
+    // Method to calculate complexity metrics
+    fn calculate_complexity_metrics(
+        &self,
+        block: &syn::Block,
+        item_fn: &syn::ItemFn,
+    ) -> ComplexityMetricsData {
+        ComplexityMetricsData {
+            cyclomatic: self.calculate_cyclomatic_with_visitor(block, item_fn),
+            cognitive: self.calculate_cognitive_with_visitor(block, item_fn),
+        }
+    }
+
+    // Pure function for enhanced analysis
+    fn perform_enhanced_analysis(block: &syn::Block) -> (Vec<MatchLocation>, Vec<IfElseChain>) {
+        let mut match_detector = RecursiveMatchDetector::new();
+        let matches = match_detector.find_matches_in_block(block);
+
+        let mut if_else_analyzer = IfElseChainAnalyzer::new();
+        let if_else_chains = if_else_analyzer.analyze_block(block);
+
+        (matches, if_else_chains)
+    }
+
+    // Pure function to build metrics
+    fn build_function_metrics(
+        context: FunctionContext,
+        metadata: FunctionMetadata,
+        complexity: ComplexityMetricsData,
+        block: &syn::Block,
+        item_fn: &syn::ItemFn,
+    ) -> FunctionMetrics {
+        FunctionMetrics {
+            name: context.name,
+            file: context.file,
+            line: context.line,
+            cyclomatic: complexity.cyclomatic,
+            cognitive: complexity.cognitive,
+            nesting: calculate_nesting(block),
+            length: count_function_lines(item_fn),
+            is_test: metadata.is_test,
+            visibility: metadata.visibility,
+            is_trait_method: context.is_trait_method,
+            in_test_module: context.in_test_module,
+            entropy_score: metadata.entropy_score,
+            is_pure: metadata.purity_info.0,
+            purity_confidence: metadata.purity_info.1,
+        }
+    }
+
+    // Pure function to classify function role
+    fn classify_function_role(
+        name: &str,
+        is_test: bool,
+    ) -> crate::complexity::threshold_manager::FunctionRole {
+        use crate::complexity::threshold_manager::FunctionRole;
+
+        match () {
+            _ if is_test => FunctionRole::Test,
+            _ if name == "main" => FunctionRole::EntryPoint,
+            _ => FunctionRole::CoreLogic,
+        }
+    }
+
+    // Method to create analysis result
+    fn create_analysis_result(
+        &self,
+        name: String,
+        metrics: &FunctionMetrics,
+        role: crate::complexity::threshold_manager::FunctionRole,
+        enhanced_analysis: (Vec<MatchLocation>, Vec<IfElseChain>),
+    ) -> EnhancedFunctionAnalysis {
+        let (matches, if_else_chains) = enhanced_analysis;
+
+        let enhanced_message = if self.enhanced_thresholds.should_flag_function(metrics, role) {
+            Some(generate_enhanced_message(
+                metrics,
                 &matches,
                 &if_else_chains,
                 &self.enhanced_thresholds,
-            );
-
-            self.enhanced_analysis.push(EnhancedFunctionAnalysis {
-                function_name: name.clone(),
-                matches,
-                if_else_chains,
-                enhanced_message: Some(enhanced_msg),
-            });
+            ))
         } else {
-            // Store analysis even if not flagged, for statistics
-            self.enhanced_analysis.push(EnhancedFunctionAnalysis {
-                function_name: name.clone(),
-                matches,
-                if_else_chains,
-                enhanced_message: None,
-            });
-        }
+            None
+        };
 
-        self.functions.push(metrics);
+        EnhancedFunctionAnalysis {
+            function_name: name,
+            matches,
+            if_else_chains,
+            enhanced_message,
+        }
     }
 
     fn is_test_function(name: &str, item_fn: &syn::ItemFn) -> bool {
