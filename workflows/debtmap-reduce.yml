@@ -5,7 +5,7 @@ mode: mapreduce
 setup:
   - shell: "just coverage-lcov"
     
-  - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output debtmap.json --format json"
+  - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output debtmap.json --format json"
 
 # Map phase: Process each debt item in parallel
 map:
@@ -16,28 +16,9 @@ map:
   # Commands to execute for each debt item
   agent_template:
     commands:
-      # Fix the specific debt item with all available context
+      # Fix the specific debt item with the full JSON context
       - claude: |
-          /fix-debt-item \
-            --file "${item.location.file}" \
-            --function "${item.location.function}" \
-            --line ${item.location.line} \
-            --score ${item.unified_score.final_score} \
-            --cyclomatic ${item.cyclomatic_complexity:-0} \
-            --cognitive ${item.cognitive_complexity:-0} \
-            --nesting ${item.nesting_depth:-0} \
-            --length ${item.function_length:-0} \
-            --role "${item.function_role:-Unknown}" \
-            --action "${item.recommendation.primary_action:-Add tests}" \
-            --coverage-factor ${item.unified_score.coverage_factor:-0} \
-            --complexity-factor ${item.unified_score.complexity_factor:-0} \
-            --upstream ${item.upstream_dependencies:-0} \
-            --downstream ${item.downstream_dependencies:-0} \
-            --risk-reduction ${item.expected_impact.risk_reduction:-0} \
-            --complexity-reduction ${item.expected_impact.complexity_reduction:-0} \
-            --entropy ${item.entropy_details.entropy_score:-0} \
-            --repetition ${item.entropy_details.pattern_repetition:-0} \
-            --adjusted-complexity ${item.entropy_details.adjusted_complexity:-0}
+          /fix-debt-item --json '${item}'
         capture_output: true
         commit_required: true
         timeout: 300
@@ -86,10 +67,17 @@ reduce:
     # Re-run debtmap to measure improvements
     - shell: "just coverage-lcov"
     
-    - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output debtmap-after.json --format json"
+    - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output debtmap-after.json --format json"
       capture_output: true
     
     # Compare debt metrics and create final commit with summary
-    - claude: "/mmm-compare-debt-results --before debtmap.json --after debtmap-after.json --map-results '${map.results}' --successful ${map.successful} --failed ${map.failed} --total ${map.total}"
+    - claude: |
+        /mmm-compare-debt-results \
+          --before debtmap.json \
+          --after debtmap-after.json \
+          --map-results '${map.results}' \
+          --successful ${map.successful} \
+          --failed ${map.failed} \
+          --total ${map.total}
       commit_required: true
 

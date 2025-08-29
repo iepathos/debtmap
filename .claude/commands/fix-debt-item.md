@@ -9,35 +9,42 @@ Fix a single tech debt item with the provided parameters from debtmap analysis.
 
 ## Parameters
 
-Required parameters passed from MapReduce workflow:
-- `--file`: The file containing the debt item
-- `--function`: The function name with the issue
-- `--line`: The line number where the issue starts
-- `--score`: The unified priority score of this item
+The workflow passes a single JSON object containing all debt item information:
+- `--json`: Complete JSON object for the debt item
 
-Additional context parameters:
-- `--cyclomatic`: Cyclomatic complexity of the function
-- `--cognitive`: Cognitive complexity of the function
-- `--nesting`: Maximum nesting depth
-- `--length`: Number of lines in the function
-- `--role`: Function role (e.g., PureLogic, IOWrapper, Orchestration)
-- `--action`: Primary action recommended by debtmap
-- `--coverage-factor`: Coverage factor from unified score
-- `--complexity-factor`: Complexity factor from unified score
-- `--roi-factor`: ROI factor from unified score
-- `--upstream`: Number of upstream dependencies
-- `--downstream`: Number of downstream dependencies
-- `--risk-reduction`: Expected risk reduction from fixing
-- `--complexity-reduction`: Expected complexity reduction from fixing
-- `--entropy`: Entropy score (0-1, higher means more diverse patterns)
-- `--repetition`: Pattern repetition rate (0-1, higher means more repetitive)
-- `--adjusted-complexity`: Entropy-adjusted complexity value
+The JSON object contains fields such as:
+- `location`: Object with `file`, `function`, `line` fields
+- `unified_score`: Object with `final_score`, `coverage_factor`, `complexity_factor`, etc.
+- `cyclomatic_complexity`: Cyclomatic complexity metric
+- `cognitive_complexity`: Cognitive complexity metric  
+- `nesting_depth`: Maximum nesting depth
+- `function_length`: Number of lines in the function
+- `function_role`: Role classification (e.g., PureLogic, IOWrapper, Orchestration)
+- `recommendation`: Object with `primary_action` and other suggestions
+- `upstream_dependencies`: Count of upstream dependencies
+- `downstream_dependencies`: Count of downstream dependencies
+- `expected_impact`: Object with `risk_reduction`, `complexity_reduction`
+- `entropy_details`: Object with `entropy_score`, `pattern_repetition`, `adjusted_complexity`
+- And any other fields debtmap provides
 
 ## Process
 
-### Step 0: Interpret the Recommended Action
+### Step 0: Parse the JSON Object
 
-The `--action` parameter provides debtmap's specific recommendation. Common patterns:
+First, parse the provided JSON to extract the necessary fields. The JSON object passed via `--json` contains all debt metrics and recommendations.
+
+Extract key values from the JSON:
+- File path: `item.location.file`
+- Function name: `item.location.function`
+- Line number: `item.location.line`
+- Score: `item.unified_score.final_score`
+- Complexity metrics: `item.cyclomatic_complexity`, `item.cognitive_complexity`
+- Recommended action: `item.recommendation.primary_action`
+- And all other relevant fields as needed
+
+### Step 1: Interpret the Recommended Action
+
+The `recommendation.primary_action` field provides debtmap's specific recommendation. Common patterns:
 
 - **"Extract N pure functions (complexity X → Y), then add Z tests"**
   → Priority is refactoring for complexity reduction, followed by testing
@@ -55,21 +62,17 @@ Use this action as your primary guide, but validate it makes sense given the cod
 
 ### Step 1: Analyze the Specific Issue
 
-Read the file and locate the exact function:
-```bash
-# View the function context
-sed -n "${line},+50p" ${file}
-```
+Read the file and locate the exact function using the location information from the JSON object.
 
-Use the provided metrics to understand the issue:
-- **Score**: ${score} (Priority level)
-- **Complexity**: Cyclomatic=${cyclomatic}, Cognitive=${cognitive}, Adjusted=${adjusted-complexity}
-- **Entropy**: Score=${entropy}, Repetition=${repetition} (high repetition suggests extractable patterns)
-- **Structure**: Nesting depth=${nesting}, Length=${length} lines
-- **Role**: ${role} (determines refactoring approach)
-- **Dependencies**: ${upstream} upstream, ${downstream} downstream
-- **Recommended Action**: ${action}
-- **Expected Impact**: Risk reduction=${risk-reduction}, Complexity reduction=${complexity-reduction}
+Use the provided metrics from the JSON to understand the issue:
+- **Score**: `item.unified_score.final_score` (Priority level)
+- **Complexity**: Cyclomatic=`item.cyclomatic_complexity`, Cognitive=`item.cognitive_complexity`, Adjusted=`item.entropy_details.adjusted_complexity`
+- **Entropy**: Score=`item.entropy_details.entropy_score`, Repetition=`item.entropy_details.pattern_repetition` (high repetition suggests extractable patterns)
+- **Structure**: Nesting depth=`item.nesting_depth`, Length=`item.function_length` lines
+- **Role**: `item.function_role` (determines refactoring approach)
+- **Dependencies**: `item.upstream_dependencies` upstream, `item.downstream_dependencies` downstream
+- **Recommended Action**: `item.recommendation.primary_action`
+- **Expected Impact**: Risk reduction=`item.expected_impact.risk_reduction`, Complexity reduction=`item.expected_impact.complexity_reduction`
 
 Priority levels:
 - **CRITICAL (Score 10.0)**: Functions with high complexity and zero coverage
@@ -86,7 +89,7 @@ Priority levels:
 - **Adjusted complexity < Original**: Entropy analysis suggests true complexity is lower
 - **High entropy (>0.7)**: Diverse patterns - may be legitimately complex
 
-**Then consider the function role (${role}):**
+**Then consider the function role (`item.function_role`):**
 
 - **PureLogic**: Focus on breaking down complex logic into smaller pure functions
 - **IOWrapper**: Extract business logic from I/O operations  
@@ -221,7 +224,7 @@ fn process_file(path: &Path) -> Result<(), Error> {
 
 **For Testing Priority:**
 
-Based on the metrics (Score=${score}, Cyclomatic=${cyclomatic}):
+Based on the metrics from the JSON object:
 - Score >= 7 AND Cyclomatic > 10 → Apply functional refactoring first (see Step 3)
 - Coverage-factor > 5 → Focus on comprehensive test coverage
 - Otherwise → Add targeted tests for uncovered branches
@@ -284,38 +287,38 @@ Create a descriptive commit message that includes:
 **For refactoring commits:**
 ```bash
 git add -A
-git commit -m "refactor: reduce complexity in ${function}
+git commit -m "refactor: reduce complexity in [function_name]
 
-- Applied: ${action}
-- Complexity: ${cyclomatic} → [new_complexity] (adjusted: ${adjusted-complexity})
-- Entropy: ${entropy}, Repetition: ${repetition}
-- Function: ${function} in ${file}
-- Risk reduction: ${risk-reduction}
+- Applied: [action from item.recommendation.primary_action]
+- Complexity: [item.cyclomatic_complexity] → [new_complexity] (adjusted: [item.entropy_details.adjusted_complexity])
+- Entropy: [item.entropy_details.entropy_score], Repetition: [item.entropy_details.pattern_repetition]
+- Function: [item.location.function] in [item.location.file]
+- Risk reduction: [item.expected_impact.risk_reduction]
 "
 ```
 
 **For test addition commits:**
 ```bash
 git add -A
-git commit -m "test: add coverage for ${function}
+git commit -m "test: add coverage for [function_name]
 
-- Added [N] test cases for ${function}
-- Coverage factor: ${coverage-factor}
-- Function: ${function} in ${file}
-- Expected risk reduction: ${risk-reduction}
+- Added [N] test cases for [item.location.function]
+- Coverage factor: [item.unified_score.coverage_factor]
+- Function: [item.location.function] in [item.location.file]
+- Expected risk reduction: [item.expected_impact.risk_reduction]
 "
 ```
 
 **For combined refactoring + tests:**
 ```bash
 git add -A
-git commit -m "fix: refactor and test ${function}
+git commit -m "fix: refactor and test [function_name]
 
-- Applied: ${action}
-- Complexity: ${cyclomatic} → [new_complexity]
+- Applied: [item.recommendation.primary_action]
+- Complexity: [item.cyclomatic_complexity] → [new_complexity]
 - Added [N] comprehensive tests
-- Function: ${function} in ${file}
-- Risk reduction: ${risk-reduction}
+- Function: [item.location.function] in [item.location.file]
+- Risk reduction: [item.expected_impact.risk_reduction]
 "
 ```
 
