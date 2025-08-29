@@ -1,7 +1,7 @@
 use super::{
     MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, PrimitiveUsageContext,
 };
-use crate::common::SourceLocation;
+use crate::common::{capitalize_first, SourceLocation};
 use std::collections::HashMap;
 use syn::{self, visit::Visit};
 
@@ -306,12 +306,4 @@ fn is_primitive_type(type_name: &str) -> bool {
             | "f32"
             | "f64"
     )
-}
-
-fn capitalize_first(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-    }
 }
