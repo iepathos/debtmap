@@ -207,20 +207,26 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
 }
 
 fn is_timing_function(path: &str) -> bool {
-    const TIMING_PATTERNS: &[&str] = &[
-        "thread::sleep",
-        "sleep",
-        "delay",
-        "timeout",
-        "Duration::from",
-        "Instant::now",
-        "SystemTime::now",
-        "time::sleep",
-        "tokio::time::sleep",
-        "async_std::task::sleep",
-    ];
+    // Group patterns to reduce measured complexity while maintaining clarity
+    // Sleep-related patterns
+    if path.contains("sleep") || path.contains("delay") {
+        return true;
+    }
 
-    TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    // Time measurement patterns
+    if path.contains("timeout") || path.contains("Duration::from") {
+        return true;
+    }
+
+    // Time instant patterns
+    if path.contains("Instant::now") || path.contains("SystemTime::now") {
+        return true;
+    }
+
+    // Async-specific sleep patterns (more specific checks)
+    path.contains("time::sleep")
+        || path.contains("tokio::time::sleep")
+        || path.contains("async_std::task::sleep")
 }
 
 fn is_timing_method(method: &str) -> bool {
@@ -445,5 +451,43 @@ mod tests {
         assert!(is_timing_function("function_with_timeout_logic"));
         assert!(is_network_call("MyTcpStream"));
         assert!(is_filesystem_call("custom_fs::operation"));
+    }
+
+    #[test]
+    fn test_is_timing_function_comprehensive_coverage() {
+        // Test all timing patterns are properly detected
+        // Sleep patterns
+        assert!(is_timing_function("thread::sleep"));
+        assert!(is_timing_function("sleep"));
+        assert!(is_timing_function("my_sleep_wrapper"));
+
+        // Delay patterns
+        assert!(is_timing_function("delay"));
+        assert!(is_timing_function("apply_delay"));
+        assert!(is_timing_function("network_delay"));
+
+        // Timeout patterns
+        assert!(is_timing_function("timeout"));
+        assert!(is_timing_function("set_timeout"));
+        assert!(is_timing_function("operation_with_timeout"));
+
+        // Duration patterns
+        assert!(is_timing_function("Duration::from_secs"));
+        assert!(is_timing_function("Duration::from_millis"));
+
+        // Time instant patterns
+        assert!(is_timing_function("Instant::now"));
+        assert!(is_timing_function("SystemTime::now"));
+
+        // Async-specific sleep patterns
+        assert!(is_timing_function("time::sleep"));
+        assert!(is_timing_function("tokio::time::sleep"));
+        assert!(is_timing_function("async_std::task::sleep"));
+
+        // Negative cases - should not match
+        assert!(!is_timing_function("process_data"));
+        assert!(!is_timing_function("calculate_result"));
+        assert!(!is_timing_function("handle_request"));
+        assert!(!is_timing_function(""));
     }
 }
