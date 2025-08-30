@@ -126,54 +126,32 @@ impl GodObjectDetector {
     }
 
     fn extract_method_prefix(&self, method_name: &str) -> String {
+        Self::find_matching_prefix(method_name)
+            .unwrap_or_else(|| Self::extract_first_word(method_name))
+    }
+
+    /// Pure function to find a matching prefix from the common list
+    fn find_matching_prefix(method_name: &str) -> Option<String> {
         const COMMON_PREFIXES: &[&str] = &[
-            "get",
-            "set",
-            "is",
-            "has",
-            "can",
-            "should",
-            "will",
-            "create",
-            "build",
-            "make",
-            "new",
-            "init",
-            "calculate",
-            "compute",
-            "process",
-            "transform",
-            "validate",
-            "check",
-            "verify",
-            "ensure",
-            "save",
-            "load",
-            "store",
-            "retrieve",
-            "fetch",
-            "update",
-            "modify",
-            "change",
-            "edit",
-            "delete",
-            "remove",
-            "clear",
-            "reset",
-            "send",
-            "receive",
-            "handle",
-            "manage",
+            "get", "set", "is", "has", "can", "should", "will",
+            "create", "build", "make", "new", "init",
+            "calculate", "compute", "process", "transform",
+            "validate", "check", "verify", "ensure",
+            "save", "load", "store", "retrieve", "fetch",
+            "update", "modify", "change", "edit",
+            "delete", "remove", "clear", "reset",
+            "send", "receive", "handle", "manage",
         ];
 
         let lower_name = method_name.to_lowercase();
+        COMMON_PREFIXES
+            .iter()
+            .find(|&&prefix| lower_name.starts_with(prefix))
+            .map(|&s| s.to_string())
+    }
 
-        for prefix in COMMON_PREFIXES {
-            if lower_name.starts_with(prefix) {
-                return prefix.to_string();
-            }
-        }
-
+    /// Pure function to extract the first word from a method name
+    fn extract_first_word(method_name: &str) -> String {
         method_name
             .split('_')
             .next()
@@ -182,13 +160,22 @@ impl GodObjectDetector {
     }
 
     fn infer_responsibility_name(&self, prefix: &str) -> String {
+        Self::classify_responsibility(prefix)
+    }
+
+    /// Pure function to classify responsibility based on method prefix
+    fn classify_responsibility(prefix: &str) -> String {
         match prefix {
             "get" | "set" => "Data Access".to_string(),
             "calculate" | "compute" => "Computation".to_string(),
-            "validate" | "check" => "Validation".to_string(),
-            "save" | "load" | "store" => "Persistence".to_string(),
-            "create" | "build" | "new" => "Construction".to_string(),
-            "send" | "receive" | "handle" => "Communication".to_string(),
+            "validate" | "check" | "verify" | "ensure" => "Validation".to_string(),
+            "save" | "load" | "store" | "retrieve" | "fetch" => "Persistence".to_string(),
+            "create" | "build" | "new" | "make" | "init" => "Construction".to_string(),
+            "send" | "receive" | "handle" | "manage" => "Communication".to_string(),
+            "update" | "modify" | "change" | "edit" => "Modification".to_string(),
+            "delete" | "remove" | "clear" | "reset" => "Deletion".to_string(),
+            "is" | "has" | "can" | "should" | "will" => "State Query".to_string(),
+            "process" | "transform" => "Processing".to_string(),
             _ => format!("{} Operations", capitalize_first(prefix)),
         }
     }
@@ -368,6 +355,218 @@ impl<'ast> Visit<'ast> for TypeVisitor {
 mod tests {
     use super::*;
     use syn::{parse_quote, ItemImpl};
+
+    #[test]
+    fn test_find_matching_prefix_with_get() {
+        assert_eq!(
+            GodObjectDetector::find_matching_prefix("get_value"),
+            Some("get".to_string())
+        );
+    }
+
+    #[test]
+    fn test_find_matching_prefix_with_set() {
+        assert_eq!(
+            GodObjectDetector::find_matching_prefix("setValue"),
+            Some("set".to_string())
+        );
+    }
+
+    #[test]
+    fn test_find_matching_prefix_with_validate() {
+        assert_eq!(
+            GodObjectDetector::find_matching_prefix("validate_input"),
+            Some("validate".to_string())
+        );
+    }
+
+    #[test]
+    fn test_find_matching_prefix_case_insensitive() {
+        assert_eq!(
+            GodObjectDetector::find_matching_prefix("CREATE_INSTANCE"),
+            Some("create".to_string())
+        );
+    }
+
+    #[test]
+    fn test_find_matching_prefix_no_match() {
+        assert_eq!(
+            GodObjectDetector::find_matching_prefix("foo_bar"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_first_word_with_underscore() {
+        assert_eq!(
+            GodObjectDetector::extract_first_word("custom_method_name"),
+            "custom".to_string()
+        );
+    }
+
+    #[test]
+    fn test_extract_first_word_no_underscore() {
+        assert_eq!(
+            GodObjectDetector::extract_first_word("singleword"),
+            "singleword".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_data_access() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("get"),
+            "Data Access".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("set"),
+            "Data Access".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_computation() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("calculate"),
+            "Computation".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("compute"),
+            "Computation".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_validation() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("validate"),
+            "Validation".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("check"),
+            "Validation".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("verify"),
+            "Validation".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_persistence() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("save"),
+            "Persistence".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("load"),
+            "Persistence".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("fetch"),
+            "Persistence".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_construction() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("create"),
+            "Construction".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("build"),
+            "Construction".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("new"),
+            "Construction".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_communication() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("send"),
+            "Communication".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("receive"),
+            "Communication".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("handle"),
+            "Communication".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_modification() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("update"),
+            "Modification".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("modify"),
+            "Modification".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("change"),
+            "Modification".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_deletion() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("delete"),
+            "Deletion".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("remove"),
+            "Deletion".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("clear"),
+            "Deletion".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_state_query() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("is"),
+            "State Query".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("has"),
+            "State Query".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("can"),
+            "State Query".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_processing() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("process"),
+            "Processing".to_string()
+        );
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("transform"),
+            "Processing".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_responsibility_default() {
+        assert_eq!(
+            GodObjectDetector::classify_responsibility("custom"),
+            "Custom Operations".to_string()
+        );
+    }
 
     #[test]
     fn test_extract_type_name_with_path_type() {
