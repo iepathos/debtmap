@@ -206,17 +206,91 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     analyzer.indicators
 }
 
-fn is_timing_function(path: &str) -> bool {
-    const TIMING_PATTERNS: &[&str] = &[
-        "sleep",
-        "Instant::now",
-        "SystemTime::now",
-        "Duration::from",
-        "delay",
-        "timeout",
-    ];
+// Pattern-based classification for flakiness detection
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PatternCategory {
+    Timing,
+    Random,
+    ExternalService,
+    Filesystem,
+    Network,
+}
 
-    TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
+impl PatternCategory {
+    const fn patterns(&self) -> &'static [&'static str] {
+        match self {
+            Self::Timing => &[
+                "sleep",
+                "Instant::now",
+                "SystemTime::now",
+                "Duration::from",
+                "delay",
+                "timeout",
+            ],
+            Self::Random => &[
+                "rand",
+                "random",
+                "thread_rng",
+                "StdRng",
+                "SmallRng",
+                "gen_range",
+                "sample",
+                "shuffle",
+                "choose",
+            ],
+            Self::ExternalService => &[
+                "reqwest",
+                "hyper",
+                "http",
+                "Client::new",
+                "HttpClient",
+                "ApiClient",
+                "database",
+                "db",
+                "postgres",
+                "mysql",
+                "redis",
+                "mongodb",
+                "sqlx",
+                "diesel",
+            ],
+            Self::Filesystem => &[
+                "fs::",
+                "File::",
+                "std::fs",
+                "tokio::fs",
+                "async_std::fs",
+                "read_to_string",
+                "write",
+                "create",
+                "remove_file",
+                "remove_dir",
+                "rename",
+                "copy",
+                "metadata",
+            ],
+            Self::Network => &[
+                "TcpStream",
+                "TcpListener",
+                "UdpSocket",
+                "connect",
+                "bind",
+                "listen",
+                "accept",
+                "send_to",
+                "recv_from",
+            ],
+        }
+    }
+
+    fn matches(&self, text: &str) -> bool {
+        self.patterns().iter().any(|pattern| text.contains(pattern))
+    }
+}
+
+// Specific helper functions using the consolidated pattern matching
+fn is_timing_function(path: &str) -> bool {
+    PatternCategory::Timing.matches(path)
 }
 
 fn is_timing_method(method: &str) -> bool {
@@ -233,85 +307,89 @@ fn is_timing_method(method: &str) -> bool {
 }
 
 fn is_random_function(path: &str) -> bool {
-    const RANDOM_PATTERNS: &[&str] = &[
-        "rand",
-        "random",
-        "thread_rng",
-        "StdRng",
-        "SmallRng",
-        "gen_range",
-        "sample",
-        "shuffle",
-        "choose",
-    ];
-
-    RANDOM_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    PatternCategory::Random.matches(path)
 }
 
 fn is_external_service_call(path: &str) -> bool {
-    const EXTERNAL_PATTERNS: &[&str] = &[
-        "reqwest",
-        "hyper",
-        "http",
-        "Client::new",
-        "HttpClient",
-        "ApiClient",
-        "database",
-        "db",
-        "postgres",
-        "mysql",
-        "redis",
-        "mongodb",
-        "sqlx",
-        "diesel",
-    ];
-
-    EXTERNAL_PATTERNS
-        .iter()
-        .any(|pattern| path.contains(pattern))
+    PatternCategory::ExternalService.matches(path)
 }
 
 fn is_filesystem_call(path: &str) -> bool {
-    const FS_PATTERNS: &[&str] = &[
-        "fs::",
-        "File::",
-        "std::fs",
-        "tokio::fs",
-        "async_std::fs",
-        "read_to_string",
-        "write",
-        "create",
-        "remove_file",
-        "remove_dir",
-        "rename",
-        "copy",
-        "metadata",
-    ];
-
-    FS_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    PatternCategory::Filesystem.matches(path)
 }
 
 fn is_network_call(path: &str) -> bool {
-    const NETWORK_PATTERNS: &[&str] = &[
-        "TcpStream",
-        "TcpListener",
-        "UdpSocket",
-        "connect",
-        "bind",
-        "listen",
-        "accept",
-        "send_to",
-        "recv_from",
-    ];
-
-    NETWORK_PATTERNS
-        .iter()
-        .any(|pattern| path.contains(pattern))
+    PatternCategory::Network.matches(path)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Tests for PatternCategory enum
+    #[test]
+    fn test_pattern_category_timing_matches() {
+        let category = PatternCategory::Timing;
+        assert!(category.matches("thread::sleep"));
+        assert!(category.matches("Instant::now()"));
+        assert!(category.matches("SystemTime::now()"));
+        assert!(category.matches("Duration::from_secs"));
+        assert!(category.matches("delay_ms"));
+        assert!(category.matches("timeout_handler"));
+        assert!(!category.matches("random_value"));
+        assert!(!category.matches("file_read"));
+    }
+
+    #[test]
+    fn test_pattern_category_random_matches() {
+        let category = PatternCategory::Random;
+        assert!(category.matches("rand::thread_rng"));
+        assert!(category.matches("random_number"));
+        assert!(category.matches("StdRng::new"));
+        assert!(category.matches("SmallRng::from_entropy"));
+        assert!(category.matches("gen_range(0, 100)"));
+        assert!(category.matches("vec.shuffle()"));
+        assert!(category.matches("items.choose()"));
+        assert!(!category.matches("sleep_ms"));
+        assert!(!category.matches("file_write"));
+    }
+
+    #[test]
+    fn test_pattern_category_external_service_matches() {
+        let category = PatternCategory::ExternalService;
+        assert!(category.matches("reqwest::Client"));
+        assert!(category.matches("hyper::server"));
+        assert!(category.matches("http::request"));
+        assert!(category.matches("Client::new()"));
+        assert!(category.matches("database_connection"));
+        assert!(category.matches("postgres::connect"));
+        assert!(category.matches("redis::get"));
+        assert!(category.matches("sqlx::query"));
+        assert!(!category.matches("local_computation"));
+    }
+
+    #[test]
+    fn test_pattern_category_filesystem_matches() {
+        let category = PatternCategory::Filesystem;
+        assert!(category.matches("fs::read_to_string"));
+        assert!(category.matches("File::open"));
+        assert!(category.matches("std::fs::create_dir"));
+        assert!(category.matches("tokio::fs::write"));
+        assert!(category.matches("async_std::fs::remove"));
+        assert!(category.matches("metadata()"));
+        assert!(!category.matches("network_send"));
+    }
+
+    #[test]
+    fn test_pattern_category_network_matches() {
+        let category = PatternCategory::Network;
+        assert!(category.matches("TcpStream::connect"));
+        assert!(category.matches("TcpListener::bind"));
+        assert!(category.matches("UdpSocket::send_to"));
+        assert!(category.matches("socket.accept()"));
+        assert!(category.matches("recv_from_addr"));
+        assert!(!category.matches("file_read"));
+    }
 
     #[test]
     fn test_is_timing_function_detects_sleep() {
@@ -375,6 +453,42 @@ mod tests {
         assert!(is_external_service_call("ApiClient::new"));
     }
 
+    // Edge case tests for pattern matching
+    #[test]
+    fn test_pattern_case_sensitivity() {
+        // All patterns are case-sensitive
+        assert!(is_timing_function("sleep"));
+        assert!(!is_timing_function("SLEEP"));
+        assert!(is_random_function("random"));
+        assert!(!is_random_function("RANDOM"));
+    }
+
+    #[test]
+    fn test_partial_matches_work() {
+        // Patterns match as substrings
+        assert!(is_timing_function("my_sleep_function"));
+        assert!(is_timing_function("function_with_timeout_handler"));
+        assert!(is_random_function("get_random_value"));
+        assert!(is_filesystem_call("my_fs::operations"));
+    }
+
+    #[test]
+    fn test_empty_string_handling() {
+        assert!(!is_timing_function(""));
+        assert!(!is_timing_method(""));
+        assert!(!is_random_function(""));
+        assert!(!is_external_service_call(""));
+        assert!(!is_filesystem_call(""));
+        assert!(!is_network_call(""));
+    }
+
+    #[test]
+    fn test_pattern_category_equality() {
+        assert_eq!(PatternCategory::Timing, PatternCategory::Timing);
+        assert_ne!(PatternCategory::Timing, PatternCategory::Random);
+        assert_ne!(PatternCategory::Filesystem, PatternCategory::Network);
+    }
+
     #[test]
     fn test_is_external_service_call_detects_databases() {
         assert!(is_external_service_call("postgres::connect"));
@@ -432,15 +546,6 @@ mod tests {
 
         assert!(!is_random_function("RAND")); // case sensitive
         assert!(is_random_function("rand")); // lowercase matches
-    }
-
-    #[test]
-    fn test_partial_matches_work() {
-        // Ensure contains() logic works for partial matches
-        assert!(is_timing_function("my_sleep_function"));
-        assert!(is_timing_function("function_with_timeout_logic"));
-        assert!(is_network_call("MyTcpStream"));
-        assert!(is_filesystem_call("custom_fs::operation"));
     }
 
     #[test]
