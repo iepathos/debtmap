@@ -215,7 +215,7 @@ fn is_timing_function(path: &str) -> bool {
         "delay",
         "timeout",
     ];
-    
+
     TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
 }
 
