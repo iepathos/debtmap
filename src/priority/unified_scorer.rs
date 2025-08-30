@@ -1632,6 +1632,256 @@ fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, V
     }
 }
 
+/// Classify the complexity level based on cyclomatic complexity
+fn classify_complexity_level(cyclomatic: u32) -> ComplexityLevel {
+    match cyclomatic {
+        0..=3 => ComplexityLevel::Low,
+        4..=5 => ComplexityLevel::LowModerate,
+        6..=10 => ComplexityLevel::Moderate,
+        _ => ComplexityLevel::High,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ComplexityLevel {
+    Low,
+    LowModerate,
+    Moderate,
+    High,
+}
+
+/// Generate complexity-based recommendation for risk debt
+fn generate_complexity_risk_recommendation(
+    cyclo: u32,
+    coverage: &Option<TransitiveCoverage>,
+    factors: &[String],
+) -> (String, String, Vec<String>) {
+    let complexity_level = classify_complexity_level(cyclo);
+    let has_good_coverage = coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
+    let has_coverage_issue = factors
+        .iter()
+        .any(|f| f.contains("coverage") || f.contains("Coverage") || f.contains("uncovered"));
+
+    match complexity_level {
+        ComplexityLevel::Low => generate_low_complexity_recommendation(cyclo, has_coverage_issue),
+        ComplexityLevel::LowModerate => {
+            generate_low_moderate_complexity_recommendation(cyclo, has_good_coverage)
+        }
+        ComplexityLevel::Moderate => {
+            generate_moderate_complexity_recommendation(cyclo, has_good_coverage)
+        }
+        ComplexityLevel::High => {
+            generate_high_complexity_recommendation(cyclo, has_good_coverage, has_coverage_issue)
+        }
+    }
+}
+
+/// Generate recommendation for low complexity functions
+fn generate_low_complexity_recommendation(
+    cyclo: u32,
+    has_coverage_issue: bool,
+) -> (String, String, Vec<String>) {
+    let action = if has_coverage_issue || cyclo > 3 {
+        format!(
+            "Extract helper functions for clarity, then add {} unit tests",
+            cyclo.max(3)
+        )
+    } else {
+        "Simplify function structure and improve testability".to_string()
+    };
+
+    (
+        action,
+        "Low complexity but flagged for improvement".to_string(),
+        vec![
+            "Extract helper functions for clarity".to_string(),
+            "Remove unnecessary branching".to_string(),
+            "Consolidate similar code paths".to_string(),
+            format!(
+                "Add {} unit tests for edge cases and main paths",
+                cyclo.max(3)
+            ),
+        ],
+    )
+}
+
+/// Generate recommendation for low-moderate complexity functions (5-6)
+fn generate_low_moderate_complexity_recommendation(
+    cyclo: u32,
+    has_good_coverage: bool,
+) -> (String, String, Vec<String>) {
+    // For cyclomatic 5-6, extract 2 functions
+    let functions_to_extract = 2;
+    let target_complexity = 3;
+
+    let action = if has_good_coverage {
+        format!(
+            "Extract {} pure functions (complexity {} → {})",
+            functions_to_extract, cyclo, target_complexity
+        )
+    } else {
+        format!(
+            "Extract {} pure functions (complexity {} → {}) and add comprehensive tests",
+            functions_to_extract, cyclo, target_complexity
+        )
+    };
+
+    let mut steps = vec![
+        format!(
+            "Identify {} logical sections from {} branches:",
+            functions_to_extract, cyclo
+        ),
+        format!(
+            "  • Look for groups of ~{} related conditions",
+            cyclo / functions_to_extract.max(1)
+        ),
+        format!(
+            "  • Each extracted function should have complexity ≤{}",
+            target_complexity
+        ),
+        "Extraction candidates:".to_string(),
+        "  • Validation logic → validate_preconditions()".to_string(),
+        "  • Main logic → process_core()".to_string(),
+        "Move all I/O operations to a single orchestrator function".to_string(),
+    ];
+
+    if !has_good_coverage {
+        steps.push(format!(
+            "Write {} unit tests for the extracted pure functions",
+            functions_to_extract * 3
+        ));
+        steps.push("Achieve 80%+ test coverage for all functions".to_string());
+    } else {
+        steps.push(format!(
+            "Goal: Reduce cyclomatic complexity from {} to <={}",
+            cyclo, target_complexity
+        ));
+    }
+
+    (
+        action,
+        "Low-moderate complexity requiring refactoring".to_string(),
+        steps,
+    )
+}
+
+/// Generate recommendation for moderate complexity functions (7-10)
+fn generate_moderate_complexity_recommendation(
+    cyclo: u32,
+    has_good_coverage: bool,
+) -> (String, String, Vec<String>) {
+    let functions_to_extract = (cyclo / 3).max(2);
+    let target_complexity = 3;
+
+    let action = if has_good_coverage {
+        format!(
+            "Extract {} pure functions (complexity {} → {})",
+            functions_to_extract, cyclo, target_complexity
+        )
+    } else {
+        format!(
+            "Extract {} pure functions (complexity {} → {}) and add comprehensive tests",
+            functions_to_extract, cyclo, target_complexity
+        )
+    };
+
+    let mut steps = vec![
+        format!(
+            "Identify {} logical sections from {} branches:",
+            functions_to_extract, cyclo
+        ),
+        format!(
+            "  • Look for groups of ~{} related conditions",
+            cyclo / functions_to_extract.max(1)
+        ),
+        format!(
+            "  • Each extracted function should have complexity ≤{}",
+            target_complexity
+        ),
+        "Extraction candidates:".to_string(),
+        "  • Validation logic → validate_preconditions()".to_string(),
+        "  • Complex calculations → calculate_specific()".to_string(),
+        "  • Loop processing → process_items()".to_string(),
+        "Move all I/O operations to a single orchestrator function".to_string(),
+    ];
+
+    if !has_good_coverage {
+        steps.push(format!(
+            "Write {} unit tests for the extracted pure functions",
+            functions_to_extract * 3
+        ));
+        steps.push("Achieve 80%+ test coverage for all functions".to_string());
+    } else {
+        steps.push(format!(
+            "Goal: Reduce cyclomatic complexity from {} to <={}",
+            cyclo, target_complexity
+        ));
+    }
+
+    (
+        action,
+        "Moderate complexity requiring refactoring".to_string(),
+        steps,
+    )
+}
+
+/// Generate recommendation for high complexity functions (11+)
+fn generate_high_complexity_recommendation(
+    cyclo: u32,
+    has_good_coverage: bool,
+    has_coverage_issue: bool,
+) -> (String, String, Vec<String>) {
+    let functions_to_extract = (cyclo / 4).max(3);
+    let target_complexity = 5;
+
+    let action = if has_good_coverage {
+        format!(
+            "Decompose into {} pure functions (complexity {} → {})",
+            functions_to_extract, cyclo, target_complexity
+        )
+    } else {
+        format!("Decompose into {} pure functions (complexity {} → {}), then add {} comprehensive tests", 
+                functions_to_extract, cyclo, target_complexity, functions_to_extract * 4)
+    };
+
+    let mut steps = vec![
+        "Map each conditional branch to its core responsibility".to_string(),
+        format!(
+            "Create {} pure functions, one per responsibility",
+            functions_to_extract
+        ),
+        "Replace complex conditionals with function dispatch table".to_string(),
+        "Extract validation logic into composable predicates".to_string(),
+        "Transform data mutations into immutable transformations".to_string(),
+        "Isolate side effects in a thin orchestration layer".to_string(),
+    ];
+
+    if !has_good_coverage {
+        steps.push(format!(
+            "Write {} unit tests plus property-based tests for pure functions",
+            functions_to_extract * 4
+        ));
+    }
+
+    if has_coverage_issue && !has_good_coverage {
+        steps.push(format!(
+            "Target: Each function ≤{} complexity with 80%+ coverage",
+            target_complexity
+        ));
+    } else {
+        steps.push(format!(
+            "Target: Each function ≤{} cyclomatic complexity",
+            target_complexity
+        ));
+    }
+
+    (
+        action,
+        "High complexity requiring aggressive refactoring".to_string(),
+        steps,
+    )
+}
+
 /// Generate recommendation for infrastructure debt types (duplication, risk)
 fn generate_infrastructure_recommendation_with_coverage(
     debt_type: &DebtType,
@@ -1661,185 +1911,14 @@ fn generate_infrastructure_recommendation_with_coverage(
 
             if has_complexity_issue {
                 // Extract complexity values from factors string if present
-                let cyclo_match = factors
-                    .iter()
-                    .find(|f| f.contains("cyclomatic"))
-                    .and_then(|f| {
-                        f.split(':')
-                            .nth(1)?
-                            .trim()
-                            .strip_suffix(')')?
-                            .parse::<u32>()
-                            .ok()
-                    });
-
-                let _cognitive_match = factors
-                    .iter()
-                    .find(|f| f.contains("Cognitive complexity"))
-                    .and_then(|f| f.split(':').nth(1)?.trim().parse::<u32>().ok());
-
-                let cyclo = cyclo_match.unwrap_or(0);
-                let _cognitive = _cognitive_match.unwrap_or(0);
-                let is_moderate = cyclo > 5 && cyclo <= 10;
-
-                if is_moderate {
-                    // Check if coverage is also mentioned
-                    let has_coverage_issue = factors.iter().any(|f| {
-                        f.contains("coverage") || f.contains("Coverage") || f.contains("uncovered")
-                    });
-
-                    // Calculate how many functions to extract based on complexity
-                    let functions_to_extract = (cyclo / 3).max(2);
-                    let target_complexity = 3;
-
-                    // Check if coverage is already good before recommending tests
-                    let has_good_coverage =
-                        coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
-
-                    let action = if has_good_coverage {
-                        format!(
-                            "Extract {} pure functions (complexity {} → {})",
-                            functions_to_extract, cyclo, target_complexity
-                        )
-                    } else {
-                        format!(
-                            "Extract {} pure functions (complexity {} → {}) and add comprehensive tests",
-                            functions_to_extract, cyclo, target_complexity
-                        )
-                    };
-
-                    let mut steps = vec![
-                        format!(
-                            "Identify {} logical sections from {} branches:",
-                            functions_to_extract, cyclo
-                        ),
-                        format!(
-                            "  • Look for groups of ~{} related conditions",
-                            cyclo / functions_to_extract.max(1)
-                        ),
-                        format!(
-                            "  • Each extracted function should have complexity ≤{}",
-                            target_complexity
-                        ),
-                        "Extraction candidates:".to_string(),
-                        "  • Validation logic → validate_preconditions()".to_string(),
-                        "  • Complex calculations → calculate_specific()".to_string(),
-                        "  • Loop processing → process_items()".to_string(),
-                        "Move all I/O operations to a single orchestrator function".to_string(),
-                    ];
-
-                    // Only add testing steps if coverage is low
-                    if !has_good_coverage {
-                        steps.push(format!(
-                            "Write {} unit tests for the extracted pure functions",
-                            functions_to_extract * 3
-                        ));
-                        if has_coverage_issue {
-                            steps.push("Achieve 80%+ test coverage for all functions".to_string());
-                        }
-                    }
-
-                    if !has_coverage_issue && has_good_coverage {
-                        steps.push(format!(
-                            "Goal: Reduce cyclomatic complexity from {} to <={}",
-                            cyclo, target_complexity
-                        ));
-                    }
-
-                    (
-                        action,
-                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
-                        steps,
-                    )
-                } else if cyclo > 10 {
-                    // High complexity - needs more aggressive refactoring
-                    let has_coverage_issue = factors.iter().any(|f| {
-                        f.contains("coverage") || f.contains("Coverage") || f.contains("uncovered")
-                    });
-
-                    let functions_to_extract = (cyclo / 4).max(3);
-                    let target_complexity = 5;
-
-                    // Check if coverage is already good before recommending tests
-                    let has_good_coverage =
-                        coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
-
-                    let action = if has_good_coverage {
-                        format!(
-                            "Decompose into {} pure functions (complexity {} → {})",
-                            functions_to_extract, cyclo, target_complexity
-                        )
-                    } else {
-                        format!("Decompose into {} pure functions (complexity {} → {}), then add {} comprehensive tests", 
-                                functions_to_extract, cyclo, target_complexity, functions_to_extract * 4)
-                    };
-
-                    let mut steps = vec![
-                        "Map each conditional branch to its core responsibility".to_string(),
-                        format!(
-                            "Create {} pure functions, one per responsibility",
-                            functions_to_extract
-                        ),
-                        "Replace complex conditionals with function dispatch table".to_string(),
-                        "Extract validation logic into composable predicates".to_string(),
-                        "Transform data mutations into immutable transformations".to_string(),
-                        "Isolate side effects in a thin orchestration layer".to_string(),
-                    ];
-
-                    // Only add testing steps if coverage is low
-                    if !has_good_coverage {
-                        steps.push(format!(
-                            "Write {} unit tests plus property-based tests for pure functions",
-                            functions_to_extract * 4
-                        ));
-                    }
-
-                    if has_coverage_issue && !has_good_coverage {
-                        steps.push(format!(
-                            "Target: Each function ≤{} complexity with 80%+ coverage",
-                            target_complexity
-                        ));
-                    } else {
-                        steps.push(format!(
-                            "Target: Each function ≤{} cyclomatic complexity",
-                            target_complexity
-                        ));
-                    }
-
-                    (
-                        action,
-                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
-                        steps,
-                    )
-                } else {
-                    // Low complexity but still flagged - likely other issues including coverage
-                    let has_coverage_issue = factors.iter().any(|f| {
-                        f.contains("coverage") || f.contains("Coverage") || f.contains("uncovered")
-                    });
-
-                    let action = if has_coverage_issue || cyclo > 3 {
-                        format!(
-                            "Extract helper functions for clarity, then add {} unit tests",
-                            cyclo.max(3)
-                        )
-                    } else {
-                        "Simplify function structure and improve testability".to_string()
-                    };
-
-                    (
-                        action,
-                        format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
-                        vec![
-                            "Extract helper functions for clarity".to_string(),
-                            "Remove unnecessary branching".to_string(),
-                            "Consolidate similar code paths".to_string(),
-                            format!(
-                                "Add {} unit tests for edge cases and main paths",
-                                cyclo.max(3)
-                            ),
-                        ],
-                    )
-                }
+                let cyclo = extract_cyclomatic_from_factors(factors).unwrap_or(0);
+                let (action, _, steps) =
+                    generate_complexity_risk_recommendation(cyclo, coverage, factors);
+                (
+                    action,
+                    format!("Risk score {:.1}: {}", risk_score, factors.join(", ")),
+                    steps,
+                )
             } else {
                 // Non-complexity related risk
                 (
@@ -1856,37 +1935,59 @@ fn generate_infrastructure_recommendation_with_coverage(
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-        } => {
-            // Calculate extraction based on complexity distribution
-            let functions_to_extract = calculate_functions_to_extract(*cyclomatic, *cognitive);
-            let target_per_function = (*cyclomatic / functions_to_extract).max(3);
-            (
-                format!(
-                    "Extract {} pure functions, each handling ~{} branches (complexity {} → ~{})",
-                    functions_to_extract,
-                    *cyclomatic / functions_to_extract.max(1),
-                    cyclomatic,
-                    target_per_function
-                ),
-                format!(
-                    "High complexity function (cyclo={cyclomatic}, cog={cognitive}) likely with low coverage - needs testing and refactoring"
-                ),
-                vec![
-                    format!("Identify {} branch clusters from {} total branches:", functions_to_extract, cyclomatic),
-                    format!("  • Each cluster should handle ~{} related conditions", cyclomatic / functions_to_extract.max(1)),
-                    "Common extraction patterns:".to_string(),
-                    "  • Early validation checks → validate_preconditions()".to_string(),
-                    "  • Complex calculations in branches → calculate_[specific]()".to_string(),  
-                    "  • Data processing in loops → process_[item_type]()".to_string(),
-                    "  • Error handling branches → handle_[error_case]()".to_string(),
-                    format!("Each extracted function should have cyclomatic complexity ≤{}", target_per_function),
-                    format!("Write ~{} tests per extracted function for full branch coverage", target_per_function),
-                    "Use property-based testing for complex logic validation".to_string(),
-                ],
-            )
-        }
+        } => generate_complexity_hotspot_recommendation(*cyclomatic, *cognitive),
         _ => unreachable!("Not an infrastructure debt type"),
     }
+}
+
+/// Extract cyclomatic complexity value from factors strings
+fn extract_cyclomatic_from_factors(factors: &[String]) -> Option<u32> {
+    factors
+        .iter()
+        .find(|f| f.contains("cyclomatic"))
+        .and_then(|f| {
+            f.split(':')
+                .nth(1)?
+                .trim()
+                .strip_suffix(')')?
+                .parse::<u32>()
+                .ok()
+        })
+}
+
+/// Generate recommendation for complexity hotspots
+fn generate_complexity_hotspot_recommendation(
+    cyclomatic: u32,
+    cognitive: u32,
+) -> (String, String, Vec<String>) {
+    // Calculate extraction based on complexity distribution
+    let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
+    let target_per_function = (cyclomatic / functions_to_extract).max(3);
+    (
+        format!(
+            "Extract {} pure functions, each handling ~{} branches (complexity {} → ~{})",
+            functions_to_extract,
+            cyclomatic / functions_to_extract.max(1),
+            cyclomatic,
+            target_per_function
+        ),
+        format!(
+            "High complexity function (cyclo={}, cog={}) likely with low coverage - needs testing and refactoring",
+            cyclomatic, cognitive
+        ),
+        vec![
+            format!("Identify {} branch clusters from {} total branches:", functions_to_extract, cyclomatic),
+            format!("  • Each cluster should handle ~{} related conditions", cyclomatic / functions_to_extract.max(1)),
+            "Common extraction patterns:".to_string(),
+            "  • Early validation checks → validate_preconditions()".to_string(),
+            "  • Complex calculations in branches → calculate_[specific]()".to_string(),  
+            "  • Data processing in loops → process_[item_type]()".to_string(),
+            "  • Error handling branches → handle_[error_case]()".to_string(),
+            format!("Each extracted function should have cyclomatic complexity ≤{}", target_per_function),
+            format!("Write ~{} tests per extracted function for full branch coverage", target_per_function),
+            "Use property-based testing for complex logic validation".to_string(),
+        ],
+    )
 }
 
 /// Generate complexity recommendation using pattern analysis when available

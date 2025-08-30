@@ -207,15 +207,16 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
 }
 
 fn is_timing_function(path: &str) -> bool {
-    // Group patterns by category for better maintainability
-    // Sleep-related patterns
-    path.contains("sleep") ||
-    // Time measurement patterns  
-    path.contains("Instant::now") || path.contains("SystemTime::now") ||
-    // Duration and delay patterns
-    path.contains("Duration::from") || path.contains("delay") ||
-    // Timeout patterns
-    path.contains("timeout")
+    const TIMING_PATTERNS: &[&str] = &[
+        "sleep",
+        "Instant::now",
+        "SystemTime::now",
+        "Duration::from",
+        "delay",
+        "timeout",
+    ];
+
+    TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
 }
 
 fn is_timing_method(method: &str) -> bool {
@@ -454,5 +455,50 @@ mod tests {
         assert!(is_timing_function("Duration::from_millis"));
         assert!(is_timing_function("Instant::now"));
         assert!(is_timing_function("SystemTime::now"));
+    }
+
+    #[test]
+    fn test_is_timing_function_edge_cases() {
+        // Test empty string
+        assert!(!is_timing_function(""));
+
+        // Test single character strings
+        assert!(!is_timing_function("a"));
+
+        // Test exact matches
+        assert!(is_timing_function("sleep"));
+        assert!(is_timing_function("delay"));
+        assert!(is_timing_function("timeout"));
+
+        // Test case sensitivity - function is case-sensitive
+        assert!(!is_timing_function("SLEEP")); // Should not match uppercase
+        assert!(!is_timing_function("Sleep")); // Should not match mixed case
+
+        // Test with special characters in path
+        assert!(is_timing_function("module::sleep_function"));
+        assert!(is_timing_function("sleep.function"));
+        assert!(is_timing_function("sleep-function"));
+    }
+
+    #[test]
+    fn test_is_timing_function_boundary_patterns() {
+        // Test Duration patterns with various formats
+        assert!(is_timing_function("Duration::from_secs"));
+        assert!(is_timing_function("Duration::from_millis"));
+        assert!(is_timing_function("Duration::from_nanos"));
+        assert!(is_timing_function("Duration::from_micros"));
+
+        // Test delay variations
+        assert!(is_timing_function("delay_for"));
+        assert!(is_timing_function("delay_until"));
+        assert!(is_timing_function("with_delay"));
+
+        // Test timeout variations
+        assert!(is_timing_function("timeout_after"));
+        assert!(is_timing_function("with_timeout"));
+        assert!(is_timing_function("set_read_timeout"));
+
+        // Ensure non-timing "Duration" patterns don't match
+        assert!(!is_timing_function("calculate_duration")); // "duration" alone without "Duration::from" context
     }
 }
