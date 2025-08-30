@@ -1,7 +1,7 @@
 // Analysis helper functions for direct library API testing
 use anyhow::Result;
 use chrono::Utc;
-use debtmap::analyzers::{analyze_file, get_analyzer};
+use debtmap::analyzers::{analyze_file, get_analyzer, get_analyzer_with_context};
 use debtmap::core::{
     AnalysisResults, ComplexityReport, ComplexitySummary, DebtItem, DebtType, DependencyReport,
     FileMetrics, Language, Priority, TechnicalDebtReport,
@@ -33,7 +33,13 @@ pub fn analyze_file_directly(file_path: &Path) -> Result<AnalysisResults> {
     // Read and analyze the file
     let content = std::fs::read_to_string(file_path)?;
     let language = detect_language(file_path);
-    let analyzer = get_analyzer(language);
+
+    // Check if context-aware analysis is enabled via environment variable
+    let context_aware = std::env::var("DEBTMAP_CONTEXT_AWARE")
+        .map(|v| v == "true")
+        .unwrap_or(false);
+
+    let analyzer = get_analyzer_with_context(language, context_aware);
 
     // Parse and analyze the file
     let metrics = analyze_file(content.clone(), file_path.to_path_buf(), &*analyzer)?;

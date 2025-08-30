@@ -6,7 +6,6 @@ use debtmap::core::DebtType;
 use std::path::{Path, PathBuf};
 
 #[test]
-#[ignore = "Converted to library API - needs further debugging"]
 fn test_context_aware_filters_parameter_analyzer() {
     // Test using library API directly instead of spawning subprocess
     let file_path = PathBuf::from("src/organization/parameter_analyzer.rs");
@@ -82,7 +81,6 @@ fn test_context_aware_filters_parameter_analyzer() {
 }
 
 #[test]
-#[ignore = "Converted to library API - needs further debugging"]
 fn test_context_aware_filters_rust_call_graph() {
     // Test using library API directly
     let file_path = PathBuf::from("src/analyzers/rust_call_graph.rs");
@@ -132,7 +130,7 @@ fn test_context_aware_filters_rust_call_graph() {
 }
 
 #[test]
-#[ignore = "Too slow and converted to library API"]
+#[ignore = "Too slow for regular test runs"]
 fn test_context_aware_on_entire_codebase() {
     // This test analyzes the entire codebase - kept as ignored for performance
     use debtmap::config::DebtmapConfig;
@@ -186,7 +184,6 @@ fn test_context_aware_on_entire_codebase() {
 }
 
 #[test]
-#[ignore = "Converted to library API - needs further debugging"]
 fn test_context_aware_on_specific_dirs() {
     // Faster version that only analyzes specific problem directories
     use debtmap::config::DebtmapConfig;
