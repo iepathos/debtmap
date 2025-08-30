@@ -4436,7 +4436,7 @@ end_of_record
 
         // Verify the file contains markdown content
         let contents = fs::read_to_string(output_path).unwrap();
-        assert!(contents.contains("# Priority Technical Debt Fixes"));
+        assert!(contents.contains("# Debtmap v"));
     }
 
     #[test]
@@ -4573,7 +4573,7 @@ end_of_record
 
         // Verify markdown content
         let contents = fs::read_to_string(output_path).unwrap();
-        assert!(contents.contains("# Priority Technical Debt Fixes"));
+        assert!(contents.contains("# Debtmap v"));
     }
 
     #[test]

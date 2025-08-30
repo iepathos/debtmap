@@ -8,7 +8,7 @@ pub fn format_priorities_markdown(
     verbosity: u8,
 ) -> String {
     let mut output = String::new();
-    
+
     let version = env!("CARGO_PKG_VERSION");
     writeln!(output, "# Debtmap v{}\n", version).unwrap();
 
