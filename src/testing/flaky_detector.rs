@@ -336,7 +336,6 @@ mod tests {
         assert!(!is_timing_function("handle_request"));
     }
 
-
     #[test]
     fn test_is_timing_method_detects_timing_methods() {
         assert!(is_timing_method("elapsed"));
