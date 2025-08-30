@@ -206,21 +206,31 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     analyzer.indicators
 }
 
+/// Classifies whether a given path represents a timing-related function.
+/// This is a pure function that can be tested in isolation.
 fn is_timing_function(path: &str) -> bool {
+    // Consolidated timing patterns for better maintainability
     const TIMING_PATTERNS: &[&str] = &[
+        // Sleep functions
         "thread::sleep",
         "sleep",
-        "delay",
-        "timeout",
-        "Duration::from",
-        "Instant::now",
-        "SystemTime::now",
         "time::sleep",
         "tokio::time::sleep",
         "async_std::task::sleep",
+        // Delay and timeout
+        "delay",
+        "timeout",
+        // Time measurement
+        "Duration::from",
+        "Instant::now",
+        "SystemTime::now",
     ];
 
-    TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    // Using pattern matching for clearer intent
+    match () {
+        _ if path.is_empty() => false,
+        _ => TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern)),
+    }
 }
 
 fn is_timing_method(method: &str) -> bool {
@@ -338,6 +348,52 @@ mod tests {
         assert!(!is_timing_function("process_data"));
         assert!(!is_timing_function("calculate_result"));
         assert!(!is_timing_function("handle_request"));
+    }
+
+    #[test]
+    fn test_is_timing_function_edge_cases() {
+        // Test empty string
+        assert!(!is_timing_function(""));
+
+        // Test delay patterns
+        assert!(is_timing_function("with_delay"));
+        assert!(is_timing_function("delay_ms"));
+
+        // Test timeout patterns
+        assert!(is_timing_function("with_timeout"));
+        assert!(is_timing_function("request_timeout"));
+
+        // Test various Duration methods
+        assert!(is_timing_function("Duration::from_millis"));
+        assert!(is_timing_function("Duration::from_nanos"));
+    }
+
+    #[test]
+    fn test_is_timing_function_all_patterns_covered() {
+        // Ensure all defined patterns are tested
+        let test_cases = vec![
+            ("thread::sleep(Duration::from_secs(1))", true),
+            ("sleep_for_retry", true),
+            ("time::sleep_until", true),
+            ("tokio::time::sleep_until", true),
+            ("async_std::task::sleep_for", true),
+            ("apply_delay", true),
+            ("set_timeout", true),
+            ("Duration::from_secs", true),
+            ("Instant::now().elapsed()", true),
+            ("SystemTime::now().duration_since", true),
+            ("normal_function", false),
+            ("data_processor", false),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(
+                is_timing_function(input),
+                expected,
+                "Failed for input: {}",
+                input
+            );
+        }
     }
 
     #[test]
