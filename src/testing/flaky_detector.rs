@@ -206,31 +206,12 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     analyzer.indicators
 }
 
-<<<<<<< HEAD
 /// Pure function to check if a string contains any of the given patterns
 #[inline]
 fn matches_any_pattern(text: &str, patterns: &[&str]) -> bool {
     patterns.iter().any(|pattern| text.contains(pattern))
 }
 
-/// Checks if a path contains timing-related patterns
-/// Uses functional pattern matching for clarity and reduced complexity
-fn is_timing_function(path: &str) -> bool {
-    matches_any_pattern(
-        path,
-        &[
-            "sleep",
-            "Instant::now",
-            "SystemTime::now",
-            "Duration::from",
-            "delay",
-            "timeout",
-            "wait_for",
-            "park_timeout",
-            "recv_timeout",
-        ],
-    )
-=======
 // Pattern-based classification for flakiness detection
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PatternCategory {
@@ -251,6 +232,9 @@ impl PatternCategory {
                 "Duration::from",
                 "delay",
                 "timeout",
+                "wait_for",
+                "park_timeout",
+                "recv_timeout",
             ],
             Self::Random => &[
                 "rand",
@@ -316,7 +300,6 @@ impl PatternCategory {
 // Specific helper functions using the consolidated pattern matching
 fn is_timing_function(path: &str) -> bool {
     PatternCategory::Timing.matches(path)
->>>>>>> mmm-agent-cook-1756588120-item_9
 }
 
 fn is_timing_method(method: &str) -> bool {
@@ -333,82 +316,6 @@ fn is_timing_method(method: &str) -> bool {
 }
 
 fn is_random_function(path: &str) -> bool {
-<<<<<<< HEAD
-    matches_any_pattern(
-        path,
-        &[
-            "rand",
-            "random",
-            "thread_rng",
-            "StdRng",
-            "SmallRng",
-            "gen_range",
-            "sample",
-            "shuffle",
-            "choose",
-        ],
-    )
-}
-
-fn is_external_service_call(path: &str) -> bool {
-    matches_any_pattern(
-        path,
-        &[
-            "reqwest",
-            "hyper",
-            "http",
-            "Client::new",
-            "HttpClient",
-            "ApiClient",
-            "database",
-            "db",
-            "postgres",
-            "mysql",
-            "redis",
-            "mongodb",
-            "sqlx",
-            "diesel",
-        ],
-    )
-}
-
-fn is_filesystem_call(path: &str) -> bool {
-    matches_any_pattern(
-        path,
-        &[
-            "fs::",
-            "File::",
-            "std::fs",
-            "tokio::fs",
-            "async_std::fs",
-            "read_to_string",
-            "write",
-            "create",
-            "remove_file",
-            "remove_dir",
-            "rename",
-            "copy",
-            "metadata",
-        ],
-    )
-}
-
-fn is_network_call(path: &str) -> bool {
-    matches_any_pattern(
-        path,
-        &[
-            "TcpStream",
-            "TcpListener",
-            "UdpSocket",
-            "connect",
-            "bind",
-            "listen",
-            "accept",
-            "send_to",
-            "recv_from",
-        ],
-    )
-=======
     PatternCategory::Random.matches(path)
 }
 
@@ -422,7 +329,6 @@ fn is_filesystem_call(path: &str) -> bool {
 
 fn is_network_call(path: &str) -> bool {
     PatternCategory::Network.matches(path)
->>>>>>> mmm-agent-cook-1756588120-item_9
 }
 
 #[cfg(test)]
