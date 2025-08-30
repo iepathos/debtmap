@@ -250,13 +250,28 @@ mod tests {
 
     #[test]
     fn test_accumulation_op_to_verb() {
-        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Sum), "sum");
-        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Product), "multiply");
-        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Concatenation), "concat");
-        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Collection), "collect");
-        
+        assert_eq!(
+            FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Sum),
+            "sum"
+        );
+        assert_eq!(
+            FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Product),
+            "multiply"
+        );
+        assert_eq!(
+            FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Concatenation),
+            "concat"
+        );
+        assert_eq!(
+            FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Collection),
+            "collect"
+        );
+
         let custom_op = AccumulationOp::Custom("aggregate".to_string());
-        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&custom_op), "aggregate");
+        assert_eq!(
+            FunctionNameInferrer::accumulation_op_to_verb(&custom_op),
+            "aggregate"
+        );
     }
 
     #[test]
@@ -266,7 +281,7 @@ mod tests {
             &AccumulationOp::Sum,
             &None,
             &None,
-            "items"
+            "items",
         );
         assert_eq!(name, "sum_items");
 
@@ -279,7 +294,7 @@ mod tests {
             &AccumulationOp::Collection,
             &filter,
             &None,
-            "values"
+            "values",
         );
         assert_eq!(name, "filter_collect_values");
 
@@ -292,7 +307,7 @@ mod tests {
             &AccumulationOp::Sum,
             &filter,
             &transform,
-            "numbers"
+            "numbers",
         );
         assert_eq!(name, "filter_map_sum_numbers");
     }
@@ -304,13 +319,13 @@ mod tests {
             FunctionNameInferrer::build_guard_chain_name(1),
             "validate_precondition"
         );
-        
+
         // Multiple checks
         assert_eq!(
             FunctionNameInferrer::build_guard_chain_name(3),
             "validate_3_preconditions"
         );
-        
+
         // Zero checks edge case
         assert_eq!(
             FunctionNameInferrer::build_guard_chain_name(0),
@@ -321,19 +336,11 @@ mod tests {
     #[test]
     fn test_build_transformation_name() {
         // Single stage transformation
-        let name = FunctionNameInferrer::build_transformation_name(
-            "string",
-            "number",
-            1
-        );
+        let name = FunctionNameInferrer::build_transformation_name("string", "number", 1);
         assert_eq!(name, "transform_string_to_number");
 
         // Multi-stage pipeline
-        let name = FunctionNameInferrer::build_transformation_name(
-            "data",
-            "result",
-            3
-        );
+        let name = FunctionNameInferrer::build_transformation_name("data", "result", 3);
         assert_eq!(name, "process_data_pipeline");
     }
 
@@ -343,7 +350,7 @@ mod tests {
             FunctionNameInferrer::build_branches_name("status"),
             "handle_status_cases"
         );
-        
+
         assert_eq!(
             FunctionNameInferrer::build_branches_name("error_type"),
             "handle_error_type_cases"
@@ -356,7 +363,7 @@ mod tests {
             FunctionNameInferrer::build_nested_extraction_name("loop"),
             "process_loop_block"
         );
-        
+
         assert_eq!(
             FunctionNameInferrer::build_nested_extraction_name("condition"),
             "process_condition_block"

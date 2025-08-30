@@ -133,14 +133,43 @@ impl GodObjectDetector {
     /// Pure function to find a matching prefix from the common list
     fn find_matching_prefix(method_name: &str) -> Option<String> {
         const COMMON_PREFIXES: &[&str] = &[
-            "get", "set", "is", "has", "can", "should", "will",
-            "create", "build", "make", "new", "init",
-            "calculate", "compute", "process", "transform",
-            "validate", "check", "verify", "ensure",
-            "save", "load", "store", "retrieve", "fetch",
-            "update", "modify", "change", "edit",
-            "delete", "remove", "clear", "reset",
-            "send", "receive", "handle", "manage",
+            "get",
+            "set",
+            "is",
+            "has",
+            "can",
+            "should",
+            "will",
+            "create",
+            "build",
+            "make",
+            "new",
+            "init",
+            "calculate",
+            "compute",
+            "process",
+            "transform",
+            "validate",
+            "check",
+            "verify",
+            "ensure",
+            "save",
+            "load",
+            "store",
+            "retrieve",
+            "fetch",
+            "update",
+            "modify",
+            "change",
+            "edit",
+            "delete",
+            "remove",
+            "clear",
+            "reset",
+            "send",
+            "receive",
+            "handle",
+            "manage",
         ];
 
         let lower_name = method_name.to_lowercase();
@@ -390,10 +419,7 @@ mod tests {
 
     #[test]
     fn test_find_matching_prefix_no_match() {
-        assert_eq!(
-            GodObjectDetector::find_matching_prefix("foo_bar"),
-            None
-        );
+        assert_eq!(GodObjectDetector::find_matching_prefix("foo_bar"), None);
     }
 
     #[test]

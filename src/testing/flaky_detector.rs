@@ -206,12 +206,6 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     analyzer.indicators
 }
 
-/// Pure function to check if a string contains any of the given patterns
-#[inline]
-fn matches_any_pattern(text: &str, patterns: &[&str]) -> bool {
-    patterns.iter().any(|pattern| text.contains(pattern))
-}
-
 // Pattern-based classification for flakiness detection
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PatternCategory {
@@ -398,6 +392,12 @@ mod tests {
         assert!(category.matches("socket.accept()"));
         assert!(category.matches("recv_from_addr"));
         assert!(!category.matches("file_read"));
+    }
+
+    /// Pure function to check if a string contains any of the given patterns
+    #[inline]
+    fn matches_any_pattern(text: &str, patterns: &[&str]) -> bool {
+        patterns.iter().any(|pattern| text.contains(pattern))
     }
 
     #[test]
