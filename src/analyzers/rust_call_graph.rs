@@ -37,6 +37,16 @@ pub struct MacroHandlingConfig {
     pub show_statistics: bool,
 }
 
+/// Type classification for macros to determine parsing strategy
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum MacroType {
+    Collection,
+    Formatting,
+    Assertion,
+    Logging,
+    Generic,
+}
+
 /// Call graph extractor that uses two-pass resolution for accurate call tracking
 pub struct CallGraphExtractor {
     pub call_graph: CallGraph,
@@ -427,35 +437,49 @@ impl CallGraphExtractor {
         self.macro_stats.total_macros += 1;
 
         let macro_name = self.extract_macro_name(&expr_macro.mac.path);
+        let macro_type = Self::classify_macro_type(&macro_name);
 
-        match macro_name.as_str() {
-            // Collection macros
+        self.dispatch_macro_parsing(macro_type, &expr_macro.mac.tokens, &macro_name);
+    }
+
+    /// Classify macro by its type for appropriate parsing strategy
+    fn classify_macro_type(macro_name: &str) -> MacroType {
+        match macro_name {
             "vec" | "vec_deque" | "hashmap" | "btreemap" | "hashset" | "btreeset" => {
-                self.parse_collection_macro(&expr_macro.mac.tokens, &macro_name);
+                MacroType::Collection
             }
-            // Formatting macros
             "format" | "print" | "println" | "eprint" | "eprintln" | "write" | "writeln"
-            | "format_args" => {
-                self.parse_format_macro(&expr_macro.mac.tokens, &macro_name);
-            }
-            // Assertion macros
+            | "format_args" => MacroType::Formatting,
             "assert" | "assert_eq" | "assert_ne" | "debug_assert" | "debug_assert_eq"
-            | "debug_assert_ne" => {
-                self.parse_assert_macro(&expr_macro.mac.tokens, &macro_name);
-            }
-            // Logging macros
-            "log" | "trace" | "debug" | "info" | "warn" | "error" => {
-                self.parse_logging_macro(&expr_macro.mac.tokens, &macro_name);
-            }
-            // Try generic expression parsing
-            _ => {
-                if let Ok(parsed_expr) = syn::parse2::<Expr>(expr_macro.mac.tokens.clone()) {
-                    self.macro_stats.successfully_parsed += 1;
-                    self.visit_expr(&parsed_expr);
-                } else {
-                    self.log_unexpandable_macro(&macro_name);
-                }
-            }
+            | "debug_assert_ne" => MacroType::Assertion,
+            "log" | "trace" | "debug" | "info" | "warn" | "error" => MacroType::Logging,
+            _ => MacroType::Generic,
+        }
+    }
+
+    /// Dispatch macro parsing based on macro type
+    fn dispatch_macro_parsing(
+        &mut self,
+        macro_type: MacroType,
+        tokens: &proc_macro2::TokenStream,
+        macro_name: &str,
+    ) {
+        match macro_type {
+            MacroType::Collection => self.parse_collection_macro(tokens, macro_name),
+            MacroType::Formatting => self.parse_format_macro(tokens, macro_name),
+            MacroType::Assertion => self.parse_assert_macro(tokens, macro_name),
+            MacroType::Logging => self.parse_logging_macro(tokens, macro_name),
+            MacroType::Generic => self.parse_generic_macro(tokens, macro_name),
+        }
+    }
+
+    /// Parse generic macros by attempting to parse as expression
+    fn parse_generic_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
+        if let Ok(parsed_expr) = syn::parse2::<Expr>(tokens.clone()) {
+            self.macro_stats.successfully_parsed += 1;
+            self.visit_expr(&parsed_expr);
+        } else {
+            self.log_unexpandable_macro(macro_name);
         }
     }
 
@@ -1208,6 +1232,75 @@ mod tests {
 
     fn parse_rust_code(code: &str) -> syn::File {
         syn::parse_str(code).expect("Failed to parse code")
+    }
+
+    #[test]
+    fn test_classify_macro_type() {
+        // Test collection macros
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("vec"),
+            MacroType::Collection
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("hashmap"),
+            MacroType::Collection
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("btreeset"),
+            MacroType::Collection
+        );
+
+        // Test formatting macros
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("format"),
+            MacroType::Formatting
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("println"),
+            MacroType::Formatting
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("writeln"),
+            MacroType::Formatting
+        );
+
+        // Test assertion macros
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("assert"),
+            MacroType::Assertion
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("assert_eq"),
+            MacroType::Assertion
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("debug_assert_ne"),
+            MacroType::Assertion
+        );
+
+        // Test logging macros
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("log"),
+            MacroType::Logging
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("error"),
+            MacroType::Logging
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("debug"),
+            MacroType::Logging
+        );
+
+        // Test generic/unknown macros
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("custom_macro"),
+            MacroType::Generic
+        );
+        assert_eq!(
+            CallGraphExtractor::classify_macro_type("unknown"),
+            MacroType::Generic
+        );
     }
 
     #[test]

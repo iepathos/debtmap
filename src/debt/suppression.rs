@@ -305,6 +305,20 @@ fn add_line_suppression(
     );
 }
 
+/// Transforms open blocks into unclosed block markers
+fn create_unclosed_blocks(
+    open_blocks: Vec<(usize, Vec<DebtType>, Option<String>)>,
+    file: &Path,
+) -> Vec<UnclosedBlock> {
+    open_blocks
+        .into_iter()
+        .map(|(start_line, _, _)| UnclosedBlock {
+            file: file.to_path_buf(),
+            start_line,
+        })
+        .collect()
+}
+
 pub fn parse_suppression_comments(
     content: &str,
     language: Language,
@@ -324,13 +338,7 @@ pub fn parse_suppression_comments(
         });
 
     // Record any unclosed blocks
-    context.unclosed_blocks = open_blocks
-        .into_iter()
-        .map(|(start_line, _, _)| UnclosedBlock {
-            file: file.to_path_buf(),
-            start_line,
-        })
-        .collect();
+    context.unclosed_blocks = create_unclosed_blocks(open_blocks, file);
 
     context
 }
@@ -504,5 +512,37 @@ mod tests {
         assert!(context.is_suppressed(1, &DebtType::Todo));
         assert!(context.is_suppressed(1, &DebtType::Fixme));
         assert!(context.is_suppressed(1, &DebtType::CodeSmell));
+    }
+
+    #[test]
+    fn test_create_unclosed_blocks() {
+        let open_blocks = vec![
+            (10, vec![DebtType::Todo], Some("reason1".to_string())),
+            (25, vec![DebtType::Fixme], None),
+            (
+                42,
+                vec![DebtType::CodeSmell, DebtType::Complexity],
+                Some("reason2".to_string()),
+            ),
+        ];
+        let file = Path::new("test_file.rs");
+
+        let unclosed = create_unclosed_blocks(open_blocks, file);
+
+        assert_eq!(unclosed.len(), 3);
+        assert_eq!(unclosed[0].start_line, 10);
+        assert_eq!(unclosed[0].file, PathBuf::from("test_file.rs"));
+        assert_eq!(unclosed[1].start_line, 25);
+        assert_eq!(unclosed[2].start_line, 42);
+    }
+
+    #[test]
+    fn test_create_unclosed_blocks_empty() {
+        let open_blocks = vec![];
+        let file = Path::new("empty.rs");
+
+        let unclosed = create_unclosed_blocks(open_blocks, file);
+
+        assert!(unclosed.is_empty());
     }
 }
