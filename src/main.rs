@@ -1816,7 +1816,12 @@ fn output_terminal(
     use std::io::Write;
 
     let format = determine_priority_output_format(top, tail);
-    let output = priority::formatter::format_priorities_with_config(analysis, format, verbosity, formatting_config);
+    let output = priority::formatter::format_priorities_with_config(
+        analysis,
+        format,
+        verbosity,
+        formatting_config,
+    );
 
     if let Some(path) = output_file {
         let mut file = fs::File::create(path)?;
@@ -1843,7 +1848,14 @@ fn output_unified_priorities(
     } else if is_markdown_file(&output_file) {
         output_markdown(&analysis, top, tail, verbosity, output_file)
     } else {
-        output_terminal(&analysis, top, tail, verbosity, output_file, formatting_config)
+        output_terminal(
+            &analysis,
+            top,
+            tail,
+            verbosity,
+            output_file,
+            formatting_config,
+        )
     }
 }
 
@@ -1872,7 +1884,15 @@ fn output_unified_priorities_with_config(
         )
     } else {
         // Fall back to standard output
-        output_unified_priorities(analysis, top, tail, verbosity, output_file, output_format, formatting_config)
+        output_unified_priorities(
+            analysis,
+            top,
+            tail,
+            verbosity,
+            output_file,
+            output_format,
+            formatting_config,
+        )
     }
 }
 

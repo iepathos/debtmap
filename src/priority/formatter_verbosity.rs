@@ -1,8 +1,9 @@
+use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
 use crate::priority::UnifiedDebtItem;
-use crate::formatting::{FormattingConfig, OutputFormatter, ColoredFormatter};
 use colored::*;
 use std::fmt::Write;
 
+#[allow(dead_code)]
 pub fn format_priority_item_with_verbosity(
     output: &mut String,
     rank: usize,
@@ -126,7 +127,7 @@ pub fn format_priority_item_with_config(
         let tree_sub_branch = formatter.emoji("│  ├─", "|  |-");
         let _tree_end = formatter.emoji("│  └─", "|  \\-");
         let tree_pipe = formatter.emoji("│", "|");
-        
+
         writeln!(output, "{} SCORE CALCULATION:", tree_branch).unwrap();
         writeln!(output, "{} Base Components (Weighted):", tree_sub_branch).unwrap();
 
@@ -217,7 +218,14 @@ pub fn format_priority_item_with_config(
             + item.unified_score.coverage_factor * weights.coverage
             + item.unified_score.dependency_factor * weights.dependency;
 
-        writeln!(output, "{}  {} Base Score: {:.2}", tree_pipe, formatter.emoji("├─", "|-"), base_score).unwrap();
+        writeln!(
+            output,
+            "{}  {} Base Score: {:.2}",
+            tree_pipe,
+            formatter.emoji("├─", "|-"),
+            base_score
+        )
+        .unwrap();
 
         // Show entropy impact if present
         if let Some(ref entropy) = item.entropy_details {
@@ -333,7 +341,14 @@ pub fn format_priority_item_with_config(
                     item.upstream_callers.len() - 3
                 )
             };
-            writeln!(output, "{}  {} CALLERS: {}", tree_pipe, formatter.emoji("├─", "|-"), callers_display.cyan()).unwrap();
+            writeln!(
+                output,
+                "{}  {} CALLERS: {}",
+                tree_pipe,
+                formatter.emoji("├─", "|-"),
+                callers_display.cyan()
+            )
+            .unwrap();
         }
 
         // Add downstream callees if present
@@ -347,7 +362,14 @@ pub fn format_priority_item_with_config(
                     item.downstream_callees.len() - 3
                 )
             };
-            writeln!(output, "{}  {} CALLS: {}", tree_pipe, formatter.emoji("└─", "\\-"), callees_display.bright_magenta()).unwrap();
+            writeln!(
+                output,
+                "{}  {} CALLS: {}",
+                tree_pipe,
+                formatter.emoji("└─", "\\-"),
+                callees_display.bright_magenta()
+            )
+            .unwrap();
         }
     }
 
@@ -357,7 +379,12 @@ pub fn format_priority_item_with_config(
 
         // Show coverage details for functions with less than 100% coverage that have uncovered lines
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() {
-            writeln!(output, "{}", format!("{} COVERAGE DETAILS:", formatter.emoji("├─", "|-")).bright_blue()).unwrap();
+            writeln!(
+                output,
+                "{}",
+                format!("{} COVERAGE DETAILS:", formatter.emoji("├─", "|-")).bright_blue()
+            )
+            .unwrap();
 
             // Sort the uncovered lines first
             let mut sorted_lines = trans_cov.uncovered_lines.clone();
@@ -402,14 +429,34 @@ pub fn format_priority_item_with_config(
                 )
             };
 
-            writeln!(output, "{}  {} Uncovered lines: {}", tree_pipe, formatter.emoji("├─", "|-"), lines_str.bright_red()).unwrap();
+            writeln!(
+                output,
+                "{}  {} Uncovered lines: {}",
+                tree_pipe,
+                formatter.emoji("├─", "|-"),
+                lines_str.bright_red()
+            )
+            .unwrap();
 
             // Provide specific branch coverage recommendations based on pattern
             let branch_recommendations = analyze_coverage_gaps(&sorted_lines, item);
             if !branch_recommendations.is_empty() {
-                writeln!(output, "{}  {} Test focus areas:", tree_pipe, formatter.emoji("└─", "\\-")).unwrap();
+                writeln!(
+                    output,
+                    "{}  {} Test focus areas:",
+                    tree_pipe,
+                    formatter.emoji("└─", "\\-")
+                )
+                .unwrap();
                 for rec in branch_recommendations.iter().take(3) {
-                    writeln!(output, "{}      {} {}", tree_pipe, formatter.emoji("•", "*"), rec.yellow()).unwrap();
+                    writeln!(
+                        output,
+                        "{}      {} {}",
+                        tree_pipe,
+                        formatter.emoji("•", "*"),
+                        rec.yellow()
+                    )
+                    .unwrap();
                 }
             }
         }

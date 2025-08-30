@@ -1,13 +1,12 @@
+use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
 use crate::priority::{
     DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis, UnifiedDebtItem,
 };
-use crate::formatting::{FormattingConfig, OutputFormatter, ColoredFormatter};
 use colored::*;
 use std::fmt::Write;
 
 #[path = "formatter_verbosity.rs"]
 mod verbosity;
-use self::verbosity::{format_priority_item_with_verbosity, format_priority_item_with_config};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
@@ -115,11 +114,17 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
     format_default_with_verbosity(analysis, limit, 0)
 }
 
+#[allow(dead_code)]
 fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u8) -> String {
     format_tail_with_config(analysis, n, verbosity, FormattingConfig::default())
 }
 
-fn format_tail_with_config(analysis: &UnifiedAnalysis, n: usize, verbosity: u8, config: FormattingConfig) -> String {
+fn format_tail_with_config(
+    analysis: &UnifiedAnalysis,
+    n: usize,
+    verbosity: u8,
+    config: FormattingConfig,
+) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
 
@@ -137,7 +142,13 @@ fn format_tail_with_config(analysis: &UnifiedAnalysis, n: usize, verbosity: u8, 
     let start_rank = (analysis.items.len() - tail_items.len()) + 1;
 
     for (idx, item) in tail_items.iter().enumerate() {
-        verbosity::format_priority_item_with_config(&mut output, start_rank + idx, item, verbosity, config);
+        verbosity::format_priority_item_with_config(
+            &mut output,
+            start_rank + idx,
+            item,
+            verbosity,
+            config,
+        );
         writeln!(output).unwrap();
     }
 
