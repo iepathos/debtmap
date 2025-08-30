@@ -16,7 +16,7 @@ pub fn format_priorities_markdown(
 
     writeln!(
         output,
-        "## Top {} Recommendations (by unified priority)\n",
+        "## Top {} Recommendations\n",
         count
     )
     .unwrap();
