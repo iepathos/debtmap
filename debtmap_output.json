@@ -1,0 +1,8 @@
+   Compiling debtmap v0.2.0 (/Users/glen/.mmm/worktrees/debtmap/session-5cdfb8a6-d403-4e9d-82ed-016a102458b6)
+    Finished `release` profile [optimized] target(s) in 51.99s
+     Running `target/release/debtmap . --json`
+error: unrecognized subcommand '.'
+
+Usage: debtmap <COMMAND>
+
+For more information, try '--help'.

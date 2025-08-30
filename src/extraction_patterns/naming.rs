@@ -18,6 +18,71 @@ impl FunctionNameInferrer {
         Self::format_for_language(base_name, language)
     }
 
+    // Extract pure helper functions to reduce complexity
+    fn accumulation_op_to_verb(operation: &AccumulationOp) -> &str {
+        match operation {
+            AccumulationOp::Sum => "sum",
+            AccumulationOp::Product => "multiply",
+            AccumulationOp::Concatenation => "concat",
+            AccumulationOp::Collection => "collect",
+            AccumulationOp::Custom(name) => name.as_str(),
+        }
+    }
+
+    fn build_accumulation_name(
+        operation: &AccumulationOp,
+        filter: &Option<Box<super::Expression>>,
+        transform: &Option<Box<super::Expression>>,
+        iterator_binding: &str,
+    ) -> String {
+        let mut name_parts = vec![];
+
+        if filter.is_some() {
+            name_parts.push("filter");
+        }
+
+        if transform.is_some() {
+            name_parts.push("map");
+        }
+
+        name_parts.push(Self::accumulation_op_to_verb(operation));
+        name_parts.push(Self::pluralize(iterator_binding));
+
+        name_parts.join("_")
+    }
+
+    fn build_guard_chain_name(checks_count: usize) -> String {
+        if checks_count == 1 {
+            "validate_precondition".to_string()
+        } else {
+            format!("validate_{}_preconditions", checks_count)
+        }
+    }
+
+    fn build_transformation_name(
+        input_binding: &str,
+        output_type: &str,
+        stages_count: usize,
+    ) -> String {
+        if stages_count == 1 {
+            format!(
+                "transform_{}_to_{}",
+                Self::singularize(input_binding),
+                Self::singularize(output_type)
+            )
+        } else {
+            format!("process_{}_pipeline", Self::singularize(input_binding))
+        }
+    }
+
+    fn build_branches_name(condition_var: &str) -> String {
+        format!("handle_{}_cases", Self::singularize(condition_var))
+    }
+
+    fn build_nested_extraction_name(outer_scope: &str) -> String {
+        format!("process_{}_block", Self::singularize(outer_scope))
+    }
+
     fn generate_base_name(pattern: &ExtractablePattern) -> String {
         match pattern {
             ExtractablePattern::AccumulationLoop {
@@ -26,37 +91,10 @@ impl FunctionNameInferrer {
                 filter,
                 transform,
                 ..
-            } => {
-                let op_verb = match operation {
-                    AccumulationOp::Sum => "sum",
-                    AccumulationOp::Product => "multiply",
-                    AccumulationOp::Concatenation => "concat",
-                    AccumulationOp::Collection => "collect",
-                    AccumulationOp::Custom(name) => name.as_str(),
-                };
-
-                let mut name_parts = vec![];
-
-                if filter.is_some() {
-                    name_parts.push("filter");
-                }
-
-                if transform.is_some() {
-                    name_parts.push("map");
-                }
-
-                name_parts.push(op_verb);
-                name_parts.push(Self::pluralize(iterator_binding));
-
-                name_parts.join("_")
-            }
+            } => Self::build_accumulation_name(operation, filter, transform, iterator_binding),
 
             ExtractablePattern::GuardChainSequence { checks, .. } => {
-                if checks.len() == 1 {
-                    "validate_precondition".to_string()
-                } else {
-                    format!("validate_{}_preconditions", checks.len())
-                }
+                Self::build_guard_chain_name(checks.len())
             }
 
             ExtractablePattern::TransformationPipeline {
@@ -64,24 +102,14 @@ impl FunctionNameInferrer {
                 output_type,
                 stages,
                 ..
-            } => {
-                if stages.len() == 1 {
-                    format!(
-                        "transform_{}_to_{}",
-                        Self::singularize(input_binding),
-                        Self::singularize(output_type)
-                    )
-                } else {
-                    format!("process_{}_pipeline", Self::singularize(input_binding))
-                }
-            }
+            } => Self::build_transformation_name(input_binding, output_type, stages.len()),
 
             ExtractablePattern::SimilarBranches { condition_var, .. } => {
-                format!("handle_{}_cases", Self::singularize(condition_var))
+                Self::build_branches_name(condition_var)
             }
 
             ExtractablePattern::NestedExtraction { outer_scope, .. } => {
-                format!("process_{}_block", Self::singularize(outer_scope))
+                Self::build_nested_extraction_name(outer_scope)
             }
         }
     }
@@ -218,5 +246,120 @@ mod tests {
         assert!(variants.contains(&"sum_values".to_string()));
         assert!(variants.contains(&"sum_values_totals".to_string()));
         assert!(variants.contains(&"calculate_sum_values".to_string()));
+    }
+
+    #[test]
+    fn test_accumulation_op_to_verb() {
+        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Sum), "sum");
+        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Product), "multiply");
+        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Concatenation), "concat");
+        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&AccumulationOp::Collection), "collect");
+        
+        let custom_op = AccumulationOp::Custom("aggregate".to_string());
+        assert_eq!(FunctionNameInferrer::accumulation_op_to_verb(&custom_op), "aggregate");
+    }
+
+    #[test]
+    fn test_build_accumulation_name() {
+        // Test without filter or transform
+        let name = FunctionNameInferrer::build_accumulation_name(
+            &AccumulationOp::Sum,
+            &None,
+            &None,
+            "items"
+        );
+        assert_eq!(name, "sum_items");
+
+        // Test with filter
+        let filter = Some(Box::new(super::super::Expression {
+            code: "x > 0".to_string(),
+            variables: vec!["x".to_string()],
+        }));
+        let name = FunctionNameInferrer::build_accumulation_name(
+            &AccumulationOp::Collection,
+            &filter,
+            &None,
+            "values"
+        );
+        assert_eq!(name, "filter_collect_values");
+
+        // Test with both filter and transform
+        let transform = Some(Box::new(super::super::Expression {
+            code: "x * 2".to_string(),
+            variables: vec!["x".to_string()],
+        }));
+        let name = FunctionNameInferrer::build_accumulation_name(
+            &AccumulationOp::Sum,
+            &filter,
+            &transform,
+            "numbers"
+        );
+        assert_eq!(name, "filter_map_sum_numbers");
+    }
+
+    #[test]
+    fn test_build_guard_chain_name() {
+        // Single check
+        assert_eq!(
+            FunctionNameInferrer::build_guard_chain_name(1),
+            "validate_precondition"
+        );
+        
+        // Multiple checks
+        assert_eq!(
+            FunctionNameInferrer::build_guard_chain_name(3),
+            "validate_3_preconditions"
+        );
+        
+        // Zero checks edge case
+        assert_eq!(
+            FunctionNameInferrer::build_guard_chain_name(0),
+            "validate_0_preconditions"
+        );
+    }
+
+    #[test]
+    fn test_build_transformation_name() {
+        // Single stage transformation
+        let name = FunctionNameInferrer::build_transformation_name(
+            "string",
+            "number",
+            1
+        );
+        assert_eq!(name, "transform_string_to_number");
+
+        // Multi-stage pipeline
+        let name = FunctionNameInferrer::build_transformation_name(
+            "data",
+            "result",
+            3
+        );
+        assert_eq!(name, "process_data_pipeline");
+    }
+
+    #[test]
+    fn test_build_branches_name() {
+        assert_eq!(
+            FunctionNameInferrer::build_branches_name("status"),
+            "handle_status_cases"
+        );
+        
+        assert_eq!(
+            FunctionNameInferrer::build_branches_name("error_type"),
+            "handle_error_type_cases"
+        );
+    }
+
+    #[test]
+    fn test_build_nested_extraction_name() {
+        assert_eq!(
+            FunctionNameInferrer::build_nested_extraction_name("loop"),
+            "process_loop_block"
+        );
+        
+        assert_eq!(
+            FunctionNameInferrer::build_nested_extraction_name("condition"),
+            "process_condition_block"
+        );
     }
 }
