@@ -98,6 +98,14 @@ impl FormattingConfig {
 
         config
     }
+
+    /// Create a plain output configuration (ASCII-only, no colors, no emoji)
+    pub fn plain() -> Self {
+        Self {
+            color: ColorMode::Never,
+            emoji: EmojiMode::Never,
+        }
+    }
 }
 
 pub trait OutputFormatter {

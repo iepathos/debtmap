@@ -96,3 +96,85 @@ fn test_emoji_formatting() {
     assert_eq!(formatter_with.emoji("📊", "[STATS]"), "📊");
     assert_eq!(formatter_without.emoji("📊", "[STATS]"), "[STATS]");
 }
+
+#[test]
+fn test_plain_output_mode_is_ascii_only() {
+    // Create a formatter with plain mode settings (no color, no emoji)
+    let config = FormattingConfig::plain();
+    let formatter = ColoredFormatter::new(config);
+
+    // Test that colors are disabled
+    assert_eq!(config.color, ColorMode::Never);
+    assert_eq!(config.emoji, EmojiMode::Never);
+
+    // Test that all text formatting returns plain ASCII text
+    assert_eq!(formatter.success("SUCCESS"), "SUCCESS");
+    assert_eq!(formatter.error("ERROR"), "ERROR");
+    assert_eq!(formatter.warning("WARNING"), "WARNING");
+    assert_eq!(formatter.info("INFO"), "INFO");
+    assert_eq!(formatter.bold("BOLD"), "BOLD");
+    assert_eq!(formatter.dim("DIM"), "DIM");
+
+    // Test that emojis are replaced with ASCII alternatives
+    assert_eq!(formatter.emoji("🎯", "[TARGET]"), "[TARGET]");
+    assert_eq!(formatter.emoji("✅", "[OK]"), "[OK]");
+    assert_eq!(formatter.emoji("❌", "[FAIL]"), "[FAIL]");
+    assert_eq!(formatter.emoji("⚠️", "[WARN]"), "[WARN]");
+    assert_eq!(formatter.emoji("📊", "[STATS]"), "[STATS]");
+    assert_eq!(formatter.emoji("🔍", "[SEARCH]"), "[SEARCH]");
+    assert_eq!(formatter.emoji("📈", "[GRAPH]"), "[GRAPH]");
+    assert_eq!(formatter.emoji("💡", "[TIP]"), "[TIP]");
+
+    // Verify that all output is pure ASCII (no Unicode characters)
+    let test_strings = vec![
+        formatter.success("test"),
+        formatter.error("test"),
+        formatter.warning("test"),
+        formatter.info("test"),
+        formatter.bold("test"),
+        formatter.dim("test"),
+        formatter.emoji("🎯", "[TARGET]"),
+        formatter.emoji("✨", "[FEATURE]"),
+    ];
+
+    for s in test_strings {
+        assert!(
+            s.chars().all(|c| c.is_ascii()),
+            "Output '{}' contains non-ASCII characters",
+            s
+        );
+    }
+}
+
+#[test]
+fn test_plain_mode_complex_formatting() {
+    let config = FormattingConfig::plain();
+    let formatter = ColoredFormatter::new(config);
+
+    // Test complex nested formatting scenarios
+    let complex_text = "Technical Debt Report";
+
+    // In plain mode, all formatting should be stripped
+    assert_eq!(formatter.bold(&formatter.error(complex_text)), complex_text);
+    assert_eq!(
+        formatter.dim(&formatter.warning(complex_text)),
+        complex_text
+    );
+    assert_eq!(
+        formatter.success(&format!(
+            "{} {}",
+            formatter.emoji("✅", "[PASS]"),
+            "All tests passed"
+        )),
+        "[PASS] All tests passed"
+    );
+
+    // Test that numeric formatting is preserved
+    let stats = "Found 42 issues in 10 files";
+    assert_eq!(formatter.info(stats), stats);
+
+    // Test special characters that should remain in ASCII mode
+    let special = "Score: 85% | Complexity: 3/10 | Files: src/*.rs";
+    assert_eq!(formatter.bold(special), special);
+    assert!(special.chars().all(|c| c.is_ascii()));
+}
