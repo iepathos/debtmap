@@ -8,18 +8,14 @@ pub fn format_priorities_markdown(
     verbosity: u8,
 ) -> String {
     let mut output = String::new();
-
-    writeln!(output, "# Priority Technical Debt Fixes\n").unwrap();
+    
+    let version = env!("CARGO_PKG_VERSION");
+    writeln!(output, "# Debtmap v{}\n", version).unwrap();
 
     let top_items = analysis.get_top_priorities(limit);
     let count = top_items.len().min(limit);
 
-    writeln!(
-        output,
-        "## Top {} Recommendations\n",
-        count
-    )
-    .unwrap();
+    writeln!(output, "## Top {} Recommendations\n", count).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
         format_priority_item_markdown(&mut output, idx + 1, item, verbosity);
