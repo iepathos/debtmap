@@ -1774,20 +1774,28 @@ fn output_unified_priorities(
     output_format: Option<cli::OutputFormat>,
     formatting_config: FormattingConfig,
 ) -> Result<()> {
-    // Check if JSON format is requested
-    if let Some(cli::OutputFormat::Json) = output_format {
-        output_json(&analysis, output_file)
-    } else if is_markdown_file(&output_file) {
-        output_markdown(&analysis, top, tail, verbosity, output_file)
-    } else {
-        output_terminal(
-            &analysis,
-            top,
-            tail,
-            verbosity,
-            output_file,
-            formatting_config,
-        )
+    // Check the requested output format first
+    match output_format {
+        Some(cli::OutputFormat::Json) => output_json(&analysis, output_file),
+        Some(cli::OutputFormat::Markdown) => {
+            output_markdown(&analysis, top, tail, verbosity, output_file)
+        }
+        _ => {
+            // For terminal format or when format is not specified,
+            // check if output file is markdown
+            if is_markdown_file(&output_file) {
+                output_markdown(&analysis, top, tail, verbosity, output_file)
+            } else {
+                output_terminal(
+                    &analysis,
+                    top,
+                    tail,
+                    verbosity,
+                    output_file,
+                    formatting_config,
+                )
+            }
+        }
     }
 }
 
