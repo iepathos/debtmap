@@ -1,12 +1,13 @@
 use crate::priority::{
     DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis, UnifiedDebtItem,
 };
+use crate::formatting::{FormattingConfig, OutputFormatter, ColoredFormatter};
 use colored::*;
 use std::fmt::Write;
 
 #[path = "formatter_verbosity.rs"]
 mod verbosity;
-use self::verbosity::format_priority_item_with_verbosity;
+use self::verbosity::{format_priority_item_with_verbosity, format_priority_item_with_config};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
@@ -24,10 +25,19 @@ pub fn format_priorities_with_verbosity(
     format: OutputFormat,
     verbosity: u8,
 ) -> String {
+    format_priorities_with_config(analysis, format, verbosity, FormattingConfig::default())
+}
+
+pub fn format_priorities_with_config(
+    analysis: &UnifiedAnalysis,
+    format: OutputFormat,
+    verbosity: u8,
+    config: FormattingConfig,
+) -> String {
     match format {
-        OutputFormat::Default => format_default_with_verbosity(analysis, 10, verbosity),
-        OutputFormat::Top(n) => format_default_with_verbosity(analysis, n, verbosity),
-        OutputFormat::Tail(n) => format_tail_with_verbosity(analysis, n, verbosity),
+        OutputFormat::Default => format_default_with_config(analysis, 10, verbosity, config),
+        OutputFormat::Top(n) => format_default_with_config(analysis, n, verbosity, config),
+        OutputFormat::Tail(n) => format_tail_with_config(analysis, n, verbosity, config),
     }
 }
 
@@ -35,6 +45,15 @@ fn format_default_with_verbosity(
     analysis: &UnifiedAnalysis,
     limit: usize,
     verbosity: u8,
+) -> String {
+    format_default_with_config(analysis, limit, verbosity, FormattingConfig::default())
+}
+
+fn format_default_with_config(
+    analysis: &UnifiedAnalysis,
+    limit: usize,
+    verbosity: u8,
+    config: FormattingConfig,
 ) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
@@ -52,9 +71,11 @@ fn format_default_with_verbosity(
     let top_items = analysis.get_top_priorities(limit);
     let count = top_items.len().min(limit);
 
+    let formatter = ColoredFormatter::new(config);
     writeln!(
         output,
-        "🎯 {} (by unified priority)",
+        "{} {} (by unified priority)",
+        formatter.emoji("🎯", "[TARGET]"),
         format!("TOP {count} RECOMMENDATIONS")
             .bright_yellow()
             .bold()
@@ -63,14 +84,15 @@ fn format_default_with_verbosity(
     writeln!(output).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
-        format_priority_item_with_verbosity(&mut output, idx + 1, item, verbosity);
+        verbosity::format_priority_item_with_config(&mut output, idx + 1, item, verbosity, config);
         writeln!(output).unwrap();
     }
 
     // Add summary
     writeln!(
         output,
-        "📊 {}",
+        "{} {}",
+        formatter.emoji("📊", "[STATS]"),
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
     )
     .unwrap();
@@ -78,7 +100,8 @@ fn format_default_with_verbosity(
     if let Some(coverage) = analysis.overall_coverage {
         writeln!(
             output,
-            "📈 {}",
+            "{} {}",
+            formatter.emoji("📈", "[CHART]"),
             format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
         )
         .unwrap();
@@ -93,6 +116,10 @@ fn format_default(analysis: &UnifiedAnalysis, limit: usize) -> String {
 }
 
 fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u8) -> String {
+    format_tail_with_config(analysis, n, verbosity, FormattingConfig::default())
+}
+
+fn format_tail_with_config(analysis: &UnifiedAnalysis, n: usize, verbosity: u8, config: FormattingConfig) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
 
@@ -110,7 +137,7 @@ fn format_tail_with_verbosity(analysis: &UnifiedAnalysis, n: usize, verbosity: u
     let start_rank = (analysis.items.len() - tail_items.len()) + 1;
 
     for (idx, item) in tail_items.iter().enumerate() {
-        format_priority_item_with_verbosity(&mut output, start_rank + idx, item, verbosity);
+        verbosity::format_priority_item_with_config(&mut output, start_rank + idx, item, verbosity, config);
         writeln!(output).unwrap();
     }
 

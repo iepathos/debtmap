@@ -1810,12 +1810,13 @@ fn output_terminal(
     tail: Option<usize>,
     verbosity: u8,
     output_file: Option<PathBuf>,
+    formatting_config: FormattingConfig,
 ) -> Result<()> {
     use std::fs;
     use std::io::Write;
 
     let format = determine_priority_output_format(top, tail);
-    let output = priority::formatter::format_priorities_with_verbosity(analysis, format, verbosity);
+    let output = priority::formatter::format_priorities_with_config(analysis, format, verbosity, formatting_config);
 
     if let Some(path) = output_file {
         let mut file = fs::File::create(path)?;
@@ -1834,6 +1835,7 @@ fn output_unified_priorities(
     verbosity: u8,
     output_file: Option<PathBuf>,
     output_format: Option<cli::OutputFormat>,
+    formatting_config: FormattingConfig,
 ) -> Result<()> {
     // Check if JSON format is requested
     if let Some(cli::OutputFormat::Json) = output_format {
@@ -1841,7 +1843,7 @@ fn output_unified_priorities(
     } else if is_markdown_file(&output_file) {
         output_markdown(&analysis, top, tail, verbosity, output_file)
     } else {
-        output_terminal(&analysis, top, tail, verbosity, output_file)
+        output_terminal(&analysis, top, tail, verbosity, output_file, formatting_config)
     }
 }
 
@@ -1870,7 +1872,7 @@ fn output_unified_priorities_with_config(
         )
     } else {
         // Fall back to standard output
-        output_unified_priorities(analysis, top, tail, verbosity, output_file, output_format)
+        output_unified_priorities(analysis, top, tail, verbosity, output_file, output_format, formatting_config)
     }
 }
 

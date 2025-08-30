@@ -1,4 +1,5 @@
 use crate::priority::UnifiedDebtItem;
+use crate::formatting::{FormattingConfig, OutputFormatter, ColoredFormatter};
 use colored::*;
 use std::fmt::Write;
 
@@ -8,6 +9,18 @@ pub fn format_priority_item_with_verbosity(
     item: &UnifiedDebtItem,
     verbosity: u8,
 ) {
+    format_priority_item_with_config(output, rank, item, verbosity, FormattingConfig::default())
+}
+
+pub fn format_priority_item_with_config(
+    output: &mut String,
+    rank: usize,
+    item: &UnifiedDebtItem,
+    verbosity: u8,
+    config: FormattingConfig,
+) {
+    let formatter = ColoredFormatter::new(config);
+    let tree_pipe = formatter.emoji("│", "|");
     let severity = crate::priority::formatter::get_severity_label(item.unified_score.final_score);
     let severity_color =
         crate::priority::formatter::get_severity_color(item.unified_score.final_score);
@@ -89,7 +102,8 @@ pub fn format_priority_item_with_verbosity(
         if !factors.is_empty() {
             writeln!(
                 output,
-                "   ↳ Main factors: {}",
+                "   {} Main factors: {}",
+                formatter.emoji("↳", "->"),
                 factors.join(", ").bright_white()
             )
             .unwrap();
@@ -108,14 +122,21 @@ pub fn format_priority_item_with_verbosity(
     // Show detailed calculation for verbosity >= 2
     if verbosity >= 2 {
         let weights = crate::config::get_scoring_weights();
-        writeln!(output, "├─ SCORE CALCULATION:").unwrap();
-        writeln!(output, "│  ├─ Base Components (Weighted):").unwrap();
+        let tree_branch = formatter.emoji("├─", "|-");
+        let tree_sub_branch = formatter.emoji("│  ├─", "|  |-");
+        let _tree_end = formatter.emoji("│  └─", "|  \\-");
+        let tree_pipe = formatter.emoji("│", "|");
+        
+        writeln!(output, "{} SCORE CALCULATION:", tree_branch).unwrap();
+        writeln!(output, "{} Base Components (Weighted):", tree_sub_branch).unwrap();
 
         // Show complexity with entropy adjustment if present
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "│  │  ├─ Complexity:  {:.1} × {:.0}% = {:.2} (entropy-adjusted from {})",
+                "{}  {} Complexity:  {:.1} × {:.0}% = {:.2} (entropy-adjusted from {})",
+                tree_pipe,
+                formatter.emoji("├─", "|-"),
                 item.unified_score.complexity_factor,
                 weights.complexity * 100.0,
                 item.unified_score.complexity_factor * weights.complexity,
@@ -125,7 +146,9 @@ pub fn format_priority_item_with_verbosity(
         } else {
             writeln!(
                 output,
-                "│  │  ├─ Complexity:  {:.1} × {:.0}% = {:.2}",
+                "{}  {} Complexity:  {:.1} × {:.0}% = {:.2}",
+                tree_pipe,
+                formatter.emoji("├─", "|-"),
                 item.unified_score.complexity_factor,
                 weights.complexity * 100.0,
                 item.unified_score.complexity_factor * weights.complexity
@@ -140,7 +163,9 @@ pub fn format_priority_item_with_verbosity(
         };
         writeln!(
             output,
-            "│  │  ├─ Coverage:    {:.1} × {:.0}% = {:.2}{}",
+            "{}  {} Coverage:    {:.1} × {:.0}% = {:.2}{}",
+            tree_pipe,
+            formatter.emoji("├─", "|-"),
             item.unified_score.coverage_factor,
             weights.coverage * 100.0,
             item.unified_score.coverage_factor * weights.coverage,
@@ -150,7 +175,9 @@ pub fn format_priority_item_with_verbosity(
 
         writeln!(
             output,
-            "│  │  ├─ Dependency:  {:.1} × {:.0}% = {:.2}",
+            "{}  {} Dependency:  {:.1} × {:.0}% = {:.2}",
+            tree_pipe,
+            formatter.emoji("├─", "|-"),
             item.unified_score.dependency_factor,
             weights.dependency * 100.0,
             item.unified_score.dependency_factor * weights.dependency
@@ -163,7 +190,10 @@ pub fn format_priority_item_with_verbosity(
             if weights.semantic > 0.0 {
                 writeln!(
                     output,
-                    "│  │  ├─ Semantic:    0.0 × {:.0}% = 0.00 (role multipliers used instead)",
+                    "{}  {}  {} Semantic:    0.0 × {:.0}% = 0.00 (role multipliers used instead)",
+                    tree_pipe,
+                    tree_pipe,
+                    formatter.emoji("├─", "|-"),
                     weights.semantic * 100.0
                 )
                 .unwrap();
@@ -171,7 +201,10 @@ pub fn format_priority_item_with_verbosity(
             if weights.organization > 0.0 {
                 writeln!(
                     output,
-                    "│  │  ├─ Organization: 0.0 × {:.0}% = 0.00 (included in complexity)",
+                    "{}  {}  {} Organization: 0.0 × {:.0}% = 0.00 (included in complexity)",
+                    tree_pipe,
+                    tree_pipe,
+                    formatter.emoji("├─", "|-"),
                     weights.organization * 100.0
                 )
                 .unwrap();
@@ -184,13 +217,15 @@ pub fn format_priority_item_with_verbosity(
             + item.unified_score.coverage_factor * weights.coverage
             + item.unified_score.dependency_factor * weights.dependency;
 
-        writeln!(output, "│  ├─ Base Score: {:.2}", base_score).unwrap();
+        writeln!(output, "{}  {} Base Score: {:.2}", tree_pipe, formatter.emoji("├─", "|-"), base_score).unwrap();
 
         // Show entropy impact if present
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "│  ├─ Entropy Impact: {:.0}% dampening (entropy: {:.2}, repetition: {:.0}%)",
+                "{}  {} Entropy Impact: {:.0}% dampening (entropy: {:.2}, repetition: {:.0}%)",
+                tree_pipe,
+                formatter.emoji("├─", "|-"),
                 (1.0 - entropy.dampening_factor) * 100.0,
                 entropy.entropy_score,
                 entropy.pattern_repetition * 100.0
@@ -200,13 +235,17 @@ pub fn format_priority_item_with_verbosity(
 
         writeln!(
             output,
-            "│  ├─ Role Adjustment: ×{:.2}",
+            "{}  {} Role Adjustment: ×{:.2}",
+            tree_pipe,
+            formatter.emoji("├─", "|-"),
             item.unified_score.role_multiplier
         )
         .unwrap();
         writeln!(
             output,
-            "│  └─ Final Score: {:.2}",
+            "{}  {} Final Score: {:.2}",
+            tree_pipe,
+            formatter.emoji("└─", "\\-"),
             item.unified_score.final_score
         )
         .unwrap();
@@ -216,7 +255,7 @@ pub fn format_priority_item_with_verbosity(
     writeln!(
         output,
         "{} {}:{} {}()",
-        "├─ LOCATION:".bright_blue(),
+        format!("{} LOCATION:", formatter.emoji("├─", "|-")).bright_blue(),
         item.location.file.display(),
         item.location.line,
         item.location.function.bright_green()
@@ -226,7 +265,7 @@ pub fn format_priority_item_with_verbosity(
     writeln!(
         output,
         "{} {}",
-        "├─ ACTION:".bright_blue(),
+        format!("{} ACTION:", formatter.emoji("├─", "|-")).bright_blue(),
         item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
@@ -234,7 +273,7 @@ pub fn format_priority_item_with_verbosity(
     writeln!(
         output,
         "{} {}",
-        "├─ IMPACT:".bright_blue(),
+        format!("{} IMPACT:", formatter.emoji("├─", "|-")).bright_blue(),
         crate::priority::formatter::format_impact(&item.expected_impact).bright_cyan()
     )
     .unwrap();
@@ -248,7 +287,7 @@ pub fn format_priority_item_with_verbosity(
             writeln!(
                 output,
                 "{} cyclomatic={} (adj:{}), branches={}, cognitive={}, nesting={}, entropy={:.2}",
-                "├─ COMPLEXITY:".bright_blue(),
+                format!("{} COMPLEXITY:", formatter.emoji("├─", "|-")).bright_blue(),
                 cyclomatic.to_string().yellow(),
                 entropy.adjusted_complexity.to_string().yellow(),
                 branch_count.to_string().yellow(),
@@ -261,7 +300,7 @@ pub fn format_priority_item_with_verbosity(
             writeln!(
                 output,
                 "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
-                "├─ COMPLEXITY:".bright_blue(),
+                format!("{} COMPLEXITY:", formatter.emoji("├─", "|-")).bright_blue(),
                 cyclomatic.to_string().yellow(),
                 branch_count.to_string().yellow(),
                 cognitive.to_string().yellow(),
@@ -277,7 +316,7 @@ pub fn format_priority_item_with_verbosity(
         writeln!(
             output,
             "{} {} upstream, {} downstream",
-            "├─ DEPENDENCIES:".bright_blue(),
+            format!("{} DEPENDENCIES:", formatter.emoji("├─", "|-")).bright_blue(),
             upstream.to_string().cyan(),
             downstream.to_string().cyan()
         )
@@ -294,7 +333,7 @@ pub fn format_priority_item_with_verbosity(
                     item.upstream_callers.len() - 3
                 )
             };
-            writeln!(output, "│  ├─ CALLERS: {}", callers_display.cyan()).unwrap();
+            writeln!(output, "{}  {} CALLERS: {}", tree_pipe, formatter.emoji("├─", "|-"), callers_display.cyan()).unwrap();
         }
 
         // Add downstream callees if present
@@ -308,7 +347,7 @@ pub fn format_priority_item_with_verbosity(
                     item.downstream_callees.len() - 3
                 )
             };
-            writeln!(output, "│  └─ CALLS: {}", callees_display.bright_magenta()).unwrap();
+            writeln!(output, "{}  {} CALLS: {}", tree_pipe, formatter.emoji("└─", "\\-"), callees_display.bright_magenta()).unwrap();
         }
     }
 
@@ -318,7 +357,7 @@ pub fn format_priority_item_with_verbosity(
 
         // Show coverage details for functions with less than 100% coverage that have uncovered lines
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() {
-            writeln!(output, "{}", "├─ COVERAGE DETAILS:".bright_blue()).unwrap();
+            writeln!(output, "{}", format!("{} COVERAGE DETAILS:", formatter.emoji("├─", "|-")).bright_blue()).unwrap();
 
             // Sort the uncovered lines first
             let mut sorted_lines = trans_cov.uncovered_lines.clone();
@@ -363,14 +402,14 @@ pub fn format_priority_item_with_verbosity(
                 )
             };
 
-            writeln!(output, "│  ├─ Uncovered lines: {}", lines_str.bright_red()).unwrap();
+            writeln!(output, "{}  {} Uncovered lines: {}", tree_pipe, formatter.emoji("├─", "|-"), lines_str.bright_red()).unwrap();
 
             // Provide specific branch coverage recommendations based on pattern
             let branch_recommendations = analyze_coverage_gaps(&sorted_lines, item);
             if !branch_recommendations.is_empty() {
-                writeln!(output, "│  └─ Test focus areas:").unwrap();
+                writeln!(output, "{}  {} Test focus areas:", tree_pipe, formatter.emoji("└─", "\\-")).unwrap();
                 for rec in branch_recommendations.iter().take(3) {
-                    writeln!(output, "│      • {}", rec.yellow()).unwrap();
+                    writeln!(output, "{}      {} {}", tree_pipe, formatter.emoji("•", "*"), rec.yellow()).unwrap();
                 }
             }
         }
@@ -380,7 +419,7 @@ pub fn format_priority_item_with_verbosity(
     writeln!(
         output,
         "{} {}",
-        "└─ WHY:".bright_blue(),
+        format!("{} WHY:", formatter.emoji("└─", "\\-")).bright_blue(),
         item.recommendation.rationale
     )
     .unwrap();
