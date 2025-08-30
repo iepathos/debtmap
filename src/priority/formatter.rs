@@ -73,7 +73,7 @@ fn format_default_with_config(
     let count = top_items.len().min(limit);
     writeln!(
         output,
-        "{} {} (by unified priority)",
+        "{} {}",
         formatter.emoji("🎯", "[TARGET]"),
         format!("TOP {count} RECOMMENDATIONS")
             .bright_yellow()

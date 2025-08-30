@@ -1,4 +1,5 @@
-use debtmap::io::writers::markdown::{EnhancedMarkdownWriter, MarkdownWriter};
+use debtmap::io::writers::markdown::EnhancedMarkdownWriter;
+use debtmap::io::writers::MarkdownWriter;
 use debtmap::priority::{
     unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
     CallGraph, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, UnifiedAnalysis,

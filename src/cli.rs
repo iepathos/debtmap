@@ -114,14 +114,6 @@ pub enum Commands {
         #[arg(long = "threshold-preset", value_enum)]
         threshold_preset: Option<ThresholdPreset>,
 
-        /// Enable enhanced markdown format with rich features
-        #[arg(long = "markdown-enhanced")]
-        markdown_enhanced: bool,
-
-        /// Detail level for enhanced markdown (summary, standard, detailed, complete)
-        #[arg(long = "markdown-detail", default_value = "standard")]
-        markdown_detail: String,
-
         /// Plain output mode: ASCII-only, no colors, no emoji, machine-parseable
         #[arg(long = "plain")]
         plain: bool,

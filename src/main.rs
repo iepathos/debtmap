@@ -45,8 +45,6 @@ struct AnalyzeConfig {
     #[allow(dead_code)]
     no_context_aware: bool,
     threshold_preset: Option<cli::ThresholdPreset>,
-    markdown_enhanced: bool,
-    markdown_detail: String,
     formatting_config: FormattingConfig,
 }
 
@@ -113,8 +111,6 @@ fn main() -> Result<()> {
             filter_categories,
             no_context_aware,
             threshold_preset,
-            markdown_enhanced,
-            markdown_detail,
             plain,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
@@ -155,8 +151,6 @@ fn main() -> Result<()> {
                 filter_categories,
                 no_context_aware,
                 threshold_preset,
-                markdown_enhanced,
-                markdown_detail,
                 formatting_config,
             };
             handle_analyze(config)
@@ -252,8 +246,6 @@ fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.verbosity,
         config.output,
         Some(config.format),
-        config.markdown_enhanced,
-        &config.markdown_detail,
         &results,
         config.coverage_file.as_ref(),
         config.formatting_config,
@@ -1744,59 +1736,6 @@ fn output_markdown(
 }
 
 /// Handles terminal format output
-fn output_enhanced_markdown(
-    analysis: &priority::UnifiedAnalysis,
-    results: &AnalysisResults,
-    coverage_file: Option<&PathBuf>,
-    detail_level: &str,
-    output_file: Option<PathBuf>,
-) -> Result<()> {
-    use io::writers::{DetailLevel, EnhancedMarkdownWriter, MarkdownConfig};
-
-    // Parse detail level
-    let detail = match detail_level.to_lowercase().as_str() {
-        "summary" => DetailLevel::Summary,
-        "standard" => DetailLevel::Standard,
-        "detailed" => DetailLevel::Detailed,
-        "complete" => DetailLevel::Complete,
-        _ => DetailLevel::Standard,
-    };
-
-    // Create configuration
-    let config = MarkdownConfig {
-        detail_level: detail,
-        ..MarkdownConfig::default()
-    };
-
-    // Calculate risk insights if coverage available
-    let risk_insights = if let Some(lcov_path) = coverage_file {
-        match analyze_risk_with_coverage(results, lcov_path, &PathBuf::from("."), false, None, None)
-        {
-            Ok(insights) => insights,
-            Err(e) => {
-                log::warn!("Failed to calculate risk insights: {}", e);
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    // Create writer
-    let writer: Box<dyn std::io::Write> = if let Some(path) = output_file {
-        Box::new(std::fs::File::create(path)?)
-    } else {
-        Box::new(std::io::stdout())
-    };
-
-    let mut enhanced_writer = EnhancedMarkdownWriter::with_config(writer, config);
-
-    // Write the enhanced report
-    enhanced_writer.write_enhanced_report(results, Some(analysis), risk_insights.as_ref())?;
-
-    Ok(())
-}
-
 fn output_terminal(
     analysis: &priority::UnifiedAnalysis,
     top: Option<usize>,
@@ -1860,33 +1799,20 @@ fn output_unified_priorities_with_config(
     verbosity: u8,
     output_file: Option<PathBuf>,
     output_format: Option<cli::OutputFormat>,
-    markdown_enhanced: bool,
-    markdown_detail: &str,
-    results: &AnalysisResults,
-    coverage_file: Option<&PathBuf>,
+    _results: &AnalysisResults,
+    _coverage_file: Option<&PathBuf>,
     formatting_config: FormattingConfig,
 ) -> Result<()> {
-    // Check if enhanced markdown is requested
-    if markdown_enhanced && matches!(output_format, Some(cli::OutputFormat::Markdown)) {
-        output_enhanced_markdown(
-            &analysis,
-            results,
-            coverage_file,
-            markdown_detail,
-            output_file,
-        )
-    } else {
-        // Fall back to standard output
-        output_unified_priorities(
-            analysis,
-            top,
-            tail,
-            verbosity,
-            output_file,
-            output_format,
-            formatting_config,
-        )
-    }
+    // Always use standard output
+    output_unified_priorities(
+        analysis,
+        top,
+        tail,
+        verbosity,
+        output_file,
+        output_format,
+        formatting_config,
+    )
 }
 
 #[cfg(test)]
