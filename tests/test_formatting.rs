@@ -138,11 +138,7 @@ fn test_plain_output_mode_is_ascii_only() {
     ];
 
     for s in test_strings {
-        assert!(
-            s.chars().all(|c| c.is_ascii()),
-            "Output '{}' contains non-ASCII characters",
-            s
-        );
+        assert!(s.is_ascii(), "Output '{}' contains non-ASCII characters", s);
     }
 }
 
@@ -176,5 +172,5 @@ fn test_plain_mode_complex_formatting() {
     // Test special characters that should remain in ASCII mode
     let special = "Score: 85% | Complexity: 3/10 | Files: src/*.rs";
     assert_eq!(formatter.bold(special), special);
-    assert!(special.chars().all(|c| c.is_ascii()));
+    assert!(special.is_ascii());
 }
