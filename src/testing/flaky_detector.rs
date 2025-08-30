@@ -207,15 +207,16 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
 }
 
 fn is_timing_function(path: &str) -> bool {
-    // Group patterns by category for better maintainability
-    // Sleep-related patterns
-    path.contains("sleep") ||
-    // Time measurement patterns  
-    path.contains("Instant::now") || path.contains("SystemTime::now") ||
-    // Duration and delay patterns
-    path.contains("Duration::from") || path.contains("delay") ||
-    // Timeout patterns
-    path.contains("timeout")
+    const TIMING_PATTERNS: &[&str] = &[
+        "sleep",
+        "Instant::now",
+        "SystemTime::now",
+        "Duration::from",
+        "delay",
+        "timeout",
+    ];
+
+    TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
 }
 
 fn is_timing_method(method: &str) -> bool {
