@@ -206,17 +206,23 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     analyzer.indicators
 }
 
-fn is_timing_function(path: &str) -> bool {
-    const TIMING_PATTERNS: &[&str] = &[
-        "sleep",
-        "Instant::now",
-        "SystemTime::now",
-        "Duration::from",
-        "delay",
-        "timeout",
-    ];
+#[inline]
+fn matches_any_pattern(text: &str, patterns: &[&str]) -> bool {
+    patterns.iter().any(|pattern| text.contains(pattern))
+}
 
-    TIMING_PATTERNS.iter().any(|pattern| path.contains(pattern))
+fn is_timing_function(path: &str) -> bool {
+    matches_any_pattern(
+        path,
+        &[
+            "sleep",
+            "Instant::now",
+            "SystemTime::now",
+            "Duration::from",
+            "delay",
+            "timeout",
+        ],
+    )
 }
 
 fn is_timing_method(method: &str) -> bool {
@@ -233,80 +239,80 @@ fn is_timing_method(method: &str) -> bool {
 }
 
 fn is_random_function(path: &str) -> bool {
-    const RANDOM_PATTERNS: &[&str] = &[
-        "rand",
-        "random",
-        "thread_rng",
-        "StdRng",
-        "SmallRng",
-        "gen_range",
-        "sample",
-        "shuffle",
-        "choose",
-    ];
-
-    RANDOM_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    matches_any_pattern(
+        path,
+        &[
+            "rand",
+            "random",
+            "thread_rng",
+            "StdRng",
+            "SmallRng",
+            "gen_range",
+            "sample",
+            "shuffle",
+            "choose",
+        ],
+    )
 }
 
 fn is_external_service_call(path: &str) -> bool {
-    const EXTERNAL_PATTERNS: &[&str] = &[
-        "reqwest",
-        "hyper",
-        "http",
-        "Client::new",
-        "HttpClient",
-        "ApiClient",
-        "database",
-        "db",
-        "postgres",
-        "mysql",
-        "redis",
-        "mongodb",
-        "sqlx",
-        "diesel",
-    ];
-
-    EXTERNAL_PATTERNS
-        .iter()
-        .any(|pattern| path.contains(pattern))
+    matches_any_pattern(
+        path,
+        &[
+            "reqwest",
+            "hyper",
+            "http",
+            "Client::new",
+            "HttpClient",
+            "ApiClient",
+            "database",
+            "db",
+            "postgres",
+            "mysql",
+            "redis",
+            "mongodb",
+            "sqlx",
+            "diesel",
+        ],
+    )
 }
 
 fn is_filesystem_call(path: &str) -> bool {
-    const FS_PATTERNS: &[&str] = &[
-        "fs::",
-        "File::",
-        "std::fs",
-        "tokio::fs",
-        "async_std::fs",
-        "read_to_string",
-        "write",
-        "create",
-        "remove_file",
-        "remove_dir",
-        "rename",
-        "copy",
-        "metadata",
-    ];
-
-    FS_PATTERNS.iter().any(|pattern| path.contains(pattern))
+    matches_any_pattern(
+        path,
+        &[
+            "fs::",
+            "File::",
+            "std::fs",
+            "tokio::fs",
+            "async_std::fs",
+            "read_to_string",
+            "write",
+            "create",
+            "remove_file",
+            "remove_dir",
+            "rename",
+            "copy",
+            "metadata",
+        ],
+    )
 }
 
 fn is_network_call(path: &str) -> bool {
-    const NETWORK_PATTERNS: &[&str] = &[
-        "TcpStream",
-        "TcpListener",
-        "UdpSocket",
-        "connect",
-        "bind",
-        "listen",
-        "accept",
-        "send_to",
-        "recv_from",
-    ];
-
-    NETWORK_PATTERNS
-        .iter()
-        .any(|pattern| path.contains(pattern))
+    matches_any_pattern(
+        path,
+        &[
+            "TcpStream",
+            "TcpListener",
+            "UdpSocket",
+            "connect",
+            "bind",
+            "listen",
+            "accept",
+            "send_to",
+            "recv_from",
+        ],
+    )
 }
 
 #[cfg(test)]
