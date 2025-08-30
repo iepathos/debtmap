@@ -21,7 +21,7 @@ pub fn format_priority_item_with_config(
     config: FormattingConfig,
 ) {
     let formatter = ColoredFormatter::new(config);
-    let tree_pipe = formatter.emoji("│", "|");
+    let tree_pipe = formatter.emoji("│", " ");
     let severity = crate::priority::formatter::get_severity_label(item.unified_score.final_score);
     let severity_color =
         crate::priority::formatter::get_severity_color(item.unified_score.final_score);
@@ -104,7 +104,7 @@ pub fn format_priority_item_with_config(
             writeln!(
                 output,
                 "   {} Main factors: {}",
-                formatter.emoji("↳", "->"),
+                formatter.emoji("↳", "  "),
                 factors.join(", ").bright_white()
             )
             .unwrap();
@@ -123,10 +123,10 @@ pub fn format_priority_item_with_config(
     // Show detailed calculation for verbosity >= 2
     if verbosity >= 2 {
         let weights = crate::config::get_scoring_weights();
-        let tree_branch = formatter.emoji("├─", "|-");
-        let tree_sub_branch = formatter.emoji("│  ├─", "|  |-");
-        let _tree_end = formatter.emoji("│  └─", "|  \\-");
-        let tree_pipe = formatter.emoji("│", "|");
+        let tree_branch = formatter.emoji("├─", "-");
+        let tree_sub_branch = formatter.emoji("│  ├─", "  -");
+        let _tree_end = formatter.emoji("│  └─", "  -");
+        let tree_pipe = formatter.emoji("│", " ");
 
         writeln!(output, "{} SCORE CALCULATION:", tree_branch).unwrap();
         writeln!(output, "{} Base Components (Weighted):", tree_sub_branch).unwrap();
@@ -137,7 +137,7 @@ pub fn format_priority_item_with_config(
                 output,
                 "{}  {} Complexity:  {:.1} × {:.0}% = {:.2} (entropy-adjusted from {})",
                 tree_pipe,
-                formatter.emoji("├─", "|-"),
+                formatter.emoji("├─", "-"),
                 item.unified_score.complexity_factor,
                 weights.complexity * 100.0,
                 item.unified_score.complexity_factor * weights.complexity,
@@ -149,7 +149,7 @@ pub fn format_priority_item_with_config(
                 output,
                 "{}  {} Complexity:  {:.1} × {:.0}% = {:.2}",
                 tree_pipe,
-                formatter.emoji("├─", "|-"),
+                formatter.emoji("├─", "-"),
                 item.unified_score.complexity_factor,
                 weights.complexity * 100.0,
                 item.unified_score.complexity_factor * weights.complexity
@@ -166,7 +166,7 @@ pub fn format_priority_item_with_config(
             output,
             "{}  {} Coverage:    {:.1} × {:.0}% = {:.2}{}",
             tree_pipe,
-            formatter.emoji("├─", "|-"),
+            formatter.emoji("├─", "-"),
             item.unified_score.coverage_factor,
             weights.coverage * 100.0,
             item.unified_score.coverage_factor * weights.coverage,
@@ -178,7 +178,7 @@ pub fn format_priority_item_with_config(
             output,
             "{}  {} Dependency:  {:.1} × {:.0}% = {:.2}",
             tree_pipe,
-            formatter.emoji("├─", "|-"),
+            formatter.emoji("├─", "-"),
             item.unified_score.dependency_factor,
             weights.dependency * 100.0,
             item.unified_score.dependency_factor * weights.dependency
@@ -194,7 +194,7 @@ pub fn format_priority_item_with_config(
                     "{}  {}  {} Semantic:    0.0 × {:.0}% = 0.00 (role multipliers used instead)",
                     tree_pipe,
                     tree_pipe,
-                    formatter.emoji("├─", "|-"),
+                    formatter.emoji("├─", "-"),
                     weights.semantic * 100.0
                 )
                 .unwrap();
@@ -205,7 +205,7 @@ pub fn format_priority_item_with_config(
                     "{}  {}  {} Organization: 0.0 × {:.0}% = 0.00 (included in complexity)",
                     tree_pipe,
                     tree_pipe,
-                    formatter.emoji("├─", "|-"),
+                    formatter.emoji("├─", "-"),
                     weights.organization * 100.0
                 )
                 .unwrap();
@@ -222,7 +222,7 @@ pub fn format_priority_item_with_config(
             output,
             "{}  {} Base Score: {:.2}",
             tree_pipe,
-            formatter.emoji("├─", "|-"),
+            formatter.emoji("├─", "-"),
             base_score
         )
         .unwrap();
@@ -233,7 +233,7 @@ pub fn format_priority_item_with_config(
                 output,
                 "{}  {} Entropy Impact: {:.0}% dampening (entropy: {:.2}, repetition: {:.0}%)",
                 tree_pipe,
-                formatter.emoji("├─", "|-"),
+                formatter.emoji("├─", "-"),
                 (1.0 - entropy.dampening_factor) * 100.0,
                 entropy.entropy_score,
                 entropy.pattern_repetition * 100.0
@@ -245,7 +245,7 @@ pub fn format_priority_item_with_config(
             output,
             "{}  {} Role Adjustment: ×{:.2}",
             tree_pipe,
-            formatter.emoji("├─", "|-"),
+            formatter.emoji("├─", "-"),
             item.unified_score.role_multiplier
         )
         .unwrap();
@@ -253,7 +253,7 @@ pub fn format_priority_item_with_config(
             output,
             "{}  {} Final Score: {:.2}",
             tree_pipe,
-            formatter.emoji("└─", "\\-"),
+            formatter.emoji("└─", "-"),
             item.unified_score.final_score
         )
         .unwrap();
@@ -263,7 +263,7 @@ pub fn format_priority_item_with_config(
     writeln!(
         output,
         "{} {}:{} {}()",
-        format!("{} LOCATION:", formatter.emoji("├─", "|-")).bright_blue(),
+        format!("{} LOCATION:", formatter.emoji("├─", "-")).bright_blue(),
         item.location.file.display(),
         item.location.line,
         item.location.function.bright_green()
@@ -273,7 +273,7 @@ pub fn format_priority_item_with_config(
     writeln!(
         output,
         "{} {}",
-        format!("{} ACTION:", formatter.emoji("├─", "|-")).bright_blue(),
+        format!("{} ACTION:", formatter.emoji("├─", "-")).bright_blue(),
         item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
@@ -281,7 +281,7 @@ pub fn format_priority_item_with_config(
     writeln!(
         output,
         "{} {}",
-        format!("{} IMPACT:", formatter.emoji("├─", "|-")).bright_blue(),
+        format!("{} IMPACT:", formatter.emoji("├─", "-")).bright_blue(),
         crate::priority::formatter::format_impact(&item.expected_impact).bright_cyan()
     )
     .unwrap();
@@ -295,7 +295,7 @@ pub fn format_priority_item_with_config(
             writeln!(
                 output,
                 "{} cyclomatic={} (adj:{}), branches={}, cognitive={}, nesting={}, entropy={:.2}",
-                format!("{} COMPLEXITY:", formatter.emoji("├─", "|-")).bright_blue(),
+                format!("{} COMPLEXITY:", formatter.emoji("├─", "-")).bright_blue(),
                 cyclomatic.to_string().yellow(),
                 entropy.adjusted_complexity.to_string().yellow(),
                 branch_count.to_string().yellow(),
@@ -308,7 +308,7 @@ pub fn format_priority_item_with_config(
             writeln!(
                 output,
                 "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
-                format!("{} COMPLEXITY:", formatter.emoji("├─", "|-")).bright_blue(),
+                format!("{} COMPLEXITY:", formatter.emoji("├─", "-")).bright_blue(),
                 cyclomatic.to_string().yellow(),
                 branch_count.to_string().yellow(),
                 cognitive.to_string().yellow(),
@@ -324,7 +324,7 @@ pub fn format_priority_item_with_config(
         writeln!(
             output,
             "{} {} upstream, {} downstream",
-            format!("{} DEPENDENCIES:", formatter.emoji("├─", "|-")).bright_blue(),
+            format!("{} DEPENDENCIES:", formatter.emoji("├─", "-")).bright_blue(),
             upstream.to_string().cyan(),
             downstream.to_string().cyan()
         )
@@ -345,7 +345,7 @@ pub fn format_priority_item_with_config(
                 output,
                 "{}  {} CALLERS: {}",
                 tree_pipe,
-                formatter.emoji("├─", "|-"),
+                formatter.emoji("├─", "-"),
                 callers_display.cyan()
             )
             .unwrap();
@@ -366,7 +366,7 @@ pub fn format_priority_item_with_config(
                 output,
                 "{}  {} CALLS: {}",
                 tree_pipe,
-                formatter.emoji("└─", "\\-"),
+                formatter.emoji("└─", "-"),
                 callees_display.bright_magenta()
             )
             .unwrap();
@@ -382,7 +382,7 @@ pub fn format_priority_item_with_config(
             writeln!(
                 output,
                 "{}",
-                format!("{} COVERAGE DETAILS:", formatter.emoji("├─", "|-")).bright_blue()
+                format!("{} COVERAGE DETAILS:", formatter.emoji("├─", "-")).bright_blue()
             )
             .unwrap();
 
@@ -433,7 +433,7 @@ pub fn format_priority_item_with_config(
                 output,
                 "{}  {} Uncovered lines: {}",
                 tree_pipe,
-                formatter.emoji("├─", "|-"),
+                formatter.emoji("├─", "-"),
                 lines_str.bright_red()
             )
             .unwrap();
@@ -445,7 +445,7 @@ pub fn format_priority_item_with_config(
                     output,
                     "{}  {} Test focus areas:",
                     tree_pipe,
-                    formatter.emoji("└─", "\\-")
+                    formatter.emoji("└─", "-")
                 )
                 .unwrap();
                 for rec in branch_recommendations.iter().take(3) {
@@ -466,7 +466,7 @@ pub fn format_priority_item_with_config(
     writeln!(
         output,
         "{} {}",
-        "└─ WHY:".bright_blue(),
+        formatter.emoji("└─ WHY:", "- WHY:").bright_blue(),
         item.recommendation.rationale
     )
     .unwrap();

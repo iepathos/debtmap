@@ -115,10 +115,7 @@ fn main() -> Result<()> {
             threshold_preset,
             markdown_enhanced,
             markdown_detail,
-            color,
-            no_color,
-            emoji,
-            no_emoji,
+            plain,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
 
@@ -128,17 +125,13 @@ fn main() -> Result<()> {
             }
 
             // Parse formatting configuration
-            let mut formatting_config = FormattingConfig::from_env();
-            if no_color {
-                formatting_config.color = ColorMode::Never;
-            } else if let Some(mode) = ColorMode::parse(&color) {
-                formatting_config.color = mode;
-            }
-            if no_emoji {
-                formatting_config.emoji = EmojiMode::Never;
-            } else if let Some(mode) = EmojiMode::parse(&emoji) {
-                formatting_config.emoji = mode;
-            }
+            let formatting_config = if plain {
+                // Plain mode: no colors, no emoji, ASCII-only
+                FormattingConfig::new(ColorMode::Never, EmojiMode::Never)
+            } else {
+                // Auto-detect from environment
+                FormattingConfig::from_env()
+            };
 
             let config = AnalyzeConfig {
                 path,

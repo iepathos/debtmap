@@ -56,21 +56,21 @@ fn format_default_with_config(
 ) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
+    let formatter = ColoredFormatter::new(config);
 
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
         format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(output).unwrap();
 
     let top_items = analysis.get_top_priorities(limit);
     let count = top_items.len().min(limit);
-
-    let formatter = ColoredFormatter::new(config);
     writeln!(
         output,
         "{} {} (by unified priority)",
@@ -127,15 +127,17 @@ fn format_tail_with_config(
 ) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
+    let formatter = ColoredFormatter::new(config);
 
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
         format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(output).unwrap();
 
     let tail_items = analysis.get_bottom_priorities(n);
@@ -159,15 +161,17 @@ fn format_tail_with_config(
 fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
+    let formatter = ColoredFormatter::new(FormattingConfig::default());
 
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
         format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(output).unwrap();
 
     let bottom_items = analysis.get_bottom_priorities(limit);
@@ -223,15 +227,17 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
 fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
+    let formatter = ColoredFormatter::new(FormattingConfig::default());
 
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
         "    {}",
         format!("Debtmap v{}", version).bright_white().bold()
     )
     .unwrap();
-    writeln!(output, "{}", "═".repeat(44).bright_blue()).unwrap();
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(output).unwrap();
 
     for (idx, item) in analysis.items.iter().enumerate() {
@@ -356,10 +362,11 @@ pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebt
         }
     }
 
+    let formatter = ColoredFormatter::new(FormattingConfig::default());
     writeln!(
         output,
         "{} {}",
-        "└─ WHY:".bright_blue(),
+        formatter.emoji("└─ WHY:", "- WHY:").bright_blue(),
         item.recommendation.rationale
     )
     .unwrap();

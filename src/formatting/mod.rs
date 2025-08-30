@@ -1,5 +1,6 @@
 use colored::*;
 use std::env;
+use std::io::IsTerminal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorMode {
@@ -238,7 +239,7 @@ fn detect_color_support() -> bool {
     }
 
     // Check if stdout is a TTY
-    atty::is(atty::Stream::Stdout)
+    std::io::stdout().is_terminal()
 }
 
 fn detect_emoji_support() -> bool {
