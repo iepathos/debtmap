@@ -4529,7 +4529,14 @@ end_of_record
         };
 
         // Test terminal output without error
-        let result = output_terminal(&analysis, Some(5), None, 0, None);
+        let result = output_terminal(
+            &analysis,
+            Some(5),
+            None,
+            0,
+            None,
+            FormattingConfig::default(),
+        );
         assert!(result.is_ok());
     }
 
@@ -4554,7 +4561,14 @@ end_of_record
             overall_coverage: Some(75.0),
         };
 
-        let result = output_terminal(&analysis, None, Some(5), 2, Some(output_path.clone()));
+        let result = output_terminal(
+            &analysis,
+            None,
+            Some(5),
+            2,
+            Some(output_path.clone()),
+            FormattingConfig::default(),
+        );
         assert!(result.is_ok());
         assert!(output_path.exists());
     }
@@ -4587,6 +4601,7 @@ end_of_record
             0,
             Some(output_path.clone()),
             Some(cli::OutputFormat::Json),
+            FormattingConfig::default(),
         );
         assert!(result.is_ok());
         assert!(output_path.exists());
@@ -4617,8 +4632,15 @@ end_of_record
             overall_coverage: Some(75.0),
         };
 
-        let result =
-            output_unified_priorities(analysis, Some(5), None, 1, Some(output_path.clone()), None);
+        let result = output_unified_priorities(
+            analysis,
+            Some(5),
+            None,
+            1,
+            Some(output_path.clone()),
+            None,
+            FormattingConfig::default(),
+        );
         assert!(result.is_ok());
         assert!(output_path.exists());
 
@@ -4648,8 +4670,15 @@ end_of_record
             overall_coverage: Some(75.0),
         };
 
-        let result =
-            output_unified_priorities(analysis, None, Some(3), 2, Some(output_path.clone()), None);
+        let result = output_unified_priorities(
+            analysis,
+            None,
+            Some(3),
+            2,
+            Some(output_path.clone()),
+            None,
+            FormattingConfig::default(),
+        );
         assert!(result.is_ok());
         assert!(output_path.exists());
     }

@@ -466,7 +466,7 @@ pub fn format_priority_item_with_config(
     writeln!(
         output,
         "{} {}",
-        format!("{} WHY:", formatter.emoji("└─", "\\-")).bright_blue(),
+        "└─ WHY:".bright_blue(),
         item.recommendation.rationale
     )
     .unwrap();

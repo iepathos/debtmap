@@ -43,8 +43,8 @@ fn test_formatting_config_from_env() {
 
 #[test]
 fn test_color_mode_should_use_color() {
-    assert_eq!(ColorMode::Always.should_use_color(), true);
-    assert_eq!(ColorMode::Never.should_use_color(), false);
+    assert!(ColorMode::Always.should_use_color());
+    assert!(!ColorMode::Never.should_use_color());
     // Auto depends on terminal detection, but we can test it exists
     let _ = ColorMode::Auto.should_use_color();
 }
