@@ -206,25 +206,29 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     analyzer.indicators
 }
 
+/// Pure function to check if a string contains any of the given patterns
+#[inline]
+fn matches_any_pattern(text: &str, patterns: &[&str]) -> bool {
+    patterns.iter().any(|pattern| text.contains(pattern))
+}
+
 /// Checks if a path contains timing-related patterns
 /// Uses functional pattern matching for clarity and reduced complexity
 fn is_timing_function(path: &str) -> bool {
-    // Refactored using pattern consolidation - complexity reduced to 2
-    const TIMING_PATTERNS: &[&str] = &[
-        "sleep",
-        "Instant::now",
-        "SystemTime::now",
-        "Duration::from",
-        "delay",
-        "timeout",
-        "wait_for",
-        "park_timeout",
-        "recv_timeout",
-    ];
-
-/// Pure function to check if a string contains any of the given patterns
-fn matches_any_pattern(text: &str, patterns: &[&str]) -> bool {
-    patterns.iter().any(|pattern| text.contains(pattern))
+    matches_any_pattern(
+        path,
+        &[
+            "sleep",
+            "Instant::now",
+            "SystemTime::now",
+            "Duration::from",
+            "delay",
+            "timeout",
+            "wait_for",
+            "park_timeout",
+            "recv_timeout",
+        ],
+    )
 }
 
 fn is_timing_method(method: &str) -> bool {
