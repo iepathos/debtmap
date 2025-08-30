@@ -207,15 +207,26 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
 }
 
 fn is_timing_function(path: &str) -> bool {
-    // Group patterns by category for better maintainability
+    // Group patterns to reduce measured complexity while maintaining clarity
     // Sleep-related patterns
-    path.contains("sleep") ||
-    // Time measurement patterns  
-    path.contains("Instant::now") || path.contains("SystemTime::now") ||
-    // Duration and delay patterns
-    path.contains("Duration::from") || path.contains("delay") ||
-    // Timeout patterns
-    path.contains("timeout")
+    if path.contains("sleep") || path.contains("delay") {
+        return true;
+    }
+
+    // Time measurement patterns
+    if path.contains("timeout") || path.contains("Duration::from") {
+        return true;
+    }
+
+    // Time instant patterns
+    if path.contains("Instant::now") || path.contains("SystemTime::now") {
+        return true;
+    }
+
+    // Async-specific sleep patterns (more specific checks)
+    path.contains("time::sleep")
+        || path.contains("tokio::time::sleep")
+        || path.contains("async_std::task::sleep")
 }
 
 fn is_timing_method(method: &str) -> bool {
@@ -443,16 +454,39 @@ mod tests {
     }
 
     #[test]
-    fn test_consolidated_patterns_still_work() {
-        // Test all the specific patterns that were consolidated
+    fn test_is_timing_function_comprehensive_coverage() {
+        // Test all timing patterns are properly detected
+        // Sleep patterns
         assert!(is_timing_function("thread::sleep"));
+        assert!(is_timing_function("sleep"));
+        assert!(is_timing_function("my_sleep_wrapper"));
         assert!(is_timing_function("time::sleep"));
         assert!(is_timing_function("tokio::time::sleep"));
         assert!(is_timing_function("async_std::task::sleep"));
+
+        // Delay patterns
+        assert!(is_timing_function("delay"));
+        assert!(is_timing_function("apply_delay"));
+        assert!(is_timing_function("network_delay"));
         assert!(is_timing_function("delay_ms"));
+
+        // Timeout patterns
+        assert!(is_timing_function("timeout"));
         assert!(is_timing_function("set_timeout"));
+        assert!(is_timing_function("operation_with_timeout"));
+
+        // Duration patterns
+        assert!(is_timing_function("Duration::from_secs"));
         assert!(is_timing_function("Duration::from_millis"));
+
+        // Time instant patterns
         assert!(is_timing_function("Instant::now"));
         assert!(is_timing_function("SystemTime::now"));
+
+        // Negative cases - should not match
+        assert!(!is_timing_function("process_data"));
+        assert!(!is_timing_function("calculate_result"));
+        assert!(!is_timing_function("handle_request"));
+        assert!(!is_timing_function(""));
     }
 }
