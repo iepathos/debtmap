@@ -43,6 +43,8 @@ lcov = "0.8"
 
 # Parallel processing
 rayon = "1.10"
+dashmap = "6.1"
+crossbeam = "0.8"
 
 # Hashing for duplication detection
 sha2 = "0.10"

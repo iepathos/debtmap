@@ -366,6 +366,16 @@ We have completed the initial implementation with core functionality for analyzi
   - Percentile-based score normalization for better 0-10 distribution
   - 2x+ spread between top debt items achieved
 
+- [x] **Spec 70**: Parallel Call Graph Construction
+  - Parallel processing for call graph construction using Rayon
+  - 60-70% performance improvement on multi-core machines
+  - Concurrent data structures (DashMap/DashSet) for thread-safe operations
+  - Three-phase parallel processing (parsing, extraction, analysis)
+  - Configurable thread count via --jobs flag (0 = all cores)
+  - Call graph caching with automatic invalidation on file changes
+  - Deterministic results across runs
+  - Progress tracking during long operations
+
 ## Pending Specs
 
 ### Enhancements

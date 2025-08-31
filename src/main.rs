@@ -33,6 +33,9 @@ fn main() -> Result<()> {
             no_context_aware,
             threshold_preset,
             plain,
+            parallel,
+            jobs,
+            use_cache,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
 
@@ -73,6 +76,9 @@ fn main() -> Result<()> {
                 no_context_aware,
                 threshold_preset,
                 formatting_config,
+                parallel,
+                jobs,
+                use_cache,
             };
             debtmap::commands::analyze::handle_analyze(config)
         }
