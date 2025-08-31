@@ -7,6 +7,15 @@ use crate::{core::AnalysisResults, formatting::FormattingConfig, io, priority, r
 use anyhow::Result;
 use std::path::PathBuf;
 
+pub struct OutputConfig {
+    pub top: Option<usize>,
+    pub tail: Option<usize>,
+    pub verbosity: u8,
+    pub output_file: Option<PathBuf>,
+    pub output_format: Option<crate::cli::OutputFormat>,
+    pub formatting_config: FormattingConfig,
+}
+
 pub use formatters::*;
 pub use json::*;
 pub use markdown::*;
@@ -36,23 +45,18 @@ pub fn output_results_with_risk(
 
 pub fn output_unified_priorities_with_config(
     analysis: priority::UnifiedAnalysis,
-    top: Option<usize>,
-    tail: Option<usize>,
-    verbosity: u8,
-    output_file: Option<PathBuf>,
-    output_format: Option<crate::cli::OutputFormat>,
+    config: OutputConfig,
     _results: &AnalysisResults,
     _coverage_file: Option<&PathBuf>,
-    formatting_config: FormattingConfig,
 ) -> Result<()> {
     output_unified_priorities(
         analysis,
-        top,
-        tail,
-        verbosity,
-        output_file,
-        output_format,
-        formatting_config,
+        config.top,
+        config.tail,
+        config.verbosity,
+        config.output_file,
+        config.output_format,
+        config.formatting_config,
     )
 }
 

@@ -23,12 +23,6 @@ pub fn output_markdown(
     Ok(())
 }
 
-fn calculate_markdown_limit(top: Option<usize>, tail: Option<usize>) -> usize {
-    if let Some(n) = top {
-        n
-    } else if tail.is_some() {
-        10
-    } else {
-        10
-    }
+fn calculate_markdown_limit(top: Option<usize>, _tail: Option<usize>) -> usize {
+    top.unwrap_or(10)
 }

@@ -1,7 +1,7 @@
 use chrono::Utc;
 use debtmap::core::{
-    AnalysisResults, ComplexityReport, ComplexitySummary, DebtItem, DebtType, DependencyReport,
-    FunctionMetrics, Priority, TechnicalDebtReport,
+    AnalysisResults, ComplexityReport, ComplexitySummary, DependencyReport, FunctionMetrics,
+    TechnicalDebtReport,
 };
 use debtmap::utils::risk_analyzer::{analyze_risk_with_coverage, analyze_risk_without_coverage};
 use std::fs;

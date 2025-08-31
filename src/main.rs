@@ -1,9 +1,5 @@
-use debtmap::builders;
 use debtmap::cli;
-use debtmap::commands;
 use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
-use debtmap::output;
-use debtmap::utils;
 
 use anyhow::Result;
 use cli::Commands;

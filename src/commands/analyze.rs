@@ -52,16 +52,20 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.show_macro_stats,
     )?;
 
+    let output_config = output::OutputConfig {
+        top: config.top,
+        tail: config.tail,
+        verbosity: config.verbosity,
+        output_file: config.output,
+        output_format: Some(config.format),
+        formatting_config: config.formatting_config,
+    };
+
     output::output_unified_priorities_with_config(
         unified_analysis,
-        config.top,
-        config.tail,
-        config.verbosity,
-        config.output,
-        Some(config.format),
+        output_config,
         &results,
         config.coverage_file.as_ref(),
-        config.formatting_config,
     )?;
 
     Ok(())
