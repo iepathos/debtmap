@@ -4,6 +4,7 @@ pub mod debt_aggregator;
 pub mod external_api_detector;
 pub mod formatter;
 pub mod formatter_markdown;
+pub mod scoring;
 pub mod semantic_classifier;
 pub mod unified_scorer;
 

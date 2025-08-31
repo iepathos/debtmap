@@ -936,7 +936,7 @@ impl<'ast> Visit<'ast> for BranchSimilarityAnalyzer {
     }
 }
 
-/// Apply entropy-based dampening to complexity scores
+/// Apply entropy-based dampening to complexity scores (spec 68: max 50% reduction)
 pub fn apply_entropy_dampening(base_complexity: u32, entropy_score: &EntropyScore) -> u32 {
     let config = crate::config::get_entropy_config();
 
@@ -944,44 +944,21 @@ pub fn apply_entropy_dampening(base_complexity: u32, entropy_score: &EntropyScor
         return base_complexity;
     }
 
-    // Calculate individual dampening factors with graduated approach (more moderate)
-    let repetition_factor = if entropy_score.pattern_repetition > config.pattern_threshold {
-        // Graduated dampening based on repetition level (max 20% reduction)
-        let excess = (entropy_score.pattern_repetition - config.pattern_threshold)
-            / (1.0 - config.pattern_threshold);
-        1.0 - (excess * config.max_repetition_reduction).min(config.max_repetition_reduction)
-    } else {
-        1.0
-    };
+    // Spec 68: Only apply dampening for very low entropy (< 0.2)
+    if entropy_score.token_entropy >= 0.2 {
+        return base_complexity; // No dampening for normal entropy
+    }
 
-    let entropy_factor = if entropy_score.token_entropy < config.entropy_threshold {
-        // Graduated dampening based on entropy level (max 15% reduction)
-        let deficit =
-            (config.entropy_threshold - entropy_score.token_entropy) / config.entropy_threshold;
-        1.0 - (deficit * config.max_entropy_reduction).min(config.max_entropy_reduction)
-    } else {
-        1.0
-    };
+    // Spec 68: Calculate graduated dampening: 50-100% of score preserved
+    // Formula: dampening = max(0.5, 1.0 - (0.5 × (0.2 - entropy) / 0.2))
+    // This ensures maximum 50% reduction, minimum 0% reduction
+    let dampening_factor = (0.5 + 0.5 * (entropy_score.token_entropy / 0.2)).max(0.5);
 
-    let branch_factor = if entropy_score.branch_similarity > config.branch_threshold {
-        // Graduated dampening based on branch similarity (max 25% reduction)
-        let excess = (entropy_score.branch_similarity - config.branch_threshold)
-            / (1.0 - config.branch_threshold);
-        1.0 - (excess * config.max_branch_reduction).min(config.max_branch_reduction)
-    } else {
-        1.0
-    };
-
-    // Combine factors with cap at max_combined_reduction (default 30%)
-    let combined_factor = (repetition_factor * entropy_factor * branch_factor)
-        .max(1.0 - config.max_combined_reduction);
-
-    // Apply configured weight
-    let weighted_multiplier = 1.0 - (1.0 - combined_factor) * config.weight;
-
-    // Apply dampening with minimum complexity preservation
-    let adjusted = (base_complexity as f64 * weighted_multiplier) as u32;
-    adjusted.max(base_complexity / 2) // Never reduce by more than 50% as safety
+    // Apply dampening with guaranteed minimum preservation
+    let adjusted = (base_complexity as f64 * dampening_factor) as u32;
+    
+    // Ensure we never reduce below 50% (though the formula above already guarantees this)
+    adjusted.max(base_complexity / 2)
 }
 
 #[cfg(test)]
@@ -1048,9 +1025,9 @@ mod tests {
 
     #[test]
     fn test_entropy_dampening() {
-        // Test with entropy that would trigger dampening if enabled
+        // Test with low entropy that triggers dampening per spec 68
         let entropy_score = EntropyScore {
-            token_entropy: 0.3,
+            token_entropy: 0.1,  // Low entropy (< 0.2) to trigger dampening
             pattern_repetition: 0.8,
             branch_similarity: 0.6,
             effective_complexity: 0.3,
@@ -1068,10 +1045,11 @@ mod tests {
         if !crate::config::get_entropy_config().enabled {
             assert_eq!(dampened, original); // No change when disabled
         } else {
-            // When enabled, should apply dampening
-            assert!(dampened < original);
-            // With new moderate dampening (max 30% reduction), expect at least 70% of original
-            assert!(dampened >= 7); // At least 70% of 10
+            // When enabled with low entropy (0.1), should apply dampening
+            // Per spec 68: dampening_factor = 0.5 + 0.5 * (0.1/0.2) = 0.75
+            // So dampened should be 10 * 0.75 = 7.5, rounded to 7 or 8
+            assert!(dampened < original, "Should apply dampening with low entropy");
+            assert!(dampened >= 7, "Should preserve at least 70% with entropy=0.1");
             assert!(dampened <= original); // But still some reduction
         }
     }

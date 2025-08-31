@@ -52,70 +52,70 @@ fn test_apply_entropy_dampening_no_reduction() {
 
 #[test]
 fn test_apply_entropy_dampening_high_repetition() {
-    // Test high pattern repetition leading to reduction
+    // Per spec 68: Only low entropy (< 0.2) causes dampening, not high repetition alone
     let base_complexity = 25;
     let entropy_score = create_entropy_score(
-        0.7, // Normal entropy
-        0.9, // Very high repetition (above threshold)
+        0.7, // Normal entropy (> 0.2, so NO dampening per spec 68)
+        0.9, // Very high repetition (ignored when entropy > 0.2)
         0.4, // Normal branch similarity
     );
 
     let result = apply_entropy_dampening(base_complexity, &entropy_score);
 
-    // High repetition should reduce complexity
-    assert!(result < base_complexity);
-    assert!(result >= base_complexity / 2); // Safety cap
+    // With entropy > 0.2, no dampening should occur per spec 68
+    assert_eq!(result, base_complexity);
 }
 
 #[test]
 fn test_apply_entropy_dampening_low_entropy() {
-    // Test low token entropy leading to reduction
+    // Test low token entropy leading to reduction (spec 68)
     let base_complexity = 30;
     let entropy_score = create_entropy_score(
-        0.2, // Very low entropy (below threshold)
+        0.1, // Very low entropy (< 0.2 threshold, triggers dampening)
         0.4, // Normal repetition
         0.4, // Normal branch similarity
     );
 
     let result = apply_entropy_dampening(base_complexity, &entropy_score);
 
-    // Low entropy should reduce complexity
+    // Low entropy (0.1) should reduce complexity
+    // Per spec 68: dampening_factor = 0.5 + 0.5 * (0.1/0.2) = 0.75
+    // So result should be 30 * 0.75 = 22.5, rounded to 22 or 23
     assert!(result < base_complexity);
-    assert!(result >= base_complexity / 2);
+    assert!(result >= base_complexity / 2); // Never less than 50%
+    assert!(result >= 22 && result <= 23);
 }
 
 #[test]
 fn test_apply_entropy_dampening_high_branch_similarity() {
-    // Test high branch similarity leading to reduction
+    // Per spec 68: Only low entropy (< 0.2) causes dampening
     let base_complexity = 18;
     let entropy_score = create_entropy_score(
-        0.6,  // Normal entropy
+        0.6,  // Normal entropy (> 0.2, so NO dampening)
         0.4,  // Normal repetition
-        0.85, // Very high branch similarity (above threshold)
+        0.85, // Very high branch similarity (ignored when entropy > 0.2)
     );
 
     let result = apply_entropy_dampening(base_complexity, &entropy_score);
 
-    // High branch similarity should reduce complexity
-    assert!(result < base_complexity);
-    assert!(result >= base_complexity / 2);
+    // With entropy > 0.2, no dampening should occur
+    assert_eq!(result, base_complexity);
 }
 
 #[test]
 fn test_apply_entropy_dampening_combined_factors() {
-    // Test multiple dampening factors combined
+    // Per spec 68: Only entropy < 0.2 matters, other factors ignored
     let base_complexity = 40;
     let entropy_score = create_entropy_score(
-        0.3, // Low entropy
-        0.8, // High repetition
-        0.8, // High branch similarity
+        0.3, // Entropy > 0.2, so NO dampening despite other factors
+        0.8, // High repetition (ignored)
+        0.8, // High branch similarity (ignored)
     );
 
     let result = apply_entropy_dampening(base_complexity, &entropy_score);
 
-    // Multiple factors should reduce complexity significantly
-    assert!(result < base_complexity);
-    assert!(result >= base_complexity / 2); // Still respects safety cap
+    // With entropy > 0.2, no dampening occurs regardless of other factors
+    assert_eq!(result, base_complexity);
 }
 
 #[test]
@@ -169,35 +169,36 @@ fn test_apply_entropy_dampening_boundary_values() {
 
 #[test]
 fn test_apply_entropy_dampening_graduated_reduction() {
-    // Test that reduction is graduated based on how much values exceed thresholds
+    // Test graduated reduction based on entropy level (spec 68)
     let base_complexity = 20;
 
-    // Slightly above threshold
-    let slight_excess = create_entropy_score(0.6, 0.65, 0.65);
-    let result_slight = apply_entropy_dampening(base_complexity, &slight_excess);
+    // Just below threshold (more dampening)
+    let low_entropy = create_entropy_score(0.1, 0.65, 0.65);
+    let result_low = apply_entropy_dampening(base_complexity, &low_entropy);
 
-    // Significantly above threshold
-    let high_excess = create_entropy_score(0.6, 0.95, 0.95);
-    let result_high = apply_entropy_dampening(base_complexity, &high_excess);
+    // Very low entropy (maximum dampening)
+    let very_low_entropy = create_entropy_score(0.0, 0.95, 0.95);
+    let result_very_low = apply_entropy_dampening(base_complexity, &very_low_entropy);
 
-    // Higher excess should lead to more reduction
-    assert!(result_high < result_slight);
-    assert!(result_slight <= base_complexity);
+    // Lower entropy should lead to more reduction
+    // 0.0 entropy = 50% dampening, 0.1 entropy = 75% preserved
+    assert!(result_very_low < result_low);
+    assert_eq!(result_very_low, base_complexity / 2); // 50% for 0.0 entropy
+    assert!(result_low == 15); // 75% of 20 for 0.1 entropy
 }
 
 #[test]
 fn test_apply_entropy_dampening_weight_application() {
-    // Test that config weight affects the dampening
+    // Test entropy at the boundary (spec 68)
     let base_complexity = 25;
 
-    // Create score that would trigger dampening
+    // Entropy at exactly 0.2 threshold - NO dampening
     let entropy_score = create_entropy_score(0.2, 0.8, 0.8);
 
     let result = apply_entropy_dampening(base_complexity, &entropy_score);
 
-    // Result should be dampened but within expected bounds
-    assert!(result < base_complexity);
-    assert!(result >= (base_complexity as f64 * 0.5) as u32);
+    // At threshold, no dampening should occur
+    assert_eq!(result, base_complexity);
 }
 
 #[test]

@@ -129,100 +129,74 @@ pub fn format_priority_item_with_config(
         let tree_pipe = formatter.emoji("│", " ");
 
         writeln!(output, "{} SCORE CALCULATION:", tree_branch).unwrap();
-        writeln!(output, "{} Base Components (Weighted):", tree_sub_branch).unwrap();
+        writeln!(output, "{} Multiplicative Components (Spec 68):", tree_sub_branch).unwrap();
 
-        // Show complexity with entropy adjustment if present
-        if let Some(ref entropy) = item.entropy_details {
-            writeln!(
-                output,
-                "{}  {} Complexity:  {:.1} × {:.0}% = {:.2} (entropy-adjusted from {})",
-                tree_pipe,
-                formatter.emoji("├─", "-"),
-                item.unified_score.complexity_factor,
-                weights.complexity * 100.0,
-                item.unified_score.complexity_factor * weights.complexity,
-                entropy.original_complexity
-            )
-            .unwrap();
-        } else {
-            writeln!(
-                output,
-                "{}  {} Complexity:  {:.1} × {:.0}% = {:.2}",
-                tree_pipe,
-                formatter.emoji("├─", "-"),
-                item.unified_score.complexity_factor,
-                weights.complexity * 100.0,
-                item.unified_score.complexity_factor * weights.complexity
-            )
-            .unwrap();
-        }
-        // Show coverage with actual percentage if available
+        // Calculate multiplicative factors for display
+        let coverage_gap = item.unified_score.coverage_factor / 10.0; // Convert from display scale
+        let coverage_factor = coverage_gap.powf(1.5);
+        let complexity_factor = item.unified_score.complexity_factor.powf(0.8);
+        let dependency_factor = ((item.unified_score.dependency_factor + 1.0).sqrt() / 2.0).min(1.0);
+        
+        // Show coverage gap with exponential scaling
         let coverage_detail = if let Some(ref trans_cov) = item.transitive_coverage {
-            format!(" (actual: {:.2}% line coverage)", trans_cov.direct * 100.0)
+            format!(" (gap: {:.1}%, coverage: {:.1}%)", coverage_gap * 100.0, trans_cov.direct * 100.0)
+        } else if coverage_gap < 1.0 {
+            format!(" (gap: {:.1}%)", coverage_gap * 100.0)
+        } else {
+            " (no coverage data)".to_string()
+        };
+        writeln!(
+            output,
+            "{}  {} Coverage Gap: {:.3}^1.5 = {:.3}{}",
+            tree_pipe,
+            formatter.emoji("├─", "-"),
+            coverage_gap,
+            coverage_factor,
+            coverage_detail
+        )
+        .unwrap();
+        
+        // Show complexity with entropy adjustment if present
+        let complexity_detail = if let Some(ref entropy) = item.entropy_details {
+            format!(" (entropy-adjusted from {})", entropy.original_complexity)
         } else {
             String::new()
         };
         writeln!(
             output,
-            "{}  {} Coverage:    {:.1} × {:.0}% = {:.2}{}",
+            "{}  {} Complexity:   {:.1}^0.8 = {:.3}{}",
             tree_pipe,
             formatter.emoji("├─", "-"),
-            item.unified_score.coverage_factor,
-            weights.coverage * 100.0,
-            item.unified_score.coverage_factor * weights.coverage,
-            coverage_detail
+            item.unified_score.complexity_factor,
+            complexity_factor,
+            complexity_detail
+        )
+        .unwrap();
+        // Show dependency factor with sqrt scaling
+        writeln!(
+            output,
+            "{}  {} Dependencies: {} callers → {:.3}",
+            tree_pipe,
+            formatter.emoji("├─", "-"),
+            item.unified_score.dependency_factor as u32,
+            dependency_factor
         )
         .unwrap();
 
+        // Calculate multiplicative base score (spec 68)
+        // Apply small constants to avoid zero multiplication
+        let complexity_component = (complexity_factor + 0.1).max(0.1);
+        let dependency_component = (dependency_factor + 0.1).max(0.1);
+        let base_score = coverage_factor * complexity_component * dependency_component;
+        
         writeln!(
             output,
-            "{}  {} Dependency:  {:.1} × {:.0}% = {:.2}",
+            "{}  {} Base Score: {:.3} × {:.3} × {:.3} = {:.4}",
             tree_pipe,
             formatter.emoji("├─", "-"),
-            item.unified_score.dependency_factor,
-            weights.dependency * 100.0,
-            item.unified_score.dependency_factor * weights.dependency
-        )
-        .unwrap();
-
-        // Show semantic and organization with 0% weight for transparency
-        // These were removed per spec 58 but keeping in display for clarity
-        if weights.semantic > 0.0 || weights.organization > 0.0 {
-            if weights.semantic > 0.0 {
-                writeln!(
-                    output,
-                    "{}  {}  {} Semantic:    0.0 × {:.0}% = 0.00 (role multipliers used instead)",
-                    tree_pipe,
-                    tree_pipe,
-                    formatter.emoji("├─", "-"),
-                    weights.semantic * 100.0
-                )
-                .unwrap();
-            }
-            if weights.organization > 0.0 {
-                writeln!(
-                    output,
-                    "{}  {}  {} Organization: 0.0 × {:.0}% = 0.00 (included in complexity)",
-                    tree_pipe,
-                    tree_pipe,
-                    formatter.emoji("├─", "-"),
-                    weights.organization * 100.0
-                )
-                .unwrap();
-            }
-        }
-
-        // Calculate base score with actual weights from config
-        // Note: semantic and organization are in config but not used in calculation (always 0)
-        let base_score = item.unified_score.complexity_factor * weights.complexity
-            + item.unified_score.coverage_factor * weights.coverage
-            + item.unified_score.dependency_factor * weights.dependency;
-
-        writeln!(
-            output,
-            "{}  {} Base Score: {:.2}",
-            tree_pipe,
-            formatter.emoji("├─", "-"),
+            coverage_factor,
+            complexity_component,
+            dependency_component,
             base_score
         )
         .unwrap();

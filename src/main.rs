@@ -1362,9 +1362,9 @@ fn create_debt_item_from_metric(
         &std::collections::HashSet<priority::call_graph::FunctionId>,
     >,
 ) -> priority::UnifiedDebtItem {
-    use priority::unified_scorer;
+    use priority::scoring::debt_item;
 
-    unified_scorer::create_unified_debt_item_with_exclusions(
+    debt_item::create_unified_debt_item_with_exclusions(
         metric,
         call_graph,
         coverage_data,
@@ -1385,7 +1385,7 @@ fn create_debt_item_from_metric_with_aggregator(
     data_flow: Option<&debtmap::data_flow::DataFlowGraph>,
 ) -> priority::UnifiedDebtItem {
     use debtmap::scoring::{EnhancedScorer, ScoringContext};
-    use priority::unified_scorer;
+    use priority::scoring::debt_item;
     use std::collections::HashSet;
 
     // Always use enhanced scoring
@@ -1408,7 +1408,7 @@ fn create_debt_item_from_metric_with_aggregator(
     let score_breakdown = scorer.score_function_with_aggregator(metric, debt_aggregator);
 
     // Convert to UnifiedDebtItem with enhanced score
-    let mut item = unified_scorer::create_unified_debt_item_with_aggregator_and_data_flow(
+    let mut item = debt_item::create_unified_debt_item_with_aggregator_and_data_flow(
         metric,
         call_graph,
         coverage_data,
@@ -1588,7 +1588,7 @@ fn create_unified_analysis(
     call_graph: &priority::CallGraph,
     coverage_data: Option<&risk::lcov::LcovData>,
 ) -> priority::UnifiedAnalysis {
-    use priority::{unified_scorer, UnifiedAnalysis};
+    use priority::{scoring::debt_item, UnifiedAnalysis};
 
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
@@ -1603,7 +1603,7 @@ fn create_unified_analysis(
         }
 
         // Create the unified debt item
-        let item = unified_scorer::create_unified_debt_item(metric, call_graph, coverage_data);
+        let item = debt_item::create_unified_debt_item(metric, call_graph, coverage_data);
         unified.add_item(item);
     }
 
