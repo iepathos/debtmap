@@ -123,52 +123,9 @@ impl<'ast> Visit<'ast> for FlakinessAnalyzer {
                 .collect::<Vec<_>>()
                 .join("::");
 
-            // Check for timing functions
-            if is_timing_function(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::TimingDependency,
-                    impact: ReliabilityImpact::High,
-                    suggestion:
-                        "Replace sleep/timing dependencies with deterministic waits or mocks"
-                            .to_string(),
-                });
-            }
-
-            // Check for random functions
-            if is_random_function(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::RandomValues,
-                    impact: ReliabilityImpact::Medium,
-                    suggestion: "Use deterministic test data instead of random values".to_string(),
-                });
-            }
-
-            // Check for external service calls
-            if is_external_service_call(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::ExternalDependency,
-                    impact: ReliabilityImpact::Critical,
-                    suggestion: "Mock external service calls for unit tests".to_string(),
-                });
-            }
-
-            // Check for filesystem operations
-            if is_filesystem_call(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::FilesystemDependency,
-                    impact: ReliabilityImpact::Medium,
-                    suggestion: "Use temporary directories or mock filesystem operations"
-                        .to_string(),
-                });
-            }
-
-            // Check for network operations
-            if is_network_call(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::NetworkDependency,
-                    impact: ReliabilityImpact::Critical,
-                    suggestion: "Mock network calls or use test doubles".to_string(),
-                });
+            // Consolidated pattern matching for flakiness detection
+            if let Some(indicator) = detect_flakiness_pattern(&path_str) {
+                self.indicators.push(indicator);
             }
         }
 
@@ -204,6 +161,40 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     let mut analyzer = FlakinessAnalyzer::new();
     analyzer.visit_item_fn(function);
     analyzer.indicators
+}
+
+// Pure function for pattern-based flakiness detection
+fn detect_flakiness_pattern(path_str: &str) -> Option<FlakinessIndicator> {
+    // Pattern matching using a declarative approach
+    match () {
+        _ if is_timing_function(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::TimingDependency,
+            impact: ReliabilityImpact::High,
+            suggestion: "Replace sleep/timing dependencies with deterministic waits or mocks"
+                .to_string(),
+        }),
+        _ if is_random_function(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::RandomValues,
+            impact: ReliabilityImpact::Medium,
+            suggestion: "Use deterministic test data instead of random values".to_string(),
+        }),
+        _ if is_external_service_call(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::ExternalDependency,
+            impact: ReliabilityImpact::Critical,
+            suggestion: "Mock external service calls for unit tests".to_string(),
+        }),
+        _ if is_filesystem_call(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::FilesystemDependency,
+            impact: ReliabilityImpact::Medium,
+            suggestion: "Use temporary directories or mock filesystem operations".to_string(),
+        }),
+        _ if is_network_call(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::NetworkDependency,
+            impact: ReliabilityImpact::Critical,
+            suggestion: "Mock network calls or use test doubles".to_string(),
+        }),
+        _ => None,
+    }
 }
 
 // Pattern-based classification for flakiness detection
@@ -637,5 +628,82 @@ mod tests {
         assert!(is_timing_function("thread::park_timeout"));
         assert!(is_timing_function("channel.recv_timeout"));
         assert!(is_timing_function("future.wait_for"));
+    }
+
+    #[test]
+    fn test_detect_flakiness_pattern_timing() {
+        let indicator = detect_flakiness_pattern("thread::sleep").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::TimingDependency);
+        assert_eq!(indicator.impact, ReliabilityImpact::High);
+        assert!(indicator.suggestion.contains("deterministic"));
+
+        let indicator = detect_flakiness_pattern("Instant::now").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::TimingDependency);
+    }
+
+    #[test]
+    fn test_detect_flakiness_pattern_random() {
+        let indicator = detect_flakiness_pattern("rand::thread_rng").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::RandomValues);
+        assert_eq!(indicator.impact, ReliabilityImpact::Medium);
+        assert!(indicator.suggestion.contains("deterministic test data"));
+    }
+
+    #[test]
+    fn test_detect_flakiness_pattern_external_service() {
+        let indicator = detect_flakiness_pattern("reqwest::Client").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::ExternalDependency);
+        assert_eq!(indicator.impact, ReliabilityImpact::Critical);
+        assert!(indicator.suggestion.contains("Mock external"));
+
+        let indicator = detect_flakiness_pattern("postgres::connect").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::ExternalDependency);
+    }
+
+    #[test]
+    fn test_detect_flakiness_pattern_filesystem() {
+        let indicator = detect_flakiness_pattern("std::fs::read_to_string").unwrap();
+        assert_eq!(
+            indicator.flakiness_type,
+            FlakinessType::FilesystemDependency
+        );
+        assert_eq!(indicator.impact, ReliabilityImpact::Medium);
+        assert!(indicator.suggestion.contains("temporary directories"));
+
+        let indicator = detect_flakiness_pattern("File::create").unwrap();
+        assert_eq!(
+            indicator.flakiness_type,
+            FlakinessType::FilesystemDependency
+        );
+    }
+
+    #[test]
+    fn test_detect_flakiness_pattern_network() {
+        let indicator = detect_flakiness_pattern("TcpStream::connect").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::NetworkDependency);
+        assert_eq!(indicator.impact, ReliabilityImpact::Critical);
+        assert!(indicator.suggestion.contains("test doubles"));
+
+        let indicator = detect_flakiness_pattern("UdpSocket::bind").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::NetworkDependency);
+    }
+
+    #[test]
+    fn test_detect_flakiness_pattern_no_match() {
+        assert!(detect_flakiness_pattern("regular_function").is_none());
+        assert!(detect_flakiness_pattern("process_data").is_none());
+        assert!(detect_flakiness_pattern("calculate_result").is_none());
+        assert!(detect_flakiness_pattern("").is_none());
+    }
+
+    #[test]
+    fn test_detect_flakiness_pattern_priority_order() {
+        // Test that timing patterns take precedence (first in match)
+        let indicator = detect_flakiness_pattern("sleep_and_random").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::TimingDependency);
+
+        // Test edge cases
+        let indicator = detect_flakiness_pattern("timeout_with_delay").unwrap();
+        assert_eq!(indicator.flakiness_type, FlakinessType::TimingDependency);
     }
 }
