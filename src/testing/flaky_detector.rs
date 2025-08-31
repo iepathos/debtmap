@@ -641,4 +641,4 @@ mod tests {
         assert!(is_timing_function("channel.recv_timeout"));
         assert!(is_timing_function("future.wait_for"));
     }
-
+}
