@@ -30,6 +30,12 @@ impl ScoreNormalizer {
     }
 
     pub fn normalize(&self, raw_score: f64) -> f64 {
+        // If we have no percentile data, just return the raw score
+        // (it should already be normalized to 0-10 by the scoring system)
+        if self.percentiles.is_empty() {
+            return raw_score;
+        }
+        
         let percentile = self.find_percentile(raw_score);
 
         // Use sigmoid function for smooth distribution
