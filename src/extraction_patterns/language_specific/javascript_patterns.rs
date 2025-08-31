@@ -133,15 +133,22 @@ impl JavaScriptPatternMatcher {
 
     fn infer_return_type(&self, pattern: &ExtractablePattern) -> String {
         match pattern {
-            ExtractablePattern::AccumulationLoop { operation, .. } => match operation {
-                AccumulationOp::Sum | AccumulationOp::Product => "number".to_string(),
-                AccumulationOp::Concatenation => "string".to_string(),
-                AccumulationOp::Collection => "Array".to_string(),
-                AccumulationOp::Custom(_) => "any".to_string(),
-            },
+            ExtractablePattern::AccumulationLoop { operation, .. } => {
+                Self::classify_accumulation_return_type(operation)
+            }
             ExtractablePattern::GuardChainSequence { .. } => "boolean".to_string(),
             ExtractablePattern::TransformationPipeline { output_type, .. } => output_type.clone(),
             _ => "void".to_string(),
+        }
+    }
+
+    /// Pure function to classify return type based on accumulation operation
+    fn classify_accumulation_return_type(operation: &AccumulationOp) -> String {
+        match operation {
+            AccumulationOp::Sum | AccumulationOp::Product => "number".to_string(),
+            AccumulationOp::Concatenation => "string".to_string(),
+            AccumulationOp::Collection => "Array".to_string(),
+            AccumulationOp::Custom(_) => "any".to_string(),
         }
     }
 
@@ -215,5 +222,120 @@ impl JavaScriptPatternMatcher {
             }
             _ => "// Example transformation".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::extraction_patterns::{AccumulationOp, ExtractablePattern, ReturnType};
+
+    #[test]
+    fn test_classify_accumulation_return_type() {
+        // Test numeric operations return "number"
+        assert_eq!(
+            JavaScriptPatternMatcher::classify_accumulation_return_type(&AccumulationOp::Sum),
+            "number"
+        );
+        assert_eq!(
+            JavaScriptPatternMatcher::classify_accumulation_return_type(&AccumulationOp::Product),
+            "number"
+        );
+
+        // Test string operation returns "string"
+        assert_eq!(
+            JavaScriptPatternMatcher::classify_accumulation_return_type(
+                &AccumulationOp::Concatenation
+            ),
+            "string"
+        );
+
+        // Test collection operation returns "Array"
+        assert_eq!(
+            JavaScriptPatternMatcher::classify_accumulation_return_type(
+                &AccumulationOp::Collection
+            ),
+            "Array"
+        );
+
+        // Test custom operation returns "any"
+        assert_eq!(
+            JavaScriptPatternMatcher::classify_accumulation_return_type(&AccumulationOp::Custom(
+                "custom".to_string()
+            )),
+            "any"
+        );
+    }
+
+    #[test]
+    fn test_infer_return_type_guard_chain() {
+        let matcher = JavaScriptPatternMatcher;
+        let pattern = ExtractablePattern::GuardChainSequence {
+            checks: vec![],
+            early_return: ReturnType {
+                type_name: "default".to_string(),
+                is_early_return: true,
+            },
+            start_line: 1,
+            end_line: 10,
+        };
+        assert_eq!(matcher.infer_return_type(&pattern), "boolean");
+    }
+
+    #[test]
+    fn test_infer_return_type_transformation_pipeline() {
+        let matcher = JavaScriptPatternMatcher;
+        let pattern = ExtractablePattern::TransformationPipeline {
+            input_binding: "input".to_string(),
+            stages: vec![],
+            output_type: "CustomType".to_string(),
+            start_line: 1,
+            end_line: 10,
+        };
+        assert_eq!(matcher.infer_return_type(&pattern), "CustomType");
+    }
+
+    #[test]
+    fn test_infer_return_type_accumulation_loops() {
+        let matcher = JavaScriptPatternMatcher;
+
+        // Test Sum operation
+        let sum_pattern = ExtractablePattern::AccumulationLoop {
+            iterator_binding: "items".to_string(),
+            accumulator: "sum".to_string(),
+            operation: AccumulationOp::Sum,
+            filter: None,
+            transform: None,
+            start_line: 1,
+            end_line: 10,
+        };
+        assert_eq!(matcher.infer_return_type(&sum_pattern), "number");
+
+        // Test Collection operation
+        let collection_pattern = ExtractablePattern::AccumulationLoop {
+            iterator_binding: "items".to_string(),
+            accumulator: "result".to_string(),
+            operation: AccumulationOp::Collection,
+            filter: None,
+            transform: None,
+            start_line: 1,
+            end_line: 10,
+        };
+        assert_eq!(matcher.infer_return_type(&collection_pattern), "Array");
+    }
+
+    #[test]
+    fn test_infer_return_type_default_cases() {
+        let matcher = JavaScriptPatternMatcher;
+
+        // Test default case with an unhandled pattern - using SimilarBranches as it exists
+        let pattern = ExtractablePattern::SimilarBranches {
+            condition_var: "test".to_string(),
+            common_operations: vec![],
+            branch_specific: vec![],
+            start_line: 1,
+            end_line: 10,
+        };
+        assert_eq!(matcher.infer_return_type(&pattern), "void");
     }
 }

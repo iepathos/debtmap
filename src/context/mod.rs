@@ -284,63 +284,65 @@ fn is_configuration_file(path: &str) -> bool {
 
 /// Detect function role from name and patterns
 pub fn detect_function_role(name: &str, is_test_attr: bool) -> FunctionRole {
-    // Test functions
-    if is_test_attr
-        || name.starts_with("test_")
+    match () {
+        // Test functions
+        _ if is_test_attr || is_test_function_name(name) => FunctionRole::TestFunction,
+
+        // Main function (Rust, Python, Java, etc.)
+        _ if matches!(name, "main" | "__main__" | "Main") => FunctionRole::Main,
+
+        // Config loaders
+        _ if is_config_function(name) => FunctionRole::ConfigLoader,
+
+        // Initialization functions
+        _ if is_initialization_function(name) => FunctionRole::Initialization,
+
+        // Handler functions
+        _ if is_handler_function(name) => FunctionRole::Handler,
+
+        // Utility functions (common patterns)
+        _ if is_utility_function(name) => FunctionRole::Utility,
+
+        _ => FunctionRole::Unknown,
+    }
+}
+
+// Pure classification helper functions
+fn is_test_function_name(name: &str) -> bool {
+    name.starts_with("test_")
         || name.ends_with("_test")
         || name.starts_with("it_")
         || name.starts_with("should_")
-    {
-        return FunctionRole::TestFunction;
-    }
+}
 
-    // Main function (Rust, Python, Java, etc.)
-    if name == "main" || name == "__main__" || name == "Main" {
-        return FunctionRole::Main;
-    }
-
-    // Config loaders
-    if name.contains("load_config")
+fn is_config_function(name: &str) -> bool {
+    name.contains("load_config")
         || name.contains("read_config")
         || name.contains("parse_config")
         || name.contains("init_config")
-        || name == "configure"
-        || name == "setup_configuration"
-    {
-        return FunctionRole::ConfigLoader;
-    }
+        || matches!(name, "configure" | "setup_configuration")
+}
 
-    // Initialization functions
-    if name.starts_with("init_")
+fn is_initialization_function(name: &str) -> bool {
+    name.starts_with("init_")
         || name.starts_with("setup_")
         || name.starts_with("initialize_")
-        || name == "init"
-        || name == "setup"
-        || name == "initialize"
-    {
-        return FunctionRole::Initialization;
-    }
+        || matches!(name, "init" | "setup" | "initialize")
+}
 
-    // Handler functions
-    if name.contains("handle_")
-        || name.contains("handler")
+fn is_handler_function(name: &str) -> bool {
+    name.contains("handle_")
         || name.ends_with("_handler")
+        || name == "handler"
         || name.starts_with("on_")
         || name.starts_with("process_")
-    {
-        return FunctionRole::Handler;
-    }
+}
 
-    // Utility functions (common patterns)
-    if name.starts_with("helper_")
+fn is_utility_function(name: &str) -> bool {
+    name.starts_with("helper_")
         || name.starts_with("util_")
         || name.contains("_helper")
         || name.contains("_util")
-    {
-        return FunctionRole::Utility;
-    }
-
-    FunctionRole::Unknown
 }
 
 #[cfg(test)]
@@ -418,6 +420,61 @@ mod tests {
             detect_function_role("some_function", false),
             FunctionRole::Unknown
         );
+    }
+
+    #[test]
+    fn test_is_test_function_name() {
+        assert!(is_test_function_name("test_addition"));
+        assert!(is_test_function_name("complex_test"));
+        assert!(is_test_function_name("it_should_work"));
+        assert!(is_test_function_name("should_process_data"));
+        assert!(!is_test_function_name("testing_helper"));
+        assert!(!is_test_function_name("get_test_data"));
+    }
+
+    #[test]
+    fn test_is_config_function() {
+        assert!(is_config_function("load_config"));
+        assert!(is_config_function("read_config_file"));
+        assert!(is_config_function("parse_config"));
+        assert!(is_config_function("init_config"));
+        assert!(is_config_function("configure"));
+        assert!(is_config_function("setup_configuration"));
+        assert!(!is_config_function("config_value"));
+        assert!(!is_config_function("get_configuration"));
+    }
+
+    #[test]
+    fn test_is_initialization_function() {
+        assert!(is_initialization_function("init_system"));
+        assert!(is_initialization_function("setup_database"));
+        assert!(is_initialization_function("initialize_cache"));
+        assert!(is_initialization_function("init"));
+        assert!(is_initialization_function("setup"));
+        assert!(is_initialization_function("initialize"));
+        assert!(!is_initialization_function("initial_value"));
+        assert!(!is_initialization_function("get_setup"));
+    }
+
+    #[test]
+    fn test_is_handler_function() {
+        assert!(is_handler_function("handle_request"));
+        assert!(is_handler_function("request_handler"));
+        assert!(is_handler_function("api_handler"));
+        assert!(is_handler_function("on_message"));
+        assert!(is_handler_function("process_event"));
+        assert!(!is_handler_function("handler_config"));
+        assert!(!is_handler_function("processing_time"));
+    }
+
+    #[test]
+    fn test_is_utility_function() {
+        assert!(is_utility_function("helper_parse"));
+        assert!(is_utility_function("util_format"));
+        assert!(is_utility_function("string_helper"));
+        assert!(is_utility_function("date_util"));
+        assert!(!is_utility_function("helpful_message"));
+        assert!(!is_utility_function("utility_bill"));
     }
 
     #[test]

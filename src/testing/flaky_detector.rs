@@ -123,52 +123,9 @@ impl<'ast> Visit<'ast> for FlakinessAnalyzer {
                 .collect::<Vec<_>>()
                 .join("::");
 
-            // Check for timing functions
-            if is_timing_function(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::TimingDependency,
-                    impact: ReliabilityImpact::High,
-                    suggestion:
-                        "Replace sleep/timing dependencies with deterministic waits or mocks"
-                            .to_string(),
-                });
-            }
-
-            // Check for random functions
-            if is_random_function(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::RandomValues,
-                    impact: ReliabilityImpact::Medium,
-                    suggestion: "Use deterministic test data instead of random values".to_string(),
-                });
-            }
-
-            // Check for external service calls
-            if is_external_service_call(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::ExternalDependency,
-                    impact: ReliabilityImpact::Critical,
-                    suggestion: "Mock external service calls for unit tests".to_string(),
-                });
-            }
-
-            // Check for filesystem operations
-            if is_filesystem_call(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::FilesystemDependency,
-                    impact: ReliabilityImpact::Medium,
-                    suggestion: "Use temporary directories or mock filesystem operations"
-                        .to_string(),
-                });
-            }
-
-            // Check for network operations
-            if is_network_call(&path_str) {
-                self.indicators.push(FlakinessIndicator {
-                    flakiness_type: FlakinessType::NetworkDependency,
-                    impact: ReliabilityImpact::Critical,
-                    suggestion: "Mock network calls or use test doubles".to_string(),
-                });
+            // Consolidated pattern matching for flakiness detection
+            if let Some(indicator) = detect_flakiness_pattern(&path_str) {
+                self.indicators.push(indicator);
             }
         }
 
@@ -206,6 +163,40 @@ fn analyze_flakiness(function: &ItemFn) -> Vec<FlakinessIndicator> {
     analyzer.indicators
 }
 
+// Pure function for pattern-based flakiness detection
+fn detect_flakiness_pattern(path_str: &str) -> Option<FlakinessIndicator> {
+    // Pattern matching using a declarative approach
+    match () {
+        _ if is_timing_function(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::TimingDependency,
+            impact: ReliabilityImpact::High,
+            suggestion: "Replace sleep/timing dependencies with deterministic waits or mocks"
+                .to_string(),
+        }),
+        _ if is_random_function(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::RandomValues,
+            impact: ReliabilityImpact::Medium,
+            suggestion: "Use deterministic test data instead of random values".to_string(),
+        }),
+        _ if is_external_service_call(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::ExternalDependency,
+            impact: ReliabilityImpact::Critical,
+            suggestion: "Mock external service calls for unit tests".to_string(),
+        }),
+        _ if is_filesystem_call(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::FilesystemDependency,
+            impact: ReliabilityImpact::Medium,
+            suggestion: "Use temporary directories or mock filesystem operations".to_string(),
+        }),
+        _ if is_network_call(path_str) => Some(FlakinessIndicator {
+            flakiness_type: FlakinessType::NetworkDependency,
+            impact: ReliabilityImpact::Critical,
+            suggestion: "Mock network calls or use test doubles".to_string(),
+        }),
+        _ => None,
+    }
+}
+
 // Pattern-based classification for flakiness detection
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PatternCategory {
@@ -218,71 +209,83 @@ enum PatternCategory {
 
 impl PatternCategory {
     const fn patterns(&self) -> &'static [&'static str] {
+        // Static pattern definitions for each category
+        const TIMING_PATTERNS: &[&str] = &[
+            "sleep",
+            "Instant::now",
+            "SystemTime::now",
+            "Duration::from",
+            "delay",
+            "timeout",
+            "wait_for",
+            "park_timeout",
+            "recv_timeout",
+        ];
+
+        const RANDOM_PATTERNS: &[&str] = &[
+            "rand",
+            "random",
+            "thread_rng",
+            "StdRng",
+            "SmallRng",
+            "gen_range",
+            "sample",
+            "shuffle",
+            "choose",
+        ];
+
+        const EXTERNAL_SERVICE_PATTERNS: &[&str] = &[
+            "reqwest",
+            "hyper",
+            "http",
+            "Client::new",
+            "HttpClient",
+            "ApiClient",
+            "database",
+            "db",
+            "postgres",
+            "mysql",
+            "redis",
+            "mongodb",
+            "sqlx",
+            "diesel",
+        ];
+
+        const FILESYSTEM_PATTERNS: &[&str] = &[
+            "fs::",
+            "File::",
+            "std::fs",
+            "tokio::fs",
+            "async_std::fs",
+            "read_to_string",
+            "write",
+            "create",
+            "remove_file",
+            "remove_dir",
+            "rename",
+            "copy",
+            "metadata",
+        ];
+
+        const NETWORK_PATTERNS: &[&str] = &[
+            "TcpStream",
+            "TcpListener",
+            "UdpSocket",
+            "connect",
+            "bind",
+            "listen",
+            "accept",
+            "send_to",
+            "recv_from",
+        ];
+
+        // Simple match to return the appropriate pattern array
         match self {
-            Self::Timing => &[
-                "sleep",
-                "Instant::now",
-                "SystemTime::now",
-                "Duration::from",
-                "delay",
-                "timeout",
-                "wait_for",
-                "park_timeout",
-                "recv_timeout",
-            ],
-            Self::Random => &[
-                "rand",
-                "random",
-                "thread_rng",
-                "StdRng",
-                "SmallRng",
-                "gen_range",
-                "sample",
-                "shuffle",
-                "choose",
-            ],
-            Self::ExternalService => &[
-                "reqwest",
-                "hyper",
-                "http",
-                "Client::new",
-                "HttpClient",
-                "ApiClient",
-                "database",
-                "db",
-                "postgres",
-                "mysql",
-                "redis",
-                "mongodb",
-                "sqlx",
-                "diesel",
-            ],
-            Self::Filesystem => &[
-                "fs::",
-                "File::",
-                "std::fs",
-                "tokio::fs",
-                "async_std::fs",
-                "read_to_string",
-                "write",
-                "create",
-                "remove_file",
-                "remove_dir",
-                "rename",
-                "copy",
-                "metadata",
-            ],
-            Self::Network => &[
-                "TcpStream",
-                "TcpListener",
-                "UdpSocket",
-                "connect",
-                "bind",
-                "listen",
-                "accept",
-                "send_to",
-                "recv_from",
-            ],
+            Self::Timing => TIMING_PATTERNS,
+            Self::Random => RANDOM_PATTERNS,
+            Self::ExternalService => EXTERNAL_SERVICE_PATTERNS,
+            Self::Filesystem => FILESYSTEM_PATTERNS,
+            Self::Network => NETWORK_PATTERNS,
         }
     }
 
