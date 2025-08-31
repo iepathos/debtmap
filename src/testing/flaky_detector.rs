@@ -209,71 +209,83 @@ enum PatternCategory {
 
 impl PatternCategory {
     const fn patterns(&self) -> &'static [&'static str] {
+        // Static pattern definitions for each category
+        const TIMING_PATTERNS: &[&str] = &[
+            "sleep",
+            "Instant::now",
+            "SystemTime::now",
+            "Duration::from",
+            "delay",
+            "timeout",
+            "wait_for",
+            "park_timeout",
+            "recv_timeout",
+        ];
+
+        const RANDOM_PATTERNS: &[&str] = &[
+            "rand",
+            "random",
+            "thread_rng",
+            "StdRng",
+            "SmallRng",
+            "gen_range",
+            "sample",
+            "shuffle",
+            "choose",
+        ];
+
+        const EXTERNAL_SERVICE_PATTERNS: &[&str] = &[
+            "reqwest",
+            "hyper",
+            "http",
+            "Client::new",
+            "HttpClient",
+            "ApiClient",
+            "database",
+            "db",
+            "postgres",
+            "mysql",
+            "redis",
+            "mongodb",
+            "sqlx",
+            "diesel",
+        ];
+
+        const FILESYSTEM_PATTERNS: &[&str] = &[
+            "fs::",
+            "File::",
+            "std::fs",
+            "tokio::fs",
+            "async_std::fs",
+            "read_to_string",
+            "write",
+            "create",
+            "remove_file",
+            "remove_dir",
+            "rename",
+            "copy",
+            "metadata",
+        ];
+
+        const NETWORK_PATTERNS: &[&str] = &[
+            "TcpStream",
+            "TcpListener",
+            "UdpSocket",
+            "connect",
+            "bind",
+            "listen",
+            "accept",
+            "send_to",
+            "recv_from",
+        ];
+
+        // Simple match to return the appropriate pattern array
         match self {
-            Self::Timing => &[
-                "sleep",
-                "Instant::now",
-                "SystemTime::now",
-                "Duration::from",
-                "delay",
-                "timeout",
-                "wait_for",
-                "park_timeout",
-                "recv_timeout",
-            ],
-            Self::Random => &[
-                "rand",
-                "random",
-                "thread_rng",
-                "StdRng",
-                "SmallRng",
-                "gen_range",
-                "sample",
-                "shuffle",
-                "choose",
-            ],
-            Self::ExternalService => &[
-                "reqwest",
-                "hyper",
-                "http",
-                "Client::new",
-                "HttpClient",
-                "ApiClient",
-                "database",
-                "db",
-                "postgres",
-                "mysql",
-                "redis",
-                "mongodb",
-                "sqlx",
-                "diesel",
-            ],
-            Self::Filesystem => &[
-                "fs::",
-                "File::",
-                "std::fs",
-                "tokio::fs",
-                "async_std::fs",
-                "read_to_string",
-                "write",
-                "create",
-                "remove_file",
-                "remove_dir",
-                "rename",
-                "copy",
-                "metadata",
-            ],
-            Self::Network => &[
-                "TcpStream",
-                "TcpListener",
-                "UdpSocket",
-                "connect",
-                "bind",
-                "listen",
-                "accept",
-                "send_to",
-                "recv_from",
-            ],
+            Self::Timing => TIMING_PATTERNS,
+            Self::Random => RANDOM_PATTERNS,
+            Self::ExternalService => EXTERNAL_SERVICE_PATTERNS,
+            Self::Filesystem => FILESYSTEM_PATTERNS,
+            Self::Network => NETWORK_PATTERNS,
         }
     }
 
