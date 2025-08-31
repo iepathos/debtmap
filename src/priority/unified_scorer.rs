@@ -1,16 +1,15 @@
 use crate::core::FunctionMetrics;
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
-    coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage},
+    coverage_propagation::TransitiveCoverage,
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
-    external_api_detector::{is_likely_external_api},
     scoring::calculation::{
         apply_interaction_bonus, calculate_base_score, calculate_complexity_factor,
         calculate_coverage_factor, calculate_dependency_factor, normalize_final_score,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
     semantic_classifier::{classify_function_role, FunctionRole},
-    ActionableRecommendation, DebtType, FunctionAnalysis, FunctionVisibility, ImpactMetrics,
+    ActionableRecommendation, DebtType, FunctionAnalysis, ImpactMetrics,
 };
 use crate::risk::evidence_calculator::EvidenceBasedRiskCalculator;
 use crate::risk::lcov::LcovData;
@@ -167,8 +166,9 @@ pub fn calculate_unified_priority_with_debt(
     };
 
     // Calculate multiplicative base score using pure function
-    let mut base_score = calculate_base_score(coverage_factor, complexity_factor, dependency_factor);
-    
+    let mut base_score =
+        calculate_base_score(coverage_factor, complexity_factor, dependency_factor);
+
     // Apply interaction bonus using pure function
     base_score = apply_interaction_bonus(base_score, coverage_pct, raw_complexity);
 
@@ -200,7 +200,8 @@ pub fn calculate_unified_priority_with_debt(
     // Apply entropy dampening (spec 68: max 50% reduction)
     let final_score = if let Some(entropy_score) = func.entropy_score.as_ref() {
         // Apply dampening as a multiplier to the score
-        let dampening_factor = crate::complexity::entropy::apply_entropy_dampening(100, entropy_score) as f64 / 100.0;
+        let dampening_factor =
+            crate::complexity::entropy::apply_entropy_dampening(100, entropy_score) as f64 / 100.0;
         debt_adjusted_score * dampening_factor
     } else {
         debt_adjusted_score
@@ -208,11 +209,13 @@ pub fn calculate_unified_priority_with_debt(
 
     // Normalize to 0-10 scale with better distribution
     let normalized_score = normalize_final_score(final_score);
-    
+
     // Debug: Log ALL scores to find where 5.05 comes from
     if std::env::var("DEBUG_ALL_SCORES").is_ok() {
-        eprintln!("SCORE DEBUG: {} - raw={:.4}, norm={:.2}, cov={:.2}, cplx={:.2}, deps={}", 
-                 func.name, final_score, normalized_score, coverage_pct, raw_complexity, upstream_count);
+        eprintln!(
+            "SCORE DEBUG: {} - raw={:.4}, norm={:.2}, cov={:.2}, cplx={:.2}, deps={}",
+            func.name, final_score, normalized_score, coverage_pct, raw_complexity, upstream_count
+        );
     }
 
     UnifiedScore {
@@ -294,4 +297,3 @@ pub fn is_dead_code_with_exclusions(
     // Use the enhanced dead code detection with function pointer information
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
-

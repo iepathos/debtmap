@@ -2,7 +2,7 @@ use debtmap::analyzers::rust::RustAnalyzer;
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
 use debtmap::analyzers::Analyzer;
 use debtmap::priority::call_graph::FunctionId;
-use debtmap::priority::unified_scorer::{
+use debtmap::priority::scoring::classification::{
     classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
 };
 use debtmap::priority::DebtType;

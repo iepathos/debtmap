@@ -2,16 +2,16 @@
 // This file contains the additional generate_* functions extracted from unified_scorer.rs
 
 use crate::core::FunctionMetrics;
-use crate::priority::{FunctionVisibility, DebtType, TransitiveCoverage};
 use crate::priority::call_graph::{CallGraph, FunctionId};
+use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
 
 /// Enum for complexity classification
 #[derive(Debug, Clone)]
 enum ComplexityLevel {
-    Low,           // 1-4
-    LowModerate,   // 5-6
-    Moderate,      // 7-10
-    High,          // 11+
+    Low,         // 1-4
+    LowModerate, // 5-6
+    Moderate,    // 7-10
+    High,        // 11+
 }
 
 /// Classify complexity level based on cyclomatic complexity
@@ -29,17 +29,20 @@ fn determine_visibility(func: &FunctionMetrics) -> FunctionVisibility {
     // Try to extract visibility from metrics if available
     let vis_str = func.visibility.as_deref();
     match vis_str {
-        Some(vis) if vis == "pub" => FunctionVisibility::Public,
-        Some(vis) if vis == "pub(crate)" => FunctionVisibility::Crate,
+        Some("pub") => FunctionVisibility::Public,
+        Some("pub(crate)") => FunctionVisibility::Crate,
         Some(vis) if vis.starts_with("pub(") => FunctionVisibility::Crate, // pub(super), pub(in ...), etc.
         _ => FunctionVisibility::Private,
     }
 }
 
 /// Generate enhanced dead code hints
-fn generate_enhanced_dead_code_hints(func: &FunctionMetrics, visibility: &FunctionVisibility) -> Vec<String> {
+fn generate_enhanced_dead_code_hints(
+    func: &FunctionMetrics,
+    visibility: &FunctionVisibility,
+) -> Vec<String> {
     let mut hints = Vec::new();
-    
+
     // Add visibility-based hints
     match visibility {
         FunctionVisibility::Public => {
@@ -52,17 +55,17 @@ fn generate_enhanced_dead_code_hints(func: &FunctionMetrics, visibility: &Functi
             hints.push("Crate-visible function - check for usage within crate".to_string());
         }
     }
-    
+
     // Add file-based hints
     let file_str = func.file.to_string_lossy();
     if file_str.contains("test") {
         hints.push("Test-related function - may be test helper".to_string());
     }
-    
+
     if func.name.starts_with("test_") {
         hints.push("Test function - verify no test dependencies".to_string());
     }
-    
+
     hints
 }
 
@@ -280,10 +283,7 @@ fn generate_high_complexity_recommendation(
     } else if has_coverage_issue {
         format!(
             "Add {} tests, then decompose into {} pure functions (complexity {} → {})",
-            cyclo,
-            functions_to_extract,
-            cyclo,
-            target_complexity
+            cyclo, functions_to_extract, cyclo, target_complexity
         )
     } else {
         format!(
@@ -297,10 +297,7 @@ fn generate_high_complexity_recommendation(
             "This high-complexity function needs to be broken down into {} logical units:",
             functions_to_extract
         ),
-        format!(
-            "1. Map {} execution paths into logical groupings:",
-            cyclo
-        ),
+        format!("1. Map {} execution paths into logical groupings:", cyclo),
         format!("  • ~{} paths for input validation", cyclo / 4),
         format!("  • ~{} paths for core logic", cyclo / 2),
         format!("  • ~{} paths for output/error handling", cyclo / 4),
@@ -318,13 +315,35 @@ fn generate_high_complexity_recommendation(
     }
 
     steps.extend(vec![
-        format!("{}. Extract functions with single responsibilities:", if has_coverage_issue && !has_good_coverage { 3 } else { 2 }),
+        format!(
+            "{}. Extract functions with single responsibilities:",
+            if has_coverage_issue && !has_good_coverage {
+                3
+            } else {
+                2
+            }
+        ),
         "  • validate_inputs() for precondition checks".to_string(),
         "  • process_core_logic() for main algorithm".to_string(),
         "  • handle_results() for output formatting".to_string(),
         "  • handle_errors() for error cases".to_string(),
-        format!("{}. Each function should have cyclomatic complexity ≤{}", if has_coverage_issue && !has_good_coverage { 4 } else { 3 }, target_complexity),
-        format!("{}. Add unit tests for each extracted function (~3-5 tests per function)", if has_coverage_issue && !has_good_coverage { 5 } else { 4 }),
+        format!(
+            "{}. Each function should have cyclomatic complexity ≤{}",
+            if has_coverage_issue && !has_good_coverage {
+                4
+            } else {
+                3
+            },
+            target_complexity
+        ),
+        format!(
+            "{}. Add unit tests for each extracted function (~3-5 tests per function)",
+            if has_coverage_issue && !has_good_coverage {
+                5
+            } else {
+                4
+            }
+        ),
     ]);
 
     (
@@ -413,7 +432,7 @@ pub fn generate_complexity_hotspot_recommendation(
     cognitive: u32,
 ) -> (String, String, Vec<String>) {
     use crate::priority::scoring::recommendation::calculate_functions_to_extract;
-    
+
     // Calculate extraction based on complexity distribution
     let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
     let target_per_function = (cyclomatic / functions_to_extract).max(3);
@@ -460,9 +479,11 @@ fn detect_file_language(file_path: &std::path::Path) -> crate::core::Language {
 }
 
 /// Get pattern type name for display
-fn pattern_type_name(pattern_type: &crate::extraction_patterns::ExtractablePattern) -> &'static str {
+fn pattern_type_name(
+    pattern_type: &crate::extraction_patterns::ExtractablePattern,
+) -> &'static str {
     use crate::extraction_patterns::ExtractablePattern;
-    
+
     match pattern_type {
         ExtractablePattern::AccumulationLoop { .. } => "accumulation loop",
         ExtractablePattern::GuardChainSequence { .. } => "guard chain",

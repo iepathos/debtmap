@@ -1,9 +1,7 @@
 use debtmap::analysis::call_graph::FrameworkPatternDetector;
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
-use debtmap::priority::unified_scorer::{
-    classify_debt_type_enhanced, classify_debt_type_with_exclusions,
-};
+use debtmap::priority::scoring::classification::classify_debt_type_with_exclusions;
 use debtmap::priority::DebtType;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -47,7 +45,15 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
 
     // Even without framework exclusions, test functions should be excluded
     // by the hardcoded logic (is_test flag)
-    let debt_type = classify_debt_type_enhanced(&test_func, &call_graph, &func_id);
+    let framework_patterns = HashSet::new(); // Empty framework patterns for this test
+    let debt_type = classify_debt_type_with_exclusions(
+        &test_func,
+        &call_graph,
+        &func_id,
+        &framework_patterns,
+        None,
+        None,
+    );
 
     // Verify it's not dead code
     match debt_type {

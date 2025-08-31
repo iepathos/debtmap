@@ -956,7 +956,7 @@ pub fn apply_entropy_dampening(base_complexity: u32, entropy_score: &EntropyScor
 
     // Apply dampening with guaranteed minimum preservation
     let adjusted = (base_complexity as f64 * dampening_factor) as u32;
-    
+
     // Ensure we never reduce below 50% (though the formula above already guarantees this)
     adjusted.max(base_complexity / 2)
 }
@@ -1027,7 +1027,7 @@ mod tests {
     fn test_entropy_dampening() {
         // Test with low entropy that triggers dampening per spec 68
         let entropy_score = EntropyScore {
-            token_entropy: 0.1,  // Low entropy (< 0.2) to trigger dampening
+            token_entropy: 0.1, // Low entropy (< 0.2) to trigger dampening
             pattern_repetition: 0.8,
             branch_similarity: 0.6,
             effective_complexity: 0.3,
@@ -1048,8 +1048,14 @@ mod tests {
             // When enabled with low entropy (0.1), should apply dampening
             // Per spec 68: dampening_factor = 0.5 + 0.5 * (0.1/0.2) = 0.75
             // So dampened should be 10 * 0.75 = 7.5, rounded to 7 or 8
-            assert!(dampened < original, "Should apply dampening with low entropy");
-            assert!(dampened >= 7, "Should preserve at least 70% with entropy=0.1");
+            assert!(
+                dampened < original,
+                "Should apply dampening with low entropy"
+            );
+            assert!(
+                dampened >= 7,
+                "Should preserve at least 70% with entropy=0.1"
+            );
             assert!(dampened <= original); // But still some reduction
         }
     }

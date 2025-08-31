@@ -1,43 +1,31 @@
 // Functions for creating UnifiedDebtItem instances
 
-use std::path::PathBuf;
-use std::collections::HashSet;
 use crate::core::FunctionMetrics;
+use crate::priority::unified_scorer::{
+    calculate_unified_priority, calculate_unified_priority_with_debt, EntropyDetails,
+};
 use crate::priority::{
-    UnifiedDebtItem, UnifiedScore, Location, TransitiveCoverage,
-    DebtType, ActionableRecommendation, ImpactMetrics, FunctionRole, FunctionVisibility,
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::calculate_transitive_coverage,
-    debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
+    debt_aggregator::DebtAggregator,
     external_api_detector::is_likely_external_api,
-    semantic_classifier::classify_function_role,
     scoring::recommendation_extended::{
-        generate_resource_management_recommendation,
-        generate_string_concat_recommendation,
-        generate_nested_loops_recommendation,
-        generate_data_structure_recommendation,
-        generate_god_object_recommendation,
-        generate_feature_envy_recommendation,
-        generate_primitive_obsession_recommendation,
-        generate_magic_values_recommendation,
-        generate_assertion_complexity_recommendation,
-        generate_flaky_test_recommendation,
-        generate_async_misuse_recommendation,
-        generate_resource_leak_recommendation,
+        generate_assertion_complexity_recommendation, generate_async_misuse_recommendation,
         generate_collection_inefficiency_recommendation,
-        generate_infrastructure_recommendation_with_coverage,
         generate_complexity_recommendation_with_patterns_and_coverage,
-        generate_usage_hints,
+        generate_data_structure_recommendation, generate_feature_envy_recommendation,
+        generate_flaky_test_recommendation, generate_god_object_recommendation,
+        generate_infrastructure_recommendation_with_coverage, generate_magic_values_recommendation,
+        generate_nested_loops_recommendation, generate_primitive_obsession_recommendation,
+        generate_resource_leak_recommendation, generate_resource_management_recommendation,
+        generate_string_concat_recommendation, generate_usage_hints,
     },
-    scoring::classification::{
-        is_dead_code as classification_is_dead_code,
-        is_dead_code_with_exclusions as classification_is_dead_code_with_exclusions,
-        classify_debt_type_with_exclusions as classification_classify_debt_type_with_exclusions,
-    },
+    semantic_classifier::classify_function_role,
+    ActionableRecommendation, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
+    TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
 };
-use crate::data_flow::DataFlowGraph;
 use crate::risk::lcov::LcovData;
-use crate::priority::unified_scorer::{EntropyDetails, calculate_unified_priority, calculate_unified_priority_with_debt};
+use std::collections::HashSet;
 
 /// Create a unified debt item with enhanced call graph analysis
 pub fn create_unified_debt_item_enhanced(

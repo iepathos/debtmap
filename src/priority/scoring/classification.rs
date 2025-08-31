@@ -1,10 +1,10 @@
 // Debt classification functions
 
-use std::collections::HashSet;
-use crate::priority::call_graph::{CallGraph, FunctionId};
-use crate::priority::semantic_classifier::{FunctionRole, classify_function_role};
 use crate::core::FunctionMetrics;
+use crate::priority::call_graph::{CallGraph, FunctionId};
+use crate::priority::semantic_classifier::{classify_function_role, FunctionRole};
 use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
+use std::collections::HashSet;
 
 /// Determine the primary debt type for a function
 pub fn determine_debt_type(
@@ -278,7 +278,10 @@ pub fn classify_risk_based_debt(func: &FunctionMetrics, role: &FunctionRole) -> 
 }
 
 /// Classify simple function risk
-pub fn classify_simple_function_risk(func: &FunctionMetrics, role: &FunctionRole) -> Option<DebtType> {
+pub fn classify_simple_function_risk(
+    func: &FunctionMetrics,
+    role: &FunctionRole,
+) -> Option<DebtType> {
     if func.cyclomatic > 3 || func.cognitive > 5 {
         return None;
     }
@@ -290,24 +293,18 @@ pub fn classify_simple_function_risk(func: &FunctionMetrics, role: &FunctionRole
                 factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
             })
         }
-        FunctionRole::PureLogic if func.length <= 10 => {
-            Some(DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Trivial pure function - not technical debt".to_string()],
-            })
-        }
-        FunctionRole::PureLogic => {
-            Some(DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Simple pure function - minimal risk".to_string()],
-            })
-        }
-        _ => {
-            Some(DebtType::Risk {
-                risk_score: 0.1,
-                factors: vec!["Simple function with low complexity".to_string()],
-            })
-        }
+        FunctionRole::PureLogic if func.length <= 10 => Some(DebtType::Risk {
+            risk_score: 0.0,
+            factors: vec!["Trivial pure function - not technical debt".to_string()],
+        }),
+        FunctionRole::PureLogic => Some(DebtType::Risk {
+            risk_score: 0.0,
+            factors: vec!["Simple pure function - minimal risk".to_string()],
+        }),
+        _ => Some(DebtType::Risk {
+            risk_score: 0.1,
+            factors: vec!["Simple function with low complexity".to_string()],
+        }),
     }
 }
 
@@ -397,16 +394,37 @@ fn is_likely_trait_method(func: &FunctionMetrics) -> bool {
     // 1. Public visibility + specific method names that are commonly trait methods
     // 2. Common trait method patterns
 
-    if func.visibility.as_ref().map_or(false, |v| v == "pub") {
+    if func.visibility.as_ref().is_some_and(|v| v == "pub") {
         // Common trait methods
         let trait_methods = [
-            "fmt", "clone", "default", "from", "into",
-            "try_from", "try_into", "as_ref", "as_mut",
-            "drop", "deref", "deref_mut", "index", "index_mut",
-            "add", "sub", "mul", "div", "rem",
-            "eq", "ne", "partial_cmp", "cmp",
-            "hash", "serialize", "deserialize",
-            "next", "size_hint",
+            "fmt",
+            "clone",
+            "default",
+            "from",
+            "into",
+            "try_from",
+            "try_into",
+            "as_ref",
+            "as_mut",
+            "drop",
+            "deref",
+            "deref_mut",
+            "index",
+            "index_mut",
+            "add",
+            "sub",
+            "mul",
+            "div",
+            "rem",
+            "eq",
+            "ne",
+            "partial_cmp",
+            "cmp",
+            "hash",
+            "serialize",
+            "deserialize",
+            "next",
+            "size_hint",
         ];
 
         if trait_methods.contains(&func.name.as_str()) {
@@ -448,10 +466,14 @@ fn determine_visibility(func: &FunctionMetrics) -> FunctionVisibility {
     }
 }
 
-fn generate_usage_hints(func: &FunctionMetrics, _call_graph: &CallGraph, _func_id: &FunctionId) -> Vec<String> {
+fn generate_usage_hints(
+    func: &FunctionMetrics,
+    _call_graph: &CallGraph,
+    _func_id: &FunctionId,
+) -> Vec<String> {
     let mut hints = Vec::new();
 
-    if func.visibility.as_ref().map_or(false, |v| v == "pub") {
+    if func.visibility.as_ref().is_some_and(|v| v == "pub") {
         hints.push("Public function with no internal callers".to_string());
     } else {
         hints.push("Private function with no callers".to_string());
@@ -461,7 +483,8 @@ fn generate_usage_hints(func: &FunctionMetrics, _call_graph: &CallGraph, _func_i
         hints.push("Name starts with underscore (often indicates internal/unused)".to_string());
     }
 
-    if func.name.contains("old") || func.name.contains("legacy") || func.name.contains("deprecated") {
+    if func.name.contains("old") || func.name.contains("legacy") || func.name.contains("deprecated")
+    {
         hints.push("Name suggests obsolete functionality".to_string());
     }
 

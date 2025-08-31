@@ -1,8 +1,8 @@
 // Recommendation generation functions for debt items
 
-use crate::priority::semantic_classifier::FunctionRole;
 use crate::core::FunctionMetrics;
-use crate::priority::{FunctionVisibility, DebtType, TransitiveCoverage};
+use crate::priority::semantic_classifier::FunctionRole;
+use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
 
 /// Generate recommendation for testing gap debt type
 pub fn generate_testing_gap_recommendation(
@@ -235,11 +235,16 @@ fn generate_combined_testing_refactoring_steps(
     coverage_pct: i32,
 ) -> Vec<String> {
     vec![
-        format!("Add tests for the {} uncovered branches (current coverage: {}%)", 
-                cyclomatic - (cyclomatic as f64 * coverage_pct as f64 / 100.0) as u32, coverage_pct),
+        format!(
+            "Add tests for the {} uncovered branches (current coverage: {}%)",
+            cyclomatic - (cyclomatic as f64 * coverage_pct as f64 / 100.0) as u32,
+            coverage_pct
+        ),
         "Identify logical sections within the function".to_string(),
-        format!("Extract {} helper functions to reduce complexity", 
-                calculate_functions_to_extract(cyclomatic, cognitive)),
+        format!(
+            "Extract {} helper functions to reduce complexity",
+            calculate_functions_to_extract(cyclomatic, cognitive)
+        ),
         "Ensure each extracted function has single responsibility".to_string(),
         "Add unit tests for each extracted function".to_string(),
     ]
@@ -264,11 +269,11 @@ fn generate_testing_gap_steps(is_complex: bool) -> Vec<String> {
 
 pub fn analyze_uncovered_lines(_func: &FunctionMetrics, uncovered_lines: &[usize]) -> Vec<String> {
     let mut recommendations = Vec::new();
-    
+
     // Group consecutive lines
     let mut line_groups = Vec::new();
     let mut current_group = Vec::new();
-    
+
     for &line in uncovered_lines {
         if current_group.is_empty() || line == current_group.last().unwrap() + 1 {
             current_group.push(line);
@@ -282,30 +287,28 @@ pub fn analyze_uncovered_lines(_func: &FunctionMetrics, uncovered_lines: &[usize
     if !current_group.is_empty() {
         line_groups.push(current_group);
     }
-    
+
     // Generate recommendations based on line groups
-    for group in line_groups.iter().take(3) {  // Limit to first 3 groups
+    for group in line_groups.iter().take(3) {
+        // Limit to first 3 groups
         if group.len() > 1 {
             recommendations.push(format!(
-                "Focus on uncovered block at lines {}-{}", 
-                group.first().unwrap(), 
+                "Focus on uncovered block at lines {}-{}",
+                group.first().unwrap(),
                 group.last().unwrap()
             ));
         } else {
-            recommendations.push(format!(
-                "Cover uncovered line {}", 
-                group[0]
-            ));
+            recommendations.push(format!("Cover uncovered line {}", group[0]));
         }
     }
-    
+
     if line_groups.len() > 3 {
         recommendations.push(format!(
             "...and {} more uncovered sections",
             line_groups.len() - 3
         ));
     }
-    
+
     recommendations
 }
 
@@ -321,18 +324,27 @@ fn generate_dead_code_action(
             if name.starts_with("test_") || func.file.to_string_lossy().contains("test") {
                 (
                     "Remove unused test helper".to_string(),
-                    format!("Unused test helper function with complexity {}/{}", cyclomatic, cognitive),
+                    format!(
+                        "Unused test helper function with complexity {}/{}",
+                        cyclomatic, cognitive
+                    ),
                 )
             } else {
                 (
                     "Remove unused public function (no API indicators)".to_string(),
-                    format!("Public function with no callers and complexity {}/{}", cyclomatic, cognitive),
+                    format!(
+                        "Public function with no callers and complexity {}/{}",
+                        cyclomatic, cognitive
+                    ),
                 )
             }
         }
         FunctionVisibility::Private | FunctionVisibility::Crate => (
             "Remove unused private function".to_string(),
-            format!("Private function with no callers and complexity {}/{}", cyclomatic, cognitive),
+            format!(
+                "Private function with no callers and complexity {}/{}",
+                cyclomatic, cognitive
+            ),
         ),
     }
 }

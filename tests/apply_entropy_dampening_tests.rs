@@ -83,7 +83,7 @@ fn test_apply_entropy_dampening_low_entropy() {
     // So result should be 30 * 0.75 = 22.5, rounded to 22 or 23
     assert!(result < base_complexity);
     assert!(result >= base_complexity / 2); // Never less than 50%
-    assert!(result >= 22 && result <= 23);
+    assert!((22..=23).contains(&result));
 }
 
 #[test]

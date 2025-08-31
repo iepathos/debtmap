@@ -35,7 +35,7 @@ impl ScoreNormalizer {
         if self.percentiles.is_empty() {
             return raw_score;
         }
-        
+
         let percentile = self.find_percentile(raw_score);
 
         // Use sigmoid function for smooth distribution

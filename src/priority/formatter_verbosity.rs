@@ -122,24 +122,34 @@ pub fn format_priority_item_with_config(
 
     // Show detailed calculation for verbosity >= 2
     if verbosity >= 2 {
-        let weights = crate::config::get_scoring_weights();
+        let _weights = crate::config::get_scoring_weights();
         let tree_branch = formatter.emoji("├─", "-");
         let tree_sub_branch = formatter.emoji("│  ├─", "  -");
         let _tree_end = formatter.emoji("│  └─", "  -");
         let tree_pipe = formatter.emoji("│", " ");
 
         writeln!(output, "{} SCORE CALCULATION:", tree_branch).unwrap();
-        writeln!(output, "{} Multiplicative Components (Spec 68):", tree_sub_branch).unwrap();
+        writeln!(
+            output,
+            "{} Multiplicative Components (Spec 68):",
+            tree_sub_branch
+        )
+        .unwrap();
 
         // Calculate multiplicative factors for display
         let coverage_gap = item.unified_score.coverage_factor / 10.0; // Convert from display scale
         let coverage_factor = coverage_gap.powf(1.5);
         let complexity_factor = item.unified_score.complexity_factor.powf(0.8);
-        let dependency_factor = ((item.unified_score.dependency_factor + 1.0).sqrt() / 2.0).min(1.0);
-        
+        let dependency_factor =
+            ((item.unified_score.dependency_factor + 1.0).sqrt() / 2.0).min(1.0);
+
         // Show coverage gap with exponential scaling
         let coverage_detail = if let Some(ref trans_cov) = item.transitive_coverage {
-            format!(" (gap: {:.1}%, coverage: {:.1}%)", coverage_gap * 100.0, trans_cov.direct * 100.0)
+            format!(
+                " (gap: {:.1}%, coverage: {:.1}%)",
+                coverage_gap * 100.0,
+                trans_cov.direct * 100.0
+            )
         } else if coverage_gap < 1.0 {
             format!(" (gap: {:.1}%)", coverage_gap * 100.0)
         } else {
@@ -155,7 +165,7 @@ pub fn format_priority_item_with_config(
             coverage_detail
         )
         .unwrap();
-        
+
         // Show complexity with entropy adjustment if present
         let complexity_detail = if let Some(ref entropy) = item.entropy_details {
             format!(" (entropy-adjusted from {})", entropy.original_complexity)
@@ -188,7 +198,7 @@ pub fn format_priority_item_with_config(
         let complexity_component = (complexity_factor + 0.1).max(0.1);
         let dependency_component = (dependency_factor + 0.1).max(0.1);
         let base_score = coverage_factor * complexity_component * dependency_component;
-        
+
         writeln!(
             output,
             "{}  {} Base Score: {:.3} × {:.3} × {:.3} = {:.4}",

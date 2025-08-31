@@ -2,7 +2,7 @@ use debtmap::analyzers::{rust::RustAnalyzer, Analyzer};
 use debtmap::config::{get_language_features, LanguageFeatures};
 use debtmap::core::Language;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
-use debtmap::priority::unified_scorer::is_dead_code_with_exclusions;
+use debtmap::priority::scoring::classification::is_dead_code_with_exclusions;
 use std::collections::HashSet;
 use std::path::PathBuf;
 

@@ -2,7 +2,7 @@ use debtmap::analysis::python_call_graph::PythonCallGraphAnalyzer;
 use debtmap::analyzers::python::PythonAnalyzer;
 use debtmap::analyzers::Analyzer;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
-use debtmap::priority::unified_scorer::{
+use debtmap::priority::scoring::classification::{
     classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
 };
 use debtmap::priority::DebtType;
