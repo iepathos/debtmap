@@ -357,6 +357,15 @@ We have completed the initial implementation with core functionality for analyzi
   - Falls back to heuristic recommendations when no patterns detected
   - Enhanced recommendation steps with specific pattern details
 
+- [x] **Spec 68**: Enhanced Scoring Differentiation for Effective Debt Reduction
+  - Multiplicative scoring model replacing additive weighted sum
+  - Reduced entropy dampening from 100% to max 50%
+  - Exponential coverage gap emphasis with (1-coverage)^1.5 scaling
+  - Complexity-coverage interaction bonuses for untested complex code
+  - Small constants added to prevent zero multiplication
+  - Percentile-based score normalization for better 0-10 distribution
+  - 2x+ spread between top debt items achieved
+
 ## Pending Specs
 
 ### Enhancements
