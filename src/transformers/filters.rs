@@ -19,37 +19,49 @@ pub struct FilterConfig {
 
 impl FilterConfig {
     pub fn apply(&self, metrics: FileMetrics) -> FileMetrics {
-        let mut result = metrics;
+        // Build a pipeline of filters based on configuration
+        let filters = self.build_filter_pipeline();
+
+        // Apply all filters in sequence
+        filters.into_iter().fold(metrics, |acc, filter| filter(acc))
+    }
+
+    fn build_filter_pipeline(&self) -> Vec<Box<dyn FnOnce(FileMetrics) -> FileMetrics>> {
+        let mut filters: Vec<Box<dyn FnOnce(FileMetrics) -> FileMetrics>> = Vec::new();
 
         if let Some(min) = self.min_complexity {
-            result = filter_by_min_complexity(result, min);
+            filters.push(Box::new(move |m| filter_by_min_complexity(m, min)));
         }
 
         if let Some(max) = self.max_complexity {
-            result = filter_by_max_complexity(result, max);
+            filters.push(Box::new(move |m| filter_by_max_complexity(m, max)));
         }
 
         if let Some(ref langs) = self.languages {
-            result = filter_by_language(result, langs.clone());
+            let langs = langs.clone();
+            filters.push(Box::new(move |m| filter_by_language(m, langs)));
         }
 
         if let Some(ref patterns) = self.file_patterns {
-            result = filter_by_file_pattern(result, patterns.clone());
+            let patterns = patterns.clone();
+            filters.push(Box::new(move |m| filter_by_file_pattern(m, patterns)));
         }
 
         if let Some(ref patterns) = self.exclude_patterns {
-            result = exclude_by_pattern(result, patterns.clone());
+            let patterns = patterns.clone();
+            filters.push(Box::new(move |m| exclude_by_pattern(m, patterns)));
         }
 
         if let Some(min_prio) = self.min_priority {
-            result = filter_by_min_priority(result, min_prio);
+            filters.push(Box::new(move |m| filter_by_min_priority(m, min_prio)));
         }
 
         if let Some(ref types) = self.debt_types {
-            result = filter_by_debt_types(result, types.clone());
+            let types = types.clone();
+            filters.push(Box::new(move |m| filter_by_debt_types(m, types)));
         }
 
-        result
+        filters
     }
 }
 
