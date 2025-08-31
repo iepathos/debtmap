@@ -927,6 +927,16 @@ pub fn is_dead_code_with_exclusions(
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
 
+// Pure function to check if function has testing gap
+fn has_testing_gap(coverage: f64, is_test: bool) -> bool {
+    coverage < 0.2 && !is_test
+}
+
+// Pure function to check if function is complexity hotspot based on metrics only
+fn is_complexity_hotspot_by_metrics(cyclomatic: u32, cognitive: u32) -> bool {
+    cyclomatic > 5 || cognitive > 8
+}
+
 /// Enhanced dead code detection using the enhanced call graph
 /// Enhanced version of debt type classification with framework pattern exclusions
 pub fn classify_debt_type_with_exclusions(
@@ -939,25 +949,12 @@ pub fn classify_debt_type_with_exclusions(
 ) -> DebtType {
     // Test functions are special debt cases
     if func.is_test {
-        return match () {
-            _ if func.cyclomatic > 15 || func.cognitive > 20 => DebtType::TestComplexityHotspot {
-                cyclomatic: func.cyclomatic,
-                cognitive: func.cognitive,
-                threshold: 15,
-            },
-            _ => DebtType::TestingGap {
-                coverage: 0.0, // Test functions don't have coverage themselves
-                cyclomatic: func.cyclomatic,
-                cognitive: func.cognitive,
-            },
-        };
+        return classify_test_debt(func);
     }
 
     // Check for testing gaps first (like in determine_debt_type)
     if let Some(cov) = coverage {
-        // Any untested function (< 20% coverage) that isn't a test itself is a testing gap
-        // Even simple functions need basic tests
-        if cov.direct < 0.2 && !func.is_test {
+        if has_testing_gap(cov.direct, func.is_test) {
             return DebtType::TestingGap {
                 coverage: cov.direct,
                 cyclomatic: func.cyclomatic,
@@ -967,8 +964,7 @@ pub fn classify_debt_type_with_exclusions(
     }
 
     // Check for complexity hotspots - include moderate complexity functions
-    // Any function with cyclomatic > 5 or cognitive > 8 is a complexity candidate
-    if func.cyclomatic > 5 || func.cognitive > 8 {
+    if is_complexity_hotspot_by_metrics(func.cyclomatic, func.cognitive) {
         return DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
@@ -997,26 +993,8 @@ pub fn classify_debt_type_with_exclusions(
     // Low complexity functions that are I/O wrappers or entry points
     // should not be flagged as technical debt
     if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        // Check if it's an I/O wrapper or entry point
-        if role == FunctionRole::IOWrapper
-            || role == FunctionRole::EntryPoint
-            || role == FunctionRole::PatternMatch
-        {
-            // These are acceptable patterns, not debt
-            return DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
-            };
-        }
-
-        // Pure logic functions that are very simple are not debt
-        if role == FunctionRole::PureLogic && func.length <= 10 {
-            // Simple pure functions like formatters don't need to be flagged
-            // Return minimal risk to indicate no real debt
-            return DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Trivial pure function - not technical debt".to_string()],
-            };
+        if let Some(debt) = classify_simple_function_risk(func, &role) {
+            return debt;
         }
     }
 
@@ -5259,5 +5237,222 @@ mod tests {
             factor2 < factor1,
             "Higher repetition should cause more dampening"
         );
+    }
+
+    // Tests for extracted pure functions
+
+    #[test]
+    fn test_classify_test_debt_type_high_complexity() {
+        // Test when cyclomatic complexity exceeds threshold
+        let mut func = create_test_metrics();
+        func.cyclomatic = 20;
+        func.cognitive = 10;
+        func.is_test = true;
+        let debt = classify_test_debt(&func);
+        match debt {
+            DebtType::TestComplexityHotspot {
+                cyclomatic,
+                cognitive,
+                threshold,
+            } => {
+                assert_eq!(cyclomatic, 20);
+                assert_eq!(cognitive, 10);
+                assert_eq!(threshold, 15);
+            }
+            _ => panic!("Expected TestComplexityHotspot"),
+        }
+    }
+
+    #[test]
+    fn test_classify_test_debt_type_high_cognitive() {
+        // Test when cognitive complexity exceeds threshold
+        let mut func = create_test_metrics();
+        func.cyclomatic = 10;
+        func.cognitive = 25;
+        func.is_test = true;
+        let debt = classify_test_debt(&func);
+        match debt {
+            DebtType::TestComplexityHotspot {
+                cyclomatic,
+                cognitive,
+                threshold,
+            } => {
+                assert_eq!(cyclomatic, 10);
+                assert_eq!(cognitive, 25);
+                assert_eq!(threshold, 15);
+            }
+            _ => panic!("Expected TestComplexityHotspot"),
+        }
+    }
+
+    #[test]
+    fn test_classify_test_debt_type_normal() {
+        // Test when complexity is within normal range
+        let mut func = create_test_metrics();
+        func.cyclomatic = 10;
+        func.cognitive = 15;
+        func.is_test = true;
+        let debt = classify_test_debt(&func);
+        match debt {
+            DebtType::TestingGap {
+                coverage,
+                cyclomatic,
+                cognitive,
+            } => {
+                assert_eq!(coverage, 0.0);
+                assert_eq!(cyclomatic, 10);
+                assert_eq!(cognitive, 15);
+            }
+            _ => panic!("Expected TestingGap"),
+        }
+    }
+
+    #[test]
+    fn test_has_testing_gap_true() {
+        // Coverage below threshold and not a test
+        assert!(has_testing_gap(0.1, false));
+        assert!(has_testing_gap(0.0, false));
+        assert!(has_testing_gap(0.19, false));
+    }
+
+    #[test]
+    fn test_has_testing_gap_false() {
+        // Coverage above threshold
+        assert!(!has_testing_gap(0.2, false));
+        assert!(!has_testing_gap(0.5, false));
+        assert!(!has_testing_gap(1.0, false));
+
+        // Test functions don't have gaps
+        assert!(!has_testing_gap(0.0, true));
+        assert!(!has_testing_gap(0.1, true));
+    }
+
+    #[test]
+    fn test_is_complexity_hotspot_by_metrics_true() {
+        // High cyclomatic complexity
+        assert!(is_complexity_hotspot_by_metrics(6, 5));
+        assert!(is_complexity_hotspot_by_metrics(10, 7));
+
+        // High cognitive complexity
+        assert!(is_complexity_hotspot_by_metrics(3, 9));
+        assert!(is_complexity_hotspot_by_metrics(5, 15));
+
+        // Both high
+        assert!(is_complexity_hotspot_by_metrics(10, 10));
+    }
+
+    #[test]
+    fn test_is_complexity_hotspot_by_metrics_false() {
+        // Both below thresholds
+        assert!(!is_complexity_hotspot_by_metrics(5, 8));
+        assert!(!is_complexity_hotspot_by_metrics(3, 5));
+        assert!(!is_complexity_hotspot_by_metrics(1, 1));
+    }
+
+    #[test]
+    fn test_classify_simple_function_debt_io_wrapper() {
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        let debt = classify_simple_function_risk(&func, &FunctionRole::IOWrapper);
+        assert!(debt.is_some());
+        match debt.unwrap() {
+            DebtType::Risk {
+                risk_score,
+                factors,
+            } => {
+                assert_eq!(risk_score, 0.0);
+                assert_eq!(
+                    factors[0],
+                    "Simple I/O wrapper or entry point - minimal risk"
+                );
+            }
+            _ => panic!("Expected Risk with minimal score"),
+        }
+    }
+
+    #[test]
+    fn test_classify_simple_function_debt_entry_point() {
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        let debt = classify_simple_function_risk(&func, &FunctionRole::EntryPoint);
+        assert!(debt.is_some());
+        match debt.unwrap() {
+            DebtType::Risk {
+                risk_score,
+                factors,
+            } => {
+                assert_eq!(risk_score, 0.0);
+                assert_eq!(
+                    factors[0],
+                    "Simple I/O wrapper or entry point - minimal risk"
+                );
+            }
+            _ => panic!("Expected Risk with minimal score"),
+        }
+    }
+
+    #[test]
+    fn test_classify_simple_function_debt_pattern_match() {
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        let debt = classify_simple_function_risk(&func, &FunctionRole::PatternMatch);
+        assert!(debt.is_some());
+        match debt.unwrap() {
+            DebtType::Risk {
+                risk_score,
+                factors,
+            } => {
+                assert_eq!(risk_score, 0.0);
+                assert_eq!(
+                    factors[0],
+                    "Simple I/O wrapper or entry point - minimal risk"
+                );
+            }
+            _ => panic!("Expected Risk with minimal score"),
+        }
+    }
+
+    #[test]
+    fn test_classify_simple_function_debt_pure_logic_short() {
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        func.length = 8; // Short pure function
+        let debt = classify_simple_function_risk(&func, &FunctionRole::PureLogic);
+        assert!(debt.is_some());
+        match debt.unwrap() {
+            DebtType::Risk {
+                risk_score,
+                factors,
+            } => {
+                assert_eq!(risk_score, 0.0);
+                assert_eq!(factors[0], "Trivial pure function - not technical debt");
+            }
+            _ => panic!("Expected Risk with minimal score"),
+        }
+    }
+
+    #[test]
+    fn test_classify_simple_function_debt_pure_logic_long() {
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        func.length = 15; // Longer pure function
+        let debt = classify_simple_function_risk(&func, &FunctionRole::PureLogic);
+        // Should return None for longer pure function
+        assert!(debt.is_none());
+    }
+
+    #[test]
+    fn test_classify_simple_function_debt_orchestration() {
+        let mut func = create_test_metrics();
+        func.cyclomatic = 2;
+        func.cognitive = 3;
+        let debt = classify_simple_function_risk(&func, &FunctionRole::Orchestrator);
+        // Should return None for orchestrator
+        assert!(debt.is_none());
     }
 }
