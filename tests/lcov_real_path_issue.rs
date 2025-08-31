@@ -1,6 +1,6 @@
 use debtmap::risk::lcov::parse_lcov_file;
-use std::path::PathBuf;
 use std::io::Write;
+use std::path::PathBuf;
 use tempfile::NamedTempFile;
 
 /// This test reproduces the actual issue where paths from find_project_files
@@ -23,28 +23,28 @@ end_of_record
 
     let mut temp_file = NamedTempFile::new().unwrap();
     temp_file.write_all(lcov_content.as_bytes()).unwrap();
-    
+
     let lcov_data = parse_lcov_file(temp_file.path()).unwrap();
-    
+
     // These are the actual paths returned by find_project_files
     let path_from_root = PathBuf::from("./src/analyzers/rust.rs");
     let path_from_src = PathBuf::from("src/analyzers/rust.rs");
-    
+
     println!("Testing path from root: {:?}", path_from_root);
     let coverage_from_root = lcov_data.get_function_coverage(&path_from_root, "analyze_rust_file");
     println!("Coverage from root: {:?}", coverage_from_root);
-    
+
     println!("\nTesting path from src: {:?}", path_from_src);
     let coverage_from_src = lcov_data.get_function_coverage(&path_from_src, "analyze_rust_file");
     println!("Coverage from src: {:?}", coverage_from_src);
-    
+
     // Both should find the coverage
     assert!(
         coverage_from_root.is_some(),
         "Should find coverage when analyzing from root with path {:?}",
         path_from_root
     );
-    
+
     assert!(
         coverage_from_src.is_some(),
         "Should find coverage when analyzing from src with path {:?}",
@@ -70,26 +70,26 @@ end_of_record
 
     let mut temp_file = NamedTempFile::new().unwrap();
     temp_file.write_all(lcov_content.as_bytes()).unwrap();
-    
+
     let lcov_data = parse_lcov_file(temp_file.path()).unwrap();
-    
+
     // All these variations should match
     let test_paths = vec![
-        "./src/analyzers/rust.rs",     // Path from root with ./
-        "src/analyzers/rust.rs",        // Path from src directory
+        "./src/analyzers/rust.rs", // Path from root with ./
+        "src/analyzers/rust.rs",   // Path from src directory
         "/Users/glen/memento-mori/debtmap/src/analyzers/rust.rs", // Absolute path
     ];
-    
+
     for path_str in test_paths {
         let path = PathBuf::from(path_str);
         let coverage = lcov_data.get_function_coverage(&path, "test_function");
-        
+
         assert!(
             coverage.is_some(),
             "Path '{}' should match the LCOV data but got None",
             path_str
         );
-        
+
         assert_eq!(
             coverage.unwrap(),
             0.5,
