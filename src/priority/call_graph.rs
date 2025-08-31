@@ -9,14 +9,14 @@ pub struct FunctionId {
     pub line: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionCall {
     pub caller: FunctionId,
     pub callee: FunctionId,
     pub call_type: CallType,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CallType {
     Direct,
     Delegate,
@@ -142,6 +142,14 @@ impl CallGraph {
         self.caller_index.entry(callee).or_default().insert(caller);
     }
 
+    pub fn add_call_parts(&mut self, caller: FunctionId, callee: FunctionId, call_type: CallType) {
+        self.add_call(FunctionCall {
+            caller,
+            callee,
+            call_type,
+        });
+    }
+
     pub fn get_callees(&self, func_id: &FunctionId) -> Vec<FunctionId> {
         self.callee_index
             .get(func_id)
@@ -162,6 +170,21 @@ impl CallGraph {
 
     pub fn get_dependency_count(&self, func_id: &FunctionId) -> usize {
         self.get_callers(func_id).len()
+    }
+
+    /// Get all functions in the graph
+    pub fn get_all_functions(&self) -> impl Iterator<Item = &FunctionId> {
+        self.nodes.keys()
+    }
+
+    /// Get function info
+    pub fn get_function_info(&self, func_id: &FunctionId) -> Option<(bool, bool, u32, usize)> {
+        self.nodes.get(func_id).map(|node| (
+            node.is_entry_point,
+            node.is_test,
+            node.complexity,
+            node._lines,
+        ))
     }
 
     /// Mark a function as being reachable through trait dispatch

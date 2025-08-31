@@ -122,6 +122,7 @@ Risk analysis and coverage correlation:
 Unified debt prioritization system:
 - `mod.rs`: Core types for unified analysis
 - `call_graph.rs`: Function call graph construction, analysis, and dead code detection
+- `parallel_call_graph.rs`: Parallel call graph construction using concurrent data structures
 - `semantic_classifier.rs`: Function role classification (PureLogic, Orchestrator, etc.)
 - `coverage_propagation.rs`: Transitive coverage calculation through call graph
 - `unified_scorer.rs`: Unified priority scoring algorithm combining all metrics, includes dead code detection
@@ -160,6 +161,16 @@ Rust-specific call graph analysis with multi-phase construction:
 - `call_graph/framework_patterns.rs`: Framework pattern recognition, Visit trait exclusion
 - `call_graph/cross_module.rs`: Cross-module dependency analysis
 - Type tracking integration: Uses TypeTracker, GlobalTypeRegistry, FunctionSignatureRegistry, and TraitImplementationTracker for accurate method call resolution based on variable types, field access chains, function return types, and trait implementations
+
+### Cache (`src/cache/`)
+Caching system for performance optimization:
+- `call_graph_cache.rs`: Call graph caching with automatic invalidation on file changes
+
+### Builders (`src/builders/`)
+Construction and assembly of complex analysis structures:
+- `call_graph.rs`: Sequential call graph construction
+- `parallel_call_graph.rs`: Parallel call graph construction with Rayon
+- `unified_analysis.rs`: Unified analysis orchestration
 
 ### IO (`src/io/`)
 Side-effectful operations:

@@ -117,6 +117,18 @@ pub enum Commands {
         /// Plain output mode: ASCII-only, no colors, no emoji, machine-parseable
         #[arg(long = "plain")]
         plain: bool,
+
+        /// Enable parallel call graph construction for better performance
+        #[arg(long = "parallel")]
+        parallel: bool,
+
+        /// Number of threads for parallel processing (0 = use all cores)
+        #[arg(long = "jobs", short = 'j', default_value = "0")]
+        jobs: usize,
+
+        /// Enable call graph caching to speed up repeated analyses
+        #[arg(long = "cache")]
+        use_cache: bool,
     },
 
     /// Initialize configuration file

@@ -29,6 +29,9 @@ pub struct AnalyzeConfig {
     pub no_context_aware: bool,
     pub threshold_preset: Option<cli::ThresholdPreset>,
     pub formatting_config: FormattingConfig,
+    pub parallel: bool,
+    pub jobs: usize,
+    pub use_cache: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
@@ -43,13 +46,16 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.threshold_duplication,
     )?;
 
-    let unified_analysis = unified_analysis::perform_unified_analysis(
+    let unified_analysis = unified_analysis::perform_unified_analysis_with_options(
         &results,
         config.coverage_file.as_ref(),
         config.semantic_off,
         &config.path,
         config.verbose_macro_warnings,
         config.show_macro_stats,
+        config.parallel,
+        config.jobs,
+        config.use_cache,
     )?;
 
     let output_config = output::OutputConfig {

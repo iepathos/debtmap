@@ -3,6 +3,7 @@ pub mod analysis;
 pub mod analysis_utils;
 pub mod analyzers;
 pub mod builders;
+pub mod cache;
 pub mod cli;
 pub mod commands;
 pub mod common;
