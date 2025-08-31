@@ -2,7 +2,9 @@
 pub mod analysis;
 pub mod analysis_utils;
 pub mod analyzers;
+pub mod builders;
 pub mod cli;
+pub mod commands;
 pub mod common;
 pub mod complexity;
 pub mod config;
@@ -15,6 +17,7 @@ pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;
 pub mod organization;
+pub mod output;
 pub mod patterns;
 pub mod priority;
 pub mod refactoring;
@@ -23,6 +26,7 @@ pub mod risk;
 pub mod scoring;
 pub mod testing;
 pub mod transformers;
+pub mod utils;
 
 // Re-export commonly used types
 pub use crate::core::{
