@@ -322,9 +322,11 @@ fn find_functions_by_path<'a>(
         .map(|(_, funcs)| funcs)
         .or_else(|| {
             // Strategy 3: Check if any LCOV path ends with query path (relative query, absolute LCOV)
+            // Normalize the query path first to handle "./src/..." patterns
+            let normalized_query = normalize_path(query_path);
             functions
                 .iter()
-                .find(|(lcov_path, _)| lcov_path.ends_with(query_path))
+                .find(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
                 .map(|(_, funcs)| funcs)
         })
         .or_else(|| {
