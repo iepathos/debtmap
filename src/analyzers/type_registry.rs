@@ -174,6 +174,7 @@ impl GlobalTypeRegistry {
     }
 
     /// Extract type name from a syn::Path
+    #[allow(dead_code)]
     fn extract_type_name_from_path(path: &syn::Path) -> String {
         path.segments
             .iter()
@@ -236,7 +237,7 @@ impl GlobalTypeRegistry {
     fn extract_generic_args(path: &Path) -> Vec<String> {
         path.segments
             .last()
-            .and_then(|seg| Self::extract_args_from_segment(seg))
+            .and_then(Self::extract_args_from_segment)
             .unwrap_or_default()
     }
 
@@ -256,9 +257,11 @@ impl GlobalTypeRegistry {
     /// Extract type name from a generic argument
     fn extract_type_name_from_arg(arg: &syn::GenericArgument) -> Option<String> {
         match arg {
-            syn::GenericArgument::Type(Type::Path(type_path)) => {
-                type_path.path.segments.last().map(|seg| seg.ident.to_string())
-            }
+            syn::GenericArgument::Type(Type::Path(type_path)) => type_path
+                .path
+                .segments
+                .last()
+                .map(|seg| seg.ident.to_string()),
             _ => None,
         }
     }

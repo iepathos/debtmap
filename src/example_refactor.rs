@@ -7,10 +7,10 @@ use std::path::Path;
 /// Reduced cyclomatic complexity from 11 to <10
 pub fn classify_file_operation(path: &Path, operation: &str) -> FileOperationType {
     let path_str = path.to_string_lossy();
-    
+
     // Extract pure classification logic
     let path_type = classify_path_type(&path_str);
-    
+
     // Use pattern matching for cleaner logic
     match (path_type, operation) {
         (PathType::Temp, "write" | "create") => FileOperationType::TempWrite,
@@ -74,49 +74,100 @@ mod tests {
         assert_eq!(classify_path_type("/var/cache/app"), PathType::Cache);
         assert_eq!(classify_path_type("/var/log/system.log"), PathType::Log);
         assert_eq!(classify_path_type("/etc/config/app.conf"), PathType::Config);
-        assert_eq!(classify_path_type("/home/user/settings.ini"), PathType::Config);
-        assert_eq!(classify_path_type("/home/user/document.txt"), PathType::Regular);
+        assert_eq!(
+            classify_path_type("/home/user/settings.ini"),
+            PathType::Config
+        );
+        assert_eq!(
+            classify_path_type("/home/user/document.txt"),
+            PathType::Regular
+        );
     }
 
     #[test]
     fn test_temp_operations() {
         let path = Path::new("/tmp/file.txt");
-        assert_eq!(classify_file_operation(path, "write"), FileOperationType::TempWrite);
-        assert_eq!(classify_file_operation(path, "create"), FileOperationType::TempWrite);
-        assert_eq!(classify_file_operation(path, "read"), FileOperationType::TempRead);
-        assert_eq!(classify_file_operation(path, "delete"), FileOperationType::TempOther);
+        assert_eq!(
+            classify_file_operation(path, "write"),
+            FileOperationType::TempWrite
+        );
+        assert_eq!(
+            classify_file_operation(path, "create"),
+            FileOperationType::TempWrite
+        );
+        assert_eq!(
+            classify_file_operation(path, "read"),
+            FileOperationType::TempRead
+        );
+        assert_eq!(
+            classify_file_operation(path, "delete"),
+            FileOperationType::TempOther
+        );
     }
 
     #[test]
     fn test_cache_operations() {
         let path = Path::new("/var/cache/data");
-        assert_eq!(classify_file_operation(path, "write"), FileOperationType::CacheWrite);
-        assert_eq!(classify_file_operation(path, "read"), FileOperationType::CacheRead);
-        assert_eq!(classify_file_operation(path, "invalidate"), FileOperationType::CacheOther);
+        assert_eq!(
+            classify_file_operation(path, "write"),
+            FileOperationType::CacheWrite
+        );
+        assert_eq!(
+            classify_file_operation(path, "read"),
+            FileOperationType::CacheRead
+        );
+        assert_eq!(
+            classify_file_operation(path, "invalidate"),
+            FileOperationType::CacheOther
+        );
     }
 
     #[test]
     fn test_log_operations() {
         let path = Path::new("/var/log/app.log");
-        assert_eq!(classify_file_operation(path, "append"), FileOperationType::LogAppend);
-        assert_eq!(classify_file_operation(path, "rotate"), FileOperationType::LogOther);
-        assert_eq!(classify_file_operation(path, "read"), FileOperationType::LogOther);
+        assert_eq!(
+            classify_file_operation(path, "append"),
+            FileOperationType::LogAppend
+        );
+        assert_eq!(
+            classify_file_operation(path, "rotate"),
+            FileOperationType::LogOther
+        );
+        assert_eq!(
+            classify_file_operation(path, "read"),
+            FileOperationType::LogOther
+        );
     }
 
     #[test]
     fn test_config_operations() {
         let path = Path::new("/etc/config/app.conf");
-        assert_eq!(classify_file_operation(path, "read"), FileOperationType::Configuration);
-        assert_eq!(classify_file_operation(path, "write"), FileOperationType::Configuration);
-        
+        assert_eq!(
+            classify_file_operation(path, "read"),
+            FileOperationType::Configuration
+        );
+        assert_eq!(
+            classify_file_operation(path, "write"),
+            FileOperationType::Configuration
+        );
+
         let settings_path = Path::new("/home/user/settings.json");
-        assert_eq!(classify_file_operation(settings_path, "update"), FileOperationType::Configuration);
+        assert_eq!(
+            classify_file_operation(settings_path, "update"),
+            FileOperationType::Configuration
+        );
     }
 
     #[test]
     fn test_regular_file_operations() {
         let path = Path::new("/home/user/document.txt");
-        assert_eq!(classify_file_operation(path, "read"), FileOperationType::Regular);
-        assert_eq!(classify_file_operation(path, "write"), FileOperationType::Regular);
+        assert_eq!(
+            classify_file_operation(path, "read"),
+            FileOperationType::Regular
+        );
+        assert_eq!(
+            classify_file_operation(path, "write"),
+            FileOperationType::Regular
+        );
     }
 }
