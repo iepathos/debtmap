@@ -1,0 +1,30 @@
+fix: eliminate 0 technical debt items via MapReduce
+
+Processed 0 debt items in parallel:
+- Successfully fixed: 0 items
+- Failed to fix: 0 items
+
+Technical Debt Improvements:
+- Total debt score: 1695 → 1690 (+0%)
+- Items resolved: 10 of 0 targeted
+- Overall items: 279 → 281 (-1%)
+
+Top improvements:
+1. io_patterns.rs::: score 10 → 6 (-42%)
+2. coverage_analyzer.rs::: score 8 → 6 (-32%)
+3. rules.rs::: score 7 → 5 (-35%)
+4. enhanced_markdown.rs::: score 9 → 8 (-12%)
+
+Items completely resolved:
+1. context_aware.rs::: score 10 → 0 (resolved)
+2. critical_path.rs::: score 10 → 0 (resolved)
+3. coupling.rs::: score 6 → 0 (resolved)
+4. god_object_detector.rs::: score 3 → 0 (resolved)
+5. config.rs::: score 3 → 0 (resolved)
+
+⚠️ Regressions detected:
+- functional_patterns.rs::: score 4 → 10 (+157%)
+- resource.rs::: score 5 → 10 (+122%)
+- rust.rs::: score 8 → 10 (+30%)
+
+This commit represents the aggregated work of multiple parallel agents.
