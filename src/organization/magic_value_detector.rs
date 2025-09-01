@@ -96,6 +96,59 @@ impl MagicValueDetector {
     }
 }
 
+impl MagicValueDetector {
+    /// Count occurrences of values, filtering out ignored ones
+    fn count_value_occurrences<'a, F>(
+        &self,
+        values: impl Iterator<Item = (&'a String, &'a SourceLocation)>,
+        should_ignore: F,
+    ) -> HashMap<String, usize>
+    where
+        F: Fn(&str) -> bool,
+    {
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        for (value, _) in values {
+            if !should_ignore(value) {
+                *counts.entry(value.clone()).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+
+    /// Create magic value pattern from counted occurrences
+    fn create_magic_value_pattern(
+        &self,
+        value: String,
+        count: usize,
+        value_type: MagicValueType,
+    ) -> OrganizationAntiPattern {
+        let context = match value_type {
+            MagicValueType::NumericLiteral => self.infer_context(&value),
+            MagicValueType::StringLiteral => ValueContext::BusinessLogic,
+            MagicValueType::ArraySize => ValueContext::ArrayIndexing,
+            MagicValueType::ConfigurationValue => ValueContext::BusinessLogic,
+            MagicValueType::BusinessRule => ValueContext::BusinessLogic,
+        };
+
+        let suggested_name = match value_type {
+            MagicValueType::NumericLiteral => self.suggest_constant_name(&value, &context),
+            MagicValueType::StringLiteral => format!("STR_{}", self.value_to_identifier(&value)),
+            MagicValueType::ArraySize => format!("ARRAY_SIZE_{}", self.value_to_identifier(&value)),
+            MagicValueType::ConfigurationValue => format!("CONFIG_{}", self.value_to_identifier(&value)),
+            MagicValueType::BusinessRule => format!("RULE_{}", self.value_to_identifier(&value)),
+        };
+
+        OrganizationAntiPattern::MagicValue {
+            value_type,
+            value,
+            occurrence_count: count,
+            suggested_constant_name: suggested_name,
+            context,
+            locations: vec![SourceLocation::default()], // TODO: Extract actual locations
+        }
+    }
+}
+
 impl OrganizationDetector for MagicValueDetector {
     fn detect_anti_patterns(&self, file: &syn::File) -> Vec<OrganizationAntiPattern> {
         let mut patterns = Vec::new();
@@ -103,45 +156,34 @@ impl OrganizationDetector for MagicValueDetector {
         visitor.visit_file(file);
 
         // Analyze numeric literals
-        let mut numeric_counts: HashMap<String, usize> = HashMap::new();
-        for (value, _) in &visitor.numeric_literals {
-            if !self.should_ignore_numeric_value(value) {
-                *numeric_counts.entry(value.clone()).or_insert(0) += 1;
-            }
-        }
+        let numeric_counts = self.count_value_occurrences(
+            visitor.numeric_literals.iter().map(|(v, l)| (v, l)),
+            |v| self.should_ignore_numeric_value(v),
+        );
 
         for (value, count) in numeric_counts {
             if count >= self.min_occurrence_threshold {
-                let context = self.infer_context(&value);
-                patterns.push(OrganizationAntiPattern::MagicValue {
-                    value_type: MagicValueType::NumericLiteral,
-                    value: value.clone(),
-                    occurrence_count: count,
-                    suggested_constant_name: self.suggest_constant_name(&value, &context),
-                    context,
-                    locations: vec![SourceLocation::default()], // TODO: Extract actual locations
-                });
+                patterns.push(self.create_magic_value_pattern(
+                    value,
+                    count,
+                    MagicValueType::NumericLiteral,
+                ));
             }
         }
 
         // Analyze string literals
-        let mut string_counts: HashMap<String, usize> = HashMap::new();
-        for (value, _) in &visitor.string_literals {
-            if !self.should_ignore_string_value(value) {
-                *string_counts.entry(value.clone()).or_insert(0) += 1;
-            }
-        }
+        let string_counts = self.count_value_occurrences(
+            visitor.string_literals.iter().map(|(v, l)| (v, l)),
+            |v| self.should_ignore_string_value(v),
+        );
 
         for (value, count) in string_counts {
             if count >= self.min_occurrence_threshold {
-                patterns.push(OrganizationAntiPattern::MagicValue {
-                    value_type: MagicValueType::StringLiteral,
-                    value: value.clone(),
-                    occurrence_count: count,
-                    suggested_constant_name: format!("STR_{}", self.value_to_identifier(&value)),
-                    context: ValueContext::BusinessLogic,
-                    locations: vec![SourceLocation::default()], // TODO: Extract actual locations
-                });
+                patterns.push(self.create_magic_value_pattern(
+                    value,
+                    count,
+                    MagicValueType::StringLiteral,
+                ));
             }
         }
 
@@ -183,8 +225,8 @@ impl OrganizationDetector for MagicValueDetector {
 }
 
 struct LiteralVisitor {
-    numeric_literals: Vec<(String, String)>, // (value, context)
-    string_literals: Vec<(String, String)>,  // (value, context)
+    numeric_literals: Vec<(String, SourceLocation)>, // (value, location)
+    string_literals: Vec<(String, SourceLocation)>,  // (value, location)
 }
 
 impl LiteralVisitor {
@@ -202,15 +244,15 @@ impl<'ast> Visit<'ast> for LiteralVisitor {
             match &expr_lit.lit {
                 syn::Lit::Int(lit_int) => {
                     let value = lit_int.base10_digits().to_string();
-                    self.numeric_literals.push((value, "numeric".to_string()));
+                    self.numeric_literals.push((value, SourceLocation::default()));
                 }
                 syn::Lit::Float(lit_float) => {
                     let value = lit_float.base10_digits().to_string();
-                    self.numeric_literals.push((value, "numeric".to_string()));
+                    self.numeric_literals.push((value, SourceLocation::default()));
                 }
                 syn::Lit::Str(lit_str) => {
                     let value = lit_str.value();
-                    self.string_literals.push((value, "string".to_string()));
+                    self.string_literals.push((value, SourceLocation::default()));
                 }
                 _ => {}
             }
@@ -453,6 +495,110 @@ mod tests {
             detector.estimate_maintainability_impact(&pattern),
             MaintainabilityImpact::Low
         ));
+    }
+
+    #[test]
+    fn test_count_value_occurrences() {
+        let detector = MagicValueDetector::new();
+        
+        // Test with numeric values
+        let values = vec![
+            ("42".to_string(), SourceLocation::default()),
+            ("42".to_string(), SourceLocation::default()),
+            ("1".to_string(), SourceLocation::default()),
+            ("100".to_string(), SourceLocation::default()),
+            ("42".to_string(), SourceLocation::default()),
+        ];
+        
+        let counts = detector.count_value_occurrences(
+            values.iter().map(|(v, l)| (v, l)),
+            |v| detector.should_ignore_numeric_value(v),
+        );
+        
+        assert_eq!(counts.get("42"), Some(&3));
+        assert_eq!(counts.get("1"), None); // Ignored common value
+        assert_eq!(counts.get("100"), None); // Ignored common value
+    }
+
+    #[test]
+    fn test_count_value_occurrences_with_strings() {
+        let detector = MagicValueDetector::new();
+        
+        // Test with string values
+        let values = vec![
+            ("config".to_string(), SourceLocation::default()),
+            ("".to_string(), SourceLocation::default()),
+            ("config".to_string(), SourceLocation::default()),
+            (" ".to_string(), SourceLocation::default()),
+            ("config".to_string(), SourceLocation::default()),
+            ("error".to_string(), SourceLocation::default()),
+        ];
+        
+        let counts = detector.count_value_occurrences(
+            values.iter().map(|(v, l)| (v, l)),
+            |v| detector.should_ignore_string_value(v),
+        );
+        
+        assert_eq!(counts.get("config"), Some(&3));
+        assert_eq!(counts.get("error"), Some(&1));
+        assert_eq!(counts.get(""), None); // Ignored empty string
+        assert_eq!(counts.get(" "), None); // Ignored whitespace
+    }
+
+    #[test]
+    fn test_create_magic_value_pattern_numeric() {
+        let detector = MagicValueDetector::new();
+        
+        let pattern = detector.create_magic_value_pattern(
+            "42".to_string(),
+            5,
+            MagicValueType::NumericLiteral,
+        );
+        
+        if let OrganizationAntiPattern::MagicValue {
+            value_type,
+            value,
+            occurrence_count,
+            suggested_constant_name,
+            context,
+            ..
+        } = pattern {
+            assert!(matches!(value_type, MagicValueType::NumericLiteral));
+            assert_eq!(value, "42");
+            assert_eq!(occurrence_count, 5);
+            assert!(suggested_constant_name.contains("42"));
+            assert!(matches!(context, ValueContext::BusinessLogic));
+        } else {
+            panic!("Expected MagicValue pattern");
+        }
+    }
+
+    #[test]
+    fn test_create_magic_value_pattern_string() {
+        let detector = MagicValueDetector::new();
+        
+        let pattern = detector.create_magic_value_pattern(
+            "config_key".to_string(),
+            3,
+            MagicValueType::StringLiteral,
+        );
+        
+        if let OrganizationAntiPattern::MagicValue {
+            value_type,
+            value,
+            occurrence_count,
+            suggested_constant_name,
+            context,
+            ..
+        } = pattern {
+            assert!(matches!(value_type, MagicValueType::StringLiteral));
+            assert_eq!(value, "config_key");
+            assert_eq!(occurrence_count, 3);
+            assert_eq!(suggested_constant_name, "STR_CONFIG_KEY");
+            assert!(matches!(context, ValueContext::BusinessLogic));
+        } else {
+            panic!("Expected MagicValue pattern");
+        }
     }
 
     #[test]
