@@ -28,53 +28,57 @@ impl PrimitiveObsessionDetector {
 
     fn analyze_primitive_usage(&self, type_usage: &TypeUsage) -> Option<PrimitiveUsageContext> {
         let name_lower = type_usage.context.to_lowercase();
+        let type_name = &type_usage.type_name;
 
-        // Check for identifier patterns
-        if self.track_string_identifiers
-            && type_usage.type_name == "String"
-            && (name_lower.contains("id")
-                || name_lower.contains("key")
-                || name_lower.contains("code"))
-        {
-            return Some(PrimitiveUsageContext::Identifier);
+        // Use pattern matching with guards for cleaner logic
+        match () {
+            _ if self.track_string_identifiers
+                && type_name == "String"
+                && Self::contains_any(&name_lower, &["id", "key", "code"]) =>
+            {
+                Some(PrimitiveUsageContext::Identifier)
+            }
+            _ if self.track_numeric_measurements
+                && Self::is_numeric_type(type_name)
+                && Self::contains_any(
+                    &name_lower,
+                    &[
+                        "distance",
+                        "weight",
+                        "height",
+                        "temperature",
+                        "price",
+                        "amount",
+                    ],
+                ) =>
+            {
+                Some(PrimitiveUsageContext::Measurement)
+            }
+            _ if type_name == "bool"
+                && Self::contains_any(&name_lower, &["status", "state", "flag"]) =>
+            {
+                Some(PrimitiveUsageContext::Status)
+            }
+            _ if Self::is_category_type(type_name)
+                && Self::contains_any(&name_lower, &["type", "category", "kind", "mode"]) =>
+            {
+                Some(PrimitiveUsageContext::Category)
+            }
+            _ => None,
         }
+    }
 
-        // Check for measurement patterns
-        if self.track_numeric_measurements
-            && (type_usage.type_name == "f64"
-                || type_usage.type_name == "f32"
-                || type_usage.type_name == "i32"
-                || type_usage.type_name == "u32")
-            && (name_lower.contains("distance")
-                || name_lower.contains("weight")
-                || name_lower.contains("height")
-                || name_lower.contains("temperature")
-                || name_lower.contains("price")
-                || name_lower.contains("amount"))
-        {
-            return Some(PrimitiveUsageContext::Measurement);
-        }
+    // Helper methods to simplify pattern matching
+    fn contains_any(text: &str, patterns: &[&str]) -> bool {
+        patterns.iter().any(|pattern| text.contains(pattern))
+    }
 
-        // Check for status patterns
-        if type_usage.type_name == "bool"
-            && (name_lower.contains("status")
-                || name_lower.contains("state")
-                || name_lower.contains("flag"))
-        {
-            return Some(PrimitiveUsageContext::Status);
-        }
+    fn is_numeric_type(type_name: &str) -> bool {
+        matches!(type_name, "f64" | "f32" | "i32" | "u32")
+    }
 
-        // Check for category patterns
-        if (type_usage.type_name == "String" || type_usage.type_name == "i32")
-            && (name_lower.contains("type")
-                || name_lower.contains("category")
-                || name_lower.contains("kind")
-                || name_lower.contains("mode"))
-        {
-            return Some(PrimitiveUsageContext::Category);
-        }
-
-        None
+    fn is_category_type(type_name: &str) -> bool {
+        matches!(type_name, "String" | "i32")
     }
 
     fn suggest_domain_type(&self, primitive_type: &str, context: &PrimitiveUsageContext) -> String {
@@ -261,25 +265,32 @@ impl<'ast> Visit<'ast> for TypeUsageVisitor {
 impl TypeUsageVisitor {
     fn infer_type_from_expr(&self, expr: &syn::Expr) -> String {
         match expr {
-            syn::Expr::Lit(expr_lit) => match &expr_lit.lit {
-                syn::Lit::Str(_) => "String".to_string(),
-                syn::Lit::Int(_) => "i32".to_string(),
-                syn::Lit::Float(_) => "f64".to_string(),
-                syn::Lit::Bool(_) => "bool".to_string(),
-                _ => "Unknown".to_string(),
-            },
-            syn::Expr::Call(expr_call) => {
-                if let syn::Expr::Path(path) = &*expr_call.func {
-                    path.path
-                        .segments
-                        .last()
-                        .map(|seg| seg.ident.to_string())
-                        .unwrap_or_else(|| "Unknown".to_string())
-                } else {
-                    "Unknown".to_string()
-                }
-            }
+            syn::Expr::Lit(expr_lit) => Self::infer_type_from_literal(&expr_lit.lit),
+            syn::Expr::Call(expr_call) => Self::extract_function_name(expr_call),
             _ => "Unknown".to_string(),
+        }
+    }
+
+    fn infer_type_from_literal(lit: &syn::Lit) -> String {
+        match lit {
+            syn::Lit::Str(_) => "String",
+            syn::Lit::Int(_) => "i32",
+            syn::Lit::Float(_) => "f64",
+            syn::Lit::Bool(_) => "bool",
+            _ => "Unknown",
+        }
+        .to_string()
+    }
+
+    fn extract_function_name(expr_call: &syn::ExprCall) -> String {
+        if let syn::Expr::Path(path) = &*expr_call.func {
+            path.path
+                .segments
+                .last()
+                .map(|seg| seg.ident.to_string())
+                .unwrap_or_else(|| "Unknown".to_string())
+        } else {
+            "Unknown".to_string()
         }
     }
 }
