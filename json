@@ -1,104 +1,107 @@
 ============================================
-    Debtmap v0.2.0
+    Debtmap v0.2.1
 ============================================
 
 [TARGET] TOP 10 RECOMMENDATIONS
 
-#1 SCORE: 5.05 [MEDIUM]
-- LOCATION: src/extraction_patterns/language_specific/javascript_patterns.rs:134 JavaScriptPatternMatcher::infer_return_type()
-- ACTION: Extract 3 pure functions (complexity 7 → ~7)
-- IMPACT: -3 complexity, -2.3 risk
-- COMPLEXITY: cyclomatic=7 (adj:6), branches=7, cognitive=11, nesting=2, entropy=0.41
-- DEPENDENCIES: 1 upstream, 1 downstream
-   - CALLERS: JavaScriptPatternMatcher::generate_extraction
-   - CALLS: EntropyAnalyzer::clone
-- WHY: Cyclomatic complexity of 7 means at least 7 test cases needed for full path coverage - extraction reduces this to 3-5 tests per function. Extracting 3 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Pure function extraction will create easily testable units with no side effects.
+#1 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/type_registry.rs:177 GlobalTypeRegistry::extract_field_type()
+- ACTION: Extract validation logic, nested processing, complex calculations to reduce complexity 9 → ~0
+- IMPACT: -4 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=9 (adj:9), branches=9, cognitive=40, nesting=4, entropy=0.46
+- DEPENDENCIES: 1 upstream, 3 downstream
+   - CALLERS: GlobalTypeRegistry::extract_fields
+   - CALLS: LazyPipeline::map, ContextMap::iter, LazyPipeline::collect
+- WHY: Complex function (cyclo=9, cog=40, nesting=4) with 3 suggested extraction patterns. Predicted complexity reduction: 133%
 
-#2 SCORE: 5.05 [MEDIUM]
-- LOCATION: src/priority/call_graph.rs:551 CallGraph::resolve_cross_file_calls()
-- ACTION: Extract 3 pure functions to reduce complexity from 6 to ~4
-- IMPACT: -3 complexity, -2.3 risk
-- COMPLEXITY: cyclomatic=6 (adj:5), branches=6, cognitive=12, nesting=4, entropy=0.34
+#2 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/context_aware.rs:40 ContextAwareAnalyzer::filter_debt_items()
+- ACTION: Extract validation logic, complex calculations to reduce complexity 13 → ~5
+- IMPACT: -6 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=13 (adj:13), branches=13, cognitive=28, nesting=3, entropy=0.29
+- DEPENDENCIES: 1 upstream, 10 downstream
+   - CALLERS: ContextAwareAnalyzer::analyze
+   - CALLS: ContextRuleEngine::evaluate, FunctionContext::new, detect_file_type, ... (7 more)
+- WHY: Complex function (cyclo=13, cog=28, nesting=3) with 2 suggested extraction patterns. Predicted complexity reduction: 61%
+
+#3 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/rust.rs:461 FunctionVisitor::is_test_function()
+- ACTION: Extract validation logic to reduce complexity 13 → ~10
+- IMPACT: -6 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=13 (adj:13), branches=13, cognitive=15, nesting=0, entropy=0.35
+- DEPENDENCIES: 4 upstream, 2 downstream
+   - CALLERS: TestComplexityDetector::detect_anti_patterns, FunctionVisitor::extract_function_metadata, extract_test_patterns, ... (1 more)
+   - CALLS: ContextMap::iter, LazyPipeline::any
+- WHY: Complex function (cyclo=13, cog=15, nesting=0) with 1 suggested extraction patterns. Predicted complexity reduction: 23%
+
+#4 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/rust.rs:855 extract_debt_items_with_enhanced()
+- ACTION: Extract process_input_pipeline (confidence: 76%), process_input_pipeline (confidence: 78%) to reduce complexity from 7 to ~0
+- IMPACT: -3 complexity, -3.4 risk
+- COMPLEXITY: cyclomatic=7 (adj:7), branches=7, cognitive=18, nesting=3, entropy=0.27
+- DEPENDENCIES: 1 upstream, 8 downstream
+   - CALLERS: collect_all_rust_debt_items
+   - CALLS: ContextMap::iter, LazyPipeline::map, format_enhanced_context, ... (5 more)
+- WHY: Cyclomatic complexity of 7 indicates 7 independent paths requiring 7 test cases minimum - extraction will reduce this to 3-5 tests per function. Function has 2 extractable patterns that can be isolated. These extractions will separate distinct concerns into testable units. Target complexity per function is 5 or less for optimal maintainability.
+
+#5 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/rust.rs:1005 convert_organization_pattern_to_debt_item()
+- ACTION: Extract validation logic to reduce complexity 24 → ~18
+- IMPACT: -12 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=24 (adj:22), branches=24, cognitive=43, nesting=2, entropy=0.18
 - DEPENDENCIES: 1 upstream, 5 downstream
-   - CALLERS: process_rust_files_for_call_graph
-   - CALLS: CallGraph::apply_call_resolution, CallGraph::build_function_name_map, HistoryCache::get, ... (2 more)
-- WHY: Cyclomatic complexity of 6 means at least 6 test cases needed for full path coverage - extraction reduces this to 3-5 tests per function. Extracting 3 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Pure function extraction will create easily testable units with no side effects.
+   - CALLERS: analyze_organization_patterns
+   - CALLS: EntropyAnalyzer::clone, OrganizationAntiPattern::primary_location, ContextMap::iter, ... (2 more)
+- WHY: Complex function (cyclo=24, cog=43, nesting=2) with 1 suggested extraction patterns. Predicted complexity reduction: 25%
 
-#3 SCORE: 5.05 [MEDIUM]
-- LOCATION: src/organization/primitive_obsession_detector.rs:29 PrimitiveObsessionDetector::analyze_primitive_usage()
-- ACTION: Extract 6 pure functions to reduce complexity from 5 to ~0
-- IMPACT: -2 complexity, -2.5 risk
-- COMPLEXITY: cyclomatic=5 (adj:4), branches=5, cognitive=26, nesting=1, entropy=0.36
-- DEPENDENCIES: 1 upstream, 0 downstream
-   - CALLERS: PrimitiveObsessionDetector::group_similar_usages
-- WHY: Cyclomatic complexity of 5 is manageable but can be improved through extraction. Extracting 6 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Pure function extraction will create easily testable units with no side effects.
+#6 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/javascript/detectors/resource.rs:200 detect_timer_leaks()
+- ACTION: Extract validation logic, nested processing, complex calculations to reduce complexity 18 → ~0
+- IMPACT: -9 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=18 (adj:18), branches=18, cognitive=67, nesting=7, entropy=0.35
+- DEPENDENCIES: 1 upstream, 5 downstream
+   - CALLERS: detect_resource_patterns
+   - CALLS: SourceLocation::from_node, Applicative::unwrap, ContextMap::iter, ... (2 more)
+- WHY: Complex function (cyclo=18, cog=67, nesting=7) with 3 suggested extraction patterns. Predicted complexity reduction: 105%
 
-#4 SCORE: 5.05 [MEDIUM]
-- LOCATION: src/analyzers/signature_extractor.rs:122 SignatureExtractor::detect_builder_patterns()
-- ACTION: Extract 6 pure functions to reduce complexity from 9 to ~0
-- IMPACT: -4 complexity, -2.9 risk
-- COMPLEXITY: cyclomatic=9 (adj:8), branches=9, cognitive=26, nesting=4, entropy=0.50
+#7 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/signature_extractor.rs:122 SignatureExtractor::detect_builder_patterns()
+- ACTION: Extract validation logic, nested processing, complex calculations to reduce complexity 9 → ~0
+- IMPACT: -4 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=9 (adj:9), branches=9, cognitive=26, nesting=4, entropy=0.50
 - DEPENDENCIES: 1 upstream, 8 downstream
    - CALLERS: SignatureExtractor::extract_from_file
-   - CALLS: FunctionSignatureRegistry::register_builder, EntropyAnalyzer::clone, ContextMap::iter, ... (5 more)
-- WHY: Cyclomatic complexity of 9 means at least 9 test cases needed for full path coverage - extraction reduces this to 3-5 tests per function. Extracting 6 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Consider isolating side effects during extraction.
+   - CALLS: LazyPipeline::collect, EntropyAnalyzer::clone, FunctionSignatureRegistry::get_all_methods, ... (5 more)
+- WHY: Complex function (cyclo=9, cog=26, nesting=4) with 3 suggested extraction patterns. Predicted complexity reduction: 100%
 
-#5 SCORE: 5.05 [MEDIUM]
-- LOCATION: src/io/writers/enhanced_markdown.rs:527 EnhancedMarkdownWriter::write_priority_matrix()
-- ACTION: Extract 2 pure functions to reduce complexity from 8 to ~6
-- IMPACT: -4 complexity, -2.3 risk
-- COMPLEXITY: cyclomatic=8 (adj:8), branches=8, cognitive=8, nesting=1, entropy=0.58
+#8 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analysis/call_graph/function_pointer.rs:315 FunctionPointerVisitor::analyze_function_pointer_assignment()
+- ACTION: Extract nested processing, complex calculations to reduce complexity 6 → ~1
+- IMPACT: -3 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=6 (adj:6), branches=6, cognitive=15, nesting=5, entropy=0.28
 - DEPENDENCIES: 1 upstream, 3 downstream
-   - CALLERS: EnhancedMarkdownWriter::write_technical_debt
-   - CALLS: ContextMap::iter, EnhancedMarkdownWriter::get_priority_label, UnifiedAnalysis::get_top_priorities
-- WHY: Cyclomatic complexity of 8 means at least 8 test cases needed for full path coverage - extraction reduces this to 3-5 tests per function. Extracting 2 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Pure function extraction will create easily testable units with no side effects.
+   - CALLERS: FunctionPointerVisitor::visit_local
+   - CALLS: FunctionPointerVisitor::extract_function_name_from_path, FunctionPointerVisitor::get_line_number, EntropyAnalyzer::clone
+- WHY: Complex function (cyclo=6, cog=15, nesting=5) with 2 suggested extraction patterns. Predicted complexity reduction: 83%
 
-#6 SCORE: 5.05 [MEDIUM]
-- LOCATION: src/priority/external_api_detector.rs:42 is_explicitly_marked_api()
-- ACTION: Extract 3 pure functions (complexity 6 → ~6)
-- IMPACT: -3 complexity, -2.6 risk
-- COMPLEXITY: cyclomatic=6 (adj:6), branches=6, cognitive=11, nesting=2, entropy=0.54
-- DEPENDENCIES: 1 upstream, 2 downstream
-   - CALLERS: is_likely_external_api_with_config
-   - CALLS: ContextMatcher::any, ContextMap::iter
-- WHY: Cyclomatic complexity of 6 means at least 6 test cases needed for full path coverage - extraction reduces this to 3-5 tests per function. Extracting 3 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Consider isolating side effects during extraction.
+#9 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analysis/call_graph/framework_patterns.rs:339 PatternVisitor::analyze_attribute()
+- ACTION: Extract validation logic to reduce complexity 8 → ~6
+- IMPACT: -4 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=8 (adj:8), branches=8, cognitive=12, nesting=1, entropy=0.31
+- DEPENDENCIES: 13 upstream, 11 downstream
+   - CALLERS: tests::test_analyze_attribute_unrecognized, tests::test_analyze_attribute_serialization_disabled, tests::test_analyze_attribute_tokio_test, ... (10 more)
+   - CALLS: PatternVisitor::is_test_attribute, PatternVisitor::detect_test_framework, PatternVisitor::is_web_handler_attribute, ... (8 more)
+- WHY: Complex function (cyclo=8, cog=12, nesting=1) with 1 suggested extraction patterns. Predicted complexity reduction: 25%
 
-#7 SCORE: 5.05 [MEDIUM]
-- LOCATION: src/priority/external_api_detector.rs:167 classify_api_patterns()
-- ACTION: Extract 2 pure functions (complexity 6 → ~6)
-- IMPACT: -3 complexity, -2.2 risk
-- COMPLEXITY: cyclomatic=6 (adj:5), branches=6, cognitive=5, nesting=1, entropy=0.38
-- DEPENDENCIES: 1 upstream, 5 downstream
-   - CALLERS: is_likely_external_api_with_config
-   - CALLS: is_trait_method_pattern, is_constructor_pattern, has_public_api_prefix, ... (2 more)
-- WHY: Cyclomatic complexity of 6 means at least 6 test cases needed for full path coverage - extraction reduces this to 3-5 tests per function. Extracting 2 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Consider isolating side effects during extraction.
+#10 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/builders/unified_analysis.rs:53 perform_unified_analysis_with_options()
+- ACTION: Extract validation logic, complex calculations to reduce complexity 24 → ~8
+- IMPACT: -12 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=24 (adj:24), branches=24, cognitive=52, nesting=3, entropy=0.22
+- DEPENDENCIES: 2 upstream, 14 downstream
+   - CALLERS: handle_analyze, perform_unified_analysis
+   - CALLS: LazyPipeline::collect, find_project_files_with_config, build_call_graph_parallel, ... (11 more)
+- WHY: Complex function (cyclo=24, cog=52, nesting=3) with 2 suggested extraction patterns. Predicted complexity reduction: 66%
 
-#8 SCORE: 5.04 [MEDIUM]
-- LOCATION: src/analyzers/javascript/detectors/testing.rs:514 contains_async_operations()
-- ACTION: Extract 2 pure functions (complexity 7 → ~7)
-- IMPACT: -3 complexity, -2.1 risk
-- COMPLEXITY: cyclomatic=7 (adj:6), branches=7, cognitive=6, nesting=0, entropy=0.43
-- DEPENDENCIES: 1 upstream, 0 downstream
-   - CALLERS: detect_async_test_issues
-- WHY: Cyclomatic complexity of 7 means at least 7 test cases needed for full path coverage - extraction reduces this to 3-5 tests per function. Extracting 2 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Pure function extraction will create easily testable units with no side effects.
-
-#9 SCORE: 5.04 [MEDIUM]
-- LOCATION: src/debt/suppression.rs:194 parse_line()
-- ACTION: Extract 2 pure functions to reduce complexity from 1 to ~0
-- IMPACT: -0 complexity, -1.9 risk
-- COMPLEXITY: cyclomatic=1 (adj:0), branches=1, cognitive=9, nesting=0, entropy=-0.00
-- DEPENDENCIES: 1 upstream, 4 downstream
-   - CALLERS: parse_suppression_comments
-   - CALLS: try_parse_block_end, try_parse_next_line, try_parse_line_suppression, ... (1 more)
-- WHY: Cyclomatic complexity of 1 is manageable but can be improved through extraction. Extracting 2 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Pure function extraction will create easily testable units with no side effects.
-
-#10 SCORE: 5.04 [MEDIUM]
-- LOCATION: src/resource/async_detector.rs:247 AsyncResourceDetector::assess_resource_impact()
-- ACTION: Extract 2 pure functions (complexity 5 → ~5)
-- IMPACT: -2 complexity, -2.2 risk
-- COMPLEXITY: cyclomatic=5 (adj:4), branches=5, cognitive=9, nesting=2, entropy=0.24
-- DEPENDENCIES: 1 upstream, 0 downstream
-   - CALLERS: analyze_resource_patterns
-- WHY: Cyclomatic complexity of 5 is manageable but can be improved through extraction. Extracting 2 functions targets ~5 complexity per function - the sweet spot for maintainability where each function has a single clear purpose and can be tested with 3-5 test cases. Pure function extraction will create easily testable units with no side effects.
-
-[STATS] TOTAL DEBT SCORE: 1205
+[STATS] TOTAL DEBT SCORE: 1065
