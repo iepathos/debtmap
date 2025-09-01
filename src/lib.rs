@@ -30,6 +30,8 @@ pub mod transformers;
 pub mod utils;
 
 #[cfg(test)]
+mod example_complex_function;
+#[cfg(test)]
 mod example_refactor;
 
 // Re-export commonly used types
