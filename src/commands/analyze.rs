@@ -1,10 +1,17 @@
 use super::super::builders::unified_analysis;
 use super::super::output;
 use super::super::utils::{analysis_helpers, language_parser};
-use crate::{analysis_utils, cli, config, core::*, formatting::FormattingConfig, io};
+use crate::{
+    analysis_utils, cli, config,
+    core::{self, *},
+    formatting::FormattingConfig,
+    io,
+};
 use anyhow::{Context, Result};
 use chrono::Utc;
+use rayon::prelude::*;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 pub struct AnalyzeConfig {
     pub path: PathBuf,
@@ -32,11 +39,26 @@ pub struct AnalyzeConfig {
     pub parallel: bool,
     pub jobs: usize,
     pub use_cache: bool,
+    pub no_cache: bool,
+    pub clear_cache: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     configure_output(&config);
     set_threshold_preset(config.threshold_preset);
+
+    // Handle cache flags
+    if config.clear_cache {
+        let cache_dir = config.path.join(".debtmap_cache");
+        if cache_dir.exists() {
+            std::fs::remove_dir_all(&cache_dir)?;
+            log::info!("Cache cleared");
+        }
+    }
+
+    if config.no_cache {
+        std::env::set_var("DEBTMAP_NO_CACHE", "1");
+    }
 
     let languages = language_parser::parse_languages(config.languages);
     let results = analyze_project(
@@ -111,7 +133,35 @@ fn analyze_project(
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
 
-    let file_metrics = analysis_utils::collect_file_metrics(&files);
+    // Initialize cache (enabled by default unless DEBTMAP_NO_CACHE is set)
+    let cache_dir = path.join(".debtmap_cache");
+    let cache_enabled = std::env::var("DEBTMAP_NO_CACHE").is_err();
+    let mut cache = if cache_enabled {
+        match core::cache::AnalysisCache::new(cache_dir) {
+            Ok(c) => Some(c),
+            Err(e) => {
+                log::warn!("Failed to initialize cache: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Collect file metrics with or without cache
+    let file_metrics = if let Some(ref mut cache) = cache {
+        collect_file_metrics_with_cache(&files, cache)
+    } else {
+        analysis_utils::collect_file_metrics(&files)
+    };
+
+    // Print cache statistics in verbose mode
+    if cache_enabled && log::log_enabled!(log::Level::Debug) {
+        if let Some(cache) = &cache {
+            log::info!("Cache stats: {}", cache.stats());
+        }
+    }
+
     let all_functions = analysis_utils::extract_all_functions(&file_metrics);
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);
     let duplications = analysis_helpers::detect_duplications(&files, duplication_threshold);
@@ -130,4 +180,24 @@ fn analyze_project(
         dependencies,
         duplications,
     })
+}
+
+fn collect_file_metrics_with_cache(
+    files: &[PathBuf],
+    cache: &mut core::cache::AnalysisCache,
+) -> Vec<FileMetrics> {
+    let cache = Arc::new(Mutex::new(cache));
+
+    files
+        .par_iter()
+        .filter_map(|path| {
+            let mut cache = cache.lock().unwrap();
+            cache
+                .get_or_compute(path, || {
+                    analysis_utils::analyze_single_file(path)
+                        .ok_or_else(|| anyhow::anyhow!("Failed to analyze file"))
+                })
+                .ok()
+        })
+        .collect()
 }
