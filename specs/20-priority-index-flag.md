@@ -17,7 +17,7 @@ created: 2025-08-12
 
 ## Context
 
-When using debtmap with mmm's `--map-args` feature for parallel processing, users need a way to extract individual priority items by their index position. Currently, the `--top N` flag returns multiple items, but there's no way to get just the Nth priority item for distributed processing.
+When using debtmap with prodigy's `--map-args` feature for parallel processing, users need a way to extract individual priority items by their index position. Currently, the `--top N` flag returns multiple items, but there's no way to get just the Nth priority item for distributed processing.
 
 This limitation prevents efficient parallelization where different processes could work on different priority items simultaneously, such as:
 - Parallel testing of high-priority functions
@@ -26,7 +26,7 @@ This limitation prevents efficient parallelization where different processes cou
 
 ## Objective
 
-Add a `--priority-index` CLI flag that returns only the Nth priority item (1-based indexing) from the unified debt analysis, enabling efficient parallel processing when combined with mmm's `--map-args` feature.
+Add a `--priority-index` CLI flag that returns only the Nth priority item (1-based indexing) from the unified debt analysis, enabling efficient parallel processing when combined with prodigy's `--map-args` feature.
 
 ## Requirements
 
@@ -82,7 +82,7 @@ Add a `--priority-index` CLI flag that returns only the Nth priority item (1-bas
 - [ ] Single item output maintains same structure as multi-item output
 - [ ] Error messages include helpful context about available range
 - [ ] Help text clearly documents usage and examples
-- [ ] Integration tests demonstrate parallel processing scenarios with mmm
+- [ ] Integration tests demonstrate parallel processing scenarios with prodigy
 - [ ] Performance impact is negligible compared to full analysis
 
 ## Technical Details
@@ -442,8 +442,8 @@ fn test_priority_index_with_json_format() {
 
 ```rust
 #[test]
-fn test_mmm_integration_example() {
-    // Demonstrate how this would work with mmm --map-args
+fn test_prodigy_integration_example() {
+    // Demonstrate how this would work with prodigy --map-args
     
     // First, get the count of priority items
     let count_output = Command::new("./target/debug/debtmap")
@@ -479,15 +479,15 @@ fn test_mmm_integration_example() {
 --priority-index <INDEX>
     Extract specific priority item by index (1-based) for parallel processing.
     
-    Use with mmm's --map-args for distributed analysis:
+    Use with prodigy's --map-args for distributed analysis:
     
     Examples:
       --priority-index 1                    Get highest priority item
       --priority-index 5 --format json     Get 5th item as JSON
       --priority-index 10 --priorities-only Get 10th item (minimal format)
     
-    mmm Integration:
-      mmm "debtmap analyze . --priority-index {}" --map-args 1,2,3,4,5
+    prodigy Integration:
+      prodigy "debtmap analyze . --priority-index {}" --map-args 1,2,3,4,5
     
     Notes:
       - Uses 1-based indexing (1 = highest priority)
@@ -500,7 +500,7 @@ fn test_mmm_integration_example() {
 
 Add to README.md:
 ```markdown
-## Parallel Processing with mmm
+## Parallel Processing with prodigy
 
 For large codebases or distributed teams, you can process priority items in parallel:
 
@@ -510,8 +510,8 @@ debtmap analyze . --priority-index 1     # Highest priority
 debtmap analyze . --priority-index 2     # Second priority
 # ... etc
 
-# Use with mmm for parallel processing
-mmm "debtmap analyze . --priority-index {} --format json" --map-args $(seq 1 10)
+# Use with prodigy for parallel processing
+prodigy "debtmap analyze . --priority-index {} --format json" --map-args $(seq 1 10)
 ```
 
 This enables scenarios like:
@@ -558,16 +558,16 @@ debtmap analyze . --priority-index 5 --format json
 debtmap analyze . --priority-index 3 --detailed
 ```
 
-### Parallel Processing with mmm
+### Parallel Processing with prodigy
 ```bash
 # Process top 5 priority items in parallel
-mmm "debtmap analyze . --priority-index {} --format json" --map-args 1,2,3,4,5
+prodigy "debtmap analyze . --priority-index {} --format json" --map-args 1,2,3,4,5
 
 # Parallel refactoring: each team member gets different priorities
-mmm "echo 'Priority {}: $(debtmap analyze . --priority-index {} --priorities-only)'" --map-args 1,2,3
+prodigy "echo 'Priority {}: $(debtmap analyze . --priority-index {} --priorities-only)'" --map-args 1,2,3
 
 # CI/CD: Different build stages handle different priority levels
-mmm "debtmap analyze . --priority-index {} | ./handle-priority.sh {}" --map-args $(seq 1 10)
+prodigy "debtmap analyze . --priority-index {} | ./handle-priority.sh {}" --map-args $(seq 1 10)
 ```
 
 ### Error Handling
@@ -586,7 +586,7 @@ debtmap analyze . --priority-index 999
 After implementation:
 
 1. **Enhanced Parallel Processing**: Teams can efficiently distribute priority item analysis across multiple processes or team members
-2. **Better mmm Integration**: Seamless integration with mmm's `--map-args` feature for distributed processing
+2. **Better prodigy Integration**: Seamless integration with prodigy's `--map-args` feature for distributed processing
 3. **Improved Workflow Automation**: CI/CD pipelines can target specific priority levels without processing entire analysis
 4. **Maintained Consistency**: Single-item output maintains the same structure and metadata as multi-item output
 5. **Clear Error Guidance**: Users receive helpful feedback when indices are out of bounds or invalid

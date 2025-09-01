@@ -1,10 +1,10 @@
 # implement.yml - Example configuration for implementing specifications
-# This replaces the old `mmm implement` functionality
+# This replaces the old `prodigy implement` functionality
 #
 # Usage examples:
-#   mmm cook examples/implement.yml --args "33"
-#   mmm cook examples/implement.yml --map "specs/*.md"
-#   mmm cook examples/implement.yml --map "specs/temp/*.md" --worktree
+#   prodigy cook examples/implement.yml --args "33"
+#   prodigy cook examples/implement.yml --map "specs/*.md"
+#   prodigy cook examples/implement.yml --map "specs/temp/*.md" --worktree
 
 # Commands to execute for each specification
 # Implement the spec using the $ARG variable which contains:
@@ -14,12 +14,12 @@
 #    max_cache_age: 300
 #    save: true
 
-- claude: "/mmm-implement-spec $ARG"
+- claude: "/prodigy-implement-spec $ARG"
   commit_required: true
 
 - shell: "just test"
   on_failure:
-    claude: "/mmm-debug-test-failure --spec $ARG --output ${shell.output}"
+    claude: "/prodigy-debug-test-failure --spec $ARG --output ${shell.output}"
     commit_required: true
     max_attempts: 3
     fail_workflow: false  # Continue workflow even if tests can't be fixed

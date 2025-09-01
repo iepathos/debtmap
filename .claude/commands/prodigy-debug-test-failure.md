@@ -1,4 +1,4 @@
-# /mmm-debug-test-failure
+# /prodigy-debug-test-failure
 
 Fix failing tests by analyzing test output and applying targeted fixes.
 

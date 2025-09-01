@@ -1,18 +1,18 @@
-# /mmm-product-enhance
+# /prodigy-product-enhance
 
 Analyze the codebase from a product management perspective, focusing on user value, feature opportunities, and user experience enhancements rather than code quality metrics. This command identifies improvements that would enhance the product's value proposition and user satisfaction.
 
 ## Variables
 
 SCOPE: $ARGUMENTS (optional - specify scope like "cli", "api", specific features, or omit for entire product)
-FOCUS: $MMM_FOCUS (optional - focus directive from mmm CLI, e.g., "onboarding", "api", "cli-ux")
+FOCUS: $PRODIGY_FOCUS (optional - focus directive from prodigy CLI, e.g., "onboarding", "api", "cli-ux")
 
 ## Execute
 
 ### Phase 1: Product Context and User Understanding
 
 1. **Read Project Context**
-   - Read .mmm context files (PROJECT.md, ARCHITECTURE.md, ROADMAP.md)
+   - Read .prodigy context files (PROJECT.md, ARCHITECTURE.md, ROADMAP.md)
    - Understand product goals, user personas, and value proposition
    - Identify core features and their intended use cases
    - Review completed and planned features from ROADMAP.md
@@ -233,8 +233,8 @@ FOCUS: $MMM_FOCUS (optional - focus directive from mmm CLI, e.g., "onboarding", 
 ## Automation Mode Behavior
 
 **Automation Detection**: The command detects automation mode when:
-- Environment variable `MMM_AUTOMATION=true` is set
-- Called from within an MMM workflow context
+- Environment variable `PRODIGY_AUTOMATION=true` is set
+- Called from within an PRODIGY workflow context
 
 **Git-Native Automation Flow**:
 1. Analyze product from user perspective
@@ -307,10 +307,10 @@ FOCUS: $MMM_FOCUS (optional - focus directive from mmm CLI, e.g., "onboarding", 
 ## Example Usage
 
 ```
-/mmm-product-enhance
-/mmm-product-enhance "cli"
-/mmm-product-enhance "api documentation"
-/mmm-product-enhance "onboarding"
+/prodigy-product-enhance
+/prodigy-product-enhance "cli"
+/prodigy-product-enhance "api documentation"
+/prodigy-product-enhance "onboarding"
 ```
 
 ## Advanced Features

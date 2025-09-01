@@ -1,24 +1,24 @@
-# /mmm-docs-generate
+# /prodigy-docs-generate
 
-Generates comprehensive Rust documentation for undocumented or poorly documented code, using project context from .mmm/ analysis.
+Generates comprehensive Rust documentation for undocumented or poorly documented code, using project context from .prodigy/ analysis.
 
 ## Usage
 
 ```
-/mmm-docs-generate [documentation type description...]
+/prodigy-docs-generate [documentation type description...]
 ```
 
 Examples:
-- `/mmm-docs-generate` - Generate docs for all undocumented Rust code
-- `/mmm-docs-generate public API documentation` - Focus on public API documentation
-- `/mmm-docs-generate usage examples and tutorials` - Generate usage examples and tutorials
-- `/mmm-docs-generate architecture overview` - Create architecture documentation
-- `/mmm-docs-generate module documentation for core components` - Document specific modules
+- `/prodigy-docs-generate` - Generate docs for all undocumented Rust code
+- `/prodigy-docs-generate public API documentation` - Focus on public API documentation
+- `/prodigy-docs-generate usage examples and tutorials` - Generate usage examples and tutorials
+- `/prodigy-docs-generate architecture overview` - Create architecture documentation
+- `/prodigy-docs-generate module documentation for core components` - Document specific modules
 
 ## What This Command Does
 
 1. **Project Context Gathering**
-   - Reads .mmm/context/ analysis data for project understanding
+   - Reads .prodigy/context/ analysis data for project understanding
    - Reviews architecture patterns and conventions
    - Analyzes dependency graph and module structure
    - Identifies high-priority undocumented areas
@@ -64,7 +64,7 @@ Examples:
 
 Before generating documentation, the command:
 
-1. **Reads MMM Context**: Checks for .mmm/context/ directory and loads:
+1. **Reads PRODIGY Context**: Checks for .prodigy/context/ directory and loads:
    - `analysis.json` - Complete project analysis
    - `architecture.json` - Architectural patterns and violations
    - `conventions.json` - Code conventions and naming patterns
@@ -85,12 +85,12 @@ docs: generate [documentation type] documentation
 
 - Add rustdoc comments for [specific areas]
 - Include usage examples and code samples
-- Follow project conventions from .mmm/context analysis
+- Follow project conventions from .prodigy/context analysis
 ```
 
 ## Implementation Workflow
 
-1. **Context Analysis**: Read .mmm/context/ data for project understanding
+1. **Context Analysis**: Read .prodigy/context/ data for project understanding
 2. **Scope Determination**: Parse multi-word prompt to determine documentation scope
 3. **Gap Analysis**: Identify missing or inadequate documentation
 4. **Content Generation**: Create rustdoc-compatible documentation

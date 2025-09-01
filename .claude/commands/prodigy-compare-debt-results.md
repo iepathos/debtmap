@@ -1,5 +1,5 @@
 ---
-name: mmm-compare-debt-results
+name: prodigy-compare-debt-results
 description: Compare before/after debtmap results and create a commit documenting improvements
 args:
   - name: before
@@ -29,7 +29,7 @@ Analyze the difference between before and after debtmap results to quantify tech
 
 ## Usage
 ```
-/mmm-compare-debt-results --before <original-debtmap.json> --after <new-debtmap.json> --map-results '<results>' --successful <count> --failed <count>
+/prodigy-compare-debt-results --before <original-debtmap.json> --after <new-debtmap.json> --map-results '<results>' --successful <count> --failed <count>
 ```
 
 ## Parameters

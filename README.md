@@ -928,13 +928,13 @@ For detailed documentation on specific features:
 
 ### Automated Technical Debt Reduction
 
-We use [mmm (Memento Mori)](https://github.com/iepathos/mmm) for automated technical debt reduction through AI-driven workflows. This allows us to continuously improve code quality without manual intervention.
+We use [prodigy](https://github.com/iepathos/prodigy) for automated technical debt reduction through AI-driven workflows. This allows us to continuously improve code quality without manual intervention.
 
 #### Quick Start
 
 ```bash
 # Run automated debt reduction (5 iterations)
-mmm cook workflows/debtmap.yml -wn 5
+prodigy cook workflows/debtmap.yml -wn 5
 ```
 
 This command:
@@ -956,14 +956,14 @@ The workflow automatically addresses:
 #### Documentation
 
 For detailed information on our development process:
-- [MMM Workflow Guide](docs/MMM_WORKFLOW.md) - Using mmm for automated debt reduction
+- [Prodigy Workflow Guide](docs/PRODIGY_WORKFLOW.md) - Using prodigy for automated debt reduction
 - [Claude Workflow Guide](docs/CLAUDE_WORKFLOW.md) - Manual debt reduction with Claude Code
 
 #### Example Session
 
 ```bash
-$ mmm cook workflows/debtmap.yml -wn 3
-ℹ️  Created worktree at: /Users/glen/.mmm/worktrees/debtmap/session-abc123
+$ prodigy cook workflows/debtmap.yml -wn 3
+ℹ️  Created worktree at: /Users/glen/.prodigy/worktrees/debtmap/session-abc123
 🔄 Starting iteration 1/3
 ✅ Fixed: Reduced complexity in parse_lcov_file from 80 to 45
 🔄 Starting iteration 2/3
@@ -977,12 +977,12 @@ After the workflow completes, review and merge the improvements:
 
 ```bash
 # Review changes
-pushd ~/.mmm/worktrees/debtmap/session-*
+pushd ~/.prodigy/worktrees/debtmap/session-*
   git log --oneline
 popd
 
 # If satisfied, merge to main
-mmm worktree merge session-abc123
+prodigy worktree merge session-abc123
 ```
 
 ## License

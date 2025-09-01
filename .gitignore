@@ -93,10 +93,12 @@ env/
 local/
 dev/
 
-# MMM session state files
-.mmm/session_state.json
-.mmm/state.json.corrupted.*
-.mmm/mapreduce/
-.mmm/worktrees/
-.mmm/context/
-.mmm/metrics/
+# Prodigy session state files
+.prodigy/session_state.json
+.prodigy/state.json.corrupted.*
+.prodigy/mapreduce/
+.prodigy/worktrees/
+.prodigy/context/
+.prodigy/metrics/
+# Legacy MMM files (can be removed after migration)
+.mmm/

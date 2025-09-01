@@ -263,7 +263,7 @@ src/
 - Spec 10: Add modern pattern detection (async/await, callbacks, functional)
 - Spec 12: Improve ROI calculations
 - Spec 13: Add risk categorization system
-- Spec 20: Priority Index Flag for Parallel Processing (NEW - enables extracting specific priority items by index for distributed processing with mmm's --map-args feature)
+- Spec 20: Priority Index Flag for Parallel Processing (NEW - enables extracting specific priority items by index for distributed processing with prodigy's --map-args feature)
 - Spec 52: Entropy-Based Complexity Scoring (NEW - reduces false positives by 70%+ using information theory to distinguish pattern-based code from genuine complexity)
 
 ### Long-term Goals

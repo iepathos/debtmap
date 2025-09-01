@@ -1,4 +1,4 @@
-# /mmm-add-spec
+# /prodigy-add-spec
 
 Generate a new specification document based on a feature description. This command creates a properly formatted specification that follows project conventions and integrates with the existing specification system.
 
@@ -11,8 +11,8 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
 ### Phase 1: Project Context Analysis
 
 1. **Read Project Context**
-   - Read .mmm context files to understand current project state
-   - Files read in order: .mmm/PROJECT.md, .mmm/ARCHITECTURE.md, .mmm/CONVENTIONS.md, .mmm/ROADMAP.md, .mmm/DECISIONS.md
+   - Read .prodigy context files to understand current project state
+   - Files read in order: .prodigy/PROJECT.md, .prodigy/ARCHITECTURE.md, .prodigy/CONVENTIONS.md, .prodigy/ROADMAP.md, .prodigy/DECISIONS.md
    - Understand existing capabilities and architectural patterns
    - Identify current technology stack and dependencies
 
@@ -280,16 +280,16 @@ created: {YYYY-MM-DD}
 ## Example Usage
 
 ```
-/mmm-add-spec "Add user authentication system with JWT tokens"
-/mmm-add-spec "Implement caching layer for database queries"
-/mmm-add-spec "Add REST API endpoints for project management"
-/mmm-add-spec "Create automated backup system for project data"
+/prodigy-add-spec "Add user authentication system with JWT tokens"
+/prodigy-add-spec "Implement caching layer for database queries"
+/prodigy-add-spec "Add REST API endpoints for project management"
+/prodigy-add-spec "Create automated backup system for project data"
 ```
 
 ## Integration with Development Workflow
 
 ### Specification Lifecycle
-1. **Generation**: Created with /mmm-add-spec command
+1. **Generation**: Created with /prodigy-add-spec command
 2. **Review**: Technical review and refinement
 3. **Approval**: Stakeholder approval and finalization
 4. **Implementation**: Actual feature development

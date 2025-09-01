@@ -3,10 +3,10 @@
 
 - shell: "just test"
   on_failure:
-    claude: "/mmm-debug-test-failure --spec $ARG --output ${shell.output}"
+    claude: "/prodigy-debug-test-failure --spec $ARG --output ${shell.output}"
     max_attempts: 3
     fail_workflow: false  # Continue workflow even if tests can't be fixed
 
 # Run linting and formatting after implementation
-- claude: "/mmm-lint"
+- claude: "/prodigy-lint"
   

@@ -25,7 +25,7 @@ map:
       # Run tests to verify the fix
       - shell: "just test"
         on_failure:
-          claude: "/mmm-debug-test-failure --output '${shell.output}'"
+          claude: "/prodigy-debug-test-failure --output '${shell.output}'"
           max_attempts: 2
           fail_workflow: false
       
@@ -52,7 +52,7 @@ reduce:
     # Run full test suite after all fixes
     - shell: "just test"
       on_failure:
-        claude: "/mmm-debug-test-failure --output '${shell.output}'"
+        claude: "/prodigy-debug-test-failure --output '${shell.output}'"
         max_attempts: 3
         fail_workflow: true  # Fail if tests don't pass after merging
     
@@ -71,7 +71,7 @@ reduce:
     
     # Compare debt metrics and create final commit with summary
     - claude: |
-        /mmm-compare-debt-results \
+        /prodigy-compare-debt-results \
           --before debtmap.json \
           --after debtmap-after.json \
           --map-results '${map.results}' \

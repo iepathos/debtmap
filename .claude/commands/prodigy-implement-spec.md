@@ -1,23 +1,23 @@
 # Implement Spec Command
 
-Implements a Git Good specification by reading the spec file, executing the implementation, and updating .mmm context files.  Read the files in .mmm to get general project context.
+Implements a Git Good specification by reading the spec file, executing the implementation, and updating .prodigy context files.  Read the files in .prodigy to get general project context.
 
 Arguments: $ARGUMENTS
 
 ## Usage
 
 ```
-/mmm-implement-spec <spec-identifier>
+/prodigy-implement-spec <spec-identifier>
 ```
 
 Examples: 
-- `/mmm-implement-spec 01` to implement the project structure specification
-- `/mmm-implement-spec iteration-1234567890-improvements` to implement a temporary improvement spec
+- `/prodigy-implement-spec 01` to implement the project structure specification
+- `/prodigy-implement-spec iteration-1234567890-improvements` to implement a temporary improvement spec
 
 ## What This Command Does
 
 1. **Reads the Project Context**
-   - Read the .mmm context files to get general understanding of the project.
+   - Read the .prodigy context files to get general understanding of the project.
    - Files are read in this order to build context:
      - PROJECT.md (current state and capabilities)
      - ARCHITECTURE.md (system design)
@@ -59,8 +59,8 @@ Examples:
 
 The command will:
 - First check if a spec identifier was provided ($ARGUMENTS)
-- If no identifier provided, fail with: "Error: Spec identifier is required. Usage: /mmm-implement-spec <spec-identifier>"
-- Read all .mmm context files in order (PROJECT.md, ARCHITECTURE.md, CONVENTIONS.md, ROADMAP.md, DECISIONS.md)
+- If no identifier provided, fail with: "Error: Spec identifier is required. Usage: /prodigy-implement-spec <spec-identifier>"
+- Read all .prodigy context files in order (PROJECT.md, ARCHITECTURE.md, CONVENTIONS.md, ROADMAP.md, DECISIONS.md)
 - Build comprehensive understanding of project state and conventions
 - Locate specification file using $ARGUMENTS:
   - **Numeric IDs** (e.g., "01", "08a", "67"): Find spec file matching pattern `specs/{number}-*.md`
@@ -87,7 +87,7 @@ Based on the spec type:
 
 ### Step 4: Context Updates
 
-Update .mmm files (skip for temporary iteration specs):
+Update .prodigy files (skip for temporary iteration specs):
 - **Permanent specs only**:
   - **PROJECT.md**: Update "Current State" percentage and "What Exists"
   - **ARCHITECTURE.md**: Add architectural details for new components
@@ -127,7 +127,7 @@ Final steps:
 3. **Documentation**
    - Add inline documentation for new code
    - Update module-level documentation
-   - Keep .mmm files current
+   - Keep .prodigy files current
 
 4. **Testing**
    - Add unit tests for new functionality
@@ -137,8 +137,8 @@ Final steps:
 ## Automation Mode Behavior
 
 **Automation Detection**: The command detects automation mode when:
-- Environment variable `MMM_AUTOMATION=true` is set
-- Called from within an MMM workflow context
+- Environment variable `PRODIGY_AUTOMATION=true` is set
+- Called from within an PRODIGY workflow context
 
 **Git-Native Automation Flow**:
 1. Read spec file and implement all required changes
@@ -172,7 +172,7 @@ The command will:
 ## Example Workflow
 
 ```
-/mmm-implement-spec 67
+/prodigy-implement-spec 67
 ```
 
 This would:

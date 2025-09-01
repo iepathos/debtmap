@@ -1,24 +1,24 @@
-# MMM Merge Worktree Command
+# PRODIGY Merge Worktree Command
 
-Intelligently merges MMM worktree branches with automatic conflict resolution into the repository's default branch (main or master).
+Intelligently merges PRODIGY worktree branches with automatic conflict resolution into the repository's default branch (main or master).
 
 Arguments: $ARGUMENTS
 
 ## Usage
 
 ```
-/mmm-merge-worktree <branch-name>
+/prodigy-merge-worktree <branch-name>
 ```
 
 Examples:
-- `/mmm-merge-worktree mmm-performance-1234567890`
-- `/mmm-merge-worktree mmm-security-1234567891`
+- `/prodigy-merge-worktree prodigy-performance-1234567890`
+- `/prodigy-merge-worktree prodigy-security-1234567891`
 
 ## Execute
 
 1. **Get Branch Name**
    - The branch name is provided as: $ARGUMENTS
-   - If no branch name provided (empty $ARGUMENTS), fail with: "Error: Branch name is required. Usage: /mmm-merge-worktree <branch-name>"
+   - If no branch name provided (empty $ARGUMENTS), fail with: "Error: Branch name is required. Usage: /prodigy-merge-worktree <branch-name>"
 
 2. **Determine Default Branch**
    - Check if 'main' branch exists using `git rev-parse --verify refs/heads/main`
@@ -122,13 +122,13 @@ Original commits from worktree:
 
 ```bash
 # Check what needs merging
-$ mmm worktree ls
-Active MMM worktrees:
-  mmm-performance-1234567890 - /path/to/.mmm/worktrees/... (focus: performance)
-  mmm-security-1234567891 - /path/to/.mmm/worktrees/... (focus: security)
+$ prodigy worktree ls
+Active PRODIGY worktrees:
+  prodigy-performance-1234567890 - /path/to/.prodigy/worktrees/... (focus: performance)
+  prodigy-security-1234567891 - /path/to/.prodigy/worktrees/... (focus: security)
 
 # Merge first worktree
-$ claude /mmm-merge-worktree mmm-performance-1234567890
+$ claude /prodigy-merge-worktree prodigy-performance-1234567890
 Attempting merge...
 Found 2 conflicts in:
   - src/main.rs
@@ -137,19 +137,19 @@ Resolving conflicts...
 ✓ src/main.rs: Combined performance optimization with existing structure
 ✓ src/lib.rs: Merged both import additions
 Creating merge commit...
-✓ Successfully merged 'mmm-performance-1234567890' into master
+✓ Successfully merged 'prodigy-performance-1234567890' into master
 
 # Merge second worktree (may have conflicts with first merge)
-$ claude /mmm-merge-worktree mmm-security-1234567891
+$ claude /prodigy-merge-worktree prodigy-security-1234567891
 Attempting merge...
 Found 3 conflicts...
 <resolution details>
-✓ Successfully merged 'mmm-security-1234567891' into master
+✓ Successfully merged 'prodigy-security-1234567891' into master
 ```
 
 ## Automation Support
 
-When `MMM_AUTOMATION=true` is set:
+When `PRODIGY_AUTOMATION=true` is set:
 - No interactive prompts should be shown
 - If branch name is missing or invalid, fail with clear error message
 - Always merges to the default branch (main or master)

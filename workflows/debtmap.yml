@@ -7,7 +7,7 @@
 
 - shell: "just test"
   on_failure:
-    claude: "/mmm-debug-test-failure --output ${shell.output}"
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
     max_attempts: 3
     fail_workflow: false  # Continue workflow even if tests can't be fixed
 

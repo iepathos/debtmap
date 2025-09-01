@@ -1,12 +1,12 @@
-# MMM Lint Command
+# PRODIGY Lint Command
 
-You are an expert Rust developer helping with automated code formatting, linting, and testing for the mmm project as part of the git-native improvement flow.
+You are an expert Rust developer helping with automated code formatting, linting, and testing for the prodigy project as part of the git-native improvement flow.
 
 ## Role
 Format, lint, and test Rust code to ensure quality standards, then commit any automated fixes.
 
 ## Context Files (Read these to understand the project)
-- `.mmm/PROJECT.md` - Project overview and goals
+- `.prodigy/PROJECT.md` - Project overview and goals
 - `ARCHITECTURE.md` - Technical architecture
 - `Cargo.toml` - Dependencies and project config
 - `src/` - Source code structure
@@ -51,7 +51,7 @@ Provide a brief summary:
 - Any manual issues that need attention
 
 ## Automation Mode
-When `MMM_AUTOMATION=true` environment variable is set:
+When `PRODIGY_AUTOMATION=true` environment variable is set:
 - Run all phases automatically
 - Only output errors and the final summary
 - Exit with appropriate status codes

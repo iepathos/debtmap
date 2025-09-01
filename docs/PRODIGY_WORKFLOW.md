@@ -1,17 +1,17 @@
-# Using Claude Code, mmm cook, and debtmap for Automated Technical Debt Reduction
+# Using Claude Code, prodigy cook, and debtmap for Automated Technical Debt Reduction
 
-This guide explains how to use `mmm cook` with the `workflows/debtmap.yml` workflow to automatically reduce technical debt through iterative Claude-powered improvements.
+This guide explains how to use `prodigy cook` with the `workflows/debtmap.yml` workflow to automatically reduce technical debt through iterative Claude-powered improvements.
 
-## What is mmm?
+## What is prodigy?
 
-`mmm` (Memento Mori) is an AI workflow automation tool that enables declarative workflows using Claude. It creates isolated git worktrees for each session and orchestrates multi-step improvement cycles.
+`prodigy` (Prodigy) is an AI workflow automation tool that enables declarative workflows using Claude. It creates isolated git worktrees for each session and orchestrates multi-step improvement cycles.
 
 ## The Debtmap Workflow
 
 ### Command
 
 ```bash
-mmm cook workflows/debtmap.yml -wyn 5
+prodigy cook workflows/debtmap.yml -wyn 5
 ```
 
 Options:
@@ -21,9 +21,9 @@ Options:
 
 ### What Happens
 
-When you run this command, mmm:
+When you run this command, prodigy:
 
-1. **Creates an isolated worktree** at `~/.mmm/worktrees/debtmap/session-[uuid]`
+1. **Creates an isolated worktree** at `~/.prodigy/worktrees/debtmap/session-[uuid]`
 2. **Executes the workflow** for up to 5 iterations
 3. Each iteration runs three steps:
    - **Claude debtmap analysis** - Identifies and fixes top priority technical debt
@@ -38,12 +38,12 @@ When you run this command, mmm:
 
 - shell: "just test"
   on_failure:
-    claude: "/mmm-debug-test-failure --spec $ARG --output ${shell.output}"
+    claude: "/prodigy-debug-test-failure --spec $ARG --output ${shell.output}"
     max_attempts: 3
     fail_workflow: false  # Continue workflow even if tests can't be fixed
 
 # Run linting and formatting after implementation
-- claude: "/mmm-lint"
+- claude: "/prodigy-lint"
 ```
 
 ## The Claude Commands
@@ -69,8 +69,8 @@ This command:
 ## Example Session Output
 
 ```bash
-$ mmm cook workflows/debtmap.yml -wyn 5
-ℹ️  Created worktree at: /Users/glen/.mmm/worktrees/debtmap/session-76d7d5a2
+$ prodigy cook workflows/debtmap.yml -wyn 5
+ℹ️  Created worktree at: /Users/glen/.prodigy/worktrees/debtmap/session-76d7d5a2
 ℹ️  Executing workflow: default (max 5 iterations)
 🔄 Starting improvement loop
 🔄 Starting iteration 1/5
@@ -78,7 +78,7 @@ $ mmm cook workflows/debtmap.yml -wyn 5
 ✅ ✓ claude: /debtmap created commits
 🔄 Executing step 2/3: test: just test
 ✅ ✓ Tests passed on attempt 1
-🔄 Executing step 3/3: claude: /mmm-lint
+🔄 Executing step 3/3: claude: /prodigy-lint
 ℹ️  ✓ Iteration 1 completed in 5m 43s
 ```
 
@@ -108,7 +108,7 @@ Review changes in the worktree:
 
 ```bash
 # Navigate to the worktree
-cd ~/.mmm/worktrees/debtmap/session-[uuid]
+cd ~/.prodigy/worktrees/debtmap/session-[uuid]
 
 # Review all commits made
 git log --oneline
@@ -126,12 +126,12 @@ debtmap analyze . --coverage-file target/coverage/lcov.info
 
 1. **Morning run**: Start the day with debt reduction
    ```bash
-   mmm cook workflows/debtmap.yml -wyn 5
+   prodigy cook workflows/debtmap.yml -wyn 5
    ```
 
 2. **Review changes**: Examine what was fixed
    ```bash
-   cd ~/.mmm/worktrees/debtmap/session-*
+   cd ~/.prodigy/worktrees/debtmap/session-*
    git log --stat
    ```
 
@@ -146,7 +146,7 @@ debtmap analyze . --coverage-file target/coverage/lcov.info
 Schedule regular runs:
 ```bash
 # Add to crontab for nightly runs
-0 2 * * * cd /path/to/project && mmm cook workflows/debtmap.yml -wyn 10
+0 2 * * * cd /path/to/project && prodigy cook workflows/debtmap.yml -wyn 10
 ```
 
 ## Customization
@@ -177,7 +177,7 @@ Example enhanced workflow:
 
 - shell: "cargo clippy -- -D warnings"
   
-- claude: "/mmm-lint"
+- claude: "/prodigy-lint"
 
 - shell: "cargo bench"
   continue_on_failure: true
@@ -210,7 +210,7 @@ Each commit includes:
 
 Begin with fewer iterations to understand the impact:
 ```bash
-mmm cook workflows/debtmap.yml -wyn 1
+prodigy cook workflows/debtmap.yml -wyn 1
 ```
 
 ### 2. Review Before Merging
@@ -229,10 +229,10 @@ cargo tarpaulin --out html
 
 Monitor debt reduction over time:
 ```bash
-# Before mmm run
+# Before prodigy run
 debtmap analyze . > before.txt
 
-# After mmm run
+# After prodigy run
 debtmap analyze . > after.txt
 
 # Compare
@@ -241,7 +241,7 @@ diff before.txt after.txt
 
 ### 4. Combine with Manual Review
 
-Use mmm for automated fixes, then:
+Use prodigy for automated fixes, then:
 - Review architectural decisions
 - Add documentation for complex changes
 - Update tests for edge cases
@@ -253,7 +253,7 @@ Use mmm for automated fixes, then:
 If the workflow fails:
 ```bash
 # Check logs in worktree
-cd ~/.mmm/worktrees/debtmap/session-*
+cd ~/.prodigy/worktrees/debtmap/session-*
 git status
 cargo test
 ```
@@ -283,7 +283,7 @@ Create a custom workflow for focused improvement:
   
 - shell: "cargo test core::"
   
-- claude: "/mmm-lint src/core"
+- claude: "/prodigy-lint src/core"
 ```
 
 ### Parallel Workflows
@@ -291,13 +291,13 @@ Create a custom workflow for focused improvement:
 Run multiple improvement streams:
 ```bash
 # Terminal 1: Fix complexity
-mmm cook workflows/complexity.yml -wyn 5
+prodigy cook workflows/complexity.yml -wyn 5
 
 # Terminal 2: Improve coverage
-mmm cook workflows/coverage.yml -wyn 5
+prodigy cook workflows/coverage.yml -wyn 5
 
 # Terminal 3: Remove duplication
-mmm cook workflows/duplication.yml -wyn 5
+prodigy cook workflows/duplication.yml -wyn 5
 ```
 
 ### CI Integration
@@ -315,9 +315,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run mmm debt reduction
+      - name: Run prodigy debt reduction
         run: |
-          mmm cook workflows/debtmap.yml -wyn 10
+          prodigy cook workflows/debtmap.yml -wyn 10
       - name: Create PR
         run: |
           gh pr create --title "Weekly debt reduction" \
@@ -336,7 +336,7 @@ Using this workflow typically achieves:
 
 ## Summary
 
-The `mmm cook workflows/debtmap.yml -wyn 5` command provides:
+The `prodigy cook workflows/debtmap.yml -wyn 5` command provides:
 1. **Automated debt reduction** through Claude-powered analysis
 2. **Safe iteration** in isolated worktrees
 3. **Validated improvements** with comprehensive testing
