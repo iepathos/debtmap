@@ -100,5 +100,3 @@ dev/
 .prodigy/worktrees/
 .prodigy/context/
 .prodigy/metrics/
-# Legacy MMM files (can be removed after migration)
-.mmm/

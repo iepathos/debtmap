@@ -1,1 +1,0 @@
-Python detector implementation added
