@@ -6,6 +6,19 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
+// Type definitions for timer classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TimerType {
+    Timeout,
+    Interval,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClearType {
+    Timeout,
+    Interval,
+}
+
 #[derive(Debug, Clone)]
 pub enum ResourceManagementIssue {
     EventListenerLeak {
@@ -197,13 +210,118 @@ fn detect_event_listener_leaks(
     }
 }
 
+// Pure function to classify timer function calls
+fn classify_timer_function(func_name: &str) -> Option<TimerType> {
+    match func_name {
+        "setTimeout" => Some(TimerType::Timeout),
+        "setInterval" => Some(TimerType::Interval),
+        _ => None,
+    }
+}
+
+// Pure function to classify clear function calls
+fn classify_clear_function(func_name: &str) -> Option<ClearType> {
+    match func_name {
+        "clearTimeout" => Some(ClearType::Timeout),
+        "clearInterval" => Some(ClearType::Interval),
+        _ => None,
+    }
+}
+
+// Pure function to check if node is a timer assignment
+fn is_timer_assignment(parent: Node) -> bool {
+    parent.kind() == "variable_declarator" || parent.kind() == "assignment_expression"
+}
+
+// Extract timer variables from matches - processes AST nodes and returns data
+fn extract_timer_variables<'a>(
+    cursor: &mut QueryCursor,
+    query: &Query,
+    root: Node<'a>,
+    source: &str,
+) -> (HashSet<(String, String)>, Vec<ResourceManagementIssue>) {
+    let mut timer_vars = HashSet::new();
+    let mut issues = Vec::new();
+    let mut matches = cursor.matches(query, root, source.as_bytes());
+
+    while let Some(match_) = matches.next() {
+        if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
+            let func_name = get_node_text(func.node, source);
+
+            if classify_timer_function(func_name).is_some() {
+                if let Some(parent) = match_.captures.last().unwrap().node.parent() {
+                    if is_timer_assignment(parent) {
+                        if let Some(var_name) = extract_variable_name(parent, source) {
+                            timer_vars.insert((var_name.to_string(), func_name.to_string()));
+                        } else {
+                            issues.push(ResourceManagementIssue::TimerLeak {
+                                location: SourceLocation::from_node(
+                                    match_.captures.last().unwrap().node,
+                                ),
+                                timer_type: func_name.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (timer_vars, issues)
+}
+
+// Extract cleared variables from matches - processes clear function calls
+fn extract_cleared_variables<'a>(
+    cursor: &mut QueryCursor,
+    query: &Query,
+    root: Node<'a>,
+    source: &str,
+) -> HashSet<String> {
+    let mut cleared_vars = HashSet::new();
+    let mut matches = cursor.matches(query, root, source.as_bytes());
+
+    while let Some(match_) = matches.next() {
+        if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
+            let func_name = get_node_text(func.node, source);
+
+            if classify_clear_function(func_name).is_some() {
+                if let Some(call_node) = match_.captures.last() {
+                    if let Some(args) = call_node.node.child_by_field_name("arguments") {
+                        if let Some(first_arg) = args.child(1) {
+                            let arg_text = get_node_text(first_arg, source);
+                            cleared_vars.insert(arg_text.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    cleared_vars
+}
+
+// Generate timer leak issues for uncleared timers - pure transformation
+fn generate_timer_leak_issues(
+    timer_vars: HashSet<(String, String)>,
+    cleared_vars: &HashSet<String>,
+    root: Node,
+) -> Vec<ResourceManagementIssue> {
+    timer_vars
+        .into_iter()
+        .filter(|(var_name, _)| !cleared_vars.contains(var_name))
+        .map(|(_, timer_type)| ResourceManagementIssue::TimerLeak {
+            location: SourceLocation::from_node(root),
+            timer_type,
+        })
+        .collect()
+}
+
 fn detect_timer_leaks(
     root: Node,
     source: &str,
     language: &tree_sitter::Language,
     issues: &mut Vec<ResourceManagementIssue>,
 ) {
-    // Detect setInterval/setTimeout without clearInterval/clearTimeout
     let timer_query = r#"
     (call_expression
       function: (identifier) @func
@@ -216,75 +334,28 @@ fn detect_timer_leaks(
     ) @clear_call
     "#;
 
-    let mut timer_vars = HashSet::new();
-    let mut cleared_vars = HashSet::new();
-
-    if let Ok(query) = Query::new(language, timer_query) {
+    // Collect timer variables
+    let (timer_vars, mut immediate_issues) = if let Ok(query) = Query::new(language, timer_query) {
         let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
+        extract_timer_variables(&mut cursor, &query, root, source)
+    } else {
+        (HashSet::new(), Vec::new())
+    };
 
-        while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
-
-                if func_name == "setTimeout" || func_name == "setInterval" {
-                    // Check if the result is assigned to a variable
-                    if let Some(parent) = match_.captures.last().unwrap().node.parent() {
-                        if parent.kind() == "variable_declarator"
-                            || parent.kind() == "assignment_expression"
-                        {
-                            // Try to get variable name
-                            if let Some(var_name) = extract_variable_name(parent, source) {
-                                timer_vars.insert((var_name.to_string(), func_name.to_string()));
-                            } else {
-                                // Timer not stored, definite leak
-                                issues.push(ResourceManagementIssue::TimerLeak {
-                                    location: SourceLocation::from_node(
-                                        match_.captures.last().unwrap().node,
-                                    ),
-                                    timer_type: func_name.to_string(),
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Check for clear calls
-    if let Ok(query) = Query::new(language, clear_query) {
+    // Collect cleared variables
+    let cleared_vars = if let Ok(query) = Query::new(language, clear_query) {
         let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
+        extract_cleared_variables(&mut cursor, &query, root, source)
+    } else {
+        HashSet::new()
+    };
 
-        while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
+    // Generate issues for uncleared timers
+    let leak_issues = generate_timer_leak_issues(timer_vars, &cleared_vars, root);
 
-                if func_name == "clearTimeout" || func_name == "clearInterval" {
-                    // Try to get the argument (timer ID variable)
-                    if let Some(call_node) = match_.captures.last() {
-                        if let Some(args) = call_node.node.child_by_field_name("arguments") {
-                            if let Some(first_arg) = args.child(1) {
-                                let arg_text = get_node_text(first_arg, source);
-                                cleared_vars.insert(arg_text.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Report timers that weren't cleared
-    for (var_name, timer_type) in timer_vars {
-        if !cleared_vars.contains(&var_name) {
-            issues.push(ResourceManagementIssue::TimerLeak {
-                location: SourceLocation::from_node(root), // Simplified location
-                timer_type,
-            });
-        }
-    }
+    // Add all issues
+    issues.append(&mut immediate_issues);
+    issues.extend(leak_issues);
 }
 
 fn detect_websocket_leaks(
@@ -679,5 +750,72 @@ mod tests {
             "function add(a, b) { return a + b; }"
         ));
         assert!(!contains_external_references(""));
+    }
+
+    #[test]
+    fn test_classify_timer_function() {
+        // Test timer function classification
+        assert_eq!(
+            classify_timer_function("setTimeout"),
+            Some(TimerType::Timeout)
+        );
+        assert_eq!(
+            classify_timer_function("setInterval"),
+            Some(TimerType::Interval)
+        );
+        assert_eq!(classify_timer_function("setImmediate"), None);
+        assert_eq!(classify_timer_function("console.log"), None);
+        assert_eq!(classify_timer_function(""), None);
+    }
+
+    #[test]
+    fn test_classify_clear_function() {
+        // Test clear function classification
+        assert_eq!(
+            classify_clear_function("clearTimeout"),
+            Some(ClearType::Timeout)
+        );
+        assert_eq!(
+            classify_clear_function("clearInterval"),
+            Some(ClearType::Interval)
+        );
+        assert_eq!(classify_clear_function("clearImmediate"), None);
+        assert_eq!(classify_clear_function("console.clear"), None);
+        assert_eq!(classify_clear_function(""), None);
+    }
+
+    #[test]
+    fn test_generate_timer_leak_issues() {
+        // Create a simple mock node for testing
+        let source = "const x = 1;";
+        let language = tree_sitter_typescript::LANGUAGE_TYPESCRIPT;
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&language.into()).unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        let root = tree.root_node();
+
+        // Test with no cleared variables
+        let mut timer_vars = HashSet::new();
+        timer_vars.insert(("timer1".to_string(), "setTimeout".to_string()));
+        timer_vars.insert(("timer2".to_string(), "setInterval".to_string()));
+        let cleared_vars = HashSet::new();
+
+        let issues = generate_timer_leak_issues(timer_vars.clone(), &cleared_vars, root);
+        assert_eq!(issues.len(), 2);
+
+        // Test with some cleared variables
+        let mut cleared_vars = HashSet::new();
+        cleared_vars.insert("timer1".to_string());
+
+        let issues = generate_timer_leak_issues(timer_vars.clone(), &cleared_vars, root);
+        assert_eq!(issues.len(), 1);
+
+        // Test with all cleared variables
+        let mut cleared_vars = HashSet::new();
+        cleared_vars.insert("timer1".to_string());
+        cleared_vars.insert("timer2".to_string());
+
+        let issues = generate_timer_leak_issues(timer_vars, &cleared_vars, root);
+        assert_eq!(issues.len(), 0);
     }
 }
