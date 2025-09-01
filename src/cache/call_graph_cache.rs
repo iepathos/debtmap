@@ -250,35 +250,6 @@ impl CallGraphCache {
 
         Ok(())
     }
-
-    /// Clean up old cache entries
-    pub fn cleanup_old_entries(&self) -> Result<()> {
-        if !self.cache_dir.exists() {
-            return Ok(());
-        }
-
-        let now = SystemTime::now();
-
-        for entry in fs::read_dir(&self.cache_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.extension() == Some(std::ffi::OsStr::new("json")) {
-                if let Ok(metadata) = fs::metadata(&path) {
-                    if let Ok(modified) = metadata.modified() {
-                        if let Ok(age) = now.duration_since(modified) {
-                            if age.as_secs() > self.max_age {
-                                log::debug!("Removing old cache file: {:?}", path);
-                                fs::remove_file(path).ok();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 // Add dirs dependency helper module for cache directory
