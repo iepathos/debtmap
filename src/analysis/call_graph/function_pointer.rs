@@ -313,39 +313,45 @@ impl FunctionPointerVisitor {
     }
 
     fn analyze_function_pointer_assignment(&mut self, local: &Local) {
-        if let Some(current_func) = &self.current_function {
-            // Check if this is assigning a function to a variable
-            if let Pat::Ident(PatIdent { ident, .. }) = &local.pat {
-                let var_name = ident.to_string();
+        let Some(current_func) = &self.current_function else {
+            return;
+        };
+        let Pat::Ident(PatIdent { ident, .. }) = &local.pat else {
+            return;
+        };
+        let Some(init) = &local.init else { return };
 
-                if let Some(init) = &local.init {
-                    let line = self.get_line_number(ident.span());
+        let var_name = ident.to_string();
+        let line = self.get_line_number(ident.span());
+        let possible_targets = self.extract_possible_targets(&init.expr);
 
-                    // Check if the initializer is a function path
-                    let mut possible_targets = HashSet::new();
-                    if let Expr::Path(path) = &*init.expr {
-                        if let Some(func_name) = self.extract_function_name_from_path(path) {
-                            let target_func = FunctionId {
-                                file: self.file_path.clone(),
-                                name: func_name,
-                                line: 0, // Unknown line for external function
-                            };
-                            possible_targets.insert(target_func);
-                        }
-                    }
+        let pointer_info = FunctionPointerInfo {
+            variable_name: var_name,
+            defining_function: current_func.clone(),
+            possible_targets,
+            line,
+            is_parameter: false,
+        };
 
-                    let pointer_info = FunctionPointerInfo {
-                        variable_name: var_name,
-                        defining_function: current_func.clone(),
-                        possible_targets,
-                        line,
-                        is_parameter: false,
-                    };
+        self.function_pointers.push(pointer_info);
+    }
 
-                    self.function_pointers.push(pointer_info);
-                }
+    /// Extract possible function targets from an expression
+    fn extract_possible_targets(&self, expr: &Expr) -> HashSet<FunctionId> {
+        let mut possible_targets = HashSet::new();
+
+        if let Expr::Path(path) = expr {
+            if let Some(func_name) = self.extract_function_name_from_path(path) {
+                let target_func = FunctionId {
+                    file: self.file_path.clone(),
+                    name: func_name,
+                    line: 0, // Unknown line for external function
+                };
+                possible_targets.insert(target_func);
             }
         }
+
+        possible_targets
     }
 
     /// Extract direct function pointer call from expression
@@ -811,5 +817,188 @@ mod tests {
         // Should not record any calls without current function context
         assert!(visitor.pointer_calls.is_empty());
         assert!(visitor.hof_calls.is_empty());
+    }
+
+    #[test]
+    fn test_extract_possible_targets_with_path() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test extracting function target from path expression
+        let expr: Expr = parse_quote! { my_function };
+        let targets = visitor.extract_possible_targets(&expr);
+
+        assert_eq!(targets.len(), 1);
+        let target = targets.iter().next().unwrap();
+        assert_eq!(target.name, "my_function");
+        assert_eq!(target.file, std::path::PathBuf::from("test.rs"));
+    }
+
+    #[test]
+    fn test_extract_possible_targets_with_qualified_path() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test extracting function target from qualified path
+        let expr: Expr = parse_quote! { module::submodule::function };
+        let targets = visitor.extract_possible_targets(&expr);
+
+        assert_eq!(targets.len(), 1);
+        let target = targets.iter().next().unwrap();
+        assert_eq!(target.name, "module::submodule::function");
+    }
+
+    #[test]
+    fn test_extract_possible_targets_non_path() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test with non-path expression (should return empty set)
+        let expr: Expr = parse_quote! { 42 };
+        let targets = visitor.extract_possible_targets(&expr);
+
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn test_extract_possible_targets_closure() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+
+        // Test with closure expression (should return empty set)
+        let expr: Expr = parse_quote! { |x| x + 1 };
+        let targets = visitor.extract_possible_targets(&expr);
+
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_function_pointer_assignment_complete() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "outer_func".to_string(),
+            line: 1,
+        });
+
+        // Test complete function pointer assignment
+        // Creating a synthetic Local with function assignment
+        let pat = Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: parse_quote! { func_ptr },
+            subpat: None,
+        });
+
+        let init_expr: Expr = parse_quote! { my_function };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local);
+
+        assert_eq!(visitor.function_pointers.len(), 1);
+        let pointer = &visitor.function_pointers[0];
+        assert_eq!(pointer.variable_name, "func_ptr");
+        assert!(!pointer.is_parameter);
+        assert_eq!(pointer.possible_targets.len(), 1);
+    }
+
+    #[test]
+    fn test_analyze_function_pointer_assignment_no_init() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "outer_func".to_string(),
+            line: 1,
+        });
+
+        // Test local without initialization (should not add pointer)
+        let pat = Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: parse_quote! { func_ptr },
+            subpat: None,
+        });
+
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: None, // No initialization
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local);
+
+        assert!(visitor.function_pointers.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_function_pointer_assignment_non_ident_pattern() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "outer_func".to_string(),
+            line: 1,
+        });
+
+        // Test with tuple pattern (should not add pointer)
+        let pat: Pat = parse_quote! { (a, b) };
+        let init_expr: Expr = parse_quote! { get_tuple() };
+
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local);
+
+        assert!(visitor.function_pointers.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_function_pointer_assignment_no_current_function() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        // No current function set
+
+        let pat = Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: parse_quote! { func_ptr },
+            subpat: None,
+        });
+
+        let init_expr: Expr = parse_quote! { my_function };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local);
+
+        // Should not record without current function context
+        assert!(visitor.function_pointers.is_empty());
     }
 }
