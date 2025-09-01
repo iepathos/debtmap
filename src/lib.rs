@@ -29,6 +29,9 @@ pub mod testing;
 pub mod transformers;
 pub mod utils;
 
+#[cfg(test)]
+mod example_refactor;
+
 // Re-export commonly used types
 pub use crate::core::{
     AnalysisResults, CircularDependency, ComplexityMetrics, ComplexityReport, ComplexitySummary,
