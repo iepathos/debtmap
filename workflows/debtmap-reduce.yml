@@ -29,8 +29,8 @@ map:
           max_attempts: 2
           fail_workflow: false
       
-      # Run linting
-      - shell: "just fmt && just lint"
+      # Check formatting and linting
+      - shell: "just fmt-check && just lint"
         on_failure:
           claude: "/mmm-lint '${shell.output}'"
           max_attempts: 2
@@ -56,8 +56,8 @@ reduce:
         max_attempts: 3
         fail_workflow: true  # Fail if tests don't pass after merging
     
-    # Run formatting and linting
-    - shell: "just fmt && just lint"
+    # Check formatting and linting
+    - shell: "just fmt-check && just lint"
       on_failure:
         claude: "/lint ${shell.output}"
         max_attempts: 3
