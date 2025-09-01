@@ -63,7 +63,9 @@ impl CallGraphCache {
         if let Some(cache_dir) = dirs::cache_dir() {
             Ok(cache_dir.join("debtmap").join("call_graphs"))
         } else {
-            Ok(std::env::temp_dir().join("debtmap_cache").join("call_graphs"))
+            Ok(std::env::temp_dir()
+                .join("debtmap_cache")
+                .join("call_graphs"))
         }
     }
 
@@ -75,7 +77,7 @@ impl CallGraphCache {
     ) -> Result<CacheKey> {
         // Hash all source file contents
         let mut hasher = Sha256::new();
-        
+
         // Sort files for deterministic hashing
         let mut sorted_files = source_files.to_vec();
         sorted_files.sort();
@@ -106,7 +108,11 @@ impl CallGraphCache {
     pub fn get(
         &mut self,
         key: &CacheKey,
-    ) -> Option<(CallGraph, Vec<crate::priority::call_graph::FunctionId>, Vec<crate::priority::call_graph::FunctionId>)> {
+    ) -> Option<(
+        CallGraph,
+        Vec<crate::priority::call_graph::FunctionId>,
+        Vec<crate::priority::call_graph::FunctionId>,
+    )> {
         // Check memory cache first
         if let Some(entry) = self.memory_cache.get(key) {
             if self.is_valid_entry(entry) {
@@ -176,7 +182,7 @@ impl CallGraphCache {
             if !file.exists() {
                 return false;
             }
-            
+
             // Check modification time
             if let Ok(metadata) = fs::metadata(file) {
                 if let Ok(modified) = metadata.modified() {
@@ -193,30 +199,30 @@ impl CallGraphCache {
     /// Load cache entry from disk
     fn load_from_disk(&self, key: &CacheKey) -> Result<CacheEntry> {
         let cache_file = self.get_cache_file_path(key);
-        
+
         if !cache_file.exists() {
             anyhow::bail!("Cache file does not exist");
         }
 
         let content = fs::read_to_string(&cache_file)
             .with_context(|| format!("Failed to read cache file: {:?}", cache_file))?;
-        
-        let entry: CacheEntry = serde_json::from_str(&content)
-            .with_context(|| "Failed to deserialize cache entry")?;
-        
+
+        let entry: CacheEntry =
+            serde_json::from_str(&content).with_context(|| "Failed to deserialize cache entry")?;
+
         Ok(entry)
     }
 
     /// Save cache entry to disk
     fn save_to_disk(&self, key: &CacheKey, entry: &CacheEntry) -> Result<()> {
         let cache_file = self.get_cache_file_path(key);
-        
+
         let content = serde_json::to_string_pretty(entry)
             .with_context(|| "Failed to serialize cache entry")?;
-        
+
         fs::write(&cache_file, content)
             .with_context(|| format!("Failed to write cache file: {:?}", cache_file))?;
-        
+
         Ok(())
     }
 
@@ -252,11 +258,11 @@ impl CallGraphCache {
         }
 
         let now = SystemTime::now();
-        
+
         for entry in fs::read_dir(&self.cache_dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.extension() == Some(std::ffi::OsStr::new("json")) {
                 if let Ok(metadata) = fs::metadata(&path) {
                     if let Ok(modified) = metadata.modified() {
@@ -284,20 +290,19 @@ mod dirs {
         {
             home_dir().map(|h| h.join("Library").join("Caches"))
         }
-        
+
         #[cfg(target_os = "linux")]
         {
             std::env::var_os("XDG_CACHE_HOME")
                 .map(PathBuf::from)
                 .or_else(|| home_dir().map(|h| h.join(".cache")))
         }
-        
+
         #[cfg(target_os = "windows")]
         {
-            std::env::var_os("LOCALAPPDATA")
-                .map(PathBuf::from)
+            std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
         }
-        
+
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         {
             None

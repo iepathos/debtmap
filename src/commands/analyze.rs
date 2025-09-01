@@ -47,15 +47,17 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     )?;
 
     let unified_analysis = unified_analysis::perform_unified_analysis_with_options(
-        &results,
-        config.coverage_file.as_ref(),
-        config.semantic_off,
-        &config.path,
-        config.verbose_macro_warnings,
-        config.show_macro_stats,
-        config.parallel,
-        config.jobs,
-        config.use_cache,
+        unified_analysis::UnifiedAnalysisOptions {
+            results: &results,
+            coverage_file: config.coverage_file.as_ref(),
+            semantic_off: config.semantic_off,
+            project_path: &config.path,
+            verbose_macro_warnings: config.verbose_macro_warnings,
+            show_macro_stats: config.show_macro_stats,
+            parallel: config.parallel,
+            jobs: config.jobs,
+            use_cache: config.use_cache,
+        },
     )?;
 
     let output_config = output::OutputConfig {

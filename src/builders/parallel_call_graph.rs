@@ -1,22 +1,29 @@
 use crate::{
     analysis::call_graph::RustCallGraphBuilder,
     analyzers::rust_call_graph::extract_call_graph_multi_file,
-    config, core::Language, io,
+    config,
+    core::Language,
+    io,
     priority::{
-        call_graph::{CallGraph, CallType, FunctionId},
+        call_graph::{CallGraph, FunctionId},
         parallel_call_graph::{ParallelCallGraph, ParallelConfig},
     },
 };
 use anyhow::{Context, Result};
-use dashmap::DashMap;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Parallel call graph builder for Rust projects
 pub struct ParallelCallGraphBuilder {
     config: ParallelConfig,
+}
+
+impl Default for ParallelCallGraphBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ParallelCallGraphBuilder {
@@ -35,11 +42,7 @@ impl ParallelCallGraphBuilder {
         &self,
         project_path: &Path,
         base_graph: CallGraph,
-    ) -> Result<(
-        CallGraph,
-        HashSet<FunctionId>,
-        HashSet<FunctionId>,
-    )> {
+    ) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)> {
         // Configure Rayon thread pool if specified
         if self.config.num_threads > 0 {
             rayon::ThreadPoolBuilder::new()
@@ -50,12 +53,9 @@ impl ParallelCallGraphBuilder {
 
         // Find all Rust files
         let config = config::get_config();
-        let rust_files = io::walker::find_project_files_with_config(
-            project_path,
-            vec![Language::Rust],
-            config,
-        )
-        .context("Failed to find Rust files for call graph")?;
+        let rust_files =
+            io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)
+                .context("Failed to find Rust files for call graph")?;
 
         let total_files = rust_files.len();
         log::info!("Processing {} Rust files in parallel", total_files);
@@ -86,7 +86,9 @@ impl ParallelCallGraphBuilder {
             "Parallel call graph complete: {} nodes, {} edges, {} files processed",
             stats.total_nodes.load(std::sync::atomic::Ordering::Relaxed),
             stats.total_edges.load(std::sync::atomic::Ordering::Relaxed),
-            stats.files_processed.load(std::sync::atomic::Ordering::Relaxed),
+            stats
+                .files_processed
+                .load(std::sync::atomic::Ordering::Relaxed),
         );
 
         Ok((final_graph, framework_exclusions, function_pointer_used))
@@ -103,7 +105,7 @@ impl ParallelCallGraphBuilder {
             .par_iter()
             .filter_map(|file_path| {
                 let content = io::read_file(file_path).ok()?;
-                
+
                 // Update progress
                 parallel_graph.stats().increment_files();
                 if let Some(ref callback) = self.config.progress_callback {
@@ -117,7 +119,7 @@ impl ParallelCallGraphBuilder {
                         .load(std::sync::atomic::Ordering::Relaxed);
                     callback(processed, total);
                 }
-                
+
                 Some((file_path.clone(), content))
             })
             .collect();
@@ -133,27 +135,27 @@ impl ParallelCallGraphBuilder {
     ) -> Result<()> {
         // Group files into chunks for better parallelization
         let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
-        
+
         // Process chunks in parallel
-        parsed_files
-            .par_chunks(chunk_size)
-            .for_each(|chunk| {
-                // Parse syn files within each chunk
-                let parsed_chunk: Vec<_> = chunk
-                    .iter()
-                    .filter_map(|(path, content)| {
-                        syn::parse_file(content).ok().map(|parsed| (parsed, path.clone()))
-                    })
-                    .collect();
-                
-                if !parsed_chunk.is_empty() {
-                    // Extract call graph for this chunk
-                    let chunk_graph = extract_call_graph_multi_file(&parsed_chunk);
-                    
-                    // Merge into main graph
-                    parallel_graph.merge_concurrent(chunk_graph);
-                }
-            });
+        parsed_files.par_chunks(chunk_size).for_each(|chunk| {
+            // Parse syn files within each chunk
+            let parsed_chunk: Vec<_> = chunk
+                .iter()
+                .filter_map(|(path, content)| {
+                    syn::parse_file(content)
+                        .ok()
+                        .map(|parsed| (parsed, path.clone()))
+                })
+                .collect();
+
+            if !parsed_chunk.is_empty() {
+                // Extract call graph for this chunk
+                let chunk_graph = extract_call_graph_multi_file(&parsed_chunk);
+
+                // Merge into main graph
+                parallel_graph.merge_concurrent(chunk_graph);
+            }
+        });
 
         Ok(())
     }
@@ -168,7 +170,9 @@ impl ParallelCallGraphBuilder {
         let workspace_files: Vec<(PathBuf, syn::File)> = parsed_files
             .iter()
             .filter_map(|(path, content)| {
-                syn::parse_file(content).ok().map(|parsed| (path.clone(), parsed))
+                syn::parse_file(content)
+                    .ok()
+                    .map(|parsed| (path.clone(), parsed))
             })
             .collect();
 
@@ -191,13 +195,13 @@ impl ParallelCallGraphBuilder {
 
         // Extract results
         let enhanced_graph = enhanced_builder.build();
-        
+
         let framework_exclusions: HashSet<FunctionId> = enhanced_graph
             .framework_patterns
             .get_exclusions()
             .into_iter()
             .collect();
-        
+
         let function_pointer_used: HashSet<FunctionId> = enhanced_graph
             .function_pointer_tracker
             .get_definitely_used_functions()
@@ -217,17 +221,13 @@ pub fn build_call_graph_parallel(
     base_graph: CallGraph,
     num_threads: Option<usize>,
     show_progress: bool,
-) -> Result<(
-    CallGraph,
-    HashSet<FunctionId>,
-    HashSet<FunctionId>,
-)> {
+) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)> {
     let mut config = ParallelConfig::default();
-    
+
     if let Some(threads) = num_threads {
         config = config.with_threads(threads);
     }
-    
+
     if show_progress {
         config = config.with_progress(|processed, total| {
             if processed % 10 == 0 || processed == total {
@@ -235,7 +235,7 @@ pub fn build_call_graph_parallel(
             }
         });
     }
-    
+
     let builder = ParallelCallGraphBuilder::with_config(config);
     builder.build_parallel(project_path, base_graph)
 }

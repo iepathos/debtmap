@@ -179,12 +179,14 @@ impl CallGraph {
 
     /// Get function info
     pub fn get_function_info(&self, func_id: &FunctionId) -> Option<(bool, bool, u32, usize)> {
-        self.nodes.get(func_id).map(|node| (
-            node.is_entry_point,
-            node.is_test,
-            node.complexity,
-            node._lines,
-        ))
+        self.nodes.get(func_id).map(|node| {
+            (
+                node.is_entry_point,
+                node.is_test,
+                node.complexity,
+                node._lines,
+            )
+        })
     }
 
     /// Mark a function as being reachable through trait dispatch

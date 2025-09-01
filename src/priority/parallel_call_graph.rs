@@ -102,19 +102,16 @@ impl ParallelCallGraph {
             callee: callee.clone(),
             call_type,
         };
-        
+
         if self.edges.insert(call) {
             // Update indices
             self.caller_index
                 .entry(caller.clone())
-                .or_insert_with(DashSet::new)
+                .or_default()
                 .insert(callee.clone());
-            
-            self.callee_index
-                .entry(callee)
-                .or_insert_with(DashSet::new)
-                .insert(caller);
-            
+
+            self.callee_index.entry(callee).or_default().insert(caller);
+
             self.stats.add_edges(1);
         }
     }
@@ -132,14 +129,18 @@ impl ParallelCallGraph {
         // Parallelize edge merging
         let calls_vec: Vec<_> = other.get_all_calls();
         calls_vec.par_iter().for_each(|call| {
-            self.add_call(call.caller.clone(), call.callee.clone(), call.call_type.clone());
+            self.add_call(
+                call.caller.clone(),
+                call.callee.clone(),
+                call.call_type.clone(),
+            );
         });
     }
 
     /// Convert to regular CallGraph for compatibility
     pub fn to_call_graph(&self) -> CallGraph {
         let mut call_graph = CallGraph::new();
-        
+
         // Add all nodes
         for entry in self.nodes.iter() {
             let node = entry.value();
@@ -151,12 +152,12 @@ impl ParallelCallGraph {
                 node.lines,
             );
         }
-        
+
         // Add all edges
         for call in self.edges.iter() {
             call_graph.add_call(call.clone());
         }
-        
+
         call_graph
     }
 
@@ -170,6 +171,7 @@ impl ParallelCallGraph {
 pub type ProgressCallback = Box<dyn Fn(usize, usize) + Send + Sync>;
 
 /// Configuration for parallel call graph construction
+#[derive(Default)]
 pub struct ParallelConfig {
     /// Number of worker threads (0 = use all cores)
     pub num_threads: usize,
@@ -177,16 +179,6 @@ pub struct ParallelConfig {
     pub deterministic: bool,
     /// Progress callback
     pub progress_callback: Option<ProgressCallback>,
-}
-
-impl Default for ParallelConfig {
-    fn default() -> Self {
-        Self {
-            num_threads: 0, // Use all cores by default
-            deterministic: false,
-            progress_callback: None,
-        }
-    }
 }
 
 impl ParallelConfig {

@@ -16,6 +16,19 @@ use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+/// Options for unified analysis
+pub struct UnifiedAnalysisOptions<'a> {
+    pub results: &'a AnalysisResults,
+    pub coverage_file: Option<&'a PathBuf>,
+    pub semantic_off: bool,
+    pub project_path: &'a Path,
+    pub verbose_macro_warnings: bool,
+    pub show_macro_stats: bool,
+    pub parallel: bool,
+    pub jobs: usize,
+    pub use_cache: bool,
+}
+
 pub fn perform_unified_analysis(
     results: &AnalysisResults,
     coverage_file: Option<&PathBuf>,
@@ -24,77 +37,83 @@ pub fn perform_unified_analysis(
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
 ) -> Result<UnifiedAnalysis> {
-    perform_unified_analysis_with_options(
+    perform_unified_analysis_with_options(UnifiedAnalysisOptions {
         results,
         coverage_file,
-        _semantic_off,
+        semantic_off: _semantic_off,
         project_path,
         verbose_macro_warnings,
         show_macro_stats,
-        false, // parallel
-        0,     // jobs
-        false, // use_cache
-    )
+        parallel: false,
+        jobs: 0,
+        use_cache: false,
+    })
 }
 
 pub fn perform_unified_analysis_with_options(
-    results: &AnalysisResults,
-    coverage_file: Option<&PathBuf>,
-    _semantic_off: bool,
-    project_path: &Path,
-    verbose_macro_warnings: bool,
-    show_macro_stats: bool,
-    parallel: bool,
-    jobs: usize,
-    use_cache: bool,
+    options: UnifiedAnalysisOptions,
 ) -> Result<UnifiedAnalysis> {
+    let UnifiedAnalysisOptions {
+        results,
+        coverage_file,
+        semantic_off: _semantic_off,
+        project_path,
+        verbose_macro_warnings,
+        show_macro_stats,
+        parallel,
+        jobs,
+        use_cache,
+    } = options;
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
-    
+
     let (framework_exclusions, function_pointer_used_functions) = if parallel {
         // Use parallel call graph construction
-        let thread_msg = if jobs == 0 { 
-            "all available".to_string() 
-        } else { 
-            jobs.to_string() 
+        let thread_msg = if jobs == 0 {
+            "all available".to_string()
+        } else {
+            jobs.to_string()
         };
-        log::info!("Using parallel call graph construction with {} threads", thread_msg);
-        
-        let (mut parallel_graph, exclusions, used_funcs) = 
+        log::info!(
+            "Using parallel call graph construction with {} threads",
+            thread_msg
+        );
+
+        let (mut parallel_graph, exclusions, used_funcs) =
             parallel_call_graph::build_call_graph_parallel(
                 project_path,
                 call_graph.clone(),
                 if jobs == 0 { None } else { Some(jobs) },
                 true, // show_progress
             )?;
-        
+
         // Process Python files (still sequential for now)
         call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph)?;
-        
+
         call_graph = parallel_graph;
         (exclusions, used_funcs)
     } else if use_cache {
         // Try to use cached call graph
         let config = config::get_config();
-        let rust_files = io::walker::find_project_files_with_config(
-            project_path,
-            vec![Language::Rust],
-            config,
-        )?;
-        
+        let rust_files =
+            io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)?;
+
         let mut cache = CallGraphCache::new()?;
         let cache_key = CallGraphCache::generate_key(project_path, &rust_files, config)?;
-        
+
         if let Some((cached_graph, exclusions, used_funcs)) = cache.get(&cache_key) {
             log::info!("Using cached call graph");
             call_graph = cached_graph;
-            
+
             // Process Python files (still need to be done)
             call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)?;
-            
-            (exclusions.into_iter().collect(), used_funcs.into_iter().collect())
+
+            (
+                exclusions.into_iter().collect(),
+                used_funcs.into_iter().collect(),
+            )
         } else {
             log::info!("No valid cache found, building call graph from scratch");
-            
+
             // Build normally and cache the result
             let (exclusions, used_funcs) = call_graph::process_rust_files_for_call_graph(
                 project_path,
@@ -102,7 +121,7 @@ pub fn perform_unified_analysis_with_options(
                 verbose_macro_warnings,
                 show_macro_stats,
             )?;
-            
+
             // Cache the result
             cache.put(
                 cache_key,
@@ -111,9 +130,9 @@ pub fn perform_unified_analysis_with_options(
                 used_funcs.iter().cloned().collect(),
                 rust_files,
             )?;
-            
+
             call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)?;
-            
+
             (exclusions, used_funcs)
         }
     } else {
@@ -124,9 +143,9 @@ pub fn perform_unified_analysis_with_options(
             verbose_macro_warnings,
             show_macro_stats,
         )?;
-        
+
         call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)?;
-        
+
         (exclusions, used_funcs)
     };
 
