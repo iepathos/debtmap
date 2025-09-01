@@ -163,7 +163,10 @@ pub fn build_module_dependency_map(
 /// Build forward and reverse dependency maps from file dependencies
 fn build_dependency_maps(
     file_dependencies: &[(PathBuf, Vec<Dependency>)],
-) -> (HashMap<String, HashSet<String>>, HashMap<String, HashSet<String>>) {
+) -> (
+    HashMap<String, HashSet<String>>,
+    HashMap<String, HashSet<String>>,
+) {
     let mut module_map: HashMap<String, HashSet<String>> = HashMap::new();
     let mut reverse_map: HashMap<String, HashSet<String>> = HashMap::new();
 

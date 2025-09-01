@@ -99,7 +99,7 @@ impl GodObjectDetector {
 
     fn suggest_responsibility_split(&self, analysis: &TypeAnalysis) -> Vec<ResponsibilityGroup> {
         let method_groups = self.group_methods_by_prefix(&analysis.methods);
-        
+
         let groups: Vec<ResponsibilityGroup> = method_groups
             .into_iter()
             .map(|(prefix, methods)| self.create_responsibility_group(prefix, methods))
@@ -114,7 +114,11 @@ impl GodObjectDetector {
     }
 
     /// Create a responsibility group from prefix and methods
-    fn create_responsibility_group(&self, prefix: String, methods: Vec<String>) -> ResponsibilityGroup {
+    fn create_responsibility_group(
+        &self,
+        prefix: String,
+        methods: Vec<String>,
+    ) -> ResponsibilityGroup {
         let responsibility = self.infer_responsibility_name(&prefix);
         ResponsibilityGroup {
             name: format!("{}Manager", responsibility.replace(' ', "")),
@@ -873,9 +877,9 @@ mod tests {
     fn test_create_responsibility_group() {
         let detector = GodObjectDetector::new();
         let methods = vec!["get_value".to_string(), "get_name".to_string()];
-        
+
         let group = detector.create_responsibility_group("get".to_string(), methods.clone());
-        
+
         assert_eq!(group.name, "DataAccessManager");
         assert_eq!(group.responsibility, "Data Access");
         assert_eq!(group.methods, methods);
@@ -886,9 +890,9 @@ mod tests {
     fn test_create_responsibility_group_with_spaces() {
         let detector = GodObjectDetector::new();
         let methods = vec!["validate_input".to_string()];
-        
+
         let group = detector.create_responsibility_group("validate".to_string(), methods.clone());
-        
+
         assert_eq!(group.name, "ValidationManager");
         assert_eq!(group.responsibility, "Validation");
         assert_eq!(group.methods, methods);
@@ -907,9 +911,9 @@ mod tests {
             trait_implementations: 0,
             location: SourceLocation::default(),
         };
-        
+
         let group = detector.create_default_responsibility_group(&analysis);
-        
+
         assert_eq!(group.name, "TestClassCore");
         assert_eq!(group.responsibility, "Core functionality");
         assert_eq!(group.methods, analysis.methods);
@@ -936,11 +940,11 @@ mod tests {
             trait_implementations: 0,
             location: SourceLocation::default(),
         };
-        
+
         let groups = detector.suggest_responsibility_split(&analysis);
-        
+
         assert_eq!(groups.len(), 4); // get, set, validate, save
-        
+
         // Verify that groups are properly created
         let group_names: Vec<String> = groups.iter().map(|g| g.name.clone()).collect();
         assert!(group_names.contains(&"DataAccessManager".to_string()));
@@ -961,9 +965,9 @@ mod tests {
             trait_implementations: 0,
             location: SourceLocation::default(),
         };
-        
+
         let groups = detector.suggest_responsibility_split(&analysis);
-        
+
         // Should return the grouped method even if below threshold
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].name, "CustomOperationsManager");
@@ -982,9 +986,9 @@ mod tests {
             trait_implementations: 0,
             location: SourceLocation::default(),
         };
-        
+
         let groups = detector.suggest_responsibility_split(&analysis);
-        
+
         // Should still group by prefix even above threshold
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].name, "CustomOperationsManager");
@@ -995,7 +999,7 @@ mod tests {
         let detector = GodObjectDetector::new();
         let analysis = TypeAnalysis {
             name: "EmptyClass".to_string(),
-            method_count: 20, // Above max_methods (15) 
+            method_count: 20, // Above max_methods (15)
             field_count: 5,
             methods: Vec::new(), // No methods to group
             fields: vec!["field1".to_string()],
@@ -1003,9 +1007,9 @@ mod tests {
             trait_implementations: 0,
             location: SourceLocation::default(),
         };
-        
+
         let groups = detector.suggest_responsibility_split(&analysis);
-        
+
         // Should create default group when no methods but above threshold
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].name, "EmptyClassCore");
