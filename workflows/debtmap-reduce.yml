@@ -32,7 +32,7 @@ map:
       # Check formatting and linting
       - shell: "just fmt-check && just lint"
         on_failure:
-          claude: "/mmm-lint '${shell.output}'"
+          claude: "/lint '${shell.output}'"
           max_attempts: 2
           fail_workflow: false
   
