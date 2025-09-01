@@ -37,7 +37,7 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 
 ## Features
 
-- **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript
+- **Multi-language support** - Fully supports Rust. Partial support for Python, JavaScript, and TypeScript with planned full support.
 - **Entropy-based complexity analysis** - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory
 - **Token classification system** - Advanced token categorization with weighted entropy for more accurate complexity assessment
 - **Comprehensive debt detection** - Identifies technical debt across security, organization, testing, and resource management
