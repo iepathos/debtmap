@@ -313,27 +313,36 @@ impl FunctionPointerVisitor {
     }
 
     fn analyze_function_pointer_assignment(&mut self, local: &Local) {
-        let Some(current_func) = &self.current_function else {
-            return;
-        };
-        let Pat::Ident(PatIdent { ident, .. }) = &local.pat else {
-            return;
-        };
-        let Some(init) = &local.init else { return };
+        if let Some(pointer_info) = self.extract_pointer_info(local) {
+            self.function_pointers.push(pointer_info);
+        }
+    }
 
+    /// Extract function pointer information from a local statement
+    fn extract_pointer_info(&self, local: &Local) -> Option<FunctionPointerInfo> {
+        let current_func = self.current_function.as_ref()?;
+        let ident = Self::extract_identifier(&local.pat)?;
+        let init = local.init.as_ref()?;
+        
         let var_name = ident.to_string();
         let line = self.get_line_number(ident.span());
         let possible_targets = self.extract_possible_targets(&init.expr);
 
-        let pointer_info = FunctionPointerInfo {
+        Some(FunctionPointerInfo {
             variable_name: var_name,
             defining_function: current_func.clone(),
             possible_targets,
             line,
             is_parameter: false,
-        };
+        })
+    }
 
-        self.function_pointers.push(pointer_info);
+    /// Extract identifier from a pattern
+    fn extract_identifier(pat: &Pat) -> Option<&syn::Ident> {
+        match pat {
+            Pat::Ident(PatIdent { ident, .. }) => Some(ident),
+            _ => None,
+        }
     }
 
     /// Extract possible function targets from an expression
@@ -907,6 +916,163 @@ mod tests {
         assert_eq!(pointer.variable_name, "func_ptr");
         assert!(!pointer.is_parameter);
         assert_eq!(pointer.possible_targets.len(), 1);
+    }
+
+    #[test]
+    fn test_extract_identifier_with_ident_pattern() {
+        // Test extracting identifier from Pat::Ident
+        let pat = Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: parse_quote! { my_var },
+            subpat: None,
+        });
+        
+        let result = FunctionPointerVisitor::extract_identifier(&pat);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().to_string(), "my_var");
+    }
+
+    #[test]
+    fn test_extract_identifier_with_non_ident_pattern() {
+        // Test extracting identifier from non-ident pattern (should return None)
+        let pat: Pat = parse_quote! { _ };
+        let result = FunctionPointerVisitor::extract_identifier(&pat);
+        assert!(result.is_none());
+
+        // Test with tuple pattern
+        let pat: Pat = parse_quote! { (x, y) };
+        let result = FunctionPointerVisitor::extract_identifier(&pat);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_pointer_info_without_current_function() {
+        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        // No current function set
+        
+        let pat = Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: parse_quote! { func_ptr },
+            subpat: None,
+        });
+        
+        let init_expr: Expr = parse_quote! { my_function };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+        
+        let result = visitor.extract_pointer_info(&local);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_pointer_info_without_init() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "outer_func".to_string(),
+            line: 1,
+        });
+        
+        let pat = Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: parse_quote! { func_ptr },
+            subpat: None,
+        });
+        
+        // Local without init expression
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: None,
+            semi_token: Default::default(),
+        };
+        
+        let result = visitor.extract_pointer_info(&local);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_pointer_info_with_non_ident_pattern() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "outer_func".to_string(),
+            line: 1,
+        });
+        
+        // Use wildcard pattern instead of identifier
+        let pat: Pat = parse_quote! { _ };
+        let init_expr: Expr = parse_quote! { my_function };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+        
+        let result = visitor.extract_pointer_info(&local);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_pointer_info_complete_flow() {
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "outer_func".to_string(),
+            line: 1,
+        });
+        
+        let pat = Pat::Ident(PatIdent {
+            attrs: vec![],
+            by_ref: None,
+            mutability: None,
+            ident: parse_quote! { func_ptr },
+            subpat: None,
+        });
+        
+        let init_expr: Expr = parse_quote! { my_function };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+        
+        let result = visitor.extract_pointer_info(&local);
+        assert!(result.is_some());
+        
+        let pointer_info = result.unwrap();
+        assert_eq!(pointer_info.variable_name, "func_ptr");
+        assert_eq!(pointer_info.defining_function.name, "outer_func");
+        assert!(!pointer_info.is_parameter);
+        assert_eq!(pointer_info.possible_targets.len(), 1);
     }
 
     #[test]
