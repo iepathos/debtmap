@@ -14,6 +14,7 @@ pub mod core;
 pub mod data_flow;
 pub mod database;
 pub mod debt;
+pub mod example_debt;
 pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;
