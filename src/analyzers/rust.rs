@@ -862,37 +862,60 @@ fn extract_debt_items_with_enhanced(
     functions
         .iter()
         .filter(|func| func.is_complex(threshold))
-        .map(|func| {
-            // Find corresponding enhanced analysis if available
-            let enhanced = enhanced_analysis
-                .iter()
-                .find(|e| e.function_name == func.name);
-
-            if let Some(analysis) = enhanced {
-                if let Some(ref enhanced_msg) = analysis.enhanced_message {
-                    // Create debt item with enhanced message
-                    DebtItem {
-                        id: format!("complexity-{}-{}", func.file.display(), func.line),
-                        debt_type: DebtType::Complexity,
-                        priority: if func.cyclomatic > threshold * 2 {
-                            Priority::High
-                        } else {
-                            Priority::Medium
-                        },
-                        file: func.file.clone(),
-                        line: func.line,
-                        column: None,
-                        message: enhanced_msg.summary.clone(),
-                        context: Some(format_enhanced_context(enhanced_msg)),
-                    }
-                } else {
-                    create_complexity_debt_item(func, threshold)
-                }
-            } else {
-                create_complexity_debt_item(func, threshold)
-            }
-        })
+        .map(|func| create_debt_item_for_function(func, threshold, enhanced_analysis))
         .collect()
+}
+
+// Pure function to create debt item for a single function
+fn create_debt_item_for_function(
+    func: &FunctionMetrics,
+    threshold: u32,
+    enhanced_analysis: &[EnhancedFunctionAnalysis],
+) -> DebtItem {
+    // Find corresponding enhanced analysis if available
+    let enhanced = find_enhanced_analysis_for_function(&func.name, enhanced_analysis);
+
+    match enhanced.and_then(|a| a.enhanced_message.as_ref()) {
+        Some(enhanced_msg) => create_enhanced_debt_item(func, threshold, enhanced_msg),
+        None => create_complexity_debt_item(func, threshold),
+    }
+}
+
+// Pure function to find enhanced analysis for a function
+fn find_enhanced_analysis_for_function<'a>(
+    function_name: &str,
+    enhanced_analysis: &'a [EnhancedFunctionAnalysis],
+) -> Option<&'a EnhancedFunctionAnalysis> {
+    enhanced_analysis
+        .iter()
+        .find(|e| e.function_name == function_name)
+}
+
+// Pure function to create enhanced debt item
+fn create_enhanced_debt_item(
+    func: &FunctionMetrics,
+    threshold: u32,
+    enhanced_msg: &EnhancedComplexityMessage,
+) -> DebtItem {
+    DebtItem {
+        id: format!("complexity-{}-{}", func.file.display(), func.line),
+        debt_type: DebtType::Complexity,
+        priority: classify_priority(func.cyclomatic, threshold),
+        file: func.file.clone(),
+        line: func.line,
+        column: None,
+        message: enhanced_msg.summary.clone(),
+        context: Some(format_enhanced_context(enhanced_msg)),
+    }
+}
+
+// Pure function to classify priority based on complexity
+fn classify_priority(cyclomatic: u32, threshold: u32) -> Priority {
+    if cyclomatic > threshold * 2 {
+        Priority::High
+    } else {
+        Priority::Medium
+    }
 }
 
 fn format_enhanced_context(msg: &EnhancedComplexityMessage) -> String {
@@ -935,11 +958,7 @@ fn create_complexity_debt_item(func: &FunctionMetrics, threshold: u32) -> DebtIt
     DebtItem {
         id: format!("complexity-{}-{}", func.file.display(), func.line),
         debt_type: DebtType::Complexity,
-        priority: if func.cyclomatic > threshold * 2 {
-            Priority::High
-        } else {
-            Priority::Medium
-        },
+        priority: classify_priority(func.cyclomatic, threshold),
         file: func.file.clone(),
         line: func.line,
         column: None,
