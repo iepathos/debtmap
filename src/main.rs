@@ -36,6 +36,8 @@ fn main() -> Result<()> {
             parallel,
             jobs,
             use_cache,
+            no_cache,
+            clear_cache,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
 
@@ -79,6 +81,8 @@ fn main() -> Result<()> {
                 parallel,
                 jobs,
                 use_cache,
+                no_cache,
+                clear_cache,
             };
             debtmap::commands::analyze::handle_analyze(config)
         }

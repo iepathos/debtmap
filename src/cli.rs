@@ -129,6 +129,14 @@ pub enum Commands {
         /// Enable call graph caching to speed up repeated analyses
         #[arg(long = "cache")]
         use_cache: bool,
+
+        /// Disable caching for this run
+        #[arg(long = "no-cache")]
+        no_cache: bool,
+
+        /// Clear cache before running analysis
+        #[arg(long = "clear-cache")]
+        clear_cache: bool,
     },
 
     /// Initialize configuration file
