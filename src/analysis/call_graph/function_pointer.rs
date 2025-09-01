@@ -8,7 +8,7 @@ use anyhow::Result;
 use im::{HashMap, HashSet, Vector};
 use std::path::Path;
 use syn::visit::Visit;
-use syn::{Expr, ExprCall, ExprClosure, ExprPath, File, ItemFn, Local, Pat, PatIdent, Type};
+use syn::{Expr, ExprCall, ExprClosure, ExprPath, File, Ident, ItemFn, Local, Pat, PatIdent, Type};
 
 /// Information about a closure
 #[derive(Debug, Clone)]
@@ -312,38 +312,40 @@ impl FunctionPointerVisitor {
         }
     }
 
-    fn analyze_function_pointer_assignment(&mut self, local: &Local) {
-        if let Some(pointer_info) = self.extract_pointer_info(local) {
-            self.function_pointers.push(pointer_info);
+    /// Extract variable name and init expression from a local statement
+    fn extract_pointer_assignment_data(local: &Local) -> Option<(&Ident, &Expr)> {
+        match &local.pat {
+            Pat::Ident(PatIdent { ident, .. }) => {
+                local.init.as_ref().map(|init| (ident, &*init.expr))
+            }
+            _ => None,
         }
     }
 
-    /// Extract function pointer information from a local statement
-    fn extract_pointer_info(&self, local: &Local) -> Option<FunctionPointerInfo> {
-        let current_func = self.current_function.as_ref()?;
-        let ident = Self::extract_identifier(&local.pat)?;
-        let init = local.init.as_ref()?;
-        
+    fn analyze_function_pointer_assignment(&mut self, local: &Local) {
+        let Some(current_func) = &self.current_function else {
+            return;
+        };
+
+        let Some((ident, init_expr)) = Self::extract_pointer_assignment_data(local) else {
+            return;
+        };
+
         let var_name = ident.to_string();
         let line = self.get_line_number(ident.span());
-        let possible_targets = self.extract_possible_targets(&init.expr);
+        let possible_targets = self.extract_possible_targets(init_expr);
 
-        Some(FunctionPointerInfo {
+        let pointer_info = FunctionPointerInfo {
             variable_name: var_name,
             defining_function: current_func.clone(),
             possible_targets,
             line,
             is_parameter: false,
-        })
+        };
+
+        self.function_pointers.push(pointer_info);
     }
 
-    /// Extract identifier from a pattern
-    fn extract_identifier(pat: &Pat) -> Option<&syn::Ident> {
-        match pat {
-            Pat::Ident(PatIdent { ident, .. }) => Some(ident),
-            _ => None,
-        }
-    }
 
     /// Extract possible function targets from an expression
     fn extract_possible_targets(&self, expr: &Expr) -> HashSet<FunctionId> {
@@ -918,162 +920,6 @@ mod tests {
         assert_eq!(pointer.possible_targets.len(), 1);
     }
 
-    #[test]
-    fn test_extract_identifier_with_ident_pattern() {
-        // Test extracting identifier from Pat::Ident
-        let pat = Pat::Ident(PatIdent {
-            attrs: vec![],
-            by_ref: None,
-            mutability: None,
-            ident: parse_quote! { my_var },
-            subpat: None,
-        });
-        
-        let result = FunctionPointerVisitor::extract_identifier(&pat);
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().to_string(), "my_var");
-    }
-
-    #[test]
-    fn test_extract_identifier_with_non_ident_pattern() {
-        // Test extracting identifier from non-ident pattern (should return None)
-        let pat: Pat = parse_quote! { _ };
-        let result = FunctionPointerVisitor::extract_identifier(&pat);
-        assert!(result.is_none());
-
-        // Test with tuple pattern
-        let pat: Pat = parse_quote! { (x, y) };
-        let result = FunctionPointerVisitor::extract_identifier(&pat);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_extract_pointer_info_without_current_function() {
-        let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        // No current function set
-        
-        let pat = Pat::Ident(PatIdent {
-            attrs: vec![],
-            by_ref: None,
-            mutability: None,
-            ident: parse_quote! { func_ptr },
-            subpat: None,
-        });
-        
-        let init_expr: Expr = parse_quote! { my_function };
-        let local = Local {
-            attrs: vec![],
-            let_token: Default::default(),
-            pat,
-            init: Some(syn::LocalInit {
-                eq_token: Default::default(),
-                expr: Box::new(init_expr),
-                diverge: None,
-            }),
-            semi_token: Default::default(),
-        };
-        
-        let result = visitor.extract_pointer_info(&local);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_extract_pointer_info_without_init() {
-        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "outer_func".to_string(),
-            line: 1,
-        });
-        
-        let pat = Pat::Ident(PatIdent {
-            attrs: vec![],
-            by_ref: None,
-            mutability: None,
-            ident: parse_quote! { func_ptr },
-            subpat: None,
-        });
-        
-        // Local without init expression
-        let local = Local {
-            attrs: vec![],
-            let_token: Default::default(),
-            pat,
-            init: None,
-            semi_token: Default::default(),
-        };
-        
-        let result = visitor.extract_pointer_info(&local);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_extract_pointer_info_with_non_ident_pattern() {
-        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "outer_func".to_string(),
-            line: 1,
-        });
-        
-        // Use wildcard pattern instead of identifier
-        let pat: Pat = parse_quote! { _ };
-        let init_expr: Expr = parse_quote! { my_function };
-        let local = Local {
-            attrs: vec![],
-            let_token: Default::default(),
-            pat,
-            init: Some(syn::LocalInit {
-                eq_token: Default::default(),
-                expr: Box::new(init_expr),
-                diverge: None,
-            }),
-            semi_token: Default::default(),
-        };
-        
-        let result = visitor.extract_pointer_info(&local);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_extract_pointer_info_complete_flow() {
-        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "outer_func".to_string(),
-            line: 1,
-        });
-        
-        let pat = Pat::Ident(PatIdent {
-            attrs: vec![],
-            by_ref: None,
-            mutability: None,
-            ident: parse_quote! { func_ptr },
-            subpat: None,
-        });
-        
-        let init_expr: Expr = parse_quote! { my_function };
-        let local = Local {
-            attrs: vec![],
-            let_token: Default::default(),
-            pat,
-            init: Some(syn::LocalInit {
-                eq_token: Default::default(),
-                expr: Box::new(init_expr),
-                diverge: None,
-            }),
-            semi_token: Default::default(),
-        };
-        
-        let result = visitor.extract_pointer_info(&local);
-        assert!(result.is_some());
-        
-        let pointer_info = result.unwrap();
-        assert_eq!(pointer_info.variable_name, "func_ptr");
-        assert_eq!(pointer_info.defining_function.name, "outer_func");
-        assert!(!pointer_info.is_parameter);
-        assert_eq!(pointer_info.possible_targets.len(), 1);
-    }
 
     #[test]
     fn test_analyze_function_pointer_assignment_no_init() {
@@ -1166,5 +1012,205 @@ mod tests {
 
         // Should not record without current function context
         assert!(visitor.function_pointers.is_empty());
+    }
+
+    #[test]
+    fn test_extract_pointer_assignment_data_with_ident() {
+        // Test extracting from a valid identifier pattern with init
+        let pat: Pat = parse_quote! { func_ptr };
+        let init_expr: Expr = parse_quote! { my_function };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        let result = FunctionPointerVisitor::extract_pointer_assignment_data(&local);
+        assert!(result.is_some());
+        let (ident, _expr) = result.unwrap();
+        assert_eq!(ident.to_string(), "func_ptr");
+    }
+
+    #[test]
+    fn test_extract_pointer_assignment_data_without_init() {
+        // Test with identifier pattern but no initialization
+        let pat: Pat = parse_quote! { func_ptr };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: None,
+            semi_token: Default::default(),
+        };
+
+        let result = FunctionPointerVisitor::extract_pointer_assignment_data(&local);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_pointer_assignment_data_with_non_ident_pattern() {
+        // Test with a tuple pattern instead of identifier
+        let pat: Pat = parse_quote! { (a, b) };
+        let init_expr: Expr = parse_quote! { (func1, func2) };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        let result = FunctionPointerVisitor::extract_pointer_assignment_data(&local);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_pointer_assignment_data_with_mut_ident() {
+        // Test with mutable identifier pattern
+        let pat: Pat = parse_quote! { mut func_ptr };
+        let init_expr: Expr = parse_quote! { my_function };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        let result = FunctionPointerVisitor::extract_pointer_assignment_data(&local);
+        assert!(result.is_some());
+        let (ident, _expr) = result.unwrap();
+        assert_eq!(ident.to_string(), "func_ptr");
+    }
+
+    #[test]
+    fn test_analyze_function_pointer_assignment_complete_flow() {
+        // Test the complete flow with all components working together
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "parent_func".to_string(),
+            line: 10,
+        });
+
+        let pat: Pat = parse_quote! { callback };
+        let init_expr: Expr = parse_quote! { process_item };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local);
+
+        assert_eq!(visitor.function_pointers.len(), 1);
+        let pointer_info = &visitor.function_pointers[0];
+        assert_eq!(pointer_info.variable_name, "callback");
+        assert_eq!(pointer_info.defining_function.name, "parent_func");
+        assert!(!pointer_info.is_parameter);
+        assert_eq!(pointer_info.possible_targets.len(), 1);
+    }
+
+    #[test]
+    fn test_analyze_function_pointer_assignment_with_complex_init() {
+        // Test with a more complex initialization expression
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "setup_handlers".to_string(),
+            line: 5,
+        });
+
+        let pat: Pat = parse_quote! { handler };
+        // Using a closure expression
+        let init_expr: Expr = parse_quote! { |x| x + 1 };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local);
+
+        // Should still record the assignment even with non-path expression
+        assert_eq!(visitor.function_pointers.len(), 1);
+        let pointer_info = &visitor.function_pointers[0];
+        assert_eq!(pointer_info.variable_name, "handler");
+        // Possible targets will be empty for non-path expressions
+        assert!(pointer_info.possible_targets.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_function_pointer_assignment_edge_cases() {
+        // Test various edge cases
+        let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
+        visitor.current_function = Some(FunctionId {
+            file: std::path::PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 1,
+        });
+
+        // Edge case 1: Pattern with type annotation
+        let pat: Pat = parse_quote! { func_ptr };
+        let init_expr: Expr = parse_quote! { some_func };
+        let local = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local);
+        assert_eq!(visitor.function_pointers.len(), 1);
+
+        // Edge case 2: Destructuring pattern (should be ignored)
+        let pat2: Pat = parse_quote! { Point { x, y } };
+        let init_expr2: Expr = parse_quote! { get_point() };
+        let local2 = Local {
+            attrs: vec![],
+            let_token: Default::default(),
+            pat: pat2,
+            init: Some(syn::LocalInit {
+                eq_token: Default::default(),
+                expr: Box::new(init_expr2),
+                diverge: None,
+            }),
+            semi_token: Default::default(),
+        };
+
+        visitor.analyze_function_pointer_assignment(&local2);
+        // Should still be 1, not 2
+        assert_eq!(visitor.function_pointers.len(), 1);
     }
 }
