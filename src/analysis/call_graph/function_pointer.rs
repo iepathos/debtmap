@@ -920,7 +920,6 @@ mod tests {
         assert_eq!(pointer.possible_targets.len(), 1);
     }
 
-
     #[test]
     fn test_analyze_function_pointer_assignment_no_init() {
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));

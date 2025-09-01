@@ -74,7 +74,7 @@ pub fn print_validation_details(details: &ValidationDetails) {
 fn print_failed_validation_checks(details: &ValidationDetails) {
     // Define validation checks as data
     let checks = create_validation_checks(details);
-    
+
     // Process each check functionally
     checks
         .into_iter()
@@ -95,7 +95,7 @@ impl ValidationCheck {
     fn is_failed(&self) -> bool {
         self.failed
     }
-    
+
     fn format_failure(&self) -> String {
         format_threshold_failure(
             self.metric_name,
@@ -114,14 +114,20 @@ fn create_validation_checks(details: &ValidationDetails) -> Vec<ValidationCheck>
             actual: format!("{:.1}", details.average_complexity),
             threshold: format!("{:.1}", details.max_average_complexity),
             comparison: ">",
-            failed: exceeds_max_threshold(details.average_complexity, details.max_average_complexity),
+            failed: exceeds_max_threshold(
+                details.average_complexity,
+                details.max_average_complexity,
+            ),
         },
         ValidationCheck {
             metric_name: "High complexity functions",
             actual: details.high_complexity_count.to_string(),
             threshold: details.max_high_complexity_count.to_string(),
             comparison: ">",
-            failed: exceeds_max_threshold(details.high_complexity_count, details.max_high_complexity_count),
+            failed: exceeds_max_threshold(
+                details.high_complexity_count,
+                details.max_high_complexity_count,
+            ),
         },
         ValidationCheck {
             metric_name: "Technical debt items",
@@ -143,7 +149,10 @@ fn create_validation_checks(details: &ValidationDetails) -> Vec<ValidationCheck>
             threshold: format!("{:.1}", details.max_codebase_risk_score),
             comparison: ">",
             failed: details.max_codebase_risk_score > 0.0
-                && exceeds_max_threshold(details.codebase_risk_score, details.max_codebase_risk_score),
+                && exceeds_max_threshold(
+                    details.codebase_risk_score,
+                    details.max_codebase_risk_score,
+                ),
         },
         ValidationCheck {
             metric_name: "High-risk functions",
@@ -151,7 +160,10 @@ fn create_validation_checks(details: &ValidationDetails) -> Vec<ValidationCheck>
             threshold: details.max_high_risk_functions.to_string(),
             comparison: ">",
             failed: details.max_high_risk_functions > 0
-                && exceeds_max_threshold(details.high_risk_functions, details.max_high_risk_functions),
+                && exceeds_max_threshold(
+                    details.high_risk_functions,
+                    details.max_high_risk_functions,
+                ),
         },
         ValidationCheck {
             metric_name: "Code coverage",
@@ -159,7 +171,10 @@ fn create_validation_checks(details: &ValidationDetails) -> Vec<ValidationCheck>
             threshold: format!("{:.1}%", details.min_coverage_percentage),
             comparison: "<",
             failed: details.min_coverage_percentage > 0.0
-                && below_min_threshold(details.coverage_percentage, details.min_coverage_percentage),
+                && below_min_threshold(
+                    details.coverage_percentage,
+                    details.min_coverage_percentage,
+                ),
         },
     ]
 }
@@ -220,21 +235,21 @@ fn format_risk_function(func: &risk::FunctionRisk) -> String {
 mod tests {
     use super::*;
     use crate::commands::validate::ValidationDetails;
-    
+
     #[test]
     fn test_exceeds_max_threshold() {
         assert!(exceeds_max_threshold(10, 5));
         assert!(!exceeds_max_threshold(5, 10));
         assert!(!exceeds_max_threshold(5, 5));
     }
-    
+
     #[test]
     fn test_below_min_threshold() {
         assert!(below_min_threshold(5, 10));
         assert!(!below_min_threshold(10, 5));
         assert!(!below_min_threshold(5, 5));
     }
-    
+
     #[test]
     fn test_validation_check_is_failed() {
         let check = ValidationCheck {
@@ -245,7 +260,7 @@ mod tests {
             failed: true,
         };
         assert!(check.is_failed());
-        
+
         let check_passed = ValidationCheck {
             metric_name: "Test metric",
             actual: "5".to_string(),
@@ -255,7 +270,7 @@ mod tests {
         };
         assert!(!check_passed.is_failed());
     }
-    
+
     #[test]
     fn test_validation_check_format_failure() {
         let check = ValidationCheck {
@@ -272,7 +287,7 @@ mod tests {
         assert!(formatted.contains(">"));
         assert!(formatted.contains("❌"));
     }
-    
+
     #[test]
     fn test_create_validation_checks_all_thresholds_passed() {
         let details = ValidationDetails {
@@ -291,48 +306,49 @@ mod tests {
             coverage_percentage: 80.0,
             min_coverage_percentage: 70.0,
         };
-        
+
         let checks = create_validation_checks(&details);
         assert_eq!(checks.len(), 7);
-        
+
         // All checks should pass
         let failed_count = checks.iter().filter(|c| c.is_failed()).count();
         assert_eq!(failed_count, 0);
     }
-    
+
     #[test]
     fn test_create_validation_checks_some_thresholds_failed() {
         let details = ValidationDetails {
-            average_complexity: 15.0,  // Exceeds threshold
+            average_complexity: 15.0, // Exceeds threshold
             max_average_complexity: 10.0,
-            high_complexity_count: 10,  // Exceeds threshold
+            high_complexity_count: 10, // Exceeds threshold
             max_high_complexity_count: 5,
-            debt_items: 10,  // Within threshold
+            debt_items: 10, // Within threshold
             max_debt_items: 20,
-            total_debt_score: 50,  // Within threshold
+            total_debt_score: 50, // Within threshold
             max_total_debt_score: 100,
-            codebase_risk_score: 3.0,  // Within threshold
+            codebase_risk_score: 3.0, // Within threshold
             max_codebase_risk_score: 5.0,
-            high_risk_functions: 1,  // Within threshold
+            high_risk_functions: 1, // Within threshold
             max_high_risk_functions: 3,
-            coverage_percentage: 60.0,  // Below threshold
+            coverage_percentage: 60.0, // Below threshold
             min_coverage_percentage: 70.0,
         };
-        
+
         let checks = create_validation_checks(&details);
-        
+
         // Count failed checks
-        let failed_checks: Vec<_> = checks.iter()
+        let failed_checks: Vec<_> = checks
+            .iter()
             .filter(|c| c.is_failed())
             .map(|c| c.metric_name)
             .collect();
-        
+
         assert_eq!(failed_checks.len(), 3);
         assert!(failed_checks.contains(&"Average complexity"));
         assert!(failed_checks.contains(&"High complexity functions"));
         assert!(failed_checks.contains(&"Code coverage"));
     }
-    
+
     #[test]
     fn test_create_validation_checks_disabled_thresholds() {
         let details = ValidationDetails {
@@ -344,38 +360,41 @@ mod tests {
             max_debt_items: 20,
             total_debt_score: 50,
             max_total_debt_score: 100,
-            codebase_risk_score: 10.0,  // Would exceed if enabled
-            max_codebase_risk_score: 0.0,  // Disabled (0.0)
-            high_risk_functions: 10,  // Would exceed if enabled
-            max_high_risk_functions: 0,  // Disabled (0)
-            coverage_percentage: 30.0,  // Would fail if enabled
-            min_coverage_percentage: 0.0,  // Disabled (0.0)
+            codebase_risk_score: 10.0,    // Would exceed if enabled
+            max_codebase_risk_score: 0.0, // Disabled (0.0)
+            high_risk_functions: 10,      // Would exceed if enabled
+            max_high_risk_functions: 0,   // Disabled (0)
+            coverage_percentage: 30.0,    // Would fail if enabled
+            min_coverage_percentage: 0.0, // Disabled (0.0)
         };
-        
+
         let checks = create_validation_checks(&details);
-        
+
         // These disabled checks should not be marked as failed
-        let risk_check = checks.iter()
+        let risk_check = checks
+            .iter()
             .find(|c| c.metric_name == "Codebase risk score")
             .unwrap();
         assert!(!risk_check.is_failed());
-        
-        let high_risk_check = checks.iter()
+
+        let high_risk_check = checks
+            .iter()
             .find(|c| c.metric_name == "High-risk functions")
             .unwrap();
         assert!(!high_risk_check.is_failed());
-        
-        let coverage_check = checks.iter()
+
+        let coverage_check = checks
+            .iter()
             .find(|c| c.metric_name == "Code coverage")
             .unwrap();
         assert!(!coverage_check.is_failed());
     }
-    
+
     #[test]
     fn test_format_threshold_failure() {
         let result = format_threshold_failure("Test metric", "100", "50", ">");
         assert_eq!(result, "    ❌ Test metric: 100 > 50");
-        
+
         let result = format_threshold_failure("Coverage", "40%", "60%", "<");
         assert_eq!(result, "    ❌ Coverage: 40% < 60%");
     }
