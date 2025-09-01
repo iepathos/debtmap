@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use syn::{Field, Fields, Item, ItemStruct, Type, TypePath};
+use syn::{Field, Fields, Item, ItemStruct, Path, PathSegment, Type, TypePath, TypeReference};
 
 /// Global type registry for tracking struct definitions across the codebase
 #[derive(Debug, Clone)]
@@ -176,73 +176,91 @@ impl GlobalTypeRegistry {
     /// Extract type information from a field
     fn extract_field_type(&self, field: &Field) -> ResolvedFieldType {
         match &field.ty {
-            Type::Path(TypePath { path, .. }) => {
-                let type_name = path
-                    .segments
-                    .iter()
-                    .map(|seg| seg.ident.to_string())
-                    .collect::<Vec<_>>()
-                    .join("::");
+            Type::Path(type_path) => Self::extract_path_type(type_path),
+            Type::Reference(type_ref) => Self::extract_reference_type(type_ref),
+            _ => Self::unknown_field_type(),
+        }
+    }
 
-                let generic_args = if let Some(last_seg) = path.segments.last() {
-                    match &last_seg.arguments {
-                        syn::PathArguments::AngleBracketed(args) => args
-                            .args
-                            .iter()
-                            .filter_map(|arg| match arg {
-                                syn::GenericArgument::Type(Type::Path(type_path)) => {
-                                    Some(type_path.path.segments.last()?.ident.to_string())
-                                }
-                                _ => None,
-                            })
-                            .collect(),
-                        _ => Vec::new(),
-                    }
-                } else {
-                    Vec::new()
-                };
+    /// Extract type information from a path type
+    fn extract_path_type(type_path: &TypePath) -> ResolvedFieldType {
+        let type_name = Self::build_type_name(&type_path.path);
+        let generic_args = Self::extract_generic_args(&type_path.path);
 
-                ResolvedFieldType {
-                    type_name,
-                    is_reference: false,
-                    is_mutable: false,
-                    generic_args,
-                }
-            }
-            Type::Reference(type_ref) => {
-                let mut field_type = match &*type_ref.elem {
-                    Type::Path(type_path) => {
-                        let type_name = type_path
-                            .path
-                            .segments
-                            .iter()
-                            .map(|seg| seg.ident.to_string())
-                            .collect::<Vec<_>>()
-                            .join("::");
-                        ResolvedFieldType {
-                            type_name,
-                            is_reference: true,
-                            is_mutable: type_ref.mutability.is_some(),
-                            generic_args: Vec::new(),
-                        }
-                    }
-                    _ => ResolvedFieldType {
-                        type_name: "Unknown".to_string(),
-                        is_reference: true,
-                        is_mutable: type_ref.mutability.is_some(),
-                        generic_args: Vec::new(),
-                    },
-                };
-                field_type.is_reference = true;
-                field_type.is_mutable = type_ref.mutability.is_some();
-                field_type
-            }
-            _ => ResolvedFieldType {
-                type_name: "Unknown".to_string(),
-                is_reference: false,
-                is_mutable: false,
+        ResolvedFieldType {
+            type_name,
+            is_reference: false,
+            is_mutable: false,
+            generic_args,
+        }
+    }
+
+    /// Extract type information from a reference type
+    fn extract_reference_type(type_ref: &TypeReference) -> ResolvedFieldType {
+        let base_type = match &*type_ref.elem {
+            Type::Path(type_path) => ResolvedFieldType {
+                type_name: Self::build_type_name(&type_path.path),
+                is_reference: true,
+                is_mutable: type_ref.mutability.is_some(),
                 generic_args: Vec::new(),
             },
+            _ => Self::unknown_field_type(),
+        };
+
+        ResolvedFieldType {
+            is_reference: true,
+            is_mutable: type_ref.mutability.is_some(),
+            ..base_type
+        }
+    }
+
+    /// Build a type name from a path
+    fn build_type_name(path: &Path) -> String {
+        path.segments
+            .iter()
+            .map(|seg| seg.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::")
+    }
+
+    /// Extract generic arguments from a path
+    fn extract_generic_args(path: &Path) -> Vec<String> {
+        path.segments
+            .last()
+            .and_then(|seg| Self::extract_args_from_segment(seg))
+            .unwrap_or_default()
+    }
+
+    /// Extract arguments from a path segment
+    fn extract_args_from_segment(segment: &PathSegment) -> Option<Vec<String>> {
+        match &segment.arguments {
+            syn::PathArguments::AngleBracketed(args) => Some(
+                args.args
+                    .iter()
+                    .filter_map(Self::extract_type_name_from_arg)
+                    .collect(),
+            ),
+            _ => None,
+        }
+    }
+
+    /// Extract type name from a generic argument
+    fn extract_type_name_from_arg(arg: &syn::GenericArgument) -> Option<String> {
+        match arg {
+            syn::GenericArgument::Type(Type::Path(type_path)) => {
+                type_path.path.segments.last().map(|seg| seg.ident.to_string())
+            }
+            _ => None,
+        }
+    }
+
+    /// Create an unknown field type
+    fn unknown_field_type() -> ResolvedFieldType {
+        ResolvedFieldType {
+            type_name: "Unknown".to_string(),
+            is_reference: false,
+            is_mutable: false,
+            generic_args: Vec::new(),
         }
     }
 
