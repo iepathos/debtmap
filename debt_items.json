@@ -1,0 +1,6 @@
+error: the following required arguments were not provided:
+  <PATH>
+
+Usage: debtmap analyze --format <FORMAT> <PATH>
+
+For more information, try '--help'.

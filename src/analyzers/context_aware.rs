@@ -3,9 +3,12 @@
 use crate::analyzers::Analyzer;
 use crate::context::rules::DebtPattern;
 use crate::context::{
-    detect_file_type, ContextDetector, ContextRuleEngine, FunctionContext, RuleAction,
+    detect_file_type, ContextDetector, ContextRuleEngine, FileType, FunctionContext, RuleAction,
 };
-use crate::core::{ast::Ast, DebtItem, DebtType, FileMetrics, Language, Priority};
+use crate::core::{
+    ast::{Ast, RustAst},
+    DebtItem, DebtType, FileMetrics, Language, Priority,
+};
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -36,38 +39,37 @@ impl ContextAwareAnalyzer {
         self.enabled = enabled;
     }
 
-    /// Process a single debt item based on rule action
-    fn process_debt_item(
+    /// Process a debt item based on the rule action
+    fn process_rule_action(
         &self,
-        item: &mut DebtItem,
         action: RuleAction,
+        item: &mut DebtItem,
         pattern: &DebtPattern,
         context: &FunctionContext,
     ) -> bool {
         match action {
             RuleAction::Allow | RuleAction::Skip => false,
             RuleAction::Warn => {
-                self.apply_severity_reduction(item, -2, pattern, context);
+                item.priority = adjust_priority(item.priority, -2);
+                self.add_context_note(item, pattern, context);
                 true
             }
             RuleAction::ReduceSeverity(n) => {
-                self.apply_severity_reduction(item, -n, pattern, context);
+                item.priority = adjust_priority(item.priority, -n);
+                self.add_context_note(item, pattern, context);
                 true
             }
             RuleAction::Deny => true,
         }
     }
 
-    /// Apply severity reduction and add context reason
-    fn apply_severity_reduction(
+    /// Add context note to debt item message
+    fn add_context_note(
         &self,
         item: &mut DebtItem,
-        reduction: i32,
         pattern: &DebtPattern,
         context: &FunctionContext,
     ) {
-        item.priority = adjust_priority(item.priority, reduction);
-
         if let Some(reason) = self
             .rule_engine
             .write()
@@ -76,6 +78,49 @@ impl ContextAwareAnalyzer {
         {
             item.message = format!("{} (Context: {})", item.message, reason);
         }
+    }
+
+    /// Process debt items for Rust code
+    fn process_rust_items(
+        &self,
+        metrics: &mut FileMetrics,
+        rust_ast: &RustAst,
+        file_type: FileType,
+    ) {
+        let mut detector = ContextDetector::new(file_type);
+        detector.visit_file(&rust_ast.file);
+
+        metrics.debt_items.retain_mut(|item| {
+            let context = detector
+                .get_context_for_line(item.line)
+                .cloned()
+                .unwrap_or_else(|| FunctionContext::new().with_file_type(file_type));
+
+            let pattern = debt_type_to_pattern(&item.debt_type, &item.message);
+            let action = self
+                .rule_engine
+                .write()
+                .unwrap()
+                .evaluate(&pattern, &context);
+
+            self.process_rule_action(action, item, &pattern, &context)
+        });
+    }
+
+    /// Process debt items for non-Rust code
+    fn process_non_rust_items(&self, metrics: &mut FileMetrics, file_type: FileType) {
+        let context = FunctionContext::new().with_file_type(file_type);
+
+        metrics.debt_items.retain_mut(|item| {
+            let pattern = debt_type_to_pattern(&item.debt_type, &item.message);
+            let action = self
+                .rule_engine
+                .write()
+                .unwrap()
+                .evaluate(&pattern, &context);
+
+            self.process_rule_action(action, item, &pattern, &context)
+        });
     }
 
     /// Filter debt items based on context rules
@@ -87,37 +132,9 @@ impl ContextAwareAnalyzer {
         let file_type = detect_file_type(path);
 
         if let Ast::Rust(rust_ast) = ast {
-            let mut detector = ContextDetector::new(file_type);
-            detector.visit_file(&rust_ast.file);
-
-            metrics.debt_items.retain_mut(|item| {
-                let context = detector
-                    .get_context_for_line(item.line)
-                    .cloned()
-                    .unwrap_or_else(|| FunctionContext::new().with_file_type(file_type));
-
-                let pattern = debt_type_to_pattern(&item.debt_type, &item.message);
-                let action = self
-                    .rule_engine
-                    .write()
-                    .unwrap()
-                    .evaluate(&pattern, &context);
-
-                self.process_debt_item(item, action, &pattern, &context)
-            });
+            self.process_rust_items(&mut metrics, rust_ast, file_type);
         } else {
-            let context = FunctionContext::new().with_file_type(file_type);
-
-            metrics.debt_items.retain_mut(|item| {
-                let pattern = debt_type_to_pattern(&item.debt_type, &item.message);
-                let action = self
-                    .rule_engine
-                    .write()
-                    .unwrap()
-                    .evaluate(&pattern, &context);
-
-                self.process_debt_item(item, action, &pattern, &context)
-            });
+            self.process_non_rust_items(&mut metrics, file_type);
         }
 
         metrics
@@ -227,31 +244,31 @@ mod tests {
     }
 
     #[test]
-    fn test_process_debt_item_allow() {
+    fn test_process_rule_action_allow() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let pattern = DebtPattern::DebtType(DebtType::Todo);
         let context = FunctionContext::new();
 
         // RuleAction::Allow should filter out the item
-        let keep = analyzer.process_debt_item(&mut item, RuleAction::Allow, &pattern, &context);
+        let keep = analyzer.process_rule_action(RuleAction::Allow, &mut item, &pattern, &context);
         assert!(!keep, "Allow action should filter out the item");
     }
 
     #[test]
-    fn test_process_debt_item_skip() {
+    fn test_process_rule_action_skip() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let pattern = DebtPattern::DebtType(DebtType::Todo);
         let context = FunctionContext::new();
 
         // RuleAction::Skip should filter out the item
-        let keep = analyzer.process_debt_item(&mut item, RuleAction::Skip, &pattern, &context);
+        let keep = analyzer.process_rule_action(RuleAction::Skip, &mut item, &pattern, &context);
         assert!(!keep, "Skip action should filter out the item");
     }
 
     #[test]
-    fn test_process_debt_item_warn() {
+    fn test_process_rule_action_warn() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let original_priority = item.priority;
@@ -259,7 +276,7 @@ mod tests {
         let context = FunctionContext::new();
 
         // RuleAction::Warn should reduce severity by 2 and keep the item
-        let keep = analyzer.process_debt_item(&mut item, RuleAction::Warn, &pattern, &context);
+        let keep = analyzer.process_rule_action(RuleAction::Warn, &mut item, &pattern, &context);
         assert!(keep, "Warn action should keep the item");
         assert_eq!(
             item.priority,
@@ -269,7 +286,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_debt_item_reduce_severity() {
+    fn test_process_rule_action_reduce_severity() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let original_priority = item.priority;
@@ -277,9 +294,9 @@ mod tests {
         let context = FunctionContext::new();
 
         // RuleAction::ReduceSeverity should reduce by specified amount
-        let keep = analyzer.process_debt_item(
-            &mut item,
+        let keep = analyzer.process_rule_action(
             RuleAction::ReduceSeverity(3),
+            &mut item,
             &pattern,
             &context,
         );
@@ -292,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_debt_item_deny() {
+    fn test_process_rule_action_deny() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let original_priority = item.priority;
@@ -300,7 +317,7 @@ mod tests {
         let context = FunctionContext::new();
 
         // RuleAction::Deny should keep the item unchanged
-        let keep = analyzer.process_debt_item(&mut item, RuleAction::Deny, &pattern, &context);
+        let keep = analyzer.process_rule_action(RuleAction::Deny, &mut item, &pattern, &context);
         assert!(keep, "Deny action should keep the item");
         assert_eq!(
             item.priority, original_priority,
@@ -309,19 +326,16 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_severity_reduction() {
+    fn test_add_context_note() {
         let analyzer = create_test_analyzer();
         let mut item = create_test_debt_item();
         let pattern = DebtPattern::DebtType(DebtType::Todo);
         let context = FunctionContext::new();
 
-        // Test severity reduction
-        analyzer.apply_severity_reduction(&mut item, -2, &pattern, &context);
-        assert_eq!(
-            item.priority,
-            Priority::Low,
-            "Priority should be reduced to Low"
-        );
+        // Test adding context note
+        analyzer.add_context_note(&mut item, &pattern, &context);
+        // Note: Without a configured rule engine with reasons, this won't modify the message
+        // but the method should still execute without errors
     }
 
     #[test]
