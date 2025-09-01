@@ -619,6 +619,15 @@ mod tests {
         ]
     }
 
+    fn classify_complexity_threshold(cyclomatic: u32) -> ComplexityThreshold {
+        match () {
+            _ if cyclomatic > 20 => ComplexityThreshold::Critical,
+            _ if cyclomatic > 10 => ComplexityThreshold::High,
+            _ if cyclomatic > 5 => ComplexityThreshold::Moderate,
+            _ => ComplexityThreshold::Low,
+        }
+    }
+
     fn create_complexity_factor(
         score: f64,
         weight: f64,
@@ -630,15 +639,7 @@ mod tests {
                 cyclomatic,
                 cognitive,
                 lines: 100,
-                threshold_type: if cyclomatic > 20 {
-                    ComplexityThreshold::Critical
-                } else if cyclomatic > 10 {
-                    ComplexityThreshold::High
-                } else if cyclomatic > 5 {
-                    ComplexityThreshold::Moderate
-                } else {
-                    ComplexityThreshold::Low
-                },
+                threshold_type: classify_complexity_threshold(cyclomatic),
             },
             score,
             severity: score_to_severity(score),

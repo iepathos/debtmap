@@ -14,6 +14,7 @@ pub mod core;
 pub mod data_flow;
 pub mod database;
 pub mod debt;
+pub mod example_debt;
 pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;
@@ -29,6 +30,8 @@ pub mod testing;
 pub mod transformers;
 pub mod utils;
 
+#[cfg(test)]
+mod example_complex_function;
 #[cfg(test)]
 mod example_refactor;
 
