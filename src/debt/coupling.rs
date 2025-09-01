@@ -156,65 +156,93 @@ pub fn identify_zone_of_uselessness(metrics: &HashMap<String, CouplingMetrics>) 
 pub fn build_module_dependency_map(
     file_dependencies: &[(PathBuf, Vec<Dependency>)],
 ) -> Vec<ModuleDependency> {
+    let (module_map, reverse_map) = build_dependency_maps(file_dependencies);
+    convert_to_module_dependencies(module_map, reverse_map)
+}
+
+/// Build forward and reverse dependency maps from file dependencies
+fn build_dependency_maps(
+    file_dependencies: &[(PathBuf, Vec<Dependency>)],
+) -> (HashMap<String, HashSet<String>>, HashMap<String, HashSet<String>>) {
     let mut module_map: HashMap<String, HashSet<String>> = HashMap::new();
     let mut reverse_map: HashMap<String, HashSet<String>> = HashMap::new();
 
     for (file_path, deps) in file_dependencies {
         let module_name = extract_module_name(file_path);
-
-        let dependencies: HashSet<String> = deps
-            .iter()
-            .filter_map(|dep| {
-                if dep.kind == DependencyKind::Import || dep.kind == DependencyKind::Module {
-                    Some(extract_module_from_import(&dep.name))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let dependencies = extract_import_dependencies(deps);
 
         module_map.insert(module_name.clone(), dependencies.clone());
-
-        // Build reverse map for dependents
-        for dep in dependencies {
-            reverse_map
-                .entry(dep)
-                .or_default()
-                .insert(module_name.clone());
-        }
+        update_reverse_map(&mut reverse_map, &module_name, dependencies);
     }
 
-    // Convert to ModuleDependency format
-    let mut result = Vec::new();
+    (module_map, reverse_map)
+}
+
+/// Extract import and module dependencies from a dependency list
+fn extract_import_dependencies(deps: &[Dependency]) -> HashSet<String> {
+    deps.iter()
+        .filter(|dep| is_import_or_module_dependency(dep))
+        .map(|dep| extract_module_from_import(&dep.name))
+        .collect()
+}
+
+/// Check if a dependency is an import or module type
+fn is_import_or_module_dependency(dep: &Dependency) -> bool {
+    matches!(dep.kind, DependencyKind::Import | DependencyKind::Module)
+}
+
+/// Update reverse dependency map with module's dependencies
+fn update_reverse_map(
+    reverse_map: &mut HashMap<String, HashSet<String>>,
+    module_name: &str,
+    dependencies: HashSet<String>,
+) {
+    for dep in dependencies {
+        reverse_map
+            .entry(dep)
+            .or_default()
+            .insert(module_name.to_string());
+    }
+}
+
+/// Convert dependency maps to ModuleDependency format
+fn convert_to_module_dependencies(
+    module_map: HashMap<String, HashSet<String>>,
+    reverse_map: HashMap<String, HashSet<String>>,
+) -> Vec<ModuleDependency> {
     let all_modules: HashSet<String> = module_map
         .keys()
         .chain(reverse_map.keys())
         .cloned()
         .collect();
 
-    for module in all_modules {
-        let dependencies = module_map
-            .get(&module)
+    all_modules
+        .into_iter()
+        .map(|module| create_module_dependency(&module, &module_map, &reverse_map))
+        .collect()
+}
+
+/// Create a ModuleDependency for a specific module
+fn create_module_dependency(
+    module: &str,
+    module_map: &HashMap<String, HashSet<String>>,
+    reverse_map: &HashMap<String, HashSet<String>>,
+) -> ModuleDependency {
+    ModuleDependency {
+        module: module.to_string(),
+        dependencies: module_map
+            .get(module)
             .cloned()
             .unwrap_or_default()
             .into_iter()
-            .collect();
-
-        let dependents = reverse_map
-            .get(&module)
+            .collect(),
+        dependents: reverse_map
+            .get(module)
             .cloned()
             .unwrap_or_default()
             .into_iter()
-            .collect();
-
-        result.push(ModuleDependency {
-            module,
-            dependencies,
-            dependents,
-        });
+            .collect(),
     }
-
-    result
 }
 
 fn extract_module_name(path: &Path) -> String {
