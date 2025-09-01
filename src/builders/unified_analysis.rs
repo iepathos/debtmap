@@ -1,13 +1,18 @@
 use super::{call_graph, parallel_call_graph};
 use crate::{
-    cache::CallGraphCache,
+    cache::{CacheKey, CallGraphCache},
     config,
     core::{self, AnalysisResults, DebtItem, FunctionMetrics, Language},
     io,
     priority::{
-        self, debt_aggregator::DebtAggregator, debt_aggregator::FunctionId as AggregatorFunctionId,
-        scoring::debt_item, unified_scorer::Location, ActionableRecommendation, DebtType,
-        FunctionRole, ImpactMetrics, UnifiedAnalysis, UnifiedDebtItem, UnifiedScore,
+        self,
+        call_graph::{CallGraph, FunctionId},
+        debt_aggregator::DebtAggregator,
+        debt_aggregator::FunctionId as AggregatorFunctionId,
+        scoring::debt_item,
+        unified_scorer::Location,
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, UnifiedAnalysis,
+        UnifiedDebtItem, UnifiedScore,
     },
     risk,
     scoring::{EnhancedScorer, ScoringContext},
@@ -66,95 +71,28 @@ pub fn perform_unified_analysis_with_options(
     } = options;
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
-    let (framework_exclusions, function_pointer_used_functions) = if parallel {
-        // Use parallel call graph construction
-        let thread_msg = if jobs == 0 {
-            "all available".to_string()
-        } else {
-            jobs.to_string()
-        };
-        log::info!(
-            "Using parallel call graph construction with {} threads",
-            thread_msg
-        );
+    // Select execution strategy based on options
+    let execution_strategy = determine_execution_strategy(parallel, use_cache);
 
-        let (mut parallel_graph, exclusions, used_funcs) =
-            parallel_call_graph::build_call_graph_parallel(
-                project_path,
-                call_graph.clone(),
-                if jobs == 0 { None } else { Some(jobs) },
-                true, // show_progress
-            )?;
-
-        // Process Python files (still sequential for now)
-        call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph)?;
-
-        call_graph = parallel_graph;
-        (exclusions, used_funcs)
-    } else if use_cache {
-        // Try to use cached call graph
-        let config = config::get_config();
-        let rust_files =
-            io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)?;
-
-        let mut cache = CallGraphCache::new()?;
-        let cache_key = CallGraphCache::generate_key(project_path, &rust_files, config)?;
-
-        if let Some((cached_graph, exclusions, used_funcs)) = cache.get(&cache_key) {
-            log::info!("Using cached call graph");
-            call_graph = cached_graph;
-
-            // Process Python files (still need to be done)
-            call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)?;
-
-            (
-                exclusions.into_iter().collect(),
-                used_funcs.into_iter().collect(),
-            )
-        } else {
-            log::info!("No valid cache found, building call graph from scratch");
-
-            // Build normally and cache the result
-            let (exclusions, used_funcs) = call_graph::process_rust_files_for_call_graph(
-                project_path,
-                &mut call_graph,
-                verbose_macro_warnings,
-                show_macro_stats,
-            )?;
-
-            // Cache the result
-            cache.put(
-                cache_key,
-                call_graph.clone(),
-                exclusions.iter().cloned().collect(),
-                used_funcs.iter().cloned().collect(),
-                rust_files,
-            )?;
-
-            call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)?;
-
-            (exclusions, used_funcs)
+    let (framework_exclusions, function_pointer_used_functions) = match execution_strategy {
+        ExecutionStrategy::Parallel => {
+            build_parallel_call_graph(project_path, &mut call_graph, jobs)?
         }
-    } else {
-        // Use traditional sequential call graph construction
-        let (exclusions, used_funcs) = call_graph::process_rust_files_for_call_graph(
+        ExecutionStrategy::Cached => build_cached_call_graph(
             project_path,
             &mut call_graph,
             verbose_macro_warnings,
             show_macro_stats,
-        )?;
-
-        call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)?;
-
-        (exclusions, used_funcs)
+        )?,
+        ExecutionStrategy::Sequential => build_sequential_call_graph(
+            project_path,
+            &mut call_graph,
+            verbose_macro_warnings,
+            show_macro_stats,
+        )?,
     };
 
-    let coverage_data = match coverage_file {
-        Some(lcov_path) => {
-            Some(risk::lcov::parse_lcov_file(lcov_path).context("Failed to parse LCOV file")?)
-        }
-        None => None,
-    };
+    let coverage_data = load_coverage_data(coverage_file.cloned())?;
 
     Ok(create_unified_analysis_with_exclusions(
         &results.complexity.metrics,
@@ -164,6 +102,176 @@ pub fn perform_unified_analysis_with_options(
         Some(&function_pointer_used_functions),
         Some(&results.technical_debt.items),
     ))
+}
+
+/// Determines the execution strategy based on configuration options
+fn determine_execution_strategy(parallel: bool, use_cache: bool) -> ExecutionStrategy {
+    match (parallel, use_cache) {
+        (true, _) => ExecutionStrategy::Parallel,
+        (false, true) => ExecutionStrategy::Cached,
+        (false, false) => ExecutionStrategy::Sequential,
+    }
+}
+
+/// Execution strategies for call graph construction
+enum ExecutionStrategy {
+    Parallel,
+    Cached,
+    Sequential,
+}
+
+/// Builds call graph using parallel processing
+fn build_parallel_call_graph(
+    project_path: &Path,
+    call_graph: &mut CallGraph,
+    jobs: usize,
+) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    let thread_count = if jobs == 0 { None } else { Some(jobs) };
+    log_parallel_execution(jobs);
+
+    let (mut parallel_graph, exclusions, used_funcs) =
+        parallel_call_graph::build_call_graph_parallel(
+            project_path,
+            call_graph.clone(),
+            thread_count,
+            true, // show_progress
+        )?;
+
+    // Process Python files (still sequential for now)
+    call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph)?;
+    *call_graph = parallel_graph;
+
+    Ok((exclusions, used_funcs))
+}
+
+/// Builds call graph with caching support
+fn build_cached_call_graph(
+    project_path: &Path,
+    call_graph: &mut CallGraph,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    let config = config::get_config();
+    let rust_files =
+        io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)?;
+
+    let mut cache = CallGraphCache::new()?;
+    let cache_key = CallGraphCache::generate_key(project_path, &rust_files, config)?;
+
+    if let Some((cached_graph, exclusions, used_funcs)) = cache.get(&cache_key) {
+        use_cached_graph(
+            project_path,
+            call_graph,
+            cached_graph,
+            exclusions,
+            used_funcs,
+        )
+    } else {
+        build_and_cache_graph(
+            project_path,
+            call_graph,
+            verbose_macro_warnings,
+            show_macro_stats,
+            cache,
+            cache_key,
+            rust_files,
+        )
+    }
+}
+
+/// Uses a cached call graph
+fn use_cached_graph(
+    project_path: &Path,
+    call_graph: &mut CallGraph,
+    cached_graph: CallGraph,
+    exclusions: Vec<FunctionId>,
+    used_funcs: Vec<FunctionId>,
+) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    log::info!("Using cached call graph");
+    *call_graph = cached_graph;
+
+    // Process Python files (still need to be done)
+    call_graph::process_python_files_for_call_graph(project_path, call_graph)?;
+
+    Ok((
+        exclusions.into_iter().collect(),
+        used_funcs.into_iter().collect(),
+    ))
+}
+
+/// Builds and caches a new call graph
+fn build_and_cache_graph(
+    project_path: &Path,
+    call_graph: &mut CallGraph,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+    mut cache: CallGraphCache,
+    cache_key: CacheKey,
+    rust_files: Vec<PathBuf>,
+) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    log::info!("No valid cache found, building call graph from scratch");
+
+    let (exclusions, used_funcs) = call_graph::process_rust_files_for_call_graph(
+        project_path,
+        call_graph,
+        verbose_macro_warnings,
+        show_macro_stats,
+    )?;
+
+    // Cache the result
+    cache.put(
+        cache_key,
+        call_graph.clone(),
+        exclusions.iter().cloned().collect(),
+        used_funcs.iter().cloned().collect(),
+        rust_files,
+    )?;
+
+    call_graph::process_python_files_for_call_graph(project_path, call_graph)?;
+
+    Ok((exclusions, used_funcs))
+}
+
+/// Builds call graph using sequential processing
+fn build_sequential_call_graph(
+    project_path: &Path,
+    call_graph: &mut CallGraph,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
+    let (exclusions, used_funcs) = call_graph::process_rust_files_for_call_graph(
+        project_path,
+        call_graph,
+        verbose_macro_warnings,
+        show_macro_stats,
+    )?;
+
+    call_graph::process_python_files_for_call_graph(project_path, call_graph)?;
+
+    Ok((exclusions, used_funcs))
+}
+
+/// Logs parallel execution information
+fn log_parallel_execution(jobs: usize) {
+    let thread_msg = if jobs == 0 {
+        "all available".to_string()
+    } else {
+        jobs.to_string()
+    };
+    log::info!(
+        "Using parallel call graph construction with {} threads",
+        thread_msg
+    );
+}
+
+/// Loads coverage data from the specified file
+fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lcov::LcovData>> {
+    match coverage_file {
+        Some(lcov_path) => Ok(Some(
+            risk::lcov::parse_lcov_file(&lcov_path).context("Failed to parse LCOV file")?,
+        )),
+        None => Ok(None),
+    }
 }
 
 pub fn create_unified_analysis_with_exclusions(
