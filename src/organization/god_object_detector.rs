@@ -78,6 +78,18 @@ impl GodObjectDetector {
         }
     }
 
+    /// Classify the maintainability impact based on method and field counts
+    fn classify_god_object_impact(
+        method_count: usize,
+        field_count: usize,
+    ) -> MaintainabilityImpact {
+        match () {
+            _ if method_count > 30 || field_count > 20 => MaintainabilityImpact::Critical,
+            _ if method_count > 20 || field_count > 15 => MaintainabilityImpact::High,
+            _ => MaintainabilityImpact::Medium,
+        }
+    }
+
     fn is_god_object(&self, analysis: &TypeAnalysis) -> bool {
         analysis.method_count > self.max_methods
             || analysis.field_count > self.max_fields
@@ -248,15 +260,7 @@ impl OrganizationDetector for GodObjectDetector {
                 method_count,
                 field_count,
                 ..
-            } => {
-                if *method_count > 30 || *field_count > 20 {
-                    MaintainabilityImpact::Critical
-                } else if *method_count > 20 || *field_count > 15 {
-                    MaintainabilityImpact::High
-                } else {
-                    MaintainabilityImpact::Medium
-                }
-            }
+            } => GodObjectDetector::classify_god_object_impact(*method_count, *field_count),
             _ => MaintainabilityImpact::Low,
         }
     }
@@ -475,6 +479,86 @@ mod tests {
         assert_eq!(
             GodObjectDetector::classify_responsibility("verify"),
             "Validation".to_string()
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_impact_critical() {
+        // Critical: method_count > 30 or field_count > 20
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(31, 10),
+            MaintainabilityImpact::Critical
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(15, 21),
+            MaintainabilityImpact::Critical
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(35, 25),
+            MaintainabilityImpact::Critical
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_impact_high() {
+        // High: method_count > 20 or field_count > 15 (but not critical)
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(21, 10),
+            MaintainabilityImpact::High
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(15, 16),
+            MaintainabilityImpact::High
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(25, 14),
+            MaintainabilityImpact::High
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_impact_medium() {
+        // Medium: everything else
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(10, 10),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(20, 15),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(5, 5),
+            MaintainabilityImpact::Medium
+        );
+    }
+
+    #[test]
+    fn test_classify_god_object_impact_boundary_conditions() {
+        // Test exact boundary values
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(30, 20),
+            MaintainabilityImpact::High
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(31, 20),
+            MaintainabilityImpact::Critical
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(30, 21),
+            MaintainabilityImpact::Critical
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(20, 15),
+            MaintainabilityImpact::Medium
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(21, 15),
+            MaintainabilityImpact::High
+        );
+        assert_eq!(
+            GodObjectDetector::classify_god_object_impact(20, 16),
+            MaintainabilityImpact::High
         );
     }
 
