@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 /// Scoring weights configuration
@@ -626,8 +627,90 @@ static CONFIG: OnceLock<DebtmapConfig> = OnceLock::new();
 static SCORING_WEIGHTS: OnceLock<ScoringWeights> = OnceLock::new();
 
 /// Load configuration from .debtmap.toml if it exists
+/// Pure function to read and parse config file contents
+fn read_config_file(path: &Path) -> Result<String, std::io::Error> {
+    let file = fs::File::open(path)?;
+    let mut reader = BufReader::new(file);
+    let mut contents = String::new();
+    reader.read_to_string(&mut contents)?;
+    Ok(contents)
+}
+
+/// Pure function to parse and validate config from TOML string
+#[cfg(test)]
+pub(crate) fn parse_and_validate_config(contents: &str) -> Result<DebtmapConfig, String> {
+    parse_and_validate_config_impl(contents)
+}
+
+fn parse_and_validate_config_impl(contents: &str) -> Result<DebtmapConfig, String> {
+    let mut config = toml::from_str::<DebtmapConfig>(contents)
+        .map_err(|e| format!("Failed to parse .debtmap.toml: {}", e))?;
+
+    // Validate and normalize scoring weights if present
+    if let Some(ref mut scoring) = config.scoring {
+        if let Err(e) = scoring.validate() {
+            eprintln!("Warning: Invalid scoring weights: {}. Using defaults.", e);
+            config.scoring = Some(ScoringWeights::default());
+        } else {
+            scoring.normalize(); // Ensure exact sum of 1.0
+        }
+    }
+
+    Ok(config)
+}
+
+/// Pure function to try loading config from a specific path
+fn try_load_config_from_path(config_path: &Path) -> Option<DebtmapConfig> {
+    match read_config_file(config_path) {
+        Ok(contents) => match parse_and_validate_config_impl(&contents) {
+            Ok(config) => {
+                log::debug!("Loaded config from {}", config_path.display());
+                Some(config)
+            }
+            Err(e) => {
+                eprintln!("Warning: {}. Using defaults.", e);
+                None
+            }
+        },
+        Err(e) => {
+            // Only log actual errors, not "file not found"
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!(
+                    "Failed to read config file {}: {}",
+                    config_path.display(),
+                    e
+                );
+            }
+            None
+        }
+    }
+}
+
+/// Pure function to generate directory ancestors up to a depth limit
+#[cfg(test)]
+pub(crate) fn directory_ancestors(
+    start: PathBuf,
+    max_depth: usize,
+) -> impl Iterator<Item = PathBuf> {
+    directory_ancestors_impl(start, max_depth)
+}
+
+fn directory_ancestors_impl(start: PathBuf, max_depth: usize) -> impl Iterator<Item = PathBuf> {
+    std::iter::successors(Some(start), |dir| {
+        let mut parent = dir.clone();
+        if parent.pop() {
+            Some(parent)
+        } else {
+            None
+        }
+    })
+    .take(max_depth)
+}
+
 pub fn load_config() -> DebtmapConfig {
-    // Try to find .debtmap.toml in current directory or parent directories
+    const MAX_TRAVERSAL_DEPTH: usize = 10;
+
+    // Get current directory or return default
     let current = match std::env::current_dir() {
         Ok(dir) => dir,
         Err(e) => {
@@ -639,86 +722,17 @@ pub fn load_config() -> DebtmapConfig {
         }
     };
 
-    // Limit directory traversal to prevent excessive I/O
-    const MAX_TRAVERSAL_DEPTH: usize = 10;
-    let mut dir = current;
-    let mut depth = 0;
-
-    loop {
-        // Check traversal limit
-        if depth >= MAX_TRAVERSAL_DEPTH {
+    // Search for config file in directory hierarchy
+    directory_ancestors_impl(current, MAX_TRAVERSAL_DEPTH)
+        .map(|dir| dir.join(".debtmap.toml"))
+        .find_map(|path| try_load_config_from_path(&path))
+        .unwrap_or_else(|| {
             log::debug!(
-                "Reached maximum directory traversal depth ({}). Using default config.",
+                "No config found after checking {} directories. Using default config.",
                 MAX_TRAVERSAL_DEPTH
             );
-            return DebtmapConfig::default();
-        }
-
-        let config_path = dir.join(".debtmap.toml");
-        // Optimize I/O: Try to open directly instead of checking existence first
-        match fs::File::open(&config_path) {
-            Ok(file) => {
-                let mut reader = BufReader::new(file);
-                let mut contents = String::new();
-                match reader.read_to_string(&mut contents) {
-                    Ok(_) => {
-                        match toml::from_str::<DebtmapConfig>(&contents) {
-                            Ok(mut config) => {
-                                // Validate and normalize scoring weights if present
-                                if let Some(ref mut scoring) = config.scoring {
-                                    if let Err(e) = scoring.validate() {
-                                        eprintln!(
-                                            "Warning: Invalid scoring weights: {}. Using defaults.",
-                                            e
-                                        );
-                                        config.scoring = Some(ScoringWeights::default());
-                                    } else {
-                                        scoring.normalize(); // Ensure exact sum of 1.0
-                                    }
-                                }
-                                log::debug!("Loaded config from {}", config_path.display());
-                                return config;
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "Warning: Failed to parse .debtmap.toml: {}. Using defaults.",
-                                    e
-                                );
-                                return DebtmapConfig::default();
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to read config file {}: {}",
-                            config_path.display(),
-                            e
-                        );
-                        // Continue searching in parent directories
-                    }
-                }
-            }
-            Err(e) => {
-                // Only log actual errors, not "file not found"
-                if e.kind() != std::io::ErrorKind::NotFound {
-                    log::warn!(
-                        "Failed to open config file {}: {}",
-                        config_path.display(),
-                        e
-                    );
-                }
-                // Continue searching in parent directories
-            }
-        }
-
-        if !dir.pop() {
-            break;
-        }
-        depth += 1;
-    }
-
-    // Default configuration
-    DebtmapConfig::default()
+            DebtmapConfig::default()
+        })
 }
 
 /// Get the cached configuration
@@ -870,5 +884,115 @@ mod tests {
 
         let patterns = config.get_ignore_patterns();
         assert_eq!(patterns.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_and_validate_config_valid_toml() {
+        let toml_content = r#"
+[context]
+critical_paths = ["/src/main.rs"]
+
+[scoring]
+coverage = 0.20
+complexity = 0.20
+semantic = 0.20
+dependency = 0.15
+security = 0.15
+organization = 0.10
+"#;
+        let result = super::parse_and_validate_config(toml_content);
+        assert!(result.is_ok());
+        let config = result.unwrap();
+        assert!(config.scoring.is_some());
+        let scoring = config.scoring.unwrap();
+        // All weights should sum to 1.0
+        let sum = scoring.coverage
+            + scoring.complexity
+            + scoring.semantic
+            + scoring.dependency
+            + scoring.security
+            + scoring.organization;
+        assert!((sum - 1.0).abs() < 0.001);
+        // Check the values with floating point tolerance
+        assert!((scoring.coverage - 0.20).abs() < 0.001);
+        assert!((scoring.complexity - 0.20).abs() < 0.001);
+        assert!((scoring.semantic - 0.20).abs() < 0.001);
+        assert!((scoring.dependency - 0.15).abs() < 0.001);
+        assert!((scoring.security - 0.15).abs() < 0.001);
+        assert!((scoring.organization - 0.10).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_parse_and_validate_config_invalid_toml() {
+        let toml_content = "invalid toml [[ content";
+        let result = super::parse_and_validate_config(toml_content);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to parse"));
+    }
+
+    #[test]
+    fn test_parse_and_validate_config_invalid_weights_replaced_with_defaults() {
+        let toml_content = r#"
+[scoring]
+coverage = 0.5
+complexity = 0.5
+semantic = 0.5
+dependency = 0.5
+security = 0.5
+organization = 0.5
+"#;
+        let result = super::parse_and_validate_config(toml_content);
+        assert!(result.is_ok());
+        let config = result.unwrap();
+        let scoring = config.scoring.unwrap();
+        // Invalid weights (sum > 1.0) should be replaced with defaults
+        assert_eq!(scoring.coverage, 0.40);
+        assert_eq!(scoring.complexity, 0.35);
+        assert_eq!(scoring.semantic, 0.00);
+        assert_eq!(scoring.dependency, 0.20);
+        assert_eq!(scoring.security, 0.05);
+        assert_eq!(scoring.organization, 0.00);
+        let sum = scoring.coverage
+            + scoring.complexity
+            + scoring.semantic
+            + scoring.dependency
+            + scoring.security
+            + scoring.organization;
+        assert!((sum - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_directory_ancestors_generates_correct_sequence() {
+        use std::path::PathBuf;
+
+        let start = PathBuf::from("/a/b/c/d");
+        let ancestors: Vec<PathBuf> = super::directory_ancestors(start, 3).collect();
+
+        assert_eq!(ancestors.len(), 3);
+        assert_eq!(ancestors[0], PathBuf::from("/a/b/c/d"));
+        assert_eq!(ancestors[1], PathBuf::from("/a/b/c"));
+        assert_eq!(ancestors[2], PathBuf::from("/a/b"));
+    }
+
+    #[test]
+    fn test_directory_ancestors_respects_max_depth() {
+        use std::path::PathBuf;
+
+        let start = PathBuf::from("/a/b/c/d/e/f/g/h");
+        let ancestors: Vec<PathBuf> = super::directory_ancestors(start, 2).collect();
+
+        assert_eq!(ancestors.len(), 2);
+    }
+
+    #[test]
+    fn test_directory_ancestors_handles_root() {
+        use std::path::PathBuf;
+
+        let start = PathBuf::from("/");
+        let ancestors: Vec<PathBuf> = super::directory_ancestors(start, 5).collect();
+
+        // Root directory has no parent, so we only get the root itself
+        assert_eq!(ancestors.len(), 1);
+        assert_eq!(ancestors[0], PathBuf::from("/"));
     }
 }
