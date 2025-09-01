@@ -21,87 +21,87 @@
 - COMPLEXITY: cyclomatic=13 (adj:13), branches=13, cognitive=28, nesting=3, entropy=0.29
 - DEPENDENCIES: 1 upstream, 10 downstream
    - CALLERS: ContextAwareAnalyzer::analyze
-   - CALLS: ContextRuleEngine::evaluate, ContextDetector::get_context_for_line, FunctionContext::new, ... (7 more)
+   - CALLS: ContextRuleEngine::evaluate, FunctionContext::new, detect_file_type, ... (7 more)
 - WHY: Complex function (cyclo=13, cog=28, nesting=3) with 2 suggested extraction patterns. Predicted complexity reduction: 61%
 
 #3 SCORE: 10.00 [CRITICAL]
+- LOCATION: ./src/analyzers/rust.rs:461 FunctionVisitor::is_test_function()
+- ACTION: Extract validation logic to reduce complexity 13 → ~10
+- IMPACT: -6 complexity, -3.5 risk
+- COMPLEXITY: cyclomatic=13 (adj:13), branches=13, cognitive=15, nesting=0, entropy=0.35
+- DEPENDENCIES: 4 upstream, 2 downstream
+   - CALLERS: TestComplexityDetector::detect_anti_patterns, FunctionVisitor::extract_function_metadata, extract_test_patterns, ... (1 more)
+   - CALLS: ContextMap::iter, LazyPipeline::any
+- WHY: Complex function (cyclo=13, cog=15, nesting=0) with 1 suggested extraction patterns. Predicted complexity reduction: 23%
+
+#4 SCORE: 10.00 [CRITICAL]
 - LOCATION: ./src/analyzers/rust.rs:855 extract_debt_items_with_enhanced()
 - ACTION: Extract process_input_pipeline (confidence: 76%), process_input_pipeline (confidence: 78%) to reduce complexity from 7 to ~0
 - IMPACT: -3 complexity, -3.4 risk
 - COMPLEXITY: cyclomatic=7 (adj:7), branches=7, cognitive=18, nesting=3, entropy=0.27
 - DEPENDENCIES: 1 upstream, 8 downstream
    - CALLERS: collect_all_rust_debt_items
-   - CALLS: RiskAnalyzer::clone, LazyPipeline::collect, create_complexity_debt_item, ... (5 more)
+   - CALLS: ContextMap::iter, LazyPipeline::map, format_enhanced_context, ... (5 more)
 - WHY: Cyclomatic complexity of 7 indicates 7 independent paths requiring 7 test cases minimum - extraction will reduce this to 3-5 tests per function. Function has 2 extractable patterns that can be isolated. These extractions will separate distinct concerns into testable units. Target complexity per function is 5 or less for optimal maintainability.
 
-#4 SCORE: 10.00 [CRITICAL]
+#5 SCORE: 10.00 [CRITICAL]
 - LOCATION: ./src/analyzers/rust.rs:1005 convert_organization_pattern_to_debt_item()
 - ACTION: Extract validation logic to reduce complexity 24 → ~18
 - IMPACT: -12 complexity, -3.5 risk
 - COMPLEXITY: cyclomatic=24 (adj:22), branches=24, cognitive=43, nesting=2, entropy=0.18
 - DEPENDENCIES: 1 upstream, 5 downstream
    - CALLERS: analyze_organization_patterns
-   - CALLS: ContextMap::iter, RiskAnalyzer::clone, OrganizationAntiPattern::primary_location, ... (2 more)
+   - CALLS: EntropyAnalyzer::clone, OrganizationAntiPattern::primary_location, ContextMap::iter, ... (2 more)
 - WHY: Complex function (cyclo=24, cog=43, nesting=2) with 1 suggested extraction patterns. Predicted complexity reduction: 25%
 
-#5 SCORE: 10.00 [CRITICAL]
+#6 SCORE: 10.00 [CRITICAL]
 - LOCATION: ./src/analyzers/javascript/detectors/resource.rs:200 detect_timer_leaks()
 - ACTION: Extract validation logic, nested processing, complex calculations to reduce complexity 18 → ~0
 - IMPACT: -9 complexity, -3.5 risk
 - COMPLEXITY: cyclomatic=18 (adj:18), branches=18, cognitive=67, nesting=7, entropy=0.35
 - DEPENDENCIES: 1 upstream, 5 downstream
    - CALLERS: detect_resource_patterns
-   - CALLS: extract_variable_name, get_node_text, SourceLocation::from_node, ... (2 more)
+   - CALLS: SourceLocation::from_node, Applicative::unwrap, ContextMap::iter, ... (2 more)
 - WHY: Complex function (cyclo=18, cog=67, nesting=7) with 3 suggested extraction patterns. Predicted complexity reduction: 105%
 
-#6 SCORE: 10.00 [CRITICAL]
+#7 SCORE: 10.00 [CRITICAL]
 - LOCATION: ./src/analyzers/signature_extractor.rs:122 SignatureExtractor::detect_builder_patterns()
 - ACTION: Extract validation logic, nested processing, complex calculations to reduce complexity 9 → ~0
 - IMPACT: -4 complexity, -3.5 risk
 - COMPLEXITY: cyclomatic=9 (adj:9), branches=9, cognitive=26, nesting=4, entropy=0.50
 - DEPENDENCIES: 1 upstream, 8 downstream
    - CALLERS: SignatureExtractor::extract_from_file
-   - CALLS: CallGraph::is_empty, FunctionSignatureRegistry::get_all_methods, LazyPipeline::filter, ... (5 more)
+   - CALLS: LazyPipeline::collect, EntropyAnalyzer::clone, FunctionSignatureRegistry::get_all_methods, ... (5 more)
 - WHY: Complex function (cyclo=9, cog=26, nesting=4) with 3 suggested extraction patterns. Predicted complexity reduction: 100%
 
-#7 SCORE: 10.00 [CRITICAL]
+#8 SCORE: 10.00 [CRITICAL]
 - LOCATION: ./src/analysis/call_graph/function_pointer.rs:315 FunctionPointerVisitor::analyze_function_pointer_assignment()
 - ACTION: Extract nested processing, complex calculations to reduce complexity 6 → ~1
 - IMPACT: -3 complexity, -3.5 risk
 - COMPLEXITY: cyclomatic=6 (adj:6), branches=6, cognitive=15, nesting=5, entropy=0.28
 - DEPENDENCIES: 1 upstream, 3 downstream
    - CALLERS: FunctionPointerVisitor::visit_local
-   - CALLS: FunctionPointerVisitor::get_line_number, FunctionPointerVisitor::extract_function_name_from_path, RiskAnalyzer::clone
+   - CALLS: FunctionPointerVisitor::extract_function_name_from_path, FunctionPointerVisitor::get_line_number, EntropyAnalyzer::clone
 - WHY: Complex function (cyclo=6, cog=15, nesting=5) with 2 suggested extraction patterns. Predicted complexity reduction: 83%
 
-#8 SCORE: 10.00 [CRITICAL]
+#9 SCORE: 10.00 [CRITICAL]
 - LOCATION: ./src/analysis/call_graph/framework_patterns.rs:339 PatternVisitor::analyze_attribute()
 - ACTION: Extract validation logic to reduce complexity 8 → ~6
 - IMPACT: -4 complexity, -3.5 risk
 - COMPLEXITY: cyclomatic=8 (adj:8), branches=8, cognitive=12, nesting=1, entropy=0.31
 - DEPENDENCIES: 13 upstream, 11 downstream
-   - CALLERS: PatternVisitor::analyze_function_attributes, tests::test_analyze_attribute_macro_callback, tests::test_analyze_attribute_web_handler_disabled, ... (10 more)
-   - CALLS: LazyPipeline::collect, PatternVisitor::is_macro_callback_attribute, PatternVisitor::extract_attribute_name, ... (8 more)
+   - CALLERS: tests::test_analyze_attribute_unrecognized, tests::test_analyze_attribute_serialization_disabled, tests::test_analyze_attribute_tokio_test, ... (10 more)
+   - CALLS: PatternVisitor::is_test_attribute, PatternVisitor::detect_test_framework, PatternVisitor::is_web_handler_attribute, ... (8 more)
 - WHY: Complex function (cyclo=8, cog=12, nesting=1) with 1 suggested extraction patterns. Predicted complexity reduction: 25%
 
-#9 SCORE: 10.00 [CRITICAL]
+#10 SCORE: 10.00 [CRITICAL]
 - LOCATION: ./src/builders/unified_analysis.rs:53 perform_unified_analysis_with_options()
 - ACTION: Extract validation logic, complex calculations to reduce complexity 24 → ~8
 - IMPACT: -12 complexity, -3.5 risk
 - COMPLEXITY: cyclomatic=24 (adj:24), branches=24, cognitive=52, nesting=3, entropy=0.22
 - DEPENDENCIES: 2 upstream, 14 downstream
    - CALLERS: handle_analyze, perform_unified_analysis
-   - CALLS: build_call_graph_parallel, get_config, CallGraphCache::put, ... (11 more)
+   - CALLS: LazyPipeline::collect, find_project_files_with_config, build_call_graph_parallel, ... (11 more)
 - WHY: Complex function (cyclo=24, cog=52, nesting=3) with 2 suggested extraction patterns. Predicted complexity reduction: 66%
 
-#10 SCORE: 10.00 [CRITICAL]
-- LOCATION: ./src/builders/unified_analysis.rs:169 create_unified_analysis_with_exclusions()
-- ACTION: Extract process_input_pipeline (confidence: 78%) to reduce complexity from 7 to ~3
-- IMPACT: -3 complexity, -3.4 risk
-- COMPLEXITY: cyclomatic=7 (adj:7), branches=7, cognitive=13, nesting=2, entropy=0.27
-- DEPENDENCIES: 2 upstream, 16 downstream
-   - CALLERS: calculate_unified_debt_score, perform_unified_analysis_with_options
-   - CALLS: convert_error_swallowing_to_unified, LazyPipeline::collect, RiskAnalyzer::clone, ... (13 more)
-- WHY: Cyclomatic complexity of 7 indicates 7 independent paths requiring 7 test cases minimum - extraction will reduce this to 3-5 tests per function. Function has 1 extractable patterns that can be isolated. This extraction will create a focused, testable unit. Target complexity per function is 5 or less for optimal maintainability.
-
-[STATS] TOTAL DEBT SCORE: 1059
+[STATS] TOTAL DEBT SCORE: 1065

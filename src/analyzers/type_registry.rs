@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use syn::{Field, Fields, Item, ItemStruct, Type, TypePath};
+use syn::{Field, Fields, Item, ItemStruct, Path, PathSegment, Type, TypePath, TypeReference};
 
 /// Global type registry for tracking struct definitions across the codebase
 #[derive(Debug, Clone)]
@@ -208,34 +208,91 @@ impl GlobalTypeRegistry {
     /// Extract type information from a field
     fn extract_field_type(&self, field: &Field) -> ResolvedFieldType {
         match &field.ty {
-            Type::Path(TypePath { path, .. }) => ResolvedFieldType {
-                type_name: Self::extract_type_name_from_path(path),
-                is_reference: false,
-                is_mutable: false,
-                generic_args: Self::extract_generic_args(path),
-            },
-            Type::Reference(type_ref) => {
-                let (type_name, generic_args) = match &*type_ref.elem {
-                    Type::Path(type_path) => (
-                        Self::extract_type_name_from_path(&type_path.path),
-                        Self::extract_generic_args(&type_path.path),
-                    ),
-                    _ => ("Unknown".to_string(), Vec::new()),
-                };
+            Type::Path(type_path) => Self::extract_path_type(type_path),
+            Type::Reference(type_ref) => Self::extract_reference_type(type_ref),
+            _ => Self::unknown_field_type(),
+        }
+    }
 
-                ResolvedFieldType {
-                    type_name,
-                    is_reference: true,
-                    is_mutable: type_ref.mutability.is_some(),
-                    generic_args,
-                }
-            }
-            _ => ResolvedFieldType {
-                type_name: "Unknown".to_string(),
-                is_reference: false,
-                is_mutable: false,
-                generic_args: Vec::new(),
+    /// Extract type information from a path type
+    fn extract_path_type(type_path: &TypePath) -> ResolvedFieldType {
+        let type_name = Self::build_type_name(&type_path.path);
+        let generic_args = Self::extract_generic_args(&type_path.path);
+
+        ResolvedFieldType {
+            type_name,
+            is_reference: false,
+            is_mutable: false,
+            generic_args,
+        }
+    }
+
+    /// Extract type information from a reference type
+    fn extract_reference_type(type_ref: &TypeReference) -> ResolvedFieldType {
+        let base_type = match &*type_ref.elem {
+            Type::Path(type_path) => ResolvedFieldType {
+                type_name: Self::build_type_name(&type_path.path),
+                is_reference: true,
+                is_mutable: type_ref.mutability.is_some(),
+                generic_args: Self::extract_generic_args(&type_path.path),
             },
+            _ => Self::unknown_field_type(),
+        };
+
+        ResolvedFieldType {
+            is_reference: true,
+            is_mutable: type_ref.mutability.is_some(),
+            ..base_type
+        }
+    }
+
+    /// Build a type name from a path
+    fn build_type_name(path: &Path) -> String {
+        path.segments
+            .iter()
+            .map(|seg| seg.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::")
+    }
+
+    /// Extract generic arguments from a path
+    fn extract_generic_args(path: &Path) -> Vec<String> {
+        path.segments
+            .last()
+            .and_then(|seg| Self::extract_args_from_segment(seg))
+            .unwrap_or_default()
+    }
+
+    /// Extract arguments from a path segment
+    fn extract_args_from_segment(segment: &PathSegment) -> Option<Vec<String>> {
+        match &segment.arguments {
+            syn::PathArguments::AngleBracketed(args) => Some(
+                args.args
+                    .iter()
+                    .filter_map(Self::extract_type_name_from_arg)
+                    .collect(),
+            ),
+            _ => None,
+        }
+    }
+
+    /// Extract type name from a generic argument
+    fn extract_type_name_from_arg(arg: &syn::GenericArgument) -> Option<String> {
+        match arg {
+            syn::GenericArgument::Type(Type::Path(type_path)) => {
+                type_path.path.segments.last().map(|seg| seg.ident.to_string())
+            }
+            _ => None,
+        }
+    }
+
+    /// Create an unknown field type
+    fn unknown_field_type() -> ResolvedFieldType {
+        ResolvedFieldType {
+            type_name: "Unknown".to_string(),
+            is_reference: false,
+            is_mutable: false,
+            generic_args: Vec::new(),
         }
     }
 
