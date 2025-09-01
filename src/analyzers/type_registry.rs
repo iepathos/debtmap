@@ -182,29 +182,6 @@ impl GlobalTypeRegistry {
             .join("::")
     }
 
-    /// Extract generic arguments from path segments
-    fn extract_generic_args(path: &syn::Path) -> Vec<String> {
-        path.segments
-            .last()
-            .and_then(|seg| match &seg.arguments {
-                syn::PathArguments::AngleBracketed(args) => Some(
-                    args.args
-                        .iter()
-                        .filter_map(|arg| match arg {
-                            syn::GenericArgument::Type(Type::Path(type_path)) => type_path
-                                .path
-                                .segments
-                                .last()
-                                .map(|seg| seg.ident.to_string()),
-                            _ => None,
-                        })
-                        .collect(),
-                ),
-                _ => None,
-            })
-            .unwrap_or_default()
-    }
-
     /// Extract type information from a field
     fn extract_field_type(&self, field: &Field) -> ResolvedFieldType {
         match &field.ty {
