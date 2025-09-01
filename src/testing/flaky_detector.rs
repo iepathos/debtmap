@@ -20,58 +20,47 @@ impl FlakyTestDetector {
     }
 }
 
+// Pure function to extract test patterns from items
+fn extract_test_patterns(items: &[Item], path: &Path) -> Vec<TestingAntiPattern> {
+    items
+        .iter()
+        .flat_map(|item| match item {
+            Item::Fn(function) if is_test_function(function) => analyze_flakiness(function)
+                .into_iter()
+                .map(|indicator| create_anti_pattern(function, path, indicator))
+                .collect(),
+            Item::Mod(module) => {
+                if let Some((_, mod_items)) = &module.content {
+                    extract_test_patterns(mod_items, path)
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        })
+        .collect()
+}
+
+// Pure function to create an anti-pattern from a flakiness indicator
+fn create_anti_pattern(
+    function: &ItemFn,
+    path: &Path,
+    indicator: FlakinessIndicator,
+) -> TestingAntiPattern {
+    TestingAntiPattern::FlakyTestPattern {
+        test_name: function.sig.ident.to_string(),
+        file: path.to_path_buf(),
+        line: function.sig.ident.span().start().line,
+        flakiness_type: indicator.flakiness_type,
+        reliability_impact: indicator.impact,
+        stabilization_suggestion: indicator.suggestion,
+    }
+}
+
 impl TestingDetector for FlakyTestDetector {
     fn detect_anti_patterns(&self, file: &File, path: &Path) -> Vec<TestingAntiPattern> {
-        let mut patterns = Vec::new();
-
-        for item in &file.items {
-            if let Item::Fn(function) = item {
-                if is_test_function(function) {
-                    let flakiness_indicators = analyze_flakiness(function);
-
-                    for indicator in flakiness_indicators {
-                        let line = function.sig.ident.span().start().line;
-
-                        patterns.push(TestingAntiPattern::FlakyTestPattern {
-                            test_name: function.sig.ident.to_string(),
-                            file: path.to_path_buf(),
-                            line,
-                            flakiness_type: indicator.flakiness_type,
-                            reliability_impact: indicator.impact,
-                            stabilization_suggestion: indicator.suggestion,
-                        });
-                    }
-                }
-            }
-
-            // Also check test modules
-            if let Item::Mod(module) = item {
-                if let Some((_, items)) = &module.content {
-                    for mod_item in items {
-                        if let Item::Fn(function) = mod_item {
-                            if is_test_function(function) {
-                                let flakiness_indicators = analyze_flakiness(function);
-
-                                for indicator in flakiness_indicators {
-                                    let line = function.sig.ident.span().start().line;
-
-                                    patterns.push(TestingAntiPattern::FlakyTestPattern {
-                                        test_name: function.sig.ident.to_string(),
-                                        file: path.to_path_buf(),
-                                        line,
-                                        flakiness_type: indicator.flakiness_type,
-                                        reliability_impact: indicator.impact,
-                                        stabilization_suggestion: indicator.suggestion,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        patterns
+        // Extract test functions from both root items and modules
+        extract_test_patterns(&file.items, path)
     }
 
     fn detector_name(&self) -> &'static str {
