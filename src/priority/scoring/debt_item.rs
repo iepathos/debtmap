@@ -1069,6 +1069,134 @@ fn generate_combined_testing_refactoring_steps(
 }
 
 /// Generate recommendation for testing gap debt type
+/// Get display name for a function role
+fn get_role_display_name(role: FunctionRole) -> &'static str {
+    match role {
+        FunctionRole::PureLogic => "Business logic",
+        FunctionRole::Orchestrator => "Orchestration",
+        FunctionRole::IOWrapper => "I/O wrapper",
+        FunctionRole::EntryPoint => "Entry point",
+        FunctionRole::PatternMatch => "Pattern matching",
+        FunctionRole::Unknown => "Function",
+    }
+}
+
+/// Calculate test cases needed based on complexity and current coverage
+fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
+    if coverage_pct >= 1.0 {
+        return 0;
+    }
+
+    let current_test_cases = if coverage_pct > 0.0 {
+        (cyclomatic as f64 * coverage_pct).ceil() as u32
+    } else {
+        0
+    };
+
+    cyclomatic.saturating_sub(current_test_cases)
+}
+
+/// Calculate approximate test cases for simple functions
+fn calculate_simple_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
+    ((cyclomatic.max(2) as f64 * (1.0 - coverage_pct)).ceil() as u32).max(2)
+}
+
+/// Add uncovered lines recommendations to steps
+fn add_uncovered_lines_to_steps(
+    steps: &mut Vec<String>,
+    func: &FunctionMetrics,
+    transitive_coverage: &Option<TransitiveCoverage>,
+) {
+    if let Some(cov) = transitive_coverage {
+        if !cov.uncovered_lines.is_empty() {
+            let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
+            for (i, rec) in uncovered_recommendations.into_iter().enumerate() {
+                steps.insert(i, rec);
+            }
+        }
+    }
+}
+
+/// Generate recommendation when function is fully covered
+fn generate_full_coverage_recommendation(role: FunctionRole) -> (String, String, Vec<String>) {
+    let role_display = get_role_display_name(role);
+    (
+        "Maintain test coverage".to_string(),
+        format!("{} function is currently 100% covered", role_display),
+        vec![
+            "Keep tests up to date with code changes".to_string(),
+            "Consider property-based testing for edge cases".to_string(),
+            "Monitor coverage in CI/CD pipeline".to_string(),
+        ],
+    )
+}
+
+/// Generate recommendation for complex functions with testing gaps
+fn generate_complex_function_recommendation(
+    cyclomatic: u32,
+    cognitive: u32,
+    coverage_pct: f64,
+    coverage_gap: i32,
+    role_str: &str,
+    func: &FunctionMetrics,
+    transitive_coverage: &Option<TransitiveCoverage>,
+) -> (String, String, Vec<String>) {
+    let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
+    let needed_test_cases = calculate_needed_test_cases(cyclomatic, coverage_pct);
+    let coverage_pct_int = (coverage_pct * 100.0) as i32;
+
+    let complexity_explanation = format!(
+        "Cyclomatic complexity of {} requires at least {} test cases for full path coverage. After extracting {} functions, each will need only 3-5 tests",
+        cyclomatic, cyclomatic, functions_to_extract
+    );
+
+    let mut steps =
+        generate_combined_testing_refactoring_steps(cyclomatic, cognitive, coverage_pct_int);
+    add_uncovered_lines_to_steps(&mut steps, func, transitive_coverage);
+
+    (
+        format!("Add {} tests for {}% coverage gap, then refactor complexity {} into {} functions",
+               needed_test_cases, coverage_gap, cyclomatic, functions_to_extract),
+        format!("Complex {role_str} with {coverage_gap}% gap. {}. Testing before refactoring ensures no regressions",
+               complexity_explanation),
+        steps,
+    )
+}
+
+/// Generate recommendation for simple functions with testing gaps
+fn generate_simple_function_recommendation(
+    cyclomatic: u32,
+    coverage_pct: f64,
+    coverage_gap: i32,
+    role: FunctionRole,
+    func: &FunctionMetrics,
+    transitive_coverage: &Option<TransitiveCoverage>,
+) -> (String, String, Vec<String>) {
+    let role_display = get_role_display_name(role);
+    let test_cases_needed = calculate_simple_test_cases(cyclomatic, coverage_pct);
+    let coverage_pct_int = (coverage_pct * 100.0) as i32;
+
+    let coverage_explanation = if coverage_pct_int == 0 {
+        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} test cases to cover all {} execution paths",
+               test_cases_needed, cyclomatic.max(2))
+    } else {
+        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} more test cases",
+               test_cases_needed)
+    };
+
+    let mut steps = generate_testing_gap_steps(false);
+    add_uncovered_lines_to_steps(&mut steps, func, transitive_coverage);
+
+    (
+        format!(
+            "Add {} tests for {}% coverage gap",
+            test_cases_needed, coverage_gap
+        ),
+        coverage_explanation,
+        steps,
+    )
+}
+
 fn generate_testing_gap_recommendation(
     coverage_pct: f64,
     cyclomatic: u32,
@@ -1077,111 +1205,34 @@ fn generate_testing_gap_recommendation(
     func: &FunctionMetrics,
     transitive_coverage: &Option<TransitiveCoverage>,
 ) -> (String, String, Vec<String>) {
-    let is_complex = cyclomatic > 10 || cognitive > 15;
-    let coverage_pct_int = (coverage_pct * 100.0) as i32;
-    let role_str = format_role_description(role);
-    let coverage_gap = 100 - coverage_pct_int;
+    let coverage_gap = 100 - (coverage_pct * 100.0) as i32;
 
     // If function is fully covered, no testing gap exists
     if coverage_gap == 0 {
-        let role_display = match role {
-            FunctionRole::PureLogic => "Business logic",
-            FunctionRole::Orchestrator => "Orchestration",
-            FunctionRole::IOWrapper => "I/O wrapper",
-            FunctionRole::EntryPoint => "Entry point",
-            FunctionRole::PatternMatch => "Pattern matching",
-            FunctionRole::Unknown => "Function",
-        };
-
-        return (
-            "Maintain test coverage".to_string(),
-            format!("{} function is currently 100% covered", role_display),
-            vec![
-                "Keep tests up to date with code changes".to_string(),
-                "Consider property-based testing for edge cases".to_string(),
-                "Monitor coverage in CI/CD pipeline".to_string(),
-            ],
-        );
+        return generate_full_coverage_recommendation(role);
     }
 
+    let is_complex = cyclomatic > 10 || cognitive > 15;
+
     if is_complex {
-        let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
-
-        // Calculate test cases needed
-        let current_test_cases = if coverage_pct_int > 0 {
-            (cyclomatic as f64 * coverage_pct).ceil() as u32
-        } else {
-            0
-        };
-        let needed_test_cases = cyclomatic.saturating_sub(current_test_cases);
-
-        // Explain why both testing and refactoring are needed
-        let complexity_explanation = format!(
-            "Cyclomatic complexity of {} requires at least {} test cases for full path coverage. After extracting {} functions, each will need only 3-5 tests",
-            cyclomatic, cyclomatic, functions_to_extract
-        );
-
-        // Add uncovered lines info if available
-        let mut steps =
-            generate_combined_testing_refactoring_steps(cyclomatic, cognitive, coverage_pct_int);
-        if let Some(cov) = transitive_coverage {
-            if !cov.uncovered_lines.is_empty() {
-                let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
-                // Insert uncovered lines info at the beginning of steps
-                for (i, rec) in uncovered_recommendations.into_iter().enumerate() {
-                    steps.insert(i, rec);
-                }
-            }
-        }
-
-        (
-            format!("Add {} tests for {}% coverage gap, then refactor complexity {} into {} functions", 
-                   needed_test_cases, coverage_gap, cyclomatic, functions_to_extract),
-            format!("Complex {role_str} with {coverage_gap}% gap. {}. Testing before refactoring ensures no regressions",
-                   complexity_explanation),
-            steps,
+        let role_str = format_role_description(role);
+        generate_complex_function_recommendation(
+            cyclomatic,
+            cognitive,
+            coverage_pct,
+            coverage_gap,
+            role_str,
+            func,
+            transitive_coverage,
         )
     } else {
-        let role_display = match role {
-            FunctionRole::PureLogic => "Business logic",
-            FunctionRole::Orchestrator => "Orchestration",
-            FunctionRole::IOWrapper => "I/O wrapper",
-            FunctionRole::EntryPoint => "Entry point",
-            FunctionRole::PatternMatch => "Pattern matching",
-            FunctionRole::Unknown => "Function",
-        };
-
-        // Calculate approximate test cases needed (minimum 2 for basic happy/error paths)
-        let test_cases_needed =
-            ((cyclomatic.max(2) as f64 * (1.0 - coverage_pct)).ceil() as u32).max(2);
-
-        let coverage_explanation = if coverage_pct_int == 0 {
-            format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} test cases to cover all {} execution paths",
-                   test_cases_needed, cyclomatic.max(2))
-        } else {
-            format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} more test cases",
-                   test_cases_needed)
-        };
-
-        // Add uncovered lines info if available
-        let mut steps = generate_testing_gap_steps(false);
-        if let Some(cov) = transitive_coverage {
-            if !cov.uncovered_lines.is_empty() {
-                let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
-                // Insert uncovered lines info at the beginning of steps
-                for (i, rec) in uncovered_recommendations.into_iter().enumerate() {
-                    steps.insert(i, rec);
-                }
-            }
-        }
-
-        (
-            format!(
-                "Add {} tests for {}% coverage gap",
-                test_cases_needed, coverage_gap
-            ),
-            coverage_explanation,
-            steps,
+        generate_simple_function_recommendation(
+            cyclomatic,
+            coverage_pct,
+            coverage_gap,
+            role,
+            func,
+            transitive_coverage,
         )
     }
 }
@@ -1595,5 +1646,108 @@ fn calculate_expected_impact(
         lines_reduction,
         complexity_reduction,
         risk_reduction,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_role_display_name() {
+        assert_eq!(
+            get_role_display_name(FunctionRole::PureLogic),
+            "Business logic"
+        );
+        assert_eq!(
+            get_role_display_name(FunctionRole::Orchestrator),
+            "Orchestration"
+        );
+        assert_eq!(
+            get_role_display_name(FunctionRole::IOWrapper),
+            "I/O wrapper"
+        );
+        assert_eq!(
+            get_role_display_name(FunctionRole::EntryPoint),
+            "Entry point"
+        );
+        assert_eq!(
+            get_role_display_name(FunctionRole::PatternMatch),
+            "Pattern matching"
+        );
+        assert_eq!(get_role_display_name(FunctionRole::Unknown), "Function");
+    }
+
+    #[test]
+    fn test_calculate_needed_test_cases_full_coverage() {
+        // When coverage is 100%, no test cases needed
+        assert_eq!(calculate_needed_test_cases(10, 1.0), 0);
+        assert_eq!(calculate_needed_test_cases(25, 1.0), 0);
+    }
+
+    #[test]
+    fn test_calculate_needed_test_cases_no_coverage() {
+        // When coverage is 0%, all test cases needed
+        assert_eq!(calculate_needed_test_cases(10, 0.0), 10);
+        assert_eq!(calculate_needed_test_cases(25, 0.0), 25);
+    }
+
+    #[test]
+    fn test_calculate_needed_test_cases_partial_coverage() {
+        // When 50% covered, half test cases needed
+        assert_eq!(calculate_needed_test_cases(10, 0.5), 5);
+        // When 80% covered, 20% test cases needed
+        assert_eq!(calculate_needed_test_cases(10, 0.8), 2);
+        // Rounding up for fractional cases
+        assert_eq!(calculate_needed_test_cases(10, 0.25), 7);
+    }
+
+    #[test]
+    fn test_calculate_simple_test_cases_minimum() {
+        // Always returns at least 2 test cases
+        assert_eq!(calculate_simple_test_cases(1, 0.5), 2);
+        assert_eq!(calculate_simple_test_cases(1, 0.9), 2);
+    }
+
+    #[test]
+    fn test_calculate_simple_test_cases_no_coverage() {
+        // With no coverage, uses cyclomatic complexity (min 2)
+        assert_eq!(calculate_simple_test_cases(5, 0.0), 5);
+        assert_eq!(calculate_simple_test_cases(1, 0.0), 2);
+    }
+
+    #[test]
+    fn test_calculate_simple_test_cases_partial_coverage() {
+        // With partial coverage, calculates proportionally
+        assert_eq!(calculate_simple_test_cases(10, 0.5), 5);
+        assert_eq!(calculate_simple_test_cases(10, 0.8), 2);
+    }
+
+    #[test]
+    fn test_generate_full_coverage_recommendation() {
+        let (action, rationale, steps) =
+            generate_full_coverage_recommendation(FunctionRole::PureLogic);
+        assert_eq!(action, "Maintain test coverage");
+        assert!(rationale.contains("Business logic"));
+        assert!(rationale.contains("100% covered"));
+        assert_eq!(steps.len(), 3);
+        assert!(steps[0].contains("up to date"));
+        assert!(steps[1].contains("property-based testing"));
+        assert!(steps[2].contains("CI/CD"));
+    }
+
+    #[test]
+    fn test_generate_full_coverage_recommendation_different_roles() {
+        for role in [
+            FunctionRole::Orchestrator,
+            FunctionRole::IOWrapper,
+            FunctionRole::EntryPoint,
+            FunctionRole::PatternMatch,
+            FunctionRole::Unknown,
+        ] {
+            let (action, rationale, _) = generate_full_coverage_recommendation(role);
+            assert_eq!(action, "Maintain test coverage");
+            assert!(rationale.contains("100% covered"));
+        }
     }
 }
