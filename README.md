@@ -928,7 +928,7 @@ For detailed documentation on specific features:
 
 ### Automated Technical Debt Reduction
 
-We use [prodigy](https://github.com/iepathos/prodigy) for automated technical debt reduction through AI-driven workflows. This allows us to continuously improve code quality without manual intervention.
+We use [prodigy](https://github.com/iepathos/prodigy) for automated technical debt reduction through AI-driven workflows. This allows us to continuously improve code quality without manual intervention. It also enables map reduce workflows where we run parallel agents to reduce many tech debt items at once in codebases.
 
 #### Quick Start
 
