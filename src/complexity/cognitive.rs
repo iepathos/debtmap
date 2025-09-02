@@ -1,9 +1,40 @@
 use super::pattern_adjustments::calculate_cognitive_adjusted;
 use super::patterns::{analyze_patterns, PatternComplexity};
 use super::recursive_detector::RecursiveMatchDetector;
+use super::rust_normalizer::RustSemanticNormalizer;
+use super::semantic_normalizer::{
+    NormalizedBlock, NormalizedExpression, NormalizedStatement, SemanticNormalizer,
+};
 use syn::{visit::Visit, Block, Expr};
 
 pub fn calculate_cognitive(block: &Block) -> u32 {
+    // Use legacy calculation for now to maintain compatibility
+    // Switch to normalized when ready
+    calculate_cognitive_legacy(block)
+}
+
+/// Calculate cognitive complexity using semantic normalization
+pub fn calculate_cognitive_normalized(block: &Block) -> u32 {
+    let normalizer = RustSemanticNormalizer::new();
+    let normalized = normalizer.normalize(block.clone());
+
+    let complexity = calculate_from_normalized(&normalized);
+
+    // Add pattern-based complexity (using original block for now)
+    let patterns = analyze_patterns(block);
+    let base_complexity = complexity + patterns.total_complexity();
+
+    // Only apply pattern-specific adjustments if complexity is significant
+    // This avoids false positives on simple blocks
+    if base_complexity > 2 {
+        calculate_cognitive_adjusted(block, base_complexity)
+    } else {
+        base_complexity
+    }
+}
+
+/// Calculate cognitive complexity without normalization (legacy)
+pub fn calculate_cognitive_legacy(block: &Block) -> u32 {
     let mut visitor = CognitiveVisitor {
         complexity: 0,
         nesting_level: 0,
@@ -197,6 +228,101 @@ pub fn calculate_cognitive_penalty(nesting: u32) -> u32 {
 
 pub fn combine_cognitive(complexities: Vec<u32>) -> u32 {
     complexities.iter().sum()
+}
+
+/// Calculate complexity from normalized AST
+fn calculate_from_normalized(normalized: &NormalizedBlock) -> u32 {
+    calculate_from_normalized_internal(normalized, 0)
+}
+
+fn calculate_from_normalized_internal(normalized: &NormalizedBlock, nesting_level: u32) -> u32 {
+    let mut complexity = 0;
+
+    for stmt in &normalized.statements {
+        let (stmt_complexity, increases_nesting) =
+            calculate_statement_complexity(stmt, nesting_level);
+        complexity += stmt_complexity;
+
+        if increases_nesting {
+            // Process nested statements recursively with increased nesting
+            if let NormalizedStatement::Control(control) = stmt {
+                let nested_complexity =
+                    calculate_from_normalized_internal(&control.body, nesting_level + 1);
+                complexity += nested_complexity;
+            }
+        }
+    }
+
+    // Apply formatting artifact reduction only at the top level
+    if nesting_level == 0
+        && normalized
+            .formatting_metadata
+            .multiline_expressions_normalized
+            > 0
+    {
+        let reduction = normalized
+            .formatting_metadata
+            .multiline_expressions_normalized
+            .min(complexity / 8);
+        complexity = complexity.saturating_sub(reduction);
+    }
+
+    complexity
+}
+
+/// Calculate complexity for a normalized statement
+fn calculate_statement_complexity(stmt: &NormalizedStatement, nesting_level: u32) -> (u32, bool) {
+    match stmt {
+        NormalizedStatement::Expression(expr) => {
+            let complexity = calculate_expression_complexity(expr, nesting_level);
+            (complexity, false)
+        }
+        NormalizedStatement::Control(control) => {
+            use super::semantic_normalizer::ControlType;
+            let base_complexity = match control.control_type {
+                ControlType::If | ControlType::While | ControlType::For | ControlType::Loop => {
+                    1 + nesting_level
+                }
+                ControlType::Match => {
+                    // Match expressions get base complexity plus arms
+                    1 + nesting_level
+                }
+                ControlType::Try => 1 + nesting_level,
+            };
+            (base_complexity, true)
+        }
+        NormalizedStatement::Local(_) | NormalizedStatement::Declaration(_) => (0, false),
+    }
+}
+
+/// Calculate complexity for a normalized expression
+fn calculate_expression_complexity(expr: &NormalizedExpression, nesting_level: u32) -> u32 {
+    use super::semantic_normalizer::ExprType;
+
+    // Don't skip entirely for multiline artifacts, just reduce the penalty
+    let artifact_reduction = if expr.is_multiline_artifact { 1 } else { 0 };
+
+    let base_complexity = match &expr.expr_type {
+        ExprType::ControlFlow => 1 + nesting_level,
+        ExprType::Match { arm_count } => {
+            // Base complexity plus number of arms
+            1 + nesting_level + (*arm_count as u32)
+        }
+        ExprType::LogicalOp => 1,
+        ExprType::Closure { is_async } => (if *is_async { 2 } else { 1 }) + nesting_level.min(1),
+        ExprType::Await => 1,
+        ExprType::Unsafe => 2,
+        _ => 0,
+    };
+
+    // Add complexity from logical components (these are already normalized)
+    let component_complexity: u32 = expr
+        .logical_components
+        .iter()
+        .map(|c| c.complexity_contribution)
+        .sum();
+
+    (base_complexity + component_complexity).saturating_sub(artifact_reduction)
 }
 
 #[cfg(test)]
