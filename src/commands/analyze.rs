@@ -41,6 +41,9 @@ pub struct AnalyzeConfig {
     pub use_cache: bool,
     pub no_cache: bool,
     pub clear_cache: bool,
+    pub multi_pass: bool,
+    pub show_attribution: bool,
+    pub detail_level: Option<String>,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {

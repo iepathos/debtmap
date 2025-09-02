@@ -137,6 +137,18 @@ pub enum Commands {
         /// Clear cache before running analysis
         #[arg(long = "clear-cache")]
         clear_cache: bool,
+
+        /// Enable multi-pass analysis with attribution
+        #[arg(long = "multi-pass")]
+        multi_pass: bool,
+
+        /// Show complexity attribution details
+        #[arg(long = "attribution")]
+        show_attribution: bool,
+
+        /// Detail level for diagnostic reports (summary, standard, comprehensive, debug)
+        #[arg(long = "detail-level", default_value = "standard")]
+        detail_level: Option<String>,
     },
 
     /// Initialize configuration file

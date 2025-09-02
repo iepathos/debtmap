@@ -5,9 +5,14 @@
 //! - Python-specific call graph analysis with instance method tracking
 //! - Framework pattern detection
 //! - Cross-module dependency tracking
+//! - Multi-pass complexity analysis with attribution
+//! - Diagnostic reporting and insights generation
 
+pub mod attribution;
 pub mod call_graph;
+pub mod diagnostics;
 pub mod function_visitor;
+pub mod multi_pass;
 pub mod python_call_graph;
 
 pub use call_graph::{

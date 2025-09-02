@@ -38,6 +38,9 @@ fn main() -> Result<()> {
             use_cache,
             no_cache,
             clear_cache,
+            multi_pass,
+            show_attribution,
+            detail_level,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
 
@@ -83,6 +86,9 @@ fn main() -> Result<()> {
                 use_cache,
                 no_cache,
                 clear_cache,
+                multi_pass,
+                show_attribution,
+                detail_level,
             };
             debtmap::commands::analyze::handle_analyze(config)
         }
