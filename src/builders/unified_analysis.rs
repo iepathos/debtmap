@@ -1,5 +1,7 @@
 use super::{call_graph, parallel_call_graph};
 use crate::{
+    analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
+    analysis::diagnostics::{DetailLevel, OutputFormat, DiagnosticReporter},
     cache::{CacheKey, CallGraphCache},
     config,
     core::{self, AnalysisResults, DebtItem, FunctionMetrics, Language},
@@ -32,6 +34,8 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub parallel: bool,
     pub jobs: usize,
     pub use_cache: bool,
+    pub multi_pass: bool,
+    pub show_attribution: bool,
 }
 
 pub fn perform_unified_analysis(
@@ -52,6 +56,8 @@ pub fn perform_unified_analysis(
         parallel: false,
         jobs: 0,
         use_cache: false,
+        multi_pass: false,
+        show_attribution: false,
     })
 }
 
@@ -68,8 +74,15 @@ pub fn perform_unified_analysis_with_options(
         parallel,
         jobs,
         use_cache,
+        multi_pass,
+        show_attribution,
     } = options;
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
+
+    // Perform multi-pass analysis if enabled
+    if multi_pass {
+        perform_multi_pass_analysis(results, show_attribution)?;
+    }
 
     // Select execution strategy based on options
     let execution_strategy = determine_execution_strategy(parallel, use_cache);
@@ -472,4 +485,91 @@ fn convert_error_swallowing_to_unified(
             }
         })
         .collect()
+}
+
+/// Perform multi-pass analysis on the results
+fn perform_multi_pass_analysis(
+    results: &AnalysisResults,
+    show_attribution: bool,
+) -> Result<()> {
+    // Group function metrics by file
+    let mut files: std::collections::HashMap<PathBuf, Vec<&FunctionMetrics>> = 
+        std::collections::HashMap::new();
+    
+    for function in &results.complexity.metrics {
+        files.entry(function.file.clone()).or_insert_with(Vec::new).push(function);
+    }
+
+    // For each file, perform multi-pass analysis
+    for (file_path, _functions) in files {
+        // Read the source file content
+        if let Ok(source_content) = std::fs::read_to_string(&file_path) {
+            // Determine language from file extension
+            let language = Language::from_path(&file_path);
+            
+            let options = MultiPassOptions {
+                language: language.clone(),
+                detail_level: if show_attribution {
+                    DetailLevel::Comprehensive
+                } else {
+                    DetailLevel::Standard
+                },
+                enable_recommendations: true,
+                track_source_locations: true,
+                generate_insights: true,
+                output_format: OutputFormat::Json,
+                performance_tracking: true,
+            };
+
+            match analyze_with_attribution(&source_content, language.clone(), options) {
+                Ok(multi_pass_result) => {
+                    // Print attribution information if requested
+                    if show_attribution {
+                        print_attribution_summary(&multi_pass_result, &file_path);
+                        
+                        // Generate and print detailed diagnostic report
+                        let reporter = DiagnosticReporter::new(
+                            OutputFormat::Markdown,
+                            DetailLevel::Comprehensive,
+                        );
+                        let diagnostic_report = reporter.generate_report(&multi_pass_result);
+                        let formatted_report = reporter.format_report(&diagnostic_report);
+                        
+                        println!("\n{}", formatted_report);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Multi-pass analysis failed for {}: {}", file_path.display(), e);
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// Print a summary of the multi-pass analysis attribution
+fn print_attribution_summary(result: &MultiPassResult, file_path: &Path) {
+    println!("\n=== Multi-Pass Analysis: {} ===", file_path.display());
+    println!("Raw Complexity: {}", result.raw_complexity.total_complexity);
+    println!("Normalized Complexity: {}", result.normalized_complexity.total_complexity);
+    
+    if let Some(ref perf) = result.performance_metrics {
+        println!("Analysis Time: {}ms (raw: {}ms, normalized: {}ms, attribution: {}ms)",
+            perf.total_time_ms,
+            perf.raw_analysis_time_ms,
+            perf.normalized_analysis_time_ms,
+            perf.attribution_time_ms
+        );
+    }
+    
+    println!("Insights: {} found", result.insights.len());
+    println!("Recommendations: {} generated", result.recommendations.len());
+    
+    if !result.insights.is_empty() {
+        println!("\nKey Insights:");
+        for insight in result.insights.iter().take(3) {
+            println!("  - {}", insight.description);
+        }
+    }
 }

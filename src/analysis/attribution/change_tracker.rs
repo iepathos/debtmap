@@ -328,6 +328,7 @@ mod tests {
             },
             insights: vec![],
             recommendations: vec![],
+            performance_metrics: None,
         }
     }
 }

@@ -57,13 +57,15 @@ impl DiagnosticReporter {
         };
 
         let performance_metrics = if self.detail_level.includes_performance() {
-            Some(AnalysisPerformanceMetrics {
-                total_time_ms: 100,
-                raw_analysis_ms: 40,
-                normalized_analysis_ms: 35,
-                attribution_ms: 20,
-                reporting_ms: 5,
-                memory_used_mb: 10.5,
+            result.performance_metrics.as_ref().map(|perf| {
+                AnalysisPerformanceMetrics {
+                    total_time_ms: perf.total_time_ms,
+                    raw_analysis_ms: perf.raw_analysis_time_ms,
+                    normalized_analysis_ms: perf.normalized_analysis_time_ms,
+                    attribution_ms: perf.attribution_time_ms,
+                    reporting_ms: 0, // Not tracked yet
+                    memory_used_mb: perf.memory_used_mb,
+                }
             })
         } else {
             None
@@ -464,6 +466,13 @@ mod tests {
                 estimated_impact: 5,
                 suggested_actions: vec!["Extract helper functions".to_string()],
             }],
+            performance_metrics: Some(crate::analysis::multi_pass::AnalysisPerformanceMetrics {
+                raw_analysis_time_ms: 100,
+                normalized_analysis_time_ms: 80,
+                attribution_time_ms: 50,
+                total_time_ms: 230,
+                memory_used_mb: 15.5,
+            }),
         }
     }
 }

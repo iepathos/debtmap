@@ -82,6 +82,8 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             parallel: config.parallel,
             jobs: config.jobs,
             use_cache: config.use_cache,
+            multi_pass: config.multi_pass,
+            show_attribution: config.show_attribution,
         },
     )?;
 

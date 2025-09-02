@@ -359,6 +359,7 @@ mod tests {
             },
             insights: vec![],
             recommendations: vec![],
+            performance_metrics: None,
         };
 
         let summary = generate_summary(&result);

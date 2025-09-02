@@ -8,6 +8,16 @@ pub mod source_tracker;
 use self::pattern_tracker::PatternTracker;
 use self::source_tracker::{ComplexitySourceType, SourceTracker};
 
+/// Estimated location information for complexity mapping
+#[derive(Debug, Clone)]
+struct EstimatedComplexityLocation {
+    line: u32,
+    column: u32,
+    span: Option<(u32, u32)>,
+    construct_type: String,
+    context: String,
+}
+
 /// Core attribution engine for complexity source analysis
 pub struct AttributionEngine {
     #[allow(dead_code)]
@@ -156,27 +166,91 @@ impl AttributionEngine {
         let mut mappings = Vec::new();
 
         for func in functions {
-            // Map each complexity point to its source
-            for i in 0..func.cyclomatic {
-                mappings.push(SourceMapping {
-                    complexity_point: i + 1,
-                    location: CodeLocation {
-                        file: func.file.to_string_lossy().to_string(),
-                        line: func.line as u32,
-                        column: 0,
-                        span: Some((func.line as u32, (func.line + func.length) as u32)),
-                    },
-                    ast_path: vec![
-                        "module".to_string(),
-                        "function".to_string(),
-                        func.name.clone(),
-                    ],
-                    context: format!("In function {}", func.name),
-                });
+            // Create a base mapping for the function
+            mappings.push(SourceMapping {
+                complexity_point: 1,
+                location: CodeLocation {
+                    file: func.file.to_string_lossy().to_string(),
+                    line: func.line as u32,
+                    column: 0,
+                    span: Some((func.line as u32, (func.line + func.length) as u32)),
+                },
+                ast_path: vec![
+                    "module".to_string(),
+                    "function".to_string(),
+                    func.name.clone(),
+                ],
+                context: format!("Function definition: {}", func.name),
+            });
+
+            // Generate estimated mappings for complexity points
+            // In a full implementation, this would use AST analysis
+            let estimated_complexity_points = self.estimate_complexity_locations(func);
+            
+            for (point, location_info) in estimated_complexity_points.into_iter().enumerate() {
+                if point > 0 {  // Skip first point since it's already added above
+                    mappings.push(SourceMapping {
+                        complexity_point: (point + 1) as u32,
+                        location: CodeLocation {
+                            file: func.file.to_string_lossy().to_string(),
+                            line: location_info.line,
+                            column: location_info.column,
+                            span: location_info.span,
+                        },
+                        ast_path: vec![
+                            "module".to_string(),
+                            "function".to_string(),
+                            func.name.clone(),
+                            location_info.construct_type,
+                        ],
+                        context: location_info.context,
+                    });
+                }
             }
         }
 
         mappings
+    }
+
+    /// Estimate complexity locations within a function
+    /// In a full implementation, this would parse the AST to find actual control flow constructs
+    fn estimate_complexity_locations(&self, func: &FunctionMetrics) -> Vec<EstimatedComplexityLocation> {
+        let mut locations = Vec::new();
+        
+        // Create estimated locations based on function properties
+        let complexity_per_line = if func.length > 0 {
+            func.cyclomatic as f32 / func.length as f32
+        } else {
+            1.0
+        };
+
+        let mut current_line = func.line;
+        let line_step = if func.cyclomatic > 1 && func.length > 1 {
+            func.length / (func.cyclomatic as usize).max(1)
+        } else {
+            1
+        };
+
+        for i in 0..func.cyclomatic {
+            locations.push(EstimatedComplexityLocation {
+                line: current_line as u32,
+                column: if i == 0 { 0 } else { 4 },  // Estimate indentation
+                span: Some((current_line as u32, current_line as u32)),
+                construct_type: if i == 0 {
+                    "function_signature".to_string()
+                } else {
+                    format!("control_flow_{}", i)
+                },
+                context: if i == 0 {
+                    format!("Function signature for {}", func.name)
+                } else {
+                    format!("Control flow construct #{} in {}", i, func.name)
+                },
+            });
+            current_line += line_step;
+        }
+
+        locations
     }
 }
 
