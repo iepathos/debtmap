@@ -346,7 +346,6 @@ impl FunctionPointerVisitor {
         self.function_pointers.push(pointer_info);
     }
 
-
     /// Extract possible function targets from an expression
     fn extract_possible_targets(&self, expr: &Expr) -> HashSet<FunctionId> {
         let mut possible_targets = HashSet::new();
