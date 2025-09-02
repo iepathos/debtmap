@@ -632,7 +632,12 @@ pub fn classify_debt_type_with_exclusions(
 
     // Check for testing gaps first (like in determine_debt_type)
     if let Some(cov) = coverage {
-        if has_testing_gap(cov.direct, func.is_test) {
+        // Classify as testing gap if:
+        // 1. Very low coverage (< 20%), OR
+        // 2. Has moderate coverage gaps (< 80%) with meaningful complexity
+        if has_testing_gap(cov.direct, func.is_test)
+            || (cov.direct < 0.8 && func.cyclomatic > 5 && !cov.uncovered_lines.is_empty())
+        {
             return DebtType::TestingGap {
                 coverage: cov.direct,
                 cyclomatic: func.cyclomatic,

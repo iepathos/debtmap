@@ -137,21 +137,29 @@ pub fn format_priority_item_with_config(
         .unwrap();
 
         // Calculate multiplicative factors for display
-        let coverage_gap = item.unified_score.coverage_factor / 10.0; // Convert from display scale
-        let coverage_factor = coverage_gap.powf(1.5);
+        // Get actual coverage percentage and gap from the data
+        let (actual_coverage_gap, actual_coverage_pct) =
+            if let Some(ref trans_cov) = item.transitive_coverage {
+                let coverage_pct = trans_cov.direct;
+                let gap = 1.0 - coverage_pct;
+                (gap, coverage_pct)
+            } else {
+                (1.0, 0.0) // No coverage data means 100% gap
+            };
+
+        // Calculate the coverage factor using the same formula as in scoring
+        let coverage_factor = (actual_coverage_gap.powf(1.5) + 0.1).max(0.1);
         let complexity_factor = item.unified_score.complexity_factor.powf(0.8);
         let dependency_factor =
             ((item.unified_score.dependency_factor + 1.0).sqrt() / 2.0).min(1.0);
 
-        // Show coverage gap with exponential scaling
-        let coverage_detail = if let Some(ref trans_cov) = item.transitive_coverage {
+        // Show actual coverage gap and percentage
+        let coverage_detail = if item.transitive_coverage.is_some() {
             format!(
                 " (gap: {:.1}%, coverage: {:.1}%)",
-                coverage_gap * 100.0,
-                trans_cov.direct * 100.0
+                actual_coverage_gap * 100.0,
+                actual_coverage_pct * 100.0
             )
-        } else if coverage_gap < 1.0 {
-            format!(" (gap: {:.1}%)", coverage_gap * 100.0)
         } else {
             " (no coverage data)".to_string()
         };
@@ -160,7 +168,7 @@ pub fn format_priority_item_with_config(
             "{}  {} Coverage Gap: {:.3}^1.5 = {:.3}{}",
             tree_pipe,
             formatter.emoji("├─", "-"),
-            coverage_gap,
+            actual_coverage_gap,
             coverage_factor,
             coverage_detail
         )

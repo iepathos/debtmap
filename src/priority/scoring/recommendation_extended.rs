@@ -493,6 +493,72 @@ fn pattern_type_name(
     }
 }
 
+/// Generate coverage-focused recommendation when coverage is the primary issue
+fn generate_coverage_focused_recommendation(
+    func: &FunctionMetrics,
+    cyclomatic: u32,
+    cognitive: u32,
+    cov: &TransitiveCoverage,
+) -> (String, String, Vec<String>) {
+    use crate::priority::scoring::recommendation::analyze_uncovered_lines;
+
+    let coverage_pct = cov.direct * 100.0;
+    let uncovered_count = cov.uncovered_lines.len();
+
+    // Primary action focuses on improving coverage
+    let action = format!(
+        "Add tests to improve coverage from {:.1}% to >80% ({} uncovered lines)",
+        coverage_pct, uncovered_count
+    );
+
+    // Rationale emphasizes coverage as the primary issue
+    let rationale = format!(
+        "Function has poor test coverage ({:.1}%) with {} uncovered lines. \
+         With complexity of {} (cyclomatic) and {} (cognitive), this function needs {} test cases minimum. \
+         Improving coverage will reduce risk and enable safe refactoring.",
+        coverage_pct,
+        uncovered_count,
+        cyclomatic,
+        cognitive,
+        cyclomatic
+    );
+
+    let mut steps = vec![];
+
+    // Analyze uncovered lines for specific recommendations
+    let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
+    for rec in uncovered_recommendations {
+        steps.push(rec);
+    }
+
+    // Add specific testing steps based on complexity
+    if cyclomatic > 10 {
+        steps.push(format!(
+            "Focus on high-risk paths first - this function has {} independent execution paths",
+            cyclomatic
+        ));
+    }
+
+    if func.nesting > 3 {
+        steps.push("Test deeply nested conditions with edge cases".to_string());
+    }
+
+    // Add coverage target
+    steps.push(format!(
+        "Target: Add {} test cases to achieve >80% coverage",
+        (cyclomatic as f32 * 0.8).ceil() as u32
+    ));
+
+    // Only suggest refactoring after coverage is improved
+    if cyclomatic > 7 {
+        steps.push(
+            "After achieving coverage, consider refactoring to reduce complexity".to_string(),
+        );
+    }
+
+    (action, rationale, steps)
+}
+
 /// Generate complexity recommendation using pattern analysis when available
 pub fn generate_complexity_recommendation_with_patterns_and_coverage(
     func: &FunctionMetrics,
@@ -502,6 +568,14 @@ pub fn generate_complexity_recommendation_with_patterns_and_coverage(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> (String, String, Vec<String>) {
     use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
+
+    // Check if coverage is the primary issue
+    if let Some(cov) = coverage {
+        if cov.direct < 0.8 && !cov.uncovered_lines.is_empty() {
+            // Coverage is poor - prioritize testing over refactoring
+            return generate_coverage_focused_recommendation(func, cyclomatic, cognitive, cov);
+        }
+    }
 
     // Try to analyze extraction patterns
     let analyzer = UnifiedExtractionAnalyzer::new();
