@@ -7,6 +7,12 @@ use syn::{Block, Expr, Stmt};
 /// Rust-specific semantic normalizer
 pub struct RustSemanticNormalizer;
 
+impl Default for RustSemanticNormalizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RustSemanticNormalizer {
     pub fn new() -> Self {
         Self
@@ -29,12 +35,12 @@ impl RustSemanticNormalizer {
     fn has_complex_return_type(&self, output: &syn::ReturnType) -> bool {
         match output {
             syn::ReturnType::Default => false,
-            syn::ReturnType::Type(_, ty) => self.is_complex_type(ty),
+            syn::ReturnType::Type(_, ty) => Self::is_complex_type(ty),
         }
     }
 
     /// Determine if a type is complex (likely to be formatted across multiple lines)
-    fn is_complex_type(&self, ty: &syn::Type) -> bool {
+    fn is_complex_type(ty: &syn::Type) -> bool {
         match ty {
             syn::Type::Tuple(tuple) => tuple.elems.len() > 2,
             syn::Type::Path(path) => {
@@ -43,10 +49,10 @@ impl RustSemanticNormalizer {
                     matches!(&seg.arguments, syn::PathArguments::AngleBracketed(args) if args.args.len() > 2)
                 })
             }
-            syn::Type::Reference(reference) => self.is_complex_type(&reference.elem),
-            syn::Type::Ptr(ptr) => self.is_complex_type(&ptr.elem),
-            syn::Type::Slice(slice) => self.is_complex_type(&slice.elem),
-            syn::Type::Array(array) => self.is_complex_type(&array.elem),
+            syn::Type::Reference(reference) => Self::is_complex_type(&reference.elem),
+            syn::Type::Ptr(ptr) => Self::is_complex_type(&ptr.elem),
+            syn::Type::Slice(slice) => Self::is_complex_type(&slice.elem),
+            syn::Type::Array(array) => Self::is_complex_type(&array.elem),
             _ => false,
         }
     }

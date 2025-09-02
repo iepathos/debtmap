@@ -375,16 +375,13 @@ fn calculate_logical_depth(statements: &[NormalizedStatement]) -> usize {
     let mut current_depth = 0;
 
     for stmt in statements {
-        match stmt {
-            NormalizedStatement::Control(control) => {
-                current_depth += 1;
-                max_depth = max_depth.max(current_depth);
-                // Recursively check the control body
-                let body_depth = control.body.logical_structure.depth;
-                max_depth = max_depth.max(current_depth + body_depth);
-                current_depth -= 1;
-            }
-            _ => {}
+        if let NormalizedStatement::Control(control) = stmt {
+            current_depth += 1;
+            max_depth = max_depth.max(current_depth);
+            // Recursively check the control body
+            let body_depth = control.body.logical_structure.depth;
+            max_depth = max_depth.max(current_depth + body_depth);
+            current_depth -= 1;
         }
     }
 
