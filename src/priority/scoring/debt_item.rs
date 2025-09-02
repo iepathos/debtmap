@@ -1770,16 +1770,16 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
         };
-        
+
         let (action, rationale, steps) = generate_testing_gap_recommendation(
-            1.0,  // 100% coverage
-            5,    // cyclomatic
-            8,    // cognitive
+            1.0, // 100% coverage
+            5,   // cyclomatic
+            8,   // cognitive
             FunctionRole::PureLogic,
             &func,
             &None,
         );
-        
+
         assert_eq!(action, "Maintain test coverage");
         assert!(rationale.contains("Business logic function is currently 100% covered"));
         assert_eq!(steps.len(), 3);
@@ -1805,16 +1805,16 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
         };
-        
+
         let (action, rationale, steps) = generate_testing_gap_recommendation(
-            0.0,  // 0% coverage
-            25,   // cyclomatic
-            41,   // cognitive
+            0.0, // 0% coverage
+            25,  // cyclomatic
+            41,  // cognitive
             FunctionRole::PureLogic,
             &func,
             &None,
         );
-        
+
         // Should recommend adding tests and refactoring
         assert!(action.contains("Add"));
         assert!(action.contains("tests"));
@@ -1822,7 +1822,7 @@ mod tests {
         assert!(action.contains("refactor complexity"));
         assert!(rationale.contains("Complex"));
         assert!(rationale.contains("100% gap"));
-        assert!(steps.len() > 0);
+        assert!(!steps.is_empty());
     }
 
     #[test]
@@ -1844,22 +1844,22 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.8),
         };
-        
+
         let (action, rationale, steps) = generate_testing_gap_recommendation(
-            0.6,  // 60% coverage
-            15,   // cyclomatic
-            20,   // cognitive
+            0.6, // 60% coverage
+            15,  // cyclomatic
+            20,  // cognitive
             FunctionRole::Orchestrator,
             &func,
             &None,
         );
-        
+
         // Should recommend adding tests for 40% gap and refactoring
         assert!(action.contains("40% coverage gap"));
         assert!(action.contains("refactor complexity"));
         assert!(rationale.contains("Complex"));
         assert!(rationale.contains("40% gap"));
-        assert!(steps.len() > 0);
+        assert!(!steps.is_empty());
     }
 
     #[test]
@@ -1881,23 +1881,23 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.9),
         };
-        
+
         let (action, rationale, steps) = generate_testing_gap_recommendation(
-            0.0,  // 0% coverage
-            5,    // cyclomatic
-            8,    // cognitive
+            0.0, // 0% coverage
+            5,   // cyclomatic
+            8,   // cognitive
             FunctionRole::IOWrapper,
             &func,
             &None,
         );
-        
+
         // Should recommend adding tests for simple function
         assert!(action.contains("Add"));
         assert!(action.contains("test"));
         assert!(action.contains("100% coverage"));
         assert!(rationale.contains("I/O wrapper"));
         assert!(rationale.contains("100% coverage gap"));
-        assert!(steps.len() > 0);
+        assert!(!steps.is_empty());
     }
 
     #[test]
@@ -1919,23 +1919,23 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.95),
         };
-        
+
         let (action, rationale, steps) = generate_testing_gap_recommendation(
-            0.75,  // 75% coverage
-            8,     // cyclomatic
-            10,    // cognitive
+            0.75, // 75% coverage
+            8,    // cyclomatic
+            10,   // cognitive
             FunctionRole::EntryPoint,
             &func,
             &None,
         );
-        
+
         // Should recommend adding tests for 25% gap
         assert!(action.contains("Add"));
         assert!(action.contains("test"));
         assert!(action.contains("25% coverage"));
         assert!(rationale.contains("Entry point"));
         assert!(rationale.contains("25% coverage gap"));
-        assert!(steps.len() > 0);
+        assert!(!steps.is_empty());
     }
 
     #[test]
@@ -1957,26 +1957,26 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
         };
-        
+
         let transitive_cov = TransitiveCoverage {
             direct: 0.5,
             transitive: 0.5,
             propagated_from: vec![],
             uncovered_lines: vec![13, 14, 17, 18, 19],
         };
-        
+
         let (action, _rationale, steps) = generate_testing_gap_recommendation(
-            0.5,  // 50% coverage
-            6,    // cyclomatic
-            9,    // cognitive
+            0.5, // 50% coverage
+            6,   // cyclomatic
+            9,   // cognitive
             FunctionRole::PureLogic,
             &func,
             &Some(transitive_cov),
         );
-        
+
         // Should include uncovered lines analysis in steps
         assert!(action.contains("50% coverage"));
-        assert!(steps.len() > 0);
+        assert!(!steps.is_empty());
         // The steps should include recommendations from analyze_uncovered_lines
     }
 
@@ -1999,31 +1999,31 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.85),
         };
-        
+
         // Test at cyclomatic=10 (not complex)
         let (action1, _, _) = generate_testing_gap_recommendation(
-            0.3,  // 30% coverage
-            10,   // cyclomatic - at threshold
-            14,   // cognitive - below threshold
+            0.3, // 30% coverage
+            10,  // cyclomatic - at threshold
+            14,  // cognitive - below threshold
             FunctionRole::PatternMatch,
             &func,
             &None,
         );
-        
+
         // Should be treated as simple
         assert!(action1.contains("70% coverage"));
         assert!(!action1.contains("refactor complexity"));
-        
+
         // Test at cyclomatic=11 (complex)
         let (action2, _, _) = generate_testing_gap_recommendation(
-            0.3,  // 30% coverage
-            11,   // cyclomatic - above threshold
-            14,   // cognitive - below threshold
+            0.3, // 30% coverage
+            11,  // cyclomatic - above threshold
+            14,  // cognitive - below threshold
             FunctionRole::PatternMatch,
             &func,
             &None,
         );
-        
+
         // Should be treated as complex
         assert!(action2.contains("70% coverage gap"));
         assert!(action2.contains("refactor complexity"));
