@@ -135,7 +135,7 @@ impl DiagnosticReporter {
             for finding in &report.summary.key_findings {
                 output.push_str(&format!("- {}\n", finding));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Attribution details
@@ -168,7 +168,7 @@ impl DiagnosticReporter {
                         component.location
                     ));
                 }
-                output.push_str("\n");
+                output.push('\n');
             }
 
             // Formatting artifacts
@@ -216,7 +216,7 @@ impl DiagnosticReporter {
                         output.push_str(&format!("- {}\n", action));
                     }
                 }
-                output.push_str("\n");
+                output.push('\n');
             }
         }
 
@@ -330,7 +330,7 @@ impl DiagnosticReporter {
             for finding in &report.summary.key_findings {
                 output.push_str(&format!("* {}\n", finding));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         if !report.recommendations.is_empty() {

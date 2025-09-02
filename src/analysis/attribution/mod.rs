@@ -113,11 +113,7 @@ impl AttributionEngine {
         let raw_total = raw_result.total_complexity;
         let normalized_total = normalized_result.total_complexity;
 
-        let artifact_total = if raw_total > normalized_total {
-            raw_total - normalized_total
-        } else {
-            0
-        };
+        let artifact_total = raw_total.saturating_sub(normalized_total);
 
         let mut breakdown = Vec::new();
 
@@ -127,11 +123,7 @@ impl AttributionEngine {
             .iter()
             .zip(normalized_result.functions.iter())
         {
-            let diff = if raw_func.cyclomatic > norm_func.cyclomatic {
-                raw_func.cyclomatic - norm_func.cyclomatic
-            } else {
-                0
-            };
+            let diff = raw_func.cyclomatic.saturating_sub(norm_func.cyclomatic);
 
             if diff > 0 {
                 breakdown.push(ComplexityComponent {
@@ -186,9 +178,10 @@ impl AttributionEngine {
             // Generate estimated mappings for complexity points
             // In a full implementation, this would use AST analysis
             let estimated_complexity_points = self.estimate_complexity_locations(func);
-            
+
             for (point, location_info) in estimated_complexity_points.into_iter().enumerate() {
-                if point > 0 {  // Skip first point since it's already added above
+                if point > 0 {
+                    // Skip first point since it's already added above
                     mappings.push(SourceMapping {
                         complexity_point: (point + 1) as u32,
                         location: CodeLocation {
@@ -214,11 +207,14 @@ impl AttributionEngine {
 
     /// Estimate complexity locations within a function
     /// In a full implementation, this would parse the AST to find actual control flow constructs
-    fn estimate_complexity_locations(&self, func: &FunctionMetrics) -> Vec<EstimatedComplexityLocation> {
+    fn estimate_complexity_locations(
+        &self,
+        func: &FunctionMetrics,
+    ) -> Vec<EstimatedComplexityLocation> {
         let mut locations = Vec::new();
-        
+
         // Create estimated locations based on function properties
-        let complexity_per_line = if func.length > 0 {
+        let _complexity_per_line = if func.length > 0 {
             func.cyclomatic as f32 / func.length as f32
         } else {
             1.0
@@ -234,7 +230,7 @@ impl AttributionEngine {
         for i in 0..func.cyclomatic {
             locations.push(EstimatedComplexityLocation {
                 line: current_line as u32,
-                column: if i == 0 { 0 } else { 4 },  // Estimate indentation
+                column: if i == 0 { 0 } else { 4 }, // Estimate indentation
                 span: Some((current_line as u32, current_line as u32)),
                 construct_type: if i == 0 {
                     "function_signature".to_string()
@@ -361,7 +357,6 @@ pub enum LanguageFeature {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_attribution_engine_new() {

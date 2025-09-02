@@ -136,8 +136,7 @@ impl ChangeTracker {
 
         // Weighted average favoring cognitive complexity
         (raw_improvement * 0.3 + cognitive_improvement * 0.5 + normalized_improvement * 0.2)
-            .max(-1.0)
-            .min(1.0)
+            .clamp(-1.0, 1.0)
     }
 }
 

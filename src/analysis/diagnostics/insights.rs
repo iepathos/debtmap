@@ -2,15 +2,14 @@ use crate::analysis::attribution::ComplexityAttribution;
 use crate::analysis::multi_pass::{ComplexityInsight, ImpactLevel, InsightType};
 
 /// Engine for generating complexity insights
+#[derive(Default)]
 pub struct InsightGenerator {
     thresholds: InsightThresholds,
 }
 
 impl InsightGenerator {
     pub fn new() -> Self {
-        Self {
-            thresholds: InsightThresholds::default(),
-        }
+        Self::default()
     }
 
     pub fn with_thresholds(thresholds: InsightThresholds) -> Self {
@@ -276,8 +275,8 @@ impl Default for InsightThresholds {
 mod tests {
     use super::*;
     use crate::analysis::attribution::source_tracker::ComplexitySourceType;
+    use crate::analysis::attribution::LogicalConstruct;
     use crate::analysis::attribution::{AttributedComplexity, CodeLocation, ComplexityComponent};
-    use crate::analysis::attribution::{LogicalConstruct, RecognizedPattern};
 
     #[test]
     fn test_insight_generator_new() {

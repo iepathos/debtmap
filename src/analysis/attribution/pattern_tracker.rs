@@ -10,8 +10,8 @@ pub struct PatternTracker {
     pattern_detectors: Vec<Box<dyn PatternDetector>>,
 }
 
-impl PatternTracker {
-    pub fn new() -> Self {
+impl Default for PatternTracker {
+    fn default() -> Self {
         Self {
             pattern_detectors: vec![
                 Box::new(ErrorHandlingDetector::new()),
@@ -21,6 +21,12 @@ impl PatternTracker {
                 Box::new(IteratorDetector::new()),
             ],
         }
+    }
+}
+
+impl PatternTracker {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn analyze_patterns(&self, functions: &[FunctionMetrics]) -> AttributedComplexity {

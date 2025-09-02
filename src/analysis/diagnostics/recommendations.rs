@@ -8,8 +8,8 @@ pub struct RecommendationEngine {
     strategies: Vec<Box<dyn RecommendationStrategy>>,
 }
 
-impl RecommendationEngine {
-    pub fn new() -> Self {
+impl Default for RecommendationEngine {
+    fn default() -> Self {
         Self {
             strategies: vec![
                 Box::new(RefactoringStrategy::new()),
@@ -18,6 +18,12 @@ impl RecommendationEngine {
                 Box::new(GeneralStrategy::new()),
             ],
         }
+    }
+}
+
+impl RecommendationEngine {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn generate_recommendations(

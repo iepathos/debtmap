@@ -1,5 +1,4 @@
 use crate::analyzers::Analyzer;
-use crate::complexity::rust_normalizer::RustSemanticNormalizer;
 use crate::complexity::semantic_normalizer::SemanticNormalizer;
 use crate::core::{FunctionMetrics, Language};
 use anyhow::Result;
@@ -52,7 +51,7 @@ impl MultiPassAnalyzer {
         let raw_result = self.analyze_raw(&source.raw_source)?;
         let raw_time = raw_start.elapsed().as_millis() as u64;
 
-        // Second pass: Normalized complexity analysis  
+        // Second pass: Normalized complexity analysis
         let normalized_start = Instant::now();
         let normalized_result = self.analyze_normalized(&source.normalized_source)?;
         let normalized_time = normalized_start.elapsed().as_millis() as u64;
@@ -73,7 +72,7 @@ impl MultiPassAnalyzer {
         let total_time = start_time.elapsed().as_millis() as u64;
         let end_memory = Self::get_memory_usage_mb();
         let memory_used = (end_memory - start_memory).max(0.0);
-        
+
         // Create performance metrics
         let performance_metrics = AnalysisPerformanceMetrics {
             raw_analysis_time_ms: raw_time,
@@ -84,15 +83,19 @@ impl MultiPassAnalyzer {
         };
 
         // Validate performance requirements (25% overhead limit)
-        let single_pass_estimate = raw_time;  // Estimate single-pass time as raw analysis time
+        let single_pass_estimate = raw_time; // Estimate single-pass time as raw analysis time
         let overhead_percentage = if single_pass_estimate > 0 {
-            ((total_time as f64 - single_pass_estimate as f64) / single_pass_estimate as f64) * 100.0
+            ((total_time as f64 - single_pass_estimate as f64) / single_pass_estimate as f64)
+                * 100.0
         } else {
             0.0
         };
 
         if overhead_percentage > 25.0 {
-            eprintln!("Warning: Multi-pass analysis overhead ({:.1}%) exceeds 25% limit", overhead_percentage);
+            eprintln!(
+                "Warning: Multi-pass analysis overhead ({:.1}%) exceeds 25% limit",
+                overhead_percentage
+            );
         }
 
         Ok(MultiPassResult {
@@ -474,31 +477,31 @@ fn normalize_rust_source(source: &str) -> String {
     let mut result = String::new();
     let lines: Vec<&str> = source.lines().collect();
     let mut prev_empty = false;
-    
+
     for line in lines {
         let trimmed = line.trim_end();
         let is_empty = trimmed.is_empty();
-        
+
         // Skip multiple consecutive empty lines
         if is_empty && prev_empty {
             continue;
         }
-        
+
         // Normalize internal whitespace (replace multiple spaces with single spaces)
         let normalized = if !is_empty {
             trimmed.split_whitespace().collect::<Vec<_>>().join(" ")
         } else {
             String::new()
         };
-        
+
         if !result.is_empty() {
             result.push('\n');
         }
         result.push_str(&normalized);
-        
+
         prev_empty = is_empty;
     }
-    
+
     result
 }
 

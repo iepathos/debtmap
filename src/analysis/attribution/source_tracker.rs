@@ -46,15 +46,14 @@ pub enum ComplexitySourceType {
 }
 
 /// Tracker for logical structure complexity
+#[derive(Default)]
 pub struct LogicalStructureTracker {
     nesting_stack: Vec<LogicalConstruct>,
 }
 
 impl LogicalStructureTracker {
     pub fn new() -> Self {
-        Self {
-            nesting_stack: Vec::new(),
-        }
+        Self::default()
     }
 
     fn get_construct_type(node_type: &str) -> Option<LogicalConstruct> {
@@ -93,30 +92,36 @@ impl SourceTracker for LogicalStructureTracker {
 
 /// Tracker for formatting artifacts
 pub struct FormattingArtifactTracker {
-    patterns: Vec<FormattingPattern>,
+    _patterns: Vec<FormattingPattern>,
+}
+
+impl Default for FormattingArtifactTracker {
+    fn default() -> Self {
+        Self {
+            _patterns: vec![
+                FormattingPattern {
+                    _name: "multiline_expression".to_string(),
+                    _artifact_type: FormattingArtifact::MultilineExpression,
+                    _severity: ArtifactSeverity::Medium,
+                },
+                FormattingPattern {
+                    _name: "excessive_whitespace".to_string(),
+                    _artifact_type: FormattingArtifact::ExcessiveWhitespace,
+                    _severity: ArtifactSeverity::Low,
+                },
+                FormattingPattern {
+                    _name: "inconsistent_indentation".to_string(),
+                    _artifact_type: FormattingArtifact::InconsistentIndentation,
+                    _severity: ArtifactSeverity::High,
+                },
+            ],
+        }
+    }
 }
 
 impl FormattingArtifactTracker {
     pub fn new() -> Self {
-        Self {
-            patterns: vec![
-                FormattingPattern {
-                    name: "multiline_expression".to_string(),
-                    artifact_type: FormattingArtifact::MultilineExpression,
-                    severity: ArtifactSeverity::Medium,
-                },
-                FormattingPattern {
-                    name: "excessive_whitespace".to_string(),
-                    artifact_type: FormattingArtifact::ExcessiveWhitespace,
-                    severity: ArtifactSeverity::Low,
-                },
-                FormattingPattern {
-                    name: "inconsistent_indentation".to_string(),
-                    artifact_type: FormattingArtifact::InconsistentIndentation,
-                    severity: ArtifactSeverity::High,
-                },
-            ],
-        }
+        Self::default()
     }
 
     fn detect_artifact(&self, node_type: &str) -> Option<(FormattingArtifact, ArtifactSeverity)> {
@@ -167,8 +172,8 @@ pub struct PatternBasedTracker {
     patterns: Vec<CodePattern>,
 }
 
-impl PatternBasedTracker {
-    pub fn new() -> Self {
+impl Default for PatternBasedTracker {
+    fn default() -> Self {
         Self {
             patterns: vec![
                 CodePattern {
@@ -188,6 +193,12 @@ impl PatternBasedTracker {
                 },
             ],
         }
+    }
+}
+
+impl PatternBasedTracker {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     fn recognize_pattern(&self, node_type: &str) -> Option<(RecognizedPattern, f32)> {
@@ -221,9 +232,9 @@ impl SourceTracker for PatternBasedTracker {
 }
 
 struct FormattingPattern {
-    name: String,
-    artifact_type: FormattingArtifact,
-    severity: ArtifactSeverity,
+    _name: String,
+    _artifact_type: FormattingArtifact,
+    _severity: ArtifactSeverity,
 }
 
 struct CodePattern {
