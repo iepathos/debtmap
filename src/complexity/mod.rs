@@ -8,6 +8,8 @@ pub mod pattern_adjustments;
 pub mod patterns;
 pub mod python_patterns;
 pub mod recursive_detector;
+pub mod rust_normalizer;
+pub mod semantic_normalizer;
 pub mod threshold_manager;
 pub mod token_classifier;
 pub mod visitor_detector;
