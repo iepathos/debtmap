@@ -158,7 +158,6 @@ impl GlobalTypeRegistry {
 }
 
 #[test]
-#[ignore] // Multiple cargo run invocations - slow
 fn test_comprehensive_false_positive_patterns() {
     // All patterns that trigger false positives
     let patterns = vec![
