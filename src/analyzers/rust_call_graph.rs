@@ -437,7 +437,7 @@ impl CallGraphExtractor {
         self.macro_stats.total_macros += 1;
 
         let macro_name = self.extract_macro_name(&expr_macro.mac.path);
-        
+
         let macro_type = Self::classify_macro_type(&macro_name);
 
         self.dispatch_macro_parsing(macro_type, &expr_macro.mac.tokens, &macro_name);
@@ -504,10 +504,10 @@ impl CallGraphExtractor {
         else if macro_name == "hashmap" || macro_name == "btreemap" {
             // Parse the tokens as comma-separated items, then parse each item for key => value
             let tokens_str = tokens.to_string();
-            
+
             let items = tokens_str.split(',');
             let mut parsed_any = false;
-            
+
             for item in items {
                 let item = item.trim();
                 if !item.is_empty() {
@@ -518,7 +518,7 @@ impl CallGraphExtractor {
                     }
                 }
             }
-            
+
             if parsed_any {
                 self.macro_stats.successfully_parsed += 1;
             } else {
@@ -534,7 +534,7 @@ impl CallGraphExtractor {
         // Try to parse comma-separated expressions
         if let Ok(exprs) = self.parse_comma_separated_exprs(tokens) {
             self.macro_stats.successfully_parsed += 1;
-            
+
             // Visit ALL expressions, including the format string
             // The format string might contain interpolated expressions in future Rust versions
             for expr in exprs {
@@ -887,14 +887,14 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 attrs: stmt_macro.attrs.clone(),
                 mac: stmt_macro.mac.clone(),
             };
-            
+
             self.handle_macro_expression(&expr_macro);
         }
-        
+
         // Continue visiting the statement
         syn::visit::visit_stmt(self, stmt);
     }
-    
+
     fn visit_local(&mut self, local: &'ast Local) {
         // Track type when visiting variable declarations
         if let Pat::Ident(pat_ident) = &local.pat {
@@ -1911,7 +1911,7 @@ mod tests {
             .iter()
             .find(|f| f.name == "test")
             .expect("test function should exist");
-        
+
         let callees = extractor.call_graph.get_callees(test_fn);
         assert!(callees.iter().any(|callee| callee.name == "get_key"));
         assert!(callees.iter().any(|callee| callee.name == "get_value"));
@@ -1969,7 +1969,7 @@ mod tests {
             .iter()
             .find(|f| f.name == "test")
             .expect("test function should exist");
-            
+
         let callees = graph.get_callees(test_fn);
         assert!(callees.iter().any(|callee| callee.name == "get_item"));
     }
