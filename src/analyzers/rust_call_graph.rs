@@ -437,6 +437,7 @@ impl CallGraphExtractor {
         self.macro_stats.total_macros += 1;
 
         let macro_name = self.extract_macro_name(&expr_macro.mac.path);
+        
         let macro_type = Self::classify_macro_type(&macro_name);
 
         self.dispatch_macro_parsing(macro_type, &expr_macro.mac.tokens, &macro_name);
@@ -498,6 +499,31 @@ impl CallGraphExtractor {
             for expr in exprs {
                 self.visit_expr(&expr);
             }
+        }
+        // For hashmap-like macros without braces, try to parse key-value pairs directly
+        else if macro_name == "hashmap" || macro_name == "btreemap" {
+            // Parse the tokens as comma-separated items, then parse each item for key => value
+            let tokens_str = tokens.to_string();
+            
+            let items = tokens_str.split(',');
+            let mut parsed_any = false;
+            
+            for item in items {
+                let item = item.trim();
+                if !item.is_empty() {
+                    let exprs = Self::parse_key_value_pair(item);
+                    for expr in exprs {
+                        self.visit_expr(&expr);
+                        parsed_any = true;
+                    }
+                }
+            }
+            
+            if parsed_any {
+                self.macro_stats.successfully_parsed += 1;
+            } else {
+                self.log_unexpandable_macro(macro_name);
+            }
         } else {
             self.log_unexpandable_macro(macro_name);
         }
@@ -508,8 +534,10 @@ impl CallGraphExtractor {
         // Try to parse comma-separated expressions
         if let Ok(exprs) = self.parse_comma_separated_exprs(tokens) {
             self.macro_stats.successfully_parsed += 1;
-            // Skip the first element (format string) and visit the rest
-            for expr in exprs.into_iter().skip(1) {
+            
+            // Visit ALL expressions, including the format string
+            // The format string might contain interpolated expressions in future Rust versions
+            for expr in exprs {
                 self.visit_expr(&expr);
             }
         } else {
@@ -851,6 +879,22 @@ impl CallGraphExtractor {
 }
 
 impl<'ast> Visit<'ast> for CallGraphExtractor {
+    fn visit_stmt(&mut self, stmt: &'ast syn::Stmt) {
+        // Handle statement-level macros like println!, assert!, etc.
+        if let syn::Stmt::Macro(stmt_macro) = stmt {
+            // Convert StmtMacro to ExprMacro for processing
+            let expr_macro = syn::ExprMacro {
+                attrs: stmt_macro.attrs.clone(),
+                mac: stmt_macro.mac.clone(),
+            };
+            
+            self.handle_macro_expression(&expr_macro);
+        }
+        
+        // Continue visiting the statement
+        syn::visit::visit_stmt(self, stmt);
+    }
+    
     fn visit_local(&mut self, local: &'ast Local) {
         // Track type when visiting variable declarations
         if let Pat::Ident(pat_ident) = &local.pat {
@@ -1746,7 +1790,6 @@ mod tests {
     // The expansion module was removed in favor of token parsing, which doesn't
     // yet fully support detecting function calls within all macro contexts
     #[test]
-    #[ignore]
     fn test_format_macro_with_function_calls() {
         let code = r#"
             fn get_name() -> String {
@@ -1779,7 +1822,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_println_macro_with_expressions() {
         let code = r#"
             fn calculate() -> i32 {
@@ -1806,7 +1848,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_assert_macro_with_function_calls() {
         let code = r#"
             fn is_valid() -> bool {
@@ -1840,7 +1881,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_hashmap_macro_with_function_calls() {
         let code = r#"
             use std::collections::HashMap;
@@ -1865,20 +1905,19 @@ mod tests {
         extractor.extract_phase1(&file);
         extractor.resolve_phase2();
 
-        // Should detect both key and value function calls
-        let test_fn_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "test".to_string(),
-            line: 0,
-        };
-        let callees = extractor.call_graph.get_callees(&test_fn_id);
-
+        // Find the actual test function
+        let all_functions = extractor.call_graph.find_all_functions();
+        let test_fn = all_functions
+            .iter()
+            .find(|f| f.name == "test")
+            .expect("test function should exist");
+        
+        let callees = extractor.call_graph.get_callees(test_fn);
         assert!(callees.iter().any(|callee| callee.name == "get_key"));
         assert!(callees.iter().any(|callee| callee.name == "get_value"));
     }
 
     #[test]
-    #[ignore]
     fn test_macro_stats_tracking() {
         let code = r#"
             fn test() {
@@ -1908,7 +1947,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_nested_macros() {
         let code = r#"
             fn get_item() -> i32 {
@@ -1926,17 +1964,17 @@ mod tests {
         let graph = extract_call_graph(&file, Path::new("test.rs"));
 
         // Should detect the call inside nested macros
-        let test_fn_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "test".to_string(),
-            line: 0,
-        };
-        let callees = graph.get_callees(&test_fn_id);
+        let all_functions = graph.find_all_functions();
+        let test_fn = all_functions
+            .iter()
+            .find(|f| f.name == "test")
+            .expect("test function should exist");
+            
+        let callees = graph.get_callees(test_fn);
         assert!(callees.iter().any(|callee| callee.name == "get_item"));
     }
 
     #[test]
-    #[ignore]
     fn test_logging_macros() {
         let code = r#"
             fn get_debug_info() -> String {
@@ -1962,12 +2000,12 @@ mod tests {
 
         let callees = graph.get_callees(test_fn);
 
-        // Should find at least 2 calls to get_debug_info (from info! and debug!)
-        let debug_calls = callees
-            .iter()
-            .filter(|callee| callee.name == "get_debug_info")
-            .count();
-        assert!(debug_calls >= 2);
+        // Should find get_debug_info in the callee list (called from info! and debug!)
+        // Note: The call graph deduplicates callees, so we only expect one entry
+        assert!(
+            callees.iter().any(|callee| callee.name == "get_debug_info"),
+            "Should find get_debug_info in callees"
+        );
     }
 
     #[test]
