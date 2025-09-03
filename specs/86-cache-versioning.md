@@ -17,14 +17,15 @@ created: 2025-09-03
 
 ## Context
 
-The current cache implementation lacks versioning, which means cached data remains valid even when the analysis algorithms change. This leads to:
+The shared cache implementation in `src/cache/shared_cache.rs` lacks comprehensive versioning, which means cached data remains valid even when the analysis algorithms change. With the shared cache serving multiple projects and potentially multiple versions of debtmap, this leads to:
 - Incorrect analysis results when algorithms are updated
 - No automatic invalidation when debtmap is upgraded
-- Potential compatibility issues between cache format versions
+- Potential compatibility issues between cache format versions across different debtmap installations
 - Silent failures when cache structure changes
 - Developer confusion when cached results don't reflect code changes
+- Conflicts when different debtmap versions access the same shared cache
 
-Cache versioning is critical for maintaining correctness as the analysis engine evolves and ensuring users always get accurate results.
+Cache versioning is critical for maintaining correctness as the analysis engine evolves and ensuring users always get accurate results across all projects using the shared cache.
 
 ## Objective
 
@@ -70,11 +71,17 @@ Implement a robust cache versioning system that automatically invalidates stale 
 
 ### Architecture Changes
 ```rust
+// Extend existing CacheMetadata in shared_cache.rs
 #[derive(Serialize, Deserialize)]
 pub struct CacheMetadata {
+    pub version: String,  // Existing field
+    pub created_at: SystemTime,  // Existing field
+    pub last_accessed: SystemTime,  // Existing field
+    pub access_count: u64,  // Existing field
+    pub size_bytes: u64,  // Existing field
+    // New fields for versioning:
     pub cache_version: CacheVersion,
     pub analyzer_versions: HashMap<String, Version>,
-    pub created_at: DateTime<Utc>,
     pub debtmap_version: String,
 }
 
@@ -90,10 +97,15 @@ pub trait Versioned {
     fn compatible_with(&self, other: &Version) -> bool;
 }
 
-impl AnalysisCache {
+impl SharedCache {
     pub fn validate_version(&self) -> Result<ValidationResult>;
-    pub fn migrate_if_needed(&mut self) -> Result<()>;
-    pub fn invalidate_by_analyzer(&mut self, analyzer: &str) -> Result<()>;
+    pub fn migrate_if_needed(&self) -> Result<()>;
+    pub fn invalidate_by_analyzer(&self, analyzer: &str) -> Result<()>;
+    pub fn is_compatible(&self, key: &str) -> Result<bool>;
+}
+
+impl AnalysisCache {
+    pub fn check_version_compatibility(&self) -> Result<bool>;
 }
 ```
 
@@ -111,11 +123,18 @@ pub const DEBT_ANALYZER_VERSION: Version = Version::new(1, 0, 0);
 pub const DUPLICATION_ANALYZER_VERSION: Version = Version::new(1, 0, 0);
 
 // Cache initialization with version checking
-impl AnalysisCache {
-    pub fn new_versioned(cache_dir: PathBuf) -> Result<Self> {
-        let cache = Self::load_or_create(cache_dir)?;
+impl SharedCache {
+    pub fn new_versioned(repo_path: Option<&Path>) -> Result<Self> {
+        let mut cache = Self::new(repo_path)?;
         cache.validate_and_migrate()?;
         Ok(cache)
+    }
+}
+
+impl AnalysisCache {
+    pub fn new_with_version_check(project_path: Option<&Path>) -> Result<Self> {
+        let shared_cache = SharedCache::new_versioned(project_path)?;
+        // Rest of initialization...
     }
 }
 ```
@@ -124,7 +143,9 @@ impl AnalysisCache {
 
 - **Prerequisites**: None
 - **Affected Components**: 
-  - `src/core/cache.rs` - Cache implementation
+  - `src/cache/shared_cache.rs` - Shared cache versioning
+  - `src/cache/cache_location.rs` - Version-aware cache paths
+  - `src/core/cache.rs` - Analysis cache version checking
   - `src/commands/analyze.rs` - Cache initialization
   - All analyzer modules that contribute to cached data
 - **External Dependencies**: 

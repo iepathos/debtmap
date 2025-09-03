@@ -17,14 +17,14 @@ created: 2025-09-03
 
 ## Context
 
-The current cache implementation in `src/core/cache.rs` has a manual `prune()` method but lacks automatic pruning mechanisms. The cache index file has grown to 8.8MB without any size constraints or automatic cleanup. This can lead to:
-- Excessive disk usage over time
+The shared cache implementation in `src/cache/shared_cache.rs` provides a foundation for cache management but lacks automatic pruning mechanisms. The cache is now stored in a shared location (`.debtmap_cache` in the home directory or configured via environment variables) with component-based organization. Without proper pruning, this shared cache can lead to:
+- Excessive disk usage across all projects using debtmap
 - Slower cache operations due to large index size
-- Stale entries consuming space indefinitely
+- Stale entries from deleted projects consuming space indefinitely
 - Performance degradation when loading/saving the index
 - No automatic cleanup of entries for deleted files
 
-Automatic pruning is essential for maintaining cache efficiency and preventing unbounded growth in long-running projects.
+Automatic pruning is essential for maintaining cache efficiency and preventing unbounded growth across multiple projects using the shared cache.
 
 ## Objective
 
@@ -85,9 +85,14 @@ pub enum PruneStrategy {
     AgeBasedOnly,  // Only remove old entries
 }
 
-impl CacheEntry {
-    pub last_accessed: DateTime<Utc>,  // New field
-    pub access_count: usize,           // For LFU strategy
+// Note: CacheMetadata in SharedCache already has:
+// - last_accessed: SystemTime
+// - access_count: u64
+// These can be leveraged for LRU/LFU strategies
+
+impl SharedCache {
+    pub fn with_auto_pruner(self, pruner: AutoPruner) -> Self;
+    pub fn trigger_pruning(&self) -> Result<PruneStats>;
 }
 ```
 
@@ -98,10 +103,15 @@ impl CacheEntry {
 
 ### APIs and Interfaces
 ```rust
+impl SharedCache {
+    pub fn with_auto_pruning(repo_path: Option<&Path>, pruner: AutoPruner) -> Result<Self>;
+    pub fn trigger_pruning_if_needed(&self) -> Result<PruneStats>;
+    pub fn prune_with_strategy(&self, strategy: PruneStrategy) -> Result<PruneStats>;
+    pub fn cleanup_old_entries(&self, max_age_days: i64) -> Result<usize>;
+}
+
 impl AnalysisCache {
-    pub fn with_auto_pruning(cache_dir: PathBuf, pruner: AutoPruner) -> Result<Self>;
-    pub fn trigger_pruning_if_needed(&mut self) -> Result<PruneStats>;
-    pub fn prune_with_strategy(&mut self, strategy: PruneStrategy) -> Result<PruneStats>;
+    pub fn trigger_shared_cache_pruning(&self) -> Result<PruneStats>;
 }
 ```
 
@@ -109,7 +119,9 @@ impl AnalysisCache {
 
 - **Prerequisites**: None
 - **Affected Components**: 
-  - `src/core/cache.rs` - Main cache implementation
+  - `src/cache/shared_cache.rs` - Shared cache implementation
+  - `src/cache/cache_location.rs` - Cache location management
+  - `src/core/cache.rs` - Analysis cache wrapper
   - `src/commands/analyze.rs` - Cache initialization
 - **External Dependencies**: None
 

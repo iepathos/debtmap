@@ -17,14 +17,14 @@ created: 2025-09-03
 
 ## Context
 
-The current cache implementation only stores `FileMetrics`, but many expensive computations are performed repeatedly:
+The shared cache implementation in `src/cache/shared_cache.rs` provides a component-based caching infrastructure that currently stores `FileMetrics` through the `AnalysisCache` wrapper. However, many expensive computations are performed repeatedly:
 - Call graph construction requires parsing all files
 - Dependency analysis rebuilds graphs on every run
 - Trait resolution happens multiple times
 - Pattern detection re-scans the same code
 - Cross-file analysis isn't cached at all
 
-These operations can take minutes on large codebases, even when the underlying files haven't changed. Extending the cache to cover these computations would dramatically improve performance for incremental analysis.
+The shared cache's component-based design makes it ideal for storing these different types of computational results in separate namespaces. These operations can take minutes on large codebases, even when the underlying files haven't changed. Extending the cache to cover these computations would dramatically improve performance for incremental analysis across all projects using the shared cache.
 
 ## Objective
 
@@ -79,23 +79,37 @@ pub enum CacheableComputation {
     CrossFileRelations(RelationGraph),
 }
 
+// Leverage SharedCache's component-based design
 pub struct ComputationCache {
-    file_cache: AnalysisCache,
-    graph_cache: GraphCache,
-    pattern_cache: PatternCache,
-    relation_cache: RelationCache,
-}
-
-pub struct GraphCache {
-    call_graphs: HashMap<CacheKey, CallGraphData>,
-    dependency_trees: HashMap<CacheKey, DependencyData>,
-    invalidation_map: HashMap<PathBuf, Vec<CacheKey>>,
+    shared_cache: SharedCache,
+    // Components stored in separate namespaces:
+    // - "analysis" for FileMetrics
+    // - "call_graph" for call graph data
+    // - "dependencies" for dependency trees
+    // - "traits" for trait resolutions
+    // - "patterns" for pattern matches
 }
 
 impl ComputationCache {
-    pub fn get_call_graph(&mut self, files: &[PathBuf]) -> Result<CallGraphData>;
-    pub fn get_dependencies(&mut self, module: &Path) -> Result<DependencyData>;
-    pub fn invalidate_related(&mut self, changed_file: &Path) -> Result<()>;
+    pub fn new(repo_path: Option<&Path>) -> Result<Self> {
+        let shared_cache = SharedCache::new(repo_path)?;
+        Ok(Self { shared_cache })
+    }
+    
+    pub fn get_call_graph(&self, files: &[PathBuf]) -> Result<CallGraphData> {
+        let key = self.compute_cache_key(files);
+        self.shared_cache.get(&key, "call_graph")
+    }
+    
+    pub fn get_dependencies(&self, module: &Path) -> Result<DependencyData> {
+        let key = self.compute_cache_key(&[module.to_path_buf()]);
+        self.shared_cache.get(&key, "dependencies")
+    }
+    
+    pub fn invalidate_related(&self, changed_file: &Path) -> Result<()> {
+        // Use SharedCache's component isolation for targeted invalidation
+        self.shared_cache.invalidate_component_entries(changed_file)
+    }
 }
 ```
 
@@ -114,11 +128,22 @@ pub trait Cacheable: Serialize + DeserializeOwned {
 }
 
 impl CallGraphBuilder {
-    pub fn build_with_cache(&mut self, cache: &mut GraphCache) -> Result<CallGraph>;
+    pub fn build_with_cache(&mut self, cache: &ComputationCache) -> Result<CallGraph> {
+        // Try to get from shared cache's "call_graph" component
+        if let Ok(cached) = cache.get_call_graph(&self.files) {
+            return Ok(cached);
+        }
+        // Build and store in cache
+        let graph = self.build()?;
+        cache.shared_cache.put(&key, "call_graph", &graph)?;
+        Ok(graph)
+    }
 }
 
 impl DependencyAnalyzer {
-    pub fn analyze_with_cache(&mut self, cache: &mut ComputationCache) -> Result<Dependencies>;
+    pub fn analyze_with_cache(&mut self, cache: &ComputationCache) -> Result<Dependencies> {
+        // Similar pattern using "dependencies" component
+    }
 }
 ```
 
@@ -126,7 +151,8 @@ impl DependencyAnalyzer {
 
 - **Prerequisites**: [86] Cache Versioning (for version tracking)
 - **Affected Components**: 
-  - `src/core/cache.rs` - Base cache implementation
+  - `src/cache/shared_cache.rs` - Component-based caching backend
+  - `src/core/cache.rs` - Extended to support computation caching
   - `src/analyzers/call_graph.rs` - Call graph caching
   - `src/analyzers/dependency.rs` - Dependency caching
   - `src/analyzers/trait_resolver.rs` - Trait resolution caching

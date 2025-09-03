@@ -17,14 +17,14 @@ created: 2025-09-03
 
 ## Context
 
-The current cache index uses pretty-printed JSON format, resulting in an 8.8MB index file for a moderately-sized project. This causes:
-- Slow disk I/O when loading/saving the cache
-- Excessive disk space usage
-- Network transfer overhead in CI/CD environments
-- Memory pressure when loading large indices
-- Slower cache operations due to I/O bottleneck
+The shared cache implementation in `src/cache/shared_cache.rs` uses pretty-printed JSON format for its index files. With the cache now being shared across multiple projects in `.debtmap_cache`, this causes:
+- Slow disk I/O when loading/saving the cache index
+- Excessive disk space usage in the shared cache location
+- Network transfer overhead in CI/CD environments when caching the shared directory
+- Memory pressure when loading large indices that span multiple projects
+- Slower cache operations due to I/O bottleneck affecting all projects
 
-Compression can reduce the index size by 80-90%, significantly improving cache performance and reducing resource usage.
+Compression can reduce the index size by 80-90%, significantly improving cache performance and reducing resource usage across all projects using the shared cache.
 
 ## Objective
 
@@ -83,12 +83,17 @@ pub struct CompressedCache {
     compression_level: i32,
 }
 
-impl AnalysisCache {
+impl SharedCache {
     pub fn save_compressed(&self) -> Result<()>;
-    pub fn load_auto_detect(path: &Path) -> Result<Self>;
+    pub fn load_auto_detect(location: &CacheLocation) -> Result<CacheIndex>;
     pub fn export_debug(&self, path: &Path) -> Result<()>;
     pub fn get_format(&self) -> CacheFormat;
-    pub fn migrate_format(&mut self, new_format: CacheFormat) -> Result<()>;
+    pub fn migrate_format(&self, new_format: CacheFormat) -> Result<()>;
+}
+
+impl CacheIndex {
+    pub fn serialize_compressed<W: Write>(&self, writer: W, format: CacheFormat) -> Result<()>;
+    pub fn deserialize_compressed<R: Read>(reader: R) -> Result<Self>;
 }
 
 // Magic bytes for format detection
@@ -111,11 +116,18 @@ pub trait CacheSerializer {
     fn detect_format<R: Read>(reader: R) -> Result<CacheFormat>;
 }
 
-impl CacheConfig {
+impl CacheLocation {
     pub fn compression_format(&self) -> CacheFormat {
-        env::var("DEBTMAP_CACHE_FORMAT")
-            .map(|s| CacheFormat::from_str(&s))
-            .unwrap_or(CacheFormat::ZstdJson)
+        // Check strategy-specific settings first
+        match &self.strategy {
+            CacheStrategy::Shared { .. } => {
+                env::var("DEBTMAP_SHARED_CACHE_FORMAT")
+                    .or_else(|_| env::var("DEBTMAP_CACHE_FORMAT"))
+                    .map(|s| CacheFormat::from_str(&s))
+                    .unwrap_or(CacheFormat::ZstdJson)
+            }
+            _ => CacheFormat::ZstdJson,
+        }
     }
 }
 ```
@@ -124,7 +136,9 @@ impl CacheConfig {
 
 - **Prerequisites**: None
 - **Affected Components**: 
-  - `src/core/cache.rs` - Cache implementation
+  - `src/cache/shared_cache.rs` - Shared cache compression
+  - `src/cache/cache_location.rs` - Format configuration
+  - `src/core/cache.rs` - Analysis cache interaction
   - `src/commands/analyze.rs` - Cache configuration
 - **External Dependencies**: 
   - `flate2` for gzip compression
