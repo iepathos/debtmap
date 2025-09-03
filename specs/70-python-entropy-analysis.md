@@ -4,8 +4,9 @@ title: Python Entropy Analysis Support
 category: foundation
 priority: high
 status: draft
-dependencies: []
+dependencies: [90]
 created: 2025-09-01
+updated: 2025-09-03
 ---
 
 # Specification 70: Python Entropy Analysis Support
@@ -13,7 +14,7 @@ created: 2025-09-01
 **Category**: foundation
 **Priority**: high
 **Status**: draft
-**Dependencies**: None
+**Dependencies**: Spec 90 (Language-Agnostic Entropy Framework)
 
 ## Context
 
@@ -27,16 +28,16 @@ Entropy analysis helps identify:
 
 ## Objective
 
-Implement comprehensive entropy analysis for Python code that matches or exceeds the capabilities of the Rust analyzer, providing entropy scores for Python functions and modules to enhance code quality assessment.
+Implement Python-specific entropy analysis by creating a PythonEntropyAnalyzer that integrates with the language-agnostic entropy framework (spec 90), providing entropy scores for Python functions and modules that account for Python-specific patterns and constructs.
 
 ## Requirements
 
 ### Functional Requirements
-- Calculate token entropy for Python AST nodes
-- Measure pattern repetition in Python code structures
-- Provide entropy scores at function and module levels
-- Support configurable entropy thresholds
-- Integrate with existing Python complexity metrics
+- Implement LanguageEntropyAnalyzer trait for Python
+- Extract Python-specific tokens from rustpython_parser AST
+- Detect Python-specific patterns (list comprehensions, decorators, context managers)
+- Identify Python branch structures (if/elif/else, try/except, match/case)
+- Integrate with UniversalEntropyCalculator from spec 90
 
 ### Non-Functional Requirements
 - Performance overhead < 5% for typical Python files
@@ -46,51 +47,71 @@ Implement comprehensive entropy analysis for Python code that matches or exceeds
 
 ## Acceptance Criteria
 
-- [ ] EntropyAnalyzer implemented for Python AST
-- [ ] Token entropy calculation (0.0 to 1.0 scale)
-- [ ] Pattern repetition detection for Python constructs
-- [ ] Entropy scores included in FunctionMetrics
-- [ ] Configuration support via EntropyConfig
+- [ ] PythonEntropyAnalyzer implements LanguageEntropyAnalyzer trait
+- [ ] Python token extraction handles all Python 3.x syntax
+- [ ] Pattern detection includes Python-specific constructs
+- [ ] Branch similarity works with if/elif chains
+- [ ] Exception handling patterns detected
+- [ ] Comprehensions and generators properly analyzed
+- [ ] Integration with UniversalEntropyCalculator working
+- [ ] Entropy scores match expected ranges for Python code
 - [ ] Unit tests with > 90% coverage
-- [ ] Integration with Python analyzer pipeline
 - [ ] Performance benchmarks showing < 5% overhead
 
 ## Technical Details
 
 ### Implementation Approach
-1. Create `complexity::python_entropy` module
-2. Port EntropyAnalyzer to work with rustpython_parser AST
-3. Implement Python-specific token classification
-4. Add entropy field to Python FunctionMetrics
-5. Integrate with analyze_python_file workflow
+1. Create `complexity::languages::python.rs` module
+2. Implement LanguageEntropyAnalyzer trait for Python
+3. Map rustpython_parser AST nodes to token categories
+4. Handle Python-specific patterns and idioms
+5. Integrate with UniversalEntropyCalculator in analyze_python_file
 
 ### Architecture Changes
-- New module: `src/complexity/python_entropy.rs`
-- Extend PythonAnalyzer to calculate entropy
-- Add entropy configuration to Python analysis
+- New module: `src/complexity/languages/python.rs`
+- PythonAnalyzer uses UniversalEntropyCalculator
+- Leverage shared entropy algorithms from spec 90
 
 ### Data Structures
 ```rust
 pub struct PythonEntropyAnalyzer {
-    token_counts: HashMap<String, usize>,
-    total_tokens: usize,
-    pattern_cache: HashMap<u64, usize>,
+    // Implements LanguageEntropyAnalyzer trait
 }
 
-pub struct PythonEntropyScore {
-    pub token_entropy: f32,
-    pub pattern_repetition: f32,
-    pub overall_score: f32,
+impl LanguageEntropyAnalyzer for PythonEntropyAnalyzer {
+    type AstNode = rustpython_parser::ast::Stmt;
+    type Token = PythonToken;
+    
+    fn extract_tokens(&self, node: &Self::AstNode) -> Vec<Self::Token>;
+    fn detect_patterns(&self, node: &Self::AstNode) -> PatternMetrics;
+    fn calculate_branch_similarity(&self, node: &Self::AstNode) -> f64;
+    fn analyze_structure(&self, node: &Self::AstNode) -> (usize, u32);
+}
+
+pub enum PythonToken {
+    Keyword(String),        // if, elif, else, for, while, etc.
+    Operator(String),       // +, -, ==, is, in, not, etc.
+    Identifier(String),     // Variable and function names
+    Literal(PythonLiteral), // Numbers, strings, etc.
+    Comprehension,          // List/dict/set comprehensions
+    Decorator(String),      // @property, @staticmethod, etc.
+    ContextManager,         // with statements
+    Exception(String),      // Exception types
 }
 ```
 
 ### APIs and Interfaces
-- `PythonEntropyAnalyzer::calculate_entropy(&mut self, stmts: &[ast::Stmt]) -> PythonEntropyScore`
-- Integration with existing Python metrics extraction
+```rust
+// In src/analyzers/python.rs
+let mut calculator = UniversalEntropyCalculator::new();
+let analyzer = PythonEntropyAnalyzer::new();
+let entropy_score = calculator.calculate(&analyzer, &function_body);
+metrics.entropy_score = Some(entropy_score);
+```
 
 ## Dependencies
 
-- **Prerequisites**: None
+- **Prerequisites**: Spec 90 (Language-Agnostic Entropy Framework)
 - **Affected Components**: 
   - `src/analyzers/python.rs`
   - `src/core/metrics.rs`
@@ -111,10 +132,24 @@ pub struct PythonEntropyScore {
 
 ## Implementation Notes
 
-- Reuse token classification logic where possible
-- Consider Python-specific patterns (list comprehensions, decorators)
-- Handle Python 3.x syntax variations
-- Account for docstrings and comments appropriately
+### Python-Specific Patterns to Detect
+- **List/Dict/Set Comprehensions**: Compact but can be complex
+- **Decorators**: Add metadata and behavior modification
+- **Context Managers**: Resource management patterns
+- **Exception Chains**: try/except/else/finally blocks
+- **Generator Expressions**: Lazy evaluation patterns
+- **Lambda Functions**: Anonymous function complexity
+- **Multiple Assignment**: Tuple unpacking patterns
+- **Walrus Operator**: Assignment expressions (Python 3.8+)
+- **Match/Case**: Structural pattern matching (Python 3.10+)
+
+### Token Classification Considerations
+- Python uses `and/or/not` instead of `&&/||/!`
+- `is/is not` for identity comparison
+- `in/not in` for membership testing
+- Indentation-based blocks (no braces)
+- Triple-quoted strings for docstrings
+- f-strings for formatting
 
 ## Migration and Compatibility
 
