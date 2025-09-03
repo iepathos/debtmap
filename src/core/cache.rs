@@ -35,6 +35,23 @@ impl AnalysisCache {
     /// Create a new cache instance using shared cache backend
     pub fn new(project_path: Option<&Path>) -> Result<Self> {
         let shared_cache = SharedCache::new(project_path)?;
+        Self::new_with_shared_cache(shared_cache)
+    }
+
+    /// Create a new cache instance with explicit cache directory (for testing)
+    pub fn new_with_cache_dir(project_path: Option<&Path>, cache_dir: PathBuf) -> Result<Self> {
+        let shared_cache = SharedCache::new_with_cache_dir(project_path, cache_dir)?;
+        Self::new_with_shared_cache(shared_cache)
+    }
+
+    /// Create a new cache instance with legacy path (for compatibility)
+    pub fn new_with_path(_cache_dir: PathBuf) -> Result<Self> {
+        // Ignore the provided cache_dir and use shared cache
+        Self::new(None)
+    }
+
+    /// Create cache instance with shared cache backend
+    fn new_with_shared_cache(shared_cache: SharedCache) -> Result<Self> {
         let memory_index = Self::load_memory_index(&shared_cache).unwrap_or_default();
 
         Ok(Self {
@@ -43,12 +60,6 @@ impl AnalysisCache {
             hits: 0,
             misses: 0,
         })
-    }
-
-    /// Create a new cache instance with legacy path (for compatibility)
-    pub fn new_with_path(_cache_dir: PathBuf) -> Result<Self> {
-        // Ignore the provided cache_dir and use shared cache
-        Self::new(None)
     }
 
     /// Get cached metrics or compute new ones
@@ -366,9 +377,10 @@ mod tests {
     #[test]
     fn test_cache_stats() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
-        std::env::remove_var("DEBTMAP_CACHE_DIR");
+
+        let cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         assert_eq!(cache.stats().entries, 0);
         assert_eq!(cache.stats().hits, 0);
@@ -389,8 +401,10 @@ mod tests {
     #[test]
     fn test_try_cache_hit_with_valid_entry() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         let file_info = FileInfo {
             hash: "test_hash".to_string(),
@@ -413,8 +427,10 @@ mod tests {
     #[test]
     fn test_try_cache_hit_with_outdated_entry() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         let file_info = FileInfo {
             hash: "test_hash".to_string(),
@@ -437,8 +453,10 @@ mod tests {
     #[test]
     fn test_try_cache_hit_with_missing_entry() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         let file_info = FileInfo {
             hash: "nonexistent_hash".to_string(),
@@ -453,8 +471,10 @@ mod tests {
     #[test]
     fn test_compute_and_cache_success() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         let file_info = FileInfo {
             hash: "new_hash".to_string(),
@@ -473,8 +493,10 @@ mod tests {
     #[test]
     fn test_compute_and_cache_failure() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         let file_info = FileInfo {
             hash: "error_hash".to_string(),
@@ -496,8 +518,9 @@ mod tests {
         let test_file = temp_dir.path().join("test.rs");
         fs::write(&test_file, "fn main() {}").unwrap();
 
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         // First call - should compute and cache
         let compute = || Ok(create_test_metrics());
@@ -512,14 +535,15 @@ mod tests {
         assert!(result2.is_ok());
         assert_eq!(cache.misses, 1);
         assert_eq!(cache.hits, 1);
-        std::env::remove_var("DEBTMAP_CACHE_DIR");
     }
 
     #[test]
     fn test_clear_cache() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         let entry = CacheEntry {
             file_hash: "test_hash".to_string(),
@@ -538,14 +562,15 @@ mod tests {
         assert_eq!(cache.memory_index.len(), 0);
         assert_eq!(cache.hits, 0);
         assert_eq!(cache.misses, 0);
-        std::env::remove_var("DEBTMAP_CACHE_DIR");
     }
 
     #[test]
     fn test_prune_old_entries() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
 
         let old_entry = CacheEntry {
             file_hash: "old_hash".to_string(),
@@ -731,8 +756,10 @@ mod tests {
     #[test]
     fn test_load_previous_from_cache() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let mut cache =
+            AnalysisCache::new_with_cache_dir(Some(temp_dir.path()), temp_dir.path().to_path_buf())
+                .unwrap();
         let mut inc = IncrementalAnalysis::new();
 
         // Add entries to cache

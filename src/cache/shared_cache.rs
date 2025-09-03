@@ -38,6 +38,18 @@ impl SharedCache {
     /// Create a new shared cache instance
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
         let location = CacheLocation::resolve(repo_path)?;
+        Self::new_with_location(location)
+    }
+
+    /// Create a new shared cache instance with explicit cache directory (for testing)
+    pub fn new_with_cache_dir(repo_path: Option<&Path>, cache_dir: PathBuf) -> Result<Self> {
+        let strategy = CacheStrategy::Custom(cache_dir);
+        let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
+        Self::new_with_location(location)
+    }
+
+    /// Create a new shared cache instance with explicit location
+    fn new_with_location(location: CacheLocation) -> Result<Self> {
         location.ensure_directories()?;
 
         let index = Self::load_or_create_index(&location)?;

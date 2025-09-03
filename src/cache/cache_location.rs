@@ -29,6 +29,14 @@ impl CacheLocation {
             CacheStrategy::Shared // Default to shared XDG-compliant location
         };
 
+        Self::resolve_with_strategy(repo_path, strategy)
+    }
+
+    /// Resolve cache location with an explicit strategy (for testing)
+    pub fn resolve_with_strategy(
+        repo_path: Option<&Path>,
+        strategy: CacheStrategy,
+    ) -> Result<Self> {
         let repo = repo_path.unwrap_or_else(|| Path::new("."));
         let project_id = Self::generate_project_id(repo)?;
 
