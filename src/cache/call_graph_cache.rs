@@ -1,3 +1,4 @@
+use crate::cache::shared_cache::SharedCache;
 use crate::priority::call_graph::CallGraph;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -35,38 +36,60 @@ pub struct CacheEntry {
 
 /// Call graph cache manager
 pub struct CallGraphCache {
-    /// Cache directory path
-    cache_dir: PathBuf,
+    /// Shared cache backend
+    shared_cache: SharedCache,
     /// In-memory cache for current session
     memory_cache: HashMap<CacheKey, CacheEntry>,
     /// Maximum cache age in seconds
     max_age: u64,
+    /// Legacy cache directory path (for migration)
+    _legacy_cache_dir: Option<PathBuf>,
 }
 
 impl CallGraphCache {
     /// Create a new cache manager
     pub fn new() -> Result<Self> {
-        let cache_dir = Self::get_cache_dir()?;
-        fs::create_dir_all(&cache_dir)
-            .with_context(|| format!("Failed to create cache directory: {:?}", cache_dir))?;
+        // Create shared cache instance
+        let shared_cache = SharedCache::new(None)?;
+
+        // Check for legacy cache directory
+        let legacy_cache_dir = Self::get_legacy_cache_dir();
+
+        // Perform migration if needed
+        if let Some(ref legacy_dir) = legacy_cache_dir {
+            if legacy_dir.exists() {
+                log::info!("Migrating cache from legacy location: {:?}", legacy_dir);
+                if let Err(e) = shared_cache.migrate_from_local(legacy_dir) {
+                    log::warn!("Failed to migrate legacy cache: {}", e);
+                }
+            }
+        }
 
         Ok(Self {
-            cache_dir,
+            shared_cache,
             memory_cache: HashMap::new(),
             max_age: 3600 * 24, // 24 hours by default
+            _legacy_cache_dir: legacy_cache_dir,
         })
     }
 
-    /// Get the cache directory path
-    fn get_cache_dir() -> Result<PathBuf> {
-        // Try to use XDG cache directory first, fall back to temp
-        if let Some(cache_dir) = dirs::cache_dir() {
-            Ok(cache_dir.join("debtmap").join("call_graphs"))
-        } else {
-            Ok(std::env::temp_dir()
-                .join("debtmap_cache")
-                .join("call_graphs"))
+    /// Get the legacy cache directory path (for migration)
+    fn get_legacy_cache_dir() -> Option<PathBuf> {
+        // Check for .debtmap_cache in current directory
+        let local_cache = PathBuf::from(".debtmap_cache");
+        if local_cache.exists() {
+            return Some(local_cache);
         }
+
+        // Check for old XDG location
+        if let Some(cache_dir) = dirs::cache_dir() {
+            let old_cache = cache_dir.join("debtmap").join("call_graphs");
+            if old_cache.exists() {
+                return Some(old_cache);
+            }
+        }
+
+        None
     }
 
     /// Generate a cache key for the given project and files
@@ -125,17 +148,20 @@ impl CallGraphCache {
             }
         }
 
-        // Check disk cache
-        if let Ok(entry) = self.load_from_disk(key) {
-            if self.is_valid_entry(&entry) {
-                log::info!("Using disk-cached call graph");
-                // Store in memory cache for faster access
-                self.memory_cache.insert(key.clone(), entry.clone());
-                return Some((
-                    entry.call_graph,
-                    entry.framework_exclusions,
-                    entry.function_pointer_used,
-                ));
+        // Check shared cache
+        let cache_key = self.generate_cache_key(key);
+        if let Ok(data) = self.shared_cache.get(&cache_key, "call_graphs") {
+            if let Ok(entry) = serde_json::from_slice::<CacheEntry>(&data) {
+                if self.is_valid_entry(&entry) {
+                    log::info!("Using shared cached call graph");
+                    // Store in memory cache for faster access
+                    self.memory_cache.insert(key.clone(), entry.clone());
+                    return Some((
+                        entry.call_graph,
+                        entry.framework_exclusions,
+                        entry.function_pointer_used,
+                    ));
+                }
             }
         }
 
@@ -162,8 +188,10 @@ impl CallGraphCache {
         // Store in memory cache
         self.memory_cache.insert(key.clone(), entry.clone());
 
-        // Store on disk
-        self.save_to_disk(&key, &entry)?;
+        // Store in shared cache
+        let cache_key = self.generate_cache_key(&key);
+        let data = serde_json::to_vec(&entry).context("Failed to serialize cache entry")?;
+        self.shared_cache.put(&cache_key, "call_graphs", &data)?;
 
         Ok(())
     }
@@ -196,41 +224,11 @@ impl CallGraphCache {
         true
     }
 
-    /// Load cache entry from disk
-    fn load_from_disk(&self, key: &CacheKey) -> Result<CacheEntry> {
-        let cache_file = self.get_cache_file_path(key);
-
-        if !cache_file.exists() {
-            anyhow::bail!("Cache file does not exist");
-        }
-
-        let content = fs::read_to_string(&cache_file)
-            .with_context(|| format!("Failed to read cache file: {:?}", cache_file))?;
-
-        let entry: CacheEntry =
-            serde_json::from_str(&content).with_context(|| "Failed to deserialize cache entry")?;
-
-        Ok(entry)
-    }
-
-    /// Save cache entry to disk
-    fn save_to_disk(&self, key: &CacheKey, entry: &CacheEntry) -> Result<()> {
-        let cache_file = self.get_cache_file_path(key);
-
-        let content = serde_json::to_string_pretty(entry)
-            .with_context(|| "Failed to serialize cache entry")?;
-
-        fs::write(&cache_file, content)
-            .with_context(|| format!("Failed to write cache file: {:?}", cache_file))?;
-
-        Ok(())
-    }
-
-    /// Get the cache file path for a given key
-    fn get_cache_file_path(&self, key: &CacheKey) -> PathBuf {
-        // Use first 16 chars of source hash as filename
-        let filename = format!("{}.json", &key.source_hash[..16.min(key.source_hash.len())]);
-        self.cache_dir.join(filename)
+    /// Generate a string cache key from the CacheKey struct
+    fn generate_cache_key(&self, key: &CacheKey) -> String {
+        // Use source hash as the primary key component
+        // Truncate to 32 chars for reasonable length
+        key.source_hash[..32.min(key.source_hash.len())].to_string()
     }
 
     /// Clear all cached entries
@@ -238,17 +236,17 @@ impl CallGraphCache {
         // Clear memory cache
         self.memory_cache.clear();
 
-        // Clear disk cache
-        if self.cache_dir.exists() {
-            for entry in fs::read_dir(&self.cache_dir)? {
-                let entry = entry?;
-                if entry.path().extension() == Some(std::ffi::OsStr::new("json")) {
-                    fs::remove_file(entry.path())?;
-                }
-            }
-        }
+        // Clear shared cache by component
+        // Note: This only clears call_graphs component
+        log::info!("Clearing call graph cache");
+        self.shared_cache.cleanup()?;
 
         Ok(())
+    }
+
+    /// Get cache statistics
+    pub fn get_stats(&self) -> Result<crate::cache::CacheStats> {
+        self.shared_cache.get_stats()
     }
 }
 

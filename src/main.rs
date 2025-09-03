@@ -38,11 +38,43 @@ fn main() -> Result<()> {
             use_cache,
             no_cache,
             clear_cache,
+            cache_stats,
+            migrate_cache,
+            cache_location,
             multi_pass,
             show_attribution,
             detail_level,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
+
+            // Handle cache location environment variable
+            if let Some(ref location) = cache_location {
+                std::env::set_var("DEBTMAP_CACHE_DIR", location);
+            }
+
+            // Handle cache stats display
+            if cache_stats {
+                let cache = debtmap::cache::SharedCache::new(Some(&path))?;
+                let stats = cache.get_stats()?;
+                println!("{}", stats);
+                return Ok(());
+            }
+
+            // Handle cache migration
+            if migrate_cache {
+                let cache = debtmap::cache::SharedCache::new(Some(&path))?;
+                let local_cache = path.join(".debtmap_cache");
+                if local_cache.exists() {
+                    println!("Migrating cache from local to shared location...");
+                    cache.migrate_from_local(&local_cache)?;
+                    println!("Cache migration complete!");
+                    // Optionally remove local cache after successful migration
+                    if std::fs::remove_dir_all(&local_cache).is_ok() {
+                        println!("Local cache removed.");
+                    }
+                }
+                return Ok(());
+            }
 
             // Set context-aware environment variable (enabled by default)
             if !no_context_aware {
@@ -86,6 +118,9 @@ fn main() -> Result<()> {
                 use_cache,
                 no_cache,
                 clear_cache,
+                cache_stats: false,   // Already handled above
+                migrate_cache: false, // Already handled above
+                cache_location: cache_location.clone(),
                 multi_pass,
                 show_attribution,
                 detail_level,
