@@ -138,6 +138,18 @@ pub enum Commands {
         #[arg(long = "clear-cache")]
         clear_cache: bool,
 
+        /// Show cache statistics and location
+        #[arg(long = "cache-stats")]
+        cache_stats: bool,
+
+        /// Migrate cache from local to shared location
+        #[arg(long = "migrate-cache")]
+        migrate_cache: bool,
+
+        /// Cache location strategy (local, shared, or path)
+        #[arg(long = "cache-location", env = "DEBTMAP_CACHE_DIR")]
+        cache_location: Option<String>,
+
         /// Enable multi-pass analysis with attribution
         #[arg(long = "multi-pass")]
         multi_pass: bool,
