@@ -246,7 +246,7 @@ impl CallGraphCache {
 
     /// Get cache statistics
     pub fn get_stats(&self) -> Result<crate::cache::CacheStats> {
-        self.shared_cache.get_stats()
+        Ok(self.shared_cache.get_stats())
     }
 }
 

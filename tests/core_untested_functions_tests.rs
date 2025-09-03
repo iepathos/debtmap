@@ -96,7 +96,7 @@ mod test_load_previous {
     fn test_load_previous_empty_cache() {
         let mut inc = IncrementalAnalysis::new();
         let temp_dir = TempDir::new().unwrap();
-        let cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         inc.load_previous(&cache);
 
@@ -107,7 +107,7 @@ mod test_load_previous {
     fn test_load_previous_single_entry() {
         let mut inc = IncrementalAnalysis::new();
         let temp_dir = TempDir::new().unwrap();
-        let cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         // Load from cache (which is empty initially)
         inc.load_previous(&cache);
@@ -120,7 +120,7 @@ mod test_load_previous {
     fn test_load_previous_multiple_entries() {
         let mut inc = IncrementalAnalysis::new();
         let temp_dir = TempDir::new().unwrap();
-        let cache = AnalysisCache::new(temp_dir.path().to_path_buf()).unwrap();
+        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         // Load from cache
         inc.load_previous(&cache);

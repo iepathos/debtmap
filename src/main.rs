@@ -55,7 +55,7 @@ fn main() -> Result<()> {
             // Handle cache stats display
             if cache_stats {
                 let cache = debtmap::cache::SharedCache::new(Some(&path))?;
-                let stats = cache.get_stats()?;
+                let stats = cache.get_full_stats()?;
                 println!("{}", stats);
                 return Ok(());
             }

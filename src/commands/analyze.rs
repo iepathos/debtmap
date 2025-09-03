@@ -55,9 +55,9 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
 
     // Handle cache flags
     if config.clear_cache {
-        let cache_dir = config.path.join(".debtmap_cache");
-        if cache_dir.exists() {
-            std::fs::remove_dir_all(&cache_dir)?;
+        // Clear cache using the shared cache system
+        if let Ok(mut cache) = core::cache::AnalysisCache::new(Some(&config.path)) {
+            cache.clear()?;
             log::info!("Cache cleared");
         }
     }
@@ -142,10 +142,9 @@ fn analyze_project(
         .context("Failed to find project files")?;
 
     // Initialize cache (enabled by default unless DEBTMAP_NO_CACHE is set)
-    let cache_dir = path.join(".debtmap_cache");
     let cache_enabled = std::env::var("DEBTMAP_NO_CACHE").is_err();
     let mut cache = if cache_enabled {
-        match core::cache::AnalysisCache::new(cache_dir) {
+        match core::cache::AnalysisCache::new(Some(&path)) {
             Ok(c) => Some(c),
             Err(e) => {
                 log::warn!("Failed to initialize cache: {}", e);

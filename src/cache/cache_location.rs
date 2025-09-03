@@ -5,11 +5,9 @@ use std::path::{Path, PathBuf};
 /// Strategy for cache storage location
 #[derive(Debug, Clone, PartialEq)]
 pub enum CacheStrategy {
-    /// Store cache in .debtmap_cache within repository (legacy)
-    Local,
     /// Store cache in XDG-compliant shared directory (default)
     Shared,
-    /// Store cache in user-specified location
+    /// Store cache in user-specified location  
     Custom(PathBuf),
 }
 
@@ -24,38 +22,23 @@ pub struct CacheLocation {
 impl CacheLocation {
     /// Resolve cache location based on environment and defaults
     pub fn resolve(repo_path: Option<&Path>) -> Result<Self> {
-        // Check environment variables first
+        // Check if user specified a custom cache directory
         let strategy = if let Ok(custom_dir) = std::env::var("DEBTMAP_CACHE_DIR") {
             CacheStrategy::Custom(PathBuf::from(custom_dir))
-        } else if let Ok(strategy_str) = std::env::var("DEBTMAP_CACHE_STRATEGY") {
-            match strategy_str.as_str() {
-                "local" => CacheStrategy::Local,
-                "shared" => CacheStrategy::Shared,
-                _ => CacheStrategy::Shared, // Default to shared for unknown values
-            }
         } else {
-            CacheStrategy::Shared // Default strategy
+            CacheStrategy::Shared // Default to shared XDG-compliant location
         };
 
-        let (base_path, project_id) = match &strategy {
-            CacheStrategy::Local => {
-                let repo = repo_path.unwrap_or_else(|| Path::new("."));
-                let base = repo.join(".debtmap_cache");
-                let id = Self::generate_project_id(repo)?;
-                (base, id)
-            }
+        let repo = repo_path.unwrap_or_else(|| Path::new("."));
+        let project_id = Self::generate_project_id(repo)?;
+        
+        let base_path = match &strategy {
             CacheStrategy::Shared => {
                 let cache_dir = Self::get_shared_cache_dir()?;
-                let repo = repo_path.unwrap_or_else(|| Path::new("."));
-                let id = Self::generate_project_id(repo)?;
-                let base = cache_dir.join("projects").join(&id);
-                (base, id)
+                cache_dir.join("projects").join(&project_id)
             }
             CacheStrategy::Custom(path) => {
-                let repo = repo_path.unwrap_or_else(|| Path::new("."));
-                let id = Self::generate_project_id(repo)?;
-                let base = path.join("debtmap").join("projects").join(&id);
-                (base, id)
+                path.join("debtmap").join("projects").join(&project_id)
             }
         };
 
@@ -190,7 +173,7 @@ impl CacheLocation {
             .with_context(|| format!("Failed to create cache directory: {:?}", self.base_path))?;
 
         // Create subdirectories for different cache types
-        let subdirs = ["call_graphs", "analysis", "metadata", "temp"];
+        let subdirs = ["call_graphs", "analysis", "metadata", "temp", "file_metrics"];
         for subdir in &subdirs {
             let path = self.base_path.join(subdir);
             std::fs::create_dir_all(&path)
@@ -227,17 +210,9 @@ mod tests {
         assert!(matches!(location.strategy, CacheStrategy::Custom(_)));
         env::remove_var("DEBTMAP_CACHE_DIR");
 
-        // Test DEBTMAP_CACHE_STRATEGY=local
-        env::set_var("DEBTMAP_CACHE_STRATEGY", "local");
-        let location = CacheLocation::resolve(None).unwrap();
-        assert_eq!(location.strategy, CacheStrategy::Local);
-        env::remove_var("DEBTMAP_CACHE_STRATEGY");
-
-        // Test DEBTMAP_CACHE_STRATEGY=shared
-        env::set_var("DEBTMAP_CACHE_STRATEGY", "shared");
+        // Test default (no env vars) = shared
         let location = CacheLocation::resolve(None).unwrap();
         assert_eq!(location.strategy, CacheStrategy::Shared);
-        env::remove_var("DEBTMAP_CACHE_STRATEGY");
     }
 
     #[test]
