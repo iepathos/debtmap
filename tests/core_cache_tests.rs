@@ -12,7 +12,7 @@ impl EnvGuard {
     fn new() -> Self {
         Self { vars: Vec::new() }
     }
-    
+
     fn set(&mut self, key: &str, value: &str) {
         let old = std::env::var(key).ok();
         self.vars.push((key.to_string(), old));
@@ -70,7 +70,7 @@ fn test_cache_new_creates_directory() {
     assert!(!cache_path.exists());
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", cache_path.to_str().unwrap());
-    let cache = AnalysisCache::new(None).unwrap();
+    let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
     // The cache will be in the shared location, not the local path
 
     // Verify initial stats
@@ -89,7 +89,7 @@ fn test_cache_get_or_compute_miss_then_hit() {
 
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // First call should be a miss
     let compute_count = std::cell::RefCell::new(0);
@@ -127,7 +127,7 @@ fn test_cache_invalidation_on_file_change() {
 
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Initial computation
     let compute_count = std::cell::RefCell::new(0);
@@ -165,7 +165,7 @@ fn test_cache_clear() {
 
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Add entry to cache
     cache
@@ -193,7 +193,7 @@ fn test_cache_stats_hit_rate_calculation() {
     let temp_dir = TempDir::new().unwrap();
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Create test files
     for i in 0..3 {
@@ -230,7 +230,7 @@ fn test_cache_prune_old_entries() {
     let temp_dir = TempDir::new().unwrap();
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Create test files and add to cache
     for i in 0..3 {
@@ -274,7 +274,7 @@ fn test_cache_persistence_across_instances() {
     {
         let mut env = EnvGuard::new();
         env.set("DEBTMAP_CACHE_DIR", cache_dir.to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
         cache
             .get_or_compute(&test_file, || Ok(create_test_metrics("test.rs", 2, 3)))
             .unwrap();
@@ -287,7 +287,7 @@ fn test_cache_persistence_across_instances() {
     {
         let mut env = EnvGuard::new();
         env.set("DEBTMAP_CACHE_DIR", cache_dir.to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         // Access should be a hit
         let compute_called = std::cell::RefCell::new(false);
@@ -312,7 +312,7 @@ fn test_cache_handles_io_errors_gracefully() {
 
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Should return error for non-existent file
     let result = cache.get_or_compute(&non_existent_file, || {
@@ -332,7 +332,7 @@ fn test_cache_compute_function_error_handling() {
 
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Compute function returns error
     let result = cache.get_or_compute(&test_file, || Err(anyhow::anyhow!("Compute failed")));
@@ -347,7 +347,7 @@ fn test_cache_with_different_file_types() {
     let temp_dir = TempDir::new().unwrap();
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Test with different file extensions
     let files = vec![
@@ -381,7 +381,7 @@ fn test_cache_stats_display_formatting() {
     let temp_dir = TempDir::new().unwrap();
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let cache = AnalysisCache::new(None).unwrap();
+    let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     let stats = cache.stats();
     let display = format!("{stats}");
@@ -401,7 +401,7 @@ fn test_cache_handles_concurrent_modifications() {
 
     let mut env = EnvGuard::new();
     env.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-    let mut cache = AnalysisCache::new(None).unwrap();
+    let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
     // Add initial entry
     cache

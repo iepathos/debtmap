@@ -340,7 +340,13 @@ impl SharedCache {
     /// Clear all cache entries for this project
     pub fn clear_project(&self) -> Result<()> {
         // Clear all files in all components
-        for component in &["call_graphs", "analysis", "metadata", "temp", "file_metrics"] {
+        for component in &[
+            "call_graphs",
+            "analysis",
+            "metadata",
+            "temp",
+            "file_metrics",
+        ] {
             let component_path = self.location.get_component_path(component);
             if component_path.exists() {
                 // Remove all files in component directory and sharded subdirectories
@@ -366,7 +372,9 @@ impl SharedCache {
 
         // Clear index
         {
-            let mut index = self.index.write()
+            let mut index = self
+                .index
+                .write()
                 .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
             index.entries.clear();
             index.total_size = 0;

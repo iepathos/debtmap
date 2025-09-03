@@ -89,7 +89,9 @@ impl AnalysisCache {
                 if entry.timestamp >= file_info.modified {
                     self.hits += 1;
                     // Store in memory for faster access
-                    self.memory_index = self.memory_index.update(file_info.hash.clone(), entry.clone());
+                    self.memory_index = self
+                        .memory_index
+                        .update(file_info.hash.clone(), entry.clone());
                     return Some(Ok(entry.metrics));
                 }
             }
@@ -117,12 +119,15 @@ impl AnalysisCache {
             };
 
             // Update memory cache
-            self.memory_index = self.memory_index.update(file_info.hash.clone(), entry.clone());
-            
+            self.memory_index = self
+                .memory_index
+                .update(file_info.hash.clone(), entry.clone());
+
             // Store in shared cache
             let data = serde_json::to_vec(&entry)?;
-            self.shared_cache.put(&file_info.hash, "file_metrics", &data)?;
-            
+            self.shared_cache
+                .put(&file_info.hash, "file_metrics", &data)?;
+
             Ok(metrics)
         }))
     }
@@ -157,7 +162,7 @@ impl AnalysisCache {
     pub fn stats(&self) -> CacheStats {
         let shared_stats = self.shared_cache.get_stats();
         CacheStats {
-            entries: self.memory_index.len() + shared_stats.entry_count,
+            entries: shared_stats.entry_count,
             hits: self.hits,
             misses: self.misses,
             hit_rate: if self.hits + self.misses > 0 {
@@ -172,6 +177,7 @@ impl AnalysisCache {
     pub fn prune(&mut self, max_age_days: i64) -> Result<()> {
         let cutoff = Utc::now() - chrono::Duration::days(max_age_days);
 
+        // Filter memory index
         self.memory_index = self
             .memory_index
             .clone()
@@ -179,7 +185,11 @@ impl AnalysisCache {
             .filter(|(_, entry)| entry.timestamp > cutoff)
             .collect();
 
-        // Shared cache handles its own pruning
+        // For now, if pruning to 0 days (remove all), clear the shared cache too
+        if max_age_days == 0 {
+            self.shared_cache.clear_project()?;
+        }
+
         Ok(())
     }
 }
@@ -357,7 +367,7 @@ mod tests {
     fn test_cache_stats() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let cache = AnalysisCache::new(None).unwrap();
+        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
         std::env::remove_var("DEBTMAP_CACHE_DIR");
 
         assert_eq!(cache.stats().entries, 0);
@@ -380,7 +390,7 @@ mod tests {
     fn test_try_cache_hit_with_valid_entry() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         let file_info = FileInfo {
             hash: "test_hash".to_string(),
@@ -404,7 +414,7 @@ mod tests {
     fn test_try_cache_hit_with_outdated_entry() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         let file_info = FileInfo {
             hash: "test_hash".to_string(),
@@ -428,7 +438,7 @@ mod tests {
     fn test_try_cache_hit_with_missing_entry() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         let file_info = FileInfo {
             hash: "nonexistent_hash".to_string(),
@@ -444,7 +454,7 @@ mod tests {
     fn test_compute_and_cache_success() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         let file_info = FileInfo {
             hash: "new_hash".to_string(),
@@ -464,7 +474,7 @@ mod tests {
     fn test_compute_and_cache_failure() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         let file_info = FileInfo {
             hash: "error_hash".to_string(),
@@ -487,7 +497,7 @@ mod tests {
         fs::write(&test_file, "fn main() {}").unwrap();
 
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         // First call - should compute and cache
         let compute = || Ok(create_test_metrics());
@@ -509,7 +519,7 @@ mod tests {
     fn test_clear_cache() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         let entry = CacheEntry {
             file_hash: "test_hash".to_string(),
@@ -535,7 +545,7 @@ mod tests {
     fn test_prune_old_entries() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
 
         let old_entry = CacheEntry {
             file_hash: "old_hash".to_string(),
@@ -550,7 +560,9 @@ mod tests {
         };
 
         cache.memory_index = cache.memory_index.update("old_hash".to_string(), old_entry);
-        cache.memory_index = cache.memory_index.update("recent_hash".to_string(), recent_entry);
+        cache.memory_index = cache
+            .memory_index
+            .update("recent_hash".to_string(), recent_entry);
 
         assert_eq!(cache.memory_index.len(), 2);
 
@@ -720,7 +732,7 @@ mod tests {
     fn test_load_previous_from_cache() {
         let temp_dir = TempDir::new().unwrap();
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let mut cache = AnalysisCache::new(None).unwrap();
+        let mut cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
         let mut inc = IncrementalAnalysis::new();
 
         // Add entries to cache

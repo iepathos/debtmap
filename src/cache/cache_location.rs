@@ -31,15 +31,13 @@ impl CacheLocation {
 
         let repo = repo_path.unwrap_or_else(|| Path::new("."));
         let project_id = Self::generate_project_id(repo)?;
-        
+
         let base_path = match &strategy {
             CacheStrategy::Shared => {
                 let cache_dir = Self::get_shared_cache_dir()?;
                 cache_dir.join("projects").join(&project_id)
             }
-            CacheStrategy::Custom(path) => {
-                path.join("debtmap").join("projects").join(&project_id)
-            }
+            CacheStrategy::Custom(path) => path.join("debtmap").join("projects").join(&project_id),
         };
 
         Ok(Self {
@@ -173,7 +171,13 @@ impl CacheLocation {
             .with_context(|| format!("Failed to create cache directory: {:?}", self.base_path))?;
 
         // Create subdirectories for different cache types
-        let subdirs = ["call_graphs", "analysis", "metadata", "temp", "file_metrics"];
+        let subdirs = [
+            "call_graphs",
+            "analysis",
+            "metadata",
+            "temp",
+            "file_metrics",
+        ];
         for subdir in &subdirs {
             let path = self.base_path.join(subdir);
             std::fs::create_dir_all(&path)
