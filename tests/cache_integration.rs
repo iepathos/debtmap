@@ -74,8 +74,8 @@ fn test_shared_cache_creates_no_local_directory() {
 
     // Verify data is in the shared cache location
     assert!(
-        cache_dir.path().join("debtmap").exists(),
-        "Shared cache directory should exist"
+        cache_dir.path().join("debtmap").join("projects").exists(),
+        "Shared cache directory with projects subdirectory should exist"
     );
 }
 
@@ -151,7 +151,7 @@ fn test_cache_migration_from_local() {
         .join("test_file.cache");
 
     assert!(
-        migrated_file.exists() || cache_dir.path().join("debtmap").exists(),
+        migrated_file.exists() || cache_dir.path().join("debtmap").join("projects").exists(),
         "Migrated data should exist in shared cache"
     );
 }
@@ -188,10 +188,10 @@ fn test_analysis_cache_uses_shared_backend() {
     let local_cache = project_dir.path().join(".debtmap_cache");
     assert!(!local_cache.exists(), "Local cache should not be created");
 
-    // Verify shared cache was used
+    // Verify shared cache was used - check for the debtmap/projects directory structure
     assert!(
-        cache_dir.path().join("debtmap").exists(),
-        "Shared cache should be used"
+        cache_dir.path().join("debtmap").join("projects").exists(),
+        "Shared cache should be used with projects subdirectory"
     );
 }
 
