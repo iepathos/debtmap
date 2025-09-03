@@ -6,7 +6,6 @@ debtmap-after.json
 .debtmap
 debtmap-report.json
 .metadata/
-.debtmap_cache/
 
 # Rust build artifacts
 /target/
