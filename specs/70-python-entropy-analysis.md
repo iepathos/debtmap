@@ -153,4 +153,4 @@ metrics.entropy_score = Some(entropy_score);
 
 ## Migration and Compatibility
 
-During prototype phase: This is a new feature addition with no breaking changes to existing functionality. Entropy scores will be optional and backward compatible.
+During prototype phase: This specification only implements the Python-specific token extraction and pattern detection. All entropy scoring and compatibility concerns are handled by spec 90. The Python analyzer will simply provide language-specific inputs to the universal entropy calculator.
