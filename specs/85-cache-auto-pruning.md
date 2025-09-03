@@ -1,0 +1,160 @@
+---
+number: 85
+title: Automatic Cache Pruning and Size Management
+category: optimization
+priority: high
+status: draft
+dependencies: []
+created: 2025-09-03
+---
+
+# Specification 85: Automatic Cache Pruning and Size Management
+
+**Category**: optimization
+**Priority**: high
+**Status**: draft
+**Dependencies**: None
+
+## Context
+
+The current cache implementation in `src/core/cache.rs` has a manual `prune()` method but lacks automatic pruning mechanisms. The cache index file has grown to 8.8MB without any size constraints or automatic cleanup. This can lead to:
+- Excessive disk usage over time
+- Slower cache operations due to large index size
+- Stale entries consuming space indefinitely
+- Performance degradation when loading/saving the index
+- No automatic cleanup of entries for deleted files
+
+Automatic pruning is essential for maintaining cache efficiency and preventing unbounded growth in long-running projects.
+
+## Objective
+
+Implement automatic cache pruning with configurable size limits and age-based eviction to maintain optimal cache performance and disk usage.
+
+## Requirements
+
+### Functional Requirements
+- Automatic pruning triggered when cache exceeds size threshold
+- Age-based eviction of entries older than configurable duration
+- File existence validation to remove entries for deleted files
+- LRU (Least Recently Used) eviction when size limit is reached
+- Configurable pruning strategies via environment variables or config
+- Background pruning to avoid blocking analysis operations
+
+### Non-Functional Requirements
+- Pruning operations should not impact analysis performance
+- Maintain cache hit rate above 60% after pruning
+- Index file size should not exceed configurable limit (default 10MB)
+- Pruning should complete within 100ms for typical cache sizes
+
+## Acceptance Criteria
+
+- [ ] Cache automatically prunes entries when index exceeds size limit
+- [ ] Old entries are automatically removed based on configurable age
+- [ ] Entries for non-existent files are automatically cleaned up
+- [ ] LRU eviction is implemented for size-based pruning
+- [ ] Pruning can be configured via environment variables
+- [ ] Background pruning does not block cache operations
+- [ ] Cache statistics include pruning metrics
+- [ ] Unit tests verify all pruning strategies
+- [ ] Integration tests confirm pruning under load
+- [ ] Documentation explains pruning configuration
+
+## Technical Details
+
+### Implementation Approach
+1. Add `last_accessed` field to `CacheEntry` for LRU tracking
+2. Implement `AutoPruner` struct with configurable strategies
+3. Add pruning triggers to cache operations
+4. Use background thread for non-blocking pruning
+5. Add configuration options for pruning parameters
+
+### Architecture Changes
+```rust
+pub struct AutoPruner {
+    max_size_bytes: usize,
+    max_age_days: i64,
+    max_entries: usize,
+    prune_percentage: f32,  // How much to remove when limit hit
+    strategy: PruneStrategy,
+}
+
+pub enum PruneStrategy {
+    Lru,           // Least recently used
+    Lfu,           // Least frequently used
+    Fifo,          // First in, first out
+    AgeBasedOnly,  // Only remove old entries
+}
+
+impl CacheEntry {
+    pub last_accessed: DateTime<Utc>,  // New field
+    pub access_count: usize,           // For LFU strategy
+}
+```
+
+### Data Structures
+- Extended `CacheEntry` with access tracking fields
+- New `AutoPruner` configuration struct
+- Pruning statistics tracking
+
+### APIs and Interfaces
+```rust
+impl AnalysisCache {
+    pub fn with_auto_pruning(cache_dir: PathBuf, pruner: AutoPruner) -> Result<Self>;
+    pub fn trigger_pruning_if_needed(&mut self) -> Result<PruneStats>;
+    pub fn prune_with_strategy(&mut self, strategy: PruneStrategy) -> Result<PruneStats>;
+}
+```
+
+## Dependencies
+
+- **Prerequisites**: None
+- **Affected Components**: 
+  - `src/core/cache.rs` - Main cache implementation
+  - `src/commands/analyze.rs` - Cache initialization
+- **External Dependencies**: None
+
+## Testing Strategy
+
+- **Unit Tests**: 
+  - Test each pruning strategy independently
+  - Verify size limit enforcement
+  - Test age-based eviction
+  - Validate file existence checking
+- **Integration Tests**: 
+  - Test pruning under concurrent access
+  - Verify background pruning doesn't block operations
+  - Test configuration from environment variables
+- **Performance Tests**: 
+  - Measure pruning time for various cache sizes
+  - Verify cache hit rate maintenance
+  - Test memory usage during pruning
+- **User Acceptance**: 
+  - Cache doesn't grow unbounded during extended use
+  - Performance remains consistent with pruning enabled
+
+## Documentation Requirements
+
+- **Code Documentation**: 
+  - Document all pruning strategies and their trade-offs
+  - Explain configuration options with examples
+- **User Documentation**: 
+  - Add section on cache management to README
+  - Document environment variables for configuration
+  - Provide tuning recommendations
+- **Architecture Updates**: 
+  - Update cache architecture documentation with pruning behavior
+
+## Implementation Notes
+
+- Consider using `notify` crate for file system monitoring to detect deleted files
+- Implement pruning in chunks to avoid locking cache for extended periods  
+- Use atomic operations for access counting to avoid race conditions
+- Consider implementing cache warming after aggressive pruning
+- Default to conservative pruning to maintain hit rate
+
+## Migration and Compatibility
+
+- Breaking change: CacheEntry structure will change
+- Existing cache files will need migration or will be invalidated
+- Add version field to cache format for future migrations
+- Provide cache migration utility or auto-migration on first run
