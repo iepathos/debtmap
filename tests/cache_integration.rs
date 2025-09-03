@@ -122,7 +122,7 @@ fn test_cache_migration_from_local() {
 
 #[test]
 fn test_analysis_cache_uses_shared_backend() {
-    let (project_dir, cache_dir) = setup_test_env();
+    let (project_dir, _cache_dir) = setup_test_env();
 
     // Create a test file
     let test_file = create_test_file(project_dir.path(), "test.rs", "fn main() {}");
@@ -147,7 +147,7 @@ fn test_analysis_cache_uses_shared_backend() {
     };
 
     // Use the actual test file path for get_or_compute
-    let result = cache.get_or_compute(&test_file, compute).unwrap();
+    let _result = cache.get_or_compute(&test_file, compute).unwrap();
 
     // Call get_or_compute again to ensure cache write happens
     let compute2 = || {
