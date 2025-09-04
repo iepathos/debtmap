@@ -82,7 +82,7 @@ impl SharedCache {
         let background_pruner = auto_pruner
             .as_ref()
             .map(|p| BackgroundPruner::new(p.clone()));
-        
+
         // Use auto-pruner's max size if configured
         let max_cache_size = auto_pruner
             .as_ref()
@@ -93,7 +93,7 @@ impl SharedCache {
             location,
             index: Arc::new(RwLock::new(index)),
             max_cache_size,
-            cleanup_threshold: 0.9,             // Cleanup when 90% full
+            cleanup_threshold: 0.9, // Cleanup when 90% full
             auto_pruner,
             background_pruner,
         })
@@ -112,14 +112,16 @@ impl SharedCache {
                 .or_else(|_| {
                     // If deserialization fails, start with a new index
                     log::warn!("Cache index corrupted, creating new index");
-                    let mut index = CacheIndex::default();
-                    index.last_cleanup = Some(SystemTime::now());
-                    Ok(index)
+                    Ok(CacheIndex {
+                        last_cleanup: Some(SystemTime::now()),
+                        ..Default::default()
+                    })
                 })
         } else {
-            let mut index = CacheIndex::default();
-            index.last_cleanup = Some(SystemTime::now());
-            Ok(index)
+            Ok(CacheIndex {
+                last_cleanup: Some(SystemTime::now()),
+                ..Default::default()
+            })
         }
     }
 
@@ -505,14 +507,14 @@ impl SharedCache {
     pub fn trigger_pruning_if_needed(&self) -> Result<PruneStats> {
         // First, clean up any orphaned index entries for deleted files
         self.clean_orphaned_entries()?;
-        
+
         if let Some(ref pruner) = self.auto_pruner {
             let should_prune = {
                 let index = self
                     .index
                     .read()
                     .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-                pruner.should_prune(&*index)
+                pruner.should_prune(&index)
             };
 
             if should_prune {
@@ -541,7 +543,7 @@ impl SharedCache {
                     .index
                     .read()
                     .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-                pruner.calculate_entries_to_remove(&*index)
+                pruner.calculate_entries_to_remove(&index)
             };
 
             if entries_to_remove.is_empty() {
@@ -650,7 +652,7 @@ impl SharedCache {
                 .index
                 .read()
                 .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-            temp_pruner.calculate_entries_to_remove(&*index)
+            temp_pruner.calculate_entries_to_remove(&index)
         };
 
         if entries_to_remove.is_empty() {
@@ -695,11 +697,10 @@ impl SharedCache {
                 "file_metrics",
             ] {
                 let cache_path = self.get_cache_file_path(key, component);
-                if cache_path.exists() {
-                    if fs::remove_file(&cache_path).is_ok() {
+                if cache_path.exists()
+                    && fs::remove_file(&cache_path).is_ok() {
                         files_deleted += 1;
                     }
-                }
             }
         }
 
@@ -731,7 +732,7 @@ impl SharedCache {
         };
 
         let mut orphaned_entries = Vec::new();
-        
+
         // Check each entry to see if any of its files exist
         for key in entries_to_check {
             let mut file_exists = false;
@@ -748,7 +749,7 @@ impl SharedCache {
                     break;
                 }
             }
-            
+
             if !file_exists {
                 orphaned_entries.push(key);
             }
@@ -777,7 +778,7 @@ impl SharedCache {
 
         Ok(removed_count)
     }
-    
+
     /// Clean up entries older than specified days
     pub fn cleanup_old_entries(&self, max_age_days: i64) -> Result<usize> {
         let max_age = Duration::from_secs(max_age_days as u64 * 86400);

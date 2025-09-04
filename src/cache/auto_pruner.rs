@@ -208,8 +208,6 @@ impl AutoPruner {
     ) -> Vec<(String, CacheMetadata)> {
         let mut entries_to_remove = Vec::new();
         let mut removed_size = 0u64;
-        let mut removed_count = 0usize;
-
         // Calculate targets
         let target_size = if index.total_size > self.max_size_bytes as u64 {
             let excess = index.total_size - self.max_size_bytes as u64;
@@ -231,7 +229,7 @@ impl AutoPruner {
         let max_age = Duration::from_secs(self.max_age_days as u64 * 86400);
         let now = SystemTime::now();
 
-        for (key, metadata) in &sorted_entries {
+        for (removed_count, (key, metadata)) in sorted_entries.iter().enumerate() {
             // Check if we've removed enough
             if removed_size >= target_size && removed_count >= target_count {
                 // Also check if this entry is old enough to remove anyway
@@ -244,7 +242,6 @@ impl AutoPruner {
 
             entries_to_remove.push((key.clone(), metadata.clone()));
             removed_size += metadata.size_bytes;
-            removed_count += 1;
         }
 
         entries_to_remove
@@ -298,7 +295,7 @@ impl BackgroundPruner {
     pub fn is_running(&self) -> bool {
         self.running.lock().map(|r| *r).unwrap_or(false)
     }
-    
+
     /// Get the last pruning statistics
     pub fn get_last_stats(&self) -> Option<PruneStats> {
         self.last_stats.lock().ok()?.clone()
@@ -319,7 +316,7 @@ impl BackgroundPruner {
         // Check if pruning is needed
         let should_prune = {
             match index.read() {
-                Ok(idx) => self.pruner.should_prune(&*idx),
+                Ok(idx) => self.pruner.should_prune(&idx),
                 Err(_) => return false,
             }
         };
@@ -329,34 +326,34 @@ impl BackgroundPruner {
         }
 
         *running = true;
-        
+
         // Clone necessary data for the thread
         let pruner = self.pruner.clone();
         let index_clone = index.clone();
         let running_flag = self.running.clone();
         let stats_store = self.last_stats.clone();
-        
+
         // Spawn background thread for pruning
         thread::spawn(move || {
             let stats = Self::perform_pruning_thread(pruner, index_clone);
-            
+
             // Store stats and mark as not running
             if let Ok(mut last_stats) = stats_store.lock() {
                 *last_stats = stats.clone();
             }
-            
+
             if let Ok(mut r) = running_flag.lock() {
                 *r = false;
             }
-            
+
             if let Some(ref s) = stats {
                 log::info!("Background pruning completed: {}", s);
             }
         });
-        
+
         true
     }
-    
+
     /// Perform pruning synchronously (for testing or immediate needs)
     pub fn prune_sync(&self, index: Arc<RwLock<CacheIndex>>) -> Option<PruneStats> {
         let mut running = match self.running.try_lock() {
@@ -371,22 +368,25 @@ impl BackgroundPruner {
         *running = true;
         let stats = Self::perform_pruning_thread(self.pruner.clone(), index);
         *running = false;
-        
+
         if let Ok(mut last_stats) = self.last_stats.lock() {
             *last_stats = stats.clone();
         }
-        
+
         stats
     }
 
     /// Perform the actual pruning in a thread context
-    fn perform_pruning_thread(pruner: Arc<AutoPruner>, index: Arc<RwLock<CacheIndex>>) -> Option<PruneStats> {
+    fn perform_pruning_thread(
+        pruner: Arc<AutoPruner>,
+        index: Arc<RwLock<CacheIndex>>,
+    ) -> Option<PruneStats> {
         let start = SystemTime::now();
 
         // Get entries to remove
         let entries_to_remove = {
             let idx = index.read().ok()?;
-            pruner.calculate_entries_to_remove(&*idx)
+            pruner.calculate_entries_to_remove(&idx)
         };
 
         if entries_to_remove.is_empty() {
