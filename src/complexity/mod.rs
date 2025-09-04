@@ -1,7 +1,10 @@
 pub mod cognitive;
 pub mod cyclomatic;
 pub mod entropy;
+pub mod entropy_core;
+pub mod entropy_traits;
 pub mod if_else_analyzer;
+pub mod languages;
 pub mod match_patterns;
 pub mod message_generator;
 pub mod pattern_adjustments;
