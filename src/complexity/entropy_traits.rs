@@ -47,6 +47,10 @@ impl GenericToken {
     pub fn custom(value: String) -> Self {
         Self::new(TokenCategory::Custom(value.clone()), 1.0, value)
     }
+
+    pub fn value(&self) -> &str {
+        &self.value
+    }
 }
 
 impl std::hash::Hash for GenericToken {

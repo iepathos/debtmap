@@ -242,6 +242,12 @@ fn extract_functions_from_stmts(
                     func_def.name.to_string()
                 };
 
+                let entropy_score = calculate_function_entropy(
+                    &func_def.body,
+                    source,
+                    entropy_calculator,
+                );
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -254,7 +260,7 @@ fn extract_functions_from_stmts(
                     visibility: None, // Python doesn't have explicit visibility modifiers
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
-                    entropy_score: None, // TODO: Add entropy scoring for Python
+                    entropy_score,
                     is_pure: None,    // TODO: Add purity detection for Python
                     purity_confidence: None,
                 });
@@ -282,6 +288,12 @@ fn extract_functions_from_stmts(
                     format!("async {}", func_def.name)
                 };
 
+                let entropy_score = calculate_function_entropy(
+                    &func_def.body,
+                    source,
+                    entropy_calculator,
+                );
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -294,7 +306,7 @@ fn extract_functions_from_stmts(
                     visibility: None, // Python doesn't have explicit visibility modifiers
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
-                    entropy_score: None, // TODO: Add entropy scoring for Python
+                    entropy_score,
                     is_pure: None,    // TODO: Add purity detection for Python
                     purity_confidence: None,
                 });
@@ -329,15 +341,14 @@ fn extract_functions_from_stmts(
     }
 }
 
-#[allow(dead_code)]
 fn calculate_function_entropy(
     body: &[ast::Stmt],
     source: &str,
     calculator: &mut UniversalEntropyCalculator,
-) -> Option<f64> {
+) -> Option<crate::complexity::entropy_core::EntropyScore> {
     let analyzer = PythonEntropyAnalyzer::new(source);
     let score = calculator.calculate(&analyzer, &body.to_vec());
-    Some(score.effective_complexity)
+    Some(score)
 }
 
 fn estimate_line_number(lines: &[&str], func_name: &str, _stmt_idx: usize) -> usize {
