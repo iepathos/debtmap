@@ -238,7 +238,7 @@ struct EnhancedFunctionAnalysis {
 struct FunctionMetadata {
     is_test: bool,
     visibility: Option<String>,
-    entropy_score: Option<crate::complexity::entropy::EntropyScore>,
+    entropy_score: Option<crate::complexity::entropy_core::EntropyScore>,
     purity_info: (Option<bool>, Option<f32>),
 }
 
@@ -500,10 +500,23 @@ impl FunctionVisitor {
 
     fn calculate_entropy_if_enabled(
         block: &syn::Block,
-    ) -> Option<crate::complexity::entropy::EntropyScore> {
+    ) -> Option<crate::complexity::entropy_core::EntropyScore> {
         if crate::config::get_entropy_config().enabled {
-            let mut analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
-            Some(analyzer.calculate_entropy(block))
+            // For now, use the old analyzer's EntropyScore as a bridge
+            // TODO: Once old entropy is removed, update to use new framework directly
+            let mut old_analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
+            let old_score = old_analyzer.calculate_entropy(block);
+
+            // Convert old score to new score format
+            Some(crate::complexity::entropy_core::EntropyScore {
+                token_entropy: old_score.token_entropy,
+                pattern_repetition: old_score.pattern_repetition,
+                branch_similarity: old_score.branch_similarity,
+                effective_complexity: old_score.effective_complexity,
+                unique_variables: old_score.unique_variables,
+                max_nesting: old_score.max_nesting,
+                dampening_applied: old_score.dampening_applied,
+            })
         } else {
             None
         }
@@ -699,8 +712,19 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 
                 // Calculate entropy score if enabled
                 let entropy_score = if crate::config::get_entropy_config().enabled {
-                    let mut analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
-                    Some(analyzer.calculate_entropy(&block))
+                    let mut old_analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
+                    let old_score = old_analyzer.calculate_entropy(&block);
+
+                    // Convert old score to new score format
+                    Some(crate::complexity::entropy_core::EntropyScore {
+                        token_entropy: old_score.token_entropy,
+                        pattern_repetition: old_score.pattern_repetition,
+                        branch_similarity: old_score.branch_similarity,
+                        effective_complexity: old_score.effective_complexity,
+                        unique_variables: old_score.unique_variables,
+                        max_nesting: old_score.max_nesting,
+                        dampening_applied: old_score.dampening_applied,
+                    })
                 } else {
                     None
                 };
