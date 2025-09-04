@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{atomic::{AtomicU64, Ordering}, Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, RwLock,
+};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Metadata for cache management
@@ -141,39 +144,40 @@ impl SharedCache {
     }
 
     // Pure functions for path operations and atomic file handling
-    
+
     /// Resolve the index file path based on cache location
     fn resolve_index_paths(location: &CacheLocation) -> (PathBuf, PathBuf) {
         let index_path = location.get_component_path("metadata").join("index.json");
         let temp_path = Self::create_safe_temp_path(&index_path);
         (index_path, temp_path)
     }
-    
+
     /// Create a safe temporary file path that avoids collisions
     fn create_safe_temp_path(target_path: &Path) -> PathBuf {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
-        
+
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos() as u64;
         let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
         let process_id = std::process::id();
-        
+
         // Create a unique temp filename to avoid collisions
         let temp_name = format!(
-            "{}.tmp.{}.{}.{}", 
-            target_path.file_name()
+            "{}.tmp.{}.{}.{}",
+            target_path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("file"),
             process_id,
             timestamp,
             counter
         );
-        
+
         target_path.with_file_name(temp_name)
     }
-    
+
     /// Validate that a file path is safe for atomic operations
     fn validate_file_path(path: &Path) -> Result<()> {
         // Ensure the path is absolute to avoid ambiguity
@@ -183,29 +187,32 @@ impl SharedCache {
                 path
             );
         }
-        
+
         // Check for path traversal attempts
-        if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
             anyhow::bail!(
                 "File path contains unsafe parent directory references: {:?}",
                 path
             );
         }
-        
+
         Ok(())
     }
-    
+
     /// Ensure the parent directory exists for the given path with race condition handling
     fn ensure_parent_directory(file_path: &Path) -> Result<()> {
         Self::validate_file_path(file_path)?;
-        
+
         if let Some(parent) = file_path.parent() {
             Self::create_directories_safely(parent)
                 .with_context(|| format!("Failed to create parent directory: {:?}", parent))?;
         }
         Ok(())
     }
-    
+
     /// Execute a fallible operation with exponential backoff retry
     fn retry_with_backoff<T, F>(mut operation: F, operation_name: &str) -> Result<T>
     where
@@ -213,10 +220,10 @@ impl SharedCache {
     {
         use std::io::ErrorKind;
         use std::time::Duration;
-        
+
         const MAX_ATTEMPTS: usize = 3;
         const BASE_DELAY_MS: u64 = 10;
-        
+
         for attempt in 0..MAX_ATTEMPTS {
             match operation() {
                 Ok(result) => return Ok(result),
@@ -237,7 +244,7 @@ impl SharedCache {
                             false
                         }
                     });
-                    
+
                     if !is_retryable || attempt == MAX_ATTEMPTS - 1 {
                         return Err(e.context(format!(
                             "Operation '{}' failed after {} attempts",
@@ -245,7 +252,7 @@ impl SharedCache {
                             attempt + 1
                         )));
                     }
-                    
+
                     // Exponential backoff with simple jitter
                     let delay_ms = BASE_DELAY_MS * (1 << attempt);
                     // Simple deterministic jitter to avoid contention
@@ -254,19 +261,19 @@ impl SharedCache {
                 }
             }
         }
-        
+
         unreachable!("Retry loop should have returned or failed by now")
     }
-    
+
     /// Create directories safely with proper race condition handling and retries
     fn create_directories_safely(dir_path: &Path) -> Result<()> {
         use std::io::ErrorKind;
-        
+
         // Fast path: directory already exists
         if dir_path.exists() {
             return Ok(());
         }
-        
+
         let dir_path_clone = dir_path.to_path_buf();
         Self::retry_with_backoff(
             || {
@@ -280,7 +287,8 @@ impl SharedCache {
                 }
             },
             &format!("create directories {:?}", dir_path),
-        ).with_context(|| {
+        )
+        .with_context(|| {
             format!(
                 "Failed to create directory {:?}. Current working directory: {:?}",
                 dir_path,
@@ -288,36 +296,35 @@ impl SharedCache {
             )
         })
     }
-    
+
     /// Ensure both temp and target file paths have their parent directories created
     fn ensure_atomic_write_directories(target_path: &Path, temp_path: &Path) -> Result<()> {
         // Ensure target directory exists
         Self::ensure_parent_directory(target_path)?;
-        
+
         // Ensure temp directory exists (might be different from target)
         if temp_path.parent() != target_path.parent() {
             Self::ensure_parent_directory(temp_path)?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Serialize cache index to JSON string
     fn serialize_index_to_json(index: &CacheIndex) -> Result<String> {
-        serde_json::to_string_pretty(index)
-            .context("Failed to serialize cache index")
+        serde_json::to_string_pretty(index).context("Failed to serialize cache index")
     }
-    
+
     /// Write content atomically using temporary file and rename
     fn write_file_atomically(target_path: &Path, temp_path: &Path, content: &str) -> Result<()> {
         Self::write_bytes_atomically(target_path, temp_path, content.as_bytes())
     }
-    
+
     /// Write data to a temporary file with proper error context and retries
     fn write_temp_file(temp_path: &Path, data: &[u8]) -> Result<()> {
         let temp_path_clone = temp_path.to_path_buf();
         let data_len = data.len();
-        
+
         Self::retry_with_backoff(
             || {
                 fs::write(&temp_path_clone, data)
@@ -334,7 +341,7 @@ impl SharedCache {
             )
         })
     }
-    
+
     /// Flush and sync file data to ensure durability (optional but recommended)
     fn sync_temp_file(_temp_path: &Path) -> Result<()> {
         // Note: We could open and sync the temp file here for extra durability,
@@ -342,12 +349,12 @@ impl SharedCache {
         // This function is a placeholder for future enhancement if needed.
         Ok(())
     }
-    
+
     /// Atomically rename temporary file to target with retries and detailed error context
     fn atomic_rename(temp_path: &Path, target_path: &Path) -> Result<()> {
         let temp_path_clone = temp_path.to_path_buf();
         let target_path_clone = target_path.to_path_buf();
-        
+
         Self::retry_with_backoff(
             || {
                 fs::rename(&temp_path_clone, &target_path_clone)
@@ -365,45 +372,45 @@ impl SharedCache {
             )
         })
     }
-    
+
     /// Check if two paths are likely on the same filesystem (heuristic)
     fn paths_on_same_filesystem(path1: &Path, path2: &Path) -> bool {
         // Simple heuristic: if both paths have the same root, assume same filesystem
         // This isn't perfect but gives us debugging info
         path1.ancestors().last() == path2.ancestors().last()
     }
-    
+
     /// Write bytes atomically using temporary file and rename - composed from pure functions
     fn write_bytes_atomically(target_path: &Path, temp_path: &Path, data: &[u8]) -> Result<()> {
         // Step 1: Write data to temporary file
         Self::write_temp_file(temp_path, data)?;
-        
+
         // Step 2: Optional sync for durability
         Self::sync_temp_file(temp_path)?;
-        
+
         // Step 3: Atomic rename
         Self::atomic_rename(temp_path, target_path)?;
-        
+
         Ok(())
     }
 
     /// Save the current index to disk with comprehensive error handling
     pub fn save_index(&self) -> Result<()> {
         let (index_path, temp_path) = Self::resolve_index_paths(&self.location);
-        
+
         // Ensure directories exist before any file operations
         Self::ensure_atomic_write_directories(&index_path, &temp_path)?;
-        
+
         let index = self
             .index
             .read()
             .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-        
+
         let content = Self::serialize_index_to_json(&*index)?;
-        
+
         Self::write_file_atomically(&index_path, &temp_path, &content)
             .with_context(|| format!("Failed to save cache index to {:?}", index_path))?;
-        
+
         Ok(())
     }
 
@@ -546,7 +553,8 @@ impl SharedCache {
                 };
 
                 if Self::should_prune_after_insertion(pruner, &cache_stats) {
-                    if config.is_test_environment {
+                    // Always print debug in test mode
+                    if cfg!(test) {
                         println!(
                             "Post-insertion check: size={}/{}, count={}/{}",
                             stats.total_size,
@@ -554,7 +562,7 @@ impl SharedCache {
                             stats.entry_count,
                             pruner.max_entries
                         );
-                        println!("Triggering emergency pruning due to limit exceeded");
+                        println!("Triggering post-insertion pruning due to limit exceeded");
                     }
                     self.trigger_pruning()?;
                 }
@@ -564,7 +572,13 @@ impl SharedCache {
     }
 
     /// Store a cache entry with explicit pruning configuration  
-    fn put_with_config(&self, key: &str, component: &str, data: &[u8], config: &PruningConfig) -> Result<()> {
+    fn put_with_config(
+        &self,
+        key: &str,
+        component: &str,
+        data: &[u8],
+        config: &PruningConfig,
+    ) -> Result<()> {
         if config.is_test_environment {
             log::debug!(
                 "use_sync_pruning={}, auto_prune={}, cfg_test={}",
@@ -707,7 +721,14 @@ impl SharedCache {
         // Delete files with better error handling
         for key in removed_keys {
             // Try to delete from all components
-            for component in &["call_graphs", "analysis", "metadata", "temp", "file_metrics"] {
+            for component in &[
+                "call_graphs",
+                "analysis",
+                "metadata",
+                "temp",
+                "file_metrics",
+                "test",
+            ] {
                 let cache_path = self.get_cache_file_path(&key, component);
                 if cache_path.exists() {
                     if let Err(e) = fs::remove_file(&cache_path) {
@@ -940,8 +961,8 @@ impl SharedCache {
         max_age: Duration,
     ) -> bool {
         now.duration_since(last_accessed)
-            .map(|age| age >= max_age)  // Use >= to handle zero-age case
-            .unwrap_or(false)  // If time calculation fails, don't remove
+            .map(|age| age >= max_age) // Use >= to handle zero-age case
+            .unwrap_or(false) // If time calculation fails, don't remove
     }
 
     /// Filter entries to find those that should be removed based on age
@@ -963,19 +984,16 @@ impl SharedCache {
     }
 
     /// Update index by removing entries and recalculating total size
-    fn update_index_after_removal(
-        index: &mut CacheIndex,
-        entries_to_remove: &[String],
-    ) -> usize {
+    fn update_index_after_removal(index: &mut CacheIndex, entries_to_remove: &[String]) -> usize {
         let mut removed_count = 0;
-        
+
         for key in entries_to_remove {
             if let Some(metadata) = index.entries.remove(key) {
                 index.total_size -= metadata.size_bytes;
                 removed_count += 1;
             }
         }
-        
+
         index.last_cleanup = Some(SystemTime::now());
         removed_count
     }
@@ -987,17 +1005,18 @@ impl SharedCache {
     ) -> std::result::Result<(), ()> {
         let components = [
             "call_graphs",
-            "analysis", 
+            "analysis",
             "metadata",
             "temp",
             "file_metrics",
+            "test",
         ];
 
         for key in keys {
             for component in &components {
                 let cache_path = cache.get_cache_file_path(key, component);
                 if cache_path.exists() {
-                    let _ = fs::remove_file(&cache_path);  // Ignore errors
+                    let _ = fs::remove_file(&cache_path); // Ignore errors
                 }
             }
         }
@@ -1042,7 +1061,10 @@ impl SharedCache {
             self.trigger_pruning()
         } else {
             let stats = self.get_stats();
-            Ok(Self::create_no_prune_stats(stats.entry_count, stats.total_size))
+            Ok(Self::create_no_prune_stats(
+                stats.entry_count,
+                stats.total_size,
+            ))
         }
     }
 
@@ -1101,6 +1123,7 @@ impl SharedCache {
                     "metadata",
                     "temp",
                     "file_metrics",
+                    "test",
                 ] {
                     let cache_path = self.get_cache_file_path(key, component);
                     if cache_path.exists() {
@@ -1208,6 +1231,7 @@ impl SharedCache {
                 "metadata",
                 "temp",
                 "file_metrics",
+                "test",
             ] {
                 let cache_path = self.get_cache_file_path(key, component);
                 if cache_path.exists() && fs::remove_file(&cache_path).is_ok() {
@@ -1254,6 +1278,7 @@ impl SharedCache {
                 "metadata",
                 "temp",
                 "file_metrics",
+                "test", // Added for test compatibility
             ] {
                 let cache_path = self.get_cache_file_path(&key, component);
                 if cache_path.exists() {
@@ -1361,13 +1386,13 @@ impl std::fmt::Display for FullCacheStats {
 mod tests {
     use super::*;
     use crate::cache::EnvironmentSnapshot;
-    use tempfile::TempDir;
     use std::collections::HashMap;
+    use tempfile::TempDir;
 
     #[test]
     fn test_shared_cache_operations() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Set environment variables directly
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
         std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
@@ -1388,7 +1413,7 @@ mod tests {
         // Test delete
         cache.delete(key, component).unwrap();
         assert!(!cache.exists(key, component));
-        
+
         // Cleanup
         std::env::remove_var("DEBTMAP_CACHE_DIR");
         std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
@@ -1397,7 +1422,7 @@ mod tests {
     #[test]
     fn test_cache_stats() {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Set environment variables directly
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
         std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
@@ -1414,7 +1439,7 @@ mod tests {
         let stats = cache.get_stats();
         assert_eq!(stats.entry_count, 2);
         assert_eq!(stats.total_size, 10); // "data1" + "data2"
-        
+
         // Cleanup
         std::env::remove_var("DEBTMAP_CACHE_DIR");
         std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
@@ -1425,7 +1450,7 @@ mod tests {
         // Test max age calculation
         let max_age_0_days = SharedCache::calculate_max_age_duration(0);
         let max_age_1_day = SharedCache::calculate_max_age_duration(1);
-        
+
         assert_eq!(max_age_0_days, Duration::from_secs(0));
         assert_eq!(max_age_1_day, Duration::from_secs(86400));
 
@@ -1433,20 +1458,26 @@ mod tests {
         let now = SystemTime::now();
         let same_time = now;
         let older_time = now - Duration::from_secs(100);
-        
+
         // With max_age = 0, entries created at same time should be removed
         assert!(SharedCache::should_remove_entry_by_age(
-            now, same_time, Duration::from_secs(0)
+            now,
+            same_time,
+            Duration::from_secs(0)
         ));
-        
+
         // With max_age = 0, older entries should definitely be removed
         assert!(SharedCache::should_remove_entry_by_age(
-            now, older_time, Duration::from_secs(0)
+            now,
+            older_time,
+            Duration::from_secs(0)
         ));
-        
+
         // With max_age = 200s, older entries (100s old) should not be removed
         assert!(!SharedCache::should_remove_entry_by_age(
-            now, older_time, Duration::from_secs(200)
+            now,
+            older_time,
+            Duration::from_secs(200)
         ));
     }
 
@@ -1454,7 +1485,7 @@ mod tests {
     fn test_filter_entries_by_age() {
         let now = SystemTime::now();
         let old_time = now - Duration::from_secs(100);
-        
+
         let mut entries = HashMap::new();
         entries.insert(
             "recent_entry".to_string(),
@@ -1476,19 +1507,16 @@ mod tests {
                 size_bytes: 100,
             },
         );
-        
+
         // With max_age = 0, both entries should be removed
-        let to_remove_0 = SharedCache::filter_entries_by_age(
-            &entries, now, Duration::from_secs(0)
-        );
+        let to_remove_0 = SharedCache::filter_entries_by_age(&entries, now, Duration::from_secs(0));
         assert_eq!(to_remove_0.len(), 2);
         assert!(to_remove_0.contains(&"recent_entry".to_string()));
         assert!(to_remove_0.contains(&"old_entry".to_string()));
-        
+
         // With max_age = 50s, only the old entry should be removed
-        let to_remove_50 = SharedCache::filter_entries_by_age(
-            &entries, now, Duration::from_secs(50)
-        );
+        let to_remove_50 =
+            SharedCache::filter_entries_by_age(&entries, now, Duration::from_secs(50));
         assert_eq!(to_remove_50.len(), 1);
         assert!(to_remove_50.contains(&"old_entry".to_string()));
     }

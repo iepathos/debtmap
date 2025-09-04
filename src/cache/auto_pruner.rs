@@ -105,11 +105,11 @@ impl Default for AutoPruner {
 impl AutoPruner {
     /// Create cache configuration from environment snapshot (pure function)
     pub fn create_cache_config(env: &EnvironmentSnapshot) -> CacheConfig {
-        let auto_prune_enabled = env.is_true("DEBTMAP_CACHE_AUTO_PRUNE") 
+        let auto_prune_enabled = env.is_true("DEBTMAP_CACHE_AUTO_PRUNE")
             || env.get("DEBTMAP_CACHE_AUTO_PRUNE").is_none(); // Default to true if not set
-        
+
         let use_sync_pruning = env.is_true("DEBTMAP_CACHE_SYNC_PRUNE") || cfg!(test);
-        
+
         let max_cache_size = if auto_prune_enabled {
             let pruner = Self::from_env_snapshot(env);
             pruner.max_size_bytes as u64
@@ -141,16 +141,12 @@ impl AutoPruner {
     }
 
     /// Check if enough time has passed since last cleanup to warrant age-based checks
-    fn should_check_for_old_entries(
-        last_cleanup: Option<SystemTime>, 
-        now: SystemTime
-    ) -> bool {
+    fn should_check_for_old_entries(last_cleanup: Option<SystemTime>, now: SystemTime) -> bool {
         match last_cleanup {
-            Some(cleanup_time) => {
-                now.duration_since(cleanup_time)
-                    .map(|elapsed| elapsed > Duration::from_secs(86400))
-                    .unwrap_or(false)
-            }
+            Some(cleanup_time) => now
+                .duration_since(cleanup_time)
+                .map(|elapsed| elapsed > Duration::from_secs(86400))
+                .unwrap_or(false),
             None => true, // No cleanup record, should check
         }
     }
@@ -159,10 +155,10 @@ impl AutoPruner {
     fn has_old_entries(
         entries: &std::collections::HashMap<String, CacheMetadata>,
         max_age_days: i64,
-        now: SystemTime
+        now: SystemTime,
     ) -> bool {
         let max_age = Duration::from_secs(max_age_days as u64 * 86400);
-        
+
         entries.values().any(|metadata| {
             now.duration_since(metadata.last_accessed)
                 .map(|age| age > max_age)
@@ -190,6 +186,13 @@ impl AutoPruner {
 
         if let Some(entries) = env.parse::<usize>("DEBTMAP_CACHE_MAX_ENTRIES") {
             pruner.max_entries = entries;
+        } else if cfg!(test) {
+            if let Ok(val) = std::env::var("DEBTMAP_CACHE_MAX_ENTRIES") {
+                eprintln!(
+                    "DEBUG: Failed to parse DEBTMAP_CACHE_MAX_ENTRIES='{}' as usize",
+                    val
+                );
+            }
         }
 
         if let Some(percentage) = env.parse::<f32>("DEBTMAP_CACHE_PRUNE_PERCENTAGE") {
@@ -212,7 +215,7 @@ impl AutoPruner {
     /// Check if pruning is needed based on current index
     pub fn should_prune(&self, index: &CacheIndex) -> bool {
         let now = SystemTime::now();
-        
+
         // Check size limit - immediate pruning needed
         if Self::exceeds_size_limit(index.total_size, self.max_size_bytes) {
             return true;
@@ -225,9 +228,9 @@ impl AutoPruner {
 
         // Check age-based pruning only if enough time has passed since last cleanup
         // and there are actually entries that might be old
-        if !index.entries.is_empty() 
+        if !index.entries.is_empty()
             && Self::should_check_for_old_entries(index.last_cleanup, now)
-            && Self::has_old_entries(&index.entries, self.max_age_days, now) 
+            && Self::has_old_entries(&index.entries, self.max_age_days, now)
         {
             return true;
         }
@@ -304,6 +307,18 @@ impl AutoPruner {
         entries_to_remove
     }
 
+    /// Pure function to calculate how much needs to be removed
+    fn calculate_removal_amount(
+        current: usize,
+        max_allowed: usize,
+        buffer_percentage: f32,
+    ) -> usize {
+        current
+            .saturating_sub(max_allowed)
+            .saturating_add((max_allowed as f32 * buffer_percentage) as usize)
+            .min(current)
+    }
+
     /// Calculate size removal target based on current size and limits
     fn calculate_size_removal_target(
         current_size: u64,
@@ -314,41 +329,41 @@ impl AutoPruner {
             return 0;
         }
 
-        let excess = current_size - max_size_bytes as u64;
-        let buffer_amount = (max_size_bytes as f32 * prune_percentage) as u64;
-        excess + buffer_amount
+        Self::calculate_removal_amount(current_size as usize, max_size_bytes, prune_percentage)
+            as u64
     }
 
     /// Calculate count removal target based on current count and limits
     fn calculate_count_removal_target(
         current_count: usize,
         max_entries: usize,
-        prune_percentage: f32,
+        _prune_percentage: f32,
     ) -> usize {
         if current_count <= max_entries {
             return 0;
         }
 
-        let excess = current_count - max_entries;
-        let buffer_amount = (max_entries as f32 * prune_percentage) as usize;
-        excess + buffer_amount
+        // Only remove the excess, don't add buffer for count-based pruning
+        // This prevents over-aggressive pruning
+        current_count.saturating_sub(max_entries)
     }
 
-    /// Check if an entry is old enough to be removed based on age policy
-    fn is_entry_old_enough(
-        metadata: &CacheMetadata,
-        max_age_days: i64,
-        now: SystemTime,
-    ) -> bool {
-        let max_age = Duration::from_secs(max_age_days as u64 * 86400);
-        if let Ok(age) = now.duration_since(metadata.last_accessed) {
-            age > max_age
-        } else {
-            false
-        }
+    /// Pure function: Check if an entry is old
+    fn is_entry_old(entry_age: Duration, max_age: Duration) -> bool {
+        entry_age > max_age
     }
 
-    /// Determine if we should continue removing entries based on targets and age
+    /// Pure function: Calculate entry age
+    fn calculate_entry_age(metadata: &CacheMetadata, now: SystemTime) -> Option<Duration> {
+        now.duration_since(metadata.last_accessed).ok()
+    }
+
+    /// Pure function: Check if removal targets are met
+    fn are_removal_targets_met(removed: (usize, u64), targets: (usize, u64)) -> bool {
+        removed.0 >= targets.0 && removed.1 >= targets.1
+    }
+
+    /// Pure function: Determine if we should continue removing entries
     fn should_continue_removing(
         removed_count: usize,
         removed_size: u64,
@@ -358,20 +373,24 @@ impl AutoPruner {
         max_age_days: i64,
         now: SystemTime,
     ) -> bool {
-        // Continue removing if we haven't satisfied EITHER target (both need to be met)
-        let count_satisfied = removed_count >= target_count;
-        let size_satisfied = removed_size >= target_size;
-        
-        // Continue if either target is not yet satisfied
-        if !count_satisfied || !size_satisfied {
+        // Check if targets are met
+        let targets_met = Self::are_removal_targets_met(
+            (removed_count, removed_size),
+            (target_count, target_size),
+        );
+
+        if !targets_met {
             return true;
         }
 
-        // Continue if the entry is old enough to remove anyway
-        Self::is_entry_old_enough(metadata, max_age_days, now)
+        // Check age-based removal
+        let max_age = Duration::from_secs(max_age_days as u64 * 86400);
+        Self::calculate_entry_age(metadata, now)
+            .map(|age| Self::is_entry_old(age, max_age))
+            .unwrap_or(false)
     }
 
-    /// Select entries to remove using functional approach with proper state management
+    /// Pure function using iterator-based approach with fold
     fn select_entries_functionally(
         sorted_entries: &[(String, CacheMetadata)],
         target_count: usize,
@@ -379,31 +398,70 @@ impl AutoPruner {
         max_age_days: i64,
         now: SystemTime,
     ) -> Vec<(String, CacheMetadata)> {
-        let mut entries_to_remove = Vec::new();
-        let mut removed_count = 0;
-        let mut removed_size = 0u64;
-
-        for (key, metadata) in sorted_entries {
-            let should_continue = Self::should_continue_removing(
-                removed_count,
-                removed_size,
-                target_count,
-                target_size,
-                metadata,
-                max_age_days,
-                now,
-            );
-
-            if !should_continue {
-                break;
-            }
-
-            entries_to_remove.push((key.clone(), metadata.clone()));
-            removed_count += 1;
-            removed_size += metadata.size_bytes;
+        #[derive(Clone)]
+        struct RemovalState {
+            entries: Vec<(String, CacheMetadata)>,
+            count: usize,
+            size: u64,
+            should_continue: bool,
         }
 
-        entries_to_remove
+        let initial_state = RemovalState {
+            entries: Vec::new(),
+            count: 0,
+            size: 0,
+            should_continue: true,
+        };
+
+        let final_state =
+            sorted_entries
+                .iter()
+                .fold(initial_state, |mut state, (key, metadata)| {
+                    if !state.should_continue {
+                        return state;
+                    }
+
+                    let should_remove = Self::should_continue_removing(
+                        state.count,
+                        state.size,
+                        target_count,
+                        target_size,
+                        metadata,
+                        max_age_days,
+                        now,
+                    );
+
+                    if should_remove {
+                        state.entries.push((key.clone(), metadata.clone()));
+                        state.count += 1;
+                        state.size += metadata.size_bytes;
+                    } else {
+                        state.should_continue = false;
+                    }
+
+                    state
+                });
+
+        final_state.entries
+    }
+
+    /// Pure function to compute removal targets
+    fn compute_removal_targets(
+        index: &CacheIndex,
+        max_size_bytes: usize,
+        max_entries: usize,
+        prune_percentage: f32,
+    ) -> (usize, u64) {
+        let size_target =
+            Self::calculate_size_removal_target(index.total_size, max_size_bytes, prune_percentage);
+
+        let count_target = Self::calculate_count_removal_target(
+            index.entries.len(),
+            max_entries,
+            prune_percentage,
+        );
+
+        (count_target, size_target)
     }
 
     /// Select entries to remove based on limits
@@ -412,26 +470,19 @@ impl AutoPruner {
         sorted_entries: Vec<(String, CacheMetadata)>,
         index: &CacheIndex,
     ) -> Vec<(String, CacheMetadata)> {
-        let target_size = Self::calculate_size_removal_target(
-            index.total_size,
+        let (target_count, target_size) = Self::compute_removal_targets(
+            index,
             self.max_size_bytes,
-            self.prune_percentage,
-        );
-
-        let target_count = Self::calculate_count_removal_target(
-            index.entries.len(),
             self.max_entries,
             self.prune_percentage,
         );
-
-        let now = SystemTime::now();
 
         Self::select_entries_functionally(
             &sorted_entries,
             target_count,
             target_size,
             self.max_age_days,
-            now,
+            SystemTime::now(),
         )
     }
 }
@@ -650,17 +701,13 @@ mod tests {
     #[test]
     fn test_calculate_count_removal_target() {
         // No removal needed when under limit
-        assert_eq!(
-            AutoPruner::calculate_count_removal_target(3, 5, 0.25),
-            0
-        );
+        assert_eq!(AutoPruner::calculate_count_removal_target(3, 5, 0.25), 0);
 
-        // Calculate removal with buffer when over limit
+        // Calculate removal when over limit (no buffer for count-based pruning)
         let target = AutoPruner::calculate_count_removal_target(8, 5, 0.25);
-        // Excess: 8 - 5 = 3
-        // Buffer: 5 * 0.25 = 1.25 -> 1 (usize)
-        // Total: 3 + 1 = 4
-        assert_eq!(target, 4);
+        // Only remove the excess: 8 - 5 = 3
+        // Buffer is ignored for count-based pruning to prevent over-aggressive removal
+        assert_eq!(target, 3);
     }
 
     #[test]
@@ -686,9 +733,19 @@ mod tests {
         };
 
         // Entry older than 1 day should be considered old
-        assert!(AutoPruner::is_entry_old_enough(&old_metadata, 1, now));
+        let max_age = Duration::from_secs(1 * 86400); // 1 day
+        if let Some(age) = AutoPruner::calculate_entry_age(&old_metadata, now) {
+            assert!(AutoPruner::is_entry_old(age, max_age));
+        } else {
+            panic!("Should be able to calculate age for old entry");
+        }
+
         // Entry newer than 1 day should not be considered old
-        assert!(!AutoPruner::is_entry_old_enough(&recent_metadata, 1, now));
+        if let Some(age) = AutoPruner::calculate_entry_age(&recent_metadata, now) {
+            assert!(!AutoPruner::is_entry_old(age, max_age));
+        } else {
+            panic!("Should be able to calculate age for recent entry");
+        }
     }
 
     #[test]
@@ -715,7 +772,7 @@ mod tests {
                 access_count: 1,
                 size_bytes: 100,
             };
-            
+
             index.entries.insert(key.clone(), metadata.clone());
             sorted_entries.push((key, metadata));
         }
@@ -724,12 +781,12 @@ mod tests {
         let entries_to_remove = pruner.select_entries_to_remove(sorted_entries, &index);
 
         // We have 8 entries, max is 5, so excess is 3
-        // Buffer is 5 * 0.25 = 1.25 -> 1
-        // Total target: 3 + 1 = 4 entries to remove
+        // No buffer for count-based pruning to prevent over-aggressive removal
+        // Total target: 3 entries to remove
         assert_eq!(
             entries_to_remove.len(),
-            4,
-            "Should remove 4 entries (3 excess + 1 buffer)"
+            3,
+            "Should remove exactly 3 excess entries"
         );
     }
 
@@ -827,14 +884,14 @@ mod tests {
     #[test]
     fn test_should_check_for_old_entries() {
         let now = SystemTime::now();
-        
+
         // No cleanup record - should always check
         assert!(AutoPruner::should_check_for_old_entries(None, now));
-        
+
         // Recent cleanup - should not check yet
         let recent = now - Duration::from_secs(3600); // 1 hour ago
         assert!(!AutoPruner::should_check_for_old_entries(Some(recent), now));
-        
+
         // Old cleanup - should check
         let old = now - Duration::from_secs(2 * 86400); // 2 days ago
         assert!(AutoPruner::should_check_for_old_entries(Some(old), now));
@@ -844,10 +901,10 @@ mod tests {
     fn test_has_old_entries() {
         let now = SystemTime::now();
         let mut entries = std::collections::HashMap::new();
-        
+
         // No entries
         assert!(!AutoPruner::has_old_entries(&entries, 1, now));
-        
+
         // Only recent entries
         let recent_metadata = CacheMetadata {
             version: "0.1.0".to_string(),
@@ -858,7 +915,7 @@ mod tests {
         };
         entries.insert("recent".to_string(), recent_metadata);
         assert!(!AutoPruner::has_old_entries(&entries, 1, now));
-        
+
         // Add old entry
         let old_metadata = CacheMetadata {
             version: "0.1.0".to_string(),
@@ -874,7 +931,7 @@ mod tests {
     #[test]
     fn test_should_prune_age_based() {
         let pruner = AutoPruner {
-            max_age_days: 1, // 1 day
+            max_age_days: 1,       // 1 day
             max_size_bytes: 10000, // Large limits
             max_entries: 1000,
             ..Default::default()
@@ -882,7 +939,7 @@ mod tests {
 
         let now = SystemTime::now();
         let mut index = CacheIndex::default();
-        
+
         // Add old entry
         let old_metadata = CacheMetadata {
             version: "0.1.0".to_string(),
@@ -893,16 +950,16 @@ mod tests {
         };
         index.entries.insert("old_key".to_string(), old_metadata);
         index.total_size = 100;
-        
+
         // No cleanup record, should prune due to old entries
         assert!(pruner.should_prune(&index));
-        
+
         // Recent cleanup, should not prune yet
         index.last_cleanup = Some(now - Duration::from_secs(3600)); // 1 hour ago
         assert!(!pruner.should_prune(&index));
-        
+
         // Old cleanup, should prune due to old entries
-        index.last_cleanup = Some(now - Duration::from_secs(2 * 86400)); // 2 days ago  
+        index.last_cleanup = Some(now - Duration::from_secs(2 * 86400)); // 2 days ago
         assert!(pruner.should_prune(&index));
     }
 }

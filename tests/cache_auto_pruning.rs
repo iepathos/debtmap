@@ -40,7 +40,7 @@ fn test_auto_pruning_entry_count_limit() {
     env_guard.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
     env_guard.set("DEBTMAP_CACHE_AUTO_PRUNE", "true");
     env_guard.set("DEBTMAP_CACHE_MAX_ENTRIES", "5");
-    
+
     // Enable debug output for post-insertion pruning
     env_guard.set("DEBTMAP_CACHE_SYNC_PRUNE", "true");
 
@@ -50,31 +50,48 @@ fn test_auto_pruning_entry_count_limit() {
     for i in 0..10 {
         let key = format!("entry_{}", i);
         let data = b"test data";
-        println!("About to add entry {}, DEBTMAP_CACHE_AUTO_PRUNE={}", i, env::var("DEBTMAP_CACHE_AUTO_PRUNE").unwrap_or("NOT_SET".to_string()));
+        println!(
+            "About to add entry {}, DEBTMAP_CACHE_AUTO_PRUNE={}",
+            i,
+            env::var("DEBTMAP_CACHE_AUTO_PRUNE").unwrap_or("NOT_SET".to_string())
+        );
         cache.put(&key, "test_component", data).unwrap();
         let stats = cache.get_stats();
-        println!("After adding entry {}: entry_count={}, total_size={}", i, stats.entry_count, stats.total_size);
+        println!(
+            "After adding entry {}: entry_count={}, total_size={}",
+            i, stats.entry_count, stats.total_size
+        );
         if stats.entry_count > 5 {
-            println!("WARNING: Entry count exceeded limit after adding entry {}", i);
+            println!(
+                "WARNING: Entry count exceeded limit after adding entry {}",
+                i
+            );
         }
     }
 
     // Should have triggered pruning
     let stats = cache.get_stats();
-    println!("Final stats: entry_count={}, limit was 5", stats.entry_count);
-    
+    println!(
+        "Final stats: entry_count={}, limit was 5",
+        stats.entry_count
+    );
+
     // Debug: manually trigger pruning to see what happens
     if stats.entry_count > 5 {
         println!("DEBUG: Manually triggering pruning to investigate...");
         let manual_prune_stats = cache.trigger_pruning().unwrap();
         println!("Manual pruning results: {:?}", manual_prune_stats);
         let new_stats = cache.get_stats();
-        println!("Stats after manual pruning: entry_count={}", new_stats.entry_count);
+        println!(
+            "Stats after manual pruning: entry_count={}",
+            new_stats.entry_count
+        );
     }
-    
+
     assert!(
         stats.entry_count <= 5,
-        "Entry count should be pruned to under 5, got {}", stats.entry_count
+        "Entry count should be pruned to under 5, got {}",
+        stats.entry_count
     );
 
     // Automatic cleanup when env_guard is dropped
@@ -82,17 +99,15 @@ fn test_auto_pruning_entry_count_limit() {
 
 #[test]
 fn test_pruning_strategies() {
-    let temp_dir = TempDir::new().unwrap();
-
     // Test LRU strategy
     {
+        let temp_dir = TempDir::new().unwrap();
         let mut env_guard = EnvGuard::new();
         env_guard.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
         env_guard.set("DEBTMAP_CACHE_AUTO_PRUNE", "true");
         env_guard.set("DEBTMAP_CACHE_SYNC_PRUNE", "true");
         env_guard.set("DEBTMAP_CACHE_STRATEGY", "lru");
         env_guard.set("DEBTMAP_CACHE_MAX_ENTRIES", "3");
-
         let cache = SharedCache::new(None).unwrap();
 
         // Add entries with different access patterns
@@ -106,11 +121,9 @@ fn test_pruning_strategies() {
         let _ = cache.get("old_1", "test");
 
         // Add one more to trigger pruning
-        println!("Adding trigger entry to test LRU...");
         cache.put("trigger", "test", b"data").unwrap();
 
         let stats = cache.get_stats();
-        println!("After trigger entry: entry_count={}, expected=3", stats.entry_count);
         assert_eq!(stats.entry_count, 3, "Should keep only 3 entries");
 
         // old_2 should be removed (least recently used)
@@ -144,10 +157,8 @@ fn test_pruning_strategies() {
         assert!(!cache.exists("first", "test"));
         assert!(cache.exists("fourth", "test"));
 
-        // Automatic cleanup when env_guard is dropped
+        // Automatic cleanup when env_guard and temp_dir are dropped
     }
-
-    // Automatic cleanup when temp_dir is dropped
 }
 
 #[test]
@@ -245,9 +256,9 @@ fn debug_auto_pruning_issue() {
 
     println!("Creating cache with auto-pruning enabled...");
     let cache = SharedCache::new(None).unwrap();
-    
+
     println!("Initial stats: {:?}", cache.get_stats());
-    
+
     // Add entries that exceed the size limit
     for i in 0..10 {
         let key = format!("key_{}", i);
@@ -255,23 +266,35 @@ fn debug_auto_pruning_issue() {
         println!("Adding entry {} (200 bytes)", i);
         cache.put(&key, "test_component", &data).unwrap();
         let stats = cache.get_stats();
-        println!("Stats after entry {}: entry_count={}, total_size={}", i, stats.entry_count, stats.total_size);
+        println!(
+            "Stats after entry {}: entry_count={}, total_size={}",
+            i, stats.entry_count, stats.total_size
+        );
     }
 
     // Check final stats
     let stats = cache.get_stats();
-    println!("Final stats: entry_count={}, total_size={}", stats.entry_count, stats.total_size);
-    
+    println!(
+        "Final stats: entry_count={}, total_size={}",
+        stats.entry_count, stats.total_size
+    );
+
     if stats.total_size > 1000 {
-        println!("❌ Cache size {} exceeds limit of 1000 bytes", stats.total_size);
-        
+        println!(
+            "❌ Cache size {} exceeds limit of 1000 bytes",
+            stats.total_size
+        );
+
         // Try manual pruning
         println!("Attempting manual pruning...");
         let prune_stats = cache.trigger_pruning().unwrap();
         println!("Prune stats: {:?}", prune_stats);
-        
+
         let new_stats = cache.get_stats();
-        println!("Stats after manual pruning: entry_count={}, total_size={}", new_stats.entry_count, new_stats.total_size);
+        println!(
+            "Stats after manual pruning: entry_count={}, total_size={}",
+            new_stats.entry_count, new_stats.total_size
+        );
     } else {
         println!("✅ Cache size {} is within limit", stats.total_size);
     }
