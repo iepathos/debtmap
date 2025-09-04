@@ -392,15 +392,15 @@ pub fn create_unified_debt_item_with_data_flow(
 /// Helper function to calculate entropy details from FunctionMetrics
 fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
     func.entropy_score.as_ref().map(|entropy_score| {
-        let adjusted_cyclomatic =
-            crate::complexity::entropy::apply_entropy_dampening(func.cyclomatic, entropy_score);
-        let _adjusted_cognitive =
-            crate::complexity::entropy::apply_entropy_dampening(func.cognitive, entropy_score);
-        let dampening_factor = if func.cyclomatic > 0 {
-            adjusted_cyclomatic as f64 / func.cyclomatic as f64
-        } else {
-            1.0
-        };
+        // Use the new framework's dampening calculation
+        let calculator = crate::complexity::entropy_core::UniversalEntropyCalculator::new(
+            crate::complexity::entropy_core::EntropyConfig::default()
+        );
+        let dampening_value = calculator.apply_dampening(entropy_score);
+        let dampening_factor = (dampening_value / 2.0).min(1.0).max(0.5); // Normalize to 0.5-1.0 range
+        
+        let adjusted_cyclomatic = (func.cyclomatic as f64 * dampening_factor) as u32;
+        let _adjusted_cognitive = (func.cognitive as f64 * dampening_factor) as u32;
 
         EntropyDetails {
             entropy_score: entropy_score.token_entropy,
