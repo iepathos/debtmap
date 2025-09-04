@@ -1,8 +1,8 @@
 use debtmap::analyzers::python::PythonAnalyzer;
 use debtmap::analyzers::Analyzer;
+use debtmap::complexity::entropy_core::LanguageEntropyAnalyzer;
 use debtmap::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
 use debtmap::complexity::languages::python::PythonEntropyAnalyzer;
-use debtmap::complexity::entropy_core::LanguageEntropyAnalyzer;
 use rustpython_parser::ast;
 use std::path::PathBuf;
 
@@ -17,27 +17,30 @@ def process_data(x):
 "#;
 
     let analyzer = PythonEntropyAnalyzer::new(source);
-    
+
     // Parse the Python code
     let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
         .expect("Failed to parse Python code");
-    
+
     let ast::Mod::Module(module) = module else {
         panic!("Expected Module");
     };
-    
+
     // Extract tokens
     let tokens = analyzer.extract_tokens(&module.body);
     assert!(!tokens.is_empty(), "Should extract tokens from Python code");
-    
+
     // Detect patterns
     let patterns = analyzer.detect_patterns(&module.body);
     assert!(patterns.total_patterns > 0, "Should detect patterns");
-    
+
     // Check branch similarity
     let similarity = analyzer.calculate_branch_similarity(&module.body);
-    assert!(similarity >= 0.0 && similarity <= 1.0, "Branch similarity should be between 0 and 1");
-    
+    assert!(
+        similarity >= 0.0 && similarity <= 1.0,
+        "Branch similarity should be between 0 and 1"
+    );
+
     // Analyze structure
     let (vars, nesting) = analyzer.analyze_structure(&module.body);
     assert_eq!(vars, 1, "Should find one variable (x)");
@@ -61,17 +64,29 @@ def calculate_total(items):
     let ast = analyzer
         .parse(source, PathBuf::from("test.py"))
         .expect("Should parse Python code");
-    
+
     let metrics = analyzer.analyze(&ast);
-    
+
     // Check that entropy score is calculated
-    assert!(!metrics.complexity.functions.is_empty(), "Should have function metrics");
+    assert!(
+        !metrics.complexity.functions.is_empty(),
+        "Should have function metrics"
+    );
     let func = &metrics.complexity.functions[0];
-    assert!(func.entropy_score.is_some(), "Entropy score should be calculated");
-    
+    assert!(
+        func.entropy_score.is_some(),
+        "Entropy score should be calculated"
+    );
+
     let entropy_score = func.entropy_score.as_ref().unwrap();
-    assert!(entropy_score.effective_complexity > 0.0, "Entropy score should be positive");
-    assert!(entropy_score.effective_complexity < 100.0, "Entropy score should be reasonable");
+    assert!(
+        entropy_score.effective_complexity > 0.0,
+        "Entropy score should be positive"
+    );
+    assert!(
+        entropy_score.effective_complexity < 100.0,
+        "Entropy score should be reasonable"
+    );
 }
 
 #[test]
@@ -95,19 +110,21 @@ def validate_fields(data):
     let ast = analyzer
         .parse(source, PathBuf::from("test.py"))
         .expect("Should parse Python code");
-    
+
     let metrics = analyzer.analyze(&ast);
-    
+
     assert!(!metrics.complexity.functions.is_empty());
     let func = &metrics.complexity.functions[0];
-    
+
     // Repetitive validation code should have moderate to high entropy
     assert!(func.entropy_score.is_some());
     let entropy = func.entropy_score.as_ref().unwrap();
     // Repetitive code should have some entropy score calculated
-    assert!(entropy.effective_complexity >= 0.0, 
-        "Repetitive code should have entropy calculated (got {})", 
-        entropy.effective_complexity);
+    assert!(
+        entropy.effective_complexity >= 0.0,
+        "Repetitive code should have entropy calculated (got {})",
+        entropy.effective_complexity
+    );
 }
 
 #[test]
@@ -138,19 +155,21 @@ def process_request(req):
     let ast = analyzer
         .parse(source, PathBuf::from("test.py"))
         .expect("Should parse Python code");
-    
+
     let metrics = analyzer.analyze(&ast);
-    
+
     assert!(!metrics.complexity.functions.is_empty());
     let func = &metrics.complexity.functions[0];
-    
+
     // Complex nested branching should have high entropy
     assert!(func.entropy_score.is_some());
     let entropy = func.entropy_score.as_ref().unwrap();
     // Complex nested branching should have entropy calculated
-    assert!(entropy.effective_complexity >= 0.0, 
-        "Complex branching should have entropy calculated (got {})", 
-        entropy.effective_complexity);
+    assert!(
+        entropy.effective_complexity >= 0.0,
+        "Complex branching should have entropy calculated (got {})",
+        entropy.effective_complexity
+    );
 }
 
 #[test]
@@ -164,24 +183,28 @@ def transform_data(items):
 "#;
 
     let analyzer = PythonEntropyAnalyzer::new(source);
-    
+
     let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
         .expect("Failed to parse Python code");
-    
+
     let ast::Mod::Module(module) = module else {
         panic!("Expected Module");
     };
-    
+
     // Test that list comprehensions are properly tokenized
     let tokens = analyzer.extract_tokens(&module.body);
-    let comp_tokens: Vec<_> = tokens.iter()
+    let comp_tokens: Vec<_> = tokens
+        .iter()
         .filter(|t| t.value().contains("comp"))
         .collect();
     assert!(!comp_tokens.is_empty(), "Should detect list comprehensions");
-    
+
     // Pattern detection should find comprehensions
     let patterns = analyzer.detect_patterns(&module.body);
-    assert!(patterns.total_patterns > 0, "Should detect comprehension patterns");
+    assert!(
+        patterns.total_patterns > 0,
+        "Should detect comprehension patterns"
+    );
 }
 
 #[test]
@@ -200,15 +223,21 @@ async def fetch_data(url):
     let ast = analyzer
         .parse(source, PathBuf::from("test.py"))
         .expect("Should parse Python code");
-    
+
     let metrics = analyzer.analyze(&ast);
-    
+
     assert!(!metrics.complexity.functions.is_empty());
     let func = &metrics.complexity.functions[0];
-    
+
     // Async functions should have entropy calculated
-    assert!(func.entropy_score.is_some(), "Async functions should have entropy score");
-    assert!(func.name.contains("async"), "Function should be marked as async");
+    assert!(
+        func.entropy_score.is_some(),
+        "Async functions should have entropy score"
+    );
+    assert!(
+        func.name.contains("async"),
+        "Function should be marked as async"
+    );
 }
 
 #[test]
@@ -238,17 +267,27 @@ class DataProcessor:
     let ast = analyzer
         .parse(source, PathBuf::from("test.py"))
         .expect("Should parse Python code");
-    
+
     let metrics = analyzer.analyze(&ast);
-    
+
     // Should have metrics for all methods
-    assert_eq!(metrics.complexity.functions.len(), 3, "Should have 3 methods");
-    
+    assert_eq!(
+        metrics.complexity.functions.len(),
+        3,
+        "Should have 3 methods"
+    );
+
     for func in &metrics.complexity.functions {
-        assert!(func.entropy_score.is_some(), 
-            "Method {} should have entropy score", func.name);
-        assert!(func.name.contains("DataProcessor"), 
-            "Method {} should include class name", func.name);
+        assert!(
+            func.entropy_score.is_some(),
+            "Method {} should have entropy score",
+            func.name
+        );
+        assert!(
+            func.name.contains("DataProcessor"),
+            "Method {} should include class name",
+            func.name
+        );
     }
 }
 
@@ -271,25 +310,36 @@ def safe_divide(a, b):
 "#;
 
     let analyzer = PythonEntropyAnalyzer::new(source);
-    
+
     let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
         .expect("Failed to parse Python code");
-    
+
     let ast::Mod::Module(module) = module else {
         panic!("Expected Module");
     };
-    
+
     // Exception handling should contribute to entropy
     let tokens = analyzer.extract_tokens(&module.body);
-    let exception_tokens: Vec<_> = tokens.iter()
-        .filter(|t| t.value().contains("except") || t.value().contains("try") || t.value().contains("finally"))
+    let exception_tokens: Vec<_> = tokens
+        .iter()
+        .filter(|t| {
+            t.value().contains("except")
+                || t.value().contains("try")
+                || t.value().contains("finally")
+        })
         .collect();
-    assert!(!exception_tokens.is_empty(), "Should detect exception handling");
-    
+    assert!(
+        !exception_tokens.is_empty(),
+        "Should detect exception handling"
+    );
+
     // Calculate entropy with calculator
     let mut calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
     let score = calculator.calculate(&analyzer, &module.body);
-    assert!(score.effective_complexity > 0.0, "Exception handling should add complexity");
+    assert!(
+        score.effective_complexity > 0.0,
+        "Exception handling should add complexity"
+    );
 }
 
 #[test]
@@ -310,21 +360,24 @@ def handle_value(value):
 "#;
 
     let analyzer = PythonEntropyAnalyzer::new(source);
-    
+
     let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
         .expect("Failed to parse Python code");
-    
+
     let ast::Mod::Module(module) = module else {
         panic!("Expected Module");
     };
-    
+
     // Pattern matching should be detected
     let patterns = analyzer.detect_patterns(&module.body);
     assert!(patterns.total_patterns > 0, "Should detect match patterns");
-    
+
     // Branch similarity should be calculated for match arms
     let similarity = analyzer.calculate_branch_similarity(&module.body);
-    assert!(similarity > 0.0, "Match statements should have branch similarity");
+    assert!(
+        similarity > 0.0,
+        "Match statements should have branch similarity"
+    );
 }
 
 #[test]
@@ -338,20 +391,24 @@ def process_large_dataset(data):
 "#;
 
     let analyzer = PythonEntropyAnalyzer::new(source);
-    
+
     let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
         .expect("Failed to parse Python code");
-    
+
     let ast::Mod::Module(module) = module else {
         panic!("Expected Module");
     };
-    
+
     // Generator expressions should be detected as patterns
     let tokens = analyzer.extract_tokens(&module.body);
-    let gen_tokens: Vec<_> = tokens.iter()
+    let gen_tokens: Vec<_> = tokens
+        .iter()
         .filter(|t| t.value().contains("generator"))
         .collect();
-    assert!(!gen_tokens.is_empty(), "Should detect generator expressions");
+    assert!(
+        !gen_tokens.is_empty(),
+        "Should detect generator expressions"
+    );
 }
 
 #[test]
@@ -364,21 +421,23 @@ def create_handlers():
 "#;
 
     let analyzer = PythonEntropyAnalyzer::new(source);
-    
+
     let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
         .expect("Failed to parse Python code");
-    
+
     let ast::Mod::Module(module) = module else {
         panic!("Expected Module");
     };
-    
+
     // Lambda functions should be detected
     let tokens = analyzer.extract_tokens(&module.body);
-    let lambda_tokens: Vec<_> = tokens.iter()
-        .filter(|t| t.value() == "lambda")
-        .collect();
+    let lambda_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "lambda").collect();
     // Should detect at least 2 lambda functions
-    assert!(lambda_tokens.len() >= 2, "Should detect lambda functions, found {}", lambda_tokens.len());
+    assert!(
+        lambda_tokens.len() >= 2,
+        "Should detect lambda functions, found {}",
+        lambda_tokens.len()
+    );
 }
 
 #[test]
@@ -395,19 +454,17 @@ def process_with_walrus(items):
 "#;
 
     let analyzer = PythonEntropyAnalyzer::new(source);
-    
+
     let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
         .expect("Failed to parse Python code");
-    
+
     let ast::Mod::Module(module) = module else {
         panic!("Expected Module");
     };
-    
+
     // Walrus operator should be detected
     let tokens = analyzer.extract_tokens(&module.body);
-    let walrus_tokens: Vec<_> = tokens.iter()
-        .filter(|t| t.value() == ":=")
-        .collect();
+    let walrus_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == ":=").collect();
     assert!(!walrus_tokens.is_empty(), "Should detect walrus operator");
 }
 
@@ -439,28 +496,47 @@ def complex_function(data):
     let ast = analyzer
         .parse(source, PathBuf::from("test.py"))
         .expect("Should parse Python code");
-    
+
     let metrics = analyzer.analyze(&ast);
-    
-    assert_eq!(metrics.complexity.functions.len(), 2, "Should have 2 functions");
-    
-    let simple_func = metrics.complexity.functions.iter()
+
+    assert_eq!(
+        metrics.complexity.functions.len(),
+        2,
+        "Should have 2 functions"
+    );
+
+    let simple_func = metrics
+        .complexity
+        .functions
+        .iter()
         .find(|f| f.name == "simple_function")
         .expect("Should find simple_function");
-    
-    let complex_func = metrics.complexity.functions.iter()
+
+    let complex_func = metrics
+        .complexity
+        .functions
+        .iter()
         .find(|f| f.name == "complex_function")
         .expect("Should find complex_function");
-    
+
     // Both should have entropy scores
-    assert!(simple_func.entropy_score.is_some(), "Simple function should have entropy score");
-    assert!(complex_func.entropy_score.is_some(), "Complex function should have entropy score");
-    
+    assert!(
+        simple_func.entropy_score.is_some(),
+        "Simple function should have entropy score"
+    );
+    assert!(
+        complex_func.entropy_score.is_some(),
+        "Complex function should have entropy score"
+    );
+
     // Complex function should have higher entropy than simple
     let simple_entropy = simple_func.entropy_score.as_ref().unwrap();
     let complex_entropy = complex_func.entropy_score.as_ref().unwrap();
-    
-    assert!(complex_entropy.effective_complexity > simple_entropy.effective_complexity, 
+
+    assert!(
+        complex_entropy.effective_complexity > simple_entropy.effective_complexity,
         "Complex function ({}) should have higher entropy than simple ({})",
-        complex_entropy.effective_complexity, simple_entropy.effective_complexity);
+        complex_entropy.effective_complexity,
+        simple_entropy.effective_complexity
+    );
 }
