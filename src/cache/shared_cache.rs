@@ -82,11 +82,17 @@ impl SharedCache {
         let background_pruner = auto_pruner
             .as_ref()
             .map(|p| BackgroundPruner::new(p.clone()));
+        
+        // Use auto-pruner's max size if configured
+        let max_cache_size = auto_pruner
+            .as_ref()
+            .map(|p| p.max_size_bytes as u64)
+            .unwrap_or(1024 * 1024 * 1024); // 1GB default
 
         Ok(Self {
             location,
             index: Arc::new(RwLock::new(index)),
-            max_cache_size: 1024 * 1024 * 1024, // 1GB default
+            max_cache_size,
             cleanup_threshold: 0.9,             // Cleanup when 90% full
             auto_pruner,
             background_pruner,
@@ -178,7 +184,15 @@ impl SharedCache {
     pub fn put(&self, key: &str, component: &str, data: &[u8]) -> Result<()> {
         // Check if we need cleanup or auto-pruning
         if self.auto_pruner.is_some() {
-            self.trigger_pruning_if_needed()?;
+            // Try background pruning first
+            if let Some(ref bg_pruner) = self.background_pruner {
+                if !bg_pruner.is_running() {
+                    bg_pruner.start_if_needed(self.index.clone());
+                }
+            } else {
+                // Fallback to synchronous pruning
+                self.trigger_pruning_if_needed()?;
+            }
         } else {
             self.maybe_cleanup()?;
         }
@@ -489,6 +503,9 @@ impl SharedCache {
 
     /// Trigger pruning if needed based on auto-pruner configuration
     pub fn trigger_pruning_if_needed(&self) -> Result<PruneStats> {
+        // First, clean up any orphaned index entries for deleted files
+        self.clean_orphaned_entries()?;
+        
         if let Some(ref pruner) = self.auto_pruner {
             let should_prune = {
                 let index = self
@@ -560,8 +577,9 @@ impl SharedCache {
                 index.last_cleanup = Some(SystemTime::now());
             }
 
-            // Delete files
+            // Delete files and track missing ones
             for (key, _) in &entries_to_remove {
+                let mut any_file_found = false;
                 for component in &[
                     "call_graphs",
                     "analysis",
@@ -571,11 +589,18 @@ impl SharedCache {
                 ] {
                     let cache_path = self.get_cache_file_path(key, component);
                     if cache_path.exists() {
+                        any_file_found = true;
                         match fs::remove_file(&cache_path) {
                             Ok(_) => files_deleted += 1,
-                            Err(_) => files_not_found += 1,
+                            Err(e) => {
+                                log::warn!("Failed to delete cache file {:?}: {}", cache_path, e);
+                            }
                         }
                     }
+                }
+                if !any_file_found {
+                    files_not_found += 1;
+                    log::debug!("No files found for cache entry: {}", key);
                 }
             }
 
@@ -694,6 +719,65 @@ impl SharedCache {
         })
     }
 
+    /// Clean up orphaned index entries where files no longer exist
+    pub fn clean_orphaned_entries(&self) -> Result<usize> {
+        let mut removed_count = 0;
+        let entries_to_check = {
+            let index = self
+                .index
+                .read()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            index.entries.keys().cloned().collect::<Vec<_>>()
+        };
+
+        let mut orphaned_entries = Vec::new();
+        
+        // Check each entry to see if any of its files exist
+        for key in entries_to_check {
+            let mut file_exists = false;
+            for component in &[
+                "call_graphs",
+                "analysis",
+                "metadata",
+                "temp",
+                "file_metrics",
+            ] {
+                let cache_path = self.get_cache_file_path(&key, component);
+                if cache_path.exists() {
+                    file_exists = true;
+                    break;
+                }
+            }
+            
+            if !file_exists {
+                orphaned_entries.push(key);
+            }
+        }
+
+        // Remove orphaned entries from index
+        if !orphaned_entries.is_empty() {
+            let mut index = self
+                .index
+                .write()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+
+            for key in orphaned_entries {
+                if let Some(metadata) = index.entries.remove(&key) {
+                    index.total_size = index.total_size.saturating_sub(metadata.size_bytes);
+                    removed_count += 1;
+                    log::debug!("Removed orphaned cache entry: {}", key);
+                }
+            }
+        }
+
+        if removed_count > 0 {
+            self.save_index()?;
+            log::info!("Cleaned up {} orphaned cache entries", removed_count);
+        }
+
+        Ok(removed_count)
+    }
+    
     /// Clean up entries older than specified days
     pub fn cleanup_old_entries(&self, max_age_days: i64) -> Result<usize> {
         let max_age = Duration::from_secs(max_age_days as u64 * 86400);

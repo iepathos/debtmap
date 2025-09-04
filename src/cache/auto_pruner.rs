@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
+use std::thread;
 use std::time::{Duration, SystemTime};
 
 use super::shared_cache::{CacheIndex, CacheMetadata};
@@ -279,7 +280,8 @@ impl std::fmt::Display for PruneStats {
 /// Background pruner for non-blocking operations
 pub struct BackgroundPruner {
     pruner: Arc<AutoPruner>,
-    running: Arc<RwLock<bool>>,
+    running: Arc<Mutex<bool>>,
+    last_stats: Arc<Mutex<Option<PruneStats>>>,
 }
 
 impl BackgroundPruner {
@@ -287,19 +289,77 @@ impl BackgroundPruner {
     pub fn new(pruner: AutoPruner) -> Self {
         Self {
             pruner: Arc::new(pruner),
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(Mutex::new(false)),
+            last_stats: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Check if pruning is currently running
     pub fn is_running(&self) -> bool {
-        self.running.read().map(|r| *r).unwrap_or(false)
+        self.running.lock().map(|r| *r).unwrap_or(false)
+    }
+    
+    /// Get the last pruning statistics
+    pub fn get_last_stats(&self) -> Option<PruneStats> {
+        self.last_stats.lock().ok()?.clone()
     }
 
     /// Start background pruning if not already running
-    pub fn start_if_needed(&self, index: Arc<RwLock<CacheIndex>>) -> Option<PruneStats> {
+    pub fn start_if_needed(&self, index: Arc<RwLock<CacheIndex>>) -> bool {
         // Try to acquire the running lock
-        let mut running = match self.running.try_write() {
+        let mut running = match self.running.try_lock() {
+            Ok(r) => r,
+            Err(_) => return false, // Already running
+        };
+
+        if *running {
+            return false;
+        }
+
+        // Check if pruning is needed
+        let should_prune = {
+            match index.read() {
+                Ok(idx) => self.pruner.should_prune(&*idx),
+                Err(_) => return false,
+            }
+        };
+
+        if !should_prune {
+            return false;
+        }
+
+        *running = true;
+        
+        // Clone necessary data for the thread
+        let pruner = self.pruner.clone();
+        let index_clone = index.clone();
+        let running_flag = self.running.clone();
+        let stats_store = self.last_stats.clone();
+        
+        // Spawn background thread for pruning
+        thread::spawn(move || {
+            let stats = Self::perform_pruning_thread(pruner, index_clone);
+            
+            // Store stats and mark as not running
+            if let Ok(mut last_stats) = stats_store.lock() {
+                *last_stats = stats.clone();
+            }
+            
+            if let Ok(mut r) = running_flag.lock() {
+                *r = false;
+            }
+            
+            if let Some(ref s) = stats {
+                log::info!("Background pruning completed: {}", s);
+            }
+        });
+        
+        true
+    }
+    
+    /// Perform pruning synchronously (for testing or immediate needs)
+    pub fn prune_sync(&self, index: Arc<RwLock<CacheIndex>>) -> Option<PruneStats> {
+        let mut running = match self.running.try_lock() {
             Ok(r) => r,
             Err(_) => return None, // Already running
         };
@@ -309,33 +369,24 @@ impl BackgroundPruner {
         }
 
         *running = true;
-
-        // Check if pruning is needed
-        let should_prune = {
-            let idx = index.read().ok()?;
-            self.pruner.should_prune(&*idx)
-        };
-
-        if !should_prune {
-            *running = false;
-            return None;
-        }
-
-        // For now, do inline pruning (future: spawn thread)
-        let stats = self.perform_pruning(index.clone());
-
+        let stats = Self::perform_pruning_thread(self.pruner.clone(), index);
         *running = false;
+        
+        if let Ok(mut last_stats) = self.last_stats.lock() {
+            *last_stats = stats.clone();
+        }
+        
         stats
     }
 
-    /// Perform the actual pruning
-    fn perform_pruning(&self, index: Arc<RwLock<CacheIndex>>) -> Option<PruneStats> {
+    /// Perform the actual pruning in a thread context
+    fn perform_pruning_thread(pruner: Arc<AutoPruner>, index: Arc<RwLock<CacheIndex>>) -> Option<PruneStats> {
         let start = SystemTime::now();
 
         // Get entries to remove
         let entries_to_remove = {
             let idx = index.read().ok()?;
-            self.pruner.calculate_entries_to_remove(&*idx)
+            pruner.calculate_entries_to_remove(&*idx)
         };
 
         if entries_to_remove.is_empty() {
