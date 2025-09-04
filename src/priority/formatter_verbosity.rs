@@ -165,7 +165,7 @@ pub fn format_priority_item_with_config(
         };
         writeln!(
             output,
-            "{}  {} Coverage Gap: {:.3}^1.5 = {:.3}{}",
+            "{}  {} Coverage Gap: ({:.3}^1.5 + 0.1) = {:.3}{}",
             tree_pipe,
             formatter.emoji("├─", "-"),
             actual_coverage_gap,
