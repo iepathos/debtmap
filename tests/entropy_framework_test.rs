@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod entropy_framework_tests {
     use debtmap::complexity::entropy_core::{
-        EntropyConfig, EntropyScore, EntropyToken, LanguageEntropyAnalyzer, PatternMetrics,
-        TokenCategory, UniversalEntropyCalculator,
+        EntropyConfig, EntropyToken, LanguageEntropyAnalyzer, PatternMetrics,
+        UniversalEntropyCalculator,
     };
     use debtmap::complexity::entropy_traits::GenericToken;
 

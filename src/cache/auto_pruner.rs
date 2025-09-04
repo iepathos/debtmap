@@ -208,19 +208,22 @@ impl AutoPruner {
     ) -> Vec<(String, CacheMetadata)> {
         let mut entries_to_remove = Vec::new();
         let mut removed_size = 0u64;
-        // Calculate targets
+        
+        // Calculate targets - need to get UNDER the limits, not just remove excess
         let target_size = if index.total_size > self.max_size_bytes as u64 {
+            // Calculate how much we need to remove to get under the limit plus some buffer
             let excess = index.total_size - self.max_size_bytes as u64;
-            let prune_amount = (self.max_size_bytes as f32 * self.prune_percentage) as u64;
-            excess.max(prune_amount)
+            let buffer_amount = (self.max_size_bytes as f32 * self.prune_percentage) as u64;
+            excess + buffer_amount
         } else {
             0
         };
 
         let target_count = if index.entries.len() > self.max_entries {
+            // Calculate how many entries we need to remove to get under the limit plus some buffer
             let excess = index.entries.len() - self.max_entries;
-            let prune_amount = (self.max_entries as f32 * self.prune_percentage) as usize;
-            excess.max(prune_amount)
+            let buffer_amount = (self.max_entries as f32 * self.prune_percentage) as usize;
+            excess + buffer_amount
         } else {
             0
         };

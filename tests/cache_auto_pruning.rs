@@ -1,7 +1,6 @@
 use debtmap::cache::{AutoPruner, PruneStrategy, SharedCache};
 use std::env;
-use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tempfile::TempDir;
 
 #[test]
@@ -45,14 +44,21 @@ fn test_auto_pruning_entry_count_limit() {
     for i in 0..10 {
         let key = format!("entry_{}", i);
         let data = b"test data";
+        println!("About to add entry {}, DEBTMAP_CACHE_AUTO_PRUNE={}", i, env::var("DEBTMAP_CACHE_AUTO_PRUNE").unwrap_or("NOT_SET".to_string()));
         cache.put(&key, "test_component", data).unwrap();
+        let stats = cache.get_stats();
+        println!("After adding entry {}: entry_count={}", i, stats.entry_count);
+        if stats.entry_count > 5 {
+            println!("WARNING: Entry count exceeded limit after adding entry {}", i);
+        }
     }
 
     // Should have triggered pruning
     let stats = cache.get_stats();
+    println!("Final stats: entry_count={}, limit was 5", stats.entry_count);
     assert!(
         stats.entry_count <= 5,
-        "Entry count should be pruned to under 5"
+        "Entry count should be pruned to under 5, got {}", stats.entry_count
     );
 
     env::remove_var("DEBTMAP_CACHE_DIR");
@@ -207,6 +213,51 @@ fn test_prune_stats_display() {
     assert!(display.contains("150ms"));
     assert!(display.contains("50 entries"));
     assert!(display.contains("2 MB"));
+}
+
+#[test]
+fn debug_auto_pruning_issue() {
+    let temp_dir = TempDir::new().unwrap();
+    env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+    env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "true");
+    env::set_var("DEBTMAP_CACHE_MAX_SIZE", "1000"); // 1KB limit
+
+    println!("Creating cache with auto-pruning enabled...");
+    let cache = SharedCache::new(None).unwrap();
+    
+    println!("Initial stats: {:?}", cache.get_stats());
+    
+    // Add entries that exceed the size limit
+    for i in 0..10 {
+        let key = format!("key_{}", i);
+        let data = vec![0u8; 200]; // 200 bytes each
+        println!("Adding entry {} (200 bytes)", i);
+        cache.put(&key, "test_component", &data).unwrap();
+        let stats = cache.get_stats();
+        println!("Stats after entry {}: entry_count={}, total_size={}", i, stats.entry_count, stats.total_size);
+    }
+
+    // Check final stats
+    let stats = cache.get_stats();
+    println!("Final stats: entry_count={}, total_size={}", stats.entry_count, stats.total_size);
+    
+    if stats.total_size > 1000 {
+        println!("❌ Cache size {} exceeds limit of 1000 bytes", stats.total_size);
+        
+        // Try manual pruning
+        println!("Attempting manual pruning...");
+        let prune_stats = cache.trigger_pruning().unwrap();
+        println!("Prune stats: {:?}", prune_stats);
+        
+        let new_stats = cache.get_stats();
+        println!("Stats after manual pruning: entry_count={}, total_size={}", new_stats.entry_count, new_stats.total_size);
+    } else {
+        println!("✅ Cache size {} is within limit", stats.total_size);
+    }
+
+    env::remove_var("DEBTMAP_CACHE_DIR");
+    env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    env::remove_var("DEBTMAP_CACHE_MAX_SIZE");
 }
 
 #[test]
