@@ -1,5 +1,7 @@
 use crate::analyzers::python_detectors::SimplifiedPythonDetector;
 use crate::analyzers::Analyzer;
+use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
+use crate::complexity::languages::python::PythonEntropyAnalyzer;
 use crate::complexity::python_patterns::analyze_python_patterns;
 use crate::core::{
     ast::{Ast, PythonAst},
@@ -72,7 +74,13 @@ impl Analyzer for PythonAnalyzer {
 
 fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
     let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
-    let functions = extract_function_metrics(&ast.module, &ast.path, &source_content);
+    let mut entropy_calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
+    let functions = extract_function_metrics(
+        &ast.module,
+        &ast.path,
+        &source_content,
+        &mut entropy_calculator,
+    );
     let debt_items = create_python_debt_items(
         &ast.module,
         &ast.path,
@@ -186,6 +194,7 @@ fn extract_function_metrics(
     module: &ast::Mod,
     path: &Path,
     source_content: &str,
+    entropy_calculator: &mut UniversalEntropyCalculator,
 ) -> Vec<FunctionMetrics> {
     let ast::Mod::Module(module) = module else {
         return Vec::new();
@@ -195,11 +204,21 @@ fn extract_function_metrics(
     let mut functions = Vec::new();
 
     // Recursively extract functions from the module with no class context
-    extract_functions_from_stmts(&module.body, path, &lines, &mut functions, 0, None);
+    extract_functions_from_stmts(
+        &module.body,
+        path,
+        &lines,
+        &mut functions,
+        0,
+        None,
+        source_content,
+        entropy_calculator,
+    );
 
     functions
 }
 
+#[allow(clippy::only_used_in_recursion, clippy::too_many_arguments)]
 fn extract_functions_from_stmts(
     stmts: &[ast::Stmt],
     path: &Path,
@@ -207,6 +226,8 @@ fn extract_functions_from_stmts(
     functions: &mut Vec<FunctionMetrics>,
     stmt_offset: usize,
     class_context: Option<&str>,
+    source: &str,
+    entropy_calculator: &mut UniversalEntropyCalculator,
 ) {
     for (idx, stmt) in stmts.iter().enumerate() {
         match stmt {
@@ -246,6 +267,8 @@ fn extract_functions_from_stmts(
                     functions,
                     stmt_offset + idx,
                     class_context,
+                    source,
+                    entropy_calculator,
                 );
             }
             ast::Stmt::AsyncFunctionDef(func_def) => {
@@ -284,6 +307,8 @@ fn extract_functions_from_stmts(
                     functions,
                     stmt_offset + idx,
                     class_context,
+                    source,
+                    entropy_calculator,
                 );
             }
             ast::Stmt::ClassDef(class_def) => {
@@ -295,11 +320,24 @@ fn extract_functions_from_stmts(
                     functions,
                     stmt_offset + idx,
                     Some(class_def.name.as_ref()),
+                    source,
+                    entropy_calculator,
                 );
             }
             _ => {}
         }
     }
+}
+
+#[allow(dead_code)]
+fn calculate_function_entropy(
+    body: &[ast::Stmt],
+    source: &str,
+    calculator: &mut UniversalEntropyCalculator,
+) -> Option<f64> {
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let score = calculator.calculate(&analyzer, &body.to_vec());
+    Some(score.effective_complexity)
 }
 
 fn estimate_line_number(lines: &[&str], func_name: &str, _stmt_idx: usize) -> usize {
