@@ -733,7 +733,7 @@ mod tests {
         };
 
         // Entry older than 1 day should be considered old
-        let max_age = Duration::from_secs(1 * 86400); // 1 day
+        let max_age = Duration::from_secs(86400); // 1 day
         if let Some(age) = AutoPruner::calculate_entry_age(&old_metadata, now) {
             assert!(AutoPruner::is_entry_old(age, max_age));
         } else {
@@ -814,8 +814,10 @@ mod tests {
             ..Default::default()
         };
 
-        let mut index = CacheIndex::default();
-        index.total_size = 500;
+        let mut index = CacheIndex {
+            total_size: 500,
+            ..Default::default()
+        };
         assert!(!pruner.should_prune(&index));
 
         index.total_size = 1500;

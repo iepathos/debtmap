@@ -336,7 +336,7 @@ impl SharedCache {
                 "Failed to write temporary file at {:?}. Size: {} bytes. Parent exists: {}, Temp path valid: {}",
                 temp_path,
                 data_len,
-                temp_path.parent().map_or(false, |p| p.exists()),
+                temp_path.parent().is_some_and(|p| p.exists()),
                 temp_path.is_absolute()
             )
         })
@@ -367,7 +367,7 @@ impl SharedCache {
                 temp_path,
                 target_path,
                 temp_path.exists(),
-                target_path.parent().map_or(false, |p| p.exists()),
+                target_path.parent().is_some_and(|p| p.exists()),
                 Self::paths_on_same_filesystem(temp_path, target_path)
             )
         })
@@ -406,7 +406,7 @@ impl SharedCache {
             .read()
             .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
 
-        let content = Self::serialize_index_to_json(&*index)?;
+        let content = Self::serialize_index_to_json(&index)?;
 
         Self::write_file_atomically(&index_path, &temp_path, &content)
             .with_context(|| format!("Failed to save cache index to {:?}", index_path))?;
@@ -1385,7 +1385,6 @@ impl std::fmt::Display for FullCacheStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cache::EnvironmentSnapshot;
     use std::collections::HashMap;
     use tempfile::TempDir;
 

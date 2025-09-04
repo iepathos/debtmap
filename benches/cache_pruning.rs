@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::cache::auto_pruner::{AutoPruner, PruneStrategy};
-use debtmap::cache::shared_cache::{CacheIndex, CacheMetadata, SharedCache};
-use std::time::{Duration, SystemTime};
+use debtmap::cache::shared_cache::SharedCache;
+use std::hint::black_box;
 use tempfile::TempDir;
 
 fn create_cache_with_entries(num_entries: usize) -> (SharedCache, TempDir) {
@@ -22,7 +22,7 @@ fn create_cache_with_entries(num_entries: usize) -> (SharedCache, TempDir) {
 
 fn bench_lru_pruning(c: &mut Criterion) {
     c.bench_function("prune_lru_100_entries", |b| {
-        let (cache, _dir) = create_cache_with_entries(100);
+        let (_cache, _dir) = create_cache_with_entries(100);
         let pruner = AutoPruner {
             max_size_bytes: 50 * 1024, // 50KB limit (will trigger pruning)
             strategy: PruneStrategy::Lru,
@@ -36,7 +36,7 @@ fn bench_lru_pruning(c: &mut Criterion) {
     });
 
     c.bench_function("prune_lru_1000_entries", |b| {
-        let (cache, _dir) = create_cache_with_entries(1000);
+        let (_cache, _dir) = create_cache_with_entries(1000);
         let pruner = AutoPruner {
             max_size_bytes: 500 * 1024, // 500KB limit
             strategy: PruneStrategy::Lru,
@@ -50,7 +50,7 @@ fn bench_lru_pruning(c: &mut Criterion) {
     });
 
     c.bench_function("prune_lru_10000_entries", |b| {
-        let (cache, _dir) = create_cache_with_entries(10000);
+        let (_cache, _dir) = create_cache_with_entries(10000);
         let pruner = AutoPruner {
             max_size_bytes: 5 * 1024 * 1024, // 5MB limit
             strategy: PruneStrategy::Lru,
@@ -66,7 +66,7 @@ fn bench_lru_pruning(c: &mut Criterion) {
 
 fn bench_lfu_pruning(c: &mut Criterion) {
     c.bench_function("prune_lfu_1000_entries", |b| {
-        let (cache, _dir) = create_cache_with_entries(1000);
+        let (_cache, _dir) = create_cache_with_entries(1000);
         let pruner = AutoPruner {
             max_size_bytes: 500 * 1024,
             strategy: PruneStrategy::Lfu,
@@ -82,7 +82,7 @@ fn bench_lfu_pruning(c: &mut Criterion) {
 
 fn bench_fifo_pruning(c: &mut Criterion) {
     c.bench_function("prune_fifo_1000_entries", |b| {
-        let (cache, _dir) = create_cache_with_entries(1000);
+        let (_cache, _dir) = create_cache_with_entries(1000);
         let pruner = AutoPruner {
             max_size_bytes: 500 * 1024,
             strategy: PruneStrategy::Fifo,
@@ -98,7 +98,7 @@ fn bench_fifo_pruning(c: &mut Criterion) {
 
 fn bench_age_based_pruning(c: &mut Criterion) {
     c.bench_function("prune_age_based_1000_entries", |b| {
-        let (cache, _dir) = create_cache_with_entries(1000);
+        let (_cache, _dir) = create_cache_with_entries(1000);
         let pruner = AutoPruner {
             max_age_days: 1,
             strategy: PruneStrategy::AgeBasedOnly,

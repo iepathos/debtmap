@@ -35,6 +35,7 @@ impl EnvGuard {
     }
 
     /// Remove an environment variable and track the original value
+    #[allow(dead_code)]
     pub fn remove(&mut self, key: &str) {
         if !self.original_values.contains_key(key) {
             self.original_values
@@ -62,11 +63,13 @@ pub struct IsolatedCacheTest {
     pub test_id: String,
     pub cache_dir: TempDir,
     pub project_dir: TempDir,
+    #[allow(dead_code)]
     pub env_guard: EnvGuard,
 }
 
 impl IsolatedCacheTest {
     /// Create a new isolated test context
+    #[allow(dead_code)]
     pub fn new(test_name: &str) -> Self {
         // Generate unique test ID using test name, thread ID, and timestamp
         let thread_id = format!("{:?}", thread::current().id())
@@ -112,6 +115,7 @@ impl IsolatedCacheTest {
     }
 
     /// Create a new isolated cache directory with a specific name
+    #[allow(dead_code)]
     pub fn create_cache_dir(&self, name: &str) -> PathBuf {
         let dir = self.cache_dir.path().join(name);
         std::fs::create_dir_all(&dir).expect("Failed to create cache directory");
