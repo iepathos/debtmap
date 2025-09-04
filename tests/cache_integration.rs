@@ -1,8 +1,10 @@
+mod helpers;
+
 use debtmap::cache::{CacheLocation, CacheStrategy, SharedCache};
 use debtmap::core::cache::AnalysisCache;
+use helpers::cache_isolation::IsolatedCacheTest;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
 /// Helper to create a test file with content
 fn create_test_file(dir: &Path, name: &str, content: &str) -> PathBuf {
@@ -11,16 +13,11 @@ fn create_test_file(dir: &Path, name: &str, content: &str) -> PathBuf {
     file_path
 }
 
-/// Helper to set up a test environment with temporary directories
-fn setup_test_env() -> (TempDir, TempDir) {
-    let project_dir = TempDir::new().unwrap();
-    let cache_dir = TempDir::new().unwrap();
-    (project_dir, cache_dir)
-}
-
 #[test]
 fn test_shared_cache_creates_no_local_directory() {
-    let (project_dir, cache_dir) = setup_test_env();
+    let isolated = IsolatedCacheTest::new("test_shared_cache_creates_no_local_directory");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     // Create a shared cache with explicit cache directory
     let cache =
@@ -47,20 +44,22 @@ fn test_shared_cache_creates_no_local_directory() {
 
 #[test]
 fn test_cache_location_strategies() {
+    let isolated = IsolatedCacheTest::new("test_cache_location_strategies");
+
     // Test shared strategy (default)
     {
         let location = CacheLocation::resolve_with_strategy(None, CacheStrategy::Shared).unwrap();
         assert_eq!(location.strategy, CacheStrategy::Shared);
     }
 
-    // Test custom strategy
+    // Test custom strategy with isolated directory
     {
-        let custom_dir = TempDir::new().unwrap();
-        let strategy = CacheStrategy::Custom(custom_dir.path().to_path_buf());
+        let custom_dir = isolated.create_cache_dir("custom");
+        let strategy = CacheStrategy::Custom(custom_dir.clone());
         let location = CacheLocation::resolve_with_strategy(None, strategy).unwrap();
         match location.strategy {
             CacheStrategy::Custom(path) => {
-                assert_eq!(path, custom_dir.path());
+                assert_eq!(path, custom_dir);
             }
             _ => panic!("Expected Custom strategy, got {:?}", location.strategy),
         }
@@ -69,7 +68,9 @@ fn test_cache_location_strategies() {
 
 #[test]
 fn test_shared_cache_read_write() {
-    let (project_dir, cache_dir) = setup_test_env();
+    let isolated = IsolatedCacheTest::new("test_shared_cache_read_write");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     let cache =
         SharedCache::new_with_cache_dir(Some(project_dir.path()), cache_dir.path().to_path_buf())
@@ -93,8 +94,9 @@ fn test_shared_cache_read_write() {
 
 #[test]
 fn test_cache_migration_from_local() {
-    let project_dir = TempDir::new().unwrap();
-    let cache_dir = TempDir::new().unwrap();
+    let isolated = IsolatedCacheTest::new("test_cache_migration_from_local");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
     // Create a legacy local cache
     let local_cache = project_dir.path().join(".debtmap_cache");
     fs::create_dir_all(&local_cache).unwrap();
@@ -122,13 +124,17 @@ fn test_cache_migration_from_local() {
 
 #[test]
 fn test_analysis_cache_uses_shared_backend() {
-    let (project_dir, _cache_dir) = setup_test_env();
+    let isolated = IsolatedCacheTest::new("test_analysis_cache_uses_shared_backend");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     // Create a test file
     let test_file = create_test_file(project_dir.path(), "test.rs", "fn main() {}");
 
-    // Create analysis cache
-    let mut cache = AnalysisCache::new(Some(project_dir.path())).unwrap();
+    // Create analysis cache with explicit cache directory to ensure isolation
+    let mut cache =
+        AnalysisCache::new_with_cache_dir(Some(project_dir.path()), cache_dir.path().to_path_buf())
+            .unwrap();
 
     // Use the cache
     let compute = || {
@@ -185,7 +191,9 @@ fn test_analysis_cache_uses_shared_backend() {
 
 #[test]
 fn test_cache_clear_project() {
-    let (project_dir, cache_dir) = setup_test_env();
+    let isolated = IsolatedCacheTest::new("test_cache_clear_project");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     let cache =
         SharedCache::new_with_cache_dir(Some(project_dir.path()), cache_dir.path().to_path_buf())
@@ -212,7 +220,9 @@ fn test_cache_clear_project() {
 
 #[test]
 fn test_cache_stats() {
-    let (project_dir, cache_dir) = setup_test_env();
+    let isolated = IsolatedCacheTest::new("test_cache_stats");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     let cache =
         SharedCache::new_with_cache_dir(Some(project_dir.path()), cache_dir.path().to_path_buf())
@@ -235,8 +245,9 @@ fn test_cache_stats() {
 
 #[test]
 fn test_analysis_cache_creation() {
-    let project_dir = TempDir::new().unwrap();
-    let cache_dir = TempDir::new().unwrap();
+    let isolated = IsolatedCacheTest::new("test_analysis_cache_creation");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     let _test_file = create_test_file(project_dir.path(), "test.rs", "fn main() {}");
 
@@ -251,7 +262,8 @@ fn test_analysis_cache_creation() {
 
 #[test]
 fn test_cache_project_id_generation() {
-    let project_dir = TempDir::new().unwrap();
+    let isolated = IsolatedCacheTest::new("test_cache_project_id_generation");
+    let project_dir = &isolated.project_dir;
 
     // Initialize git repo for consistent project ID
     std::process::Command::new("git")
@@ -270,7 +282,9 @@ fn test_cache_project_id_generation() {
 
 #[test]
 fn test_cache_component_paths() {
-    let (project_dir, cache_dir) = setup_test_env();
+    let isolated = IsolatedCacheTest::new("test_cache_component_paths");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     let cache =
         SharedCache::new_with_cache_dir(Some(project_dir.path()), cache_dir.path().to_path_buf())
@@ -294,7 +308,9 @@ fn test_cache_component_paths() {
 
 #[test]
 fn test_cache_cleanup_on_size_limit() {
-    let (project_dir, cache_dir) = setup_test_env();
+    let isolated = IsolatedCacheTest::new("test_cache_cleanup_on_size_limit");
+    let project_dir = &isolated.project_dir;
+    let cache_dir = &isolated.cache_dir;
 
     let cache =
         SharedCache::new_with_cache_dir(Some(project_dir.path()), cache_dir.path().to_path_buf())
@@ -320,9 +336,9 @@ fn test_parallel_cache_access() {
     use std::sync::{Arc, Mutex};
     use std::thread;
 
-    let (project_dir, cache_dir) = setup_test_env();
-    let project_path = project_dir.path().to_path_buf();
-    let cache_path = cache_dir.path().to_path_buf();
+    let isolated = IsolatedCacheTest::new("test_parallel_cache_access");
+    let project_path = isolated.project_dir.path().to_path_buf();
+    let cache_path = isolated.cache_dir.path().to_path_buf();
 
     // First, create the cache and ensure directories exist
     let setup_cache =
