@@ -1,6 +1,4 @@
-use crate::complexity::entropy_core::{
-    EntropyToken, LanguageEntropyAnalyzer, PatternMetrics, TokenCategory,
-};
+use crate::complexity::entropy_core::{LanguageEntropyAnalyzer, PatternMetrics, TokenCategory};
 use crate::complexity::entropy_traits::{AnalyzerHelpers, GenericToken};
 use crate::complexity::token_classifier::{
     CallType, ClassifiedToken, FlowType, NodeType, TokenClass, TokenClassifier, TokenContext,
@@ -146,7 +144,9 @@ impl LanguageEntropyAnalyzer for RustEntropyAnalyzer {
 /// Visitor to extract tokens from Rust AST
 struct TokenExtractor<'a> {
     tokens: Vec<ClassifiedToken>,
+    #[allow(dead_code)]
     classifier: &'a TokenClassifier,
+    #[allow(dead_code)]
     source: &'a str,
 }
 

@@ -1,5 +1,4 @@
 use super::entropy_core::{EntropyToken, TokenCategory};
-use std::hash::Hash;
 
 /// Re-export core traits for convenience
 pub use super::entropy_core::{EntropyScore, UniversalEntropyCalculator};
@@ -101,6 +100,7 @@ pub trait AnalyzerHelpers {
         let len2 = s2.len();
         let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
+        #[allow(clippy::needless_range_loop)]
         for i in 0..=len1 {
             matrix[i][0] = i;
         }

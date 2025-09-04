@@ -397,7 +397,7 @@ fn calculate_entropy_details(func: &FunctionMetrics) -> Option<EntropyDetails> {
             crate::complexity::entropy_core::EntropyConfig::default(),
         );
         let dampening_value = calculator.apply_dampening(entropy_score);
-        let dampening_factor = (dampening_value / 2.0).min(1.0).max(0.5); // Normalize to 0.5-1.0 range
+        let dampening_factor = (dampening_value / 2.0).clamp(0.5, 1.0); // Normalize to 0.5-1.0 range
 
         let adjusted_cyclomatic = (func.cyclomatic as f64 * dampening_factor) as u32;
         let _adjusted_cognitive = (func.cognitive as f64 * dampening_factor) as u32;

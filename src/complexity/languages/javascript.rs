@@ -225,6 +225,7 @@ impl<'a> JavaScriptEntropyAnalyzer<'a> {
     }
 
     /// Extract simple tokens for branch comparison
+    #[allow(clippy::only_used_in_recursion)]
     fn extract_simple_tokens(&self, cursor: &mut TreeCursor, tokens: &mut Vec<String>) {
         let node = cursor.node();
         let kind = node.kind();
@@ -298,6 +299,7 @@ impl<'a> JavaScriptEntropyAnalyzer<'a> {
     }
 
     /// Recursively calculate nesting depth
+    #[allow(clippy::only_used_in_recursion)]
     fn calculate_nesting_recursive(&self, node: Node, current_depth: u32) -> u32 {
         let mut max_depth = current_depth;
 
