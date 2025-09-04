@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime};
+use std::sync::{atomic::{AtomicU64, Ordering}, Arc, RwLock};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Metadata for cache management
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,35 +140,270 @@ impl SharedCache {
         }
     }
 
-    /// Save the current index to disk
-    pub fn save_index(&self) -> Result<()> {
-        let index_path = self
-            .location
-            .get_component_path("metadata")
-            .join("index.json");
-
-        // Ensure parent directory exists
-        if let Some(parent) = index_path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create metadata directory: {:?}", parent))?;
+    // Pure functions for path operations and atomic file handling
+    
+    /// Resolve the index file path based on cache location
+    fn resolve_index_paths(location: &CacheLocation) -> (PathBuf, PathBuf) {
+        let index_path = location.get_component_path("metadata").join("index.json");
+        let temp_path = Self::create_safe_temp_path(&index_path);
+        (index_path, temp_path)
+    }
+    
+    /// Create a safe temporary file path that avoids collisions
+    fn create_safe_temp_path(target_path: &Path) -> PathBuf {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let process_id = std::process::id();
+        
+        // Create a unique temp filename to avoid collisions
+        let temp_name = format!(
+            "{}.tmp.{}.{}.{}", 
+            target_path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("file"),
+            process_id,
+            timestamp,
+            counter
+        );
+        
+        target_path.with_file_name(temp_name)
+    }
+    
+    /// Validate that a file path is safe for atomic operations
+    fn validate_file_path(path: &Path) -> Result<()> {
+        // Ensure the path is absolute to avoid ambiguity
+        if !path.is_absolute() {
+            anyhow::bail!(
+                "File path must be absolute for safe atomic operations: {:?}",
+                path
+            );
         }
+        
+        // Check for path traversal attempts
+        if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+            anyhow::bail!(
+                "File path contains unsafe parent directory references: {:?}",
+                path
+            );
+        }
+        
+        Ok(())
+    }
+    
+    /// Ensure the parent directory exists for the given path with race condition handling
+    fn ensure_parent_directory(file_path: &Path) -> Result<()> {
+        Self::validate_file_path(file_path)?;
+        
+        if let Some(parent) = file_path.parent() {
+            Self::create_directories_safely(parent)
+                .with_context(|| format!("Failed to create parent directory: {:?}", parent))?;
+        }
+        Ok(())
+    }
+    
+    /// Execute a fallible operation with exponential backoff retry
+    fn retry_with_backoff<T, F>(mut operation: F, operation_name: &str) -> Result<T>
+    where
+        F: FnMut() -> Result<T>,
+    {
+        use std::io::ErrorKind;
+        use std::time::Duration;
+        
+        const MAX_ATTEMPTS: usize = 3;
+        const BASE_DELAY_MS: u64 = 10;
+        
+        for attempt in 0..MAX_ATTEMPTS {
+            match operation() {
+                Ok(result) => return Ok(result),
+                Err(e) => {
+                    // Check if this is a potentially transient error
+                    let is_retryable = e.chain().any(|err| {
+                        if let Some(io_err) = err.downcast_ref::<std::io::Error>() {
+                            matches!(
+                                io_err.kind(),
+                                ErrorKind::AlreadyExists |
+                                ErrorKind::NotFound |
+                                ErrorKind::Interrupted |
+                                // Note: PermissionDenied is often not transient, but in concurrent
+                                // scenarios it might be due to temporary file locks
+                                ErrorKind::PermissionDenied
+                            )
+                        } else {
+                            false
+                        }
+                    });
+                    
+                    if !is_retryable || attempt == MAX_ATTEMPTS - 1 {
+                        return Err(e.context(format!(
+                            "Operation '{}' failed after {} attempts",
+                            operation_name,
+                            attempt + 1
+                        )));
+                    }
+                    
+                    // Exponential backoff with simple jitter
+                    let delay_ms = BASE_DELAY_MS * (1 << attempt);
+                    // Simple deterministic jitter to avoid contention
+                    let jitter_ms = delay_ms / 4; // 25% jitter
+                    std::thread::sleep(Duration::from_millis(delay_ms + jitter_ms));
+                }
+            }
+        }
+        
+        unreachable!("Retry loop should have returned or failed by now")
+    }
+    
+    /// Create directories safely with proper race condition handling and retries
+    fn create_directories_safely(dir_path: &Path) -> Result<()> {
+        use std::io::ErrorKind;
+        
+        // Fast path: directory already exists
+        if dir_path.exists() {
+            return Ok(());
+        }
+        
+        let dir_path_clone = dir_path.to_path_buf();
+        Self::retry_with_backoff(
+            || {
+                match fs::create_dir_all(&dir_path_clone) {
+                    Ok(()) => Ok(()),
+                    Err(e) if e.kind() == ErrorKind::AlreadyExists => {
+                        // Another thread created it between our check and creation attempt
+                        Ok(())
+                    }
+                    Err(e) => Err(anyhow::Error::from(e)),
+                }
+            },
+            &format!("create directories {:?}", dir_path),
+        ).with_context(|| {
+            format!(
+                "Failed to create directory {:?}. Current working directory: {:?}",
+                dir_path,
+                std::env::current_dir().unwrap_or_else(|_| "<unknown>".into())
+            )
+        })
+    }
+    
+    /// Ensure both temp and target file paths have their parent directories created
+    fn ensure_atomic_write_directories(target_path: &Path, temp_path: &Path) -> Result<()> {
+        // Ensure target directory exists
+        Self::ensure_parent_directory(target_path)?;
+        
+        // Ensure temp directory exists (might be different from target)
+        if temp_path.parent() != target_path.parent() {
+            Self::ensure_parent_directory(temp_path)?;
+        }
+        
+        Ok(())
+    }
+    
+    /// Serialize cache index to JSON string
+    fn serialize_index_to_json(index: &CacheIndex) -> Result<String> {
+        serde_json::to_string_pretty(index)
+            .context("Failed to serialize cache index")
+    }
+    
+    /// Write content atomically using temporary file and rename
+    fn write_file_atomically(target_path: &Path, temp_path: &Path, content: &str) -> Result<()> {
+        Self::write_bytes_atomically(target_path, temp_path, content.as_bytes())
+    }
+    
+    /// Write data to a temporary file with proper error context and retries
+    fn write_temp_file(temp_path: &Path, data: &[u8]) -> Result<()> {
+        let temp_path_clone = temp_path.to_path_buf();
+        let data_len = data.len();
+        
+        Self::retry_with_backoff(
+            || {
+                fs::write(&temp_path_clone, data)
+                    .map_err(anyhow::Error::from)
+            },
+            &format!("write temp file {:?}", temp_path),
+        ).with_context(|| {
+            format!(
+                "Failed to write temporary file at {:?}. Size: {} bytes. Parent exists: {}, Temp path valid: {}",
+                temp_path,
+                data_len,
+                temp_path.parent().map_or(false, |p| p.exists()),
+                temp_path.is_absolute()
+            )
+        })
+    }
+    
+    /// Flush and sync file data to ensure durability (optional but recommended)
+    fn sync_temp_file(_temp_path: &Path) -> Result<()> {
+        // Note: We could open and sync the temp file here for extra durability,
+        // but for cache files, the performance cost may not be worth it.
+        // This function is a placeholder for future enhancement if needed.
+        Ok(())
+    }
+    
+    /// Atomically rename temporary file to target with retries and detailed error context
+    fn atomic_rename(temp_path: &Path, target_path: &Path) -> Result<()> {
+        let temp_path_clone = temp_path.to_path_buf();
+        let target_path_clone = target_path.to_path_buf();
+        
+        Self::retry_with_backoff(
+            || {
+                fs::rename(&temp_path_clone, &target_path_clone)
+                    .map_err(anyhow::Error::from)
+            },
+            &format!("atomic rename {:?} -> {:?}", temp_path, target_path),
+        ).with_context(|| {
+            format!(
+                "Failed to rename file atomically: {:?} -> {:?}. Temp exists: {}, Target parent exists: {}, Same filesystem: {}",
+                temp_path,
+                target_path,
+                temp_path.exists(),
+                target_path.parent().map_or(false, |p| p.exists()),
+                Self::paths_on_same_filesystem(temp_path, target_path)
+            )
+        })
+    }
+    
+    /// Check if two paths are likely on the same filesystem (heuristic)
+    fn paths_on_same_filesystem(path1: &Path, path2: &Path) -> bool {
+        // Simple heuristic: if both paths have the same root, assume same filesystem
+        // This isn't perfect but gives us debugging info
+        path1.ancestors().last() == path2.ancestors().last()
+    }
+    
+    /// Write bytes atomically using temporary file and rename - composed from pure functions
+    fn write_bytes_atomically(target_path: &Path, temp_path: &Path, data: &[u8]) -> Result<()> {
+        // Step 1: Write data to temporary file
+        Self::write_temp_file(temp_path, data)?;
+        
+        // Step 2: Optional sync for durability
+        Self::sync_temp_file(temp_path)?;
+        
+        // Step 3: Atomic rename
+        Self::atomic_rename(temp_path, target_path)?;
+        
+        Ok(())
+    }
 
+    /// Save the current index to disk with comprehensive error handling
+    pub fn save_index(&self) -> Result<()> {
+        let (index_path, temp_path) = Self::resolve_index_paths(&self.location);
+        
+        // Ensure directories exist before any file operations
+        Self::ensure_atomic_write_directories(&index_path, &temp_path)?;
+        
         let index = self
             .index
             .read()
             .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-
-        let content =
-            serde_json::to_string_pretty(&*index).context("Failed to serialize cache index")?;
-
-        // Write atomically using temp file and rename
-        let temp_path = index_path.with_extension("tmp");
-        fs::write(&temp_path, content)
-            .with_context(|| format!("Failed to write temp index to {:?}", temp_path))?;
-
-        fs::rename(&temp_path, &index_path)
-            .with_context(|| format!("Failed to rename index file: {:?}", index_path))?;
-
+        
+        let content = Self::serialize_index_to_json(&*index)?;
+        
+        Self::write_file_atomically(&index_path, &temp_path, &content)
+            .with_context(|| format!("Failed to save cache index to {:?}", index_path))?;
+        
         Ok(())
     }
 
@@ -198,39 +433,36 @@ impl SharedCache {
     }
 
     // Pure functions for configuration and decision making
-    
+
     /// Determine pruning configuration based on environment and test conditions
     fn determine_pruning_config() -> PruningConfig {
-        let auto_prune_enabled = std::env::var("DEBTMAP_CACHE_AUTO_PRUNE")
-            .unwrap_or_default() == "true";
-        let sync_prune_requested = std::env::var("DEBTMAP_CACHE_SYNC_PRUNE")
-            .unwrap_or_default() == "true";
+        let auto_prune_enabled =
+            std::env::var("DEBTMAP_CACHE_AUTO_PRUNE").unwrap_or_default() == "true";
+        let sync_prune_requested =
+            std::env::var("DEBTMAP_CACHE_SYNC_PRUNE").unwrap_or_default() == "true";
         let is_test_environment = cfg!(test);
-        
+
         let use_sync_pruning = auto_prune_enabled && (is_test_environment || sync_prune_requested);
-        
+
         PruningConfig {
             auto_prune_enabled,
             use_sync_pruning,
             is_test_environment,
         }
     }
-    
+
     /// Determine if an entry already exists in the index
     fn is_existing_entry(index: &CacheIndex, key: &str) -> bool {
         index.entries.contains_key(key)
     }
-    
+
     /// Determine if pruning is needed after insertion
-    fn should_prune_after_insertion(
-        pruner: &AutoPruner,
-        stats: &InternalCacheStats,
-    ) -> bool {
+    fn should_prune_after_insertion(pruner: &AutoPruner, stats: &InternalCacheStats) -> bool {
         let size_exceeded = stats.total_size > pruner.max_size_bytes as u64;
         let count_exceeded = stats.entry_count > pruner.max_entries;
         size_exceeded || count_exceeded
     }
-    
+
     /// Create metadata for a new cache entry
     fn create_cache_metadata(data_len: usize) -> CacheMetadata {
         CacheMetadata {
@@ -241,43 +473,34 @@ impl SharedCache {
             size_bytes: data_len as u64,
         }
     }
-    
+
     /// Update index with new entry and recalculate total size
-    fn update_index_with_entry(
-        index: &mut CacheIndex,
-        key: String,
-        metadata: CacheMetadata,
-    ) {
+    fn update_index_with_entry(index: &mut CacheIndex, key: String, metadata: CacheMetadata) {
         index.entries.insert(key, metadata);
         index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
     }
-    
+
     /// Write cache file atomically to disk
     fn write_cache_file_atomically(cache_path: &Path, data: &[u8]) -> Result<()> {
-        // Ensure parent directory exists
-        if let Some(parent) = cache_path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create cache directory: {:?}", parent))?;
-        }
-
-        // Write data atomically
-        let temp_path = cache_path.with_extension("tmp");
-        fs::write(&temp_path, data)
-            .with_context(|| format!("Failed to write temp cache file: {:?}", temp_path))?;
-
-        fs::rename(&temp_path, cache_path)
-            .with_context(|| format!("Failed to rename cache file: {:?}", cache_path))?;
-            
-        Ok(())
+        let temp_path = Self::create_safe_temp_path(cache_path);
+        Self::ensure_atomic_write_directories(cache_path, &temp_path)?;
+        Self::write_bytes_atomically(cache_path, &temp_path, data)
     }
-    
+
     /// Handle pre-insertion pruning based on configuration
-    fn handle_pre_insertion_pruning(&self, key: &str, data_len: usize, config: &PruningConfig) -> Result<()> {
+    fn handle_pre_insertion_pruning(
+        &self,
+        key: &str,
+        data_len: usize,
+        config: &PruningConfig,
+    ) -> Result<()> {
         if self.auto_pruner.is_some() {
             if config.use_sync_pruning {
                 // Use synchronous pruning for tests and when explicitly requested
                 let is_new_entry = {
-                    let index = self.index.read()
+                    let index = self
+                        .index
+                        .read()
                         .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
                     !Self::is_existing_entry(&index, key)
                 };
@@ -293,7 +516,9 @@ impl SharedCache {
             } else {
                 // Fallback to synchronous pruning
                 let is_new_entry = {
-                    let index = self.index.read()
+                    let index = self
+                        .index
+                        .read()
                         .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
                     !Self::is_existing_entry(&index, key)
                 };
@@ -308,7 +533,7 @@ impl SharedCache {
         }
         Ok(())
     }
-    
+
     /// Handle post-insertion pruning if needed
     fn handle_post_insertion_pruning(&self, config: &PruningConfig) -> Result<()> {
         // For synchronous operation (especially tests), check if we exceeded limits after adding entry
@@ -319,12 +544,16 @@ impl SharedCache {
                     total_size: stats.total_size,
                     entry_count: stats.entry_count,
                 };
-                
+
                 if Self::should_prune_after_insertion(pruner, &cache_stats) {
                     if config.is_test_environment {
-                        println!("Post-insertion check: size={}/{}, count={}/{}", 
-                                 stats.total_size, pruner.max_size_bytes, 
-                                 stats.entry_count, pruner.max_entries);
+                        println!(
+                            "Post-insertion check: size={}/{}, count={}/{}",
+                            stats.total_size,
+                            pruner.max_size_bytes,
+                            stats.entry_count,
+                            pruner.max_entries
+                        );
                         println!("Triggering emergency pruning due to limit exceeded");
                     }
                     self.trigger_pruning()?;
@@ -333,20 +562,20 @@ impl SharedCache {
         }
         Ok(())
     }
-    
-    /// Store a cache entry
-    pub fn put(&self, key: &str, component: &str, data: &[u8]) -> Result<()> {
-        let config = Self::determine_pruning_config();
-        
+
+    /// Store a cache entry with explicit pruning configuration  
+    fn put_with_config(&self, key: &str, component: &str, data: &[u8], config: &PruningConfig) -> Result<()> {
         if config.is_test_environment {
-            log::debug!("use_sync_pruning={}, auto_prune={}, cfg_test={}", 
-                       config.use_sync_pruning, 
-                       config.auto_prune_enabled, 
-                       config.is_test_environment);
+            log::debug!(
+                "use_sync_pruning={}, auto_prune={}, cfg_test={}",
+                config.use_sync_pruning,
+                config.auto_prune_enabled,
+                config.is_test_environment
+            );
         }
-        
+
         // Handle pre-insertion pruning/cleanup
-        self.handle_pre_insertion_pruning(key, data.len(), &config)?;
+        self.handle_pre_insertion_pruning(key, data.len(), config)?;
 
         // Write cache file atomically
         let cache_path = self.get_cache_file_path(key, component);
@@ -354,18 +583,26 @@ impl SharedCache {
 
         // Update index with new entry
         {
-            let mut index = self.index.write()
+            let mut index = self
+                .index
+                .write()
                 .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
             let metadata = Self::create_cache_metadata(data.len());
             Self::update_index_with_entry(&mut index, key.to_string(), metadata);
         }
 
         self.save_index()?;
-        
+
         // Handle post-insertion pruning if needed
-        self.handle_post_insertion_pruning(&config)?;
-        
+        self.handle_post_insertion_pruning(config)?;
+
         Ok(())
+    }
+
+    /// Store a cache entry
+    pub fn put(&self, key: &str, component: &str, data: &[u8]) -> Result<()> {
+        let config = Self::determine_pruning_config();
+        self.put_with_config(key, component, data, &config)
     }
 
     /// Check if a cache entry exists
@@ -467,13 +704,15 @@ impl SharedCache {
             removed_keys
         };
 
-        // Delete files
+        // Delete files with better error handling
         for key in removed_keys {
             // Try to delete from all components
-            for component in &["call_graphs", "analysis", "metadata", "temp"] {
+            for component in &["call_graphs", "analysis", "metadata", "temp", "file_metrics"] {
                 let cache_path = self.get_cache_file_path(&key, component);
                 if cache_path.exists() {
-                    let _ = fs::remove_file(&cache_path);
+                    if let Err(e) = fs::remove_file(&cache_path) {
+                        log::debug!("Failed to delete cache file {:?}: {}. This may be due to concurrent access.", cache_path, e);
+                    }
                 }
             }
         }
@@ -633,46 +872,178 @@ impl SharedCache {
         })
     }
 
+    // Pure function to calculate projected cache state after adding a new entry
+    fn calculate_cache_projections(
+        current_size: u64,
+        current_count: usize,
+        new_entry_size: usize,
+    ) -> (u64, usize) {
+        let projected_size = current_size + new_entry_size as u64;
+        let projected_count = current_count + if new_entry_size > 0 { 1 } else { 0 };
+        (projected_size, projected_count)
+    }
+
+    // Pure function to determine if pruning is needed based on projections
+    fn should_prune_based_on_projections(
+        projected_size: u64,
+        projected_count: usize,
+        max_size_bytes: usize,
+        max_entries: usize,
+    ) -> bool {
+        projected_size > max_size_bytes as u64 || projected_count > max_entries
+    }
+
+    // Pure function to determine pruning decision given all inputs
+    fn calculate_pruning_decision(
+        current_size: u64,
+        current_count: usize,
+        new_entry_size: usize,
+        max_size_bytes: usize,
+        max_entries: usize,
+        additional_check: bool,
+    ) -> bool {
+        let (projected_size, projected_count) =
+            Self::calculate_cache_projections(current_size, current_count, new_entry_size);
+
+        Self::should_prune_based_on_projections(
+            projected_size,
+            projected_count,
+            max_size_bytes,
+            max_entries,
+        ) || additional_check
+    }
+
+    // Pure function to create empty prune stats with current cache state
+    fn create_no_prune_stats(entry_count: usize, total_size: u64) -> PruneStats {
+        PruneStats {
+            entries_removed: 0,
+            bytes_freed: 0,
+            entries_remaining: entry_count,
+            bytes_remaining: total_size,
+            duration_ms: 0,
+            files_deleted: 0,
+            files_not_found: 0,
+        }
+    }
+
+    // Pure functions for age-based cleanup
+
+    /// Calculate the maximum age duration from days
+    fn calculate_max_age_duration(max_age_days: i64) -> Duration {
+        Duration::from_secs(max_age_days as u64 * 86400)
+    }
+
+    /// Determine if an entry should be removed based on age
+    fn should_remove_entry_by_age(
+        now: SystemTime,
+        last_accessed: SystemTime,
+        max_age: Duration,
+    ) -> bool {
+        now.duration_since(last_accessed)
+            .map(|age| age >= max_age)  // Use >= to handle zero-age case
+            .unwrap_or(false)  // If time calculation fails, don't remove
+    }
+
+    /// Filter entries to find those that should be removed based on age
+    fn filter_entries_by_age(
+        entries: &HashMap<String, CacheMetadata>,
+        now: SystemTime,
+        max_age: Duration,
+    ) -> Vec<String> {
+        entries
+            .iter()
+            .filter_map(|(key, metadata)| {
+                if Self::should_remove_entry_by_age(now, metadata.last_accessed, max_age) {
+                    Some(key.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Update index by removing entries and recalculating total size
+    fn update_index_after_removal(
+        index: &mut CacheIndex,
+        entries_to_remove: &[String],
+    ) -> usize {
+        let mut removed_count = 0;
+        
+        for key in entries_to_remove {
+            if let Some(metadata) = index.entries.remove(key) {
+                index.total_size -= metadata.size_bytes;
+                removed_count += 1;
+            }
+        }
+        
+        index.last_cleanup = Some(SystemTime::now());
+        removed_count
+    }
+
+    /// Delete cache files for the given keys and components
+    fn delete_cache_files_for_keys(
+        cache: &SharedCache,
+        keys: &[String],
+    ) -> std::result::Result<(), ()> {
+        let components = [
+            "call_graphs",
+            "analysis", 
+            "metadata",
+            "temp",
+            "file_metrics",
+        ];
+
+        for key in keys {
+            for component in &components {
+                let cache_path = cache.get_cache_file_path(key, component);
+                if cache_path.exists() {
+                    let _ = fs::remove_file(&cache_path);  // Ignore errors
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Trigger pruning if needed based on auto-pruner configuration
     pub fn trigger_pruning_if_needed(&self) -> Result<PruneStats> {
         self.trigger_pruning_if_needed_with_new_entry(0)
     }
 
     /// Trigger pruning if needed, considering a new entry of the given size
-    pub fn trigger_pruning_if_needed_with_new_entry(&self, new_entry_size: usize) -> Result<PruneStats> {
-        // First, clean up any orphaned index entries for deleted files
+    pub fn trigger_pruning_if_needed_with_new_entry(
+        &self,
+        new_entry_size: usize,
+    ) -> Result<PruneStats> {
+        // Step 1: Clean up orphaned entries (side effect)
         self.clean_orphaned_entries()?;
 
-        if let Some(ref pruner) = self.auto_pruner {
-            let should_prune = {
+        // Step 2: Check if pruning is needed (pure decision logic)
+        let should_prune = match &self.auto_pruner {
+            Some(pruner) => {
                 let index = self
                     .index
                     .read()
                     .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-                
-                // Check if we need pruning considering the new entry
-                let projected_size = index.total_size + new_entry_size as u64;
-                let projected_count = index.entries.len() + if new_entry_size > 0 { 1 } else { 0 };
-                
-                projected_size > pruner.max_size_bytes as u64 || 
-                projected_count > pruner.max_entries ||
-                pruner.should_prune(&index)
-            };
 
-            if should_prune {
-                return self.trigger_pruning();
+                Self::calculate_pruning_decision(
+                    index.total_size,
+                    index.entries.len(),
+                    new_entry_size,
+                    pruner.max_size_bytes,
+                    pruner.max_entries,
+                    pruner.should_prune(&index),
+                )
             }
-        }
+            None => false,
+        };
 
-        Ok(PruneStats {
-            entries_removed: 0,
-            bytes_freed: 0,
-            entries_remaining: self.get_stats().entry_count,
-            bytes_remaining: self.get_stats().total_size,
-            duration_ms: 0,
-            files_deleted: 0,
-            files_not_found: 0,
-        })
+        // Step 3: Take action based on decision
+        if should_prune {
+            self.trigger_pruning()
+        } else {
+            let stats = self.get_stats();
+            Ok(Self::create_no_prune_stats(stats.entry_count, stats.total_size))
+        }
     }
 
     /// Manually trigger pruning
@@ -922,59 +1293,37 @@ impl SharedCache {
 
     /// Clean up entries older than specified days
     pub fn cleanup_old_entries(&self, max_age_days: i64) -> Result<usize> {
-        let max_age = Duration::from_secs(max_age_days as u64 * 86400);
+        // Step 1: Calculate timing parameters (pure)
+        let max_age = Self::calculate_max_age_duration(max_age_days);
         let now = SystemTime::now();
-        let mut removed_count = 0;
 
+        // Step 2: Identify entries to remove (pure logic)
         let entries_to_remove = {
             let index = self
                 .index
                 .read()
                 .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
 
-            let mut to_remove = Vec::new();
-            for (key, metadata) in &index.entries {
-                if let Ok(age) = now.duration_since(metadata.last_accessed) {
-                    if age > max_age {
-                        to_remove.push(key.clone());
-                    }
-                }
-            }
-            to_remove
+            Self::filter_entries_by_age(&index.entries, now, max_age)
         };
 
-        // Remove from index and delete files
-        {
+        // Step 3: Update index (side effect - but isolated)
+        let removed_count = {
             let mut index = self
                 .index
                 .write()
                 .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
 
-            for key in &entries_to_remove {
-                if let Some(metadata) = index.entries.remove(key) {
-                    index.total_size -= metadata.size_bytes;
-                    removed_count += 1;
+            Self::update_index_after_removal(&mut index, &entries_to_remove)
+        };
 
-                    // Delete files
-                    for component in &[
-                        "call_graphs",
-                        "analysis",
-                        "metadata",
-                        "temp",
-                        "file_metrics",
-                    ] {
-                        let cache_path = self.get_cache_file_path(key, component);
-                        if cache_path.exists() {
-                            let _ = fs::remove_file(&cache_path);
-                        }
-                    }
-                }
-            }
+        // Step 4: Delete files (side effect - but isolated)
+        Self::delete_cache_files_for_keys(self, &entries_to_remove)
+            .map_err(|_| anyhow::anyhow!("Failed to delete cache files"))?;
 
-            index.last_cleanup = Some(SystemTime::now());
-        }
-
+        // Step 5: Persist changes (side effect - but isolated)
         self.save_index()?;
+
         Ok(removed_count)
     }
 }
@@ -1012,13 +1361,19 @@ impl std::fmt::Display for FullCacheStats {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+    use std::collections::HashMap;
 
     #[test]
     fn test_shared_cache_operations() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        
+        // Create explicit environment configuration for this test
+        let mut env = EnvironmentSnapshot::default();
+        env.vars.insert("DEBTMAP_CACHE_DIR".to_string(), temp_dir.path().to_str().unwrap().to_string());
+        env.vars.insert("DEBTMAP_CACHE_AUTO_PRUNE".to_string(), "false".to_string()); // Disable for basic test
 
-        let cache = SharedCache::new(None).unwrap();
+        let location = CacheLocation::resolve(None).unwrap();
+        let cache = SharedCache::new_with_location_and_config(location, &env).unwrap();
 
         // Test put and get
         let key = "test_key";
@@ -1034,16 +1389,19 @@ mod tests {
         // Test delete
         cache.delete(key, component).unwrap();
         assert!(!cache.exists(key, component));
-
-        std::env::remove_var("DEBTMAP_CACHE_DIR");
     }
 
     #[test]
     fn test_cache_stats() {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        
+        // Create explicit environment configuration for this test
+        let mut env = EnvironmentSnapshot::default();
+        env.vars.insert("DEBTMAP_CACHE_DIR".to_string(), temp_dir.path().to_str().unwrap().to_string());
+        env.vars.insert("DEBTMAP_CACHE_AUTO_PRUNE".to_string(), "false".to_string()); // Disable for basic test
 
-        let cache = SharedCache::new(None).unwrap();
+        let location = CacheLocation::resolve(None).unwrap();
+        let cache = SharedCache::new_with_location_and_config(location, &env).unwrap();
 
         // Ensure directories are created
         cache.location.ensure_directories().unwrap();
@@ -1055,7 +1413,78 @@ mod tests {
         let stats = cache.get_stats();
         assert_eq!(stats.entry_count, 2);
         assert_eq!(stats.total_size, 10); // "data1" + "data2"
+    }
 
-        std::env::remove_var("DEBTMAP_CACHE_DIR");
+    #[test]
+    fn test_age_calculation_pure_functions() {
+        // Test max age calculation
+        let max_age_0_days = SharedCache::calculate_max_age_duration(0);
+        let max_age_1_day = SharedCache::calculate_max_age_duration(1);
+        
+        assert_eq!(max_age_0_days, Duration::from_secs(0));
+        assert_eq!(max_age_1_day, Duration::from_secs(86400));
+
+        // Test should_remove_entry_by_age with zero age (the key fix)
+        let now = SystemTime::now();
+        let same_time = now;
+        let older_time = now - Duration::from_secs(100);
+        
+        // With max_age = 0, entries created at same time should be removed
+        assert!(SharedCache::should_remove_entry_by_age(
+            now, same_time, Duration::from_secs(0)
+        ));
+        
+        // With max_age = 0, older entries should definitely be removed
+        assert!(SharedCache::should_remove_entry_by_age(
+            now, older_time, Duration::from_secs(0)
+        ));
+        
+        // With max_age = 200s, older entries (100s old) should not be removed
+        assert!(!SharedCache::should_remove_entry_by_age(
+            now, older_time, Duration::from_secs(200)
+        ));
+    }
+
+    #[test]
+    fn test_filter_entries_by_age() {
+        let now = SystemTime::now();
+        let old_time = now - Duration::from_secs(100);
+        
+        let mut entries = HashMap::new();
+        entries.insert(
+            "recent_entry".to_string(),
+            CacheMetadata {
+                version: "1.0".to_string(),
+                created_at: now,
+                last_accessed: now,
+                access_count: 1,
+                size_bytes: 100,
+            },
+        );
+        entries.insert(
+            "old_entry".to_string(),
+            CacheMetadata {
+                version: "1.0".to_string(),
+                created_at: old_time,
+                last_accessed: old_time,
+                access_count: 1,
+                size_bytes: 100,
+            },
+        );
+        
+        // With max_age = 0, both entries should be removed
+        let to_remove_0 = SharedCache::filter_entries_by_age(
+            &entries, now, Duration::from_secs(0)
+        );
+        assert_eq!(to_remove_0.len(), 2);
+        assert!(to_remove_0.contains(&"recent_entry".to_string()));
+        assert!(to_remove_0.contains(&"old_entry".to_string()));
+        
+        // With max_age = 50s, only the old entry should be removed
+        let to_remove_50 = SharedCache::filter_entries_by_age(
+            &entries, now, Duration::from_secs(50)
+        );
+        assert_eq!(to_remove_50.len(), 1);
+        assert!(to_remove_50.contains(&"old_entry".to_string()));
     }
 }
