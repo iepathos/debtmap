@@ -683,6 +683,69 @@ Examples:
 - `src/**/test_*.py` - Python test files in any subdirectory of src
 - `[!.]*.rs` - Rust files not starting with a dot
 
+## Cache Management
+
+Debtmap uses an intelligent cache system to speed up repeated analyses. The cache automatically manages its size and prunes old entries to prevent unbounded growth.
+
+### Cache Configuration
+
+Configure cache behavior through environment variables:
+
+```bash
+# Enable/disable automatic cache pruning (default: true)
+export DEBTMAP_CACHE_AUTO_PRUNE=true
+
+# Maximum cache size in bytes (default: 1GB)
+export DEBTMAP_CACHE_MAX_SIZE=1073741824
+
+# Maximum age for cache entries in days (default: 30)
+export DEBTMAP_CACHE_MAX_AGE_DAYS=30
+
+# Maximum number of cache entries (default: 10000)
+export DEBTMAP_CACHE_MAX_ENTRIES=10000
+
+# Percentage of cache to remove when limits are hit (default: 0.25 = 25%)
+export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25
+
+# Pruning strategy (lru, lfu, fifo, age_based; default: lru)
+export DEBTMAP_CACHE_STRATEGY=lru
+```
+
+### Pruning Strategies
+
+- **LRU (Least Recently Used)**: Removes entries that haven't been accessed recently
+- **LFU (Least Frequently Used)**: Removes entries with the lowest access count
+- **FIFO (First In, First Out)**: Removes oldest entries based on creation time
+- **Age-Based**: Only removes entries older than the configured max age
+
+### Cache Features
+
+- **Automatic Pruning**: Cache is automatically pruned when size or entry limits are exceeded
+- **Background Processing**: Pruning runs in background threads to avoid blocking analysis
+- **Orphan Cleanup**: Automatically removes index entries for deleted files
+- **Smart Eviction**: Preserves frequently accessed and recently used entries
+
+### Cache Location
+
+The cache location follows this priority:
+1. `$DEBTMAP_CACHE_DIR` environment variable (if set)
+2. `$XDG_CACHE_HOME/debtmap` (on Linux/Unix)
+3. `~/Library/Caches/debtmap` (on macOS)
+4. `%APPDATA%/debtmap/cache` (on Windows)
+
+### Manual Cache Management
+
+```bash
+# Clear cache for current project
+debtmap cache clear
+
+# Show cache statistics
+debtmap cache stats
+
+# Prune old entries manually
+debtmap cache prune --max-age-days 7
+```
+
 ## Configuration
 
 Create a `.debtmap.toml` file in your project root:

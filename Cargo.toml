@@ -103,3 +103,7 @@ strip = true
 opt-level = 0
 debug = true
 
+[[bench]]
+name = "cache_pruning"
+harness = false
+
