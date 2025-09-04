@@ -202,7 +202,7 @@ pub fn calculate_unified_priority_with_debt(
         // Apply dampening as a multiplier to the score
         // Use the new framework's dampening calculation
         let calculator = crate::complexity::entropy_core::UniversalEntropyCalculator::new(
-            crate::complexity::entropy_core::EntropyConfig::default()
+            crate::complexity::entropy_core::EntropyConfig::default(),
         );
         let dampening_factor = calculator.apply_dampening(entropy_score) / 100.0;
         debt_adjusted_score * dampening_factor.min(1.0).max(0.5) // Ensure max 50% reduction

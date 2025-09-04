@@ -506,7 +506,7 @@ impl FunctionVisitor {
             // TODO: Once old entropy is removed, update to use new framework directly
             let mut old_analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
             let old_score = old_analyzer.calculate_entropy(block);
-            
+
             // Convert old score to new score format
             Some(crate::complexity::entropy_core::EntropyScore {
                 token_entropy: old_score.token_entropy,
@@ -714,7 +714,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                 let entropy_score = if crate::config::get_entropy_config().enabled {
                     let mut old_analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
                     let old_score = old_analyzer.calculate_entropy(&block);
-                    
+
                     // Convert old score to new score format
                     Some(crate::complexity::entropy_core::EntropyScore {
                         token_entropy: old_score.token_entropy,

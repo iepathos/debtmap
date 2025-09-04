@@ -1,6 +1,4 @@
-use crate::complexity::entropy_core::{
-    LanguageEntropyAnalyzer, PatternMetrics,
-};
+use crate::complexity::entropy_core::{LanguageEntropyAnalyzer, PatternMetrics};
 use crate::complexity::entropy_traits::{AnalyzerHelpers, GenericToken};
 use std::collections::HashSet;
 use tree_sitter::{Node, TreeCursor};

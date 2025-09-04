@@ -17,7 +17,7 @@ impl JavaScriptEntropyAnalyzer {
                 ..Default::default()
             }
         };
-        
+
         Self {
             calculator: UniversalEntropyCalculator::new(config),
         }
@@ -27,7 +27,7 @@ impl JavaScriptEntropyAnalyzer {
     pub fn calculate_entropy(&mut self, node: Node, source: &str) -> EntropyScore {
         // Create language-specific analyzer
         let analyzer = NewJSAnalyzer::new(source);
-        
+
         // Use the universal calculator with the language-specific analyzer
         self.calculator.calculate(&analyzer, &node)
     }
