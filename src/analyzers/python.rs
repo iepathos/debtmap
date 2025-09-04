@@ -1,5 +1,7 @@
 use crate::analyzers::python_detectors::SimplifiedPythonDetector;
 use crate::analyzers::Analyzer;
+use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
+use crate::complexity::languages::python::PythonEntropyAnalyzer;
 use crate::complexity::python_patterns::analyze_python_patterns;
 use crate::core::{
     ast::{Ast, PythonAst},
@@ -72,7 +74,13 @@ impl Analyzer for PythonAnalyzer {
 
 fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
     let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
-    let functions = extract_function_metrics(&ast.module, &ast.path, &source_content);
+    let mut entropy_calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
+    let functions = extract_function_metrics(
+        &ast.module,
+        &ast.path,
+        &source_content,
+        &mut entropy_calculator,
+    );
     let debt_items = create_python_debt_items(
         &ast.module,
         &ast.path,
@@ -186,6 +194,7 @@ fn extract_function_metrics(
     module: &ast::Mod,
     path: &Path,
     source_content: &str,
+    entropy_calculator: &mut UniversalEntropyCalculator,
 ) -> Vec<FunctionMetrics> {
     let ast::Mod::Module(module) = module else {
         return Vec::new();
@@ -195,11 +204,21 @@ fn extract_function_metrics(
     let mut functions = Vec::new();
 
     // Recursively extract functions from the module with no class context
-    extract_functions_from_stmts(&module.body, path, &lines, &mut functions, 0, None);
+    extract_functions_from_stmts(
+        &module.body,
+        path,
+        &lines,
+        &mut functions,
+        0,
+        None,
+        source_content,
+        entropy_calculator,
+    );
 
     functions
 }
 
+#[allow(clippy::only_used_in_recursion, clippy::too_many_arguments)]
 fn extract_functions_from_stmts(
     stmts: &[ast::Stmt],
     path: &Path,
@@ -207,6 +226,8 @@ fn extract_functions_from_stmts(
     functions: &mut Vec<FunctionMetrics>,
     stmt_offset: usize,
     class_context: Option<&str>,
+    source: &str,
+    entropy_calculator: &mut UniversalEntropyCalculator,
 ) {
     for (idx, stmt) in stmts.iter().enumerate() {
         match stmt {
@@ -221,6 +242,9 @@ fn extract_functions_from_stmts(
                     func_def.name.to_string()
                 };
 
+                let entropy_score =
+                    calculate_function_entropy(&func_def.body, source, entropy_calculator);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -233,8 +257,8 @@ fn extract_functions_from_stmts(
                     visibility: None, // Python doesn't have explicit visibility modifiers
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
-                    entropy_score: None, // TODO: Add entropy scoring for Python
-                    is_pure: None,    // TODO: Add purity detection for Python
+                    entropy_score,
+                    is_pure: None, // TODO: Add purity detection for Python
                     purity_confidence: None,
                 });
 
@@ -246,6 +270,8 @@ fn extract_functions_from_stmts(
                     functions,
                     stmt_offset + idx,
                     class_context,
+                    source,
+                    entropy_calculator,
                 );
             }
             ast::Stmt::AsyncFunctionDef(func_def) => {
@@ -259,6 +285,9 @@ fn extract_functions_from_stmts(
                     format!("async {}", func_def.name)
                 };
 
+                let entropy_score =
+                    calculate_function_entropy(&func_def.body, source, entropy_calculator);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -271,8 +300,8 @@ fn extract_functions_from_stmts(
                     visibility: None, // Python doesn't have explicit visibility modifiers
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
-                    entropy_score: None, // TODO: Add entropy scoring for Python
-                    is_pure: None,    // TODO: Add purity detection for Python
+                    entropy_score,
+                    is_pure: None, // TODO: Add purity detection for Python
                     purity_confidence: None,
                 });
 
@@ -284,6 +313,8 @@ fn extract_functions_from_stmts(
                     functions,
                     stmt_offset + idx,
                     class_context,
+                    source,
+                    entropy_calculator,
                 );
             }
             ast::Stmt::ClassDef(class_def) => {
@@ -295,11 +326,23 @@ fn extract_functions_from_stmts(
                     functions,
                     stmt_offset + idx,
                     Some(class_def.name.as_ref()),
+                    source,
+                    entropy_calculator,
                 );
             }
             _ => {}
         }
     }
+}
+
+fn calculate_function_entropy(
+    body: &[ast::Stmt],
+    source: &str,
+    calculator: &mut UniversalEntropyCalculator,
+) -> Option<crate::complexity::entropy_core::EntropyScore> {
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let score = calculator.calculate(&analyzer, &body.to_vec());
+    Some(score)
 }
 
 fn estimate_line_number(lines: &[&str], func_name: &str, _stmt_idx: usize) -> usize {
