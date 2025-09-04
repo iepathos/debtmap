@@ -336,6 +336,146 @@ impl PatternVisitor {
         }
     }
 
+    /// Helper to create a FrameworkPattern with common fields
+    fn create_framework_pattern(
+        &self,
+        pattern_type: PatternType,
+        func_id: &FunctionId,
+        attr_name: &str,
+        framework_name: Option<String>,
+        confidence: f64,
+        metadata: HashMap<String, String>,
+    ) -> FrameworkPattern {
+        FrameworkPattern {
+            pattern_type,
+            function_id: Some(func_id.clone()),
+            triggering_attributes: vec![attr_name.to_string()].into_iter().collect(),
+            framework_name,
+            confidence,
+            metadata,
+        }
+    }
+
+    /// Try to match test pattern
+    fn try_match_test_pattern(
+        &self,
+        attr_name: &str,
+        func_id: &FunctionId,
+    ) -> Option<FrameworkPattern> {
+        (self.config.detect_tests && self.is_test_attribute(attr_name)).then(|| {
+            self.create_framework_pattern(
+                PatternType::TestFunction,
+                func_id,
+                attr_name,
+                self.detect_test_framework(attr_name),
+                1.0,
+                HashMap::new(),
+            )
+        })
+    }
+
+    /// Try to match benchmark pattern
+    fn try_match_benchmark_pattern(
+        &self,
+        attr_name: &str,
+        func_id: &FunctionId,
+    ) -> Option<FrameworkPattern> {
+        (attr_name == "bench").then(|| {
+            self.create_framework_pattern(
+                PatternType::BenchmarkFunction,
+                func_id,
+                attr_name,
+                Some("criterion".to_string()),
+                1.0,
+                HashMap::new(),
+            )
+        })
+    }
+
+    /// Try to match web handler pattern
+    fn try_match_web_handler_pattern(
+        &self,
+        attr_name: &str,
+        func_id: &FunctionId,
+        attr: &Attribute,
+    ) -> Option<FrameworkPattern> {
+        (self.config.detect_web_handlers && self.is_web_handler_attribute(attr_name)).then(|| {
+            self.create_framework_pattern(
+                PatternType::WebHandler,
+                func_id,
+                attr_name,
+                self.detect_web_framework(attr_name),
+                0.9,
+                self.extract_route_metadata(attr),
+            )
+        })
+    }
+
+    /// Try to match serialization pattern
+    fn try_match_serialization_pattern(
+        &self,
+        attr_name: &str,
+        func_id: &FunctionId,
+    ) -> Option<FrameworkPattern> {
+        (self.config.detect_serialization && self.is_serialization_attribute(attr_name)).then(
+            || {
+                self.create_framework_pattern(
+                    PatternType::SerializationFunction,
+                    func_id,
+                    attr_name,
+                    Some("serde".to_string()),
+                    0.8,
+                    HashMap::new(),
+                )
+            },
+        )
+    }
+
+    /// Try to match macro callback pattern
+    fn try_match_macro_callback_pattern(
+        &self,
+        attr_name: &str,
+        func_id: &FunctionId,
+    ) -> Option<FrameworkPattern> {
+        (self.config.detect_macro_callbacks && self.is_macro_callback_attribute(attr_name)).then(
+            || {
+                self.create_framework_pattern(
+                    PatternType::MacroCallback,
+                    func_id,
+                    attr_name,
+                    None,
+                    0.7,
+                    HashMap::new(),
+                )
+            },
+        )
+    }
+
+    /// Try to match custom pattern
+    fn try_match_custom_pattern(
+        &self,
+        attr_name: &str,
+        func_id: &FunctionId,
+    ) -> Option<FrameworkPattern> {
+        self.config
+            .custom_patterns
+            .get(attr_name)
+            .map(|description| {
+                self.create_framework_pattern(
+                    PatternType::CustomPattern {
+                        name: attr_name.to_string(),
+                    },
+                    func_id,
+                    attr_name,
+                    None,
+                    0.6,
+                    vec![("description".to_string(), description.clone())]
+                        .into_iter()
+                        .collect(),
+                )
+            })
+    }
+
     fn analyze_attribute(
         &self,
         attr: &Attribute,
@@ -343,84 +483,13 @@ impl PatternVisitor {
     ) -> Option<FrameworkPattern> {
         let attr_name = self.extract_attribute_name(attr)?;
 
-        // Test function patterns
-        if self.config.detect_tests && self.is_test_attribute(&attr_name) {
-            return Some(FrameworkPattern {
-                pattern_type: PatternType::TestFunction,
-                function_id: Some(func_id.clone()),
-                triggering_attributes: vec![attr_name.clone()].into_iter().collect(),
-                framework_name: self.detect_test_framework(&attr_name),
-                confidence: 1.0,
-                metadata: HashMap::new(),
-            });
-        }
-
-        // Benchmark function patterns
-        if attr_name == "bench" {
-            return Some(FrameworkPattern {
-                pattern_type: PatternType::BenchmarkFunction,
-                function_id: Some(func_id.clone()),
-                triggering_attributes: vec![attr_name.clone()].into_iter().collect(),
-                framework_name: Some("criterion".to_string()),
-                confidence: 1.0,
-                metadata: HashMap::new(),
-            });
-        }
-
-        // Web handler patterns
-        if self.config.detect_web_handlers && self.is_web_handler_attribute(&attr_name) {
-            return Some(FrameworkPattern {
-                pattern_type: PatternType::WebHandler,
-                function_id: Some(func_id.clone()),
-                triggering_attributes: vec![attr_name.clone()].into_iter().collect(),
-                framework_name: self.detect_web_framework(&attr_name),
-                confidence: 0.9,
-                metadata: self.extract_route_metadata(attr),
-            });
-        }
-
-        // Serialization patterns
-        if self.config.detect_serialization && self.is_serialization_attribute(&attr_name) {
-            return Some(FrameworkPattern {
-                pattern_type: PatternType::SerializationFunction,
-                function_id: Some(func_id.clone()),
-                triggering_attributes: vec![attr_name.clone()].into_iter().collect(),
-                framework_name: Some("serde".to_string()),
-                confidence: 0.8,
-                metadata: HashMap::new(),
-            });
-        }
-
-        // Macro callback patterns
-        if self.config.detect_macro_callbacks && self.is_macro_callback_attribute(&attr_name) {
-            return Some(FrameworkPattern {
-                pattern_type: PatternType::MacroCallback,
-                function_id: Some(func_id.clone()),
-                triggering_attributes: vec![attr_name.clone()].into_iter().collect(),
-                framework_name: None,
-                confidence: 0.7,
-                metadata: HashMap::new(),
-            });
-        }
-
-        // Custom patterns
-        if self.config.custom_patterns.contains_key(&attr_name) {
-            let description = self.config.custom_patterns.get(&attr_name).unwrap();
-            return Some(FrameworkPattern {
-                pattern_type: PatternType::CustomPattern {
-                    name: attr_name.clone(),
-                },
-                function_id: Some(func_id.clone()),
-                triggering_attributes: vec![attr_name.clone()].into_iter().collect(),
-                framework_name: None,
-                confidence: 0.6,
-                metadata: vec![("description".to_string(), description.clone())]
-                    .into_iter()
-                    .collect(),
-            });
-        }
-
-        None
+        // Try patterns in order of priority
+        self.try_match_test_pattern(&attr_name, func_id)
+            .or_else(|| self.try_match_benchmark_pattern(&attr_name, func_id))
+            .or_else(|| self.try_match_web_handler_pattern(&attr_name, func_id, attr))
+            .or_else(|| self.try_match_serialization_pattern(&attr_name, func_id))
+            .or_else(|| self.try_match_macro_callback_pattern(&attr_name, func_id))
+            .or_else(|| self.try_match_custom_pattern(&attr_name, func_id))
     }
 
     fn extract_attribute_name(&self, attr: &Attribute) -> Option<String> {

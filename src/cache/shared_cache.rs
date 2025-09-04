@@ -494,6 +494,25 @@ impl SharedCache {
         Self::write_bytes_atomically(cache_path, &temp_path, data)
     }
 
+    /// Check if key represents a new entry
+    fn is_new_entry(&self, key: &str) -> Result<bool> {
+        let index = self
+            .index
+            .read()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+        Ok(!Self::is_existing_entry(&index, key))
+    }
+
+    /// Execute synchronous pruning based on entry status
+    fn execute_sync_pruning(&self, key: &str, data_len: usize) -> Result<()> {
+        if self.is_new_entry(key)? {
+            self.trigger_pruning_if_needed_with_new_entry(data_len)?;
+        } else {
+            self.trigger_pruning_if_needed()?;
+        }
+        Ok(())
+    }
+
     /// Handle pre-insertion pruning based on configuration
     fn handle_pre_insertion_pruning(
         &self,
@@ -501,44 +520,27 @@ impl SharedCache {
         data_len: usize,
         config: &PruningConfig,
     ) -> Result<()> {
-        if self.auto_pruner.is_some() {
-            if config.use_sync_pruning {
-                // Use synchronous pruning for tests and when explicitly requested
-                let is_new_entry = {
-                    let index = self
-                        .index
-                        .read()
-                        .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-                    !Self::is_existing_entry(&index, key)
-                };
-                if is_new_entry {
-                    self.trigger_pruning_if_needed_with_new_entry(data_len)?;
-                } else {
-                    self.trigger_pruning_if_needed()?;
-                }
-            } else if let Some(ref bg_pruner) = self.background_pruner {
+        // Early return for no pruner case
+        if self.auto_pruner.is_none() {
+            return self.maybe_cleanup();
+        }
+
+        // Determine pruning strategy
+        match (config.use_sync_pruning, self.background_pruner.as_ref()) {
+            // Explicit sync pruning requested
+            (true, _) => self.execute_sync_pruning(key, data_len),
+
+            // Background pruning available and not sync requested
+            (false, Some(bg_pruner)) => {
                 if !bg_pruner.is_running() {
                     bg_pruner.start_if_needed(self.index.clone());
                 }
-            } else {
-                // Fallback to synchronous pruning
-                let is_new_entry = {
-                    let index = self
-                        .index
-                        .read()
-                        .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-                    !Self::is_existing_entry(&index, key)
-                };
-                if is_new_entry {
-                    self.trigger_pruning_if_needed_with_new_entry(data_len)?;
-                } else {
-                    self.trigger_pruning_if_needed()?;
-                }
+                Ok(())
             }
-        } else {
-            self.maybe_cleanup()?;
+
+            // Fallback to sync pruning when no background pruner
+            (false, None) => self.execute_sync_pruning(key, data_len),
         }
-        Ok(())
     }
 
     /// Handle post-insertion pruning if needed

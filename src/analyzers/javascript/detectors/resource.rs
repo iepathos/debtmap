@@ -233,7 +233,36 @@ fn is_timer_assignment(parent: Node) -> bool {
     parent.kind() == "variable_declarator" || parent.kind() == "assignment_expression"
 }
 
-// Extract timer variables from matches - processes AST nodes and returns data
+// Pure function to process a single timer match
+fn process_timer_match(
+    match_: &tree_sitter::QueryMatch,
+    source: &str,
+) -> Option<Result<(String, String), ResourceManagementIssue>> {
+    // Early return if no function capture
+    let func = match_.captures.iter().find(|c| c.index == 0)?;
+    let func_name = get_node_text(func.node, source);
+
+    // Early return if not a timer function
+    classify_timer_function(func_name)?;
+
+    // Early return if no parent or not a timer assignment
+    let parent = match_.captures.last()?.node.parent()?;
+    if !is_timer_assignment(parent) {
+        return None;
+    }
+
+    // Return either variable binding or timer leak issue
+    Some(
+        extract_variable_name(parent, source)
+            .map(|var_name| (var_name.to_string(), func_name.to_string()))
+            .ok_or_else(|| ResourceManagementIssue::TimerLeak {
+                location: SourceLocation::from_node(match_.captures.last().unwrap().node),
+                timer_type: func_name.to_string(),
+            }),
+    )
+}
+
+// Extract timer variables from matches using functional approach with helper
 fn extract_timer_variables<'a>(
     cursor: &mut QueryCursor,
     query: &Query,
@@ -244,24 +273,15 @@ fn extract_timer_variables<'a>(
     let mut issues = Vec::new();
     let mut matches = cursor.matches(query, root, source.as_bytes());
 
+    // Process matches using helper function for cleaner logic
     while let Some(match_) = matches.next() {
-        if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-            let func_name = get_node_text(func.node, source);
-
-            if classify_timer_function(func_name).is_some() {
-                if let Some(parent) = match_.captures.last().unwrap().node.parent() {
-                    if is_timer_assignment(parent) {
-                        if let Some(var_name) = extract_variable_name(parent, source) {
-                            timer_vars.insert((var_name.to_string(), func_name.to_string()));
-                        } else {
-                            issues.push(ResourceManagementIssue::TimerLeak {
-                                location: SourceLocation::from_node(
-                                    match_.captures.last().unwrap().node,
-                                ),
-                                timer_type: func_name.to_string(),
-                            });
-                        }
-                    }
+        if let Some(result) = process_timer_match(match_, source) {
+            match result {
+                Ok(var_tuple) => {
+                    timer_vars.insert(var_tuple);
+                }
+                Err(issue) => {
+                    issues.push(issue);
                 }
             }
         }

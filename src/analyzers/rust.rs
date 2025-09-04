@@ -461,18 +461,24 @@ impl FunctionVisitor {
     fn is_test_function(name: &str, item_fn: &syn::ItemFn) -> bool {
         const TEST_PREFIXES: &[&str] = &["test_", "it_", "should_"];
         const MOCK_PATTERNS: &[&str] = &["mock", "stub", "fake"];
-        
+
         // Check test attributes
         let has_test_attribute = item_fn.attrs.iter().any(|attr| {
             attr.path().is_ident("test")
-                || attr.path().segments.last().is_some_and(|seg| seg.ident == "test")
-                || (attr.path().is_ident("cfg") 
+                || attr
+                    .path()
+                    .segments
+                    .last()
+                    .is_some_and(|seg| seg.ident == "test")
+                || (attr.path().is_ident("cfg")
                     && attr.meta.to_token_stream().to_string().contains("test"))
         });
-        
+
         has_test_attribute
             || TEST_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
-            || MOCK_PATTERNS.iter().any(|pattern| name.to_lowercase().contains(pattern))
+            || MOCK_PATTERNS
+                .iter()
+                .any(|pattern| name.to_lowercase().contains(pattern))
     }
 
     fn extract_visibility(vis: &syn::Visibility) -> Option<String> {
@@ -1036,15 +1042,19 @@ fn analyze_organization_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem>
     organization_items
 }
 
-fn convert_organization_pattern_to_debt_item(
-    pattern: OrganizationAntiPattern,
-    impact: MaintainabilityImpact,
-    path: &Path,
-) -> DebtItem {
-    let location = pattern.primary_location().clone();
-    let line = location.line;
+// Pure function to convert impact to priority
+fn impact_to_priority(impact: MaintainabilityImpact) -> Priority {
+    match impact {
+        MaintainabilityImpact::Critical => Priority::Critical,
+        MaintainabilityImpact::High => Priority::High,
+        MaintainabilityImpact::Medium => Priority::Medium,
+        MaintainabilityImpact::Low => Priority::Low,
+    }
+}
 
-    let (priority, message, context) = match pattern {
+// Pure function to extract message and context from pattern
+fn pattern_to_message_context(pattern: &OrganizationAntiPattern) -> (String, Option<String>) {
+    match pattern {
         OrganizationAntiPattern::GodObject {
             type_name,
             method_count,
@@ -1052,12 +1062,6 @@ fn convert_organization_pattern_to_debt_item(
             suggested_split,
             ..
         } => (
-            match impact {
-                MaintainabilityImpact::Critical => Priority::Critical,
-                MaintainabilityImpact::High => Priority::High,
-                MaintainabilityImpact::Medium => Priority::Medium,
-                MaintainabilityImpact::Low => Priority::Low,
-            },
             format!(
                 "God object '{}' with {} methods and {} fields",
                 type_name, method_count, field_count
@@ -1066,8 +1070,7 @@ fn convert_organization_pattern_to_debt_item(
                 "Consider splitting into: {}",
                 suggested_split
                     .iter()
-                    .map(|g| &g.name)
-                    .map(|s| s.as_str())
+                    .map(|g| g.name.as_str())
                     .collect::<Vec<_>>()
                     .join(", ")
             )),
@@ -1078,12 +1081,6 @@ fn convert_organization_pattern_to_debt_item(
             suggested_constant_name,
             ..
         } => (
-            match impact {
-                MaintainabilityImpact::Critical => Priority::Critical,
-                MaintainabilityImpact::High => Priority::High,
-                MaintainabilityImpact::Medium => Priority::Medium,
-                MaintainabilityImpact::Low => Priority::Low,
-            },
             format!("Magic value '{}' appears {} times", value, occurrence_count),
             Some(format!(
                 "Extract constant: const {} = {};",
@@ -1096,12 +1093,6 @@ fn convert_organization_pattern_to_debt_item(
             suggested_refactoring,
             ..
         } => (
-            match impact {
-                MaintainabilityImpact::Critical => Priority::Critical,
-                MaintainabilityImpact::High => Priority::High,
-                MaintainabilityImpact::Medium => Priority::Medium,
-                MaintainabilityImpact::Low => Priority::Low,
-            },
             format!(
                 "Function '{}' has {} parameters",
                 function_name, parameter_count
@@ -1115,12 +1106,6 @@ fn convert_organization_pattern_to_debt_item(
             internal_calls,
             ..
         } => (
-            match impact {
-                MaintainabilityImpact::Critical => Priority::Critical,
-                MaintainabilityImpact::High => Priority::High,
-                MaintainabilityImpact::Medium => Priority::Medium,
-                MaintainabilityImpact::Low => Priority::Low,
-            },
             format!(
                 "Method '{}' makes {} external calls vs {} internal calls",
                 method_name, external_calls, internal_calls
@@ -1133,12 +1118,6 @@ fn convert_organization_pattern_to_debt_item(
             suggested_domain_type,
             ..
         } => (
-            match impact {
-                MaintainabilityImpact::Critical => Priority::Critical,
-                MaintainabilityImpact::High => Priority::High,
-                MaintainabilityImpact::Medium => Priority::Medium,
-                MaintainabilityImpact::Low => Priority::Low,
-            },
             format!(
                 "Primitive obsession: '{}' used for {:?}",
                 primitive_type, usage_context
@@ -1150,19 +1129,25 @@ fn convert_organization_pattern_to_debt_item(
             suggested_struct_name,
             ..
         } => (
-            match impact {
-                MaintainabilityImpact::Critical => Priority::Critical,
-                MaintainabilityImpact::High => Priority::High,
-                MaintainabilityImpact::Medium => Priority::Medium,
-                MaintainabilityImpact::Low => Priority::Low,
-            },
             format!(
                 "Data clump with {} parameters",
                 parameter_group.parameters.len()
             ),
             Some(format!("Extract struct: {}", suggested_struct_name)),
         ),
-    };
+    }
+}
+
+fn convert_organization_pattern_to_debt_item(
+    pattern: OrganizationAntiPattern,
+    impact: MaintainabilityImpact,
+    path: &Path,
+) -> DebtItem {
+    let location = pattern.primary_location().clone();
+    let line = location.line;
+
+    let priority = impact_to_priority(impact);
+    let (message, context) = pattern_to_message_context(&pattern);
 
     DebtItem {
         id: format!("organization-{}-{}", path.display(), line),
