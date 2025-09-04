@@ -1360,6 +1360,7 @@ impl std::fmt::Display for FullCacheStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::EnvironmentSnapshot;
     use tempfile::TempDir;
     use std::collections::HashMap;
 
@@ -1367,13 +1368,11 @@ mod tests {
     fn test_shared_cache_operations() {
         let temp_dir = TempDir::new().unwrap();
         
-        // Create explicit environment configuration for this test
-        let mut env = EnvironmentSnapshot::default();
-        env.vars.insert("DEBTMAP_CACHE_DIR".to_string(), temp_dir.path().to_str().unwrap().to_string());
-        env.vars.insert("DEBTMAP_CACHE_AUTO_PRUNE".to_string(), "false".to_string()); // Disable for basic test
+        // Set environment variables directly
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
-        let location = CacheLocation::resolve(None).unwrap();
-        let cache = SharedCache::new_with_location_and_config(location, &env).unwrap();
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
 
         // Test put and get
         let key = "test_key";
@@ -1389,19 +1388,21 @@ mod tests {
         // Test delete
         cache.delete(key, component).unwrap();
         assert!(!cache.exists(key, component));
+        
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
     }
 
     #[test]
     fn test_cache_stats() {
         let temp_dir = TempDir::new().unwrap();
         
-        // Create explicit environment configuration for this test
-        let mut env = EnvironmentSnapshot::default();
-        env.vars.insert("DEBTMAP_CACHE_DIR".to_string(), temp_dir.path().to_str().unwrap().to_string());
-        env.vars.insert("DEBTMAP_CACHE_AUTO_PRUNE".to_string(), "false".to_string()); // Disable for basic test
+        // Set environment variables directly
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
-        let location = CacheLocation::resolve(None).unwrap();
-        let cache = SharedCache::new_with_location_and_config(location, &env).unwrap();
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
 
         // Ensure directories are created
         cache.location.ensure_directories().unwrap();
@@ -1413,6 +1414,10 @@ mod tests {
         let stats = cache.get_stats();
         assert_eq!(stats.entry_count, 2);
         assert_eq!(stats.total_size, 10); // "data1" + "data2"
+        
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
     }
 
     #[test]

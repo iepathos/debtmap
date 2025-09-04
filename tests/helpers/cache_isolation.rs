@@ -62,7 +62,6 @@ pub struct IsolatedCacheTest {
     pub test_id: String,
     pub cache_dir: TempDir,
     pub project_dir: TempDir,
-    #[allow(dead_code)]
     pub env_guard: EnvGuard,
 }
 

@@ -358,8 +358,12 @@ impl AutoPruner {
         max_age_days: i64,
         now: SystemTime,
     ) -> bool {
-        // Continue if we haven't met our removal targets
-        if removed_count < target_count || removed_size < target_size {
+        // Continue removing if we haven't satisfied EITHER target (both need to be met)
+        let count_satisfied = removed_count >= target_count;
+        let size_satisfied = removed_size >= target_size;
+        
+        // Continue if either target is not yet satisfied
+        if !count_satisfied || !size_satisfied {
             return true;
         }
 
