@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 use crate::cache::shared_cache::SharedCache;
+use crate::cache::PruneStats;
 use crate::core::FileMetrics;
 
 /// File information for caching
@@ -196,12 +197,20 @@ impl AnalysisCache {
             .filter(|(_, entry)| entry.timestamp > cutoff)
             .collect();
 
-        // For now, if pruning to 0 days (remove all), clear the shared cache too
-        if max_age_days == 0 {
+        // Use shared cache's auto-pruning if available
+        if max_age_days > 0 {
+            self.shared_cache.cleanup_old_entries(max_age_days)?;
+        } else {
+            // If pruning to 0 days (remove all), clear the shared cache
             self.shared_cache.clear_project()?;
         }
 
         Ok(())
+    }
+
+    /// Trigger shared cache pruning
+    pub fn trigger_shared_cache_pruning(&self) -> Result<PruneStats> {
+        self.shared_cache.trigger_pruning_if_needed()
     }
 }
 

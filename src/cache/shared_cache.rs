@@ -1,3 +1,4 @@
+use crate::cache::auto_pruner::{AutoPruner, BackgroundPruner, PruneStats, PruneStrategy};
 use crate::cache::cache_location::{CacheLocation, CacheStrategy};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -5,7 +6,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 /// Metadata for cache management
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,12 +27,25 @@ pub struct CacheIndex {
 }
 
 /// Thread-safe shared cache implementation
-#[derive(Debug)]
 pub struct SharedCache {
     pub location: CacheLocation,
     index: Arc<RwLock<CacheIndex>>,
     max_cache_size: u64,
     cleanup_threshold: f64,
+    auto_pruner: Option<AutoPruner>,
+    background_pruner: Option<BackgroundPruner>,
+}
+
+impl std::fmt::Debug for SharedCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedCache")
+            .field("location", &self.location)
+            .field("max_cache_size", &self.max_cache_size)
+            .field("cleanup_threshold", &self.cleanup_threshold)
+            .field("auto_pruner", &self.auto_pruner)
+            .field("has_background_pruner", &self.background_pruner.is_some())
+            .finish()
+    }
 }
 
 impl SharedCache {
@@ -54,11 +68,28 @@ impl SharedCache {
 
         let index = Self::load_or_create_index(&location)?;
 
+        // Create auto-pruner from environment or defaults
+        let auto_pruner = if std::env::var("DEBTMAP_CACHE_AUTO_PRUNE")
+            .unwrap_or_else(|_| "true".to_string())
+            .to_lowercase()
+            == "true"
+        {
+            Some(AutoPruner::from_env())
+        } else {
+            None
+        };
+
+        let background_pruner = auto_pruner
+            .as_ref()
+            .map(|p| BackgroundPruner::new(p.clone()));
+
         Ok(Self {
             location,
             index: Arc::new(RwLock::new(index)),
             max_cache_size: 1024 * 1024 * 1024, // 1GB default
             cleanup_threshold: 0.9,             // Cleanup when 90% full
+            auto_pruner,
+            background_pruner,
         })
     }
 
@@ -75,10 +106,14 @@ impl SharedCache {
                 .or_else(|_| {
                     // If deserialization fails, start with a new index
                     log::warn!("Cache index corrupted, creating new index");
-                    Ok(CacheIndex::default())
+                    let mut index = CacheIndex::default();
+                    index.last_cleanup = Some(SystemTime::now());
+                    Ok(index)
                 })
         } else {
-            Ok(CacheIndex::default())
+            let mut index = CacheIndex::default();
+            index.last_cleanup = Some(SystemTime::now());
+            Ok(index)
         }
     }
 
@@ -88,6 +123,12 @@ impl SharedCache {
             .location
             .get_component_path("metadata")
             .join("index.json");
+
+        // Ensure parent directory exists
+        if let Some(parent) = index_path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create metadata directory: {:?}", parent))?;
+        }
 
         let index = self
             .index
@@ -135,8 +176,12 @@ impl SharedCache {
 
     /// Store a cache entry
     pub fn put(&self, key: &str, component: &str, data: &[u8]) -> Result<()> {
-        // Check if we need cleanup
-        self.maybe_cleanup()?;
+        // Check if we need cleanup or auto-pruning
+        if self.auto_pruner.is_some() {
+            self.trigger_pruning_if_needed()?;
+        } else {
+            self.maybe_cleanup()?;
+        }
 
         let cache_path = self.get_cache_file_path(key, component);
 
@@ -422,6 +467,289 @@ impl SharedCache {
             strategy: self.location.strategy.clone(),
             project_id: self.location.project_id.clone(),
         })
+    }
+
+    /// Create a new shared cache with auto-pruning enabled
+    pub fn with_auto_pruning(repo_path: Option<&Path>, pruner: AutoPruner) -> Result<Self> {
+        let location = CacheLocation::resolve(repo_path)?;
+        location.ensure_directories()?;
+        let index = Self::load_or_create_index(&location)?;
+
+        let background_pruner = BackgroundPruner::new(pruner.clone());
+
+        Ok(Self {
+            location,
+            index: Arc::new(RwLock::new(index)),
+            max_cache_size: pruner.max_size_bytes as u64,
+            cleanup_threshold: 0.9,
+            auto_pruner: Some(pruner),
+            background_pruner: Some(background_pruner),
+        })
+    }
+
+    /// Trigger pruning if needed based on auto-pruner configuration
+    pub fn trigger_pruning_if_needed(&self) -> Result<PruneStats> {
+        if let Some(ref pruner) = self.auto_pruner {
+            let should_prune = {
+                let index = self
+                    .index
+                    .read()
+                    .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+                pruner.should_prune(&*index)
+            };
+
+            if should_prune {
+                return self.trigger_pruning();
+            }
+        }
+
+        Ok(PruneStats {
+            entries_removed: 0,
+            bytes_freed: 0,
+            entries_remaining: self.get_stats().entry_count,
+            bytes_remaining: self.get_stats().total_size,
+            duration_ms: 0,
+            files_deleted: 0,
+            files_not_found: 0,
+        })
+    }
+
+    /// Manually trigger pruning
+    pub fn trigger_pruning(&self) -> Result<PruneStats> {
+        let start = SystemTime::now();
+
+        if let Some(ref pruner) = self.auto_pruner {
+            let entries_to_remove = {
+                let index = self
+                    .index
+                    .read()
+                    .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+                pruner.calculate_entries_to_remove(&*index)
+            };
+
+            if entries_to_remove.is_empty() {
+                return Ok(PruneStats {
+                    entries_removed: 0,
+                    bytes_freed: 0,
+                    entries_remaining: self.get_stats().entry_count,
+                    bytes_remaining: self.get_stats().total_size,
+                    duration_ms: 0,
+                    files_deleted: 0,
+                    files_not_found: 0,
+                });
+            }
+
+            let mut bytes_freed = 0u64;
+            let mut files_deleted = 0usize;
+            let mut files_not_found = 0usize;
+
+            // Remove from index
+            {
+                let mut index = self
+                    .index
+                    .write()
+                    .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+
+                for (key, metadata) in &entries_to_remove {
+                    if index.entries.remove(key).is_some() {
+                        bytes_freed += metadata.size_bytes;
+                    }
+                }
+
+                index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
+                index.last_cleanup = Some(SystemTime::now());
+            }
+
+            // Delete files
+            for (key, _) in &entries_to_remove {
+                for component in &[
+                    "call_graphs",
+                    "analysis",
+                    "metadata",
+                    "temp",
+                    "file_metrics",
+                ] {
+                    let cache_path = self.get_cache_file_path(key, component);
+                    if cache_path.exists() {
+                        match fs::remove_file(&cache_path) {
+                            Ok(_) => files_deleted += 1,
+                            Err(_) => files_not_found += 1,
+                        }
+                    }
+                }
+            }
+
+            self.save_index()?;
+
+            let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
+            let final_stats = self.get_stats();
+
+            Ok(PruneStats {
+                entries_removed: entries_to_remove.len(),
+                bytes_freed,
+                entries_remaining: final_stats.entry_count,
+                bytes_remaining: final_stats.total_size,
+                duration_ms: duration,
+                files_deleted,
+                files_not_found,
+            })
+        } else {
+            // Fallback to old cleanup method
+            self.cleanup()?;
+            let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
+            let stats = self.get_stats();
+
+            Ok(PruneStats {
+                entries_removed: 0,
+                bytes_freed: 0,
+                entries_remaining: stats.entry_count,
+                bytes_remaining: stats.total_size,
+                duration_ms: duration,
+                files_deleted: 0,
+                files_not_found: 0,
+            })
+        }
+    }
+
+    /// Prune entries with a specific strategy
+    pub fn prune_with_strategy(&self, strategy: PruneStrategy) -> Result<PruneStats> {
+        // Create a temporary pruner with the specified strategy
+        let temp_pruner = AutoPruner {
+            strategy,
+            ..self.auto_pruner.clone().unwrap_or_default()
+        };
+
+        let start = SystemTime::now();
+        let entries_to_remove = {
+            let index = self
+                .index
+                .read()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            temp_pruner.calculate_entries_to_remove(&*index)
+        };
+
+        if entries_to_remove.is_empty() {
+            return Ok(PruneStats {
+                entries_removed: 0,
+                bytes_freed: 0,
+                entries_remaining: self.get_stats().entry_count,
+                bytes_remaining: self.get_stats().total_size,
+                duration_ms: 0,
+                files_deleted: 0,
+                files_not_found: 0,
+            });
+        }
+
+        let mut bytes_freed = 0u64;
+        let mut files_deleted = 0usize;
+
+        // Remove from index
+        {
+            let mut index = self
+                .index
+                .write()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+
+            for (key, metadata) in &entries_to_remove {
+                if index.entries.remove(key).is_some() {
+                    bytes_freed += metadata.size_bytes;
+                }
+            }
+
+            index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
+            index.last_cleanup = Some(SystemTime::now());
+        }
+
+        // Delete files
+        for (key, _) in &entries_to_remove {
+            for component in &[
+                "call_graphs",
+                "analysis",
+                "metadata",
+                "temp",
+                "file_metrics",
+            ] {
+                let cache_path = self.get_cache_file_path(key, component);
+                if cache_path.exists() {
+                    if fs::remove_file(&cache_path).is_ok() {
+                        files_deleted += 1;
+                    }
+                }
+            }
+        }
+
+        self.save_index()?;
+
+        let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
+        let final_stats = self.get_stats();
+
+        Ok(PruneStats {
+            entries_removed: entries_to_remove.len(),
+            bytes_freed,
+            entries_remaining: final_stats.entry_count,
+            bytes_remaining: final_stats.total_size,
+            duration_ms: duration,
+            files_deleted,
+            files_not_found: 0,
+        })
+    }
+
+    /// Clean up entries older than specified days
+    pub fn cleanup_old_entries(&self, max_age_days: i64) -> Result<usize> {
+        let max_age = Duration::from_secs(max_age_days as u64 * 86400);
+        let now = SystemTime::now();
+        let mut removed_count = 0;
+
+        let entries_to_remove = {
+            let index = self
+                .index
+                .read()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+
+            let mut to_remove = Vec::new();
+            for (key, metadata) in &index.entries {
+                if let Ok(age) = now.duration_since(metadata.last_accessed) {
+                    if age > max_age {
+                        to_remove.push(key.clone());
+                    }
+                }
+            }
+            to_remove
+        };
+
+        // Remove from index and delete files
+        {
+            let mut index = self
+                .index
+                .write()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+
+            for key in &entries_to_remove {
+                if let Some(metadata) = index.entries.remove(key) {
+                    index.total_size -= metadata.size_bytes;
+                    removed_count += 1;
+
+                    // Delete files
+                    for component in &[
+                        "call_graphs",
+                        "analysis",
+                        "metadata",
+                        "temp",
+                        "file_metrics",
+                    ] {
+                        let cache_path = self.get_cache_file_path(key, component);
+                        if cache_path.exists() {
+                            let _ = fs::remove_file(&cache_path);
+                        }
+                    }
+                }
+            }
+
+            index.last_cleanup = Some(SystemTime::now());
+        }
+
+        self.save_index()?;
+        Ok(removed_count)
     }
 }
 
