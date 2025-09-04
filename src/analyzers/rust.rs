@@ -459,29 +459,20 @@ impl FunctionVisitor {
     }
 
     fn is_test_function(name: &str, item_fn: &syn::ItemFn) -> bool {
+        const TEST_PREFIXES: &[&str] = &["test_", "it_", "should_"];
+        const MOCK_PATTERNS: &[&str] = &["mock", "stub", "fake"];
+        
+        // Check test attributes
         let has_test_attribute = item_fn.attrs.iter().any(|attr| {
             attr.path().is_ident("test")
-                || attr
-                    .path()
-                    .segments
-                    .last()
-                    .is_some_and(|seg| seg.ident == "test")
-                || (attr.path().is_ident("cfg")
+                || attr.path().segments.last().is_some_and(|seg| seg.ident == "test")
+                || (attr.path().is_ident("cfg") 
                     && attr.meta.to_token_stream().to_string().contains("test"))
         });
-
-        let has_test_name =
-            name.starts_with("test_") || name.starts_with("it_") || name.starts_with("should_");
-
-        // Check if it's a mock/stub/fake function based on name
-        let is_mock_function = name.contains("Mock")
-            || name.contains("mock")
-            || name.contains("Stub")
-            || name.contains("stub")
-            || name.contains("Fake")
-            || name.contains("fake");
-
-        has_test_attribute || has_test_name || is_mock_function
+        
+        has_test_attribute
+            || TEST_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+            || MOCK_PATTERNS.iter().any(|pattern| name.to_lowercase().contains(pattern))
     }
 
     fn extract_visibility(vis: &syn::Visibility) -> Option<String> {
