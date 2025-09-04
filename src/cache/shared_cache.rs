@@ -697,10 +697,9 @@ impl SharedCache {
                 "file_metrics",
             ] {
                 let cache_path = self.get_cache_file_path(key, component);
-                if cache_path.exists()
-                    && fs::remove_file(&cache_path).is_ok() {
-                        files_deleted += 1;
-                    }
+                if cache_path.exists() && fs::remove_file(&cache_path).is_ok() {
+                    files_deleted += 1;
+                }
             }
         }
 
