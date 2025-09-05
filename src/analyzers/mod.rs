@@ -7,6 +7,7 @@ pub mod javascript;
 pub mod purity_detector;
 pub mod python;
 pub mod python_detectors;
+pub mod python_purity;
 pub mod rust;
 pub mod rust_call_graph;
 pub mod signature_extractor;
