@@ -2,44 +2,62 @@
 number: 84
 title: Detailed AST-Based Source Mapping
 category: optimization
-priority: low
+priority: medium
 status: draft
-dependencies: [80]
+dependencies: [80, 90]
 created: 2025-09-02
+updated: 2025-09-05
 ---
 
 # Specification 84: Detailed AST-Based Source Mapping
 
 **Category**: optimization
-**Priority**: low
+**Priority**: medium
 **Status**: draft
-**Dependencies**: [80] Multi-Pass Analysis with Attribution
+**Dependencies**: 
+- [80] Multi-Pass Analysis with Attribution
+- [90] Shared Cache Location (for caching source maps)
 
 ## Context
 
-The current source location mapping in the multi-pass analysis uses estimation based on function metrics (line numbers and length) rather than actual AST node locations. This simplified approach limits:
+The current implementation has fragmented source location tracking:
+- `FunctionMetrics` only tracks `line: usize` with no column or span information
+- `AstNode` in `core/ast.rs` only has single line numbers
+- Attribution engine uses `EstimatedComplexityLocation` with comments stating "Estimated location information"
+- Different languages have separate `SourceLocation` implementations (Rust uses `common/source_location.rs`, JavaScript has its own)
+- The `generate_source_mappings` function creates mappings using line numbers and estimated lengths
+
+While we have a foundation in `common/source_location.rs` with `UnifiedLocationExtractor` that can extract precise spans from syn AST nodes, this infrastructure is not consistently used across the codebase. This fragmentation limits:
 - Precise mapping of complexity points to specific code constructs
 - Accurate attribution of complexity to individual statements and expressions
 - Navigation from complexity reports to exact code locations
 - IDE integration for inline complexity visualization
 - Detailed complexity heat maps at the statement level
 
-Accurate AST-based source mapping is essential for providing developers with precise information about where complexity originates in their code, enabling targeted refactoring and better understanding of complexity distribution.
+Unifying and extending the existing source mapping infrastructure is essential for providing developers with precise information about where complexity originates in their code, enabling targeted refactoring and better understanding of complexity distribution.
 
 ## Objective
 
-Implement comprehensive AST-based source mapping that tracks exact locations of all complexity-contributing constructs, enabling precise navigation from complexity reports to source code and supporting rich IDE integrations.
+Unify and extend the existing source location infrastructure to provide comprehensive AST-based source mapping that:
+1. Builds upon the existing `common/source_location.rs` module
+2. Extends `UnifiedLocationExtractor` to support all languages consistently
+3. Replaces estimation-based attribution with precise AST node tracking
+4. Enables exact navigation from complexity reports to source code
+5. Supports rich IDE integrations and source map exports
 
 ## Requirements
 
 ### Functional Requirements
 
-- **AST Node Location Tracking**: Track precise location (line, column, span) for all AST nodes
-- **Complexity Point Mapping**: Map each complexity point to specific AST nodes
-- **Source Range Calculation**: Calculate exact source ranges for complex constructs
+- **Unified Location System**: Extend `common/source_location.rs` to be the single source of truth
+- **Enhanced FunctionMetrics**: Add `SourceLocation` to replace simple `line: usize`
+- **Enhanced AstNode**: Add full `SourceLocation` with spans to `core/ast.rs`
+- **Attribution Integration**: Replace `EstimatedComplexityLocation` with precise locations
+- **Language Unification**: Migrate JavaScript's separate `SourceLocation` to common module
+- **Complexity Point Mapping**: Map each complexity point to specific AST nodes with exact spans
 - **Cross-Reference Generation**: Build bidirectional maps between complexity and source
+- **Cache Integration**: Leverage spec 90's shared cache for source map storage
 - **Incremental Updates**: Support incremental mapping updates for code changes
-- **Multi-Language Support**: Handle source mapping for all supported languages
 - **Source Map Serialization**: Export source maps in standard formats
 - **IDE Protocol Support**: Support Language Server Protocol (LSP) for IDE integration
 
@@ -67,123 +85,196 @@ Implement comprehensive AST-based source mapping that tracks exact locations of 
 
 ### Implementation Approach
 
-**Phase 1: Enhanced AST with Source Locations**
+**Phase 1: Unify and Extend Existing Infrastructure**
 ```rust
-// Enhanced AST node with detailed location information
-#[derive(Debug, Clone)]
-pub struct ASTNodeWithLocation {
-    pub node: ASTNode,
-    pub location: SourceLocation,
-    pub span: SourceSpan,
-    pub parent: Option<NodeId>,
-    pub children: Vec<NodeId>,
-}
+// Extend existing common/source_location.rs
+use crate::common::{SourceLocation, LocationConfidence, UnifiedLocationExtractor};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SourceLocation {
+// Enhanced FunctionMetrics with full location
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FunctionMetrics {
+    pub name: String,
     pub file: PathBuf,
-    pub line: u32,
-    pub column: u32,
-    pub byte_offset: usize,
+    pub location: SourceLocation,  // Replace line: usize
+    pub cyclomatic: u32,
+    pub cognitive: u32,
+    pub nesting: u32,
+    pub length: usize,
+    // ... existing fields ...
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SourceSpan {
-    pub start: SourceLocation,
-    pub end: SourceLocation,
-    pub text: String,
+// Enhanced AstNode with source location
+#[derive(Clone, Debug)]
+pub struct AstNode {
+    pub kind: NodeKind,
+    pub name: Option<String>,
+    pub location: SourceLocation,  // Replace line: usize
+    pub children: Vec<AstNode>,
+    pub ast_id: NodeId,  // New: unique identifier for cross-referencing
 }
 
-pub struct SourceMappedAST {
-    nodes: HashMap<NodeId, ASTNodeWithLocation>,
-    source_index: SourceIndex,
-    complexity_map: ComplexityMap,
+// Extend UnifiedLocationExtractor for all languages
+impl UnifiedLocationExtractor {
+    // Existing Rust support via syn
+    
+    // Add Python support
+    pub fn extract_python_location(&self, node: &rustpython_parser::ast::Located<T>) -> SourceLocation {
+        SourceLocation {
+            line: node.location.row(),
+            column: Some(node.location.column()),
+            end_line: node.end_location.map(|e| e.row()),
+            end_column: node.end_location.map(|e| e.column()),
+            confidence: LocationConfidence::Exact,
+        }
+    }
+    
+    // Unify JavaScript/TypeScript to use common SourceLocation
+    pub fn extract_treesitter_location(&self, node: tree_sitter::Node) -> SourceLocation {
+        let start = node.start_position();
+        let end = node.end_position();
+        SourceLocation {
+            line: start.row + 1,  // tree-sitter uses 0-based
+            column: Some(start.column),
+            end_line: if end.row != start.row { Some(end.row + 1) } else { None },
+            end_column: Some(end.column),
+            confidence: LocationConfidence::Exact,
+        }
+    }
 }
 ```
 
-**Phase 2: Complexity-to-Source Mapping**
+**Phase 2: Replace Attribution Engine's Estimation**
 ```rust
-pub struct ComplexitySourceMapper {
-    ast_map: SourceMappedAST,
-    complexity_points: Vec<ComplexityPoint>,
-    source_map: SourceMap,
+// Update analysis/attribution/mod.rs
+use crate::common::{SourceLocation, UnifiedLocationExtractor};
+
+impl AttributionEngine {
+    // Replace EstimatedComplexityLocation with precise tracking
+    fn generate_source_mappings(&self, functions: &[FunctionMetrics]) -> Vec<SourceMapping> {
+        let mut mappings = Vec::new();
+        
+        for func in functions {
+            // Use actual SourceLocation instead of estimation
+            mappings.push(SourceMapping {
+                complexity_point: func.cyclomatic,
+                location: CodeLocation::from_source_location(&func.location),
+                ast_path: self.build_ast_path(func),
+                context: format!("Function: {}", func.name),
+            });
+            
+            // Add mappings for internal complexity points
+            if let Some(ast) = self.get_function_ast(func) {
+                self.map_ast_complexity_points(&ast, &mut mappings);
+            }
+        }
+        
+        mappings
+    }
+    
+    fn map_ast_complexity_points(&self, ast: &AstNode, mappings: &mut Vec<SourceMapping>) {
+        // Map each complexity-contributing node
+        match ast.kind {
+            NodeKind::If | NodeKind::While | NodeKind::For => {
+                mappings.push(SourceMapping {
+                    complexity_point: 1,
+                    location: CodeLocation::from_source_location(&ast.location),
+                    ast_path: self.build_node_path(ast),
+                    context: format!("{:?} at line {}", ast.kind, ast.location.line),
+                });
+            }
+            _ => {}
+        }
+        
+        // Recurse through children
+        for child in &ast.children {
+            self.map_ast_complexity_points(child, mappings);
+        }
+    }
+}
+
+// New complexity point tracker
+pub struct ComplexityPointRegistry {
+    points: HashMap<NodeId, ComplexityPoint>,
+    by_location: BTreeMap<(usize, Option<usize>), Vec<NodeId>>,
+    by_function: HashMap<String, Vec<NodeId>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ComplexityPoint {
-    pub id: ComplexityPointId,
+    pub node_id: NodeId,
     pub value: u32,
     pub type_: ComplexityType,
-    pub ast_node: NodeId,
-    pub source_location: SourceLocation,
-    pub source_span: SourceSpan,
-    pub contributing_factors: Vec<ComplexityFactor>,
-}
-
-impl ComplexitySourceMapper {
-    pub fn map_complexity_to_source(&mut self, metrics: &FunctionMetrics) {
-        // Visit AST nodes and calculate complexity contribution
-        self.ast_map.visit_complexity_nodes(|node| {
-            let complexity = self.calculate_node_complexity(node);
-            if complexity > 0 {
-                self.add_complexity_point(ComplexityPoint {
-                    id: self.next_id(),
-                    value: complexity,
-                    type_: self.determine_complexity_type(node),
-                    ast_node: node.id,
-                    source_location: node.location.clone(),
-                    source_span: node.span.clone(),
-                    contributing_factors: self.analyze_factors(node),
-                });
-            }
-        });
-    }
-    
-    pub fn get_source_for_complexity(&self, point_id: ComplexityPointId) -> Option<&SourceSpan> {
-        self.complexity_points
-            .iter()
-            .find(|p| p.id == point_id)
-            .map(|p| &p.source_span)
-    }
+    pub location: SourceLocation,
+    pub function_name: String,
+    pub contributing_factors: Vec<String>,
 }
 ```
 
-**Phase 3: Incremental Mapping Updates**
+**Phase 3: Cache Integration and Incremental Updates**
 ```rust
-pub struct IncrementalMapper {
-    base_map: SourceMap,
-    change_tracker: ChangeTracker,
-    diff_calculator: DiffCalculator,
+// Integrate with spec 90's shared cache infrastructure
+use crate::cache::SharedCache;
+
+pub struct CachedSourceMapper {
+    cache: SharedCache,
+    mapper: ComplexityPointRegistry,
 }
 
-impl IncrementalMapper {
-    pub fn update_mapping(&mut self, changes: &[SourceChange]) -> MappingDelta {
-        let mut delta = MappingDelta::new();
+impl CachedSourceMapper {
+    pub async fn get_or_compute_mappings(&self, file: &Path) -> Result<Vec<SourceMapping>> {
+        let cache_key = format!("source_map:{}", file.display());
         
+        // Try to get from cache
+        if let Some(cached) = self.cache.get(&cache_key).await? {
+            return Ok(cached);
+        }
+        
+        // Compute if not cached
+        let mappings = self.compute_mappings(file)?;
+        self.cache.set(&cache_key, &mappings).await?;
+        Ok(mappings)
+    }
+    
+    pub fn invalidate_mapping(&self, file: &Path) {
+        let cache_key = format!("source_map:{}", file.display());
+        self.cache.invalidate(&cache_key);
+    }
+}
+
+// Incremental update support
+impl ComplexityPointRegistry {
+    pub fn update_incremental(&mut self, file: &Path, changes: &[TextChange]) {
+        // Remove affected points
+        let affected = self.find_affected_points(file, changes);
+        for node_id in affected {
+            self.remove_point(node_id);
+        }
+        
+        // Re-analyze changed regions
         for change in changes {
-            match change {
-                SourceChange::Insert { location, text } => {
-                    let new_nodes = self.parse_and_map(text, location);
-                    delta.additions.extend(new_nodes);
-                    self.adjust_subsequent_locations(location, text.len());
-                }
-                SourceChange::Delete { span } => {
-                    let removed = self.remove_nodes_in_span(span);
-                    delta.deletions.extend(removed);
-                    self.adjust_subsequent_locations(&span.start, -(span.length() as i32));
-                }
-                SourceChange::Modify { span, new_text } => {
-                    let removed = self.remove_nodes_in_span(span);
-                    let added = self.parse_and_map(new_text, &span.start);
-                    delta.deletions.extend(removed);
-                    delta.additions.extend(added);
-                    let diff = new_text.len() as i32 - span.length() as i32;
-                    self.adjust_subsequent_locations(&span.start, diff);
-                }
+            if let Some(ast) = self.parse_region(file, &change.range) {
+                self.analyze_and_register(&ast);
             }
         }
         
-        delta
+        // Adjust line numbers for points after changes
+        self.adjust_locations(file, changes);
+    }
+    
+    fn adjust_locations(&mut self, file: &Path, changes: &[TextChange]) {
+        for change in changes {
+            let line_delta = change.new_line_count as i32 - change.old_line_count as i32;
+            if line_delta != 0 {
+                for point in self.points.values_mut() {
+                    if point.location.line > change.start_line {
+                        point.location.line = (point.location.line as i32 + line_delta) as usize;
+                        if let Some(end_line) = &mut point.location.end_line {
+                            *end_line = (*end_line as i32 + line_delta) as usize;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 ```
@@ -239,24 +330,33 @@ impl ComplexityLSPServer {
 
 ### Architecture Changes
 
+**Modified Components:**
+```
+src/common/source_location.rs   # Extended with multi-language support
+src/core/mod.rs                 # FunctionMetrics with SourceLocation
+src/core/ast.rs                 # AstNode with SourceLocation and NodeId
+src/analysis/attribution/mod.rs # Replace EstimatedComplexityLocation
+
+src/analyzers/
+├── rust.rs                      # Use UnifiedLocationExtractor
+├── python.rs                    # Use UnifiedLocationExtractor  
+└── javascript/
+    └── detectors/mod.rs        # Migrate to common SourceLocation
+```
+
 **New Components:**
 ```
 src/analysis/source_mapping/
 ├── mod.rs                      # Source mapping coordination
-├── ast_mapper.rs               # AST source location tracking
-├── complexity_mapper.rs        # Complexity-to-source mapping
+├── complexity_registry.rs      # ComplexityPointRegistry implementation
+├── cached_mapper.rs           # Cache-integrated source mapper
 ├── incremental.rs             # Incremental mapping updates
-├── source_index.rs            # Efficient source location indexing
 ├── export/
 │   ├── mod.rs                 # Export functionality
 │   ├── sourcemap_v3.rs       # Source map v3 format
 │   └── lsp_integration.rs    # LSP server integration
-└── languages/
-    ├── mod.rs                 # Language-specific mapping
-    ├── rust_mapper.rs         # Rust source mapping
-    ├── javascript_mapper.rs  # JavaScript source mapping
-    ├── typescript_mapper.rs  # TypeScript source mapping
-    └── python_mapper.rs      # Python source mapping
+└── tests/
+    └── source_mapping_test.rs # Comprehensive tests
 ```
 
 ### Data Structures
@@ -300,28 +400,32 @@ pub struct NavigationIndex {
 ### Language-Specific Implementations
 
 **Rust Source Mapping:**
-- Use `syn` crate's `Span` information
-- Track macro expansion locations
-- Handle lifetime and generic parameters
+- Already supported via `syn` crate's `Span` in `UnifiedLocationExtractor`
+- Extend to track macro expansion locations
+- Handle lifetime and generic parameters in complexity calculation
 
 **JavaScript/TypeScript Mapping:**
-- Use tree-sitter's location tracking
-- Handle JSX/TSX syntax
+- Migrate from separate `SourceLocation` to common module
+- Use `UnifiedLocationExtractor::extract_treesitter_location()`
+- Handle JSX/TSX syntax in location tracking
 - Track async/await transformations
 
 **Python Mapping:**
-- Use Python AST's `lineno` and `col_offset`
-- Handle indentation-based blocks
-- Track decorator applications
+- Implement `extract_python_location()` using rustpython_parser's location info
+- Handle indentation-based blocks correctly
+- Track decorator applications and their impact on complexity
 
 ## Dependencies
 
 - **Prerequisites**:
-  - [80] Multi-Pass Analysis with Attribution (base implementation)
+  - [80] Multi-Pass Analysis with Attribution (for attribution engine integration)
+  - [90] Shared Cache Location (for caching source maps)
 - **Affected Components**:
-  - AST parsers for all languages
-  - Complexity calculation modules
-  - Diagnostic reporters
+  - `common/source_location.rs` - extend for all languages
+  - `core/mod.rs` - update FunctionMetrics
+  - `core/ast.rs` - update AstNode structure  
+  - `analysis/attribution/mod.rs` - replace estimation logic
+  - All language analyzers - migrate to unified location system
 - **External Dependencies**:
   - Source map libraries (for v3 format)
   - LSP libraries (for IDE integration)
@@ -369,19 +473,30 @@ pub struct NavigationIndex {
 
 ## Implementation Notes
 
+### Migration Path
+
+1. **Phase 1**: Extend `UnifiedLocationExtractor` for all languages
+2. **Phase 2**: Update data structures (`FunctionMetrics`, `AstNode`)
+3. **Phase 3**: Migrate JavaScript to common `SourceLocation`
+4. **Phase 4**: Update attribution engine to use precise locations
+5. **Phase 5**: Implement caching and incremental updates
+6. **Phase 6**: Add export and IDE support
+
 ### Challenges
 
-- Maintaining accuracy during code formatting changes
-- Handling generated code and macros
-- Cross-platform path resolution
-- Performance with very large files
+- **Backward Compatibility**: Need migration for existing serialized data
+- **JavaScript Migration**: Unifying two different `SourceLocation` implementations
+- **Macro Handling**: Rust macros complicate source mapping
+- **Performance**: Maintaining <5% overhead with detailed tracking
+- **Cross-platform**: Path resolution across different OS
 
 ### Optimization Strategies
 
+- Leverage existing `SharedCache` from spec 90
 - Use interval trees for efficient location queries
-- Cache frequently accessed mappings
-- Compress source maps for storage
-- Lazy loading of source content
+- Lazy computation of source maps
+- Incremental updates to avoid full recomputation
+- Compress source maps when storing in cache
 
 ### Future Enhancements
 
@@ -389,3 +504,4 @@ pub struct NavigationIndex {
 - Visual complexity overlays in IDEs
 - Git blame integration for historical mapping
 - Cross-file complexity flow visualization
+- Integration with debugging tools
