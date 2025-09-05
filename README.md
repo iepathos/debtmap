@@ -9,7 +9,7 @@
 
 > 🚧 **Early Prototype** - This project is under active development and APIs may change
 
-A fast, language-agnostic code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.
+A fast code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.
 
 ## Why Debtmap?
 
