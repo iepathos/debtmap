@@ -37,7 +37,7 @@ def process_data(x):
     // Check branch similarity
     let similarity = analyzer.calculate_branch_similarity(&module.body);
     assert!(
-        similarity >= 0.0 && similarity <= 1.0,
+        (0.0..=1.0).contains(&similarity),
         "Branch similarity should be between 0 and 1"
     );
 
