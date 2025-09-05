@@ -1,4 +1,5 @@
 use crate::analyzers::python_detectors::SimplifiedPythonDetector;
+use crate::analyzers::python_purity::PythonPurityDetector;
 use crate::analyzers::Analyzer;
 use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
 use crate::complexity::languages::python::PythonEntropyAnalyzer;
@@ -245,6 +246,10 @@ fn extract_functions_from_stmts(
                 let entropy_score =
                     calculate_function_entropy(&func_def.body, source, entropy_calculator);
 
+                // Analyze function purity
+                let mut purity_detector = PythonPurityDetector::new();
+                let purity_analysis = purity_detector.analyze_function(func_def);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -258,8 +263,8 @@ fn extract_functions_from_stmts(
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
                     entropy_score,
-                    is_pure: None, // TODO: Add purity detection for Python
-                    purity_confidence: None,
+                    is_pure: Some(purity_analysis.is_pure),
+                    purity_confidence: Some(purity_analysis.confidence),
                 });
 
                 // Recursively look for nested functions
@@ -288,6 +293,10 @@ fn extract_functions_from_stmts(
                 let entropy_score =
                     calculate_function_entropy(&func_def.body, source, entropy_calculator);
 
+                // Analyze async function purity
+                let mut purity_detector = PythonPurityDetector::new();
+                let purity_analysis = purity_detector.analyze_async_function(func_def);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -301,8 +310,8 @@ fn extract_functions_from_stmts(
                     is_trait_method: false, // Python doesn't have traits like Rust
                     in_test_module: false, // Python test detection works differently
                     entropy_score,
-                    is_pure: None, // TODO: Add purity detection for Python
-                    purity_confidence: None,
+                    is_pure: Some(purity_analysis.is_pure),
+                    purity_confidence: Some(purity_analysis.confidence),
                 });
 
                 // Recursively look for nested functions
