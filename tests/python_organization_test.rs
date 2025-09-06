@@ -4,8 +4,8 @@ mod tests {
     use debtmap::organization::{
         OrganizationAntiPattern, ParameterRefactoring, PrimitiveUsageContext,
     };
-    use rustpython_parser::ast;
     use rustpython_parser;
+    use rustpython_parser::ast;
     use std::path::Path;
 
     fn parse_python_code(source: &str) -> ast::Mod {
@@ -53,17 +53,18 @@ class BigClass:
         let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
 
         assert!(!patterns.is_empty());
-        assert!(patterns.iter().any(|p| matches!(
-            p,
-            OrganizationAntiPattern::GodObject { .. }
-        )));
+        assert!(patterns
+            .iter()
+            .any(|p| matches!(p, OrganizationAntiPattern::GodObject { .. })));
 
         if let Some(OrganizationAntiPattern::GodObject {
             type_name,
             method_count,
             field_count,
             ..
-        }) = patterns.iter().find(|p| matches!(p, OrganizationAntiPattern::GodObject { .. }))
+        }) = patterns
+            .iter()
+            .find(|p| matches!(p, OrganizationAntiPattern::GodObject { .. }))
         {
             assert_eq!(type_name, "BigClass");
             assert_eq!(*method_count, 16);
@@ -114,10 +115,9 @@ def complex_function(param1, param2, param3, param4, param5, param6, param7):
         let detector = SimplifiedPythonOrganizationDetector::new();
         let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
 
-        assert!(patterns.iter().any(|p| matches!(
-            p,
-            OrganizationAntiPattern::LongParameterList { .. }
-        )));
+        assert!(patterns
+            .iter()
+            .any(|p| matches!(p, OrganizationAntiPattern::LongParameterList { .. })));
 
         if let Some(OrganizationAntiPattern::LongParameterList {
             function_name,
@@ -197,7 +197,7 @@ def validate_order(order_id, order_status, order_type):
             .collect();
 
         assert!(!primitive_obsession_patterns.is_empty());
-        
+
         // Should detect identifier and status primitive obsessions
         assert!(primitive_obsession_patterns.iter().any(|p| {
             if let OrganizationAntiPattern::PrimitiveObsession { usage_context, .. } = p {
@@ -268,29 +268,27 @@ class SmallClass:
 "#;
 
         let module = parse_python_code(source);
-        
+
         // With default thresholds - should not detect as God Object
         let detector = SimplifiedPythonOrganizationDetector::new();
         let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
-        assert!(!patterns.iter().any(|p| matches!(
-            p,
-            OrganizationAntiPattern::GodObject { .. }
-        )));
+        assert!(!patterns
+            .iter()
+            .any(|p| matches!(p, OrganizationAntiPattern::GodObject { .. })));
 
         // With lower thresholds - should detect as God Object
         let detector = SimplifiedPythonOrganizationDetector::with_thresholds(
-            4,  // god_object_method_threshold
-            2,  // god_object_field_threshold
-            5,  // long_parameter_threshold
-            2,  // magic_value_min_occurrences
+            4,    // god_object_method_threshold
+            2,    // god_object_field_threshold
+            5,    // long_parameter_threshold
+            2,    // magic_value_min_occurrences
             0.33, // feature_envy_threshold
-            3,  // primitive_obsession_min_occurrences
+            3,    // primitive_obsession_min_occurrences
         );
         let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
-        assert!(patterns.iter().any(|p| matches!(
-            p,
-            OrganizationAntiPattern::GodObject { .. }
-        )));
+        assert!(patterns
+            .iter()
+            .any(|p| matches!(p, OrganizationAntiPattern::GodObject { .. })));
     }
 
     #[test]
@@ -325,16 +323,22 @@ def complex_calculations():
         let magic_values: Vec<_> = patterns
             .iter()
             .filter_map(|p| match p {
-                OrganizationAntiPattern::MagicValue { value, occurrence_count, .. } => {
-                    Some((value.as_str(), *occurrence_count))
-                }
+                OrganizationAntiPattern::MagicValue {
+                    value,
+                    occurrence_count,
+                    ..
+                } => Some((value.as_str(), *occurrence_count)),
                 _ => None,
             })
             .collect();
 
         // Should detect multiple occurrences of 42 and 100
-        assert!(magic_values.iter().any(|(val, count)| *val == "42" && *count >= 4));
-        assert!(magic_values.iter().any(|(val, count)| *val == "100" && *count >= 2));
+        assert!(magic_values
+            .iter()
+            .any(|(val, count)| *val == "42" && *count >= 4));
+        assert!(magic_values
+            .iter()
+            .any(|(val, count)| *val == "100" && *count >= 2));
     }
 
     #[test]
@@ -349,19 +353,17 @@ def test_function():
 
         let module = parse_python_code(source);
         let detector = SimplifiedPythonOrganizationDetector::with_thresholds(
-            0,  // Force detection
-            0,
-            0,
-            1,
-            0.0,
-            1,
+            0, // Force detection
+            0, 0, 1, 0.0, 1,
         );
         let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
 
         for pattern in patterns {
             let location = pattern.primary_location();
             // Should have found actual line numbers, not just default to line 1
-            if source.contains("TestClass") && matches!(pattern, OrganizationAntiPattern::GodObject { .. }) {
+            if source.contains("TestClass")
+                && matches!(pattern, OrganizationAntiPattern::GodObject { .. })
+            {
                 assert_eq!(location.line, 2);
             }
         }
@@ -373,7 +375,7 @@ def test_function():
         let module = parse_python_code(source);
         let detector = SimplifiedPythonOrganizationDetector::new();
         let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
-        
+
         assert!(patterns.is_empty());
     }
 
@@ -397,7 +399,7 @@ def simple_function(x, y):
         let module = parse_python_code(source);
         let detector = SimplifiedPythonOrganizationDetector::new();
         let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
-        
+
         assert!(patterns.is_empty());
     }
 }

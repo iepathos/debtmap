@@ -3,8 +3,8 @@
 
 use crate::common::{LocationConfidence, SourceLocation};
 use crate::organization::{
-    MagicValueType, OrganizationAntiPattern, Parameter, ParameterGroup,
-    ParameterRefactoring, PrimitiveUsageContext, ResponsibilityGroup, ValueContext,
+    MagicValueType, OrganizationAntiPattern, Parameter, ParameterGroup, ParameterRefactoring,
+    PrimitiveUsageContext, ResponsibilityGroup, ValueContext,
 };
 use rustpython_parser::ast;
 use std::collections::HashMap;
@@ -18,6 +18,12 @@ pub struct SimplifiedPythonOrganizationDetector {
     magic_value_min_occurrences: usize,
     feature_envy_threshold: f64,
     primitive_obsession_min_occurrences: usize,
+}
+
+impl Default for SimplifiedPythonOrganizationDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SimplifiedPythonOrganizationDetector {
@@ -85,7 +91,10 @@ impl SimplifiedPythonOrganizationDetector {
                                 } else {
                                     method_count += 1;
                                     // Also check for feature envy in class methods
-                                    let feature_envy = self.detect_feature_envy_in_function(&func_def.body, &func_def.name.to_string());
+                                    let feature_envy = self.detect_feature_envy_in_function(
+                                        &func_def.body,
+                                        func_def.name.as_ref(),
+                                    );
                                     if let Some(envy) = feature_envy {
                                         patterns.push(envy);
                                     }
@@ -102,7 +111,9 @@ impl SimplifiedPythonOrganizationDetector {
                     }
 
                     // Use configurable thresholds
-                    if method_count > self.god_object_method_threshold || field_count > self.god_object_field_threshold {
+                    if method_count > self.god_object_method_threshold
+                        || field_count > self.god_object_field_threshold
+                    {
                         patterns.push(OrganizationAntiPattern::GodObject {
                             type_name: class_def.name.to_string(),
                             method_count,
@@ -135,13 +146,16 @@ impl SimplifiedPythonOrganizationDetector {
                                     value.to_uppercase()
                                 ),
                                 context: ValueContext::BusinessLogic,
-                                locations: vec![self.get_location_for_node(source, func_def.name.as_str())],
+                                locations: vec![
+                                    self.get_location_for_node(source, func_def.name.as_str())
+                                ],
                             });
                         }
                     }
 
                     // Feature Envy detection
-                    let feature_envy = self.detect_feature_envy_in_function(&func_def.body, &func_def.name);
+                    let feature_envy =
+                        self.detect_feature_envy_in_function(&func_def.body, &func_def.name);
                     if let Some(envy) = feature_envy {
                         patterns.push(envy);
                     }
@@ -149,12 +163,12 @@ impl SimplifiedPythonOrganizationDetector {
                     // Long Parameter List and Data Clump detection
                     let param_count = self.count_parameters(&func_def.args);
                     let param_names = self.get_parameter_names(&func_def.args);
-                    
+
                     // Track parameter groups for data clump detection
                     if param_names.len() >= 3 {
                         self.track_parameter_group(&param_names, &mut parameter_groups_tracker);
                     }
-                    
+
                     if param_count > self.long_parameter_threshold {
                         patterns.push(OrganizationAntiPattern::LongParameterList {
                             function_name: func_def.name.to_string(),
@@ -166,10 +180,14 @@ impl SimplifiedPythonOrganizationDetector {
                     }
 
                     // Primitive Obsession detection
-                    self.detect_primitive_obsession_in_function(&func_def.args, &mut primitive_usage_tracker, source);
+                    self.detect_primitive_obsession_in_function(
+                        &func_def.args,
+                        &mut primitive_usage_tracker,
+                        source,
+                    );
                 }
             }
-            
+
             // Process collected primitive obsession patterns
             for ((primitive_type, context), (count, locations)) in primitive_usage_tracker {
                 if count >= self.primitive_obsession_min_occurrences {
@@ -182,18 +200,24 @@ impl SimplifiedPythonOrganizationDetector {
                     });
                 }
             }
-            
+
             // Process collected data clumps
             for (group_key, (count, params, locations)) in parameter_groups_tracker {
                 if count >= 2 {
                     patterns.push(OrganizationAntiPattern::DataClump {
                         parameter_group: ParameterGroup {
                             parameters: params,
-                            group_name: format!("ParameterGroup{}", group_key.chars().take(10).collect::<String>()),
+                            group_name: format!(
+                                "ParameterGroup{}",
+                                group_key.chars().take(10).collect::<String>()
+                            ),
                             semantic_relationship: "Frequently occurring together".to_string(),
                         },
                         occurrence_count: count,
-                        suggested_struct_name: format!("{}Config", group_key.chars().take(15).collect::<String>()),
+                        suggested_struct_name: format!(
+                            "{}Config",
+                            group_key.chars().take(15).collect::<String>()
+                        ),
                         locations,
                     });
                 }
@@ -342,7 +366,11 @@ impl SimplifiedPythonOrganizationDetector {
         count + args.kwonlyargs.len()
     }
 
-    fn detect_feature_envy_in_function(&self, body: &[ast::Stmt], func_name: &str) -> Option<OrganizationAntiPattern> {
+    fn detect_feature_envy_in_function(
+        &self,
+        body: &[ast::Stmt],
+        func_name: &str,
+    ) -> Option<OrganizationAntiPattern> {
         let mut external_calls: HashMap<String, usize> = HashMap::new();
         let mut internal_calls = 0;
 
@@ -351,7 +379,9 @@ impl SimplifiedPythonOrganizationDetector {
         }
 
         // Find the most called external type
-        if let Some((envied_type, external_count)) = external_calls.iter().max_by_key(|(_, count)| *count) {
+        if let Some((envied_type, external_count)) =
+            external_calls.iter().max_by_key(|(_, count)| *count)
+        {
             let total_calls = internal_calls + external_calls.values().sum::<usize>();
             if total_calls > 0 {
                 let external_ratio = *external_count as f64 / total_calls as f64;
@@ -377,7 +407,12 @@ impl SimplifiedPythonOrganizationDetector {
         None
     }
 
-    fn count_method_calls(&self, stmt: &ast::Stmt, external_calls: &mut HashMap<String, usize>, internal_calls: &mut usize) {
+    fn count_method_calls(
+        &self,
+        stmt: &ast::Stmt,
+        external_calls: &mut HashMap<String, usize>,
+        internal_calls: &mut usize,
+    ) {
         match stmt {
             ast::Stmt::Expr(expr_stmt) => {
                 self.count_calls_in_expr(&expr_stmt.value, external_calls, internal_calls);
@@ -412,26 +447,31 @@ impl SimplifiedPythonOrganizationDetector {
         }
     }
 
-    fn count_calls_in_expr(&self, expr: &ast::Expr, external_calls: &mut HashMap<String, usize>, internal_calls: &mut usize) {
-        match expr {
-            ast::Expr::Call(call) => {
-                if let ast::Expr::Attribute(attr) = &*call.func {
-                    if let ast::Expr::Name(name) = &*attr.value {
-                        let name_str = format!("{:?}", name.id);
-                        // Clean up the debug formatting to get just the identifier
-                        let cleaned_name = name_str.trim_matches('"').replace("Identifier(\"", "").replace("\")", "");
-                        if cleaned_name == "self" {
-                            *internal_calls += 1;
-                        } else {
-                            *external_calls.entry(cleaned_name).or_insert(0) += 1;
-                        }
+    fn count_calls_in_expr(
+        &self,
+        expr: &ast::Expr,
+        external_calls: &mut HashMap<String, usize>,
+        internal_calls: &mut usize,
+    ) {
+        if let ast::Expr::Call(call) = expr {
+            if let ast::Expr::Attribute(attr) = &*call.func {
+                if let ast::Expr::Name(name) = &*attr.value {
+                    let name_str = format!("{:?}", name.id);
+                    // Clean up the debug formatting to get just the identifier
+                    let cleaned_name = name_str
+                        .trim_matches('"')
+                        .replace("Identifier(\"", "")
+                        .replace("\")", "");
+                    if cleaned_name == "self" {
+                        *internal_calls += 1;
+                    } else {
+                        *external_calls.entry(cleaned_name).or_insert(0) += 1;
                     }
                 }
-                for arg in &call.args {
-                    self.count_calls_in_expr(arg, external_calls, internal_calls);
-                }
             }
-            _ => {}
+            for arg in &call.args {
+                self.count_calls_in_expr(arg, external_calls, internal_calls);
+            }
         }
     }
 
@@ -441,7 +481,10 @@ impl SimplifiedPythonOrganizationDetector {
             // Extract the identifier from the arg
             let name_str = format!("{:?}", arg.def.arg);
             // Clean up the debug formatting to get just the identifier
-            let cleaned_name = name_str.trim_matches('"').replace("Identifier(\"", "").replace("\")", "");
+            let cleaned_name = name_str
+                .trim_matches('"')
+                .replace("Identifier(\"", "")
+                .replace("\")", "");
             if cleaned_name != "self" && cleaned_name != "cls" {
                 names.push(cleaned_name);
             }
@@ -449,16 +492,20 @@ impl SimplifiedPythonOrganizationDetector {
         names
     }
 
-    fn track_parameter_group(&self, params: &[String], tracker: &mut HashMap<String, (usize, Vec<Parameter>, Vec<SourceLocation>)>) {
+    fn track_parameter_group(
+        &self,
+        params: &[String],
+        tracker: &mut HashMap<String, (usize, Vec<Parameter>, Vec<SourceLocation>)>,
+    ) {
         if params.len() >= 3 {
             // Create a key from sorted parameter names
             let mut sorted_params = params.to_vec();
             sorted_params.sort();
             let key = sorted_params.join(",");
-            
+
             let entry = tracker.entry(key).or_insert((0, Vec::new(), Vec::new()));
             entry.0 += 1;
-            
+
             if entry.1.is_empty() {
                 for (i, param) in params.iter().enumerate() {
                     entry.1.push(Parameter {
@@ -468,7 +515,7 @@ impl SimplifiedPythonOrganizationDetector {
                     });
                 }
             }
-            
+
             entry.2.push(SourceLocation {
                 line: 1,
                 column: None,
@@ -488,11 +535,14 @@ impl SimplifiedPythonOrganizationDetector {
         for arg in &args.args {
             let name_str = format!("{:?}", arg.def.arg);
             // Clean up the debug formatting to get just the identifier
-            let cleaned_name = name_str.trim_matches('"').replace("Identifier(\"", "").replace("\")", "");
+            let cleaned_name = name_str
+                .trim_matches('"')
+                .replace("Identifier(\"", "")
+                .replace("\")", "");
             if cleaned_name == "self" || cleaned_name == "cls" {
                 continue;
             }
-            
+
             // Detect primitive obsession patterns based on parameter names
             let context = self.infer_primitive_context(&cleaned_name);
             if let Some(ctx) = context {
@@ -519,11 +569,19 @@ impl SimplifiedPythonOrganizationDetector {
             Some(PrimitiveUsageContext::Status)
         } else if lower.contains("type") || lower.contains("category") || lower.contains("kind") {
             Some(PrimitiveUsageContext::Category)
-        } else if lower.contains("size") || lower.contains("length") || lower.contains("count") ||
-                  lower.contains("width") || lower.contains("height") || lower.contains("weight") {
+        } else if lower.contains("size")
+            || lower.contains("length")
+            || lower.contains("count")
+            || lower.contains("width")
+            || lower.contains("height")
+            || lower.contains("weight")
+        {
             Some(PrimitiveUsageContext::Measurement)
-        } else if lower.contains("limit") || lower.contains("threshold") || lower.contains("max") ||
-                  lower.contains("min") {
+        } else if lower.contains("limit")
+            || lower.contains("threshold")
+            || lower.contains("max")
+            || lower.contains("min")
+        {
             Some(PrimitiveUsageContext::BusinessRule)
         } else {
             None
@@ -554,7 +612,7 @@ impl SimplifiedPythonOrganizationDetector {
                 };
             }
         }
-        
+
         // Fallback to approximate location
         SourceLocation {
             line: 1,
