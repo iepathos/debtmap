@@ -147,6 +147,7 @@ pub enum ResourceImpact {
 mod async_detector;
 mod collection_detector;
 mod drop_detector;
+pub mod python;
 
 pub use async_detector::AsyncResourceDetector;
 pub use collection_detector::UnboundedCollectionDetector;

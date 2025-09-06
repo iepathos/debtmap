@@ -15,6 +15,7 @@ use crate::debt::patterns::{
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use crate::organization::python::PythonOrganizationAnalyzer;
+use crate::resource::python::PythonResourceAnalyzer;
 use anyhow::Result;
 use rustpython_parser::ast;
 use std::path::{Path, PathBuf};
@@ -68,6 +69,12 @@ impl Analyzer for PythonAnalyzer {
                         .debt_items
                         .push(convert_org_pattern_to_debt_item(pattern, &python_ast.path));
                 }
+
+                // Add resource management pattern detection
+                let resource_analyzer = PythonResourceAnalyzer::new();
+                let resource_debt_items =
+                    resource_analyzer.analyze(&python_ast.module, &python_ast.path);
+                metrics.debt_items.extend(resource_debt_items);
 
                 metrics
             }
