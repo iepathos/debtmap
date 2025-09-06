@@ -69,10 +69,13 @@ impl PythonCircularRefDetector {
     fn analyze_class_statement(&self, stmt: &Stmt, class_info: &mut ClassInfo) {
         match stmt {
             Stmt::FunctionDef(func) => {
-                // Check __init__ for attribute assignments
-                if &func.name == "__init__" {
-                    for func_stmt in &func.body {
+                // Check all methods, not just __init__
+                for func_stmt in &func.body {
+                    if &func.name == "__init__" {
                         self.analyze_init_statement(func_stmt, class_info);
+                    } else {
+                        // Analyze other methods for circular references
+                        self.analyze_method_statement(func_stmt, class_info);
                     }
                 }
             }
@@ -118,9 +121,12 @@ impl PythonCircularRefDetector {
     fn extract_class_references(&self, expr: &Expr, references: &mut HashSet<String>) {
         match expr {
             Expr::Name(name) => {
-                // Simple class reference
+                // Simple class reference or self reference
                 let name_str = name.id.to_string();
-                if name_str.chars().next().map_or(false, |c| c.is_uppercase()) {
+                if name_str == "self" {
+                    // Track self references
+                    references.insert("<self>".to_string());
+                } else if name_str.chars().next().map_or(false, |c| c.is_uppercase()) {
                     references.insert(name_str);
                 }
             }
@@ -146,6 +152,43 @@ impl PythonCircularRefDetector {
         }
     }
 
+    fn check_for_circular_pattern(&self, stmt: &Stmt, class_name: &str) -> Option<ResourceIssue> {
+        // Check for specific patterns like child.children.append(self)
+        if let Stmt::Expr(expr_stmt) = stmt {
+            if let Expr::Call(call) = expr_stmt.value.as_ref() {
+                if let Expr::Attribute(attr) = call.func.as_ref() {
+                    let method = attr.attr.to_string();
+                    if method == "append" || method == "add" || method == "insert" {
+                        // Check if self is being appended
+                        for arg in &call.args {
+                            if let Expr::Name(name) = arg {
+                                if &name.id == "self" {
+                                    return Some(ResourceIssue {
+                                        issue_type: PythonResourceIssueType::CircularReference {
+                                            classes_involved: vec![class_name.to_string()],
+                                            pattern: CircularPattern::SelfReference,
+                                        },
+                                        severity: ResourceSeverity::High,
+                                        location: ResourceLocation {
+                                            line: 1,
+                                            column: 0,
+                                            end_line: None,
+                                            end_column: None,
+                                        },
+                                        suggestion: format!(
+                                            "Circular reference detected: 'self' is added to a collection. Use weak references to prevent memory leaks."
+                                        ),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     fn detect_circular_references(
         &self,
         classes: &HashMap<String, ClassInfo>,
@@ -154,7 +197,7 @@ impl PythonCircularRefDetector {
 
         // Check for direct self-references
         for (class_name, class_info) in classes {
-            if class_info.references.contains(class_name) {
+            if class_info.references.contains(class_name) || class_info.references.contains("<self>") {
                 issues.push(ResourceIssue {
                     issue_type: PythonResourceIssueType::CircularReference {
                         classes_involved: vec![class_name.clone()],
@@ -271,12 +314,73 @@ impl PythonCircularRefDetector {
         visited.remove(current);
         None
     }
+    
+    fn analyze_method_statement(&self, stmt: &Stmt, class_info: &mut ClassInfo) {
+        // Analyze non-__init__ methods for circular references
+        match stmt {
+            Stmt::Expr(expr_stmt) => {
+                // Check for method calls that might create circular references
+                if let Expr::Call(call) = expr_stmt.value.as_ref() {
+                    if let Expr::Attribute(attr) = call.func.as_ref() {
+                        // Check for patterns like child.children.append(self)
+                        if &attr.attr == "append" || &attr.attr == "add" || &attr.attr == "insert" {
+                            for arg in &call.args {
+                                if let Expr::Name(name) = arg {
+                                    if &name.id == "self" {
+                                        // Found self being added to something
+                                        class_info.references.insert("<self>".to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Stmt::Assign(assign) => {
+                // Check for assignments that create circular references
+                for target in &assign.targets {
+                    if let Expr::Attribute(attr) = target {
+                        // Check if assigning self to an attribute
+                        if let Expr::Name(name) = assign.value.as_ref() {
+                            if &name.id == "self" {
+                                class_info.references.insert("<self>".to_string());
+                            }
+                        }
+                    }
+                }
+                
+                // Also extract any class references
+                self.extract_class_references(&assign.value, &mut class_info.references);
+            }
+            _ => {}
+        }
+    }
 }
 
 impl PythonResourceDetector for PythonCircularRefDetector {
     fn detect_issues(&self, module: &ast::Mod, _path: &Path) -> Vec<ResourceIssue> {
         let classes = self.analyze_classes(module);
-        self.detect_circular_references(&classes)
+        let mut issues = self.detect_circular_references(&classes);
+        
+        // Also check for direct circular patterns in methods
+        if let ast::Mod::Module(module) = module {
+            for stmt in &module.body {
+                if let Stmt::ClassDef(class_def) = stmt {
+                    // Check for circular reference patterns
+                    for class_stmt in &class_def.body {
+                        if let Stmt::FunctionDef(func) = class_stmt {
+                            for func_stmt in &func.body {
+                                if let Some(issue) = self.check_for_circular_pattern(func_stmt, &class_def.name) {
+                                    issues.push(issue);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        issues
     }
 
     fn assess_resource_impact(&self, issue: &ResourceIssue) -> ResourceImpact {

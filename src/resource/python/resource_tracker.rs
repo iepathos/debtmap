@@ -27,6 +27,9 @@ impl PythonResourceTracker {
         process_functions.insert("concurrent.futures.ProcessPoolExecutor".to_string());
         process_functions.insert("Process".to_string());
         process_functions.insert("Popen".to_string());
+        // Add more multiprocessing patterns
+        process_functions.insert("Pool".to_string());
+        process_functions.insert("multiprocessing.Pool".to_string());
 
         let mut cleanup_methods = HashSet::new();
         cleanup_methods.insert("join".to_string());
@@ -37,6 +40,7 @@ impl PythonResourceTracker {
         cleanup_methods.insert("__del__".to_string());
         cleanup_methods.insert("__exit__".to_string());
         cleanup_methods.insert("cleanup".to_string());
+        cleanup_methods.insert("wait".to_string());
 
         Self {
             thread_functions,
@@ -122,7 +126,7 @@ impl PythonResourceTracker {
                 if self
                     .thread_functions
                     .iter()
-                    .any(|tf| func_name.contains(tf))
+                    .any(|tf| func_name.contains(tf) || tf.contains(&func_name))
                 {
                     return Some("Thread".to_string());
                 }
@@ -130,8 +134,15 @@ impl PythonResourceTracker {
                 if self
                     .process_functions
                     .iter()
-                    .any(|pf| func_name.contains(pf))
+                    .any(|pf| func_name.contains(pf) || pf.contains(&func_name))
                 {
+                    return Some("Process".to_string());
+                }
+                
+                // Enhanced multiprocessing.Process detection
+                if func_name == "Process" || 
+                   func_name.ends_with(".Process") || 
+                   func_name.contains("multiprocessing") && func_name.contains("Process") {
                     return Some("Process".to_string());
                 }
 
@@ -145,9 +156,16 @@ impl PythonResourceTracker {
                     return Some("Socket".to_string());
                 }
 
-                // Check for database connections
+                // Check for database connections and pools
                 if func_name.contains("connect") || func_name.contains("Connection") {
                     return Some("Connection".to_string());
+                }
+                
+                // Check for connection pools
+                if func_name.contains("create_engine") || 
+                   func_name.contains("Pool") || 
+                   func_name.contains("pool") && (func_name.contains("create") || func_name.contains("get")) {
+                    return Some("ConnectionPool".to_string());
                 }
             }
             _ => {}
@@ -204,9 +222,27 @@ impl PythonResourceTracker {
             Stmt::FunctionDef(func) => {
                 let mut thread_process_created = Vec::new();
                 let mut has_join_or_cleanup = false;
+                let mut _for_loop_count = 0;
+                let mut _has_loop_with_process = false;
 
                 for func_stmt in &func.body {
-                    if let Some(resources) = self.detect_resource_allocation(func_stmt) {
+                    // Check for loops that might create multiple processes
+                    if let Stmt::For(for_stmt) = func_stmt {
+                        _for_loop_count += 1;
+                        for loop_stmt in &for_stmt.body {
+                            if let Some(resources) = self.detect_resource_allocation(loop_stmt) {
+                                for resource in &resources {
+                                    if resource.contains("Process") {
+                                        _has_loop_with_process = true;
+                                        // Multiple processes in a loop
+                                        thread_process_created.push(format!("{}[multiple]", resource));
+                                    } else {
+                                        thread_process_created.push(resource.clone());
+                                    }
+                                }
+                            }
+                        }
+                    } else if let Some(resources) = self.detect_resource_allocation(func_stmt) {
                         thread_process_created.extend(resources);
                     }
 
@@ -226,19 +262,30 @@ impl PythonResourceTracker {
                 // Check if threads/processes are created but not joined
                 for resource in thread_process_created {
                     if !has_join_or_cleanup
-                        && (resource.contains("Thread") || resource.contains("Process"))
+                        && (resource.contains("Thread") || resource.contains("Process") || resource.contains("ConnectionPool"))
                     {
                         let resource_type = if resource.contains("Thread") {
                             "Thread".to_string()
-                        } else {
+                        } else if resource.contains("Process") {
                             "Process".to_string()
+                        } else {
+                            "ConnectionPool".to_string()
+                        };
+
+                        let issue_type = if resource.contains("ConnectionPool") {
+                            PythonResourceIssueType::UnclosedResource {
+                                resource_type: resource_type.clone(),
+                                variable_name: func.name.to_string(),
+                            }
+                        } else {
+                            PythonResourceIssueType::ThreadOrProcessLeak {
+                                resource_type: resource_type.clone(),
+                                name: func.name.to_string(),
+                            }
                         };
 
                         issues.push(ResourceIssue {
-                            issue_type: PythonResourceIssueType::ThreadOrProcessLeak {
-                                resource_type: resource_type.clone(),
-                                name: func.name.to_string(),
-                            },
+                            issue_type,
                             severity: ResourceSeverity::High,
                             location: ResourceLocation {
                                 line: 1, // TODO: Track actual line numbers
@@ -246,10 +293,14 @@ impl PythonResourceTracker {
                                 end_line: None,
                                 end_column: None,
                             },
-                            suggestion: format!(
-                                "{} created in '{}' but not joined. Call .join() or use with statement.",
-                                resource_type, func.name
-                            ),
+                            suggestion: if resource.contains("ConnectionPool") {
+                                format!("Connection pool created in '{}' but not closed. Call .close() or .dispose().", func.name)
+                            } else {
+                                format!(
+                                    "{} created in '{}' but not joined. Call .join() or use with statement.",
+                                    resource_type, func.name
+                                )
+                            },
                         });
                     }
                 }

@@ -81,7 +81,6 @@ def connect_to_server():
 }
 
 #[test]
-#[ignore = "Circular reference detection not fully implemented yet"]
 fn test_circular_reference_self_ref() {
     let code = r#"
 class Node:
@@ -138,7 +137,6 @@ class Cache:
 }
 
 #[test]
-#[ignore = "Async resource detection not fully implemented yet"]
 fn test_async_resource_leak_detection() {
     let code = r#"
 import asyncio
@@ -194,7 +192,6 @@ def start_worker():
 }
 
 #[test]
-#[ignore = "Process resource tracking not fully implemented yet"]
 fn test_process_resource_leak() {
     let code = r#"
 import multiprocessing
@@ -342,7 +339,6 @@ def unsafe_operation():
 }
 
 #[test]
-#[ignore = "Connection pool detection not fully implemented yet"]
 fn test_connection_pool_detection() {
     let code = r#"
 from sqlalchemy import create_engine
