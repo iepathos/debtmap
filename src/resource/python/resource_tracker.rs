@@ -138,11 +138,12 @@ impl PythonResourceTracker {
                 {
                     return Some("Process".to_string());
                 }
-                
+
                 // Enhanced multiprocessing.Process detection
-                if func_name == "Process" || 
-                   func_name.ends_with(".Process") || 
-                   func_name.contains("multiprocessing") && func_name.contains("Process") {
+                if func_name == "Process"
+                    || func_name.ends_with(".Process")
+                    || func_name.contains("multiprocessing") && func_name.contains("Process")
+                {
                     return Some("Process".to_string());
                 }
 
@@ -160,11 +161,13 @@ impl PythonResourceTracker {
                 if func_name.contains("connect") || func_name.contains("Connection") {
                     return Some("Connection".to_string());
                 }
-                
+
                 // Check for connection pools
-                if func_name.contains("create_engine") || 
-                   func_name.contains("Pool") || 
-                   func_name.contains("pool") && (func_name.contains("create") || func_name.contains("get")) {
+                if func_name.contains("create_engine")
+                    || func_name.contains("Pool")
+                    || func_name.contains("pool")
+                        && (func_name.contains("create") || func_name.contains("get"))
+                {
                     return Some("ConnectionPool".to_string());
                 }
             }
@@ -235,7 +238,8 @@ impl PythonResourceTracker {
                                     if resource.contains("Process") {
                                         _has_loop_with_process = true;
                                         // Multiple processes in a loop
-                                        thread_process_created.push(format!("{}[multiple]", resource));
+                                        thread_process_created
+                                            .push(format!("{}[multiple]", resource));
                                     } else {
                                         thread_process_created.push(resource.clone());
                                     }
@@ -262,7 +266,9 @@ impl PythonResourceTracker {
                 // Check if threads/processes are created but not joined
                 for resource in thread_process_created {
                     if !has_join_or_cleanup
-                        && (resource.contains("Thread") || resource.contains("Process") || resource.contains("ConnectionPool"))
+                        && (resource.contains("Thread")
+                            || resource.contains("Process")
+                            || resource.contains("ConnectionPool"))
                     {
                         let resource_type = if resource.contains("Thread") {
                             "Thread".to_string()

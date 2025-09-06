@@ -57,9 +57,13 @@ impl PythonAsyncResourceDetector {
         // Check if async resources are properly managed
         for resource in async_resources {
             // Check if this specific resource was closed
-            let var_name = resource_variables.get(&resource).cloned().unwrap_or_default();
-            let is_closed = closed_resources.contains(&var_name) || closed_resources.contains(&resource);
-            
+            let var_name = resource_variables
+                .get(&resource)
+                .cloned()
+                .unwrap_or_default();
+            let is_closed =
+                closed_resources.contains(&var_name) || closed_resources.contains(&resource);
+
             if !has_async_with && !has_finally && !is_closed {
                 issues.push(ResourceIssue {
                     issue_type: PythonResourceIssueType::AsyncResourceLeak {
@@ -73,7 +77,9 @@ impl PythonAsyncResourceDetector {
                         end_line: None,
                         end_column: None,
                     },
-                    suggestion: "Use 'async with' for async resources or ensure cleanup in finally block".to_string(),
+                    suggestion:
+                        "Use 'async with' for async resources or ensure cleanup in finally block"
+                            .to_string(),
                 });
             }
         }
@@ -105,10 +111,10 @@ impl PythonAsyncResourceDetector {
                 }
                 for body_stmt in &try_stmt.body {
                     self.analyze_async_statement_enhanced(
-                        body_stmt, 
-                        resources, 
+                        body_stmt,
+                        resources,
                         resource_variables,
-                        has_async_with, 
+                        has_async_with,
                         has_finally,
                         closed_resources,
                     );
@@ -118,7 +124,7 @@ impl PythonAsyncResourceDetector {
                 // Check for async resource creation
                 if let Some(resource_type) = self.detect_async_resource(&assign.value) {
                     resources.push(resource_type.clone());
-                    
+
                     // Track variable name for this resource
                     if let Some(target) = assign.targets.first() {
                         if let Expr::Name(name) = target {
@@ -131,7 +137,10 @@ impl PythonAsyncResourceDetector {
                 // Check for resource cleanup calls
                 if let Expr::Call(call) = expr_stmt.value.as_ref() {
                     if let Expr::Attribute(attr) = call.func.as_ref() {
-                        if &attr.attr == "close" || &attr.attr == "aclose" || &attr.attr == "shutdown" {
+                        if &attr.attr == "close"
+                            || &attr.attr == "aclose"
+                            || &attr.attr == "shutdown"
+                        {
                             // Resource is being closed
                             if let Expr::Name(name) = attr.value.as_ref() {
                                 closed_resources.insert(name.id.to_string());
@@ -139,7 +148,7 @@ impl PythonAsyncResourceDetector {
                         }
                     }
                 }
-                
+
                 // Check for async resource creation without assignment
                 if let Some(resource_type) = self.detect_async_resource(&expr_stmt.value) {
                     resources.push(resource_type);
@@ -148,10 +157,10 @@ impl PythonAsyncResourceDetector {
             Stmt::For(for_stmt) => {
                 for body_stmt in &for_stmt.body {
                     self.analyze_async_statement_enhanced(
-                        body_stmt, 
-                        resources, 
+                        body_stmt,
+                        resources,
                         resource_variables,
-                        has_async_with, 
+                        has_async_with,
                         has_finally,
                         closed_resources,
                     );
@@ -160,10 +169,10 @@ impl PythonAsyncResourceDetector {
             Stmt::While(while_stmt) => {
                 for body_stmt in &while_stmt.body {
                     self.analyze_async_statement_enhanced(
-                        body_stmt, 
+                        body_stmt,
                         resources,
                         resource_variables,
-                        has_async_with, 
+                        has_async_with,
                         has_finally,
                         closed_resources,
                     );
@@ -172,20 +181,20 @@ impl PythonAsyncResourceDetector {
             Stmt::If(if_stmt) => {
                 for body_stmt in &if_stmt.body {
                     self.analyze_async_statement_enhanced(
-                        body_stmt, 
+                        body_stmt,
                         resources,
                         resource_variables,
-                        has_async_with, 
+                        has_async_with,
                         has_finally,
                         closed_resources,
                     );
                 }
                 for else_stmt in &if_stmt.orelse {
                     self.analyze_async_statement_enhanced(
-                        else_stmt, 
-                        resources, 
+                        else_stmt,
+                        resources,
                         resource_variables,
-                        has_async_with, 
+                        has_async_with,
                         has_finally,
                         closed_resources,
                     );
@@ -194,7 +203,7 @@ impl PythonAsyncResourceDetector {
             _ => {}
         }
     }
-    
+
     fn analyze_async_statement(
         &self,
         stmt: &Stmt,
@@ -265,7 +274,10 @@ impl PythonResourceDetector for PythonAsyncResourceDetector {
                 match stmt {
                     Stmt::FunctionDef(func) => {
                         // Check all functions, including those named async_* or containing async resources
-                        if func.name.starts_with("async_") || func.name.contains("fetch") || func.name.contains("async") {
+                        if func.name.starts_with("async_")
+                            || func.name.contains("fetch")
+                            || func.name.contains("async")
+                        {
                             self.check_async_function(func, &mut issues);
                         } else {
                             // Still check for async resources in regular functions

@@ -197,7 +197,9 @@ impl PythonCircularRefDetector {
 
         // Check for direct self-references
         for (class_name, class_info) in classes {
-            if class_info.references.contains(class_name) || class_info.references.contains("<self>") {
+            if class_info.references.contains(class_name)
+                || class_info.references.contains("<self>")
+            {
                 issues.push(ResourceIssue {
                     issue_type: PythonResourceIssueType::CircularReference {
                         classes_involved: vec![class_name.clone()],
@@ -314,7 +316,7 @@ impl PythonCircularRefDetector {
         visited.remove(current);
         None
     }
-    
+
     fn analyze_method_statement(&self, stmt: &Stmt, class_info: &mut ClassInfo) {
         // Analyze non-__init__ methods for circular references
         match stmt {
@@ -348,7 +350,7 @@ impl PythonCircularRefDetector {
                         }
                     }
                 }
-                
+
                 // Also extract any class references
                 self.extract_class_references(&assign.value, &mut class_info.references);
             }
@@ -361,7 +363,7 @@ impl PythonResourceDetector for PythonCircularRefDetector {
     fn detect_issues(&self, module: &ast::Mod, _path: &Path) -> Vec<ResourceIssue> {
         let classes = self.analyze_classes(module);
         let mut issues = self.detect_circular_references(&classes);
-        
+
         // Also check for direct circular patterns in methods
         if let ast::Mod::Module(module) = module {
             for stmt in &module.body {
@@ -370,7 +372,9 @@ impl PythonResourceDetector for PythonCircularRefDetector {
                     for class_stmt in &class_def.body {
                         if let Stmt::FunctionDef(func) = class_stmt {
                             for func_stmt in &func.body {
-                                if let Some(issue) = self.check_for_circular_pattern(func_stmt, &class_def.name) {
+                                if let Some(issue) =
+                                    self.check_for_circular_pattern(func_stmt, &class_def.name)
+                                {
                                     issues.push(issue);
                                 }
                             }
@@ -379,7 +383,7 @@ impl PythonResourceDetector for PythonCircularRefDetector {
                 }
             }
         }
-        
+
         issues
     }
 

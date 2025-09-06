@@ -1,9 +1,8 @@
 /// Unit tests for Python resource management pattern detection (spec 73)
 use debtmap::resource::python::{
-    PythonAsyncResourceDetector, PythonCircularRefDetector,
-    PythonContextManagerDetector, PythonResourceAnalyzer, PythonResourceDetector,
-    PythonResourceIssueType, PythonResourceTracker, PythonUnboundedCollectionDetector,
-    ResourceSeverity,
+    PythonAsyncResourceDetector, PythonCircularRefDetector, PythonContextManagerDetector,
+    PythonResourceAnalyzer, PythonResourceDetector, PythonResourceIssueType, PythonResourceTracker,
+    PythonUnboundedCollectionDetector, ResourceSeverity,
 };
 use rustpython_parser::parse;
 use std::path::Path;
@@ -273,18 +272,27 @@ class ResourceHeavyClass:
     let debt_items = analyzer.analyze(&module, Path::new("test.py"));
 
     // Should detect multiple issues
-    assert!(debt_items.len() >= 3, "Should detect multiple resource issues");
-    
+    assert!(
+        debt_items.len() >= 3,
+        "Should detect multiple resource issues"
+    );
+
     // Verify different issue types are detected
-    let has_context_manager_issue = debt_items.iter().any(|item| {
-        item.message.contains("context manager") || item.message.contains("Unclosed")
-    });
-    let has_unbounded_issue = debt_items.iter().any(|item| {
-        item.message.contains("Unbounded") || item.message.contains("unbounded")
-    });
-    
-    assert!(has_context_manager_issue, "Should detect context manager issues");
-    assert!(has_unbounded_issue, "Should detect unbounded collection issues");
+    let has_context_manager_issue = debt_items
+        .iter()
+        .any(|item| item.message.contains("context manager") || item.message.contains("Unclosed"));
+    let has_unbounded_issue = debt_items
+        .iter()
+        .any(|item| item.message.contains("Unbounded") || item.message.contains("unbounded"));
+
+    assert!(
+        has_context_manager_issue,
+        "Should detect context manager issues"
+    );
+    assert!(
+        has_unbounded_issue,
+        "Should detect unbounded collection issues"
+    );
 }
 
 #[test]
@@ -309,14 +317,17 @@ def medium_issue():
     let debt_items = analyzer.analyze(&module, Path::new("test.py"));
 
     // Verify different severity levels
-    let has_critical = debt_items.iter().any(|item| {
-        matches!(item.priority, debtmap::core::Priority::Critical)
-    });
-    let has_high = debt_items.iter().any(|item| {
-        matches!(item.priority, debtmap::core::Priority::High)
-    });
-    
-    assert!(has_high || has_critical, "Should detect high priority issues");
+    let has_critical = debt_items
+        .iter()
+        .any(|item| matches!(item.priority, debtmap::core::Priority::Critical));
+    let has_high = debt_items
+        .iter()
+        .any(|item| matches!(item.priority, debtmap::core::Priority::High));
+
+    assert!(
+        has_high || has_critical,
+        "Should detect high priority issues"
+    );
 }
 
 #[test]
@@ -354,16 +365,14 @@ def setup_database():
     let tracker = PythonResourceTracker::new();
     let issues = tracker.detect_issues(&module, Path::new("test.py"));
 
-    let has_pool_issue = issues.iter().any(|issue| {
-        match &issue.issue_type {
-            PythonResourceIssueType::UnclosedResource { resource_type, .. } |
-            PythonResourceIssueType::MissingContextManager { resource_type, .. } => {
-                resource_type.contains("pool") || resource_type.contains("Pool")
-            }
-            _ => false,
+    let has_pool_issue = issues.iter().any(|issue| match &issue.issue_type {
+        PythonResourceIssueType::UnclosedResource { resource_type, .. }
+        | PythonResourceIssueType::MissingContextManager { resource_type, .. } => {
+            resource_type.contains("pool") || resource_type.contains("Pool")
         }
+        _ => false,
     });
-    
+
     assert!(has_pool_issue, "Should detect unclosed connection pool");
 }
 
@@ -407,7 +416,10 @@ def nested_resources():
     let detector = PythonContextManagerDetector::new();
     let issues = detector.detect_issues(&module, Path::new("test.py"));
 
-    assert!(issues.len() >= 2, "Should detect multiple unclosed resources");
+    assert!(
+        issues.len() >= 2,
+        "Should detect multiple unclosed resources"
+    );
 }
 
 #[test]
@@ -424,7 +436,10 @@ def file_generator():
     let detector = PythonContextManagerDetector::new();
     let issues = detector.detect_issues(&module, Path::new("test.py"));
 
-    assert!(!issues.is_empty(), "Should detect resource leak in generator");
+    assert!(
+        !issues.is_empty(),
+        "Should detect resource leak in generator"
+    );
 }
 
 #[test]
@@ -459,6 +474,9 @@ class ProperResourceManager:
             PythonResourceIssueType::MissingCleanup { .. }
         )
     });
-    
-    assert!(!has_cleanup_issue, "Should not flag class with proper cleanup");
+
+    assert!(
+        !has_cleanup_issue,
+        "Should not flag class with proper cleanup"
+    );
 }
