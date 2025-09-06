@@ -156,6 +156,8 @@ mod magic_value_detector;
 mod parameter_analyzer;
 mod primitive_obsession_detector;
 
+pub mod python;
+
 pub use feature_envy_detector::FeatureEnvyDetector;
 pub use god_object_detector::GodObjectDetector;
 pub use magic_value_detector::MagicValueDetector;
