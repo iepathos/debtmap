@@ -14,6 +14,7 @@ use crate::debt::patterns::{
 };
 use crate::debt::smells::{analyze_function_smells, analyze_module_smells};
 use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
+use crate::organization::python::PythonOrganizationAnalyzer;
 use anyhow::Result;
 use rustpython_parser::ast;
 use std::path::{Path, PathBuf};
@@ -55,6 +56,19 @@ impl Analyzer for PythonAnalyzer {
                 // Add detected patterns to debt items
                 metrics.debt_items.extend(detector.get_debt_items());
 
+                // Add organization anti-pattern detection
+                let source_content = std::fs::read_to_string(&python_ast.path).unwrap_or_default();
+                let org_analyzer = PythonOrganizationAnalyzer::new();
+                let org_patterns =
+                    org_analyzer.analyze(&python_ast.module, &python_ast.path, &source_content);
+
+                // Convert organization patterns to debt items
+                for pattern in org_patterns {
+                    metrics
+                        .debt_items
+                        .push(convert_org_pattern_to_debt_item(pattern, &python_ast.path));
+                }
+
                 metrics
             }
             _ => FileMetrics {
@@ -70,6 +84,103 @@ impl Analyzer for PythonAnalyzer {
 
     fn language(&self) -> Language {
         Language::Python
+    }
+}
+
+fn convert_org_pattern_to_debt_item(
+    pattern: crate::organization::OrganizationAntiPattern,
+    path: &Path,
+) -> DebtItem {
+    use crate::organization::OrganizationAntiPattern;
+
+    let (debt_type, message) = match &pattern {
+        OrganizationAntiPattern::GodObject {
+            type_name,
+            method_count,
+            field_count,
+            ..
+        } => (
+            DebtType::Complexity,
+            format!(
+                "God object '{}' with {} methods and {} fields",
+                type_name, method_count, field_count
+            ),
+        ),
+        OrganizationAntiPattern::FeatureEnvy {
+            method_name,
+            envied_type,
+            external_calls,
+            internal_calls,
+            ..
+        } => (
+            DebtType::CodeOrganization,
+            format!(
+                "Feature envy in '{}': {} calls to '{}' vs {} internal calls",
+                method_name, external_calls, envied_type, internal_calls
+            ),
+        ),
+        OrganizationAntiPattern::MagicValue {
+            value,
+            occurrence_count,
+            suggested_constant_name,
+            ..
+        } => (
+            DebtType::CodeSmell,
+            format!(
+                "Magic value '{}' appears {} times, suggest constant '{}'",
+                value, occurrence_count, suggested_constant_name
+            ),
+        ),
+        OrganizationAntiPattern::LongParameterList {
+            function_name,
+            parameter_count,
+            ..
+        } => (
+            DebtType::Complexity,
+            format!(
+                "Long parameter list in '{}' with {} parameters",
+                function_name, parameter_count
+            ),
+        ),
+        OrganizationAntiPattern::PrimitiveObsession {
+            primitive_type,
+            occurrence_count,
+            suggested_domain_type,
+            ..
+        } => (
+            DebtType::CodeOrganization,
+            format!(
+                "Primitive obsession: '{}' used {} times, suggest {}",
+                primitive_type, occurrence_count, suggested_domain_type
+            ),
+        ),
+        OrganizationAntiPattern::DataClump {
+            parameter_group,
+            occurrence_count,
+            suggested_struct_name,
+            ..
+        } => (
+            DebtType::CodeOrganization,
+            format!(
+                "Data clump with {} parameters appears {} times, suggest struct '{}'",
+                parameter_group.parameters.len(),
+                occurrence_count,
+                suggested_struct_name
+            ),
+        ),
+    };
+
+    let location = pattern.primary_location();
+
+    DebtItem {
+        id: format!("org-{}-{}", debt_type, location.line),
+        file: path.to_path_buf(),
+        line: location.line,
+        column: location.column,
+        debt_type,
+        message,
+        priority: Priority::Medium,
+        context: Some("organization".to_string()),
     }
 }
 
