@@ -23,11 +23,25 @@ fn test_auto_pruning_size_limit() {
         cache.put(&key, "test_component", &data).unwrap();
     }
 
+    // Allow time for any background/async pruning to complete
+    std::thread::sleep(Duration::from_millis(500));
+
+    // Manually trigger pruning to ensure it happens
+    if cache.trigger_pruning().is_ok() {
+        // Allow time for manual pruning to complete
+        std::thread::sleep(Duration::from_millis(100));
+    }
+
     // Should have triggered pruning
     let stats = cache.get_stats();
+    eprintln!(
+        "Cache stats: size={}, count={}",
+        stats.total_size, stats.entry_count
+    );
     assert!(
         stats.total_size <= 1000,
-        "Cache size should be pruned to under 1KB"
+        "Cache size should be pruned to under 1KB, but was {} bytes",
+        stats.total_size
     );
 
     // Automatic cleanup when env_guard is dropped

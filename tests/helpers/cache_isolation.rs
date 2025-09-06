@@ -17,11 +17,13 @@ impl EnvGuard {
     pub fn new() -> Self {
         // Use a static mutex to ensure environment modifications are synchronized
         static ENV_MUTEX: Mutex<()> = Mutex::new(());
-        let lock = ENV_MUTEX.lock().ok();
+        let lock = ENV_MUTEX
+            .lock()
+            .expect("Failed to acquire environment mutex");
 
         Self {
             original_values: HashMap::new(),
-            _lock: lock,
+            _lock: Some(lock),
         }
     }
 

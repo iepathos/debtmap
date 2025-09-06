@@ -9,12 +9,14 @@ use std::path::Path;
 
 pub struct PythonUnboundedCollectionDetector {
     growth_patterns: Vec<GrowthPatternMatcher>,
-    size_thresholds: HashMap<String, usize>,
+    _size_thresholds: HashMap<String, usize>,
 }
+
+type CollectionMatcher = Box<dyn Fn(&str, &CollectionInfo) -> bool>;
 
 struct GrowthPatternMatcher {
     pattern: GrowthPattern,
-    matcher: Box<dyn Fn(&str, &CollectionInfo) -> bool>,
+    matcher: CollectionMatcher,
 }
 
 #[derive(Debug)]
@@ -30,6 +32,12 @@ struct CollectionInfo {
     is_global: bool,
     is_class_attribute: bool,
     line: usize,
+}
+
+impl Default for PythonUnboundedCollectionDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PythonUnboundedCollectionDetector {
@@ -66,7 +74,7 @@ impl PythonUnboundedCollectionDetector {
 
         Self {
             growth_patterns,
-            size_thresholds,
+            _size_thresholds: size_thresholds,
         }
     }
 

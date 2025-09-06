@@ -9,7 +9,13 @@ use std::path::Path;
 
 pub struct PythonAsyncResourceDetector {
     async_resource_types: HashSet<String>,
-    async_context_managers: HashSet<String>,
+    _async_context_managers: HashSet<String>,
+}
+
+impl Default for PythonAsyncResourceDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PythonAsyncResourceDetector {
@@ -31,7 +37,7 @@ impl PythonAsyncResourceDetector {
 
         Self {
             async_resource_types,
-            async_context_managers,
+            _async_context_managers: async_context_managers,
         }
     }
 
@@ -85,6 +91,7 @@ impl PythonAsyncResourceDetector {
         }
     }
 
+    #[allow(dead_code)]
     fn is_async_decorator(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Name(name) => &name.id == "async" || &name.id == "asyncio",
@@ -126,10 +133,8 @@ impl PythonAsyncResourceDetector {
                     resources.push(resource_type.clone());
 
                     // Track variable name for this resource
-                    if let Some(target) = assign.targets.first() {
-                        if let Expr::Name(name) = target {
-                            resource_variables.insert(resource_type, name.id.to_string());
-                        }
+                    if let Some(Expr::Name(name)) = assign.targets.first() {
+                        resource_variables.insert(resource_type, name.id.to_string());
                     }
                 }
             }
@@ -204,6 +209,7 @@ impl PythonAsyncResourceDetector {
         }
     }
 
+    #[allow(dead_code)]
     fn analyze_async_statement(
         &self,
         stmt: &Stmt,
@@ -253,6 +259,7 @@ impl PythonAsyncResourceDetector {
         None
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn extract_function_name(&self, expr: &Expr) -> String {
         match expr {
             Expr::Name(name) => name.id.to_string(),
@@ -294,7 +301,7 @@ impl PythonResourceDetector for PythonAsyncResourceDetector {
                             returns: async_func.returns.clone(),
                             type_comment: async_func.type_comment.clone(),
                             type_params: vec![],
-                            range: async_func.range.clone(),
+                            range: async_func.range,
                         };
                         self.check_async_function(&func, &mut issues);
                     }
@@ -312,7 +319,7 @@ impl PythonResourceDetector for PythonAsyncResourceDetector {
                                     returns: async_func.returns.clone(),
                                     type_comment: async_func.type_comment.clone(),
                                     type_params: vec![],
-                                    range: async_func.range.clone(),
+                                    range: async_func.range,
                                 };
                                 self.check_async_function(&func, &mut issues);
                             }

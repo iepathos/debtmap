@@ -4,7 +4,6 @@ mod tests {
     use debtmap::organization::{
         OrganizationAntiPattern, ParameterRefactoring, PrimitiveUsageContext,
     };
-    use rustpython_parser;
     use rustpython_parser::ast;
     use std::path::Path;
 

@@ -289,6 +289,7 @@ impl SimplifiedPythonOrganizationDetector {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn collect_constants_in_expr(&self, expr: &ast::Expr, values: &mut HashMap<String, usize>) {
         match expr {
             ast::Expr::Constant(constant) => {
@@ -447,6 +448,7 @@ impl SimplifiedPythonOrganizationDetector {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn count_calls_in_expr(
         &self,
         expr: &ast::Expr,

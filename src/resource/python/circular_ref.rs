@@ -9,34 +9,40 @@ use std::path::Path;
 
 pub struct PythonCircularRefDetector {
     max_depth: usize,
-    known_patterns: Vec<CircularPatternTemplate>,
+    _known_patterns: Vec<CircularPatternTemplate>,
 }
 
 struct CircularPatternTemplate {
-    pattern_name: String,
+    _pattern_name: String,
 }
 
 pub struct ClassInfo {
-    name: String,
+    _name: String,
     attributes: HashSet<String>,
     references: HashSet<String>,
     line: usize,
+}
+
+impl Default for PythonCircularRefDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PythonCircularRefDetector {
     pub fn new() -> Self {
         let known_patterns = vec![
             CircularPatternTemplate {
-                pattern_name: "self_reference".to_string(),
+                _pattern_name: "self_reference".to_string(),
             },
             CircularPatternTemplate {
-                pattern_name: "parent_child_loop".to_string(),
+                _pattern_name: "parent_child_loop".to_string(),
             },
         ];
 
         Self {
             max_depth: 5,
-            known_patterns,
+            _known_patterns: known_patterns,
         }
     }
 
@@ -47,7 +53,7 @@ impl PythonCircularRefDetector {
             for stmt in &module.body {
                 if let Stmt::ClassDef(class_def) = stmt {
                     let mut class_info = ClassInfo {
-                        name: class_def.name.to_string(),
+                        _name: class_def.name.to_string(),
                         attributes: HashSet::new(),
                         references: HashSet::new(),
                         line: 1, // TODO: Track actual line numbers
@@ -118,6 +124,7 @@ impl PythonCircularRefDetector {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn extract_class_references(&self, expr: &Expr, references: &mut HashSet<String>) {
         match expr {
             Expr::Name(name) => {
@@ -126,7 +133,7 @@ impl PythonCircularRefDetector {
                 if name_str == "self" {
                     // Track self references
                     references.insert("<self>".to_string());
-                } else if name_str.chars().next().map_or(false, |c| c.is_uppercase()) {
+                } else if name_str.chars().next().is_some_and(|c| c.is_uppercase()) {
                     references.insert(name_str);
                 }
             }
@@ -134,7 +141,7 @@ impl PythonCircularRefDetector {
                 // Constructor call
                 if let Expr::Name(name) = call.func.as_ref() {
                     let name_str = name.id.to_string();
-                    if name_str.chars().next().map_or(false, |c| c.is_uppercase()) {
+                    if name_str.chars().next().is_some_and(|c| c.is_uppercase()) {
                         references.insert(name_str);
                     }
                 }
@@ -175,9 +182,7 @@ impl PythonCircularRefDetector {
                                             end_line: None,
                                             end_column: None,
                                         },
-                                        suggestion: format!(
-                                            "Circular reference detected: 'self' is added to a collection. Use weak references to prevent memory leaks."
-                                        ),
+                                        suggestion: "Circular reference detected: 'self' is added to a collection. Use weak references to prevent memory leaks.".to_string(),
                                     });
                                 }
                             }
@@ -255,7 +260,7 @@ impl PythonCircularRefDetector {
         }
 
         // Check for chain references
-        for (start_class, _) in classes {
+        for start_class in classes.keys() {
             if let Some(chain) =
                 self.find_reference_chain(start_class, classes, &mut HashSet::new(), 0)
             {
@@ -341,7 +346,7 @@ impl PythonCircularRefDetector {
             Stmt::Assign(assign) => {
                 // Check for assignments that create circular references
                 for target in &assign.targets {
-                    if let Expr::Attribute(attr) = target {
+                    if let Expr::Attribute(_attr) = target {
                         // Check if assigning self to an attribute
                         if let Expr::Name(name) = assign.value.as_ref() {
                             if &name.id == "self" {

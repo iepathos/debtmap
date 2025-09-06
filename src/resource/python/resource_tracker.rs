@@ -13,6 +13,12 @@ pub struct PythonResourceTracker {
     cleanup_methods: HashSet<String>,
 }
 
+impl Default for PythonResourceTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PythonResourceTracker {
     pub fn new() -> Self {
         let mut thread_functions = HashSet::new();
@@ -58,26 +64,23 @@ impl PythonResourceTracker {
 
         // Scan class for resource management
         for stmt in &class_def.body {
-            match stmt {
-                Stmt::FunctionDef(func) => {
-                    if &func.name == "__init__" {
-                        // Check for resource allocation in __init__
-                        for init_stmt in &func.body {
-                            if let Some(resources) = self.detect_resource_allocation(init_stmt) {
-                                for resource in resources {
-                                    managed_resources.insert(resource);
-                                }
+            if let Stmt::FunctionDef(func) = stmt {
+                if &func.name == "__init__" {
+                    // Check for resource allocation in __init__
+                    for init_stmt in &func.body {
+                        if let Some(resources) = self.detect_resource_allocation(init_stmt) {
+                            for resource in resources {
+                                managed_resources.insert(resource);
                             }
                         }
-                    } else if &func.name == "__del__" {
-                        has_del = true;
-                    } else if &func.name == "__exit__" {
-                        has_exit = true;
-                    } else if self.cleanup_methods.contains(&func.name.to_string()) {
-                        has_cleanup = true;
                     }
+                } else if &func.name == "__del__" {
+                    has_del = true;
+                } else if &func.name == "__exit__" {
+                    has_exit = true;
+                } else if self.cleanup_methods.contains(func.name.as_ref() as &str) {
+                    has_cleanup = true;
                 }
-                _ => {}
             }
         }
 
@@ -106,76 +109,71 @@ impl PythonResourceTracker {
     }
 
     fn detect_resource_allocation(&self, stmt: &Stmt) -> Option<Vec<String>> {
-        match stmt {
-            Stmt::Assign(assign) => {
-                if let Some(resource_type) = self.detect_resource_type(&assign.value) {
-                    let var_name = self.extract_variable_name(&assign.targets);
-                    return Some(vec![format!("{}: {}", var_name, resource_type)]);
-                }
+        if let Stmt::Assign(assign) = stmt {
+            if let Some(resource_type) = self.detect_resource_type(&assign.value) {
+                let var_name = self.extract_variable_name(&assign.targets);
+                return Some(vec![format!("{}: {}", var_name, resource_type)]);
             }
-            _ => {}
         }
         None
     }
 
     fn detect_resource_type(&self, expr: &Expr) -> Option<String> {
-        match expr {
-            Expr::Call(call) => {
-                let func_name = self.extract_function_name(call.func.as_ref());
+        if let Expr::Call(call) = expr {
+            let func_name = self.extract_function_name(call.func.as_ref());
 
-                if self
-                    .thread_functions
-                    .iter()
-                    .any(|tf| func_name.contains(tf) || tf.contains(&func_name))
-                {
-                    return Some("Thread".to_string());
-                }
-
-                if self
-                    .process_functions
-                    .iter()
-                    .any(|pf| func_name.contains(pf) || pf.contains(&func_name))
-                {
-                    return Some("Process".to_string());
-                }
-
-                // Enhanced multiprocessing.Process detection
-                if func_name == "Process"
-                    || func_name.ends_with(".Process")
-                    || func_name.contains("multiprocessing") && func_name.contains("Process")
-                {
-                    return Some("Process".to_string());
-                }
-
-                // Check for file handles
-                if func_name == "open" || func_name.ends_with(".open") {
-                    return Some("File".to_string());
-                }
-
-                // Check for sockets
-                if func_name.contains("socket") || func_name.contains("Socket") {
-                    return Some("Socket".to_string());
-                }
-
-                // Check for database connections and pools
-                if func_name.contains("connect") || func_name.contains("Connection") {
-                    return Some("Connection".to_string());
-                }
-
-                // Check for connection pools
-                if func_name.contains("create_engine")
-                    || func_name.contains("Pool")
-                    || func_name.contains("pool")
-                        && (func_name.contains("create") || func_name.contains("get"))
-                {
-                    return Some("ConnectionPool".to_string());
-                }
+            if self
+                .thread_functions
+                .iter()
+                .any(|tf| func_name.contains(tf) || tf.contains(&func_name))
+            {
+                return Some("Thread".to_string());
             }
-            _ => {}
+
+            if self
+                .process_functions
+                .iter()
+                .any(|pf| func_name.contains(pf) || pf.contains(&func_name))
+            {
+                return Some("Process".to_string());
+            }
+
+            // Enhanced multiprocessing.Process detection
+            if func_name == "Process"
+                || func_name.ends_with(".Process")
+                || (func_name.contains("multiprocessing") && func_name.contains("Process"))
+            {
+                return Some("Process".to_string());
+            }
+
+            // Check for file handles
+            if func_name == "open" || func_name.ends_with(".open") {
+                return Some("File".to_string());
+            }
+
+            // Check for sockets
+            if func_name.contains("socket") || func_name.contains("Socket") {
+                return Some("Socket".to_string());
+            }
+
+            // Check for database connections and pools
+            if func_name.contains("connect") || func_name.contains("Connection") {
+                return Some("Connection".to_string());
+            }
+
+            // Check for connection pools
+            if func_name.contains("create_engine")
+                || func_name.contains("Pool")
+                || (func_name.contains("pool")
+                    && (func_name.contains("create") || func_name.contains("get")))
+            {
+                return Some("ConnectionPool".to_string());
+            }
         }
         None
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn extract_function_name(&self, expr: &Expr) -> String {
         match expr {
             Expr::Name(name) => name.id.to_string(),

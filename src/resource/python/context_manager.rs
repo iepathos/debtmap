@@ -9,8 +9,14 @@ use std::path::Path;
 
 pub struct PythonContextManagerDetector {
     resource_types: HashSet<String>,
-    safe_patterns: Vec<String>,
+    _safe_patterns: Vec<String>,
     resource_functions: HashMap<String, String>, // function -> resource type
+}
+
+impl Default for PythonContextManagerDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PythonContextManagerDetector {
@@ -47,7 +53,7 @@ impl PythonContextManagerDetector {
 
         Self {
             resource_types,
-            safe_patterns,
+            _safe_patterns: safe_patterns,
             resource_functions,
         }
     }
@@ -135,36 +141,30 @@ impl PythonContextManagerDetector {
     }
 
     fn extract_resource_from_expr(&self, expr: &Expr) -> Option<(String, String)> {
-        match expr {
-            Expr::Call(call) => {
-                if let Expr::Name(name) = &call.func.as_ref() {
-                    let func_name = &name.id;
-                    let func_name_str = func_name.to_string();
-                    if self.resource_functions.contains_key(&func_name_str) {
-                        return Some((
-                            func_name_str.clone(),
-                            self.resource_functions[&func_name_str].clone(),
-                        ));
-                    }
-                } else if let Expr::Attribute(attr) = &call.func.as_ref() {
-                    let attr_name = &attr.attr;
-                    let attr_name_str = attr_name.to_string();
-                    if self.resource_types.contains(&attr_name_str) {
-                        return Some((attr_name_str.clone(), attr_name_str.clone()));
-                    }
+        if let Expr::Call(call) = expr {
+            if let Expr::Name(name) = &call.func.as_ref() {
+                let func_name = &name.id;
+                let func_name_str = func_name.to_string();
+                if self.resource_functions.contains_key(&func_name_str) {
+                    return Some((
+                        func_name_str.clone(),
+                        self.resource_functions[&func_name_str].clone(),
+                    ));
+                }
+            } else if let Expr::Attribute(attr) = &call.func.as_ref() {
+                let attr_name = &attr.attr;
+                let attr_name_str = attr_name.to_string();
+                if self.resource_types.contains(&attr_name_str) {
+                    return Some((attr_name_str.clone(), attr_name_str.clone()));
                 }
             }
-            _ => {}
         }
         None
     }
 
     fn extract_target_name(&self, targets: &[Expr]) -> String {
-        if let Some(target) = targets.first() {
-            match target {
-                Expr::Name(name) => return name.id.to_string(),
-                _ => {}
-            }
+        if let Some(Expr::Name(name)) = targets.first() {
+            return name.id.to_string();
         }
         "<unknown>".to_string()
     }
@@ -174,13 +174,10 @@ impl PythonResourceDetector for PythonContextManagerDetector {
     fn detect_issues(&self, module: &ast::Mod, _path: &Path) -> Vec<ResourceIssue> {
         let mut issues = Vec::new();
 
-        match module {
-            ast::Mod::Module(module) => {
-                for stmt in &module.body {
-                    self.check_statement(stmt, &mut issues);
-                }
+        if let ast::Mod::Module(module) = module {
+            for stmt in &module.body {
+                self.check_statement(stmt, &mut issues);
             }
-            _ => {}
         }
 
         issues
