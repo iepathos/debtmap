@@ -43,7 +43,7 @@ Unify and extend the existing source location infrastructure to provide comprehe
 2. Extends `UnifiedLocationExtractor` to support all languages consistently
 3. Replaces estimation-based attribution with precise AST node tracking
 4. Enables exact navigation from complexity reports to source code
-5. Supports rich IDE integrations and source map exports
+5. Provides precise complexity-to-source mapping for better developer experience
 
 ## Requirements
 
@@ -58,15 +58,12 @@ Unify and extend the existing source location infrastructure to provide comprehe
 - **Cross-Reference Generation**: Build bidirectional maps between complexity and source
 - **Cache Integration**: Leverage spec 90's shared cache for source map storage
 - **Incremental Updates**: Support incremental mapping updates for code changes
-- **Source Map Serialization**: Export source maps in standard formats
-- **IDE Protocol Support**: Support Language Server Protocol (LSP) for IDE integration
 
 ### Non-Functional Requirements
 
 - **Precision**: 100% accurate mapping to source locations
 - **Performance**: Mapping overhead <5% of analysis time
 - **Memory Efficiency**: Source maps use <10% additional memory
-- **Compatibility**: Support standard source map formats (v3)
 
 ## Acceptance Criteria
 
@@ -76,8 +73,6 @@ Unify and extend the existing source location infrastructure to provide comprehe
 - [ ] Bidirectional mapping between complexity and source works correctly
 - [ ] Incremental updates maintain mapping consistency
 - [ ] All supported languages have full source mapping
-- [ ] Source maps exportable in standard v3 format
-- [ ] LSP integration provides accurate go-to-definition
 - [ ] Performance overhead measured under 5%
 - [ ] Memory usage increase stays under 10%
 
@@ -279,54 +274,6 @@ impl ComplexityPointRegistry {
 }
 ```
 
-**Phase 4: Source Map Export and IDE Integration**
-```rust
-pub struct SourceMapExporter {
-    format: SourceMapFormat,
-    encoder: SourceMapEncoder,
-}
-
-impl SourceMapExporter {
-    pub fn export_v3(&self, mapping: &ComplexitySourceMapper) -> String {
-        let mut map = SourceMapV3::new();
-        
-        for point in &mapping.complexity_points {
-            map.add_mapping(Mapping {
-                generated_line: point.id.0 as u32,
-                generated_column: 0,
-                source_line: point.source_location.line,
-                source_column: point.source_location.column,
-                source_file: point.source_location.file.to_str().unwrap(),
-                name: Some(format!("complexity_{}", point.type_)),
-            });
-        }
-        
-        self.encoder.encode(&map)
-    }
-}
-
-// LSP integration
-pub struct ComplexityLSPServer {
-    mapper: ComplexitySourceMapper,
-    lsp_server: LspServer,
-}
-
-impl ComplexityLSPServer {
-    pub fn handle_goto_definition(&self, params: GotoDefinitionParams) -> Option<Location> {
-        let position = params.text_document_position_params.position;
-        
-        // Find complexity point at position
-        if let Some(point) = self.mapper.find_complexity_at_position(position) {
-            Some(Location {
-                uri: params.text_document_position_params.text_document.uri,
-                range: self.span_to_range(&point.source_span),
-            })
-        } else {
-            None
-        }
-    }
-}
-```
 
 ### Architecture Changes
 
@@ -351,10 +298,6 @@ src/analysis/source_mapping/
 ├── complexity_registry.rs      # ComplexityPointRegistry implementation
 ├── cached_mapper.rs           # Cache-integrated source mapper
 ├── incremental.rs             # Incremental mapping updates
-├── export/
-│   ├── mod.rs                 # Export functionality
-│   ├── sourcemap_v3.rs       # Source map v3 format
-│   └── lsp_integration.rs    # LSP server integration
 └── tests/
     └── source_mapping_test.rs # Comprehensive tests
 ```
@@ -362,39 +305,6 @@ src/analysis/source_mapping/
 ### Data Structures
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SourceMap {
-    pub version: u32,
-    pub file: String,
-    pub source_root: Option<String>,
-    pub sources: Vec<String>,
-    pub sources_content: Option<Vec<String>>,
-    pub names: Vec<String>,
-    pub mappings: String,  // VLQ encoded mappings
-    pub complexity_metadata: ComplexityMetadata,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ComplexityMetadata {
-    pub total_points: u32,
-    pub point_details: Vec<ComplexityPointDetail>,
-    pub heat_map: ComplexityHeatMap,
-    pub navigation_index: NavigationIndex,
-}
-
-#[derive(Debug, Clone)]
-pub struct ComplexityHeatMap {
-    pub resolution: HeatMapResolution,
-    pub data: Vec<Vec<f32>>,
-    pub color_scale: ColorScale,
-}
-
-#[derive(Debug, Clone)]
-pub struct NavigationIndex {
-    pub by_complexity: BTreeMap<u32, Vec<ComplexityPointId>>,
-    pub by_location: BTreeMap<SourceLocation, ComplexityPointId>,
-    pub by_type: HashMap<ComplexityType, Vec<ComplexityPointId>>,
-}
 ```
 
 ### Language-Specific Implementations
@@ -426,9 +336,6 @@ pub struct NavigationIndex {
   - `core/ast.rs` - update AstNode structure  
   - `analysis/attribution/mod.rs` - replace estimation logic
   - All language analyzers - migrate to unified location system
-- **External Dependencies**:
-  - Source map libraries (for v3 format)
-  - LSP libraries (for IDE integration)
 
 ## Testing Strategy
 
@@ -436,13 +343,11 @@ pub struct NavigationIndex {
 - **Location Accuracy**: Verify AST nodes have correct locations
 - **Mapping Correctness**: Test complexity-to-source mapping
 - **Incremental Updates**: Validate incremental mapping updates
-- **Export Format**: Test source map v3 format generation
 - **Cross-Reference**: Verify bidirectional mapping works
 
 ### Integration Tests
 - **End-to-End Mapping**: Complete mapping for real source files
 - **Multi-Language**: Test all supported languages
-- **IDE Integration**: Test LSP server functionality
 - **Large Files**: Verify performance with large source files
 - **Complex Constructs**: Test mapping of nested/complex code
 
@@ -458,12 +363,10 @@ pub struct NavigationIndex {
 - **Mapping Algorithm**: Document source mapping approach
 - **Location Tracking**: Explain location tracking methodology
 - **Incremental Strategy**: Document incremental update algorithm
-- **Export Formats**: Document supported export formats
 
 ### User Documentation
-- **Source Map Guide**: How to use and interpret source maps
-- **IDE Integration**: Setting up IDE integration
-- **Navigation Guide**: Using source maps for code navigation
+- **Mapping Guide**: How to use and interpret complexity mappings
+- **Navigation Guide**: Using mappings for code navigation
 - **Troubleshooting**: Common source mapping issues
 
 ### Architecture Updates
@@ -480,7 +383,6 @@ pub struct NavigationIndex {
 3. **Phase 3**: Migrate JavaScript to common `SourceLocation`
 4. **Phase 4**: Update attribution engine to use precise locations
 5. **Phase 5**: Implement caching and incremental updates
-6. **Phase 6**: Add export and IDE support
 
 ### Challenges
 
@@ -500,8 +402,9 @@ pub struct NavigationIndex {
 
 ### Future Enhancements
 
+- Export source maps in standard formats
+- IDE integration with Language Server Protocol
 - Real-time mapping updates during editing
 - Visual complexity overlays in IDEs
 - Git blame integration for historical mapping
 - Cross-file complexity flow visualization
-- Integration with debugging tools
