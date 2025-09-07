@@ -41,9 +41,11 @@ Analyze the difference between before and after debtmap results to quantify tech
 
 ## Process
 
+**CRITICAL**: This is a Rust project. Use shell commands with jq for JSON processing. Do NOT create Python scripts.
+
 1. **Load and Parse JSON Files**
-   - Read the before and after debtmap.json files
-   - Parse the JSON structures
+   - Read the before and after debtmap.json files using jq
+   - Parse the JSON structures with jq queries
 
 2. **Calculate Overall Metrics**
    - Compare total debt scores
@@ -125,40 +127,45 @@ Generate a concise, markdown-formatted summary suitable for inclusion in a git c
 - If JSON structure is unexpected, provide details
 - Handle cases where items may have moved (line number changes)
 
-## Example Implementation Steps
+## Example Implementation Using Shell and jq
 
-```python
-# Pseudo-code structure
-before_data = load_json(before_path)
-after_data = load_json(after_path)
+**IMPORTANT**: Use shell commands with jq for JSON processing. Do NOT create Python scripts in this Rust project.
 
-# Create lookup maps
-before_items = {(item.file, item.function): item for item in before_data.items}
-after_items = {(item.file, item.function): item for item in after_data.items}
+```bash
+# Example shell implementation using jq
+# Load total scores
+BEFORE_SCORE=$(jq -r '.total_debt_score // 0' debtmap.json)
+AFTER_SCORE=$(jq -r '.total_debt_score // 0' debtmap-after.json)
 
-# Calculate improvements
-resolved = before_items.keys() - after_items.keys()
-improved = []
-regressed = []
-new_items = after_items.keys() - before_items.keys()
+# Count items
+BEFORE_COUNT=$(jq -r '.items | length' debtmap.json)
+AFTER_COUNT=$(jq -r '.items | length' debtmap-after.json)
 
-for key in before_items.keys() & after_items.keys():
-    before_score = before_items[key].unified_score.final_score
-    after_score = after_items[key].unified_score.final_score
-    if after_score < before_score:
-        improved.append((key, before_score, after_score))
-    elif after_score > before_score:
-        regressed.append((key, before_score, after_score))
+# Calculate percentage improvement
+IMPROVEMENT=$(echo "scale=1; (($BEFORE_SCORE - $AFTER_SCORE) / $BEFORE_SCORE) * 100" | bc)
 
-# Generate summary statistics
-total_before = sum(item.unified_score.final_score for item in before_data.items)
-total_after = sum(item.unified_score.final_score for item in after_data.items)
-improvement_pct = ((total_before - total_after) / total_before) * 100
+# Format the commit message
+cat <<EOF
+fix: eliminate technical debt items via MapReduce
 
-# Format output
-print(f"- Total debt score: {total_before} → {total_after} (-{improvement_pct:.0f}%)")
-print(f"- Items resolved: {len(resolved)} of {successful + failed} targeted")
-# ... continue formatting
+Processed debt items in parallel:
+- Successfully fixed: ${SUCCESSFUL} items  
+- Failed to fix: ${FAILED} items
+- Total items processed: ${TOTAL}
+
+Technical Debt Improvements:
+- Total debt score: ${BEFORE_SCORE} → ${AFTER_SCORE} (-${IMPROVEMENT}%)
+- Total items: ${BEFORE_COUNT} → ${AFTER_COUNT}
+EOF
+
+# Create the git commit
+git add -A
+git commit -m "$(cat <<EOF
+fix: eliminate technical debt items via MapReduce
+
+[Include formatted summary here]
+EOF
+)"
 ```
 
 ## Integration Notes
