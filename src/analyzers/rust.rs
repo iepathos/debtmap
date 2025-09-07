@@ -270,29 +270,45 @@ struct FunctionVisitor {
 }
 
 impl FunctionVisitor {
+    /// Pure function to classify if a path represents a test file
+    fn classify_test_file(path_str: &str) -> bool {
+        // Test directory patterns
+        const TEST_DIR_PATTERNS: &[&str] = &[
+            "/tests/",
+            "/test/",
+            "/testing/",
+            "/mocks/",
+            "/mock/",
+            "/fixtures/",
+            "/fixture/",
+            "/test_helpers/",
+            "/test_utils/",
+            "/test_",
+            "/mock",
+            "/scenario",
+            "\\tests\\",
+            "\\test\\", // Windows paths
+        ];
+
+        // Test file suffixes
+        const TEST_FILE_SUFFIXES: &[&str] = &["_test.rs", "_tests.rs", "/tests.rs", "/test.rs"];
+
+        // Check directory patterns
+        let has_test_dir = TEST_DIR_PATTERNS
+            .iter()
+            .any(|pattern| path_str.contains(pattern));
+
+        // Check file suffixes
+        let has_test_suffix = TEST_FILE_SUFFIXES
+            .iter()
+            .any(|suffix| path_str.ends_with(suffix));
+
+        has_test_dir || has_test_suffix
+    }
+
     fn new(file: PathBuf, source_content: String) -> Self {
         // Check if this file is a test file based on its path
-        let is_test_file = {
-            let path_str = file.to_string_lossy();
-            path_str.contains("/tests/") 
-                || path_str.contains("/test/")
-                || path_str.contains("/testing/")
-                || path_str.contains("/mocks/")
-                || path_str.contains("/mock/")
-                || path_str.contains("/fixtures/")
-                || path_str.contains("/fixture/")
-                || path_str.contains("/test_helpers/")
-                || path_str.contains("/test_utils/")
-                || path_str.ends_with("_test.rs")
-                || path_str.ends_with("_tests.rs")
-                || path_str.ends_with("/tests.rs")
-                || path_str.ends_with("/test.rs")
-                || path_str.contains("/test_")
-                || path_str.contains("/mock")
-                || path_str.contains("/scenario")  // Mock scenarios
-                || path_str.contains("\\tests\\")  // Windows paths
-                || path_str.contains("\\test\\") // Windows paths
-        };
+        let is_test_file = Self::classify_test_file(&file.to_string_lossy());
 
         Self {
             functions: Vec::new(),
@@ -1186,6 +1202,89 @@ fn extract_use_name(tree: &syn::UseTree) -> Option<String> {
 mod tests {
     use super::*;
     use syn::parse_quote;
+
+    #[test]
+    fn test_classify_test_file_with_test_directories() {
+        // Test directory patterns
+        assert!(FunctionVisitor::classify_test_file("src/tests/mod.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/test/utils.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/testing/helpers.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file("src/mocks/data.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/mock/server.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/fixtures/sample.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file("src/fixture/db.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/test_helpers/common.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/test_utils/setup.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/test_integration.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file("src/mockito/client.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/scenario/basic.rs"));
+    }
+
+    #[test]
+    fn test_classify_test_file_with_test_suffixes() {
+        // Test file suffixes
+        assert!(FunctionVisitor::classify_test_file("src/lib_test.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/module_tests.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/tests.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/test.rs"));
+        assert!(FunctionVisitor::classify_test_file("integration_test.rs"));
+        assert!(FunctionVisitor::classify_test_file("unit_tests.rs"));
+    }
+
+    #[test]
+    fn test_classify_test_file_with_windows_paths() {
+        // Windows path patterns
+        assert!(FunctionVisitor::classify_test_file("src\\tests\\mod.rs"));
+        assert!(FunctionVisitor::classify_test_file("src\\test\\utils.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "C:\\project\\tests\\integration.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "D:\\code\\test\\unit.rs"
+        ));
+    }
+
+    #[test]
+    fn test_classify_test_file_negative_cases() {
+        // Non-test files
+        assert!(!FunctionVisitor::classify_test_file("src/main.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/lib.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/analyzer.rs"));
+        assert!(!FunctionVisitor::classify_test_file(
+            "src/core/processor.rs"
+        ));
+        assert!(!FunctionVisitor::classify_test_file("src/utils/helper.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/latest.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/contest.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/protest.rs"));
+    }
+
+    #[test]
+    fn test_classify_test_file_edge_cases() {
+        // Edge cases
+        assert!(FunctionVisitor::classify_test_file("/tests/"));
+        assert!(FunctionVisitor::classify_test_file("/tests/file.rs"));
+        assert!(FunctionVisitor::classify_test_file("path/test.rs"));
+        assert!(FunctionVisitor::classify_test_file("path/tests.rs"));
+        assert!(!FunctionVisitor::classify_test_file(""));
+        assert!(!FunctionVisitor::classify_test_file("/"));
+        assert!(FunctionVisitor::classify_test_file(
+            "deeply/nested/tests/file.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "very/deep/path/test_utils/util.rs"
+        ));
+    }
 
     #[test]
     fn test_is_test_function_with_test_attribute() {
