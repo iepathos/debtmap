@@ -68,163 +68,265 @@ impl SimplifiedPythonOrganizationDetector {
 
         if let ast::Mod::Module(module) = module {
             for stmt in &module.body {
-                // Simple God Object detection for classes
+                // Process class definitions
                 if let ast::Stmt::ClassDef(class_def) = stmt {
-                    let mut method_count = 0;
-                    let mut field_count = 0;
-
-                    for class_stmt in &class_def.body {
-                        match class_stmt {
-                            ast::Stmt::FunctionDef(func_def) => {
-                                let func_name = format!("{:?}", func_def.name);
-                                if func_name.contains("__init__") {
-                                    // Count field assignments in __init__
-                                    for init_stmt in &func_def.body {
-                                        if let ast::Stmt::Assign(assign_stmt) = init_stmt {
-                                            for target in &assign_stmt.targets {
-                                                if let ast::Expr::Attribute(_) = target {
-                                                    field_count += 1;
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    method_count += 1;
-                                    // Also check for feature envy in class methods
-                                    let feature_envy = self.detect_feature_envy_in_function(
-                                        &func_def.body,
-                                        func_def.name.as_ref(),
-                                    );
-                                    if let Some(envy) = feature_envy {
-                                        patterns.push(envy);
-                                    }
-                                }
-                            }
-                            ast::Stmt::AsyncFunctionDef(_) => {
-                                method_count += 1;
-                            }
-                            ast::Stmt::Assign(_) | ast::Stmt::AnnAssign(_) => {
-                                field_count += 1;
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    // Use configurable thresholds
-                    if method_count > self.god_object_method_threshold
-                        || field_count > self.god_object_field_threshold
-                    {
-                        patterns.push(OrganizationAntiPattern::GodObject {
-                            type_name: class_def.name.to_string(),
-                            method_count,
-                            field_count,
-                            responsibility_count: self
-                                .estimate_responsibilities(method_count, field_count),
-                            suggested_split: vec![ResponsibilityGroup {
-                                name: format!("{}Core", class_def.name),
-                                methods: vec![],
-                                fields: vec![],
-                                responsibility: "Core functionality".to_string(),
-                            }],
-                            location: self.get_location_for_node(source, class_def.name.as_str()),
-                        });
-                    }
+                    self.process_class_definition(
+                        class_def,
+                        source,
+                        &mut patterns,
+                    );
                 }
 
-                // Magic Value and Feature Envy detection for functions
+                // Process function definitions
                 if let ast::Stmt::FunctionDef(func_def) = stmt {
-                    // Detect magic values with improved traversal
-                    let magic_values = self.detect_magic_values_in_function(&func_def.body);
-                    for (value, count) in magic_values {
-                        if count >= self.magic_value_min_occurrences {
-                            patterns.push(OrganizationAntiPattern::MagicValue {
-                                value_type: MagicValueType::NumericLiteral,
-                                value: value.clone(),
-                                occurrence_count: count,
-                                suggested_constant_name: format!(
-                                    "CONSTANT_{}",
-                                    value.to_uppercase()
-                                ),
-                                context: ValueContext::BusinessLogic,
-                                locations: vec![
-                                    self.get_location_for_node(source, func_def.name.as_str())
-                                ],
-                            });
-                        }
-                    }
-
-                    // Feature Envy detection
-                    let feature_envy =
-                        self.detect_feature_envy_in_function(&func_def.body, &func_def.name);
-                    if let Some(envy) = feature_envy {
-                        patterns.push(envy);
-                    }
-
-                    // Long Parameter List and Data Clump detection
-                    let param_count = self.count_parameters(&func_def.args);
-                    let param_names = self.get_parameter_names(&func_def.args);
-
-                    // Track parameter groups for data clump detection
-                    if param_names.len() >= 3 {
-                        self.track_parameter_group(&param_names, &mut parameter_groups_tracker);
-                    }
-
-                    if param_count > self.long_parameter_threshold {
-                        patterns.push(OrganizationAntiPattern::LongParameterList {
-                            function_name: func_def.name.to_string(),
-                            parameter_count: param_count,
-                            data_clumps: vec![],
-                            suggested_refactoring: ParameterRefactoring::ExtractStruct,
-                            location: self.get_location_for_node(source, func_def.name.as_str()),
-                        });
-                    }
-
-                    // Primitive Obsession detection
-                    self.detect_primitive_obsession_in_function(
-                        &func_def.args,
-                        &mut primitive_usage_tracker,
+                    self.process_function_definition(
+                        func_def,
                         source,
+                        &mut patterns,
+                        &mut primitive_usage_tracker,
+                        &mut parameter_groups_tracker,
                     );
                 }
             }
 
             // Process collected primitive obsession patterns
-            for ((primitive_type, context), (count, locations)) in primitive_usage_tracker {
-                if count >= self.primitive_obsession_min_occurrences {
-                    patterns.push(OrganizationAntiPattern::PrimitiveObsession {
-                        primitive_type: primitive_type.clone(),
-                        usage_context: context.clone(),
-                        occurrence_count: count,
-                        suggested_domain_type: self.suggest_domain_type(&primitive_type, &context),
-                        locations,
-                    });
-                }
-            }
+            self.finalize_primitive_obsession_patterns(
+                primitive_usage_tracker,
+                &mut patterns,
+            );
 
             // Process collected data clumps
-            for (group_key, (count, params, locations)) in parameter_groups_tracker {
-                if count >= 2 {
-                    patterns.push(OrganizationAntiPattern::DataClump {
-                        parameter_group: ParameterGroup {
-                            parameters: params,
-                            group_name: format!(
-                                "ParameterGroup{}",
-                                group_key.chars().take(10).collect::<String>()
-                            ),
-                            semantic_relationship: "Frequently occurring together".to_string(),
-                        },
-                        occurrence_count: count,
-                        suggested_struct_name: format!(
-                            "{}Config",
-                            group_key.chars().take(15).collect::<String>()
-                        ),
-                        locations,
-                    });
-                }
-            }
+            self.finalize_data_clump_patterns(
+                parameter_groups_tracker,
+                &mut patterns,
+            );
         }
 
         patterns
+    }
+
+    fn process_class_definition(
+        &self,
+        class_def: &ast::StmtClassDef,
+        source: &str,
+        patterns: &mut Vec<OrganizationAntiPattern>,
+    ) {
+        let (method_count, field_count) = self.analyze_class_metrics(class_def, patterns);
+
+        // Check for God Object
+        if method_count > self.god_object_method_threshold
+            || field_count > self.god_object_field_threshold
+        {
+            patterns.push(OrganizationAntiPattern::GodObject {
+                type_name: class_def.name.to_string(),
+                method_count,
+                field_count,
+                responsibility_count: self
+                    .estimate_responsibilities(method_count, field_count),
+                suggested_split: vec![ResponsibilityGroup {
+                    name: format!("{}Core", class_def.name),
+                    methods: vec![],
+                    fields: vec![],
+                    responsibility: "Core functionality".to_string(),
+                }],
+                location: self.get_location_for_node(source, class_def.name.as_str()),
+            });
+        }
+    }
+
+    fn analyze_class_metrics(
+        &self,
+        class_def: &ast::StmtClassDef,
+        patterns: &mut Vec<OrganizationAntiPattern>,
+    ) -> (usize, usize) {
+        let mut method_count = 0;
+        let mut field_count = 0;
+
+        for class_stmt in &class_def.body {
+            match class_stmt {
+                ast::Stmt::FunctionDef(func_def) => {
+                    let (is_init, fields) = self.analyze_function_in_class(func_def);
+                    if is_init {
+                        field_count += fields;
+                    } else {
+                        method_count += 1;
+                        // Check for feature envy in class methods
+                        if let Some(envy) = self.detect_feature_envy_in_function(
+                            &func_def.body,
+                            func_def.name.as_ref(),
+                        ) {
+                            patterns.push(envy);
+                        }
+                    }
+                }
+                ast::Stmt::AsyncFunctionDef(_) => {
+                    method_count += 1;
+                }
+                ast::Stmt::Assign(_) | ast::Stmt::AnnAssign(_) => {
+                    field_count += 1;
+                }
+                _ => {}
+            }
+        }
+
+        (method_count, field_count)
+    }
+
+    fn analyze_function_in_class(&self, func_def: &ast::StmtFunctionDef) -> (bool, usize) {
+        let func_name = format!("{:?}", func_def.name);
+        if func_name.contains("__init__") {
+            let field_count = self.count_init_fields(&func_def.body);
+            (true, field_count)
+        } else {
+            (false, 0)
+        }
+    }
+
+    fn count_init_fields(&self, body: &[ast::Stmt]) -> usize {
+        let mut field_count = 0;
+        for init_stmt in body {
+            if let ast::Stmt::Assign(assign_stmt) = init_stmt {
+                for target in &assign_stmt.targets {
+                    if let ast::Expr::Attribute(_) = target {
+                        field_count += 1;
+                    }
+                }
+            }
+        }
+        field_count
+    }
+
+    fn process_function_definition(
+        &self,
+        func_def: &ast::StmtFunctionDef,
+        source: &str,
+        patterns: &mut Vec<OrganizationAntiPattern>,
+        primitive_usage_tracker: &mut HashMap<(String, PrimitiveUsageContext), (usize, Vec<SourceLocation>)>,
+        parameter_groups_tracker: &mut HashMap<String, (usize, Vec<Parameter>, Vec<SourceLocation>)>,
+    ) {
+        // Detect magic values
+        self.detect_and_report_magic_values(func_def, source, patterns);
+
+        // Feature Envy detection
+        if let Some(envy) = self.detect_feature_envy_in_function(&func_def.body, &func_def.name) {
+            patterns.push(envy);
+        }
+
+        // Process parameters
+        self.process_function_parameters(
+            func_def,
+            source,
+            patterns,
+            primitive_usage_tracker,
+            parameter_groups_tracker,
+        );
+    }
+
+    fn detect_and_report_magic_values(
+        &self,
+        func_def: &ast::StmtFunctionDef,
+        source: &str,
+        patterns: &mut Vec<OrganizationAntiPattern>,
+    ) {
+        let magic_values = self.detect_magic_values_in_function(&func_def.body);
+        for (value, count) in magic_values {
+            if count >= self.magic_value_min_occurrences {
+                patterns.push(OrganizationAntiPattern::MagicValue {
+                    value_type: MagicValueType::NumericLiteral,
+                    value: value.clone(),
+                    occurrence_count: count,
+                    suggested_constant_name: format!(
+                        "CONSTANT_{}",
+                        value.to_uppercase()
+                    ),
+                    context: ValueContext::BusinessLogic,
+                    locations: vec![
+                        self.get_location_for_node(source, func_def.name.as_str())
+                    ],
+                });
+            }
+        }
+    }
+
+    fn process_function_parameters(
+        &self,
+        func_def: &ast::StmtFunctionDef,
+        source: &str,
+        patterns: &mut Vec<OrganizationAntiPattern>,
+        primitive_usage_tracker: &mut HashMap<(String, PrimitiveUsageContext), (usize, Vec<SourceLocation>)>,
+        parameter_groups_tracker: &mut HashMap<String, (usize, Vec<Parameter>, Vec<SourceLocation>)>,
+    ) {
+        let param_count = self.count_parameters(&func_def.args);
+        let param_names = self.get_parameter_names(&func_def.args);
+
+        // Track parameter groups for data clump detection
+        if param_names.len() >= 3 {
+            self.track_parameter_group(&param_names, parameter_groups_tracker);
+        }
+
+        // Check for long parameter list
+        if param_count > self.long_parameter_threshold {
+            patterns.push(OrganizationAntiPattern::LongParameterList {
+                function_name: func_def.name.to_string(),
+                parameter_count: param_count,
+                data_clumps: vec![],
+                suggested_refactoring: ParameterRefactoring::ExtractStruct,
+                location: self.get_location_for_node(source, func_def.name.as_str()),
+            });
+        }
+
+        // Primitive Obsession detection
+        self.detect_primitive_obsession_in_function(
+            &func_def.args,
+            primitive_usage_tracker,
+            source,
+        );
+    }
+
+    fn finalize_primitive_obsession_patterns(
+        &self,
+        primitive_usage_tracker: HashMap<(String, PrimitiveUsageContext), (usize, Vec<SourceLocation>)>,
+        patterns: &mut Vec<OrganizationAntiPattern>,
+    ) {
+        for ((primitive_type, context), (count, locations)) in primitive_usage_tracker {
+            if count >= self.primitive_obsession_min_occurrences {
+                let suggested_domain_type = self.suggest_domain_type(&primitive_type, &context);
+                patterns.push(OrganizationAntiPattern::PrimitiveObsession {
+                    primitive_type: primitive_type.clone(),
+                    usage_context: context,
+                    occurrence_count: count,
+                    suggested_domain_type,
+                    locations,
+                });
+            }
+        }
+    }
+
+    fn finalize_data_clump_patterns(
+        &self,
+        parameter_groups_tracker: HashMap<String, (usize, Vec<Parameter>, Vec<SourceLocation>)>,
+        patterns: &mut Vec<OrganizationAntiPattern>,
+    ) {
+        for (group_key, (count, params, locations)) in parameter_groups_tracker {
+            if count >= 2 {
+                patterns.push(OrganizationAntiPattern::DataClump {
+                    parameter_group: ParameterGroup {
+                        parameters: params,
+                        group_name: format!(
+                            "ParameterGroup{}",
+                            group_key.chars().take(10).collect::<String>()
+                        ),
+                        semantic_relationship: "Frequently occurring together".to_string(),
+                    },
+                    occurrence_count: count,
+                    suggested_struct_name: format!(
+                        "{}Config",
+                        group_key.chars().take(15).collect::<String>()
+                    ),
+                    locations,
+                });
+            }
+        }
     }
 
     fn estimate_responsibilities(&self, method_count: usize, field_count: usize) -> usize {
