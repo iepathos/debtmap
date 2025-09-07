@@ -401,4 +401,97 @@ def simple_function(x, y):
 
         assert!(patterns.is_empty());
     }
+
+    #[test]
+    fn test_init_field_counting() {
+        // Test the refactored count_init_fields function
+        let source = r#"
+class FieldTestClass:
+    def __init__(self):
+        self.field1 = 1
+        self.field2 = 2
+        regular_var = 3  # Not a field
+        self.field3 = regular_var
+        # Multiple assignments
+        self.field4 = self.field5 = 4
+"#;
+
+        let module = parse_python_code(source);
+        let detector = SimplifiedPythonOrganizationDetector::new();
+        let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
+
+        // With default thresholds, shouldn't trigger god object
+        assert!(!patterns
+            .iter()
+            .any(|p| matches!(p, OrganizationAntiPattern::GodObject { .. })));
+    }
+
+    #[test]
+    fn test_nested_class_methods() {
+        // Test that the refactored code still handles nested class structures
+        let source = r#"
+class ComplexClass:
+    def __init__(self):
+        self.state = {}
+        for i in range(10):
+            self.state[i] = i * 2
+    
+    def method_with_envy(self):
+        other.call1()
+        other.call2()
+        other.call3()
+        other.call4()
+        other.call5()
+    
+    def normal_method(self):
+        self.state.update({})
+"#;
+
+        let module = parse_python_code(source);
+        let detector = SimplifiedPythonOrganizationDetector::new();
+        let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
+
+        // Should detect feature envy
+        let envy = patterns
+            .iter()
+            .find(|p| matches!(p, OrganizationAntiPattern::FeatureEnvy { .. }));
+
+        assert!(envy.is_some());
+        if let Some(OrganizationAntiPattern::FeatureEnvy { method_name, .. }) = envy {
+            assert_eq!(method_name, "method_with_envy");
+        }
+    }
+
+    #[test]
+    fn test_parameter_grouping_edge_cases() {
+        // Test edge cases in parameter grouping
+        let source = r#"
+def func1(a, b, c):
+    pass
+
+def func2(a, b, c):
+    pass
+
+def func3(x, y, z):
+    pass
+"#;
+
+        let module = parse_python_code(source);
+        let detector = SimplifiedPythonOrganizationDetector::new();
+        let patterns = detector.detect_patterns(&module, Path::new("test.py"), source);
+
+        // Should detect data clump for (a, b, c) appearing twice
+        let clumps: Vec<_> = patterns
+            .iter()
+            .filter(|p| matches!(p, OrganizationAntiPattern::DataClump { .. }))
+            .collect();
+
+        assert_eq!(clumps.len(), 1);
+        if let OrganizationAntiPattern::DataClump {
+            occurrence_count, ..
+        } = clumps[0]
+        {
+            assert_eq!(*occurrence_count, 2);
+        }
+    }
 }

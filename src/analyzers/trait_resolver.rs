@@ -174,34 +174,73 @@ impl TraitResolver {
         let type_traits = self.tracker.get_traits_for_type(receiver_type)?;
 
         for trait_name in type_traits {
-            if let Some(trait_def) = self.tracker.get_trait(trait_name) {
-                for method in &trait_def.methods {
-                    if method.name == method_name && method.has_default {
-                        // Check if there's an override
-                        if self
-                            .tracker
-                            .resolve_method(receiver_type, trait_name, method_name)
-                            .is_none()
-                        {
-                            // Use default implementation
-                            // Note: In a real implementation, we'd need to track default method IDs
-                            return Some(ResolvedMethod {
-                                function_id: FunctionId {
-                                    file: std::path::PathBuf::from("trait_default"),
-                                    name: format!("{}::{}", trait_name, method_name),
-                                    line: 0,
-                                },
-                                trait_name: Some(trait_name.clone()),
-                                priority: ResolutionPriority::DefaultTraitMethod,
-                                confidence: 0.6,
-                            });
-                        }
-                    }
-                }
+            if let Some(resolved) =
+                self.check_trait_default_method(receiver_type, trait_name, method_name)
+            {
+                return Some(resolved);
             }
         }
 
         None
+    }
+
+    /// Check if a trait has a default method that applies
+    fn check_trait_default_method(
+        &self,
+        receiver_type: &str,
+        trait_name: &str,
+        method_name: &str,
+    ) -> Option<ResolvedMethod> {
+        let trait_def = self.tracker.get_trait(trait_name)?;
+
+        let _method = trait_def
+            .methods
+            .iter()
+            .find(|m| Self::is_matching_default_method(m, method_name))?;
+
+        // Check if there's an override
+        if self.has_method_override(receiver_type, trait_name, method_name) {
+            return None;
+        }
+
+        Some(Self::create_default_method_resolution(
+            trait_name,
+            method_name,
+        ))
+    }
+
+    /// Check if a method matches and has a default implementation
+    fn is_matching_default_method(
+        method: &crate::analyzers::trait_implementation_tracker::TraitMethod,
+        method_name: &str,
+    ) -> bool {
+        method.name == method_name && method.has_default
+    }
+
+    /// Check if a method has been overridden in the implementation
+    fn has_method_override(
+        &self,
+        receiver_type: &str,
+        trait_name: &str,
+        method_name: &str,
+    ) -> bool {
+        self.tracker
+            .resolve_method(receiver_type, trait_name, method_name)
+            .is_some()
+    }
+
+    /// Create a ResolvedMethod for a default trait method
+    fn create_default_method_resolution(trait_name: &str, method_name: &str) -> ResolvedMethod {
+        ResolvedMethod {
+            function_id: FunctionId {
+                file: std::path::PathBuf::from("trait_default"),
+                name: format!("{}::{}", trait_name, method_name),
+                line: 0,
+            },
+            trait_name: Some(trait_name.to_string()),
+            priority: ResolutionPriority::DefaultTraitMethod,
+            confidence: 0.6,
+        }
     }
 
     /// Check if a blanket implementation applies to a type
@@ -624,5 +663,230 @@ mod tests {
         assert!(!resolver.type_satisfies_bound("", "Display"));
         assert!(!resolver.type_satisfies_bound("String", ""));
         assert!(!resolver.type_satisfies_bound("", ""));
+    }
+
+    #[test]
+    fn test_is_matching_default_method() {
+        // Test method with default implementation
+        let method_with_default = crate::analyzers::trait_implementation_tracker::TraitMethod {
+            name: "test_method".to_string(),
+            has_default: true,
+            is_async: false,
+            signature: "fn test_method(&self)".to_string(),
+        };
+        assert!(TraitResolver::is_matching_default_method(
+            &method_with_default,
+            "test_method"
+        ));
+        assert!(!TraitResolver::is_matching_default_method(
+            &method_with_default,
+            "other_method"
+        ));
+
+        // Test method without default implementation
+        let method_without_default = crate::analyzers::trait_implementation_tracker::TraitMethod {
+            name: "test_method".to_string(),
+            has_default: false,
+            is_async: false,
+            signature: "fn test_method(&self)".to_string(),
+        };
+        assert!(!TraitResolver::is_matching_default_method(
+            &method_without_default,
+            "test_method"
+        ));
+    }
+
+    #[test]
+    fn test_create_default_method_resolution() {
+        let resolved = TraitResolver::create_default_method_resolution("MyTrait", "my_method");
+
+        assert_eq!(resolved.function_id.file, PathBuf::from("trait_default"));
+        assert_eq!(resolved.function_id.name, "MyTrait::my_method");
+        assert_eq!(resolved.function_id.line, 0);
+        assert_eq!(resolved.trait_name, Some("MyTrait".to_string()));
+        assert_eq!(resolved.priority, ResolutionPriority::DefaultTraitMethod);
+        assert_eq!(resolved.confidence, 0.6);
+    }
+
+    #[test]
+    fn test_has_method_override() {
+        let mut tracker = TraitImplementationTracker::new();
+
+        // Register a trait
+        let trait_def = crate::analyzers::trait_implementation_tracker::TraitDefinition {
+            name: "TestTrait".to_string(),
+            methods: vec![
+                crate::analyzers::trait_implementation_tracker::TraitMethod {
+                    name: "test_method".to_string(),
+                    has_default: true,
+                    is_async: false,
+                    signature: "fn test_method(&self)".to_string(),
+                },
+            ]
+            .into(),
+            associated_types: Vector::new(),
+            supertraits: Vector::new(),
+            generic_params: Vector::new(),
+            module_path: Vector::new(),
+        };
+        tracker.register_trait(trait_def);
+
+        // Register an implementation with an override
+        let mut methods = HashMap::new();
+        methods.insert(
+            "test_method".to_string(),
+            crate::analyzers::trait_implementation_tracker::MethodImpl {
+                name: "test_method".to_string(),
+                function_id: FunctionId {
+                    file: PathBuf::from("test.rs"),
+                    name: "MyType::test_method".to_string(),
+                    line: 10,
+                },
+                overrides_default: true,
+            },
+        );
+
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "TestTrait".to_string(),
+                implementing_type: "MyType".to_string(),
+                methods,
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        let resolver = TraitResolver::new(Arc::new(tracker));
+
+        // Should find override
+        assert!(resolver.has_method_override("MyType", "TestTrait", "test_method"));
+
+        // Should not find override for different type
+        assert!(!resolver.has_method_override("OtherType", "TestTrait", "test_method"));
+
+        // Should not find override for non-existent method
+        assert!(!resolver.has_method_override("MyType", "TestTrait", "non_existent"));
+    }
+
+    #[test]
+    fn test_check_trait_default_method_with_override() {
+        let mut tracker = TraitImplementationTracker::new();
+
+        // Register a trait with default method
+        let trait_def = crate::analyzers::trait_implementation_tracker::TraitDefinition {
+            name: "TestTrait".to_string(),
+            methods: vec![
+                crate::analyzers::trait_implementation_tracker::TraitMethod {
+                    name: "default_method".to_string(),
+                    has_default: true,
+                    is_async: false,
+                    signature: "fn default_method(&self)".to_string(),
+                },
+            ]
+            .into(),
+            associated_types: Vector::new(),
+            supertraits: Vector::new(),
+            generic_params: Vector::new(),
+            module_path: Vector::new(),
+        };
+        tracker.register_trait(trait_def);
+
+        // Register implementation with override
+        let mut methods = HashMap::new();
+        methods.insert(
+            "default_method".to_string(),
+            crate::analyzers::trait_implementation_tracker::MethodImpl {
+                name: "default_method".to_string(),
+                function_id: FunctionId {
+                    file: PathBuf::from("test.rs"),
+                    name: "MyType::default_method".to_string(),
+                    line: 20,
+                },
+                overrides_default: true,
+            },
+        );
+
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "TestTrait".to_string(),
+                implementing_type: "MyType".to_string(),
+                methods,
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        let resolver = TraitResolver::new(Arc::new(tracker));
+
+        // Should return None because method is overridden
+        let result = resolver.check_trait_default_method("MyType", "TestTrait", "default_method");
+        assert!(result.is_none());
+
+        // Should return Some for type without override
+        let result =
+            resolver.check_trait_default_method("OtherType", "TestTrait", "default_method");
+        assert!(result.is_some());
+
+        if let Some(resolved) = result {
+            assert_eq!(resolved.priority, ResolutionPriority::DefaultTraitMethod);
+            assert_eq!(resolved.trait_name, Some("TestTrait".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_resolve_default_trait_method_complete() {
+        let mut tracker = TraitImplementationTracker::new();
+
+        // Register trait with default method
+        let trait_def = crate::analyzers::trait_implementation_tracker::TraitDefinition {
+            name: "DefaultTrait".to_string(),
+            methods: vec![
+                crate::analyzers::trait_implementation_tracker::TraitMethod {
+                    name: "default_fn".to_string(),
+                    has_default: true,
+                    is_async: false,
+                    signature: "fn default_fn(&self)".to_string(),
+                },
+            ]
+            .into(),
+            associated_types: Vector::new(),
+            supertraits: Vector::new(),
+            generic_params: Vector::new(),
+            module_path: Vector::new(),
+        };
+        tracker.register_trait(trait_def);
+
+        // Register implementation without override
+        tracker.register_implementation(
+            crate::analyzers::trait_implementation_tracker::Implementation {
+                trait_name: "DefaultTrait".to_string(),
+                implementing_type: "MyStruct".to_string(),
+                methods: HashMap::new(), // No override
+                generic_constraints: Vector::new(),
+                is_blanket: false,
+                is_negative: false,
+                module_path: Vector::new(),
+            },
+        );
+
+        let resolver = TraitResolver::new(Arc::new(tracker));
+
+        // Should resolve to default method
+        let result = resolver.resolve_default_trait_method("MyStruct", "default_fn");
+        assert!(result.is_some());
+
+        if let Some(resolved) = result {
+            assert_eq!(resolved.priority, ResolutionPriority::DefaultTraitMethod);
+            assert_eq!(resolved.trait_name, Some("DefaultTrait".to_string()));
+            assert_eq!(resolved.confidence, 0.6);
+        }
+
+        // Should return None for non-existent method
+        let result = resolver.resolve_default_trait_method("MyStruct", "non_existent");
+        assert!(result.is_none());
     }
 }

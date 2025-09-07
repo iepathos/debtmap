@@ -661,28 +661,35 @@ fn parse_and_validate_config_impl(contents: &str) -> Result<DebtmapConfig, Strin
 
 /// Pure function to try loading config from a specific path
 fn try_load_config_from_path(config_path: &Path) -> Option<DebtmapConfig> {
-    match read_config_file(config_path) {
-        Ok(contents) => match parse_and_validate_config_impl(&contents) {
-            Ok(config) => {
-                log::debug!("Loaded config from {}", config_path.display());
-                Some(config)
-            }
-            Err(e) => {
-                eprintln!("Warning: {}. Using defaults.", e);
-                None
-            }
-        },
+    let contents = match read_config_file(config_path) {
+        Ok(contents) => contents,
         Err(e) => {
-            // Only log actual errors, not "file not found"
-            if e.kind() != std::io::ErrorKind::NotFound {
-                log::warn!(
-                    "Failed to read config file {}: {}",
-                    config_path.display(),
-                    e
-                );
-            }
+            handle_read_error(config_path, &e);
+            return None;
+        }
+    };
+
+    match parse_and_validate_config_impl(&contents) {
+        Ok(config) => {
+            log::debug!("Loaded config from {}", config_path.display());
+            Some(config)
+        }
+        Err(e) => {
+            eprintln!("Warning: {}. Using defaults.", e);
             None
         }
+    }
+}
+
+/// Handle file read errors with appropriate logging
+fn handle_read_error(config_path: &Path, error: &std::io::Error) {
+    // Only log actual errors, not "file not found"
+    if error.kind() != std::io::ErrorKind::NotFound {
+        log::warn!(
+            "Failed to read config file {}: {}",
+            config_path.display(),
+            error
+        );
     }
 }
 
@@ -994,5 +1001,89 @@ organization = 0.5
         // Root directory has no parent, so we only get the root itself
         assert_eq!(ancestors.len(), 1);
         assert_eq!(ancestors[0], PathBuf::from("/"));
+    }
+
+    #[test]
+    fn test_try_load_config_from_path_with_valid_config() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("debtmap.toml");
+
+        // Write a valid config file
+        fs::write(
+            &config_path,
+            r#"
+[thresholds]
+complexity = 15
+max_file_length = 1000
+
+[scoring]
+complexity_weight = 0.4
+coverage_weight = 0.3
+inheritance_weight = 0.15
+interface_weight = 0.15
+"#,
+        )
+        .unwrap();
+
+        let result = try_load_config_from_path(&config_path);
+        assert!(result.is_some());
+
+        let config = result.unwrap();
+        assert_eq!(config.thresholds.as_ref().unwrap().complexity, Some(15));
+        assert_eq!(
+            config.thresholds.as_ref().unwrap().max_file_length,
+            Some(1000)
+        );
+    }
+
+    #[test]
+    fn test_try_load_config_from_path_with_invalid_config() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("debtmap.toml");
+
+        // Write an invalid config file
+        fs::write(&config_path, "invalid toml content").unwrap();
+
+        let result = try_load_config_from_path(&config_path);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_try_load_config_from_path_with_nonexistent_file() {
+        use std::path::PathBuf;
+
+        let config_path = PathBuf::from("/nonexistent/path/to/config.toml");
+        let result = try_load_config_from_path(&config_path);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_handle_read_error_with_not_found() {
+        use std::io;
+        use std::path::PathBuf;
+
+        let path = PathBuf::from("/test/path");
+        let error = io::Error::new(io::ErrorKind::NotFound, "File not found");
+
+        // This should not panic and should not log a warning for NotFound
+        handle_read_error(&path, &error);
+    }
+
+    #[test]
+    fn test_handle_read_error_with_permission_denied() {
+        use std::io;
+        use std::path::PathBuf;
+
+        let path = PathBuf::from("/test/path");
+        let error = io::Error::new(io::ErrorKind::PermissionDenied, "Permission denied");
+
+        // This should log a warning but not panic
+        handle_read_error(&path, &error);
     }
 }

@@ -422,50 +422,57 @@ impl RustSemanticNormalizer {
     }
 
     fn calculate_logical_structure(&self, statements: &[NormalizedStatement]) -> LogicalStructure {
-        let mut max_depth = 0;
-        let mut current_depth = 0;
-        let mut branching_factor = 0;
-        let mut has_early_return = false;
-
-        for (i, stmt) in statements.iter().enumerate() {
-            match stmt {
-                NormalizedStatement::Control(control) => {
-                    current_depth += 1;
-                    max_depth = max_depth.max(current_depth);
-
-                    match control.control_type {
-                        ControlType::If | ControlType::Match => branching_factor += 1,
-                        _ => {}
-                    }
-
-                    // Check for early returns in control blocks
-                    if control.body.logical_structure.has_early_return {
-                        has_early_return = true;
-                    }
-
-                    current_depth -= 1;
-                }
-                NormalizedStatement::Expression(expr) => {
-                    if expr.expr_type == ExprType::LogicalOp {
-                        branching_factor += 1;
-                    }
-
-                    // Check for early returns
-                    if i < statements.len() - 1 {
-                        if let Expr::Return(_) = &expr.original_expr {
-                            has_early_return = true;
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
+        let depth = Self::calculate_max_depth(statements);
+        let branching_factor = Self::calculate_branching_factor(statements);
+        let has_early_return = Self::has_early_return(statements);
 
         LogicalStructure {
-            depth: max_depth,
+            depth,
             branching_factor,
             has_early_return,
         }
+    }
+
+    fn calculate_max_depth(statements: &[NormalizedStatement]) -> usize {
+        statements
+            .iter()
+            .fold((0, 0), |(max_depth, current_depth), stmt| match stmt {
+                NormalizedStatement::Control(_) => {
+                    let new_depth = current_depth + 1;
+                    (max_depth.max(new_depth), current_depth)
+                }
+                _ => (max_depth, current_depth),
+            })
+            .0
+    }
+
+    fn calculate_branching_factor(statements: &[NormalizedStatement]) -> usize {
+        statements
+            .iter()
+            .map(|stmt| match stmt {
+                NormalizedStatement::Control(control) => {
+                    Self::is_branching_control(&control.control_type) as usize
+                }
+                NormalizedStatement::Expression(expr) if expr.expr_type == ExprType::LogicalOp => 1,
+                _ => 0,
+            })
+            .sum()
+    }
+
+    fn is_branching_control(control_type: &ControlType) -> bool {
+        matches!(control_type, ControlType::If | ControlType::Match)
+    }
+
+    fn has_early_return(statements: &[NormalizedStatement]) -> bool {
+        statements.iter().enumerate().any(|(i, stmt)| match stmt {
+            NormalizedStatement::Control(control) => {
+                control.body.logical_structure.has_early_return
+            }
+            NormalizedStatement::Expression(expr) if i < statements.len() - 1 => {
+                matches!(&expr.original_expr, Expr::Return(_))
+            }
+            _ => false,
+        })
     }
 }
 
@@ -576,5 +583,24 @@ mod tests {
             assert_eq!(normalized.arm_count, 4);
             assert!(normalized.has_guard);
         }
+    }
+
+    #[test]
+    fn test_is_branching_control() {
+        assert!(RustSemanticNormalizer::is_branching_control(
+            &ControlType::If
+        ));
+        assert!(RustSemanticNormalizer::is_branching_control(
+            &ControlType::Match
+        ));
+        assert!(!RustSemanticNormalizer::is_branching_control(
+            &ControlType::Loop
+        ));
+        assert!(!RustSemanticNormalizer::is_branching_control(
+            &ControlType::While
+        ));
+        assert!(!RustSemanticNormalizer::is_branching_control(
+            &ControlType::For
+        ));
     }
 }

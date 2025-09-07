@@ -270,29 +270,45 @@ struct FunctionVisitor {
 }
 
 impl FunctionVisitor {
+    /// Pure function to classify if a path represents a test file
+    fn classify_test_file(path_str: &str) -> bool {
+        // Test directory patterns
+        const TEST_DIR_PATTERNS: &[&str] = &[
+            "/tests/",
+            "/test/",
+            "/testing/",
+            "/mocks/",
+            "/mock/",
+            "/fixtures/",
+            "/fixture/",
+            "/test_helpers/",
+            "/test_utils/",
+            "/test_",
+            "/mock",
+            "/scenario",
+            "\\tests\\",
+            "\\test\\", // Windows paths
+        ];
+
+        // Test file suffixes
+        const TEST_FILE_SUFFIXES: &[&str] = &["_test.rs", "_tests.rs", "/tests.rs", "/test.rs"];
+
+        // Check directory patterns
+        let has_test_dir = TEST_DIR_PATTERNS
+            .iter()
+            .any(|pattern| path_str.contains(pattern));
+
+        // Check file suffixes
+        let has_test_suffix = TEST_FILE_SUFFIXES
+            .iter()
+            .any(|suffix| path_str.ends_with(suffix));
+
+        has_test_dir || has_test_suffix
+    }
+
     fn new(file: PathBuf, source_content: String) -> Self {
         // Check if this file is a test file based on its path
-        let is_test_file = {
-            let path_str = file.to_string_lossy();
-            path_str.contains("/tests/") 
-                || path_str.contains("/test/")
-                || path_str.contains("/testing/")
-                || path_str.contains("/mocks/")
-                || path_str.contains("/mock/")
-                || path_str.contains("/fixtures/")
-                || path_str.contains("/fixture/")
-                || path_str.contains("/test_helpers/")
-                || path_str.contains("/test_utils/")
-                || path_str.ends_with("_test.rs")
-                || path_str.ends_with("_tests.rs")
-                || path_str.ends_with("/tests.rs")
-                || path_str.ends_with("/test.rs")
-                || path_str.contains("/test_")
-                || path_str.contains("/mock")
-                || path_str.contains("/scenario")  // Mock scenarios
-                || path_str.contains("\\tests\\")  // Windows paths
-                || path_str.contains("\\test\\") // Windows paths
-        };
+        let is_test_file = Self::classify_test_file(&file.to_string_lossy());
 
         Self {
             functions: Vec::new(),
@@ -459,26 +475,44 @@ impl FunctionVisitor {
     }
 
     fn is_test_function(name: &str, item_fn: &syn::ItemFn) -> bool {
+        // Extract pure classification logic
+        Self::has_test_attribute(&item_fn.attrs) || Self::has_test_name_pattern(name)
+    }
+
+    fn has_test_attribute(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| match () {
+            _ if attr.path().is_ident("test") => true,
+            _ if attr
+                .path()
+                .segments
+                .last()
+                .is_some_and(|seg| seg.ident == "test") =>
+            {
+                true
+            }
+            _ if attr.path().is_ident("cfg") => {
+                attr.meta.to_token_stream().to_string().contains("test")
+            }
+            _ => false,
+        })
+    }
+
+    fn has_test_name_pattern(name: &str) -> bool {
         const TEST_PREFIXES: &[&str] = &["test_", "it_", "should_"];
         const MOCK_PATTERNS: &[&str] = &["mock", "stub", "fake"];
 
-        // Check test attributes
-        let has_test_attribute = item_fn.attrs.iter().any(|attr| {
-            attr.path().is_ident("test")
-                || attr
-                    .path()
-                    .segments
-                    .last()
-                    .is_some_and(|seg| seg.ident == "test")
-                || (attr.path().is_ident("cfg")
-                    && attr.meta.to_token_stream().to_string().contains("test"))
-        });
+        let name_lower = name.to_lowercase();
 
-        has_test_attribute
-            || TEST_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
-            || MOCK_PATTERNS
+        match () {
+            _ if TEST_PREFIXES.iter().any(|prefix| name.starts_with(prefix)) => true,
+            _ if MOCK_PATTERNS
                 .iter()
-                .any(|pattern| name.to_lowercase().contains(pattern))
+                .any(|pattern| name_lower.contains(pattern)) =>
+            {
+                true
+            }
+            _ => false,
+        }
     }
 
     fn extract_visibility(vis: &syn::Visibility) -> Option<String> {
@@ -1188,6 +1222,89 @@ mod tests {
     use syn::parse_quote;
 
     #[test]
+    fn test_classify_test_file_with_test_directories() {
+        // Test directory patterns
+        assert!(FunctionVisitor::classify_test_file("src/tests/mod.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/test/utils.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/testing/helpers.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file("src/mocks/data.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/mock/server.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/fixtures/sample.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file("src/fixture/db.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/test_helpers/common.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/test_utils/setup.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "src/test_integration.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file("src/mockito/client.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/scenario/basic.rs"));
+    }
+
+    #[test]
+    fn test_classify_test_file_with_test_suffixes() {
+        // Test file suffixes
+        assert!(FunctionVisitor::classify_test_file("src/lib_test.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/module_tests.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/tests.rs"));
+        assert!(FunctionVisitor::classify_test_file("src/test.rs"));
+        assert!(FunctionVisitor::classify_test_file("integration_test.rs"));
+        assert!(FunctionVisitor::classify_test_file("unit_tests.rs"));
+    }
+
+    #[test]
+    fn test_classify_test_file_with_windows_paths() {
+        // Windows path patterns
+        assert!(FunctionVisitor::classify_test_file("src\\tests\\mod.rs"));
+        assert!(FunctionVisitor::classify_test_file("src\\test\\utils.rs"));
+        assert!(FunctionVisitor::classify_test_file(
+            "C:\\project\\tests\\integration.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "D:\\code\\test\\unit.rs"
+        ));
+    }
+
+    #[test]
+    fn test_classify_test_file_negative_cases() {
+        // Non-test files
+        assert!(!FunctionVisitor::classify_test_file("src/main.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/lib.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/analyzer.rs"));
+        assert!(!FunctionVisitor::classify_test_file(
+            "src/core/processor.rs"
+        ));
+        assert!(!FunctionVisitor::classify_test_file("src/utils/helper.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/latest.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/contest.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/protest.rs"));
+    }
+
+    #[test]
+    fn test_classify_test_file_edge_cases() {
+        // Edge cases
+        assert!(FunctionVisitor::classify_test_file("/tests/"));
+        assert!(FunctionVisitor::classify_test_file("/tests/file.rs"));
+        assert!(FunctionVisitor::classify_test_file("path/test.rs"));
+        assert!(FunctionVisitor::classify_test_file("path/tests.rs"));
+        assert!(!FunctionVisitor::classify_test_file(""));
+        assert!(!FunctionVisitor::classify_test_file("/"));
+        assert!(FunctionVisitor::classify_test_file(
+            "deeply/nested/tests/file.rs"
+        ));
+        assert!(FunctionVisitor::classify_test_file(
+            "very/deep/path/test_utils/util.rs"
+        ));
+    }
+
+    #[test]
     fn test_is_test_function_with_test_attribute() {
         let item_fn: syn::ItemFn = parse_quote! {
             #[test]
@@ -1377,5 +1494,93 @@ mod tests {
         // The purity detector might not always detect mutation through self
         // This is a known limitation, so we just verify it returns a result
         // without asserting the specific value
+    }
+
+    #[test]
+    fn test_has_test_attribute_with_simple_test() {
+        let code = r#"
+            #[test]
+            fn my_test() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+
+    #[test]
+    fn test_has_test_attribute_with_tokio_test() {
+        let code = r#"
+            #[tokio::test]
+            async fn my_async_test() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+
+    #[test]
+    fn test_has_test_attribute_with_cfg_test() {
+        let code = r#"
+            #[cfg(test)]
+            fn helper() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+
+    #[test]
+    fn test_has_test_attribute_without_test() {
+        let code = r#"
+            #[derive(Debug)]
+            fn regular_function() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(!FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+
+    #[test]
+    fn test_has_test_name_pattern_with_test_prefix() {
+        assert!(FunctionVisitor::has_test_name_pattern("test_something"));
+        assert!(FunctionVisitor::has_test_name_pattern("test_"));
+    }
+
+    #[test]
+    fn test_has_test_name_pattern_with_it_prefix() {
+        assert!(FunctionVisitor::has_test_name_pattern("it_should_work"));
+        assert!(FunctionVisitor::has_test_name_pattern("it_"));
+    }
+
+    #[test]
+    fn test_has_test_name_pattern_with_should_prefix() {
+        assert!(FunctionVisitor::has_test_name_pattern(
+            "should_do_something"
+        ));
+        assert!(FunctionVisitor::has_test_name_pattern("should_"));
+    }
+
+    #[test]
+    fn test_has_test_name_pattern_with_mock() {
+        assert!(FunctionVisitor::has_test_name_pattern("mock_service"));
+        assert!(FunctionVisitor::has_test_name_pattern("get_mock"));
+        assert!(FunctionVisitor::has_test_name_pattern("MockBuilder"));
+    }
+
+    #[test]
+    fn test_has_test_name_pattern_with_stub() {
+        assert!(FunctionVisitor::has_test_name_pattern("stub_response"));
+        assert!(FunctionVisitor::has_test_name_pattern("get_stub"));
+        assert!(FunctionVisitor::has_test_name_pattern("StubFactory"));
+    }
+
+    #[test]
+    fn test_has_test_name_pattern_with_fake() {
+        assert!(FunctionVisitor::has_test_name_pattern("fake_data"));
+        assert!(FunctionVisitor::has_test_name_pattern("create_fake"));
+        assert!(FunctionVisitor::has_test_name_pattern("FakeImpl"));
+    }
+
+    #[test]
+    fn test_has_test_name_pattern_regular_name() {
+        assert!(!FunctionVisitor::has_test_name_pattern("regular_function"));
+        assert!(!FunctionVisitor::has_test_name_pattern("process_data"));
+        assert!(!FunctionVisitor::has_test_name_pattern("handle_request"));
     }
 }
