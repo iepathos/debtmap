@@ -459,26 +459,34 @@ impl FunctionVisitor {
     }
 
     fn is_test_function(name: &str, item_fn: &syn::ItemFn) -> bool {
+        // Extract pure classification logic
+        Self::has_test_attribute(&item_fn.attrs) || Self::has_test_name_pattern(name)
+    }
+    
+    fn has_test_attribute(attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            match () {
+                _ if attr.path().is_ident("test") => true,
+                _ if attr.path().segments.last().is_some_and(|seg| seg.ident == "test") => true,
+                _ if attr.path().is_ident("cfg") => {
+                    attr.meta.to_token_stream().to_string().contains("test")
+                }
+                _ => false,
+            }
+        })
+    }
+    
+    fn has_test_name_pattern(name: &str) -> bool {
         const TEST_PREFIXES: &[&str] = &["test_", "it_", "should_"];
         const MOCK_PATTERNS: &[&str] = &["mock", "stub", "fake"];
-
-        // Check test attributes
-        let has_test_attribute = item_fn.attrs.iter().any(|attr| {
-            attr.path().is_ident("test")
-                || attr
-                    .path()
-                    .segments
-                    .last()
-                    .is_some_and(|seg| seg.ident == "test")
-                || (attr.path().is_ident("cfg")
-                    && attr.meta.to_token_stream().to_string().contains("test"))
-        });
-
-        has_test_attribute
-            || TEST_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
-            || MOCK_PATTERNS
-                .iter()
-                .any(|pattern| name.to_lowercase().contains(pattern))
+        
+        let name_lower = name.to_lowercase();
+        
+        match () {
+            _ if TEST_PREFIXES.iter().any(|prefix| name.starts_with(prefix)) => true,
+            _ if MOCK_PATTERNS.iter().any(|pattern| name_lower.contains(pattern)) => true,
+            _ => false,
+        }
     }
 
     fn extract_visibility(vis: &syn::Visibility) -> Option<String> {
@@ -1377,5 +1385,91 @@ mod tests {
         // The purity detector might not always detect mutation through self
         // This is a known limitation, so we just verify it returns a result
         // without asserting the specific value
+    }
+    
+    #[test]
+    fn test_has_test_attribute_with_simple_test() {
+        let code = r#"
+            #[test]
+            fn my_test() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+    
+    #[test] 
+    fn test_has_test_attribute_with_tokio_test() {
+        let code = r#"
+            #[tokio::test]
+            async fn my_async_test() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+    
+    #[test]
+    fn test_has_test_attribute_with_cfg_test() {
+        let code = r#"
+            #[cfg(test)]
+            fn helper() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+    
+    #[test]
+    fn test_has_test_attribute_without_test() {
+        let code = r#"
+            #[derive(Debug)]
+            fn regular_function() {}
+        "#;
+        let item_fn = syn::parse_str::<syn::ItemFn>(code).unwrap();
+        assert!(!FunctionVisitor::has_test_attribute(&item_fn.attrs));
+    }
+    
+    #[test]
+    fn test_has_test_name_pattern_with_test_prefix() {
+        assert!(FunctionVisitor::has_test_name_pattern("test_something"));
+        assert!(FunctionVisitor::has_test_name_pattern("test_"));
+    }
+    
+    #[test]
+    fn test_has_test_name_pattern_with_it_prefix() {
+        assert!(FunctionVisitor::has_test_name_pattern("it_should_work"));
+        assert!(FunctionVisitor::has_test_name_pattern("it_"));
+    }
+    
+    #[test]
+    fn test_has_test_name_pattern_with_should_prefix() {
+        assert!(FunctionVisitor::has_test_name_pattern("should_do_something"));
+        assert!(FunctionVisitor::has_test_name_pattern("should_"));
+    }
+    
+    #[test]
+    fn test_has_test_name_pattern_with_mock() {
+        assert!(FunctionVisitor::has_test_name_pattern("mock_service"));
+        assert!(FunctionVisitor::has_test_name_pattern("get_mock"));
+        assert!(FunctionVisitor::has_test_name_pattern("MockBuilder"));
+    }
+    
+    #[test]
+    fn test_has_test_name_pattern_with_stub() {
+        assert!(FunctionVisitor::has_test_name_pattern("stub_response"));
+        assert!(FunctionVisitor::has_test_name_pattern("get_stub"));
+        assert!(FunctionVisitor::has_test_name_pattern("StubFactory"));
+    }
+    
+    #[test]
+    fn test_has_test_name_pattern_with_fake() {
+        assert!(FunctionVisitor::has_test_name_pattern("fake_data"));
+        assert!(FunctionVisitor::has_test_name_pattern("create_fake"));
+        assert!(FunctionVisitor::has_test_name_pattern("FakeImpl"));
+    }
+    
+    #[test]
+    fn test_has_test_name_pattern_regular_name() {
+        assert!(!FunctionVisitor::has_test_name_pattern("regular_function"));
+        assert!(!FunctionVisitor::has_test_name_pattern("process_data"));
+        assert!(!FunctionVisitor::has_test_name_pattern("handle_request"));
     }
 }
