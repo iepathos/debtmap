@@ -271,92 +271,88 @@ impl<'a> EnhancedScorer<'a> {
         (weighted_sum / total_weight).min(10.0)
     }
 
-    fn calculate_complexity_factor(&self, func: &FunctionMetrics) -> f64 {
-        // Map actual complexity to a multiplier
-        let combined_complexity = (func.cyclomatic + func.cognitive) as f64 / 2.0;
+    /// Maps complexity to a scoring multiplier using pattern matching
+    fn map_complexity_to_factor(combined_complexity: f64) -> f64 {
+        match () {
+            _ if combined_complexity <= 3.0 => 0.8,   // Simple functions
+            _ if combined_complexity <= 5.0 => 1.0,   // Normal complexity
+            _ if combined_complexity <= 10.0 => 1.2,  // Moderate complexity
+            _ if combined_complexity <= 20.0 => 1.5,  // High complexity
+            _ => 1.8,                                  // Very complex
+        }
+    }
 
-        if combined_complexity <= 3.0 {
-            0.8 // Simple functions get lower scores
-        } else if combined_complexity <= 5.0 {
-            1.0
-        } else if combined_complexity <= 10.0 {
-            1.2
-        } else if combined_complexity <= 20.0 {
-            1.5
-        } else {
-            1.8 // Very complex functions get higher scores
+    fn calculate_complexity_factor(&self, func: &FunctionMetrics) -> f64 {
+        let combined_complexity = (func.cyclomatic + func.cognitive) as f64 / 2.0;
+        Self::map_complexity_to_factor(combined_complexity)
+    }
+
+    /// Maps coverage percentage to a scoring factor
+    fn map_coverage_to_factor(coverage_pct: f64) -> f64 {
+        match () {
+            _ if coverage_pct == 0.0 => 1.8,   // No coverage
+            _ if coverage_pct < 50.0 => 1.4,   // Low coverage
+            _ if coverage_pct < 80.0 => 1.1,   // Medium coverage
+            _ => 0.9,                          // Good coverage
         }
     }
 
     fn calculate_coverage_factor(&self, func: &FunctionMetrics) -> f64 {
-        if let Some(coverage) = &self.context.coverage_map {
-            if let Some(coverage_pct) = coverage.get_function_coverage(&func.file, &func.name) {
-                if coverage_pct == 0.0 {
-                    1.8 // No coverage is bad
-                } else if coverage_pct < 50.0 {
-                    1.4
-                } else if coverage_pct < 80.0 {
-                    1.1
-                } else {
-                    0.9 // Well-covered code gets lower scores
-                }
-            } else {
-                1.2 // Unknown coverage
-            }
-        } else {
-            1.2 // No coverage data available
+        self.context
+            .coverage_map
+            .as_ref()
+            .and_then(|coverage| coverage.get_function_coverage(&func.file, &func.name))
+            .map(Self::map_coverage_to_factor)
+            .unwrap_or(1.2) // Unknown or no coverage data
+    }
+
+    /// Maps downstream dependency count to a criticality factor
+    fn map_dependencies_to_factor(downstream_count: usize) -> f64 {
+        match () {
+            _ if downstream_count == 0 => 0.9,     // Leaf functions
+            _ if downstream_count <= 3 => 1.0,     // Few dependencies
+            _ if downstream_count <= 10 => 1.3,    // Moderate dependencies
+            _ => 1.6,                              // Many dependencies
         }
     }
 
     fn calculate_dependency_factor(&self, func_id: &FunctionId) -> f64 {
         let downstream_count = self.context.call_graph.get_callees(func_id).len();
+        Self::map_dependencies_to_factor(downstream_count)
+    }
 
-        if downstream_count == 0 {
-            0.9 // Leaf functions are less critical
-        } else if downstream_count <= 3 {
-            1.0
-        } else if downstream_count <= 10 {
-            1.3
-        } else {
-            1.6 // Functions with many dependencies are critical
+    /// Maps call frequency to a scoring factor
+    fn map_call_frequency_to_factor(call_freq: usize) -> f64 {
+        match () {
+            _ if call_freq == 0 => 0.9,    // Never called
+            _ if call_freq <= 2 => 1.0,    // Rarely called
+            _ if call_freq <= 5 => 1.2,    // Sometimes called
+            _ => 1.4,                       // Frequently called
+        }
+    }
+
+    /// Maps change count to a factor based on git history
+    fn map_change_count_to_factor(changes: usize) -> f64 {
+        match () {
+            _ if changes > 20 => 1.3,     // High churn
+            _ if changes > 10 => 1.15,    // Moderate churn
+            _ => 1.0,                      // Stable
         }
     }
 
     fn calculate_frequency_factor(&self, func_id: &FunctionId) -> f64 {
-        // Call frequency
-        let call_freq = self
-            .context
-            .call_frequencies
+        let call_freq = self.context.call_frequencies
             .get(func_id)
             .copied()
             .unwrap_or(0);
+        
+        let call_factor = Self::map_call_frequency_to_factor(call_freq);
 
-        let call_factor = if call_freq == 0 {
-            0.9
-        } else if call_freq <= 2 {
-            1.0
-        } else if call_freq <= 5 {
-            1.2
-        } else {
-            1.4
-        };
-
-        // Change frequency (if git history available)
-        let change_factor = if let Some(git_history) = &self.context.git_history {
-            if let Some(changes) = git_history.change_counts.get(&func_id.file) {
-                if *changes > 20 {
-                    1.3
-                } else if *changes > 10 {
-                    1.15
-                } else {
-                    1.0
-                }
-            } else {
-                1.0
-            }
-        } else {
-            1.0
-        };
+        let change_factor = self.context.git_history
+            .as_ref()
+            .and_then(|history| history.change_counts.get(&func_id.file))
+            .map(|&changes| Self::map_change_count_to_factor(changes))
+            .unwrap_or(1.0);
 
         f64::min(call_factor * change_factor, 1.8)
     }
@@ -617,5 +613,100 @@ mod tests {
 
         let score = scorer.calculate_base_score(&item);
         assert_eq!(score, 7.8); // 6.5 * 1.2
+    }
+
+    #[test]
+    fn test_map_complexity_to_factor() {
+        // Test boundary conditions
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(0.0), 0.8);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(3.0), 0.8);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(3.1), 1.0);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(5.0), 1.0);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(5.1), 1.2);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(10.0), 1.2);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(10.1), 1.5);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(20.0), 1.5);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(20.1), 1.8);
+        assert_eq!(EnhancedScorer::map_complexity_to_factor(100.0), 1.8);
+    }
+
+    #[test]
+    fn test_map_coverage_to_factor() {
+        // Test exact zero
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(0.0), 1.8);
+        
+        // Test low coverage
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(0.1), 1.4);
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(25.0), 1.4);
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(49.9), 1.4);
+        
+        // Test medium coverage
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(50.0), 1.1);
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(65.0), 1.1);
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(79.9), 1.1);
+        
+        // Test good coverage
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(80.0), 0.9);
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(90.0), 0.9);
+        assert_eq!(EnhancedScorer::map_coverage_to_factor(100.0), 0.9);
+    }
+
+    #[test]
+    fn test_map_dependencies_to_factor() {
+        // Test leaf functions
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(0), 0.9);
+        
+        // Test few dependencies
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(1), 1.0);
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(2), 1.0);
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(3), 1.0);
+        
+        // Test moderate dependencies
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(4), 1.3);
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(7), 1.3);
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(10), 1.3);
+        
+        // Test many dependencies
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(11), 1.6);
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(20), 1.6);
+        assert_eq!(EnhancedScorer::map_dependencies_to_factor(100), 1.6);
+    }
+
+    #[test]
+    fn test_map_call_frequency_to_factor() {
+        // Test never called
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(0), 0.9);
+        
+        // Test rarely called
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(1), 1.0);
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(2), 1.0);
+        
+        // Test sometimes called
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(3), 1.2);
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(4), 1.2);
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(5), 1.2);
+        
+        // Test frequently called
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(6), 1.4);
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(10), 1.4);
+        assert_eq!(EnhancedScorer::map_call_frequency_to_factor(100), 1.4);
+    }
+
+    #[test]
+    fn test_map_change_count_to_factor() {
+        // Test stable code
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(0), 1.0);
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(5), 1.0);
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(10), 1.0);
+        
+        // Test moderate churn
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(11), 1.15);
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(15), 1.15);
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(20), 1.15);
+        
+        // Test high churn
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(21), 1.3);
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(50), 1.3);
+        assert_eq!(EnhancedScorer::map_change_count_to_factor(100), 1.3);
     }
 }
