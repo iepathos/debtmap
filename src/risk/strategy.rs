@@ -475,7 +475,10 @@ mod tests {
 
         // With spec 96, scores are no longer capped at 10.0
         // Very high risk can exceed 10.0
-        assert!(risk_score > 10.0, "Risk score with extreme values should exceed 10.0");
+        assert!(
+            risk_score > 10.0,
+            "Risk score with extreme values should exceed 10.0"
+        );
     }
 
     #[test]

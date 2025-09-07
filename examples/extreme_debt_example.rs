@@ -34,9 +34,11 @@ impl ExtremeLegacyProcessor {
     // - Deep nesting
     // - Multiple responsibilities
     // - No test coverage
-    pub fn process_all_data_with_extreme_complexity(&mut self) -> Result<Vec<ProcessingResult>, String> {
+    pub fn process_all_data_with_extreme_complexity(
+        &mut self,
+    ) -> Result<Vec<ProcessingResult>, String> {
         let mut results = Vec::new();
-        
+
         if let Ok(data) = self.data.lock() {
             for (key, items) in data.iter() {
                 if key.starts_with("process_") {
@@ -44,7 +46,7 @@ impl ExtremeLegacyProcessor {
                         if item.values.len() > 0 {
                             let mut score = 0.0;
                             let mut error_count = 0;
-                            
+
                             // Deep nesting level 1
                             for value in &item.values {
                                 if *value > 0.0 {
@@ -55,7 +57,8 @@ impl ExtremeLegacyProcessor {
                                             // Deep nesting level 4
                                             if item.metadata.contains_key("special") {
                                                 // Deep nesting level 5
-                                                if let Some(special) = item.metadata.get("special") {
+                                                if let Some(special) = item.metadata.get("special")
+                                                {
                                                     // Deep nesting level 6
                                                     if special == "true" {
                                                         score += value * 2.0;
@@ -87,7 +90,9 @@ impl ExtremeLegacyProcessor {
                                             } else {
                                                 // Another condition branch
                                                 if item.metadata.contains_key("priority") {
-                                                    if let Some(priority) = item.metadata.get("priority") {
+                                                    if let Some(priority) =
+                                                        item.metadata.get("priority")
+                                                    {
                                                         match priority.parse::<u32>() {
                                                             Ok(p) if p > 5 => score += value * 2.5,
                                                             Ok(p) if p > 3 => score += value * 1.8,
@@ -117,7 +122,7 @@ impl ExtremeLegacyProcessor {
                                     error_count += 1;
                                 }
                             }
-                            
+
                             // Store result
                             if let Ok(mut cache) = self.cache.lock() {
                                 let result = ProcessingResult {
@@ -151,10 +156,10 @@ impl ExtremeLegacyProcessor {
                 }
             }
         }
-        
+
         Ok(results)
     }
-    
+
     // Another complex function with multiple responsibilities
     pub fn validate_and_transform_data(&mut self, input: Vec<String>) -> Result<(), String> {
         for line in input {
@@ -163,7 +168,7 @@ impl ExtremeLegacyProcessor {
                 if parts.len() > 2 {
                     let command = parts[1];
                     let data = parts[2];
-                    
+
                     match command {
                         "CHECK" => {
                             if data.len() > 10 {

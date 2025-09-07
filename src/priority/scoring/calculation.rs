@@ -151,7 +151,7 @@ mod tests {
         assert!((normalize_final_score(0.1) - 2.0).abs() < 0.01); // 0.1 is boundary -> 2.0
         assert!((normalize_final_score(0.4) - 4.667).abs() < 0.01); // 4.0 + (0.4-0.3)*6.67 = ~4.667
         assert!((normalize_final_score(1.5) - 8.75).abs() < 0.01); // 8.0 + (1.5-1.0)*1.5 = 8.75
-        // With no cap, 5.0 raw score: 9.5 + (5.0-2.0)*0.25 = 10.25
+                                                                   // With no cap, 5.0 raw score: 9.5 + (5.0-2.0)*0.25 = 10.25
         assert!((normalize_final_score(5.0) - 10.25).abs() < 0.01);
     }
 }
