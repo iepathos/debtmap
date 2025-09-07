@@ -402,7 +402,6 @@ def simple_function(x, y):
         assert!(patterns.is_empty());
     }
 
-
     #[test]
     fn test_init_field_counting() {
         // Test the refactored count_init_fields function
@@ -456,7 +455,7 @@ class ComplexClass:
         let envy = patterns
             .iter()
             .find(|p| matches!(p, OrganizationAntiPattern::FeatureEnvy { .. }));
-        
+
         assert!(envy.is_some());
         if let Some(OrganizationAntiPattern::FeatureEnvy { method_name, .. }) = envy {
             assert_eq!(method_name, "method_with_envy");
@@ -488,7 +487,10 @@ def func3(x, y, z):
             .collect();
 
         assert_eq!(clumps.len(), 1);
-        if let OrganizationAntiPattern::DataClump { occurrence_count, .. } = clumps[0] {
+        if let OrganizationAntiPattern::DataClump {
+            occurrence_count, ..
+        } = clumps[0]
+        {
             assert_eq!(*occurrence_count, 2);
         }
     }

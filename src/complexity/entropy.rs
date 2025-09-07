@@ -406,19 +406,11 @@ impl EntropyAnalyzer {
         );
 
         let entropy_factor = Self::calculate_graduated_dampening(
-            entropy,
-            0.4,
-            0.4,
-            0.15,
-            false, // deficit when below threshold
+            entropy, 0.4, 0.4, 0.15, false, // deficit when below threshold
         );
 
         let branch_factor = Self::calculate_graduated_dampening(
-            similarity,
-            0.8,
-            0.2,
-            0.25,
-            true, // excess when above threshold
+            similarity, 0.8, 0.2, 0.25, true, // excess when above threshold
         );
 
         // Combine factors with cap at 30% total reduction
@@ -1554,44 +1546,44 @@ mod tests {
     #[test]
     fn test_calculate_graduated_dampening_excess_mode() {
         // Test excess mode (value > threshold)
-        
+
         // Value below threshold - no dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            0.5,      // value
-            0.8,      // threshold
-            0.2,      // range
-            0.25,     // max_reduction
-            true,     // excess_mode
+            0.5,  // value
+            0.8,  // threshold
+            0.2,  // range
+            0.25, // max_reduction
+            true, // excess_mode
         );
         assert_eq!(factor, 1.0);
 
         // Value at threshold - no dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            0.8,      // value
-            0.8,      // threshold
-            0.2,      // range
-            0.25,     // max_reduction
-            true,     // excess_mode
+            0.8,  // value
+            0.8,  // threshold
+            0.2,  // range
+            0.25, // max_reduction
+            true, // excess_mode
         );
         assert_eq!(factor, 1.0);
 
         // Value above threshold - graduated dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            0.9,      // value (0.1 above threshold)
-            0.8,      // threshold
-            0.2,      // range
-            0.25,     // max_reduction
-            true,     // excess_mode
+            0.9,  // value (0.1 above threshold)
+            0.8,  // threshold
+            0.2,  // range
+            0.25, // max_reduction
+            true, // excess_mode
         );
         assert!((factor - 0.875).abs() < 0.001); // 1.0 - (0.1/0.2 * 0.25) = 0.875
 
         // Value at max - maximum dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            1.0,      // value (0.2 above threshold)
-            0.8,      // threshold
-            0.2,      // range
-            0.25,     // max_reduction
-            true,     // excess_mode
+            1.0,  // value (0.2 above threshold)
+            0.8,  // threshold
+            0.2,  // range
+            0.25, // max_reduction
+            true, // excess_mode
         );
         assert_eq!(factor, 0.75); // 1.0 - 0.25
     }
@@ -1599,44 +1591,44 @@ mod tests {
     #[test]
     fn test_calculate_graduated_dampening_deficit_mode() {
         // Test deficit mode (value < threshold)
-        
+
         // Value above threshold - no dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            0.5,      // value
-            0.4,      // threshold
-            0.4,      // range
-            0.15,     // max_reduction
-            false,    // deficit_mode
+            0.5,   // value
+            0.4,   // threshold
+            0.4,   // range
+            0.15,  // max_reduction
+            false, // deficit_mode
         );
         assert_eq!(factor, 1.0);
 
         // Value at threshold - no dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            0.4,      // value
-            0.4,      // threshold
-            0.4,      // range
-            0.15,     // max_reduction
-            false,    // deficit_mode
+            0.4,   // value
+            0.4,   // threshold
+            0.4,   // range
+            0.15,  // max_reduction
+            false, // deficit_mode
         );
         assert_eq!(factor, 1.0);
 
         // Value below threshold - graduated dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            0.2,      // value (0.2 below threshold)
-            0.4,      // threshold
-            0.4,      // range
-            0.15,     // max_reduction
-            false,    // deficit_mode
+            0.2,   // value (0.2 below threshold)
+            0.4,   // threshold
+            0.4,   // range
+            0.15,  // max_reduction
+            false, // deficit_mode
         );
         assert!((factor - 0.925).abs() < 0.001); // 1.0 - (0.2/0.4 * 0.15) = 0.925
 
         // Value at minimum - maximum dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
-            0.0,      // value (0.4 below threshold)
-            0.4,      // threshold
-            0.4,      // range
-            0.15,     // max_reduction
-            false,    // deficit_mode
+            0.0,   // value (0.4 below threshold)
+            0.4,   // threshold
+            0.4,   // range
+            0.15,  // max_reduction
+            false, // deficit_mode
         );
         assert_eq!(factor, 0.85); // 1.0 - 0.15
     }
@@ -1644,7 +1636,7 @@ mod tests {
     #[test]
     fn test_calculate_dampening_factor_integration() {
         let analyzer = EntropyAnalyzer::new();
-        
+
         // Test with all factors at neutral values
         let factor = analyzer.calculate_dampening_factor(0.5, 0.5, 0.5);
         assert_eq!(factor, 1.0); // No dampening when all values are in neutral range

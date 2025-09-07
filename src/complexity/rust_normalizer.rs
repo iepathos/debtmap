@@ -434,27 +434,29 @@ impl RustSemanticNormalizer {
     }
 
     fn calculate_max_depth(statements: &[NormalizedStatement]) -> usize {
-        statements.iter().fold((0, 0), |(max_depth, current_depth), stmt| {
-            match stmt {
+        statements
+            .iter()
+            .fold((0, 0), |(max_depth, current_depth), stmt| match stmt {
                 NormalizedStatement::Control(_) => {
                     let new_depth = current_depth + 1;
                     (max_depth.max(new_depth), current_depth)
                 }
-                _ => (max_depth, current_depth)
-            }
-        }).0
+                _ => (max_depth, current_depth),
+            })
+            .0
     }
 
     fn calculate_branching_factor(statements: &[NormalizedStatement]) -> usize {
-        statements.iter().map(|stmt| {
-            match stmt {
+        statements
+            .iter()
+            .map(|stmt| match stmt {
                 NormalizedStatement::Control(control) => {
                     Self::is_branching_control(&control.control_type) as usize
                 }
                 NormalizedStatement::Expression(expr) if expr.expr_type == ExprType::LogicalOp => 1,
-                _ => 0
-            }
-        }).sum()
+                _ => 0,
+            })
+            .sum()
     }
 
     fn is_branching_control(control_type: &ControlType) -> bool {
@@ -462,16 +464,14 @@ impl RustSemanticNormalizer {
     }
 
     fn has_early_return(statements: &[NormalizedStatement]) -> bool {
-        statements.iter().enumerate().any(|(i, stmt)| {
-            match stmt {
-                NormalizedStatement::Control(control) => {
-                    control.body.logical_structure.has_early_return
-                }
-                NormalizedStatement::Expression(expr) if i < statements.len() - 1 => {
-                    matches!(&expr.original_expr, Expr::Return(_))
-                }
-                _ => false
+        statements.iter().enumerate().any(|(i, stmt)| match stmt {
+            NormalizedStatement::Control(control) => {
+                control.body.logical_structure.has_early_return
             }
+            NormalizedStatement::Expression(expr) if i < statements.len() - 1 => {
+                matches!(&expr.original_expr, Expr::Return(_))
+            }
+            _ => false,
         })
     }
 }
@@ -587,10 +587,20 @@ mod tests {
 
     #[test]
     fn test_is_branching_control() {
-        assert!(RustSemanticNormalizer::is_branching_control(&ControlType::If));
-        assert!(RustSemanticNormalizer::is_branching_control(&ControlType::Match));
-        assert!(!RustSemanticNormalizer::is_branching_control(&ControlType::Loop));
-        assert!(!RustSemanticNormalizer::is_branching_control(&ControlType::While));
-        assert!(!RustSemanticNormalizer::is_branching_control(&ControlType::For));
+        assert!(RustSemanticNormalizer::is_branching_control(
+            &ControlType::If
+        ));
+        assert!(RustSemanticNormalizer::is_branching_control(
+            &ControlType::Match
+        ));
+        assert!(!RustSemanticNormalizer::is_branching_control(
+            &ControlType::Loop
+        ));
+        assert!(!RustSemanticNormalizer::is_branching_control(
+            &ControlType::While
+        ));
+        assert!(!RustSemanticNormalizer::is_branching_control(
+            &ControlType::For
+        ));
     }
 }

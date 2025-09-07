@@ -487,7 +487,7 @@ impl CallGraphExtractor {
     /// Parse collection macros like vec![], hashmap![]
     fn parse_collection_macro(&mut self, tokens: &proc_macro2::TokenStream, macro_name: &str) {
         let parse_result = Self::try_parse_collection(tokens, macro_name);
-        
+
         match parse_result {
             CollectionParseResult::Bracketed(exprs) | CollectionParseResult::Braced(exprs) => {
                 self.macro_stats.successfully_parsed += 1;
@@ -516,19 +516,19 @@ impl CallGraphExtractor {
         if let Ok(exprs) = Self::parse_bracketed_exprs_static(tokens) {
             return CollectionParseResult::Bracketed(exprs);
         }
-        
+
         // Try to parse as map-like: {key => value, ...}
         if let Ok(exprs) = Self::parse_braced_exprs_static(tokens) {
             return CollectionParseResult::Braced(exprs);
         }
-        
+
         // For hashmap-like macros without braces, try to parse key-value pairs directly
         if Self::is_map_macro(macro_name) {
             if let Some(exprs) = Self::parse_map_tokens(tokens) {
                 return CollectionParseResult::KeyValuePairs(exprs);
             }
         }
-        
+
         CollectionParseResult::Failed
     }
 
@@ -541,7 +541,7 @@ impl CallGraphExtractor {
     fn parse_map_tokens(tokens: &proc_macro2::TokenStream) -> Option<Vec<Expr>> {
         let tokens_str = tokens.to_string();
         let mut result = Vec::new();
-        
+
         for item in tokens_str.split(',') {
             let item = item.trim();
             if !item.is_empty() {
@@ -549,7 +549,7 @@ impl CallGraphExtractor {
                 result.extend(exprs);
             }
         }
-        
+
         if result.is_empty() {
             None
         } else {
@@ -708,7 +708,9 @@ impl CallGraphExtractor {
     }
 
     /// Parse comma-separated expressions (static version)
-    fn parse_comma_separated_exprs_static(tokens: &proc_macro2::TokenStream) -> syn::Result<Vec<Expr>> {
+    fn parse_comma_separated_exprs_static(
+        tokens: &proc_macro2::TokenStream,
+    ) -> syn::Result<Vec<Expr>> {
         let parser = Punctuated::<Expr, Comma>::parse_terminated;
         match parser.parse2(tokens.clone()) {
             Ok(punctuated) => Ok(punctuated.into_iter().collect()),
@@ -3644,9 +3646,10 @@ mod tests {
         // Test vec! macro with function calls
         let tokens: proc_macro2::TokenStream = "1, compute(), 3".parse().unwrap();
         let result = CallGraphExtractor::try_parse_collection(&tokens, "vec");
-        
+
         match result {
-            CollectionParseResult::Bracketed(exprs) | CollectionParseResult::KeyValuePairs(exprs) => {
+            CollectionParseResult::Bracketed(exprs)
+            | CollectionParseResult::KeyValuePairs(exprs) => {
                 assert!(!exprs.is_empty(), "Should parse vec! macro");
             }
             _ => panic!("Failed to parse vec! macro"),
@@ -3658,7 +3661,7 @@ mod tests {
         // Test hashmap! macro with key-value pairs
         let tokens: proc_macro2::TokenStream = "key1 => value1, key2 => value2".parse().unwrap();
         let result = CallGraphExtractor::try_parse_collection(&tokens, "hashmap");
-        
+
         match result {
             CollectionParseResult::KeyValuePairs(exprs) => {
                 assert!(!exprs.is_empty(), "Should parse hashmap! macro");
@@ -3672,19 +3675,22 @@ mod tests {
         // Test empty collection
         let tokens: proc_macro2::TokenStream = "{}".parse().unwrap();
         let result = CallGraphExtractor::try_parse_collection(&tokens, "hashmap");
-        
+
         // Empty {} can be parsed as either Bracketed or Braced with empty vec
         match result {
             CollectionParseResult::Braced(exprs) | CollectionParseResult::Bracketed(exprs) => {
                 // Empty {} might parse as a single empty block expression
-                assert!(exprs.len() <= 1, "Should handle empty collection or single block");
+                assert!(
+                    exprs.len() <= 1,
+                    "Should handle empty collection or single block"
+                );
             }
             CollectionParseResult::Failed => {
                 // Empty {} might be treated as Failed if parse fails
                 // This is also acceptable behavior
             }
             CollectionParseResult::KeyValuePairs(_) => {
-                panic!("Unexpected KeyValuePairs result for empty collection"); 
+                panic!("Unexpected KeyValuePairs result for empty collection");
             }
         }
     }
@@ -3702,7 +3708,7 @@ mod tests {
         // Test parsing map tokens
         let tokens: proc_macro2::TokenStream = "key1 => val1, key2 => val2".parse().unwrap();
         let result = CallGraphExtractor::parse_map_tokens(&tokens);
-        
+
         assert!(result.is_some());
         let exprs = result.unwrap();
         assert!(!exprs.is_empty(), "Should parse key-value pairs");
@@ -3713,7 +3719,7 @@ mod tests {
         // Test empty map tokens
         let tokens: proc_macro2::TokenStream = "".parse().unwrap();
         let result = CallGraphExtractor::parse_map_tokens(&tokens);
-        
+
         assert!(result.is_none(), "Should return None for empty tokens");
     }
 
@@ -3721,14 +3727,14 @@ mod tests {
     fn test_collection_parse_result_coverage() {
         // Test all CollectionParseResult variants
         let tokens: proc_macro2::TokenStream = "[1, 2, 3]".parse().unwrap();
-        
+
         // This test ensures we handle all result types
         let result = CallGraphExtractor::try_parse_collection(&tokens, "vec");
         match result {
-            CollectionParseResult::Bracketed(_) => {},
-            CollectionParseResult::Braced(_) => {},
-            CollectionParseResult::KeyValuePairs(_) => {},
-            CollectionParseResult::Failed => {},
+            CollectionParseResult::Bracketed(_) => {}
+            CollectionParseResult::Braced(_) => {}
+            CollectionParseResult::KeyValuePairs(_) => {}
+            CollectionParseResult::Failed => {}
         }
     }
 
