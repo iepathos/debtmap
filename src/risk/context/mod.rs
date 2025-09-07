@@ -188,7 +188,7 @@ pub struct ContextualRisk {
 impl ContextualRisk {
     pub fn new(base_risk: f64, context_map: &ContextMap) -> Self {
         let context_contribution = context_map.total_contribution();
-        let contextual_risk = (base_risk * (1.0 + context_contribution)).min(10.0);
+        let contextual_risk = base_risk * (1.0 + context_contribution);
 
         let contexts: Vec<Context> = context_map
             .iter()

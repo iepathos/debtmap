@@ -100,7 +100,7 @@ impl ROICalculator {
             raw_roi
         };
 
-        let value = (scaled_roi * confidence).clamp(0.1, 10.0);
+        let value = (scaled_roi * confidence).max(0.1);
 
         ROI {
             value,

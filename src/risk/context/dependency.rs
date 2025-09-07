@@ -136,7 +136,7 @@ impl DependencyRiskCalculator {
         let dependents = self.graph.get_dependents(module_name);
         let criticality_factor = 1.0 + (dependents.len() as f64 * 0.1).min(0.5);
 
-        (base_risk * criticality_factor + dependency_risk).min(10.0)
+        base_risk * criticality_factor + dependency_risk
     }
 
     /// Calculate the blast radius of a change to a module

@@ -1,6 +1,6 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
 use crate::priority::{
-    DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis, UnifiedDebtItem,
+    score_formatter, DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis, UnifiedDebtItem,
 };
 use colored::*;
 use std::fmt::Write;
@@ -256,7 +256,11 @@ pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebt
         output,
         "#{} {} [{}]",
         rank.to_string().bright_cyan().bold(),
-        format!("SCORE: {:.2}", item.unified_score.final_score).bright_yellow(),
+        format!(
+            "SCORE: {}",
+            score_formatter::format_score(item.unified_score.final_score)
+        )
+        .bright_yellow(),
         severity.color(severity_color).bold()
     )
     .unwrap();
@@ -376,10 +380,10 @@ pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebt
 fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
     writeln!(
         output,
-        "#{} {}() - UNIFIED SCORE: {:.1}",
+        "#{} {}() - UNIFIED SCORE: {}",
         rank,
         item.location.function.bright_green(),
-        item.unified_score.final_score
+        score_formatter::format_score(item.unified_score.final_score)
     )
     .unwrap();
 

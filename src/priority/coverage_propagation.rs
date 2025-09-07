@@ -130,8 +130,8 @@ pub fn calculate_coverage_urgency(
     };
 
     // Calculate urgency score with smooth gradient
-    // This produces continuous values from 0 to 10
-    (coverage_gap * complexity_weight * 10.0).min(10.0)
+    // This produces continuous values without capping
+    coverage_gap * complexity_weight * 10.0
 }
 
 pub fn propagate_coverage_through_graph(

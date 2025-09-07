@@ -72,9 +72,12 @@ pub fn normalize_final_score(raw_score: f64) -> f64 {
     } else if raw_score <= 2.0 {
         // High scores: map to 8-9.5 range
         8.0 + (raw_score - 1.0) * 1.5 // 1.0-2.0 -> 8.0-9.5
+    } else if raw_score <= 10.0 {
+        // Very high scores: keep existing scaling
+        9.5 + (raw_score - 2.0) * 0.25
     } else {
-        // Very high scores: map to 9.5-10 range
-        (9.5 + (raw_score - 2.0) * 0.25).min(10.0)
+        // Extreme scores: use square root scaling for gradual increase
+        10.0 + (raw_score - 10.0).sqrt()
     }
 }
 
