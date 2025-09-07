@@ -125,13 +125,11 @@ impl RiskCalculator for EnhancedRiskStrategy {
             base_risk * debt_factor * complexity_factor * coverage_penalty * coverage_factor;
 
         // Ensure genuinely complex code maintains minimum risk signal
-        let adjusted_risk = if context.complexity.cognitive_complexity > 40 && final_risk < 3.0 {
+        if context.complexity.cognitive_complexity > 40 && final_risk < 3.0 {
             3.0 // Very complex code always has at least medium risk
         } else {
             final_risk
-        };
-
-        adjusted_risk.min(10.0)
+        }
     }
 
     fn calculate_risk_reduction(
@@ -475,7 +473,12 @@ mod tests {
 
         let risk_score = strategy.calculate_risk_score(&context);
 
-        assert!(risk_score <= 10.0, "Risk score should be capped at 10.0");
+        // With spec 96, scores are no longer capped at 10.0
+        // Very high risk can exceed 10.0
+        assert!(
+            risk_score > 10.0,
+            "Risk score with extreme values should exceed 10.0"
+        );
     }
 
     #[test]

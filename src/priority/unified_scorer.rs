@@ -186,9 +186,9 @@ pub fn calculate_unified_priority_with_debt(
         let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
 
         // Add small multiplicative factors for other debt types
-        let testing_modifier = 1.0 + (debt_scores.testing.min(10.0) / 100.0);
-        let resource_modifier = 1.0 + (debt_scores.resource.min(10.0) / 100.0);
-        let duplication_modifier = 1.0 + (debt_scores.duplication.min(10.0) / 100.0);
+        let testing_modifier = 1.0 + (debt_scores.testing / 100.0);
+        let resource_modifier = 1.0 + (debt_scores.resource / 100.0);
+        let duplication_modifier = 1.0 + (debt_scores.duplication / 100.0);
 
         testing_modifier * resource_modifier * duplication_modifier
     } else {

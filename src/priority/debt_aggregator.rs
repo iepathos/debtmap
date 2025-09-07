@@ -178,9 +178,8 @@ fn calculate_category_score(issues: &[DebtItem], category: DebtCategory) -> f64 
         })
         .sum();
 
-    // Normalize and apply category weight
-    let score = (priority_sum / issues.len() as f64) * severity_weight * base_score.sqrt();
-    score.min(10.0) // Cap at 10.0
+    // Normalize and apply category weight (no cap)
+    (priority_sum / issues.len() as f64) * severity_weight * base_score.sqrt()
 }
 
 #[derive(Debug, Clone, Default)]

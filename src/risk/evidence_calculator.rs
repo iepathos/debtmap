@@ -195,7 +195,7 @@ impl EvidenceBasedRiskCalculator {
     fn aggregate_risk_factors(&self, factors: &[RiskFactor], role: &FunctionRole) -> f64 {
         let base_score = Self::calculate_weighted_average(factors);
         let role_multiplier = Self::get_role_multiplier(role);
-        (base_score * role_multiplier).min(10.0)
+        base_score * role_multiplier
     }
 
     fn calculate_role_adjustment(role: &FunctionRole) -> f64 {

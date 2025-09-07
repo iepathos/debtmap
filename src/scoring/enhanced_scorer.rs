@@ -268,7 +268,7 @@ impl<'a> EnhancedScorer<'a> {
             + debt_scores.testing * testing_weight
             + debt_scores.resource * resource_weight;
 
-        (weighted_sum / total_weight).min(10.0)
+        weighted_sum / total_weight
     }
 
     /// Maps complexity to a scoring multiplier using pattern matching

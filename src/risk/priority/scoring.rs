@@ -38,7 +38,7 @@ impl CriticalityScorer {
         let size_factor = (target.lines as f64).ln() / 10.0;
         let debt_factor = 1.0 + (target.debt_items as f64 * 0.1);
 
-        (base_score * dependency_factor * size_factor * debt_factor).clamp(0.0, 10.0)
+        (base_score * dependency_factor * size_factor * debt_factor).max(0.0)
     }
 
     fn pattern_match_score(&self, path: &Path) -> f64 {

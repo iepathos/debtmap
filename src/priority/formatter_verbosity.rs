@@ -1,5 +1,5 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
-use crate::priority::UnifiedDebtItem;
+use crate::priority::{score_formatter, UnifiedDebtItem};
 use colored::*;
 use std::fmt::Write;
 
@@ -95,7 +95,11 @@ pub fn format_priority_item_with_config(
             output,
             "#{} {} [{}]",
             rank.to_string().bright_cyan().bold(),
-            format!("SCORE: {:.2}", item.unified_score.final_score).bright_yellow(),
+            format!(
+                "SCORE: {}",
+                score_formatter::format_score(item.unified_score.final_score)
+            )
+            .bright_yellow(),
             severity.color(severity_color).bold()
         )
         .unwrap();
@@ -114,7 +118,11 @@ pub fn format_priority_item_with_config(
             output,
             "#{} {} [{}]",
             rank.to_string().bright_cyan().bold(),
-            format!("SCORE: {:.2}", item.unified_score.final_score).bright_yellow(),
+            format!(
+                "SCORE: {}",
+                score_formatter::format_score(item.unified_score.final_score)
+            )
+            .bright_yellow(),
             severity.color(severity_color).bold()
         )
         .unwrap();

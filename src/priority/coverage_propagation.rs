@@ -130,8 +130,8 @@ pub fn calculate_coverage_urgency(
     };
 
     // Calculate urgency score with smooth gradient
-    // This produces continuous values from 0 to 10
-    (coverage_gap * complexity_weight * 10.0).min(10.0)
+    // This produces continuous values without capping
+    coverage_gap * complexity_weight * 10.0
 }
 
 pub fn propagate_coverage_through_graph(
@@ -256,9 +256,10 @@ mod tests {
 
         // Test 0% coverage - should be ~10.0
         let urgency_0 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
+        // With no cap, scores can exceed 10.0
         assert!(
-            (9.0..=10.0).contains(&urgency_0),
-            "0% coverage should score ~10.0, got {}",
+            urgency_0 >= 9.0,
+            "0% coverage should score at least 9.0, got {}",
             urgency_0
         );
 
@@ -407,33 +408,34 @@ mod tests {
 
         // Complexity 5: ln(6)/3 + 0.5 = ~1.09 multiplier
         let urgency_c5 = calculate_coverage_urgency(&func_id, &graph, &coverage, 5);
+        // With no cap, complexity 5 can score above 10.0
         assert!(
-            (9.5..=10.0).contains(&urgency_c5),
-            "Complexity 5 should score 9.5-10.0, got {}",
+            urgency_c5 >= 9.5,
+            "Complexity 5 should score at least 9.5, got {}",
             urgency_c5
         );
 
-        // Complexity 10: should have ~1.0x multiplier
+        // Complexity 10: with no cap, can exceed 10.0
         let urgency_c10 = calculate_coverage_urgency(&func_id, &graph, &coverage, 10);
         assert!(
-            (9.0..=10.0).contains(&urgency_c10),
-            "Complexity 10 should score ~10.0, got {}",
+            urgency_c10 >= 9.0,
+            "Complexity 10 should score at least 9.0, got {}",
             urgency_c10
         );
 
-        // Complexity 20: should have ~1.3x multiplier (capped at 10.0)
+        // Complexity 20: with no cap, can exceed 10.0
         let urgency_c20 = calculate_coverage_urgency(&func_id, &graph, &coverage, 20);
         assert!(
-            urgency_c20 == 10.0,
-            "Complexity 20 should be capped at 10.0, got {}",
+            urgency_c20 >= 10.0,
+            "Complexity 20 should score at least 10.0, got {}",
             urgency_c20
         );
 
-        // Complexity 50: should have ~1.7x multiplier (capped at 10.0)
+        // Complexity 50: with no cap, can exceed 10.0
         let urgency_c50 = calculate_coverage_urgency(&func_id, &graph, &coverage, 50);
         assert!(
-            urgency_c50 == 10.0,
-            "Complexity 50 should be capped at 10.0, got {}",
+            urgency_c50 >= 10.0,
+            "Complexity 50 should score at least 10.0, got {}",
             urgency_c50
         );
 
