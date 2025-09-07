@@ -1,6 +1,7 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
 use crate::priority::{
-    score_formatter, DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis, UnifiedDebtItem,
+    self, score_formatter, DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis,
+    UnifiedDebtItem,
 };
 use colored::*;
 use std::fmt::Write;
@@ -69,7 +70,7 @@ fn format_default_with_config(
     writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(output).unwrap();
 
-    let top_items = analysis.get_top_priorities(limit);
+    let top_items = analysis.get_top_mixed_priorities(limit);
     let count = top_items.len().min(limit);
     writeln!(
         output,
@@ -83,7 +84,7 @@ fn format_default_with_config(
     writeln!(output).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
-        verbosity::format_priority_item_with_config(&mut output, idx + 1, item, verbosity, config);
+        format_mixed_priority_item(&mut output, idx + 1, item, verbosity, config);
         writeln!(output).unwrap();
     }
 
@@ -246,6 +247,84 @@ fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     }
 
     output
+}
+
+fn format_mixed_priority_item(
+    output: &mut String,
+    rank: usize,
+    item: &priority::DebtItem,
+    verbosity: u8,
+    config: FormattingConfig,
+) {
+    match item {
+        priority::DebtItem::Function(func_item) => {
+            verbosity::format_priority_item_with_config(output, rank, func_item, verbosity, config);
+        }
+        priority::DebtItem::File(file_item) => {
+            format_file_priority_item(output, rank, file_item, config);
+        }
+    }
+}
+
+fn format_file_priority_item(
+    output: &mut String,
+    rank: usize,
+    item: &priority::FileDebtItem,
+    config: FormattingConfig,
+) {
+    let formatter = ColoredFormatter::new(config);
+    let severity = get_severity_label(item.score);
+    let severity_color = get_severity_color(item.score);
+
+    // Determine if this is a god object
+    let type_label = if item.metrics.god_object_indicators.is_god_object {
+        "FILE - GOD OBJECT"
+    } else if item.metrics.total_lines > 500 {
+        "FILE - HIGH COMPLEXITY"
+    } else {
+        "FILE"
+    };
+
+    writeln!(
+        output,
+        "#{} {} [{}]",
+        rank.to_string().bright_cyan().bold(),
+        format!("SCORE: {}", score_formatter::format_score(item.score)).bright_yellow(),
+        format!("{} - {}", severity, type_label)
+            .color(severity_color)
+            .bold()
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "{} {} ({} lines, {} functions)",
+        formatter.emoji("└─", "└─").bright_blue(),
+        item.metrics.path.display().to_string().bright_green(),
+        item.metrics.total_lines,
+        item.metrics.function_count
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "   {} {}",
+        formatter.emoji("📋", "ACTION:").bright_yellow(),
+        item.recommendation
+    )
+    .unwrap();
+
+    if item.metrics.god_object_indicators.is_god_object {
+        writeln!(
+            output,
+            "   {} Methods: {}, Fields: {}, Responsibilities: {}",
+            formatter.emoji("⚠️", "METRICS:").bright_red(),
+            item.metrics.god_object_indicators.methods_count,
+            item.metrics.god_object_indicators.fields_count,
+            item.metrics.god_object_indicators.responsibilities
+        )
+        .unwrap();
+    }
 }
 
 pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
