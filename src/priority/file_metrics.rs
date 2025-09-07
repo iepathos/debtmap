@@ -136,3 +136,251 @@ impl Default for GodObjectIndicators {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_score_basic() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 100,
+            function_count: 5,
+            class_count: 1,
+            avg_complexity: 5.0,
+            max_complexity: 10,
+            total_complexity: 25,
+            coverage_percent: 0.8,
+            uncovered_lines: 20,
+            god_object_indicators: GodObjectIndicators::default(),
+            function_scores: vec![1.0, 2.0, 3.0],
+        };
+
+        let score = metrics.calculate_score();
+        assert!(score > 0.0);
+        assert!(score < 10.0);
+    }
+
+    #[test]
+    fn test_calculate_score_with_god_object() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("god.rs"),
+            total_lines: 1000,
+            function_count: 60,
+            class_count: 1,
+            avg_complexity: 15.0,
+            max_complexity: 50,
+            total_complexity: 900,
+            coverage_percent: 0.3,
+            uncovered_lines: 700,
+            god_object_indicators: GodObjectIndicators {
+                methods_count: 60,
+                fields_count: 30,
+                responsibilities: 10,
+                is_god_object: true,
+                god_object_score: 0.8,
+            },
+            function_scores: vec![5.0; 60],
+        };
+
+        let score = metrics.calculate_score();
+        assert!(score > 50.0, "God object should have high score");
+    }
+
+    #[test]
+    fn test_calculate_score_low_coverage() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("untested.rs"),
+            total_lines: 200,
+            function_count: 10,
+            class_count: 2,
+            avg_complexity: 3.0,
+            max_complexity: 5,
+            total_complexity: 30,
+            coverage_percent: 0.1,
+            uncovered_lines: 180,
+            god_object_indicators: GodObjectIndicators::default(),
+            function_scores: vec![1.0; 10],
+        };
+
+        let score = metrics.calculate_score();
+        let base_metrics = FileDebtMetrics {
+            coverage_percent: 0.9,
+            uncovered_lines: 20,
+            ..metrics
+        };
+        let base_score = base_metrics.calculate_score();
+        
+        assert!(score > base_score, "Low coverage should increase score");
+    }
+
+    #[test]
+    fn test_calculate_score_high_complexity() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("complex.rs"),
+            total_lines: 300,
+            function_count: 15,
+            class_count: 1,
+            avg_complexity: 20.0,
+            max_complexity: 40,
+            total_complexity: 300,
+            coverage_percent: 0.7,
+            uncovered_lines: 90,
+            god_object_indicators: GodObjectIndicators::default(),
+            function_scores: vec![3.0; 15],
+        };
+
+        let score = metrics.calculate_score();
+        assert!(score > 10.0, "High complexity should produce high score");
+    }
+
+    #[test]
+    fn test_calculate_score_many_functions() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("dense.rs"),
+            total_lines: 500,
+            function_count: 75,
+            class_count: 1,
+            avg_complexity: 4.0,
+            max_complexity: 8,
+            total_complexity: 300,
+            coverage_percent: 0.6,
+            uncovered_lines: 200,
+            god_object_indicators: GodObjectIndicators::default(),
+            function_scores: vec![2.0; 75],
+        };
+
+        let score = metrics.calculate_score();
+        assert!(score > 15.0, "Dense files should have higher scores");
+    }
+
+    #[test]
+    fn test_generate_recommendation_god_object() {
+        let metrics = FileDebtMetrics {
+            god_object_indicators: GodObjectIndicators {
+                is_god_object: true,
+                ..Default::default()
+            },
+            function_count: 50,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(rec.contains("Break into"));
+        assert!(rec.contains("modules"));
+    }
+
+    #[test]
+    fn test_generate_recommendation_large_file() {
+        let metrics = FileDebtMetrics {
+            total_lines: 800,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(rec.contains("Extract complex functions"));
+        assert!(rec.contains("800 lines"));
+    }
+
+    #[test]
+    fn test_generate_recommendation_high_complexity() {
+        let metrics = FileDebtMetrics {
+            avg_complexity: 15.0,
+            total_lines: 200,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(rec.contains("Simplify complex functions"));
+    }
+
+    #[test]
+    fn test_generate_recommendation_low_coverage() {
+        let metrics = FileDebtMetrics {
+            coverage_percent: 0.25,
+            total_lines: 200,
+            avg_complexity: 3.0,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(rec.contains("Increase test coverage"));
+        assert!(rec.contains("25.0%"));
+    }
+
+    #[test]
+    fn test_generate_recommendation_general() {
+        let metrics = FileDebtMetrics {
+            total_lines: 100,
+            avg_complexity: 3.0,
+            coverage_percent: 0.85,
+            ..Default::default()
+        };
+
+        let rec = metrics.generate_recommendation();
+        assert!(rec.contains("Refactor for better maintainability"));
+    }
+
+    #[test]
+    fn test_default_file_debt_metrics() {
+        let metrics = FileDebtMetrics::default();
+        assert_eq!(metrics.total_lines, 0);
+        assert_eq!(metrics.function_count, 0);
+        assert_eq!(metrics.avg_complexity, 0.0);
+        assert_eq!(metrics.coverage_percent, 0.0);
+        assert!(!metrics.god_object_indicators.is_god_object);
+    }
+
+    #[test]
+    fn test_score_factors_multiplication() {
+        let mut metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 400,
+            function_count: 20,
+            avg_complexity: 10.0,
+            total_complexity: 200,
+            coverage_percent: 0.5,
+            ..Default::default()
+        };
+
+        let score1 = metrics.calculate_score();
+        
+        metrics.god_object_indicators.is_god_object = true;
+        metrics.god_object_indicators.god_object_score = 0.5;
+        let score2 = metrics.calculate_score();
+        
+        assert!(score2 > score1 * 2.0, "God object should multiply score significantly");
+    }
+
+    #[test]
+    fn test_function_scores_aggregation() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 100,
+            function_count: 3,
+            avg_complexity: 2.0,
+            total_complexity: 6,
+            coverage_percent: 0.5,
+            function_scores: vec![10.0, 20.0, 30.0],
+            ..Default::default()
+        };
+
+        let score = metrics.calculate_score();
+        assert!(score > 0.0);
+        
+        let metrics_no_functions = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 100,
+            function_count: 3,
+            avg_complexity: 2.0,
+            total_complexity: 6,
+            coverage_percent: 0.5,
+            function_scores: vec![],
+            ..Default::default()
+        };
+        
+        let score_no_functions = metrics_no_functions.calculate_score();
+        assert!(score > score_no_functions, "Function scores should increase total score");
+    }
+}

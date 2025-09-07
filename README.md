@@ -495,6 +495,55 @@ Based on final scores:
 - **LOW** (3.0-4.9): Nice to have
 - **MINIMAL** (0.0-2.9): Can be deferred
 
+### File-Level vs Function-Level Scoring
+
+Debtmap provides both file-level and function-level scoring to help you prioritize refactoring efforts at different granularities:
+
+#### Function-Level Scoring
+Function-level scores focus on individual functions and methods:
+- **Precision**: Identifies specific functions that need attention
+- **Granular Metrics**: Cyclomatic complexity, cognitive complexity, nesting depth
+- **Test Coverage**: Direct coverage percentage for each function
+- **Dependencies**: Call graph analysis shows function relationships
+- **Best For**: Targeted refactoring of specific problem areas
+
+#### File-Level Scoring
+File-level scores aggregate and analyze entire files:
+- **Holistic View**: Considers overall file health and maintainability
+- **Aggregated Metrics**: Total complexity, average complexity, function density
+- **God Object Detection**: Identifies files with too many responsibilities
+- **Function Score Aggregation**: Combines all function scores within the file
+- **Size Factors**: Considers total lines and function count
+- **Best For**: Architectural refactoring and module reorganization
+
+#### How File Scores Are Calculated
+File scores combine multiple factors:
+
+```
+File Score = Size × Complexity × Coverage × Density × GodObject × FunctionScores
+```
+
+- **Size Factor**: `sqrt(total_lines / 100)` - Larger files have higher impact
+- **Complexity Factor**: Combines average and total complexity across all functions
+- **Coverage Factor**: `(1 - coverage_percent) × 2 + 1` - Lower coverage increases score
+- **Density Factor**: Penalizes files with >50 functions (possible god object)
+- **God Object Multiplier**: `2.0 + god_object_score` when god object detected
+- **Function Scores**: Sum of all function scores divided by 10
+
+#### When to Use Each
+
+**Use Function-Level Scoring When:**
+- You need to identify specific hot spots in your code
+- Planning sprint work for individual developers
+- Writing unit tests for uncovered functions
+- Doing targeted performance optimization
+
+**Use File-Level Scoring When:**
+- Planning major refactoring initiatives
+- Identifying architectural issues (god objects, poor cohesion)
+- Breaking up monolithic modules
+- Evaluating overall codebase health
+
 ## Metrics Explained
 
 ### Cyclomatic Complexity
