@@ -159,18 +159,18 @@ impl<'a> Visit<'_> for ContextLossAnalyzer<'a> {
         let was_in_test = self.in_test_function;
         let prev_count = self.question_mark_count;
         let prev_func = self.current_function;
-        
+
         self.in_test_function = node
             .attrs
             .iter()
             .any(|attr| attr.path().get_ident().map(|i| i.to_string()).as_deref() == Some("test"));
-        
+
         // Reset question mark count for each function
         self.question_mark_count = 0;
         self.current_function = Some(self.get_line_number(node.sig.fn_token.span));
 
         syn::visit::visit_item_fn(self, node);
-        
+
         self.in_test_function = was_in_test;
         self.question_mark_count = prev_count;
         self.current_function = prev_func;

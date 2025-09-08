@@ -92,18 +92,16 @@ impl<'a> AsyncErrorDetector<'a> {
 
     fn check_join_handle(&mut self, stmt: &Stmt) {
         // Check for dropped JoinHandle
-        if let Stmt::Expr(expr, Some(_)) = stmt {
+        if let Stmt::Expr(Expr::Call(call), Some(_)) = stmt {
             // Expression with semicolon (dropped value)
-            if let Expr::Call(call) = expr {
-                let call_str = quote::quote!(#call).to_string();
-                if call_str.contains("spawn") {
-                    let line = self.get_line_number(call.span());
-                    self.add_debt_item(
-                        line,
-                        AsyncErrorPattern::UnhandledJoinHandle,
-                        "JoinHandle dropped without awaiting",
-                    );
-                }
+            let call_str = quote::quote!(#call).to_string();
+            if call_str.contains("spawn") {
+                let line = self.get_line_number(call.span());
+                self.add_debt_item(
+                    line,
+                    AsyncErrorPattern::UnhandledJoinHandle,
+                    "JoinHandle dropped without awaiting",
+                );
             }
         }
     }
@@ -113,7 +111,7 @@ impl<'a> AsyncErrorDetector<'a> {
         if let Expr::Macro(mac) = expr {
             // Check both simple ident and path (e.g., tokio::select!)
             let path_str = quote::quote!(#mac.mac.path).to_string().replace(" ", "");
-            
+
             // Check if this is a select! macro (handle both `select` and `tokio::select`)
             if path_str == "select" || path_str.ends_with("::select") {
                 let line = self.get_line_number(mac.mac.path.span());
@@ -179,7 +177,9 @@ impl<'a> Visit<'_> for AsyncErrorDetector<'a> {
             // Also check for macro statements in async context
             if let Stmt::Macro(stmt_macro) = node {
                 // Check if it's a select! macro
-                let path_str = quote::quote!(#stmt_macro.mac.path).to_string().replace(" ", "");
+                let path_str = quote::quote!(#stmt_macro.mac.path)
+                    .to_string()
+                    .replace(" ", "");
                 if path_str == "select" || path_str.ends_with("::select") {
                     let line = self.get_line_number(stmt_macro.mac.path.span());
                     self.add_debt_item(

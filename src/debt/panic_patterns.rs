@@ -81,7 +81,7 @@ impl<'a> PanicPatternDetector<'a> {
             self.add_debt_item(
                 line,
                 PanicPattern::UnwrapOnResult,
-                &format!(".unwrap() can panic in production"),
+                ".unwrap() can panic in production",
             );
         } else if method_name == "expect" {
             let line = self.get_line_number(method_call.method.span());
@@ -197,7 +197,7 @@ impl<'a> Visit<'_> for PanicPatternDetector<'a> {
         self.check_panic_macros(&node.mac);
         syn::visit::visit_expr_macro(self, node);
     }
-    
+
     fn visit_stmt(&mut self, node: &syn::Stmt) {
         // Also check for macros in statement position
         if let syn::Stmt::Macro(stmt_macro) = node {
