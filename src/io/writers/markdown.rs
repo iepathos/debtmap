@@ -1041,6 +1041,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::Vector::from(items),
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 complexity_reduction: 10.0,
                 coverage_improvement: 0.2,
@@ -1081,6 +1082,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::Vector::from(items),
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 complexity_reduction: 5.0,
                 coverage_improvement: 0.1,
@@ -1119,6 +1121,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::vector![dead_code_item.clone(), testing_gap_item],
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.0,
                 lines_reduction: 3,
@@ -1145,6 +1148,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::vector![testing_gap_item],
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.5,
                 lines_reduction: 0,
@@ -1393,6 +1397,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::vector![dead_code_item1, dead_code_item2],
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.0,
                 lines_reduction: 30,
@@ -1436,6 +1441,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::vector![],
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.0,
                 lines_reduction: 0,
@@ -1515,6 +1521,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::vector![dead_code_item, testing_gap_item],
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.5,
                 lines_reduction: 10,
@@ -1546,6 +1553,7 @@ mod tests {
         let analysis = UnifiedAnalysis {
             items: im::Vector::new(),
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 complexity_reduction: 0.0,
                 coverage_improvement: 0.0,
@@ -1568,6 +1576,7 @@ mod tests {
         let mut analysis = UnifiedAnalysis {
             items: im::Vector::new(),
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 complexity_reduction: 0.0,
                 coverage_improvement: 0.0,
@@ -1677,6 +1686,7 @@ mod tests {
         let mut analysis = UnifiedAnalysis {
             items: im::Vector::new(),
             file_items: im::Vector::new(),
+            file_aggregates: im::Vector::new(),
             total_impact: ImpactMetrics {
                 complexity_reduction: 0.0,
                 coverage_improvement: 0.0,

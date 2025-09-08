@@ -326,6 +326,10 @@ pub struct DebtmapConfig {
     /// Complexity thresholds for enhanced detection
     #[serde(default)]
     pub complexity_thresholds: Option<crate::complexity::threshold_manager::ComplexityThresholds>,
+
+    /// File-level score aggregation configuration
+    #[serde(default)]
+    pub aggregation: Option<crate::priority::AggregationConfig>,
 }
 
 impl DebtmapConfig {
@@ -848,6 +852,11 @@ pub fn get_complexity_thresholds() -> crate::complexity::threshold_manager::Comp
         .complexity_thresholds
         .clone()
         .unwrap_or_default()
+}
+
+/// Get file aggregation configuration
+pub fn get_aggregation_config() -> crate::priority::AggregationConfig {
+    get_config().aggregation.clone().unwrap_or_default()
 }
 
 /// Get smart performance configuration

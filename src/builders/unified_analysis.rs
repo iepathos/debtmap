@@ -349,6 +349,17 @@ pub fn create_unified_analysis_with_exclusions(
     // Add file-level analysis
     analyze_files_for_debt(&mut unified, metrics, coverage_data);
 
+    // Add file aggregation analysis
+    let aggregation_config = crate::config::get_aggregation_config();
+    if aggregation_config.enabled {
+        let items_vec: Vec<UnifiedDebtItem> = unified.items.iter().cloned().collect();
+        let file_aggregates = priority::aggregation::AggregationPipeline::aggregate_from_debt_items(
+            &items_vec,
+            &aggregation_config,
+        );
+        unified.file_aggregates = im::Vector::from(file_aggregates);
+    }
+
     unified.sort_by_priority();
     unified.calculate_total_impact();
 
