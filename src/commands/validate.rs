@@ -243,6 +243,7 @@ fn calculate_unified_debt_score(
         Some(&results.technical_debt.items),
         false,  // no_aggregation - use default settings for validate
         None,   // aggregation_method - use default
+        None,   // min_problematic - use default
     );
 
     unified.total_debt_score as u32

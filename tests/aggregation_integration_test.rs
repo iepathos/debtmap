@@ -9,30 +9,114 @@ fn test_file_aggregation_with_real_codebase() {
     let temp_dir = TempDir::new().unwrap();
     let project_path = temp_dir.path();
     
+    
     // Create test files with varying complexity
     let src_dir = project_path.join("src");
     std::fs::create_dir_all(&src_dir).unwrap();
     
-    // File 1: High complexity functions
+    // File 1: High complexity functions with more branches
     let file1_content = r#"
-fn complex_function_1() {
-    if true {
-        if false {
+fn complex_function_1(x: i32, y: i32, z: i32) -> i32 {
+    let mut result = 0;
+    if x > 0 {
+        if y > 0 {
             for i in 0..10 {
                 if i > 5 {
-                    println!("Complex!");
+                    if z > 0 {
+                        result += 1;
+                    } else if z < 0 {
+                        result -= 1;
+                    } else {
+                        result += 2;
+                    }
+                }
+                if i % 2 == 0 {
+                    match i {
+                        0 => result *= 2,
+                        2 => result *= 3,
+                        4 => result *= 4,
+                        6 => result *= 5,
+                        8 => result *= 6,
+                        _ => result *= 7,
+                    }
+                }
+            }
+        } else if y < 0 {
+            while result < 100 {
+                result += x;
+                if result % 3 == 0 {
+                    break;
+                }
+            }
+        }
+    } else if x < 0 {
+        for j in 0..20 {
+            if j % 3 == 0 {
+                result += j;
+            } else if j % 3 == 1 {
+                result -= j;
+            } else {
+                result *= 2;
+            }
+        }
+    }
+    result
+}
+
+fn complex_function_2(input: &str) -> Result<Vec<i32>, String> {
+    let mut values = Vec::new();
+    let parts: Vec<&str> = input.split(',').collect();
+    
+    for part in parts {
+        match part.trim() {
+            "one" => {
+                if values.len() > 0 {
+                    values.push(1);
+                } else {
+                    for _ in 0..5 {
+                        values.push(1);
+                    }
+                }
+            },
+            "two" => {
+                for i in 0..2 {
+                    if i == 0 {
+                        values.push(2);
+                    } else {
+                        values.push(22);
+                    }
+                }
+            },
+            "three" => {
+                let mut count = 0;
+                while count < 3 {
+                    values.push(3);
+                    count += 1;
+                    if count == 2 {
+                        values.push(33);
+                    }
+                }
+            },
+            _ => {
+                if let Ok(num) = part.trim().parse::<i32>() {
+                    if num > 0 && num < 100 {
+                        values.push(num);
+                    } else if num >= 100 {
+                        return Err("Number too large".to_string());
+                    } else {
+                        return Err("Negative number".to_string());
+                    }
+                } else {
+                    return Err(format!("Invalid input: {}", part));
                 }
             }
         }
     }
-}
-
-fn complex_function_2() {
-    match 5 {
-        1 => if true { println!("1"); },
-        2 => for _ in 0..5 { println!("2"); },
-        3 => while false { println!("3"); },
-        _ => println!("default"),
+    
+    if values.is_empty() {
+        Err("No valid values".to_string())
+    } else {
+        Ok(values)
     }
 }
 "#;
@@ -55,9 +139,11 @@ fn simple_function_2() -> i32 {
     let results = analyze_project(
         project_path.to_path_buf(),
         languages,
-        10,  // complexity threshold
+        2,  // Lower complexity threshold to catch our test functions
         50,  // duplication threshold
     ).unwrap();
+    
+    
     
     // Perform unified analysis with aggregation enabled
     let unified = unified_analysis::perform_unified_analysis_with_options(
@@ -76,6 +162,7 @@ fn simple_function_2() -> i32 {
             aggregate_only: false,
             no_aggregation: false,
             aggregation_method: Some("weighted_sum".to_string()),
+            min_problematic: None,
         },
     ).unwrap();
     
@@ -102,32 +189,108 @@ fn test_aggregation_methods() {
     let temp_dir = TempDir::new().unwrap();
     let project_path = temp_dir.path();
     
+    
     // Create test file
     let src_dir = project_path.join("src");
     std::fs::create_dir_all(&src_dir).unwrap();
     
     let file_content = r#"
-fn func1() {
-    for i in 0..10 {
-        if i > 5 {
-            println!("{}", i);
+fn func1(data: Vec<i32>) -> i32 {
+    let mut sum = 0;
+    for i in 0..data.len() {
+        if data[i] > 5 {
+            for j in 0..10 {
+                if j > i {
+                    sum += data[i] * j;
+                    if sum > 100 {
+                        break;
+                    }
+                } else if j < i {
+                    sum -= j;
+                } else {
+                    sum *= 2;
+                }
+            }
+        } else if data[i] < 0 {
+            match data[i] {
+                -1 => sum += 10,
+                -2 => sum += 20,
+                -3 => sum += 30,
+                _ => sum = 0,
+            }
         }
     }
+    sum
 }
 
-fn func2() {
-    let x = 5;
-    match x {
-        1..=3 => println!("low"),
-        4..=6 => println!("mid"),
-        _ => println!("high"),
-    }
+fn func2(input: String) -> Result<i32, String> {
+    let x = input.len();
+    let result = match x {
+        0 => return Err("Empty input".to_string()),
+        1..=3 => {
+            if input.chars().all(|c| c.is_ascii_lowercase()) {
+                10
+            } else if input.chars().all(|c| c.is_ascii_uppercase()) {
+                20
+            } else {
+                30
+            }
+        },
+        4..=6 => {
+            let mut val = 0;
+            for c in input.chars() {
+                if c.is_numeric() {
+                    val += c.to_digit(10).unwrap() as i32;
+                } else if c.is_alphabetic() {
+                    val *= 2;
+                } else {
+                    val -= 1;
+                }
+            }
+            val
+        },
+        _ => {
+            let mut counter = 0;
+            while counter < x {
+                counter += 1;
+                if counter % 2 == 0 {
+                    counter *= 2;
+                }
+            }
+            counter as i32
+        }
+    };
+    Ok(result)
 }
 
-fn func3() {
-    if true && false || true {
-        println!("logic");
+fn func3(a: bool, b: bool, c: bool, d: i32) -> i32 {
+    let mut result = 0;
+    if a && b || c {
+        for i in 0..d {
+            if i % 3 == 0 {
+                result += i;
+            } else if i % 3 == 1 {
+                result -= i;
+                if result < 0 {
+                    result = result.abs();
+                }
+            } else {
+                match i {
+                    0..=10 => result *= 2,
+                    11..=20 => result *= 3,
+                    _ => result = result / 2,
+                }
+            }
+        }
+    } else if !a && !b {
+        while result < 100 {
+            result += d;
+            if result % 7 == 0 {
+                break;
+            }
+        }
     }
+    result
 }
 "#;
     std::fs::write(src_dir.join("test.rs"), file_content).unwrap();
@@ -136,7 +299,7 @@ fn func3() {
     let results = analyze_project(
         project_path.to_path_buf(),
         languages,
-        5,  // lower threshold to catch more functions
+        2,  // lower threshold to catch more functions
         50,
     ).unwrap();
     
@@ -167,6 +330,7 @@ fn func3() {
                 aggregate_only: false,
                 no_aggregation: false,
                 aggregation_method: Some(method.to_string()),
+            min_problematic: None,
             },
         ).unwrap();
         
@@ -227,6 +391,7 @@ fn test_cli_flag_no_aggregation() {
             aggregate_only: false,
             no_aggregation: true,  // Disable aggregation
             aggregation_method: None,
+            min_problematic: None,
         },
     ).unwrap();
     
@@ -241,6 +406,7 @@ fn test_cli_flag_no_aggregation() {
 fn test_aggregation_with_multiple_files() {
     let temp_dir = TempDir::new().unwrap();
     let project_path = temp_dir.path();
+    
     
     // Create multiple files with different complexity levels
     let src_dir = project_path.join("src");
@@ -284,7 +450,7 @@ fn test_aggregation_with_multiple_files() {
     let results = analyze_project(
         project_path.to_path_buf(),
         languages,
-        3,  // Low threshold to catch nested conditions
+        2,  // Low threshold to catch nested conditions
         50,
     ).unwrap();
     
@@ -304,6 +470,7 @@ fn test_aggregation_with_multiple_files() {
             aggregate_only: false,
             no_aggregation: false,
             aggregation_method: Some("weighted_sum".to_string()),
+            min_problematic: None,
         },
     ).unwrap();
     

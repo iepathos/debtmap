@@ -173,6 +173,10 @@ pub enum Commands {
         /// File aggregation method (sum, weighted_sum, logarithmic_sum, max_plus_average)
         #[arg(long = "aggregation-method", default_value = "weighted_sum")]
         aggregation_method: Option<String>,
+        
+        /// Minimum number of problematic functions for file aggregation
+        #[arg(long = "min-problematic")]
+        min_problematic: Option<usize>,
     },
 
     /// Initialize configuration file

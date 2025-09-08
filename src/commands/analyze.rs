@@ -50,6 +50,7 @@ pub struct AnalyzeConfig {
     pub aggregate_only: bool,
     pub no_aggregation: bool,
     pub aggregation_method: Option<String>,
+    pub min_problematic: Option<usize>,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
@@ -93,6 +94,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             aggregate_only: config.aggregate_only,
             no_aggregation: config.no_aggregation,
             aggregation_method: config.aggregation_method.clone(),
+            min_problematic: config.min_problematic,
         },
     )?;
 
