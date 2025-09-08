@@ -2,6 +2,7 @@ use super::{call_graph, parallel_call_graph};
 use crate::{
     analysis::diagnostics::{DetailLevel, DiagnosticReporter, OutputFormat},
     analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
+    analyzers::FileAnalyzer,
     cache::{CacheKey, CallGraphCache},
     config,
     core::{self, AnalysisResults, DebtItem, FunctionMetrics, Language},
@@ -345,6 +346,9 @@ pub fn create_unified_analysis_with_exclusions(
         }
     }
 
+    // Add file-level analysis
+    analyze_files_for_debt(&mut unified, metrics, coverage_data);
+
     unified.sort_by_priority();
     unified.calculate_total_impact();
 
@@ -581,6 +585,75 @@ fn print_attribution_summary(result: &MultiPassResult, file_path: &Path) {
         println!("\nKey Insights:");
         for insight in result.insights.iter().take(3) {
             println!("  - {}", insight.description);
+        }
+    }
+}
+
+fn analyze_files_for_debt(
+    unified: &mut UnifiedAnalysis,
+    metrics: &[FunctionMetrics],
+    coverage_data: Option<&risk::lcov::LcovData>,
+) {
+    use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
+    use crate::priority::file_metrics::{FileDebtItem, FileImpact};
+    use std::collections::HashMap;
+
+    // Group functions by file
+    let mut files_map: HashMap<PathBuf, Vec<&FunctionMetrics>> = HashMap::new();
+    for metric in metrics {
+        files_map
+            .entry(metric.file.clone())
+            .or_default()
+            .push(metric);
+    }
+
+    let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
+
+    // Analyze each file
+    for (_file_path, functions) in files_map {
+        // Convert references to owned values for aggregate_functions
+        let functions_owned: Vec<FunctionMetrics> = functions.iter().map(|&f| f.clone()).collect();
+
+        // Get file-level metrics
+        let mut file_metrics = file_analyzer.aggregate_functions(&functions_owned);
+
+        // Calculate function scores for this file
+        let mut function_scores = Vec::new();
+        for func in &functions_owned {
+            // Get the score from unified items if it exists
+            let score = unified
+                .items
+                .iter()
+                .find(|item| item.location.file == func.file && item.location.function == func.name)
+                .map(|item| item.unified_score.final_score)
+                .unwrap_or(0.0);
+            function_scores.push(score);
+        }
+        file_metrics.function_scores = function_scores;
+
+        // Calculate file score
+        let score = file_metrics.calculate_score();
+
+        // Only add file items with significant scores
+        if score > 50.0 {
+            // Threshold for file-level items
+            let recommendation = file_metrics.generate_recommendation();
+
+            let file_item = FileDebtItem {
+                metrics: file_metrics.clone(),
+                score,
+                priority_rank: 0, // Will be set during sorting
+                recommendation,
+                impact: FileImpact {
+                    complexity_reduction: file_metrics.avg_complexity
+                        * file_metrics.function_count as f64
+                        * 0.2,
+                    maintainability_improvement: score / 10.0,
+                    test_effort: file_metrics.uncovered_lines as f64 * 0.1,
+                },
+            };
+
+            unified.add_file_item(file_item);
         }
     }
 }

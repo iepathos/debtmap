@@ -1,7 +1,10 @@
-use crate::core::{ast::Ast, FileMetrics};
+use crate::core::{ast::Ast, FileMetrics, FunctionMetrics};
+use crate::priority::file_metrics::FileDebtMetrics;
 use anyhow::Result;
+use std::path::Path;
 
 pub mod context_aware;
+pub mod file_analyzer;
 pub mod function_registry;
 pub mod javascript;
 pub mod purity_detector;
@@ -20,6 +23,11 @@ pub trait Analyzer: Send + Sync {
     fn parse(&self, content: &str, path: std::path::PathBuf) -> Result<Ast>;
     fn analyze(&self, ast: &Ast) -> FileMetrics;
     fn language(&self) -> crate::core::Language;
+}
+
+pub trait FileAnalyzer {
+    fn analyze_file(&self, path: &Path, content: &str) -> Result<FileDebtMetrics>;
+    fn aggregate_functions(&self, functions: &[FunctionMetrics]) -> FileDebtMetrics;
 }
 
 pub fn analyze_file(

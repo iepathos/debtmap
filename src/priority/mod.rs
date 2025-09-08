@@ -2,6 +2,7 @@ pub mod call_graph;
 pub mod coverage_propagation;
 pub mod debt_aggregator;
 pub mod external_api_detector;
+pub mod file_metrics;
 pub mod formatter;
 pub mod formatter_markdown;
 pub mod parallel_call_graph;
@@ -15,6 +16,7 @@ use serde::{Deserialize, Serialize};
 pub use call_graph::{CallGraph, FunctionCall};
 pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage};
 pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
+pub use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
 pub use formatter::{format_priorities, OutputFormat};
 pub use formatter_markdown::format_priorities_markdown;
 pub use semantic_classifier::{classify_function_role, FunctionRole};
@@ -26,6 +28,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedAnalysis {
     pub items: Vector<UnifiedDebtItem>,
+    pub file_items: Vector<FileDebtItem>,
     pub total_impact: ImpactMetrics,
     pub total_debt_score: f64,
     pub call_graph: CallGraph,
@@ -178,6 +181,28 @@ pub enum FunctionVisibility {
     Public,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DebtItem {
+    Function(Box<UnifiedDebtItem>),
+    File(Box<FileDebtItem>),
+}
+
+impl DebtItem {
+    pub fn score(&self) -> f64 {
+        match self {
+            DebtItem::Function(item) => item.unified_score.final_score,
+            DebtItem::File(item) => item.score,
+        }
+    }
+
+    pub fn display_type(&self) -> &str {
+        match self {
+            DebtItem::Function(_) => "FUNCTION",
+            DebtItem::File(_) => "FILE",
+        }
+    }
+}
+
 impl UnifiedAnalysis {
     pub fn new(call_graph: CallGraph) -> Self {
         // Create DataFlowGraph from the CallGraph
@@ -185,6 +210,7 @@ impl UnifiedAnalysis {
 
         Self {
             items: Vector::new(),
+            file_items: Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.0,
                 lines_reduction: 0,
@@ -195,6 +221,26 @@ impl UnifiedAnalysis {
             call_graph,
             data_flow_graph,
             overall_coverage: None,
+        }
+    }
+
+    pub fn add_file_item(&mut self, item: FileDebtItem) {
+        // Get configurable thresholds
+        let min_score = crate::config::get_minimum_debt_score();
+
+        // Filter out items below minimum thresholds
+        if item.score < min_score {
+            return;
+        }
+
+        // Check for duplicates before adding
+        let is_duplicate = self
+            .file_items
+            .iter()
+            .any(|existing| existing.metrics.path == item.metrics.path);
+
+        if !is_duplicate {
+            self.file_items.push_back(item);
         }
     }
 
@@ -249,6 +295,7 @@ impl UnifiedAnalysis {
     }
 
     pub fn sort_by_priority(&mut self) {
+        // Sort function items
         let mut items_vec: Vec<UnifiedDebtItem> = self.items.iter().cloned().collect();
         items_vec.sort_by(|a, b| {
             b.unified_score
@@ -257,6 +304,15 @@ impl UnifiedAnalysis {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         self.items = items_vec.into_iter().collect();
+
+        // Sort file items
+        let mut file_items_vec: Vec<FileDebtItem> = self.file_items.iter().cloned().collect();
+        file_items_vec.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        self.file_items = file_items_vec.into_iter().collect();
     }
 
     pub fn calculate_total_impact(&mut self) {
@@ -283,6 +339,20 @@ impl UnifiedAnalysis {
             risk_reduction += item.expected_impact.risk_reduction;
         }
 
+        // Add file-level impacts
+        for file_item in &self.file_items {
+            total_debt_score += file_item.score;
+
+            // File-level impacts are typically larger
+            complexity_reduction += file_item.impact.complexity_reduction;
+            lines_reduction += (file_item.metrics.total_lines / 10) as u32; // Rough estimate of reduction
+
+            // Coverage improvement from fixing file-level issues
+            if file_item.metrics.coverage_percent < 0.8 {
+                coverage_improvement += (0.8 - file_item.metrics.coverage_percent) * 10.0;
+            }
+        }
+
         // Coverage improvement is the estimated overall project coverage gain
         // Assuming tested functions represent a portion of the codebase
         coverage_improvement = (coverage_improvement * 5.0).min(100.0); // Scale factor for visibility
@@ -301,6 +371,31 @@ impl UnifiedAnalysis {
 
     pub fn get_top_priorities(&self, n: usize) -> Vector<UnifiedDebtItem> {
         self.items.iter().take(n).cloned().collect()
+    }
+
+    pub fn get_top_mixed_priorities(&self, n: usize) -> Vector<DebtItem> {
+        // Combine function and file items, sorted by score
+        let mut all_items: Vec<DebtItem> = Vec::new();
+
+        // Add function items
+        for item in &self.items {
+            all_items.push(DebtItem::Function(Box::new(item.clone())));
+        }
+
+        // Add file items
+        for item in &self.file_items {
+            all_items.push(DebtItem::File(Box::new(item.clone())));
+        }
+
+        // Sort by score descending
+        all_items.sort_by(|a, b| {
+            b.score()
+                .partial_cmp(&a.score())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Return top n items
+        all_items.into_iter().take(n).collect()
     }
 
     pub fn get_bottom_priorities(&self, n: usize) -> Vector<UnifiedDebtItem> {

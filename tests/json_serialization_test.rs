@@ -7,6 +7,7 @@ fn test_unified_analysis_json_serialization() {
     // Create a minimal UnifiedAnalysis instance
     let analysis = UnifiedAnalysis {
         items: Vector::new(),
+        file_items: Vector::new(),
         total_impact: ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: 0,
