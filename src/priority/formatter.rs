@@ -263,7 +263,66 @@ fn format_mixed_priority_item(
         priority::DebtItem::File(file_item) => {
             format_file_priority_item(output, rank, file_item, config);
         }
+        priority::DebtItem::FileAggregate(agg_item) => {
+            format_file_aggregate_item(output, rank, agg_item, config);
+        }
     }
+}
+
+fn format_file_aggregate_item(
+    output: &mut String,
+    rank: usize,
+    item: &priority::FileAggregateScore,
+    config: FormattingConfig,
+) {
+    let formatter = ColoredFormatter::new(config);
+
+    writeln!(
+        output,
+        "{}. {} FILE AGGREGATE SCORE: {:.1}",
+        rank,
+        formatter.emoji("📁", ""),
+        item.aggregate_score
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "   └─ {} ({} functions, total score: {:.1})",
+        item.file_path.display(),
+        item.function_count,
+        item.total_score
+    )
+    .unwrap();
+
+    if item.problematic_functions > 0 {
+        writeln!(
+            output,
+            "      {} {} problematic functions (score > {:.1})",
+            formatter.emoji("⚠️", "[WARNING]"),
+            item.problematic_functions,
+            5.0
+        )
+        .unwrap();
+    }
+
+    writeln!(
+        output,
+        "      {} Top issues:",
+        formatter.emoji("📊", "[TOP]")
+    )
+    .unwrap();
+
+    for (func_name, score) in &item.top_function_scores {
+        writeln!(output, "         - {}: {:.1}", func_name, score).unwrap();
+    }
+
+    writeln!(
+        output,
+        "      {} ACTION: Comprehensive refactoring needed",
+        formatter.emoji("🔧", "[ACTION]")
+    )
+    .unwrap();
 }
 
 fn format_file_priority_item(

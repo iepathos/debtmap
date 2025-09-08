@@ -330,6 +330,10 @@ pub struct DebtmapConfig {
     /// Error handling detection configuration
     #[serde(default)]
     pub error_handling: Option<ErrorHandlingConfig>,
+
+    /// File-level score aggregation configuration
+    #[serde(default)]
+    pub aggregation: Option<crate::priority::AggregationConfig>,
 }
 
 impl DebtmapConfig {
@@ -958,6 +962,11 @@ pub struct SeverityOverride {
 /// Get error handling configuration
 pub fn get_error_handling_config() -> ErrorHandlingConfig {
     get_config().error_handling.clone().unwrap_or_default()
+}
+
+/// Get file aggregation configuration
+pub fn get_aggregation_config() -> crate::priority::AggregationConfig {
+    get_config().aggregation.clone().unwrap_or_default()
 }
 
 /// Get smart performance configuration

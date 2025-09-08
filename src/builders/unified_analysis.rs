@@ -37,6 +37,10 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub use_cache: bool,
     pub multi_pass: bool,
     pub show_attribution: bool,
+    pub aggregate_only: bool,
+    pub no_aggregation: bool,
+    pub aggregation_method: Option<String>,
+    pub min_problematic: Option<usize>,
 }
 
 pub fn perform_unified_analysis(
@@ -59,6 +63,10 @@ pub fn perform_unified_analysis(
         use_cache: false,
         multi_pass: false,
         show_attribution: false,
+        aggregate_only: false,
+        no_aggregation: false,
+        aggregation_method: None,
+        min_problematic: None,
     })
 }
 
@@ -77,6 +85,10 @@ pub fn perform_unified_analysis_with_options(
         use_cache,
         multi_pass,
         show_attribution,
+        aggregate_only: _aggregate_only,
+        no_aggregation,
+        aggregation_method,
+        min_problematic,
     } = options;
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
@@ -115,6 +127,9 @@ pub fn perform_unified_analysis_with_options(
         &framework_exclusions,
         Some(&function_pointer_used_functions),
         Some(&results.technical_debt.items),
+        no_aggregation,
+        aggregation_method,
+        min_problematic,
     ))
 }
 
@@ -295,6 +310,9 @@ pub fn create_unified_analysis_with_exclusions(
     framework_exclusions: &HashSet<priority::call_graph::FunctionId>,
     function_pointer_used_functions: Option<&HashSet<priority::call_graph::FunctionId>>,
     debt_items: Option<&[DebtItem]>,
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
+    min_problematic: Option<usize>,
 ) -> UnifiedAnalysis {
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
@@ -326,7 +344,6 @@ pub fn create_unified_analysis_with_exclusions(
         if should_skip_metric_for_debt_analysis(metric, call_graph, &test_only_functions) {
             continue;
         }
-
         let item = create_debt_item_from_metric_with_aggregator(
             metric,
             call_graph,
@@ -348,6 +365,66 @@ pub fn create_unified_analysis_with_exclusions(
 
     // Add file-level analysis
     analyze_files_for_debt(&mut unified, metrics, coverage_data);
+
+    // Add file aggregation analysis
+    let mut aggregation_config = crate::config::get_aggregation_config();
+
+    // Override with CLI flags
+    if no_aggregation {
+        aggregation_config.enabled = false;
+    }
+
+    if let Some(method_str) = aggregation_method {
+        aggregation_config.method = match method_str.as_str() {
+            "sum" => priority::aggregation::AggregationMethod::Sum,
+            "weighted_sum" => priority::aggregation::AggregationMethod::WeightedSum,
+            "logarithmic_sum" => priority::aggregation::AggregationMethod::LogarithmicSum,
+            "max_plus_average" => priority::aggregation::AggregationMethod::MaxPlusAverage,
+            _ => aggregation_config.method, // Keep default if invalid
+        };
+    }
+
+    // Apply min_problematic if specified
+    if let Some(min_prob) = min_problematic {
+        aggregation_config.min_functions_for_aggregation = min_prob;
+    }
+
+    if aggregation_config.enabled {
+        // Try to aggregate from UnifiedDebtItems first (for scored items)
+        let items_vec: Vec<UnifiedDebtItem> = unified.items.iter().cloned().collect();
+        let mut file_aggregates = if !items_vec.is_empty() {
+            priority::aggregation::AggregationPipeline::aggregate_from_debt_items(
+                &items_vec,
+                &aggregation_config,
+            )
+        } else {
+            // If no debt items passed the threshold, aggregate from all metrics
+            // This ensures aggregation works even for files with many small issues
+            priority::aggregation::AggregationPipeline::aggregate_from_metrics(
+                metrics,
+                &aggregation_config,
+            )
+        };
+
+        // If we have items but not all files are represented, also aggregate from metrics
+        // to ensure all files with functions are included
+        if items_vec.is_empty()
+            || file_aggregates.len()
+                < metrics
+                    .iter()
+                    .map(|m| &m.file)
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    / 2
+        {
+            file_aggregates = priority::aggregation::AggregationPipeline::aggregate_from_metrics(
+                metrics,
+                &aggregation_config,
+            );
+        }
+
+        unified.file_aggregates = im::Vector::from(file_aggregates);
+    }
 
     unified.sort_by_priority();
     unified.calculate_total_impact();
