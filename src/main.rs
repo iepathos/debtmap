@@ -44,6 +44,9 @@ fn main() -> Result<()> {
             multi_pass,
             show_attribution,
             detail_level,
+            aggregate_only,
+            no_aggregation,
+            aggregation_method,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
 
@@ -124,6 +127,9 @@ fn main() -> Result<()> {
                 multi_pass,
                 show_attribution,
                 detail_level,
+                aggregate_only,
+                no_aggregation,
+                aggregation_method,
             };
             debtmap::commands::analyze::handle_analyze(config)
         }

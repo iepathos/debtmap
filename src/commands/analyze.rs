@@ -47,6 +47,9 @@ pub struct AnalyzeConfig {
     pub multi_pass: bool,
     pub show_attribution: bool,
     pub detail_level: Option<String>,
+    pub aggregate_only: bool,
+    pub no_aggregation: bool,
+    pub aggregation_method: Option<String>,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
@@ -87,6 +90,9 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             use_cache: config.use_cache,
             multi_pass: config.multi_pass,
             show_attribution: config.show_attribution,
+            aggregate_only: config.aggregate_only,
+            no_aggregation: config.no_aggregation,
+            aggregation_method: config.aggregation_method.clone(),
         },
     )?;
 

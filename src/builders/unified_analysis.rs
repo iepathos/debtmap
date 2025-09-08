@@ -37,6 +37,9 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub use_cache: bool,
     pub multi_pass: bool,
     pub show_attribution: bool,
+    pub aggregate_only: bool,
+    pub no_aggregation: bool,
+    pub aggregation_method: Option<String>,
 }
 
 pub fn perform_unified_analysis(
@@ -59,6 +62,9 @@ pub fn perform_unified_analysis(
         use_cache: false,
         multi_pass: false,
         show_attribution: false,
+        aggregate_only: false,
+        no_aggregation: false,
+        aggregation_method: None,
     })
 }
 
@@ -77,6 +83,9 @@ pub fn perform_unified_analysis_with_options(
         use_cache,
         multi_pass,
         show_attribution,
+        aggregate_only: _aggregate_only,
+        no_aggregation,
+        aggregation_method,
     } = options;
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
@@ -115,6 +124,8 @@ pub fn perform_unified_analysis_with_options(
         &framework_exclusions,
         Some(&function_pointer_used_functions),
         Some(&results.technical_debt.items),
+        no_aggregation,
+        aggregation_method,
     ))
 }
 
@@ -295,6 +306,8 @@ pub fn create_unified_analysis_with_exclusions(
     framework_exclusions: &HashSet<priority::call_graph::FunctionId>,
     function_pointer_used_functions: Option<&HashSet<priority::call_graph::FunctionId>>,
     debt_items: Option<&[DebtItem]>,
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
 ) -> UnifiedAnalysis {
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
@@ -350,7 +363,23 @@ pub fn create_unified_analysis_with_exclusions(
     analyze_files_for_debt(&mut unified, metrics, coverage_data);
 
     // Add file aggregation analysis
-    let aggregation_config = crate::config::get_aggregation_config();
+    let mut aggregation_config = crate::config::get_aggregation_config();
+    
+    // Override with CLI flags
+    if no_aggregation {
+        aggregation_config.enabled = false;
+    }
+    
+    if let Some(method_str) = aggregation_method {
+        aggregation_config.method = match method_str.as_str() {
+            "sum" => priority::aggregation::AggregationMethod::Sum,
+            "weighted_sum" => priority::aggregation::AggregationMethod::WeightedSum,
+            "logarithmic_sum" => priority::aggregation::AggregationMethod::LogarithmicSum,
+            "max_plus_average" => priority::aggregation::AggregationMethod::MaxPlusAverage,
+            _ => aggregation_config.method, // Keep default if invalid
+        };
+    }
+    
     if aggregation_config.enabled {
         let items_vec: Vec<UnifiedDebtItem> = unified.items.iter().cloned().collect();
         let file_aggregates = priority::aggregation::AggregationPipeline::aggregate_from_debt_items(

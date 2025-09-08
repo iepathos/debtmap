@@ -161,6 +161,18 @@ pub enum Commands {
         /// Detail level for diagnostic reports (summary, standard, comprehensive, debug)
         #[arg(long = "detail-level", default_value = "standard")]
         detail_level: Option<String>,
+
+        /// Show only aggregated file-level scores
+        #[arg(long = "aggregate-only")]
+        aggregate_only: bool,
+
+        /// Disable file-level aggregation
+        #[arg(long = "no-aggregation")]
+        no_aggregation: bool,
+
+        /// File aggregation method (sum, weighted_sum, logarithmic_sum, max_plus_average)
+        #[arg(long = "aggregation-method", default_value = "weighted_sum")]
+        aggregation_method: Option<String>,
     },
 
     /// Initialize configuration file

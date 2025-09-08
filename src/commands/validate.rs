@@ -241,6 +241,8 @@ fn calculate_unified_debt_score(
         &framework_exclusions,
         Some(&function_pointer_used_functions),
         Some(&results.technical_debt.items),
+        false,  // no_aggregation - use default settings for validate
+        None,   // aggregation_method - use default
     );
 
     unified.total_debt_score as u32
