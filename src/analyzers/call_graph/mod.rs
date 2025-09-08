@@ -28,7 +28,7 @@ use syn::{Expr, ExprMacro, ImplItemFn, ItemFn, Local, Pat};
 /// Main call graph extractor that coordinates all submodules
 pub struct CallGraphExtractor {
     pub call_graph: CallGraph,
-    unresolved_calls: Vec<UnresolvedCall>,
+    pub unresolved_calls: Vec<UnresolvedCall>,
     current_function: Option<FunctionId>,
     current_impl_type: Option<String>,
     current_file: PathBuf,
@@ -43,7 +43,7 @@ pub struct CallGraphExtractor {
     /// Macro expander
     macro_expander: MacroExpander,
     /// Graph builder
-    graph_builder: GraphBuilder,
+    pub graph_builder: GraphBuilder,
 }
 
 impl CallGraphExtractor {
@@ -121,7 +121,7 @@ impl CallGraphExtractor {
     }
 
     /// Phase 1: Extract functions and collect unresolved calls
-    fn extract_phase1(&mut self, file: &syn::File) {
+    pub fn extract_phase1(&mut self, file: &syn::File) {
         self.visit_file(file);
     }
 

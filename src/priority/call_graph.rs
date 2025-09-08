@@ -495,6 +495,7 @@ impl CallGraph {
     }
 
     /// Build a map of all functions by name
+    #[allow(dead_code)]
     fn build_function_name_map(&self) -> std::collections::HashMap<String, Vec<FunctionId>> {
         let mut functions_by_name = std::collections::HashMap::new();
         for func_id in self.nodes.keys() {
@@ -539,6 +540,145 @@ impl CallGraph {
         best_match.cloned()
     }
 
+    /// Advanced call resolution using sophisticated matching strategies
+    /// This pure function handles complex cases like:
+    /// - Associated function calls (Type::method matching function stored as Type::method)
+    /// - Qualified path resolution
+    /// - Cross-module calls with type hints
+    fn resolve_call_with_advanced_matching(
+        all_functions: &[FunctionId],
+        callee_name: &str,
+        caller_file: &PathBuf,
+    ) -> Option<FunctionId> {
+        use crate::analyzers::call_graph::call_resolution::CallResolver;
+        
+        // Delegate to the sophisticated CallResolver logic
+        CallResolver::resolve_function_call(
+            all_functions,
+            callee_name,
+            caller_file,
+            false // Don't force same-file preference for cross-file resolution
+        )
+    }
+
+    /// Pure function to check if two function names could be the same call
+    /// Handles various call patterns:
+    /// - Exact match: "func" matches "func"
+    /// - Associated function: "Type::method" matches "Type::method" 
+    /// - Method call resolution: "method" might match "Type::method" if we have type context
+    #[allow(dead_code)]
+    fn is_cross_file_call_match(
+        stored_function_name: &str,
+        call_name: &str,
+        type_context: Option<&str>,
+    ) -> bool {
+        // 1. Exact match
+        if stored_function_name == call_name {
+            return true;
+        }
+
+        // 2. Associated function call pattern
+        // If call_name contains "::" it's likely an associated function call
+        if call_name.contains("::") && stored_function_name == call_name {
+            return true;
+        }
+
+        // 3. Method name matching with type context
+        if let Some(type_name) = type_context {
+            let expected_qualified_name = format!("{}::{}", type_name, call_name);
+            if stored_function_name == expected_qualified_name {
+                return true;
+            }
+        }
+
+        // 4. Suffix matching for qualified paths
+        // "module::Type::method" matches "Type::method"
+        if stored_function_name.ends_with(&format!("::{}", call_name)) {
+            return true;
+        }
+
+        // 5. Extract base name from stored function for method matching
+        if let Some(pos) = stored_function_name.rfind("::") {
+            let base_name = &stored_function_name[pos + 2..];
+            if base_name == call_name {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Pure function to select the best matching function from candidates
+    /// Applies preference rules:
+    /// 1. Same file preference (when hint suggests it)
+    /// 2. Least qualified name (simpler is better)
+    /// 3. Exact matches over partial matches
+    #[allow(dead_code)]
+    fn select_best_cross_file_match(
+        candidates: Vec<FunctionId>,
+        caller_file: &PathBuf,
+        call_name: &str,
+    ) -> Option<FunctionId> {
+        if candidates.is_empty() {
+            return None;
+        }
+        
+        if candidates.len() == 1 {
+            return candidates.into_iter().next();
+        }
+
+        // Prefer exact matches first
+        let exact_matches: Vec<_> = candidates
+            .iter()
+            .filter(|func| func.name == call_name)
+            .cloned()
+            .collect();
+            
+        if !exact_matches.is_empty() {
+            return Self::apply_file_and_qualification_preference(exact_matches, caller_file);
+        }
+
+        // Then prefer cross-file matches (different file, which is what we're resolving)
+        let cross_file_matches: Vec<_> = candidates
+            .iter()
+            .filter(|func| &func.file != caller_file)
+            .cloned()
+            .collect();
+            
+        if !cross_file_matches.is_empty() {
+            return Self::apply_file_and_qualification_preference(cross_file_matches, caller_file);
+        }
+
+        // Fallback to any match
+        Self::apply_file_and_qualification_preference(candidates, caller_file)
+    }
+
+    /// Pure function to apply file and qualification preferences
+    #[allow(dead_code)]
+    fn apply_file_and_qualification_preference(
+        candidates: Vec<FunctionId>,
+        _caller_file: &PathBuf,
+    ) -> Option<FunctionId> {
+        if candidates.is_empty() {
+            return None;
+        }
+        
+        if candidates.len() == 1 {
+            return candidates.into_iter().next();
+        }
+
+        // Prefer less qualified names (simpler is better)
+        let min_colons = candidates
+            .iter()
+            .map(|func| func.name.matches("::").count())
+            .min()
+            .unwrap_or(0);
+            
+        candidates
+            .into_iter()
+            .find(|func| func.name.matches("::").count() == min_colons)
+    }
+
     /// Apply a resolved call to the graph's indexes and edges
     fn apply_call_resolution(
         &mut self,
@@ -574,26 +714,16 @@ impl CallGraph {
     /// This is needed because method calls like `obj.method()` don't know the target file
     /// at parse time and default to the current file
     pub fn resolve_cross_file_calls(&mut self) {
-        let functions_by_name = self.build_function_name_map();
+        let all_functions: Vec<FunctionId> = self.get_all_functions().cloned().collect();
         let calls_to_resolve = self.find_unresolved_calls();
 
         for call in calls_to_resolve {
-            // Look for a function with the same name in the nodes
-            if let Some(candidates) = functions_by_name.get(&call.callee.name) {
-                // First, try to find a match in the same file
-                let same_file_match = candidates
-                    .iter()
-                    .find(|func_id| func_id.file == call.caller.file);
-
-                if let Some(resolved) = same_file_match {
-                    // Prefer same-file resolution
-                    self.apply_call_resolution(&call, resolved);
-                } else if candidates.len() == 1 {
-                    // If no same-file match, but only one candidate globally, use it
-                    self.apply_call_resolution(&call, &candidates[0]);
-                }
-                // If multiple candidates across files and none in the same file,
-                // we leave them unresolved for now
+            if let Some(resolved_callee) = Self::resolve_call_with_advanced_matching(
+                &all_functions,
+                &call.callee.name,
+                &call.caller.file
+            ) {
+                self.apply_call_resolution(&call, &resolved_callee);
             }
         }
     }
@@ -1320,6 +1450,198 @@ mod tests {
             line: 999999,
         };
         assert_eq!(map.get(&process_id).unwrap().value, 300);
+    }
+
+    #[test]
+    fn test_is_cross_file_call_match() {
+        // Test exact matches
+        assert!(CallGraph::is_cross_file_call_match(
+            "my_function",
+            "my_function",
+            None
+        ));
+        
+        // Test associated function calls
+        assert!(CallGraph::is_cross_file_call_match(
+            "ContextualRisk::new",
+            "ContextualRisk::new",
+            None
+        ));
+        
+        // Test method name matching with type context
+        assert!(CallGraph::is_cross_file_call_match(
+            "MyStruct::method",
+            "method",
+            Some("MyStruct")
+        ));
+        
+        // Test suffix matching for qualified paths
+        assert!(CallGraph::is_cross_file_call_match(
+            "module::MyStruct::method",
+            "MyStruct::method",
+            None
+        ));
+        
+        // Test base name extraction
+        assert!(CallGraph::is_cross_file_call_match(
+            "MyStruct::new",
+            "new",
+            None
+        ));
+        
+        // Test non-matches
+        assert!(!CallGraph::is_cross_file_call_match(
+            "different_function",
+            "my_function",
+            None
+        ));
+        
+        assert!(!CallGraph::is_cross_file_call_match(
+            "MyStruct::method",
+            "other_method",
+            None
+        ));
+    }
+
+    #[test]
+    fn test_select_best_cross_file_match() {
+        let caller_file = PathBuf::from("src/caller.rs");
+        let other_file = PathBuf::from("src/other.rs");
+        let third_file = PathBuf::from("src/third.rs");
+        
+        // Test single candidate
+        let single_candidate = vec![FunctionId {
+            file: other_file.clone(),
+            name: "test_func".to_string(),
+            line: 10,
+        }];
+        
+        let result = CallGraph::select_best_cross_file_match(
+            single_candidate.clone(),
+            &caller_file,
+            "test_func"
+        );
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "test_func");
+        
+        // Test exact match preference
+        let candidates = vec![
+            FunctionId {
+                file: other_file.clone(),
+                name: "test_func".to_string(), // Exact match
+                line: 10,
+            },
+            FunctionId {
+                file: third_file.clone(),
+                name: "MyStruct::test_func".to_string(), // Qualified match
+                line: 20,
+            },
+        ];
+        
+        let result = CallGraph::select_best_cross_file_match(
+            candidates,
+            &caller_file,
+            "test_func"
+        );
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "test_func"); // Should prefer exact match
+        
+        // Test qualification preference (less qualified wins)
+        let qualified_candidates = vec![
+            FunctionId {
+                file: other_file.clone(),
+                name: "deep::module::MyStruct::method".to_string(), // More qualified
+                line: 10,
+            },
+            FunctionId {
+                file: third_file.clone(),
+                name: "MyStruct::method".to_string(), // Less qualified
+                line: 20,
+            },
+        ];
+        
+        let result = CallGraph::select_best_cross_file_match(
+            qualified_candidates,
+            &caller_file,
+            "method"
+        );
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "MyStruct::method"); // Should prefer less qualified
+    }
+
+    #[test]
+    fn test_resolve_call_with_advanced_matching() {
+        let caller_file = PathBuf::from("src/risk/mod.rs");
+        let callee_file = PathBuf::from("src/risk/context/mod.rs");
+        
+        // Create test functions that simulate the ContextualRisk::new scenario
+        let functions = vec![
+            FunctionId {
+                file: callee_file.clone(),
+                name: "ContextualRisk::new".to_string(),
+                line: 10,
+            },
+            FunctionId {
+                file: caller_file.clone(),
+                name: "analyze_function".to_string(),
+                line: 20,
+            },
+        ];
+        
+        // Test that ContextualRisk::new call resolves to the function in callee_file
+        let result = CallGraph::resolve_call_with_advanced_matching(
+            &functions,
+            "ContextualRisk::new",
+            &caller_file
+        );
+        
+        assert!(result.is_some());
+        let resolved = result.unwrap();
+        assert_eq!(resolved.name, "ContextualRisk::new");
+        assert_eq!(resolved.file, callee_file);
+    }
+
+    #[test]
+    fn test_apply_file_and_qualification_preference() {
+        let file1 = PathBuf::from("file1.rs");
+        let file2 = PathBuf::from("file2.rs");
+        
+        // Test empty candidates
+        let empty: Vec<FunctionId> = vec![];
+        assert!(CallGraph::apply_file_and_qualification_preference(empty, &file1).is_none());
+        
+        // Test single candidate
+        let single = vec![FunctionId {
+            file: file1.clone(),
+            name: "func".to_string(),
+            line: 10,
+        }];
+        let result = CallGraph::apply_file_and_qualification_preference(single, &file1);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "func");
+        
+        // Test qualification preference
+        let candidates = vec![
+            FunctionId {
+                file: file1.clone(),
+                name: "deep::nested::module::func".to_string(), // More qualified
+                line: 10,
+            },
+            FunctionId {
+                file: file2.clone(),
+                name: "module::func".to_string(), // Less qualified
+                line: 20,
+            },
+            FunctionId {
+                file: file1.clone(),
+                name: "func".to_string(), // Least qualified
+                line: 30,
+            },
+        ];
+        
+        let result = CallGraph::apply_file_and_qualification_preference(candidates, &file1);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "func"); // Should prefer least qualified
     }
 
     #[test]

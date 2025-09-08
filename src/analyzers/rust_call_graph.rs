@@ -32,12 +32,49 @@ pub fn extract_call_graph(file: &syn::File, path: &PathBuf) -> CallGraph {
 /// Extract call graph from multiple Rust files
 pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGraph {
     let mut combined_graph = CallGraph::new();
+    let mut all_unresolved_calls = Vec::new();
 
+    // Phase 1: Extract all functions and collect unresolved calls from all files
     for (file, path) in files {
-        let extractor = CallGraphExtractor::new(path.clone());
-        let graph = extractor.extract(file);
-        combined_graph.merge(graph);
+        let mut extractor = CallGraphExtractor::new(path.clone());
+        // Extract functions and collect unresolved calls
+        extractor.extract_phase1(file);
+        
+        // Merge the functions into the combined graph
+        combined_graph.merge(extractor.graph_builder.call_graph.clone());
+        
+        // Collect unresolved calls for later resolution
+        all_unresolved_calls.extend(extractor.unresolved_calls.clone());
     }
+
+    // Phase 2: Resolve all calls now that we have all functions
+    let multi_file_path = PathBuf::from("multi-file");
+    let mut resolved_calls = Vec::new();
+    
+    {
+        let resolver = crate::analyzers::call_graph::CallResolver::new(
+            &combined_graph, 
+            &multi_file_path
+        );
+        
+        for unresolved in &all_unresolved_calls {
+            if let Some(callee) = resolver.resolve_call(&unresolved) {
+                resolved_calls.push(crate::priority::call_graph::FunctionCall {
+                    caller: unresolved.caller.clone(),
+                    callee,
+                    call_type: unresolved.call_type.clone(),
+                });
+            }
+        }
+    }
+    
+    // Add all resolved calls
+    for call in resolved_calls {
+        combined_graph.add_call(call);
+    }
+
+    // Phase 3: Final cross-file resolution for any remaining unresolved calls
+    combined_graph.resolve_cross_file_calls();
 
     combined_graph
 }
