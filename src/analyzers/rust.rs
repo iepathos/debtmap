@@ -13,7 +13,11 @@ use crate::core::{
     ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
     FunctionMetrics, Language, Priority,
 };
+use crate::debt::async_errors::detect_async_errors;
+use crate::debt::error_context::analyze_error_context;
+use crate::debt::error_propagation::analyze_error_propagation;
 use crate::debt::error_swallowing::detect_error_swallowing;
+use crate::debt::panic_patterns::detect_panic_patterns;
 use crate::debt::patterns::{
     find_code_smells_with_suppression, find_todos_and_fixmes_with_suppression,
 };
@@ -178,6 +182,12 @@ fn collect_all_rust_debt_items(
         extract_rust_module_smell_items(path, source_content, suppression_context),
         extract_rust_function_smell_items(functions, suppression_context),
         detect_error_swallowing(file, path, Some(suppression_context)),
+        // New enhanced error handling detectors
+        detect_panic_patterns(file, path, Some(suppression_context)),
+        analyze_error_context(file, path, Some(suppression_context)),
+        detect_async_errors(file, path, Some(suppression_context)),
+        analyze_error_propagation(file, path, Some(suppression_context)),
+        // Existing resource and organization analysis
         analyze_resource_patterns(file, path),
         analyze_organization_patterns(file, path),
         testing::analyze_testing_patterns(file, path),
