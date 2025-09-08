@@ -211,7 +211,7 @@ mod tests {
             ..metrics
         };
         let base_score = base_metrics.calculate_score();
-        
+
         assert!(score > base_score, "Low coverage should increase score");
     }
 
@@ -345,12 +345,15 @@ mod tests {
         };
 
         let score1 = metrics.calculate_score();
-        
+
         metrics.god_object_indicators.is_god_object = true;
         metrics.god_object_indicators.god_object_score = 0.5;
         let score2 = metrics.calculate_score();
-        
-        assert!(score2 > score1 * 2.0, "God object should multiply score significantly");
+
+        assert!(
+            score2 > score1 * 2.0,
+            "God object should multiply score significantly"
+        );
     }
 
     #[test]
@@ -368,7 +371,7 @@ mod tests {
 
         let score = metrics.calculate_score();
         assert!(score > 0.0);
-        
+
         let metrics_no_functions = FileDebtMetrics {
             path: PathBuf::from("test.rs"),
             total_lines: 100,
@@ -379,8 +382,11 @@ mod tests {
             function_scores: vec![],
             ..Default::default()
         };
-        
+
         let score_no_functions = metrics_no_functions.calculate_score();
-        assert!(score > score_no_functions, "Function scores should increase total score");
+        assert!(
+            score > score_no_functions,
+            "Function scores should increase total score"
+        );
     }
 }

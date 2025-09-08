@@ -2180,8 +2180,7 @@ mod tests {
         let tokens: proc_macro2::TokenStream = "{ single_expr }".parse().unwrap();
         let result = extractor.parse_braced_exprs(&tokens);
         // For single expression without key-value pairs, it might return empty or single
-        if result.is_ok() {
-            let exprs = result.unwrap();
+        if let Ok(exprs) = result {
             // Accepting either empty (no key-value) or single expression
             assert!(exprs.len() <= 1, "Should have at most one expression");
         }

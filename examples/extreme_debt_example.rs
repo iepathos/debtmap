@@ -9,13 +9,16 @@ pub struct ExtremeLegacyProcessor {
     state: Arc<Mutex<SystemState>>,
 }
 
+#[allow(dead_code)]
 struct ComplexData {
     id: String,
     values: Vec<f64>,
     metadata: HashMap<String, String>,
 }
 
-struct ProcessingResult {
+#[derive(Clone)]
+#[allow(dead_code)]
+pub struct ProcessingResult {
     score: f64,
     errors: Vec<String>,
     timestamp: u64,
@@ -43,7 +46,7 @@ impl ExtremeLegacyProcessor {
             for (key, items) in data.iter() {
                 if key.starts_with("process_") {
                     for item in items {
-                        if item.values.len() > 0 {
+                        if !item.values.is_empty() {
                             let mut score = 0.0;
                             let mut error_count = 0;
 
@@ -66,7 +69,7 @@ impl ExtremeLegacyProcessor {
                                                         score += value * 0.5;
                                                     } else if special == "maybe" {
                                                         // Deep nesting level 7
-                                                        if let Ok(mut state) = self.state.lock() {
+                                                        if let Ok(state) = self.state.lock() {
                                                             if state.running {
                                                                 if state.error_count < 10 {
                                                                     score += value * 1.5;
@@ -171,10 +174,8 @@ impl ExtremeLegacyProcessor {
 
                     match command {
                         "CHECK" => {
-                            if data.len() > 10 {
-                                if data.contains("ERROR") {
-                                    return Err("Validation error".to_string());
-                                }
+                            if data.len() > 10 && data.contains("ERROR") {
+                                return Err("Validation error".to_string());
                             }
                         }
                         "TRANSFORM" => {
@@ -189,4 +190,8 @@ impl ExtremeLegacyProcessor {
         }
         Ok(())
     }
+}
+
+fn main() {
+    println!("Extreme debt example - demonstrating high technical debt scores");
 }

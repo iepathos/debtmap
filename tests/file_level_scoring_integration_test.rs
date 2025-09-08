@@ -1,4 +1,6 @@
-use debtmap::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators, FileDebtItem, FileImpact};
+use debtmap::priority::file_metrics::{
+    FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators,
+};
 use std::path::PathBuf;
 
 #[test]
@@ -37,21 +39,21 @@ fn test_file_level_scoring_integration() {
         7.6,  // Moderate-high
         5.4,  // Average
     ];
-    
+
     metrics.function_scores = function_scores.clone();
 
     let score = metrics.calculate_score();
-    
+
     // Verify score is influenced by function scores
     assert!(score > 0.0, "Score should be positive");
-    
+
     // Test with empty function scores
     metrics.function_scores = vec![];
     let score_without_functions = metrics.calculate_score();
-    
+
     metrics.function_scores = function_scores;
     let score_with_functions = metrics.calculate_score();
-    
+
     assert!(
         score_with_functions > score_without_functions,
         "Score with function scores should be higher than without"
@@ -83,11 +85,20 @@ fn test_file_scoring_with_god_object_detection() {
 
     let score = metrics.calculate_score();
     let recommendation = metrics.generate_recommendation();
-    
+
     // God object should have very high score
-    assert!(score > 100.0, "God object with high complexity should have very high score");
-    assert!(recommendation.contains("Break into"), "Should recommend breaking up god object");
-    assert!(recommendation.contains("modules"), "Should suggest modularization");
+    assert!(
+        score > 100.0,
+        "God object with high complexity should have very high score"
+    );
+    assert!(
+        recommendation.contains("Break into"),
+        "Should recommend breaking up god object"
+    );
+    assert!(
+        recommendation.contains("modules"),
+        "Should suggest modularization"
+    );
 }
 
 #[test]
@@ -135,17 +146,23 @@ fn test_file_scoring_priorities() {
         .iter()
         .map(|f| (f.path.clone(), f.calculate_score()))
         .collect();
-    
+
     scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-    
+
     // Verify correct prioritization
     assert_eq!(scores[0].0, PathBuf::from("high_priority.rs"));
     assert_eq!(scores[1].0, PathBuf::from("medium_priority.rs"));
     assert_eq!(scores[2].0, PathBuf::from("low_priority.rs"));
-    
+
     // Verify score magnitudes make sense
-    assert!(scores[0].1 > scores[1].1 * 2.0, "High priority should be significantly higher");
-    assert!(scores[1].1 > scores[2].1 * 2.0, "Medium should be significantly higher than low");
+    assert!(
+        scores[0].1 > scores[1].1 * 2.0,
+        "High priority should be significantly higher"
+    );
+    assert!(
+        scores[1].1 > scores[2].1 * 2.0,
+        "Medium should be significantly higher than low"
+    );
 }
 
 #[test]
@@ -167,7 +184,7 @@ fn test_file_debt_item_creation() {
 
     let score = metrics.calculate_score();
     let recommendation = metrics.generate_recommendation();
-    
+
     let debt_item = FileDebtItem {
         metrics: metrics.clone(),
         score,
@@ -191,12 +208,12 @@ fn test_file_debt_item_creation() {
 #[test]
 fn test_file_scoring_edge_cases() {
     // Test edge cases in file scoring
-    
+
     // Empty file
     let empty_metrics = FileDebtMetrics::default();
     let empty_score = empty_metrics.calculate_score();
     assert_eq!(empty_score, 0.0, "Empty file should have zero score");
-    
+
     // File with only coverage issues
     let coverage_only = FileDebtMetrics {
         path: PathBuf::from("untested.rs"),
@@ -210,8 +227,11 @@ fn test_file_scoring_edge_cases() {
         ..Default::default()
     };
     let coverage_score = coverage_only.calculate_score();
-    assert!(coverage_score > 0.0, "Zero coverage should produce non-zero score");
-    
+    assert!(
+        coverage_score > 0.0,
+        "Zero coverage should produce non-zero score"
+    );
+
     // Perfect file (low complexity, high coverage)
     let perfect_file = FileDebtMetrics {
         path: PathBuf::from("perfect.rs"),
@@ -225,13 +245,16 @@ fn test_file_scoring_edge_cases() {
         ..Default::default()
     };
     let perfect_score = perfect_file.calculate_score();
-    assert!(perfect_score < 1.0, "Perfect file should have very low score");
+    assert!(
+        perfect_score < 1.0,
+        "Perfect file should have very low score"
+    );
 }
 
 #[test]
 fn test_recommendation_generation_completeness() {
     // Test that all recommendation types are generated correctly
-    
+
     let test_cases = vec![
         (
             FileDebtMetrics {
@@ -293,7 +316,7 @@ fn test_recommendation_generation_completeness() {
 #[test]
 fn test_file_scoring_with_real_world_scenarios() {
     // Test realistic scenarios that might occur in production
-    
+
     // Scenario 1: Legacy file with no tests
     let legacy_file = FileDebtMetrics {
         path: PathBuf::from("src/legacy/old_module.rs"),
@@ -314,10 +337,13 @@ fn test_file_scoring_with_real_world_scenarios() {
         },
         function_scores: vec![9.0; 70],
     };
-    
+
     let legacy_score = legacy_file.calculate_score();
-    assert!(legacy_score > 200.0, "Legacy file should have extremely high score");
-    
+    assert!(
+        legacy_score > 200.0,
+        "Legacy file should have extremely high score"
+    );
+
     // Scenario 2: Well-maintained utility file
     let util_file = FileDebtMetrics {
         path: PathBuf::from("src/utils/helpers.rs"),
@@ -332,10 +358,13 @@ fn test_file_scoring_with_real_world_scenarios() {
         god_object_indicators: GodObjectIndicators::default(),
         function_scores: vec![2.0; 15],
     };
-    
+
     let util_score = util_file.calculate_score();
-    assert!(util_score < 5.0, "Well-maintained utility should have low score");
-    
+    assert!(
+        util_score < 5.0,
+        "Well-maintained utility should have low score"
+    );
+
     // Scenario 3: Business logic with moderate issues
     let business_logic = FileDebtMetrics {
         path: PathBuf::from("src/business/order_processing.rs"),
@@ -350,11 +379,14 @@ fn test_file_scoring_with_real_world_scenarios() {
         god_object_indicators: GodObjectIndicators::default(),
         function_scores: vec![5.5; 30],
     };
-    
+
     let business_score = business_logic.calculate_score();
-    assert!(business_score > 10.0 && business_score < 300.0, 
-        "Business logic should have moderate score, got: {}", business_score);
-    
+    assert!(
+        business_score > 10.0 && business_score < 300.0,
+        "Business logic should have moderate score, got: {}",
+        business_score
+    );
+
     // Verify relative ordering
     assert!(legacy_score > business_score);
     assert!(business_score > util_score);
