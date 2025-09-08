@@ -119,31 +119,49 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
 
         // Sort file aggregates by aggregate score descending
         let mut file_aggregates: Vec<_> = analysis.file_aggregates.iter().cloned().collect();
-        file_aggregates.sort_by(|a, b| b.aggregate_score.partial_cmp(&a.aggregate_score).unwrap_or(std::cmp::Ordering::Equal));
+        file_aggregates.sort_by(|a, b| {
+            b.aggregate_score
+                .partial_cmp(&a.aggregate_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Take top 10 files
         let top_files = file_aggregates.iter().take(10).collect::<Vec<_>>();
 
         writeln!(self.writer, "### Most Problematic Files")?;
         writeln!(self.writer)?;
-        writeln!(self.writer, "| Rank | File | Aggregate Score | Functions | Problematic | Top Function |")?;
-        writeln!(self.writer, "|------|------|-----------------|-----------|-------------|--------------|")?;
+        writeln!(
+            self.writer,
+            "| Rank | File | Aggregate Score | Functions | Problematic | Top Function |"
+        )?;
+        writeln!(
+            self.writer,
+            "|------|------|-----------------|-----------|-------------|--------------|"
+        )?;
 
         for (idx, aggregate) in top_files.iter().enumerate() {
             let rank = idx + 1;
-            let file_name = aggregate.file_path.file_name()
+            let file_name = aggregate
+                .file_path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown");
             let aggregate_score = format!("{:.1}", aggregate.aggregate_score);
-            let top_function = aggregate.top_function_scores.first()
+            let top_function = aggregate
+                .top_function_scores
+                .first()
                 .map(|(name, score)| format!("{} ({:.1})", name, score))
                 .unwrap_or_else(|| "N/A".to_string());
 
             writeln!(
                 self.writer,
                 "| {} | {} | {} | {} | {} | {} |",
-                rank, file_name, aggregate_score, aggregate.function_count, 
-                aggregate.problematic_functions, top_function
+                rank,
+                file_name,
+                aggregate_score,
+                aggregate.function_count,
+                aggregate.problematic_functions,
+                top_function
             )?;
         }
         writeln!(self.writer)?;
@@ -151,18 +169,46 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
         // Add detailed breakdown for top 3 files if verbosity is enabled
         if self.verbosity > 0 && !top_files.is_empty() {
             writeln!(self.writer, "<details>")?;
-            writeln!(self.writer, "<summary>File Details (click to expand)</summary>")?;
+            writeln!(
+                self.writer,
+                "<summary>File Details (click to expand)</summary>"
+            )?;
             writeln!(self.writer)?;
 
             for (idx, aggregate) in top_files.iter().take(3).enumerate() {
-                writeln!(self.writer, "#### {}. {}", idx + 1, aggregate.file_path.display())?;
+                writeln!(
+                    self.writer,
+                    "#### {}. {}",
+                    idx + 1,
+                    aggregate.file_path.display()
+                )?;
                 writeln!(self.writer)?;
-                writeln!(self.writer, "- **Total Score**: {:.2}", aggregate.total_score)?;
-                writeln!(self.writer, "- **Aggregate Score**: {:.2}", aggregate.aggregate_score)?;
-                writeln!(self.writer, "- **Aggregation Method**: {:?}", aggregate.aggregation_method)?;
-                writeln!(self.writer, "- **Function Count**: {}", aggregate.function_count)?;
-                writeln!(self.writer, "- **Problematic Functions**: {}", aggregate.problematic_functions)?;
-                
+                writeln!(
+                    self.writer,
+                    "- **Total Score**: {:.2}",
+                    aggregate.total_score
+                )?;
+                writeln!(
+                    self.writer,
+                    "- **Aggregate Score**: {:.2}",
+                    aggregate.aggregate_score
+                )?;
+                writeln!(
+                    self.writer,
+                    "- **Aggregation Method**: {:?}",
+                    aggregate.aggregation_method
+                )?;
+                writeln!(
+                    self.writer,
+                    "- **Function Count**: {}",
+                    aggregate.function_count
+                )?;
+                writeln!(
+                    self.writer,
+                    "- **Problematic Functions**: {}",
+                    aggregate.problematic_functions
+                )?;
+
                 if !aggregate.top_function_scores.is_empty() {
                     writeln!(self.writer)?;
                     writeln!(self.writer, "**Top Functions:**")?;

@@ -209,7 +209,7 @@ impl AggregationPipeline {
 
         pipeline.aggregate_file_scores()
     }
-    
+
     pub fn aggregate_from_metrics(
         metrics: &[crate::core::FunctionMetrics],
         config: &AggregationConfig,
@@ -219,11 +219,7 @@ impl AggregationPipeline {
         for metric in metrics {
             // Calculate a basic score from the metric's complexity
             let score = (metric.cyclomatic as f64 * 0.5) + (metric.cognitive as f64 * 0.5);
-            pipeline.add_function_score(
-                metric.file.clone(),
-                metric.name.clone(),
-                score,
-            );
+            pipeline.add_function_score(metric.file.clone(), metric.name.clone(), score);
         }
 
         pipeline.aggregate_file_scores()

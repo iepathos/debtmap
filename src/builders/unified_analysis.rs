@@ -368,12 +368,12 @@ pub fn create_unified_analysis_with_exclusions(
 
     // Add file aggregation analysis
     let mut aggregation_config = crate::config::get_aggregation_config();
-    
+
     // Override with CLI flags
     if no_aggregation {
         aggregation_config.enabled = false;
     }
-    
+
     if let Some(method_str) = aggregation_method {
         aggregation_config.method = match method_str.as_str() {
             "sum" => priority::aggregation::AggregationMethod::Sum,
@@ -383,12 +383,12 @@ pub fn create_unified_analysis_with_exclusions(
             _ => aggregation_config.method, // Keep default if invalid
         };
     }
-    
+
     // Apply min_problematic if specified
     if let Some(min_prob) = min_problematic {
         aggregation_config.min_functions_for_aggregation = min_prob;
     }
-    
+
     if aggregation_config.enabled {
         // Try to aggregate from UnifiedDebtItems first (for scored items)
         let items_vec: Vec<UnifiedDebtItem> = unified.items.iter().cloned().collect();
@@ -405,16 +405,24 @@ pub fn create_unified_analysis_with_exclusions(
                 &aggregation_config,
             )
         };
-        
+
         // If we have items but not all files are represented, also aggregate from metrics
         // to ensure all files with functions are included
-        if items_vec.is_empty() || file_aggregates.len() < metrics.iter().map(|m| &m.file).collect::<std::collections::HashSet<_>>().len() / 2 {
+        if items_vec.is_empty()
+            || file_aggregates.len()
+                < metrics
+                    .iter()
+                    .map(|m| &m.file)
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    / 2
+        {
             file_aggregates = priority::aggregation::AggregationPipeline::aggregate_from_metrics(
                 metrics,
                 &aggregation_config,
             );
         }
-        
+
         unified.file_aggregates = im::Vector::from(file_aggregates);
     }
 
