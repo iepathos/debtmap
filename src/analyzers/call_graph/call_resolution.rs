@@ -82,7 +82,7 @@ impl<'a> CallResolver<'a> {
 
     /// Resolve function in the same file
     fn resolve_in_same_file(&self, resolved_name: &str, original_name: &str) -> Option<FunctionId> {
-        let current_file_str = self.current_file.to_string_lossy();
+        let _current_file_str = self.current_file.to_string_lossy();
 
         // Get all functions in the current file
         let file_functions: Vec<&FunctionId> = self

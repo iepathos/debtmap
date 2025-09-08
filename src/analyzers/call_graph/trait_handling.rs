@@ -128,9 +128,9 @@ impl<'a> TraitHandler<'a> {
     }
 
     /// Process function arguments and track parameter types
-    pub fn process_function_params(&mut self, sig: &syn::Signature) {
+    pub fn process_function_params(&mut self, _sig: &syn::Signature) {
         // Track self parameter if present
-        if let Some(impl_type) = &self.current_impl_type {
+        if let Some(_impl_type) = &self.current_impl_type {
             self.type_tracker.track_self_param(None, None);
         }
     }

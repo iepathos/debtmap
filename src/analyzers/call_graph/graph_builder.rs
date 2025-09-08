@@ -56,7 +56,7 @@ impl GraphBuilder {
         name: String,
         line: usize,
         is_test: bool,
-        is_async: bool,
+        _is_async: bool,
     ) -> FunctionId {
         let function_id = FunctionId {
             name: name.clone(),

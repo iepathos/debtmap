@@ -325,7 +325,7 @@ mod tests {
         "#;
 
         let file = parse_str::<File>(code).expect("Failed to parse test code");
-        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+        let _items = analyze_error_context(&file, Path::new("test.rs"), None);
 
         // Should not detect issues when context is properly added
         // Note: Our simple analysis might still flag the ?, but that's ok

@@ -311,7 +311,7 @@ mod tests {
         "#;
 
         let file = parse_str::<File>(code).expect("Failed to parse test code");
-        let items = detect_async_errors(&file, Path::new("test.rs"), None);
+        let _items = detect_async_errors(&file, Path::new("test.rs"), None);
 
         // Our simple heuristic might detect this
         // In practice, we'd need type information
@@ -331,7 +331,7 @@ mod tests {
         "#;
 
         let file = parse_str::<File>(code).expect("Failed to parse test code");
-        let items = detect_async_errors(&file, Path::new("test.rs"), None);
+        let _items = detect_async_errors(&file, Path::new("test.rs"), None);
 
         // Should have fewer issues when properly handled
         // Our simple analysis might still flag some things

@@ -36,6 +36,7 @@ pub struct CallGraphExtractor {
     /// Type tracker for accurate method resolution
     type_tracker: TypeTracker,
     /// Global type registry (optional)
+    #[allow(dead_code)]
     type_registry: Option<Arc<GlobalTypeRegistry>>,
     /// Function signature registry for return type resolution
     function_registry: Option<Arc<FunctionSignatureRegistry>>,
@@ -409,7 +410,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
             }
         }
 
-        syn::visit::visit_item_fn(self, item_fn);
+        self.visit_block(&item_fn.block);
 
         self.type_tracker.exit_scope();
         self.current_function = None;
@@ -453,7 +454,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
             }
         }
 
-        syn::visit::visit_impl_item_fn(self, impl_fn);
+        self.visit_block(&impl_fn.block);
 
         self.type_tracker.exit_scope();
         self.current_function = None;
@@ -498,7 +499,7 @@ impl<'ast> Visit<'ast> for CallGraphExtractor {
                 // Visit base expression
                 self.visit_expr(&field_expr.base);
             }
-            Expr::Path(path_expr) => {
+            Expr::Path(_path_expr) => {
                 self.check_for_function_reference(expr);
                 syn::visit::visit_expr(self, expr);
             }
