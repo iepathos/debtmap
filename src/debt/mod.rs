@@ -1,7 +1,11 @@
+pub mod async_errors;
 pub mod circular;
 pub mod coupling;
 pub mod duplication;
+pub mod error_context;
+pub mod error_propagation;
 pub mod error_swallowing;
+pub mod panic_patterns;
 pub mod patterns;
 pub mod smells;
 pub mod suppression;
