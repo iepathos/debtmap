@@ -2,6 +2,22 @@
 use crate::priority::call_graph::{CallGraph, CallType, FunctionId};
 use std::path::PathBuf;
 
+/// Extension trait for functional pipeline composition
+trait FunctionalPipe<T> {
+    fn pipe<F, U>(self, f: F) -> U
+    where
+        F: FnOnce(T) -> U;
+}
+
+impl<T> FunctionalPipe<T> for T {
+    fn pipe<F, U>(self, f: F) -> U
+    where
+        F: FnOnce(T) -> U,
+    {
+        f(self)
+    }
+}
+
 /// Represents an unresolved function call that needs to be resolved in phase 2
 #[derive(Debug, Clone)]
 pub struct UnresolvedCall {
@@ -27,17 +43,40 @@ impl<'a> CallResolver<'a> {
 
     /// Resolve an unresolved call to a concrete function
     pub fn resolve_call(&self, call: &UnresolvedCall) -> Option<FunctionId> {
-        let resolved_name = Self::normalize_path_prefix(&call.callee_name);
-
-        // First try resolving in the same file if hinted
-        if call.same_file_hint {
-            if let Some(func) = self.resolve_in_same_file(&resolved_name, &call.callee_name) {
-                return Some(func);
-            }
+        let all_functions: Vec<FunctionId> = self.call_graph.get_all_functions().cloned().collect();
+        
+        // Use functional approach with clear precedence rules
+        Self::resolve_function_call(
+            &all_functions,
+            &call.callee_name,
+            &self.current_file,
+            call.same_file_hint
+        )
+    }
+    
+    /// Pure function to resolve a function call against a list of candidates
+    /// This is the core resolution logic extracted as a pure function
+    pub fn resolve_function_call(
+        all_functions: &[FunctionId],
+        callee_name: &str,
+        current_file: &PathBuf,
+        same_file_hint: bool,
+    ) -> Option<FunctionId> {
+        let normalized_name = Self::normalize_path_prefix(callee_name);
+        
+        // Find all matching functions using functional pipeline
+        let candidates: Vec<FunctionId> = all_functions
+            .iter()
+            .filter(|func| Self::is_function_match(func, &normalized_name, callee_name))
+            .cloned()
+            .collect();
+            
+        if candidates.is_empty() {
+            return None;
         }
-
-        // Then try global resolution
-        self.resolve_function(&resolved_name, &call.callee_name, call.same_file_hint)
+        
+        // Apply resolution strategies in order of preference
+        Self::select_best_candidate(candidates, current_file, same_file_hint)
     }
 
     /// Normalize path prefixes in function names
@@ -50,179 +89,151 @@ impl<'a> CallResolver<'a> {
         }
     }
 
-    /// Resolve a function call
-    fn resolve_function(
-        &self,
-        resolved_name: &str,
-        original_name: &str,
+    /// Pure function to select the best candidate from multiple matches
+    /// Uses clear preference rules and functional composition
+    fn select_best_candidate(
+        candidates: Vec<FunctionId>,
+        current_file: &PathBuf,
         same_file_hint: bool,
     ) -> Option<FunctionId> {
-        // Get all functions in the graph
-        let all_functions = self.call_graph.get_all_functions();
-
-        // Find all matches
-        let mut matches: Vec<&FunctionId> = all_functions
-            .filter(|func| Self::matches_function_name(func, resolved_name, original_name))
-            .collect();
-
-        if matches.is_empty() {
-            return None;
+        if candidates.len() == 1 {
+            return candidates.into_iter().next();
         }
-
-        // Sort by qualification level (prefer less qualified matches for simple names)
-        Self::sort_by_qualification(&mut matches);
-
-        // If we have multiple matches, try to disambiguate
-        if matches.len() > 1 && same_file_hint {
-            matches = self.disambiguate_matches(matches, same_file_hint);
-        }
-
-        matches.first().map(|f| (*f).clone())
-    }
-
-    /// Resolve function in the same file
-    fn resolve_in_same_file(&self, resolved_name: &str, original_name: &str) -> Option<FunctionId> {
-        let _current_file_str = self.current_file.to_string_lossy();
-
-        // Get all functions in the current file
-        let file_functions: Vec<&FunctionId> = self
-            .call_graph
-            .get_all_functions()
-            .filter(|func| func.file == *self.current_file)
-            .collect();
-
-        // Find matches in the same file
-        let mut matches: Vec<&FunctionId> = file_functions
+        
+        // Apply selection strategies as a functional pipeline
+        let result = candidates
             .into_iter()
-            .filter(|func| Self::matches_function_name(func, resolved_name, original_name))
-            .collect();
-
-        if matches.is_empty() {
-            return None;
+            .collect::<Vec<_>>()
+            .pipe(|funcs| Self::apply_same_file_preference(funcs, current_file, same_file_hint))
+            .pipe(Self::apply_qualification_preference)
+            .pipe(Self::apply_generic_preference);
+            
+        result.into_iter().next()
+    }
+    
+    /// Apply same-file preference filter
+    fn apply_same_file_preference(
+        candidates: Vec<FunctionId>,
+        current_file: &PathBuf,
+        same_file_hint: bool,
+    ) -> Vec<FunctionId> {
+        if !same_file_hint {
+            return candidates;
         }
-
-        // Sort by qualification
-        Self::sort_by_qualification(&mut matches);
-
-        // For same-file resolution, prefer the least qualified match
-        matches.first().map(|f| (*f).clone())
+        
+        let same_file_matches: Vec<FunctionId> = candidates
+            .iter()
+            .filter(|func| &func.file == current_file)
+            .cloned()
+            .collect();
+            
+        if same_file_matches.is_empty() {
+            candidates
+        } else {
+            same_file_matches
+        }
+    }
+    
+    /// Apply qualification preference filter (prefer less qualified names)
+    fn apply_qualification_preference(candidates: Vec<FunctionId>) -> Vec<FunctionId> {
+        if candidates.len() <= 1 {
+            return candidates;
+        }
+        
+        let min_qualification = candidates
+            .iter()
+            .map(|func| Self::calculate_qualification_score(&func.name))
+            .min()
+            .unwrap_or(0);
+            
+        candidates
+            .into_iter()
+            .filter(|func| Self::calculate_qualification_score(&func.name) == min_qualification)
+            .collect()
+    }
+    
+    /// Apply generic function preference filter (prefer non-generic)
+    fn apply_generic_preference(candidates: Vec<FunctionId>) -> Vec<FunctionId> {
+        if candidates.len() <= 1 {
+            return candidates;
+        }
+        
+        let non_generic: Vec<FunctionId> = candidates
+            .iter()
+            .filter(|func| !Self::is_generic_function(&func.name))
+            .cloned()
+            .collect();
+            
+        if non_generic.is_empty() {
+            candidates
+        } else {
+            non_generic
+        }
+    }
+    
+    /// Pure function to calculate qualification score
+    fn calculate_qualification_score(name: &str) -> usize {
+        let qualification_level = name.matches("::").count();
+        let has_impl = name.contains("<") && name.contains(">");
+        qualification_level + if has_impl { 1000 } else { 0 }
+    }
+    
+    
+    /// Pure function to check if function is generic
+    fn is_generic_function(name: &str) -> bool {
+        name.contains("<") && name.contains(">")
     }
 
-    /// Check if a function matches the given name
-    pub fn matches_function_name(
-        func: &&FunctionId,
-        resolved_name: &str,
+
+    /// Pure function to check if a function matches the given name
+    /// Simplified logic with clear precedence
+    pub fn is_function_match(
+        func: &FunctionId,
+        normalized_name: &str,
         original_name: &str,
     ) -> bool {
         let func_name = &func.name;
-
-        // Direct match
-        if func_name == resolved_name || func_name == original_name {
+        
+        // 1. Exact match has highest priority
+        if Self::is_exact_match(func_name, normalized_name) 
+            || Self::is_exact_match(func_name, original_name) {
             return true;
         }
-
-        // Check if function ends with the search name (for qualified names)
-        if func_name.ends_with(&format!("::{}", resolved_name))
-            || func_name.ends_with(&format!("::{}", original_name))
-        {
+        
+        // 2. Qualified name match (e.g., "module::func" ends with "::func")
+        if Self::is_qualified_match(func_name, normalized_name)
+            || Self::is_qualified_match(func_name, original_name) {
             return true;
         }
-
-        // Check for type-qualified names (e.g., MyStruct::method matches method)
-        Self::matches_base_name_with_type_check(func_name, resolved_name)
-            || Self::matches_base_name_with_type_check(func_name, original_name)
+        
+        // 3. Base name match (e.g., "MyStruct::method" matches "method")
+        Self::is_base_name_match(func_name, normalized_name)
+            || Self::is_base_name_match(func_name, original_name)
     }
-
-    /// Check if a function base name matches, accounting for type qualification
-    fn matches_base_name_with_type_check(func_name: &str, search_name: &str) -> bool {
+    
+    /// Pure function for exact name matching
+    fn is_exact_match(func_name: &str, search_name: &str) -> bool {
+        func_name == search_name
+    }
+    
+    /// Pure function for qualified name matching
+    fn is_qualified_match(func_name: &str, search_name: &str) -> bool {
+        func_name.ends_with(&format!("::{}", search_name))
+    }
+    
+    /// Pure function for base name matching
+    fn is_base_name_match(func_name: &str, search_name: &str) -> bool {
         // Handle impl methods (Type::method)
         if let Some(pos) = func_name.rfind("::") {
             let base_name = &func_name[pos + 2..];
-            if base_name == search_name {
-                return true;
-            }
+            return base_name == search_name;
         }
-
-        // Handle module paths
-        let func_parts: Vec<&str> = func_name.split("::").collect();
-        let search_parts: Vec<&str> = search_name.split("::").collect();
-
-        // If search has fewer parts, check if func ends with search pattern
-        if search_parts.len() <= func_parts.len() {
-            let func_suffix: Vec<&str> =
-                func_parts[func_parts.len() - search_parts.len()..].to_vec();
-            if func_suffix == search_parts {
-                return true;
-            }
-        }
-
         false
     }
 
-    /// Sort functions by qualification level (less qualified first)
-    fn sort_by_qualification(matches: &mut Vec<&FunctionId>) {
-        matches.sort_by_key(|func| {
-            let qualification_level = func.name.matches("::").count();
-            // Prioritize functions without impl blocks (lower qualification)
-            let has_impl = func.name.contains("<") && func.name.contains(">");
-            (has_impl as usize * 1000) + qualification_level
-        });
-    }
 
-    /// Disambiguate multiple matches
-    fn disambiguate_matches<'b>(
-        &self,
-        matches: Vec<&'b FunctionId>,
-        same_file_hint: bool,
-    ) -> Vec<&'b FunctionId> {
-        if matches.len() <= 1 {
-            return matches;
-        }
 
-        // Apply disambiguation strategies
-        self.apply_disambiguation_strategies(matches, same_file_hint)
-    }
 
-    /// Apply various strategies to disambiguate matches
-    fn apply_disambiguation_strategies<'b>(
-        &self,
-        matches: Vec<&'b FunctionId>,
-        same_file_hint: bool,
-    ) -> Vec<&'b FunctionId> {
-        let mut filtered = matches.clone();
-
-        // Strategy 1: Prefer same-file matches
-        if same_file_hint {
-            let same_file: Vec<&FunctionId> = filtered
-                .iter()
-                .filter(|f| f.file == *self.current_file)
-                .copied()
-                .collect();
-
-            if !same_file.is_empty() {
-                filtered = same_file;
-            }
-        }
-
-        // Strategy 2: Prefer non-generic functions
-        let non_generic: Vec<&FunctionId> = filtered
-            .iter()
-            .filter(|f| !f.name.contains("<") || !f.name.contains(">"))
-            .copied()
-            .collect();
-
-        if !non_generic.is_empty() {
-            filtered = non_generic;
-        }
-
-        // Strategy 3: Prefer shorter names (less qualified)
-        if filtered.len() > 1 {
-            let min_len = filtered.iter().map(|f| f.name.len()).min().unwrap_or(0);
-            filtered.retain(|f| f.name.len() == min_len);
-        }
-
-        filtered
-    }
 
     /// Extract impl type from a caller function name
     pub fn extract_impl_type_from_caller(caller_name: &str) -> Option<String> {
@@ -302,6 +313,54 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_functional_refactoring_integration() {
+        let current_file = PathBuf::from("test.rs");
+        
+        // Test the functional pipeline with owned values
+        let functions = vec![
+            FunctionId {
+                file: current_file.clone(),
+                name: "simple_func".to_string(),
+                line: 10,
+            },
+            FunctionId {
+                file: current_file.clone(),
+                name: "module::complex_func".to_string(),
+                line: 20,
+            },
+            FunctionId {
+                file: PathBuf::from("other.rs"),
+                name: "other_func".to_string(),
+                line: 30,
+            },
+        ];
+        
+        // Test resolution with same_file_hint
+        let result = CallResolver::resolve_function_call(
+            &functions,
+            "simple_func",
+            &current_file,
+            true
+        );
+        
+        assert!(result.is_some());
+        let resolved = result.unwrap();
+        assert_eq!(resolved.name, "simple_func");
+        assert_eq!(resolved.file, current_file);
+        
+        // Test resolution without same_file_hint
+        let result_no_hint = CallResolver::resolve_function_call(
+            &functions,
+            "simple_func",
+            &current_file,
+            false
+        );
+        
+        assert!(result_no_hint.is_some());
+        assert_eq!(result_no_hint.unwrap().name, "simple_func");
+    }
+
+    #[test]
     fn test_normalize_path_prefix() {
         assert_eq!(
             CallResolver::normalize_path_prefix("crate::module::func"),
@@ -319,20 +378,20 @@ mod tests {
     }
 
     #[test]
-    fn test_matches_base_name_with_type_check() {
-        assert!(CallResolver::matches_base_name_with_type_check(
+    fn test_is_base_name_match() {
+        assert!(CallResolver::is_base_name_match(
             "MyStruct::method",
             "method"
         ));
-        assert!(CallResolver::matches_base_name_with_type_check(
+        assert!(CallResolver::is_base_name_match(
             "module::MyStruct::method",
             "method"
         ));
-        assert!(CallResolver::matches_base_name_with_type_check(
+        assert!(CallResolver::is_base_name_match(
             "module::function",
             "function"
         ));
-        assert!(!CallResolver::matches_base_name_with_type_check(
+        assert!(!CallResolver::is_base_name_match(
             "MyStruct::method",
             "other"
         ));
@@ -399,4 +458,95 @@ mod tests {
             None
         );
     }
+    
+    #[test]
+    fn test_complex_matching_scenarios() {
+        let current_file = PathBuf::from("test.rs");
+        
+        // Mix of qualified and unqualified names
+        let simple_func = FunctionId {
+            file: current_file.clone(),
+            name: "calculate".to_string(),
+            line: 10,
+        };
+        
+        let qualified_func = FunctionId {
+            file: current_file.clone(),
+            name: "utils::calculate".to_string(),
+            line: 20,
+        };
+        
+        let method_func = FunctionId {
+            file: current_file.clone(),
+            name: "Calculator::calculate".to_string(),
+            line: 30,
+        };
+        
+        let functions = vec![qualified_func.clone(), method_func.clone(), simple_func.clone()];
+        
+        // When searching for "calculate" with same_file_hint, should prefer simpler match
+        let result = CallResolver::resolve_function_call(
+            &functions,
+            "calculate",
+            &current_file,
+            true
+        );
+        
+        assert!(result.is_some());
+        // Should prefer the simple, unqualified name
+        assert_eq!(result.unwrap().name, "calculate");
+    }
+    
+    #[test]
+    fn test_functional_pipeline_composition() {
+        let current_file = PathBuf::from("test.rs");
+        
+        // Create functions with different qualification levels
+        let functions = vec![
+            FunctionId {
+                file: current_file.clone(),
+                name: "func".to_string(),
+                line: 10,
+            },
+            FunctionId {
+                file: current_file.clone(),
+                name: "mod::func".to_string(),
+                line: 20,
+            },
+            FunctionId {
+                file: current_file.clone(),
+                name: "deep::mod::func".to_string(),
+                line: 30,
+            },
+        ];
+        
+        // Test that qualification preference works
+        let result = CallResolver::apply_qualification_preference(functions.clone());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "func"); // Least qualified should win
+        
+        // Test generic filtering
+        let generic_functions = vec![
+            FunctionId {
+                file: current_file.clone(),
+                name: "regular_func".to_string(),
+                line: 10,
+            },
+            FunctionId {
+                file: current_file.clone(),
+                name: "generic_func<T>".to_string(),
+                line: 20,
+            },
+        ];
+        
+        let result = CallResolver::apply_generic_preference(generic_functions.clone());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "regular_func"); // Non-generic should win
+    }
 }
+
+// Summary: Refactored call resolution using functional programming principles
+// - Replaced complex lifetime management with owned values
+// - Used functional composition with pipe() for clean data flow
+// - Made all functions pure and side-effect free
+// - Eliminated mutable state in favor of immutable transformations

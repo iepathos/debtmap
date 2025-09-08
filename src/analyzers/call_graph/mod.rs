@@ -111,11 +111,11 @@ impl CallGraphExtractor {
         // Phase 1: Extract functions and unresolved calls
         self.extract_phase1(file);
 
+        // Merge graphs before phase 2 so functions are available for resolution
+        self.call_graph.merge(self.graph_builder.call_graph.clone());
+
         // Phase 2: Resolve calls
         self.resolve_phase2();
-
-        // Merge graphs
-        self.call_graph.merge(self.graph_builder.call_graph.clone());
 
         self.call_graph
     }
@@ -305,7 +305,7 @@ impl CallGraphExtractor {
     fn process_closure_expr(&mut self, expr: &Expr) {
         if let Expr::Closure(closure) = expr {
             self.type_tracker.enter_scope(ScopeKind::Block, None);
-            self.visit_expr(&closure.body);
+            syn::visit::visit_expr(self, &closure.body);
             self.type_tracker.exit_scope();
         }
     }

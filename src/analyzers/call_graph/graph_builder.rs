@@ -154,10 +154,8 @@ impl GraphBuilder {
     }
 
     /// Get line number from a span (placeholder for actual implementation)
-    pub fn get_line_number(&self, _span: proc_macro2::Span) -> usize {
-        // In a real implementation, this would use span information
-        // to get the actual line number
-        0
+    pub fn get_line_number(&self, span: proc_macro2::Span) -> usize {
+        span.start().line
     }
 
     /// Classify an expression for special handling
