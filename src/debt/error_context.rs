@@ -9,7 +9,8 @@ pub struct ContextLossAnalyzer<'a> {
     current_file: &'a Path,
     suppression: Option<&'a SuppressionContext>,
     in_test_function: bool,
-    question_mark_chain_depth: usize,
+    question_mark_count: usize,
+    current_function: Option<usize>,
 }
 
 impl<'a> ContextLossAnalyzer<'a> {
@@ -19,7 +20,8 @@ impl<'a> ContextLossAnalyzer<'a> {
             current_file: file_path,
             suppression,
             in_test_function: false,
-            question_mark_chain_depth: 0,
+            question_mark_count: 0,
+            current_function: None,
         }
     }
 
@@ -155,13 +157,23 @@ impl<'a> ContextLossAnalyzer<'a> {
 impl<'a> Visit<'_> for ContextLossAnalyzer<'a> {
     fn visit_item_fn(&mut self, node: &ItemFn) {
         let was_in_test = self.in_test_function;
+        let prev_count = self.question_mark_count;
+        let prev_func = self.current_function;
+        
         self.in_test_function = node
             .attrs
             .iter()
             .any(|attr| attr.path().get_ident().map(|i| i.to_string()).as_deref() == Some("test"));
+        
+        // Reset question mark count for each function
+        self.question_mark_count = 0;
+        self.current_function = Some(self.get_line_number(node.sig.fn_token.span));
 
         syn::visit::visit_item_fn(self, node);
+        
         self.in_test_function = was_in_test;
+        self.question_mark_count = prev_count;
+        self.current_function = prev_func;
     }
 
     fn visit_expr_method_call(&mut self, node: &ExprMethodCall) {
@@ -172,10 +184,10 @@ impl<'a> Visit<'_> for ContextLossAnalyzer<'a> {
     }
 
     fn visit_expr_try(&mut self, node: &ExprTry) {
-        // Track chains of ? operators
-        self.question_mark_chain_depth += 1;
+        // Track total number of ? operators in current function
+        self.question_mark_count += 1;
 
-        if self.question_mark_chain_depth > 3 {
+        if self.question_mark_count > 3 {
             let line = self.get_line_number(node.question_token.span);
             self.add_debt_item(
                 line,
@@ -185,7 +197,6 @@ impl<'a> Visit<'_> for ContextLossAnalyzer<'a> {
         }
 
         syn::visit::visit_expr_try(self, node);
-        self.question_mark_chain_depth -= 1;
     }
 }
 

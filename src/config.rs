@@ -326,6 +326,10 @@ pub struct DebtmapConfig {
     /// Complexity thresholds for enhanced detection
     #[serde(default)]
     pub complexity_thresholds: Option<crate::complexity::threshold_manager::ComplexityThresholds>,
+
+    /// Error handling detection configuration
+    #[serde(default)]
+    pub error_handling: Option<ErrorHandlingConfig>,
 }
 
 impl DebtmapConfig {
@@ -848,6 +852,112 @@ pub fn get_complexity_thresholds() -> crate::complexity::threshold_manager::Comp
         .complexity_thresholds
         .clone()
         .unwrap_or_default()
+}
+
+/// Error handling configuration for pattern detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorHandlingConfig {
+    /// Enable async error detection
+    #[serde(default = "default_detect_async_errors")]
+    pub detect_async_errors: bool,
+
+    /// Enable error context loss detection
+    #[serde(default = "default_detect_context_loss")]
+    pub detect_context_loss: bool,
+
+    /// Enable error propagation analysis
+    #[serde(default = "default_detect_propagation")]
+    pub detect_propagation: bool,
+
+    /// Enable panic pattern detection
+    #[serde(default = "default_detect_panic_patterns")]
+    pub detect_panic_patterns: bool,
+
+    /// Enable error swallowing detection
+    #[serde(default = "default_detect_swallowing")]
+    pub detect_swallowing: bool,
+
+    /// Custom error patterns to detect
+    #[serde(default)]
+    pub custom_patterns: Vec<ErrorPatternConfig>,
+
+    /// Severity overrides for specific patterns
+    #[serde(default)]
+    pub severity_overrides: Vec<SeverityOverride>,
+}
+
+impl Default for ErrorHandlingConfig {
+    fn default() -> Self {
+        Self {
+            detect_async_errors: default_detect_async_errors(),
+            detect_context_loss: default_detect_context_loss(),
+            detect_propagation: default_detect_propagation(),
+            detect_panic_patterns: default_detect_panic_patterns(),
+            detect_swallowing: default_detect_swallowing(),
+            custom_patterns: Vec::new(),
+            severity_overrides: Vec::new(),
+        }
+    }
+}
+
+fn default_detect_async_errors() -> bool {
+    true
+}
+
+fn default_detect_context_loss() -> bool {
+    true
+}
+
+fn default_detect_propagation() -> bool {
+    true
+}
+
+fn default_detect_panic_patterns() -> bool {
+    true
+}
+
+fn default_detect_swallowing() -> bool {
+    true
+}
+
+/// Custom error pattern configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorPatternConfig {
+    /// Pattern name/identifier
+    pub name: String,
+
+    /// Pattern regex or matcher
+    pub pattern: String,
+
+    /// Pattern type (function_name, macro_name, method_call, etc.)
+    pub pattern_type: String,
+
+    /// Severity level (low, medium, high, critical)
+    pub severity: String,
+
+    /// Description of what this pattern detects
+    pub description: String,
+
+    /// Suggested remediation
+    pub remediation: Option<String>,
+}
+
+/// Severity override for specific patterns
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeverityOverride {
+    /// Pattern to match (e.g., "unwrap", "panic", "todo")
+    pub pattern: String,
+
+    /// Context where override applies (e.g., "test", "benchmark", "example")
+    pub context: String,
+
+    /// New severity level
+    pub severity: String,
+}
+
+/// Get error handling configuration
+pub fn get_error_handling_config() -> ErrorHandlingConfig {
+    get_config().error_handling.clone().unwrap_or_default()
 }
 
 /// Get smart performance configuration

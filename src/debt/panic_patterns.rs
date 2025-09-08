@@ -122,13 +122,11 @@ impl<'a> PanicPatternDetector<'a> {
 
             match macro_name.as_str() {
                 "panic" => {
-                    if !self.in_test_function && !self.in_test_module {
-                        self.add_debt_item(
-                            line,
-                            PanicPattern::PanicInNonTest,
-                            "panic! macro in production code",
-                        );
-                    }
+                    self.add_debt_item(
+                        line,
+                        PanicPattern::PanicInNonTest,
+                        "panic! macro in production code",
+                    );
                 }
                 "unreachable" => {
                     self.add_debt_item(
@@ -138,22 +136,18 @@ impl<'a> PanicPatternDetector<'a> {
                     );
                 }
                 "todo" => {
-                    if !self.in_test_function && !self.in_test_module {
-                        self.add_debt_item(
-                            line,
-                            PanicPattern::TodoInProduction,
-                            "todo! macro in production code",
-                        );
-                    }
+                    self.add_debt_item(
+                        line,
+                        PanicPattern::TodoInProduction,
+                        "todo! macro in production code",
+                    );
                 }
                 "unimplemented" => {
-                    if !self.in_test_function && !self.in_test_module {
-                        self.add_debt_item(
-                            line,
-                            PanicPattern::TodoInProduction,
-                            "unimplemented! macro in production code",
-                        );
-                    }
+                    self.add_debt_item(
+                        line,
+                        PanicPattern::TodoInProduction,
+                        "unimplemented! macro in production code",
+                    );
                 }
                 _ => {}
             }
@@ -202,6 +196,14 @@ impl<'a> Visit<'_> for PanicPatternDetector<'a> {
     fn visit_expr_macro(&mut self, node: &ExprMacro) {
         self.check_panic_macros(&node.mac);
         syn::visit::visit_expr_macro(self, node);
+    }
+    
+    fn visit_stmt(&mut self, node: &syn::Stmt) {
+        // Also check for macros in statement position
+        if let syn::Stmt::Macro(stmt_macro) = node {
+            self.check_panic_macros(&stmt_macro.mac);
+        }
+        syn::visit::visit_stmt(self, node);
     }
 }
 

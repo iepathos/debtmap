@@ -89,12 +89,15 @@ impl<'a> ErrorPropagationAnalyzer<'a> {
         }
 
         // Check for overly broad Result types
-        if type_str.contains("Result") && type_str.contains("String") {
-            self.add_debt_item(
-                line,
-                PropagationQuality::TypeErasure,
-                "Using String as error type loses structure",
-            );
+        if type_str.contains("Result") {
+            // Check specifically for Result<_, String> pattern
+            if type_str.contains(", String") || type_str.contains(",String") {
+                self.add_debt_item(
+                    line,
+                    PropagationQuality::TypeErasure,
+                    "Using String as error type loses structure",
+                );
+            }
         }
 
         // Check for anyhow::Error without context
@@ -194,7 +197,7 @@ mod tests {
         let items = analyze_error_propagation(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        assert!(items[0].message.contains("String"));
+        assert!(items[0].message.contains("type erasure"));
     }
 
     #[test]
