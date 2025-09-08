@@ -91,6 +91,7 @@ impl<'a> CallResolver<'a> {
 
     /// Pure function to select the best candidate from multiple matches
     /// Uses clear preference rules and functional composition
+    /// Returns None if candidates are ambiguous (multiple equally valid options)
     fn select_best_candidate(
         candidates: Vec<FunctionId>,
         current_file: &PathBuf,
@@ -100,14 +101,37 @@ impl<'a> CallResolver<'a> {
             return candidates.into_iter().next();
         }
         
+        // If there are multiple candidates and no same-file hint, check for true ambiguity
+        // We only consider it ambiguous if the candidates are truly indistinguishable:
+        // - Same exact name (not one being Type::method and another being just method)
+        // - All in different files
+        // - No clear qualification differences
+        if !same_file_hint && candidates.len() > 1 {
+            // Check if all candidates have exactly the same name (not just matching)
+            let all_same_name = candidates.iter().all(|f| f.name == candidates[0].name);
+            
+            if all_same_name {
+                // Check if all candidates are in different files (truly ambiguous)
+                let unique_files: std::collections::HashSet<_> = candidates
+                    .iter()
+                    .map(|f| &f.file)
+                    .collect();
+                
+                // If all have the same exact name and are in different files, it's ambiguous
+                if unique_files.len() == candidates.len() {
+                    // All candidates are in different files with same exact name - this is ambiguous
+                    return None;
+                }
+            }
+        }
+        
         // Apply selection strategies as a functional pipeline
         let result = candidates
-            .into_iter()
-            .collect::<Vec<_>>()
             .pipe(|funcs| Self::apply_same_file_preference(funcs, current_file, same_file_hint))
             .pipe(Self::apply_qualification_preference)
             .pipe(Self::apply_generic_preference);
             
+        // Return the best candidate after applying preferences
         result.into_iter().next()
     }
     
