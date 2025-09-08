@@ -95,6 +95,7 @@ After completing gaps:
 - Stage all modified files with `git add`
 - Create a commit with message: `fix: complete spec $ARG implementation gaps`
 - Include list of gaps fixed in commit body
+- **IMPORTANT**: Do NOT add any attribution text like "🤖 Generated with [Claude Code]" or "Co-Authored-By: Claude" to commit messages. Keep commits clean and focused on the change itself.
 - This commit is REQUIRED - Prodigy uses it to verify fixes were made
 
 ### Step 6: Output Result
