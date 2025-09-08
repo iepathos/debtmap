@@ -28,7 +28,12 @@ fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
         0
     };
 
-    cyclomatic.saturating_sub(current_test_cases)
+    // For zero coverage, ensure minimum recommendation
+    if coverage_pct == 0.0 {
+        cyclomatic.max(3)
+    } else {
+        cyclomatic.saturating_sub(current_test_cases)
+    }
 }
 
 /// Calculate approximate test cases for simple functions
@@ -76,6 +81,13 @@ fn generate_complex_function_recommendation(
     func: &FunctionMetrics,
     transitive_coverage: &Option<TransitiveCoverage>,
 ) -> (String, String, Vec<String>) {
+    // Special handling for zero coverage complex functions (spec 98)
+    if coverage_pct == 0.0 {
+        return generate_zero_coverage_complex_recommendation(
+            cyclomatic, cognitive, role_str, func,
+        );
+    }
+
     let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
     let needed_test_cases = calculate_needed_test_cases(cyclomatic, coverage_pct);
     let coverage_pct_int = (coverage_pct * 100.0) as i32;
@@ -98,6 +110,46 @@ fn generate_complex_function_recommendation(
     )
 }
 
+/// Generate urgent recommendation for complex zero coverage functions (spec 98)
+fn generate_zero_coverage_complex_recommendation(
+    cyclomatic: u32,
+    cognitive: u32,
+    role_str: String,
+    func: &FunctionMetrics,
+) -> (String, String, Vec<String>) {
+    let test_cases_needed = cyclomatic.max(5);
+    let branches = func.nesting.max(1) * cyclomatic / 3; // Estimate branches from complexity
+
+    (
+        format!(
+            "⚠️ URGENT: Add {} tests for untested complex function, then refactor",
+            test_cases_needed
+        ),
+        format!(
+            "SEVERELY UNDERTESTED: This complex {} has NEVER been tested! \
+             With cyclomatic complexity {} and cognitive complexity {}, \
+             approximately {} branches are uncovered. This is CRITICAL risk. \
+             Minimum {} test cases urgently needed.",
+            role_str, cyclomatic, cognitive, branches, test_cases_needed
+        ),
+        vec![
+            "IMMEDIATE ACTION REQUIRED:".to_string(),
+            format!(
+                "1. Create comprehensive test suite with {} test cases",
+                test_cases_needed
+            ),
+            "2. Cover all critical paths and branches".to_string(),
+            "3. Test all error conditions and edge cases".to_string(),
+            "4. After achieving coverage, refactor to reduce complexity".to_string(),
+            format!(
+                "5. Consider breaking into {} smaller functions",
+                calculate_functions_to_extract(cyclomatic, cognitive)
+            ),
+            "6. Add integration tests for the refactored components".to_string(),
+        ],
+    )
+}
+
 /// Generate recommendation for simple functions with testing gaps
 fn generate_simple_function_recommendation(
     cyclomatic: u32,
@@ -107,17 +159,17 @@ fn generate_simple_function_recommendation(
     func: &FunctionMetrics,
     transitive_coverage: &Option<TransitiveCoverage>,
 ) -> (String, String, Vec<String>) {
+    // Special handling for zero coverage (spec 98)
+    if coverage_pct == 0.0 {
+        return generate_zero_coverage_recommendation(cyclomatic, func.cognitive, role, func);
+    }
+
     let role_display = get_role_display_name(role);
     let test_cases_needed = calculate_simple_test_cases(cyclomatic, coverage_pct);
     let coverage_pct_int = (coverage_pct * 100.0) as i32;
 
-    let coverage_explanation = if coverage_pct_int == 0 {
-        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} test cases to cover all {} execution paths",
-               test_cases_needed, cyclomatic.max(2))
-    } else {
-        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} more test cases",
-               test_cases_needed)
-    };
+    let coverage_explanation = format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} more test cases",
+               test_cases_needed);
 
     let mut steps = generate_testing_gap_steps(false);
     add_uncovered_lines_to_steps(&mut steps, func, transitive_coverage);
@@ -129,6 +181,43 @@ fn generate_simple_function_recommendation(
         ),
         coverage_explanation,
         steps,
+    )
+}
+
+/// Generate urgent recommendation for zero coverage functions (spec 98)
+fn generate_zero_coverage_recommendation(
+    cyclomatic: u32,
+    cognitive: u32,
+    role: FunctionRole,
+    func: &FunctionMetrics,
+) -> (String, String, Vec<String>) {
+    let role_display = get_role_display_name(role);
+    let test_cases_needed = cyclomatic.max(3);
+    let branches = func.nesting.max(1) * 2; // Estimate branches from nesting
+
+    (
+        "⚠️ URGENT: Add tests for completely untested function (0% coverage)".to_string(),
+        format!(
+            "UNTESTED CODE: This {} has never been tested. \
+             With {} branches and complexity {}/{}, this represents high risk. \
+             Minimum {} test cases needed.",
+            role_display.to_lowercase(),
+            branches,
+            cyclomatic,
+            cognitive,
+            test_cases_needed
+        ),
+        vec![
+            "Create initial test file if it doesn't exist".to_string(),
+            format!(
+                "Write {} test cases covering all {} execution paths",
+                test_cases_needed, cyclomatic
+            ),
+            "Test happy path scenarios first".to_string(),
+            "Add tests for error conditions and edge cases".to_string(),
+            "Ensure all branches are covered".to_string(),
+            "Consider property-based testing for complex logic".to_string(),
+        ],
     )
 }
 
@@ -544,8 +633,8 @@ mod tests {
         assert!(action.contains("Add"));
         assert!(action.contains("tests"));
         assert!(action.contains("refactor"));
-        assert!(rationale.contains("Complex"));
-        assert!(rationale.contains("100% gap"));
+        assert!(rationale.contains("complex"));
+        assert!(rationale.contains("NEVER been tested"));
         assert!(!steps.is_empty());
     }
 

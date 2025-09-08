@@ -14,6 +14,7 @@ pub mod python_purity;
 pub mod rust;
 pub mod rust_call_graph;
 pub mod signature_extractor;
+pub mod test_detector;
 pub mod trait_implementation_tracker;
 pub mod trait_resolver;
 pub mod type_registry;

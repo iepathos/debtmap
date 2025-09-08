@@ -17,11 +17,11 @@ fn test_coverage_factor_calculation() {
         factor_71
     );
 
-    // Test with 0% coverage
+    // Test with 0% coverage (spec 98: 10x boost for zero coverage)
     let factor_0 = calculate_coverage_factor(0.0);
     assert!(
-        (factor_0 - 1.1).abs() < 0.01,
-        "0% coverage should give factor ~1.1, got {}",
+        (factor_0 - 10.0).abs() < 0.01,
+        "0% coverage should give factor ~10.0 (spec 98), got {}",
         factor_0
     );
 
