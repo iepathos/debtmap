@@ -96,6 +96,110 @@ mod tests {
             "Untested I/O wrapper should have non-zero score"
         );
     }
+    
+    #[test]
+    fn test_zero_coverage_prioritization() {
+        // Test spec 98: Functions with 0% coverage get 10x boost
+        let mut func = create_test_metrics();
+        func.cyclomatic = 5;
+        func.cognitive = 8;
+        func.is_test = false;
+
+        let call_graph = CallGraph::new();
+        
+        // Create mock coverage data with 0% coverage
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            func.file.clone(),
+            vec![FunctionCoverage {
+                name: func.name.clone(),
+                start_line: func.line,
+                execution_count: 0, // Zero coverage
+                coverage_percentage: 0.0,
+                uncovered_lines: vec![],
+            }],
+        );
+
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
+        
+        // Zero coverage should result in minimum score of 50 (spec 98)
+        assert!(
+            score.final_score >= 50.0,
+            "Zero coverage functions should score at least 50.0, got {}",
+            score.final_score
+        );
+    }
+    
+    #[test]
+    fn test_low_coverage_prioritization() {
+        // Test spec 98: Functions with <20% coverage get 5x boost
+        let mut func = create_test_metrics();
+        func.cyclomatic = 5;
+        func.cognitive = 8;
+        func.is_test = false;
+
+        let call_graph = CallGraph::new();
+        
+        // Create mock coverage data with 10% coverage
+        let mut lcov = LcovData::default();
+        lcov.functions.insert(
+            func.file.clone(),
+            vec![FunctionCoverage {
+                name: func.name.clone(),
+                start_line: func.line,
+                execution_count: 1, 
+                coverage_percentage: 10.0,
+                uncovered_lines: vec![],
+            }],
+        );
+
+        let score_low = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
+        
+        // Create mock coverage data with 50% coverage for comparison
+        let mut lcov_mid = LcovData::default();
+        lcov_mid.functions.insert(
+            func.file.clone(),
+            vec![FunctionCoverage {
+                name: func.name.clone(),
+                start_line: func.line,
+                execution_count: 5, 
+                coverage_percentage: 50.0,
+                uncovered_lines: vec![],
+            }],
+        );
+        
+        let score_mid = calculate_unified_priority(&func, &call_graph, Some(&lcov_mid), None);
+        
+        // Low coverage should score significantly higher than mid coverage
+        assert!(
+            score_low.final_score > score_mid.final_score * 2.0,
+            "10% coverage ({}) should score much higher than 50% coverage ({})",
+            score_low.final_score,
+            score_mid.final_score
+        );
+    }
+    
+    #[test]
+    fn test_test_code_not_boosted() {
+        // Test spec 98: Test code should not get zero coverage boost
+        let mut func = create_test_metrics();
+        func.cyclomatic = 5;
+        func.cognitive = 8;
+        func.is_test = true; // Mark as test code
+        func.name = "test_something".to_string();
+
+        let call_graph = CallGraph::new();
+        
+        // No coverage data (worst case for non-test code)
+        let score = calculate_unified_priority(&func, &call_graph, None, None);
+        
+        // Test code with no coverage should still have low score
+        assert!(
+            score.final_score < 10.0,
+            "Test code should not get zero coverage boost, got {}",
+            score.final_score
+        );
+    }
 
     #[test]
     fn test_complex_function_has_score() {

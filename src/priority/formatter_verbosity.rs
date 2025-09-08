@@ -37,7 +37,27 @@ pub fn format_priority_item_with_config(
         // Show coverage info - both good and bad coverage are important factors
         if let Some(ref trans_cov) = item.transitive_coverage {
             let coverage_pct = trans_cov.direct * 100.0;
-            if coverage_pct >= 95.0 {
+            if coverage_pct == 0.0 {
+                // ZERO COVERAGE - Critical priority (spec 98)
+                factors.push(format!(
+                    "🔴 UNTESTED (0% coverage, weight: {:.0}%)",
+                    weights.coverage * 100.0
+                ));
+            } else if coverage_pct < 20.0 {
+                // Very low coverage - high priority (spec 98)
+                factors.push(format!(
+                    "🟠 LOW COVERAGE ({:.1}%, weight: {:.0}%)",
+                    coverage_pct,
+                    weights.coverage * 100.0
+                ));
+            } else if coverage_pct < 50.0 {
+                // Partial coverage (spec 98)
+                factors.push(format!(
+                    "🟡 PARTIAL COVERAGE ({:.1}%, weight: {:.0}%)",
+                    coverage_pct,
+                    weights.coverage * 100.0
+                ));
+            } else if coverage_pct >= 95.0 {
                 // Excellent coverage - show as positive factor
                 factors.push(format!("Excellent coverage {:.1}%", coverage_pct));
             } else if coverage_pct >= 80.0 {
@@ -51,6 +71,12 @@ pub fn format_priority_item_with_config(
                     weights.coverage * 100.0
                 ));
             }
+        } else if item.unified_score.coverage_factor >= 10.0 {
+            // No coverage data and max coverage factor - likely 0% coverage (spec 98)
+            factors.push(format!(
+                "🔴 UNTESTED (no coverage data, weight: {:.0}%)",
+                weights.coverage * 100.0
+            ));
         } else if item.unified_score.coverage_factor > 3.0 {
             // No coverage data but high coverage factor
             factors.push(format!(
@@ -91,15 +117,31 @@ pub fn format_priority_item_with_config(
             _ => {} // No additional factors for other debt types
         }
 
+        // Add coverage indicator to score line (spec 98)
+        let coverage_indicator = if let Some(ref trans_cov) = item.transitive_coverage {
+            let coverage_pct = trans_cov.direct * 100.0;
+            match coverage_pct {
+                0.0 => " [🔴 UNTESTED]",
+                c if c < 20.0 => " [🟠 LOW COVERAGE]",
+                c if c < 50.0 => " [🟡 PARTIAL COVERAGE]",
+                _ => "",
+            }
+        } else if item.unified_score.coverage_factor >= 10.0 {
+            " [🔴 UNTESTED]"
+        } else {
+            ""
+        };
+
         writeln!(
             output,
-            "#{} {} [{}]",
+            "#{} {}{} [{}]",
             rank.to_string().bright_cyan().bold(),
             format!(
                 "SCORE: {}",
                 score_formatter::format_score(item.unified_score.final_score)
             )
             .bright_yellow(),
+            coverage_indicator.bright_red().bold(),
             severity.color(severity_color).bold()
         )
         .unwrap();
@@ -114,15 +156,31 @@ pub fn format_priority_item_with_config(
             .unwrap();
         }
     } else {
+        // Add coverage indicator for non-verbose mode too (spec 98)
+        let coverage_indicator = if let Some(ref trans_cov) = item.transitive_coverage {
+            let coverage_pct = trans_cov.direct * 100.0;
+            match coverage_pct {
+                0.0 => " [🔴 UNTESTED]",
+                c if c < 20.0 => " [🟠 LOW COVERAGE]",
+                c if c < 50.0 => " [🟡 PARTIAL COVERAGE]",
+                _ => "",
+            }
+        } else if item.unified_score.coverage_factor >= 10.0 {
+            " [🔴 UNTESTED]"
+        } else {
+            ""
+        };
+
         writeln!(
             output,
-            "#{} {} [{}]",
+            "#{} {}{} [{}]",
             rank.to_string().bright_cyan().bold(),
             format!(
                 "SCORE: {}",
                 score_formatter::format_score(item.unified_score.final_score)
             )
             .bright_yellow(),
+            coverage_indicator.bright_red().bold(),
             severity.color(severity_color).bold()
         )
         .unwrap();

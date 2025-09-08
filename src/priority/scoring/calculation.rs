@@ -2,9 +2,31 @@
 
 /// Calculate coverage factor from coverage percentage
 pub fn calculate_coverage_factor(coverage_pct: f64) -> f64 {
+    calculate_coverage_factor_with_test_flag(coverage_pct, false)
+}
+
+/// Calculate coverage factor with test code awareness
+pub fn calculate_coverage_factor_with_test_flag(coverage_pct: f64, is_test_code: bool) -> f64 {
+    // Don't penalize test code for coverage
+    if is_test_code {
+        return 0.1;
+    }
+
     let coverage_gap = 1.0 - coverage_pct;
-    // Use exponential scaling with baseline for differentiation
-    (coverage_gap.powf(1.5) + 0.1).max(0.1)
+
+    match coverage_pct {
+        // Zero coverage: maximum priority
+        0.0 => 10.0,
+
+        // Very low coverage: high priority
+        c if c < 0.2 => 5.0 + (coverage_gap * 3.0),
+
+        // Low coverage: elevated priority
+        c if c < 0.5 => 2.0 + (coverage_gap * 2.0),
+
+        // Moderate to high coverage: standard calculation
+        _ => (coverage_gap.powf(1.5) + 0.1).max(0.1),
+    }
 }
 
 /// Calculate complexity factor from raw complexity
@@ -103,10 +125,32 @@ mod tests {
 
     #[test]
     fn test_calculate_coverage_factor() {
-        // Test various coverage percentages
-        assert!((calculate_coverage_factor(0.0) - 1.1).abs() < 0.01); // 100% gap
-        assert!((calculate_coverage_factor(0.5) - 0.453).abs() < 0.01); // 50% gap
-        assert!((calculate_coverage_factor(1.0) - 0.1).abs() < 0.01); // 0% gap
+        // Test zero coverage prioritization (spec 98)
+        assert_eq!(calculate_coverage_factor(0.0), 10.0); // Zero coverage: 10x boost
+
+        // Very low coverage (<20%)
+        assert!((calculate_coverage_factor(0.1) - 7.7).abs() < 0.01); // 5.0 + (0.9 * 3.0) = 7.7
+        assert!((calculate_coverage_factor(0.19) - 7.43).abs() < 0.01); // 5.0 + (0.81 * 3.0) = 7.43
+
+        // Low coverage (20-50%)
+        assert!((calculate_coverage_factor(0.2) - 3.6).abs() < 0.01); // 2.0 + (0.8 * 2.0) = 3.6
+        assert!((calculate_coverage_factor(0.49) - 3.02).abs() < 0.01); // 2.0 + (0.51 * 2.0) = 3.02
+
+        // Standard coverage (>50%)
+        assert!((calculate_coverage_factor(0.5) - 0.453).abs() < 0.01); // Standard: 0.5^1.5 + 0.1
+        assert!((calculate_coverage_factor(1.0) - 0.1).abs() < 0.01); // Full coverage: minimum
+    }
+
+    #[test]
+    fn test_coverage_factor_with_test_flag() {
+        // Test code should not be penalized regardless of coverage
+        assert_eq!(calculate_coverage_factor_with_test_flag(0.0, true), 0.1);
+        assert_eq!(calculate_coverage_factor_with_test_flag(0.5, true), 0.1);
+        assert_eq!(calculate_coverage_factor_with_test_flag(1.0, true), 0.1);
+
+        // Non-test code follows normal scoring
+        assert_eq!(calculate_coverage_factor_with_test_flag(0.0, false), 10.0);
+        assert!((calculate_coverage_factor_with_test_flag(0.5, false) - 0.453).abs() < 0.01);
     }
 
     #[test]

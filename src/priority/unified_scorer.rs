@@ -149,7 +149,12 @@ pub fn calculate_unified_priority_with_debt(
     };
 
     // Use pure functions for calculation (easier to test and debug)
-    let coverage_factor = calculate_coverage_factor(coverage_pct);
+    // Use test-aware coverage factor (spec 98)
+    let coverage_factor = if func.is_test {
+        0.1 // Test functions get minimal coverage factor
+    } else {
+        calculate_coverage_factor(coverage_pct)
+    };
     let complexity_factor = calculate_complexity_factor(raw_complexity);
     let upstream_count = call_graph.get_callers(&func_id).len();
     let dependency_factor = calculate_dependency_factor(upstream_count);
@@ -171,6 +176,15 @@ pub fn calculate_unified_priority_with_debt(
 
     // Apply interaction bonus using pure function
     base_score = apply_interaction_bonus(base_score, coverage_pct, raw_complexity);
+
+    // Apply zero-coverage boost directly to base score (spec 98)
+    // This ensures minimum score of 50 for zero coverage when combined with 10x coverage factor
+    let zero_coverage_boost = if coverage_pct == 0.0 && !func.is_test {
+        5.0 // Significant boost for untested code
+    } else {
+        1.0
+    };
+    base_score *= zero_coverage_boost;
 
     // Apply role multiplier
     let role_adjusted_score = base_score * role_multiplier;
