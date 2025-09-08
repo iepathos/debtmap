@@ -121,7 +121,10 @@ fn generate_zero_coverage_complex_recommendation(
     let branches = func.nesting.max(1) * cyclomatic / 3; // Estimate branches from complexity
 
     (
-        format!("⚠️ URGENT: Add {} tests for untested complex function, then refactor", test_cases_needed),
+        format!(
+            "⚠️ URGENT: Add {} tests for untested complex function, then refactor",
+            test_cases_needed
+        ),
         format!(
             "SEVERELY UNDERTESTED: This complex {} has NEVER been tested! \
              With cyclomatic complexity {} and cognitive complexity {}, \
