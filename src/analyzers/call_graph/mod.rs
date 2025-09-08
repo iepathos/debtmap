@@ -17,16 +17,15 @@ pub use macro_expansion::{MacroExpander, MacroExpansionStats, MacroHandlingConfi
 pub use trait_handling::TraitHandler;
 
 use crate::analyzers::function_registry::FunctionSignatureRegistry;
-use crate::analyzers::signature_extractor::SignatureExtractor;
 use crate::analyzers::type_registry::GlobalTypeRegistry;
 use crate::analyzers::type_tracker::{
-    extract_type_from_expr, extract_type_from_pattern, ResolvedType, ScopeKind, TypeTracker,
+    ScopeKind, TypeTracker,
 };
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use syn::visit::Visit;
-use syn::{Expr, ExprMacro, ImplItemFn, Item, ItemFn, Local, Pat};
+use syn::{Expr, ExprMacro, ImplItemFn, ItemFn, Local, Pat};
 
 /// Main call graph extractor that coordinates all submodules
 pub struct CallGraphExtractor {
@@ -638,7 +637,9 @@ mod tests {
 
         assert_eq!(graph.node_count(), 3);
         assert!(graph.get_all_functions().any(|f| f.name == "MyStruct::new"));
-        assert!(graph.get_all_functions().any(|f| f.name == "MyStruct::method"));
+        assert!(graph
+            .get_all_functions()
+            .any(|f| f.name == "MyStruct::method"));
         assert!(graph
             .get_all_functions()
             .any(|f| f.name == "MyStruct::other_method"));
@@ -667,7 +668,9 @@ mod tests {
         let graph = extractor.extract(&file);
 
         assert!(graph.get_all_functions().any(|f| f.name == "main"));
-        assert!(graph.get_all_functions().any(|f| f.name == "submodule::func"));
+        assert!(graph
+            .get_all_functions()
+            .any(|f| f.name == "submodule::func"));
         assert!(graph
             .get_all_functions()
             .any(|f| f.name == "submodule::inner_func"));

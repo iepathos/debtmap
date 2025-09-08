@@ -1,6 +1,6 @@
 /// Trait handling and method resolution for call graph extraction
-use crate::analyzers::type_tracker::{ResolvedType, ScopeKind, TypeTracker};
-use syn::{Expr, ImplItemFn, ItemFn, Local, Pat};
+use crate::analyzers::type_tracker::{ScopeKind, TypeTracker};
+use syn::{Expr, Local, Pat};
 
 /// Handles trait resolution and method dispatch
 pub struct TraitHandler<'a> {

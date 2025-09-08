@@ -218,10 +218,7 @@ impl<'a> CallResolver<'a> {
         // Strategy 3: Prefer shorter names (less qualified)
         if filtered.len() > 1 {
             let min_len = filtered.iter().map(|f| f.name.len()).min().unwrap_or(0);
-            filtered = filtered
-                .into_iter()
-                .filter(|f| f.name.len() == min_len)
-                .collect();
+            filtered.retain(|f| f.name.len() == min_len);
         }
 
         filtered

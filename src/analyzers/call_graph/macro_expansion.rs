@@ -44,6 +44,12 @@ pub struct MacroExpander {
     pub config: MacroHandlingConfig,
 }
 
+impl Default for MacroExpander {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MacroExpander {
     pub fn new() -> Self {
         Self {
