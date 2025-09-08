@@ -303,6 +303,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_unified_analysis_with_exclusions(
     metrics: &[FunctionMetrics],
     call_graph: &priority::CallGraph,

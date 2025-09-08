@@ -1,3 +1,4 @@
+use crate::analyzers::function_registry::FunctionSignatureRegistry;
 /// Call graph extraction for Rust code
 ///
 /// This module provides backward compatibility by re-exporting types from the
@@ -10,9 +11,8 @@
 /// - `call_graph::trait_handling`: Trait and method resolution
 use crate::analyzers::signature_extractor::SignatureExtractor;
 use crate::analyzers::type_registry::GlobalTypeRegistry;
-use crate::analyzers::function_registry::FunctionSignatureRegistry;
 use crate::priority::call_graph::CallGraph;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 // Re-export everything from the call_graph module for backward compatibility
@@ -24,8 +24,8 @@ pub use crate::analyzers::call_graph::{
 };
 
 /// Extract call graph from a single Rust file
-pub fn extract_call_graph(file: &syn::File, path: &PathBuf) -> CallGraph {
-    let extractor = CallGraphExtractor::new(path.clone());
+pub fn extract_call_graph(file: &syn::File, path: &Path) -> CallGraph {
+    let extractor = CallGraphExtractor::new(path.to_path_buf());
     extractor.extract(file)
 }
 
@@ -39,10 +39,10 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         let mut extractor = CallGraphExtractor::new(path.clone());
         // Extract functions and collect unresolved calls
         extractor.extract_phase1(file);
-        
+
         // Merge the functions into the combined graph
         combined_graph.merge(extractor.graph_builder.call_graph.clone());
-        
+
         // Collect unresolved calls for later resolution
         all_unresolved_calls.extend(extractor.unresolved_calls.clone());
     }
@@ -50,15 +50,13 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
     // Phase 2: Resolve all calls now that we have all functions
     let multi_file_path = PathBuf::from("multi-file");
     let mut resolved_calls = Vec::new();
-    
+
     {
-        let resolver = crate::analyzers::call_graph::CallResolver::new(
-            &combined_graph, 
-            &multi_file_path
-        );
-        
+        let resolver =
+            crate::analyzers::call_graph::CallResolver::new(&combined_graph, &multi_file_path);
+
         for unresolved in &all_unresolved_calls {
-            if let Some(callee) = resolver.resolve_call(&unresolved) {
+            if let Some(callee) = resolver.resolve_call(unresolved) {
                 resolved_calls.push(crate::priority::call_graph::FunctionCall {
                     caller: unresolved.caller.clone(),
                     callee,
@@ -67,7 +65,7 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
             }
         }
     }
-    
+
     // Add all resolved calls
     for call in resolved_calls {
         combined_graph.add_call(call);
@@ -82,17 +80,17 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
 /// Extract call graph with function signatures
 pub fn extract_call_graph_with_signatures(
     file: &syn::File,
-    path: &PathBuf,
+    path: &Path,
     _type_registry: Arc<GlobalTypeRegistry>,
 ) -> (CallGraph, FunctionSignatureRegistry) {
     // Extract function signatures first
     let mut extractor = SignatureExtractor::new();
     extractor.extract_from_file(file);
     let function_registry = extractor.registry;
-    
+
     // Extract call graph
     let call_graph = extract_call_graph(file, path);
-    
+
     (call_graph, function_registry)
 }
 

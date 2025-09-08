@@ -192,6 +192,10 @@ impl TypeTracker {
                     None
                 }
             }
+            Expr::Struct(expr_struct) => {
+                // Resolve struct literal type from its path
+                self.resolve_struct_literal_type(expr_struct)
+            }
             Expr::MethodCall(method_call) => {
                 // Resolve method call return type
                 self.resolve_method_call_type(method_call)
@@ -206,6 +210,22 @@ impl TypeTracker {
             }
             _ => None,
         }
+    }
+
+    /// Resolve struct literal type from its path
+    fn resolve_struct_literal_type(&self, expr_struct: &ExprStruct) -> Option<ResolvedType> {
+        // Extract type name from the struct path
+        let type_name = expr_struct
+            .path
+            .segments
+            .last()
+            .map(|seg| seg.ident.to_string())?;
+
+        Some(ResolvedType {
+            type_name,
+            source: TypeSource::StructLiteral,
+            generics: Vec::new(),
+        })
     }
 
     /// Resolve field access using the type registry

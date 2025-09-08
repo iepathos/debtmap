@@ -280,8 +280,9 @@ impl CallGraphExtractor {
 
     /// Handle struct expression
     fn handle_struct_expr(&mut self, expr_struct: &syn::ExprStruct) {
-        // Visit fields
+        // Visit fields - each field may contain a function call
         for field in &expr_struct.fields {
+            // Visit the field expression, which will handle any function calls
             self.visit_expr(&field.expr);
         }
 

@@ -1,6 +1,6 @@
 use im::{HashMap, HashSet, Vector};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionId {
@@ -551,20 +551,20 @@ impl CallGraph {
         caller_file: &PathBuf,
     ) -> Option<FunctionId> {
         use crate::analyzers::call_graph::call_resolution::CallResolver;
-        
+
         // Delegate to the sophisticated CallResolver logic
         CallResolver::resolve_function_call(
             all_functions,
             callee_name,
             caller_file,
-            false // Don't force same-file preference for cross-file resolution
+            false, // Don't force same-file preference for cross-file resolution
         )
     }
 
     /// Pure function to check if two function names could be the same call
     /// Handles various call patterns:
     /// - Exact match: "func" matches "func"
-    /// - Associated function: "Type::method" matches "Type::method" 
+    /// - Associated function: "Type::method" matches "Type::method"
     /// - Method call resolution: "method" might match "Type::method" if we have type context
     #[allow(dead_code)]
     fn is_cross_file_call_match(
@@ -622,7 +622,7 @@ impl CallGraph {
         if candidates.is_empty() {
             return None;
         }
-        
+
         if candidates.len() == 1 {
             return candidates.into_iter().next();
         }
@@ -633,7 +633,7 @@ impl CallGraph {
             .filter(|func| func.name == call_name)
             .cloned()
             .collect();
-            
+
         if !exact_matches.is_empty() {
             return Self::apply_file_and_qualification_preference(exact_matches, caller_file);
         }
@@ -644,7 +644,7 @@ impl CallGraph {
             .filter(|func| &func.file != caller_file)
             .cloned()
             .collect();
-            
+
         if !cross_file_matches.is_empty() {
             return Self::apply_file_and_qualification_preference(cross_file_matches, caller_file);
         }
@@ -657,12 +657,12 @@ impl CallGraph {
     #[allow(dead_code)]
     fn apply_file_and_qualification_preference(
         candidates: Vec<FunctionId>,
-        _caller_file: &PathBuf,
+        _caller_file: &Path,
     ) -> Option<FunctionId> {
         if candidates.is_empty() {
             return None;
         }
-        
+
         if candidates.len() == 1 {
             return candidates.into_iter().next();
         }
@@ -673,7 +673,7 @@ impl CallGraph {
             .map(|func| func.name.matches("::").count())
             .min()
             .unwrap_or(0);
-            
+
         candidates
             .into_iter()
             .find(|func| func.name.matches("::").count() == min_colons)
@@ -721,7 +721,7 @@ impl CallGraph {
             if let Some(resolved_callee) = Self::resolve_call_with_advanced_matching(
                 &all_functions,
                 &call.callee.name,
-                &call.caller.file
+                &call.caller.file,
             ) {
                 self.apply_call_resolution(&call, &resolved_callee);
             }
@@ -1460,42 +1460,42 @@ mod tests {
             "my_function",
             None
         ));
-        
+
         // Test associated function calls
         assert!(CallGraph::is_cross_file_call_match(
             "ContextualRisk::new",
             "ContextualRisk::new",
             None
         ));
-        
+
         // Test method name matching with type context
         assert!(CallGraph::is_cross_file_call_match(
             "MyStruct::method",
             "method",
             Some("MyStruct")
         ));
-        
+
         // Test suffix matching for qualified paths
         assert!(CallGraph::is_cross_file_call_match(
             "module::MyStruct::method",
             "MyStruct::method",
             None
         ));
-        
+
         // Test base name extraction
         assert!(CallGraph::is_cross_file_call_match(
             "MyStruct::new",
             "new",
             None
         ));
-        
+
         // Test non-matches
         assert!(!CallGraph::is_cross_file_call_match(
             "different_function",
             "my_function",
             None
         ));
-        
+
         assert!(!CallGraph::is_cross_file_call_match(
             "MyStruct::method",
             "other_method",
@@ -1508,22 +1508,22 @@ mod tests {
         let caller_file = PathBuf::from("src/caller.rs");
         let other_file = PathBuf::from("src/other.rs");
         let third_file = PathBuf::from("src/third.rs");
-        
+
         // Test single candidate
         let single_candidate = vec![FunctionId {
             file: other_file.clone(),
             name: "test_func".to_string(),
             line: 10,
         }];
-        
+
         let result = CallGraph::select_best_cross_file_match(
             single_candidate.clone(),
             &caller_file,
-            "test_func"
+            "test_func",
         );
         assert!(result.is_some());
         assert_eq!(result.unwrap().name, "test_func");
-        
+
         // Test exact match preference
         let candidates = vec![
             FunctionId {
@@ -1537,15 +1537,11 @@ mod tests {
                 line: 20,
             },
         ];
-        
-        let result = CallGraph::select_best_cross_file_match(
-            candidates,
-            &caller_file,
-            "test_func"
-        );
+
+        let result = CallGraph::select_best_cross_file_match(candidates, &caller_file, "test_func");
         assert!(result.is_some());
         assert_eq!(result.unwrap().name, "test_func"); // Should prefer exact match
-        
+
         // Test qualification preference (less qualified wins)
         let qualified_candidates = vec![
             FunctionId {
@@ -1559,12 +1555,9 @@ mod tests {
                 line: 20,
             },
         ];
-        
-        let result = CallGraph::select_best_cross_file_match(
-            qualified_candidates,
-            &caller_file,
-            "method"
-        );
+
+        let result =
+            CallGraph::select_best_cross_file_match(qualified_candidates, &caller_file, "method");
         assert!(result.is_some());
         assert_eq!(result.unwrap().name, "MyStruct::method"); // Should prefer less qualified
     }
@@ -1573,7 +1566,7 @@ mod tests {
     fn test_resolve_call_with_advanced_matching() {
         let caller_file = PathBuf::from("src/risk/mod.rs");
         let callee_file = PathBuf::from("src/risk/context/mod.rs");
-        
+
         // Create test functions that simulate the ContextualRisk::new scenario
         let functions = vec![
             FunctionId {
@@ -1587,14 +1580,14 @@ mod tests {
                 line: 20,
             },
         ];
-        
+
         // Test that ContextualRisk::new call resolves to the function in callee_file
         let result = CallGraph::resolve_call_with_advanced_matching(
             &functions,
             "ContextualRisk::new",
-            &caller_file
+            &caller_file,
         );
-        
+
         assert!(result.is_some());
         let resolved = result.unwrap();
         assert_eq!(resolved.name, "ContextualRisk::new");
@@ -1605,11 +1598,11 @@ mod tests {
     fn test_apply_file_and_qualification_preference() {
         let file1 = PathBuf::from("file1.rs");
         let file2 = PathBuf::from("file2.rs");
-        
+
         // Test empty candidates
         let empty: Vec<FunctionId> = vec![];
         assert!(CallGraph::apply_file_and_qualification_preference(empty, &file1).is_none());
-        
+
         // Test single candidate
         let single = vec![FunctionId {
             file: file1.clone(),
@@ -1619,7 +1612,7 @@ mod tests {
         let result = CallGraph::apply_file_and_qualification_preference(single, &file1);
         assert!(result.is_some());
         assert_eq!(result.unwrap().name, "func");
-        
+
         // Test qualification preference
         let candidates = vec![
             FunctionId {
@@ -1638,7 +1631,7 @@ mod tests {
                 line: 30,
             },
         ];
-        
+
         let result = CallGraph::apply_file_and_qualification_preference(candidates, &file1);
         assert!(result.is_some());
         assert_eq!(result.unwrap().name, "func"); // Should prefer least qualified

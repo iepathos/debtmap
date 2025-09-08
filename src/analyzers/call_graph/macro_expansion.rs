@@ -141,6 +141,14 @@ impl MacroExpander {
         tokens: &proc_macro2::TokenStream,
         macro_name: &str,
     ) -> Vec<Expr> {
+        // For vec! macro, try to parse directly as comma-separated expressions
+        if macro_name == "vec" {
+            // Try parsing the token stream directly as expressions
+            if let Ok(exprs) = self.parse_comma_separated_exprs(tokens) {
+                return exprs;
+            }
+        }
+
         match self.try_parse_collection(tokens, macro_name) {
             CollectionParseResult::Success(exprs) => exprs,
             CollectionParseResult::MapSuccess(exprs) => exprs,
