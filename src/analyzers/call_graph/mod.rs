@@ -18,9 +18,7 @@ pub use trait_handling::TraitHandler;
 
 use crate::analyzers::function_registry::FunctionSignatureRegistry;
 use crate::analyzers::type_registry::GlobalTypeRegistry;
-use crate::analyzers::type_tracker::{
-    ScopeKind, TypeTracker,
-};
+use crate::analyzers::type_tracker::{ScopeKind, TypeTracker};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use std::path::PathBuf;
 use std::sync::Arc;
