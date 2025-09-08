@@ -32,7 +32,7 @@ map:
       # Check formatting and linting
       - shell: "just fmt-check && just lint"
         on_failure:
-          claude: "/lint '${shell.output}'"
+          claude: "/prodigy-lint '${shell.output}'"
           max_attempts: 2
           fail_workflow: false
   
@@ -59,7 +59,7 @@ reduce:
     # Check formatting and linting
     - shell: "just fmt-check && just lint"
       on_failure:
-        claude: "/lint ${shell.output}"
+        claude: "/prodigy-lint ${shell.output}"
         max_attempts: 3
         fail_workflow: false
           

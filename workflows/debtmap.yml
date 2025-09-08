@@ -14,6 +14,6 @@
 # Run linting and formatting after implementation
 - shell: "just fmt-check && just lint"
   on_failure:
-    claude: "/lint ${shell.output}"
+    claude: "/prodigy-lint ${shell.output}"
     max_attempts: 3
     fail_workflow: false
