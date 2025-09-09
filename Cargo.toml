@@ -111,3 +111,7 @@ harness = false
 name = "call_graph_bench"
 harness = false
 
+[[bench]]
+name = "lcov_parallel_bench"
+harness = false
+

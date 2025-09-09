@@ -61,7 +61,14 @@ fn main() -> Result<()> {
             if cache_stats {
                 let cache = debtmap::cache::SharedCache::new(Some(&path))?;
                 let stats = cache.get_full_stats()?;
-                println!("{}", stats);
+                println!("Shared cache stats:\n{}", stats);
+                
+                // Also show unified analysis cache stats
+                use debtmap::cache::UnifiedAnalysisCache;
+                if let Ok(unified_cache) = UnifiedAnalysisCache::new(Some(&path)) {
+                    println!("\n{}", unified_cache.stats());
+                }
+                
                 return Ok(());
             }
 
@@ -120,7 +127,7 @@ fn main() -> Result<()> {
                 formatting_config,
                 parallel: !no_parallel,
                 jobs,
-                use_cache,
+                use_cache: !no_cache || use_cache,  // Cache enabled by default unless --no-cache
                 no_cache,
                 clear_cache,
                 cache_stats: false,   // Already handled above

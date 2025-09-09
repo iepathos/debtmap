@@ -126,11 +126,11 @@ pub enum Commands {
         #[arg(long = "jobs", short = 'j', default_value = "0")]
         jobs: usize,
 
-        /// Enable call graph caching to speed up repeated analyses
-        #[arg(long = "cache")]
+        /// Enable caching (deprecated: caching is now enabled by default)
+        #[arg(long = "cache", hide = true)]
         use_cache: bool,
 
-        /// Disable caching for this run
+        /// Disable caching for this run (caching is enabled by default)
         #[arg(long = "no-cache")]
         no_cache: bool,
 

@@ -3,7 +3,7 @@ use crate::{
     analysis::diagnostics::{DetailLevel, DiagnosticReporter, OutputFormat},
     analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
     analyzers::FileAnalyzer,
-    cache::{CacheKey, CallGraphCache},
+    cache::{CacheKey, CallGraphCache, UnifiedAnalysisCache},
     config,
     core::{self, AnalysisResults, DebtItem, FunctionMetrics, Language},
     io,
@@ -78,7 +78,7 @@ pub fn perform_unified_analysis_with_options(
     let UnifiedAnalysisOptions {
         results,
         coverage_file,
-        semantic_off: _semantic_off,
+        semantic_off,
         project_path,
         verbose_macro_warnings,
         show_macro_stats,
@@ -93,6 +93,84 @@ pub fn perform_unified_analysis_with_options(
         min_problematic,
         no_god_object,
     } = options;
+
+    // Check if we should use unified analysis caching
+    let files: Vec<PathBuf> = results
+        .complexity
+        .metrics
+        .iter()
+        .map(|m| m.file.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    
+    let should_cache = use_cache && UnifiedAnalysisCache::should_use_cache(files.len(), coverage_file.is_some());
+    
+    // Try to get cached unified analysis result
+    if should_cache {
+        if let Ok(mut unified_cache) = UnifiedAnalysisCache::new(Some(project_path)) {
+            // Generate cache key
+            if let Ok(cache_key) = UnifiedAnalysisCache::generate_key(
+                project_path,
+                &files,
+                results.complexity.summary.max_complexity, // Use max complexity as threshold proxy
+                50, // Default duplication threshold
+                coverage_file.as_ref().map(|p| p.as_path()),
+                semantic_off,
+                parallel,
+            ) {
+                // Try to get cached result
+                if let Some(cached_analysis) = unified_cache.get(&cache_key) {
+                    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+                    if !quiet_mode {
+                        eprintln!("🎯 Using cached unified analysis ✓");
+                    }
+                    return Ok(cached_analysis);
+                }
+                
+                // Cache miss - proceed with analysis and cache the result
+                let analysis_result = perform_unified_analysis_computation(
+                    results, coverage_file, semantic_off, project_path, verbose_macro_warnings,
+                    show_macro_stats, parallel, jobs, use_cache, multi_pass, show_attribution,
+                    no_aggregation, aggregation_method, min_problematic, no_god_object
+                )?;
+                
+                // Cache the computed result
+                if let Err(e) = unified_cache.put(cache_key, analysis_result.clone(), files) {
+                    log::warn!("Failed to cache unified analysis: {}", e);
+                }
+                
+                return Ok(analysis_result);
+            }
+        }
+    }
+    
+    // No caching - proceed with direct computation
+    perform_unified_analysis_computation(
+        results, coverage_file, semantic_off, project_path, verbose_macro_warnings,
+        show_macro_stats, parallel, jobs, use_cache, multi_pass, show_attribution,
+        no_aggregation, aggregation_method, min_problematic, no_god_object
+    )
+}
+
+/// Perform the actual unified analysis computation (extracted for caching)
+fn perform_unified_analysis_computation(
+    results: &AnalysisResults,
+    coverage_file: Option<&PathBuf>,
+    _semantic_off: bool,
+    project_path: &Path,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+    parallel: bool,
+    jobs: usize,
+    use_cache: bool,
+    multi_pass: bool,
+    show_attribution: bool,
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
+    min_problematic: Option<usize>,
+    no_god_object: bool,
+) -> Result<UnifiedAnalysis> {
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
     // Perform multi-pass analysis if enabled

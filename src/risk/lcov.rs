@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct FunctionCoverage {
@@ -91,61 +93,8 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
             }
 
             Record::EndOfRecord => {
-                // First, collect and sort function start lines for boundary detection
-                let mut func_boundaries: Vec<usize> =
-                    file_functions.values().map(|f| f.start_line).collect();
-                func_boundaries.sort_unstable();
-
-                // Convert file_lines HashMap to sorted Vec for efficient range queries
-                let mut sorted_lines: Vec<(usize, u64)> = file_lines
-                    .iter()
-                    .map(|(line, count)| (*line, *count))
-                    .collect();
-                sorted_lines.sort_unstable_by_key(|(line, _)| *line);
-
-                // Process each function
-                for func in file_functions.values_mut() {
-                    let func_start = func.start_line;
-
-                    // Find the next function's start line using binary search
-                    let next_func_idx = func_boundaries
-                        .binary_search(&func_start)
-                        .unwrap_or_else(|idx| idx);
-
-                    let func_end = if next_func_idx + 1 < func_boundaries.len() {
-                        func_boundaries[next_func_idx + 1]
-                    } else {
-                        usize::MAX
-                    };
-
-                    // Binary search for function's line range in sorted_lines
-                    let start_idx = sorted_lines
-                        .binary_search_by_key(&func_start, |(line, _)| *line)
-                        .unwrap_or_else(|idx| idx);
-                    let end_idx = sorted_lines
-                        .binary_search_by_key(&func_end, |(line, _)| *line)
-                        .unwrap_or_else(|idx| idx);
-
-                    let func_lines = &sorted_lines[start_idx..end_idx];
-
-                    if !func_lines.is_empty() {
-                        let covered = func_lines.iter().filter(|(_, count)| *count > 0).count();
-                        func.coverage_percentage =
-                            (covered as f64 / func_lines.len() as f64) * 100.0;
-
-                        // Collect uncovered lines
-                        func.uncovered_lines = func_lines
-                            .iter()
-                            .filter(|(_, count)| *count == 0)
-                            .map(|(line, _)| *line)
-                            .collect();
-                    } else if func.execution_count > 0 {
-                        // If we have execution count but no line data, assume it's covered
-                        func.coverage_percentage = 100.0;
-                        func.uncovered_lines.clear();
-                    }
-                    // If no line data and no execution count, coverage remains 0.0 with no specific uncovered lines
-                }
+                // Use parallel processing for function coverage calculation
+                process_function_coverage_parallel(&mut file_functions, &file_lines);
 
                 // Save the file's data
                 if let Some(file) = current_file.take() {
@@ -175,6 +124,116 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
     }
 
     Ok(data)
+}
+
+/// Parallel processing function for calculating function coverage
+/// This replaces the sequential processing in the EndOfRecord handler
+fn process_function_coverage_parallel(
+    file_functions: &mut HashMap<String, FunctionCoverage>,
+    file_lines: &HashMap<usize, u64>,
+) {
+    // Early return if no data to process
+    if file_functions.is_empty() || file_lines.is_empty() {
+        return;
+    }
+
+    // Collect and sort function start lines for boundary detection (parallel-friendly)
+    let func_boundaries: Vec<usize> = file_functions
+        .par_iter()
+        .map(|(_, func)| func.start_line)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
+    // Convert file_lines HashMap to sorted Vec for efficient range queries
+    let sorted_lines: Vec<(usize, u64)> = file_lines
+        .par_iter()
+        .map(|(line, count)| (*line, *count))
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
+    // Use Mutex for thread-safe access to the functions HashMap
+    let functions_mutex = Mutex::new(file_functions);
+    
+    // Process functions in parallel
+    func_boundaries.par_iter().for_each(|&func_start| {
+        // Calculate function coverage for this function
+        let coverage_data = calculate_function_coverage_data(
+            func_start,
+            &func_boundaries,
+            &sorted_lines,
+        );
+
+        // Update the function in the mutex-protected HashMap
+        if let Ok(mut functions) = functions_mutex.lock() {
+            if let Some(func) = functions.values_mut().find(|f| f.start_line == func_start) {
+                func.coverage_percentage = coverage_data.coverage_percentage;
+                func.uncovered_lines = coverage_data.uncovered_lines;
+            }
+        }
+    });
+}
+
+/// Calculate coverage data for a single function
+/// Pure function that can be called in parallel
+#[derive(Debug)]
+struct FunctionCoverageData {
+    coverage_percentage: f64,
+    uncovered_lines: Vec<usize>,
+}
+
+fn calculate_function_coverage_data(
+    func_start: usize,
+    func_boundaries: &[usize],
+    sorted_lines: &[(usize, u64)],
+) -> FunctionCoverageData {
+    // Find the next function's start line using binary search
+    let next_func_idx = func_boundaries
+        .binary_search(&func_start)
+        .unwrap_or_else(|idx| idx);
+
+    let func_end = if next_func_idx + 1 < func_boundaries.len() {
+        func_boundaries[next_func_idx + 1]
+    } else {
+        usize::MAX
+    };
+
+    // Binary search for function's line range in sorted_lines
+    let start_idx = sorted_lines
+        .binary_search_by_key(&func_start, |(line, _)| *line)
+        .unwrap_or_else(|idx| idx);
+    let end_idx = sorted_lines
+        .binary_search_by_key(&func_end, |(line, _)| *line)
+        .unwrap_or_else(|idx| idx);
+
+    let func_lines = &sorted_lines[start_idx..end_idx];
+
+    if !func_lines.is_empty() {
+        let covered = func_lines.par_iter().filter(|(_, count)| *count > 0).count();
+        let coverage_percentage = (covered as f64 / func_lines.len() as f64) * 100.0;
+
+        // Collect uncovered lines in parallel
+        let uncovered_lines = func_lines
+            .par_iter()
+            .filter(|(_, count)| *count == 0)
+            .map(|(line, _)| *line)
+            .collect();
+
+        FunctionCoverageData {
+            coverage_percentage,
+            uncovered_lines,
+        }
+    } else {
+        FunctionCoverageData {
+            coverage_percentage: 0.0,
+            uncovered_lines: Vec::new(),
+        }
+    }
 }
 
 impl LcovData {
@@ -242,7 +301,8 @@ impl LcovData {
             if funcs.is_empty() {
                 0.0
             } else {
-                let sum: f64 = funcs.iter().map(|f| f.coverage_percentage).sum();
+                // Use parallel processing for coverage calculation
+                let sum: f64 = funcs.par_iter().map(|f| f.coverage_percentage).sum();
                 sum / funcs.len() as f64 / 100.0 // Convert to fraction
             }
         })
@@ -266,6 +326,36 @@ impl LcovData {
                     .map(|f| f.uncovered_lines.clone())
             })
     }
+
+    /// Batch process coverage queries for multiple functions in parallel
+    /// This is more efficient when querying coverage for many functions at once
+    pub fn batch_get_function_coverage(
+        &self,
+        queries: &[(PathBuf, String, usize)], // (file, function_name, line)
+    ) -> Vec<Option<f64>> {
+        queries
+            .par_iter()
+            .map(|(file, function_name, line)| {
+                self.get_function_coverage_with_line(file, function_name, *line)
+            })
+            .collect()
+    }
+
+    /// Get coverage statistics for all files in parallel
+    pub fn get_all_file_coverages(&self) -> HashMap<PathBuf, f64> {
+        self.functions
+            .par_iter()
+            .map(|(path, funcs)| {
+                let coverage = if funcs.is_empty() {
+                    0.0
+                } else {
+                    let sum: f64 = funcs.par_iter().map(|f| f.coverage_percentage).sum();
+                    sum / funcs.len() as f64 / 100.0 // Convert to fraction
+                };
+                (path.clone(), coverage)
+            })
+            .collect()
+    }
 }
 
 /// Find a function by name using multiple matching strategies
@@ -277,23 +367,45 @@ fn find_function_by_name<'a>(
     funcs: &'a [FunctionCoverage],
     target_name: &str,
 ) -> Option<&'a FunctionCoverage> {
-    // Strategy 1: Exact match
-    funcs
-        .iter()
-        .find(|f| f.name == target_name)
-        // Strategy 2: Normalized match
-        .or_else(|| {
-            let normalized_target = normalize_function_name(target_name);
-            funcs
-                .iter()
-                .find(|f| normalize_function_name(&f.name) == normalized_target)
-        })
-        // Strategy 3: Suffix match (e.g., "module::function" matches "function")
-        .or_else(|| {
-            funcs
-                .iter()
-                .find(|f| f.name.ends_with(target_name) || target_name.ends_with(&f.name))
-        })
+    // For small function lists, use sequential search to avoid parallel overhead
+    if funcs.len() < 10 {
+        // Strategy 1: Exact match
+        funcs
+            .iter()
+            .find(|f| f.name == target_name)
+            // Strategy 2: Normalized match
+            .or_else(|| {
+                let normalized_target = normalize_function_name(target_name);
+                funcs
+                    .iter()
+                    .find(|f| normalize_function_name(&f.name) == normalized_target)
+            })
+            // Strategy 3: Suffix match (e.g., "module::function" matches "function")
+            .or_else(|| {
+                funcs
+                    .iter()
+                    .find(|f| f.name.ends_with(target_name) || target_name.ends_with(&f.name))
+            })
+    } else {
+        // For larger function lists, use parallel search
+        // Strategy 1: Exact match (parallel)
+        funcs
+            .par_iter()
+            .find_any(|f| f.name == target_name)
+            // Strategy 2: Normalized match (parallel)
+            .or_else(|| {
+                let normalized_target = normalize_function_name(target_name);
+                funcs
+                    .par_iter()
+                    .find_any(|f| normalize_function_name(&f.name) == normalized_target)
+            })
+            // Strategy 3: Suffix match (parallel)
+            .or_else(|| {
+                funcs
+                    .par_iter()
+                    .find_any(|f| f.name.ends_with(target_name) || target_name.ends_with(&f.name))
+            })
+    }
 }
 
 /// Find a function by line number with tolerance for AST/LCOV discrepancies
@@ -331,28 +443,50 @@ fn find_functions_by_path<'a>(
 ) -> Option<&'a Vec<FunctionCoverage>> {
     // Strategy 1: Direct lookup (already tried by caller)
 
-    // Strategy 2: Check if query path ends with any LCOV path (absolute query, relative LCOV)
-    functions
-        .iter()
-        .find(|(lcov_path, _)| query_path.ends_with(lcov_path))
-        .map(|(_, funcs)| funcs)
-        .or_else(|| {
-            // Strategy 3: Check if any LCOV path ends with query path (relative query, absolute LCOV)
-            // Normalize the query path first to handle "./src/..." patterns
-            let normalized_query = normalize_path(query_path);
-            functions
-                .iter()
-                .find(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
-                .map(|(_, funcs)| funcs)
-        })
-        .or_else(|| {
-            // Strategy 4: Strip leading ./ from either path and compare
-            let normalized_query = normalize_path(query_path);
-            functions
-                .iter()
-                .find(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
-                .map(|(_, funcs)| funcs)
-        })
+    // Use parallel search for large function maps
+    if functions.len() > 20 {
+        // Strategy 2: Check if query path ends with any LCOV path (parallel)
+        functions
+            .par_iter()
+            .find_any(|(lcov_path, _)| query_path.ends_with(lcov_path))
+            .map(|(_, funcs)| funcs)
+            .or_else(|| {
+                // Strategy 3: Check if any LCOV path ends with query path (parallel)
+                let normalized_query = normalize_path(query_path);
+                functions
+                    .par_iter()
+                    .find_any(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
+                    .map(|(_, funcs)| funcs)
+            })
+            .or_else(|| {
+                // Strategy 4: Strip leading ./ from either path and compare (parallel)
+                let normalized_query = normalize_path(query_path);
+                functions
+                    .par_iter()
+                    .find_any(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
+                    .map(|(_, funcs)| funcs)
+            })
+    } else {
+        // Use sequential search for smaller maps to avoid parallel overhead
+        functions
+            .iter()
+            .find(|(lcov_path, _)| query_path.ends_with(lcov_path))
+            .map(|(_, funcs)| funcs)
+            .or_else(|| {
+                let normalized_query = normalize_path(query_path);
+                functions
+                    .iter()
+                    .find(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
+                    .map(|(_, funcs)| funcs)
+            })
+            .or_else(|| {
+                let normalized_query = normalize_path(query_path);
+                functions
+                    .iter()
+                    .find(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
+                    .map(|(_, funcs)| funcs)
+            })
+    }
 }
 
 /// Normalize a path by removing leading ./ and resolving components

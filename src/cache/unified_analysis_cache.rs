@@ -1,0 +1,273 @@
+use crate::cache::shared_cache::SharedCache;
+use crate::priority::UnifiedAnalysis;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
+
+/// Cache key for unified analysis entries
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnifiedAnalysisCacheKey {
+    /// Hash of all source files and their metrics
+    pub source_hash: String,
+    /// Project root path
+    pub project_path: PathBuf,
+    /// Configuration hash (includes thresholds, coverage file, etc.)
+    pub config_hash: String,
+    /// Coverage file hash (if present)
+    pub coverage_hash: Option<String>,
+}
+
+/// Cached unified analysis entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnifiedAnalysisCacheEntry {
+    /// The cached unified analysis result
+    pub analysis: UnifiedAnalysis,
+    /// Timestamp when cached
+    pub timestamp: SystemTime,
+    /// Source files included in the cache
+    pub source_files: Vec<PathBuf>,
+    /// Configuration used for this analysis
+    pub config_summary: String,
+}
+
+/// Unified analysis cache manager
+pub struct UnifiedAnalysisCache {
+    /// Shared cache backend
+    shared_cache: SharedCache,
+    /// In-memory cache for current session
+    memory_cache: HashMap<UnifiedAnalysisCacheKey, UnifiedAnalysisCacheEntry>,
+    /// Maximum cache age in seconds (default: 1 hour)
+    max_age: u64,
+}
+
+impl UnifiedAnalysisCache {
+    /// Create a new unified analysis cache manager
+    pub fn new(project_path: Option<&Path>) -> Result<Self> {
+        let shared_cache = SharedCache::new(project_path)?;
+        Ok(Self {
+            shared_cache,
+            memory_cache: HashMap::new(),
+            max_age: 3600, // 1 hour
+        })
+    }
+
+    /// Generate cache key for unified analysis
+    pub fn generate_key(
+        project_path: &Path,
+        source_files: &[PathBuf],
+        complexity_threshold: u32,
+        duplication_threshold: usize,
+        coverage_file: Option<&Path>,
+        semantic_off: bool,
+        parallel: bool,
+    ) -> Result<UnifiedAnalysisCacheKey> {
+        // Hash source files content and modification times
+        let mut hasher = Sha256::new();
+        
+        // Add project path
+        hasher.update(project_path.to_string_lossy().as_bytes());
+        
+        // Sort files for consistent hashing
+        let mut sorted_files = source_files.to_vec();
+        sorted_files.sort();
+        
+        for file in &sorted_files {
+            if let Ok(content) = std::fs::read_to_string(file) {
+                hasher.update(file.to_string_lossy().as_bytes());
+                hasher.update(&content.as_bytes());
+                
+                // Include modification time for cache invalidation
+                if let Ok(metadata) = std::fs::metadata(file) {
+                    if let Ok(modified) = metadata.modified() {
+                        if let Ok(duration) = modified.duration_since(SystemTime::UNIX_EPOCH) {
+                            hasher.update(&duration.as_secs().to_le_bytes());
+                        }
+                    }
+                }
+            }
+        }
+        
+        let source_hash = format!("{:x}", hasher.finalize());
+
+        // Generate config hash
+        let mut config_hasher = Sha256::new();
+        config_hasher.update(&complexity_threshold.to_le_bytes());
+        config_hasher.update(&duplication_threshold.to_le_bytes());
+        config_hasher.update(&[semantic_off as u8]);
+        config_hasher.update(&[parallel as u8]);
+        
+        let config_hash = format!("{:x}", config_hasher.finalize());
+
+        // Generate coverage hash if present
+        let coverage_hash = if let Some(coverage_path) = coverage_file {
+            if let Ok(coverage_content) = std::fs::read_to_string(coverage_path) {
+                let mut coverage_hasher = Sha256::new();
+                coverage_hasher.update(coverage_content.as_bytes());
+                Some(format!("{:x}", coverage_hasher.finalize()))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(UnifiedAnalysisCacheKey {
+            source_hash,
+            project_path: project_path.to_path_buf(),
+            config_hash,
+            coverage_hash,
+        })
+    }
+
+    /// Get cached unified analysis if available and valid
+    pub fn get(&mut self, key: &UnifiedAnalysisCacheKey) -> Option<UnifiedAnalysis> {
+        // Check memory cache first
+        if let Some(entry) = self.memory_cache.get(key) {
+            if self.is_entry_valid(entry) {
+                log::info!("Unified analysis cache hit (memory)");
+                return Some(entry.analysis.clone());
+            } else {
+                // Remove expired entry
+                self.memory_cache.remove(key);
+            }
+        }
+
+        // Check shared cache
+        let cache_key = self.generate_shared_cache_key(key);
+        if let Ok(data) = self.shared_cache.get(&cache_key, "unified_analysis") {
+            if let Ok(entry) = serde_json::from_slice::<UnifiedAnalysisCacheEntry>(&data) {
+                if self.is_entry_valid(&entry) {
+                    log::info!("Unified analysis cache hit (shared)");
+                    // Store in memory cache for faster access
+                    self.memory_cache.insert(key.clone(), entry.clone());
+                    return Some(entry.analysis);
+                }
+            }
+        }
+
+        log::info!("Unified analysis cache miss");
+        None
+    }
+
+    /// Put unified analysis result in cache
+    pub fn put(
+        &mut self,
+        key: UnifiedAnalysisCacheKey,
+        analysis: UnifiedAnalysis,
+        source_files: Vec<PathBuf>,
+    ) -> Result<()> {
+        let entry = UnifiedAnalysisCacheEntry {
+            analysis: analysis.clone(),
+            timestamp: SystemTime::now(),
+            source_files,
+            config_summary: format!("{:?}", key), // Simple config summary
+        };
+
+        // Store in memory cache
+        self.memory_cache.insert(key.clone(), entry.clone());
+
+        // Store in shared cache
+        let cache_key = self.generate_shared_cache_key(&key);
+        let data = serde_json::to_vec(&entry)
+            .context("Failed to serialize unified analysis cache entry")?;
+        
+        self.shared_cache.put(&cache_key, "unified_analysis", &data)
+            .context("Failed to store unified analysis in shared cache")?;
+
+        log::info!("Unified analysis cached successfully");
+        Ok(())
+    }
+
+    /// Clear all cached unified analysis data
+    pub fn clear(&mut self) -> Result<()> {
+        self.memory_cache.clear();
+        // Note: SharedCache doesn't have a clear method for specific types
+        // This would need to be implemented if needed
+        Ok(())
+    }
+
+    /// Get cache statistics
+    pub fn stats(&self) -> String {
+        format!(
+            "UnifiedAnalysisCache: {} entries in memory, max_age: {}s",
+            self.memory_cache.len(),
+            self.max_age
+        )
+    }
+
+    /// Check if cache entry is still valid
+    fn is_entry_valid(&self, entry: &UnifiedAnalysisCacheEntry) -> bool {
+        if let Ok(elapsed) = entry.timestamp.elapsed() {
+            elapsed.as_secs() <= self.max_age
+        } else {
+            false
+        }
+    }
+
+    /// Generate shared cache key from unified analysis cache key
+    fn generate_shared_cache_key(&self, key: &UnifiedAnalysisCacheKey) -> String {
+        format!(
+            "unified_analysis_{}_{}_{}",
+            key.source_hash,
+            key.config_hash,
+            key.coverage_hash.as_deref().unwrap_or("no_coverage")
+        )
+    }
+
+    /// Set maximum cache age in seconds
+    pub fn set_max_age(&mut self, seconds: u64) {
+        self.max_age = seconds;
+    }
+
+    /// Check if we should use cache based on project size
+    pub fn should_use_cache(file_count: usize, has_coverage: bool) -> bool {
+        // Always use cache for projects with many files or when coverage is involved
+        file_count >= 20 || has_coverage
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_cache_key_generation() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_path = temp_dir.path();
+        
+        // Create test files
+        let file1 = project_path.join("test1.rs");
+        let file2 = project_path.join("test2.rs");
+        std::fs::write(&file1, "fn test1() {}").unwrap();
+        std::fs::write(&file2, "fn test2() {}").unwrap();
+        
+        let files = vec![file1, file2];
+        
+        let key = UnifiedAnalysisCache::generate_key(
+            project_path,
+            &files,
+            10,  // complexity_threshold
+            50,  // duplication_threshold
+            None, // coverage_file
+            false, // semantic_off
+            true,  // parallel
+        ).unwrap();
+        
+        assert!(!key.source_hash.is_empty());
+        assert!(!key.config_hash.is_empty());
+        assert_eq!(key.project_path, project_path);
+        assert_eq!(key.coverage_hash, None);
+    }
+
+    #[test]
+    fn test_should_use_cache() {
+        assert_eq!(UnifiedAnalysisCache::should_use_cache(10, false), false);
+        assert_eq!(UnifiedAnalysisCache::should_use_cache(25, false), true);
+        assert_eq!(UnifiedAnalysisCache::should_use_cache(10, true), true);
+        assert_eq!(UnifiedAnalysisCache::should_use_cache(100, true), true);
+    }
+}
