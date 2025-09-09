@@ -285,7 +285,7 @@ fn format_file_aggregate_item(
     } else {
         "LOW"
     };
-    
+
     let severity_color = get_severity_color(item.aggregate_score);
 
     // Header with rank and score
@@ -293,8 +293,14 @@ fn format_file_aggregate_item(
         output,
         "#{} {} [{}]",
         rank.to_string().bright_cyan().bold(),
-        format!("SCORE: {}", score_formatter::format_score(item.aggregate_score)).bright_yellow(),
-        format!("{} - FILE AGGREGATE", severity).color(severity_color).bold()
+        format!(
+            "SCORE: {}",
+            score_formatter::format_score(item.aggregate_score)
+        )
+        .bright_yellow(),
+        format!("{} - FILE AGGREGATE", severity)
+            .color(severity_color)
+            .bold()
     )
     .unwrap();
 
@@ -330,7 +336,11 @@ fn format_file_aggregate_item(
 
     let issues_count = item.top_function_scores.len();
     for (i, (func_name, score)) in item.top_function_scores.iter().enumerate() {
-        let prefix = if i == issues_count - 1 { "│  └─" } else { "│  ├─" };
+        let prefix = if i == issues_count - 1 {
+            "│  └─"
+        } else {
+            "│  ├─"
+        };
         writeln!(output, "{} {}: {:.1}", prefix, func_name, score).unwrap();
     }
 
