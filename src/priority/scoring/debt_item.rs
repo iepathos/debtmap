@@ -91,6 +91,7 @@ pub fn create_unified_debt_item_enhanced(
         entropy_details: calculate_entropy_details(func),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
+        god_object_indicators: None,
     }
 }
 
@@ -198,6 +199,7 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
         entropy_details: calculate_entropy_details(func),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
+        god_object_indicators: None,
     }
 }
 
@@ -301,6 +303,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         entropy_details: calculate_entropy_details(func),
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
+        god_object_indicators: None,
     }
 }
 
@@ -384,6 +387,7 @@ pub fn create_unified_debt_item_with_data_flow(
         entropy_details,
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
+        god_object_indicators: None,
     }
 }
 

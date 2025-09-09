@@ -1,4 +1,5 @@
 use crate::core::FunctionMetrics;
+use crate::organization::GodObjectAnalysis;
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
     coverage_propagation::TransitiveCoverage,
@@ -46,6 +47,7 @@ pub struct UnifiedDebtItem {
     pub entropy_details: Option<EntropyDetails>, // Store entropy information
     pub is_pure: Option<bool>,                   // Whether the function is pure
     pub purity_confidence: Option<f32>,          // Confidence in purity detection
+    pub god_object_indicators: Option<GodObjectAnalysis>, // God object detection results
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +73,35 @@ pub fn calculate_unified_priority(
     organization_issues: Option<f64>,
 ) -> UnifiedScore {
     calculate_unified_priority_with_debt(func, call_graph, coverage, organization_issues, None)
+}
+
+pub fn calculate_unified_score_with_patterns(
+    func: &FunctionMetrics,
+    god_object: Option<&GodObjectAnalysis>,
+    coverage: Option<&LcovData>,
+    call_graph: &CallGraph,
+) -> UnifiedScore {
+    let base_score = calculate_unified_priority_with_debt(func, call_graph, coverage, None, None);
+
+    // Apply god object multiplier
+    let god_object_multiplier = if let Some(go) = god_object {
+        if go.is_god_object {
+            // Massive boost for functions in god objects
+            3.0 + (go.god_object_score / 50.0)
+        } else {
+            1.0
+        }
+    } else {
+        1.0
+    };
+
+    UnifiedScore {
+        complexity_factor: base_score.complexity_factor * god_object_multiplier,
+        coverage_factor: base_score.coverage_factor,
+        dependency_factor: base_score.dependency_factor,
+        role_multiplier: base_score.role_multiplier,
+        final_score: base_score.final_score * god_object_multiplier,
+    }
 }
 
 pub fn calculate_unified_priority_with_debt(

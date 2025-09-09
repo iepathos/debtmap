@@ -1,6 +1,14 @@
 use crate::common::SourceLocation;
 use syn;
 
+pub mod god_object_analysis;
+
+pub use god_object_analysis::{
+    calculate_god_object_score, determine_confidence, group_methods_by_responsibility,
+    recommend_module_splits, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
+    ModuleSplit,
+};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrganizationAntiPattern {
     GodObject {

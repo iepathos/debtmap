@@ -284,6 +284,116 @@ pub struct FunctionPatternConfig {
     pub init_patterns: Vec<String>,
 }
 
+/// God object detection configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GodObjectConfig {
+    /// Whether god object detection is enabled
+    #[serde(default = "default_god_object_enabled")]
+    pub enabled: bool,
+
+    /// Language-specific thresholds
+    #[serde(default)]
+    pub rust: GodObjectThresholds,
+
+    #[serde(default)]
+    pub python: GodObjectThresholds,
+
+    #[serde(default)]
+    pub javascript: GodObjectThresholds,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GodObjectThresholds {
+    #[serde(default = "default_max_methods")]
+    pub max_methods: usize,
+
+    #[serde(default = "default_max_fields")]
+    pub max_fields: usize,
+
+    #[serde(default = "default_max_traits")]
+    pub max_traits: usize,
+
+    #[serde(default = "default_max_lines")]
+    pub max_lines: usize,
+
+    #[serde(default = "default_max_complexity")]
+    pub max_complexity: u32,
+}
+
+impl Default for GodObjectConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            rust: GodObjectThresholds::rust_defaults(),
+            python: GodObjectThresholds::python_defaults(),
+            javascript: GodObjectThresholds::javascript_defaults(),
+        }
+    }
+}
+
+impl Default for GodObjectThresholds {
+    fn default() -> Self {
+        Self {
+            max_methods: default_max_methods(),
+            max_fields: default_max_fields(),
+            max_traits: default_max_traits(),
+            max_lines: default_max_lines(),
+            max_complexity: default_max_complexity(),
+        }
+    }
+}
+
+impl GodObjectThresholds {
+    fn rust_defaults() -> Self {
+        Self {
+            max_methods: 20,
+            max_fields: 15,
+            max_traits: 5,
+            max_lines: 1000,
+            max_complexity: 200,
+        }
+    }
+
+    fn python_defaults() -> Self {
+        Self {
+            max_methods: 15,
+            max_fields: 10,
+            max_traits: 3,
+            max_lines: 500,
+            max_complexity: 150,
+        }
+    }
+
+    fn javascript_defaults() -> Self {
+        Self {
+            max_methods: 15,
+            max_fields: 20,
+            max_traits: 3,
+            max_lines: 500,
+            max_complexity: 150,
+        }
+    }
+}
+
+fn default_god_object_enabled() -> bool {
+    true
+}
+fn default_max_methods() -> usize {
+    20
+}
+fn default_max_fields() -> usize {
+    15
+}
+fn default_max_traits() -> usize {
+    5
+}
+fn default_max_lines() -> usize {
+    1000
+}
+fn default_max_complexity() -> u32 {
+    200
+}
+
 /// Root configuration structure for debtmap
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DebtmapConfig {
@@ -294,6 +404,10 @@ pub struct DebtmapConfig {
     /// External API detection configuration
     #[serde(default)]
     pub external_api: Option<crate::priority::external_api_detector::ExternalApiConfig>,
+
+    /// God object detection configuration
+    #[serde(default)]
+    pub god_object_detection: Option<GodObjectConfig>,
 
     /// Thresholds configuration
     #[serde(default)]

@@ -564,6 +564,7 @@ fn convert_error_swallowing_to_unified(
                 entropy_details: None,
                 is_pure: None,
                 purity_confidence: None,
+                god_object_indicators: None,
             }
         })
         .collect()

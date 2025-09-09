@@ -1,5 +1,6 @@
 use crate::analyzers::FileAnalyzer;
 use crate::core::FunctionMetrics;
+use crate::organization::GodObjectDetector;
 use crate::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators};
 use crate::risk::lcov::LcovData;
 use anyhow::Result;
@@ -18,11 +19,28 @@ impl UnifiedFileAnalyzer {
         content.lines().count()
     }
 
-    fn analyze_god_object(&self, _path: &Path, content: &str) -> GodObjectIndicators {
-        // For now, we'll use simple heuristics based on file analysis
-        // This will be enhanced when spec 100 is implemented
+    fn analyze_god_object(&self, path: &Path, content: &str) -> GodObjectIndicators {
+        // Use the comprehensive god object detector for Rust files
+        if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            if let Ok(ast) = syn::parse_file(content) {
+                let detector = GodObjectDetector::with_source_content(content);
+                let analysis = detector.analyze_comprehensive(path, &ast);
+
+                return GodObjectIndicators {
+                    methods_count: analysis.method_count,
+                    fields_count: analysis.field_count,
+                    responsibilities: analysis.responsibility_count,
+                    is_god_object: analysis.is_god_object,
+                    god_object_score: analysis.god_object_score.min(100.0) / 100.0, // Normalize to 0-1
+                };
+            }
+        }
+
+        // Fallback to simple heuristics for non-Rust files
         let lines = Self::count_lines(content);
-        let function_count = content.matches("fn ").count() + content.matches("def ").count();
+        let function_count = content.matches("fn ").count()
+            + content.matches("def ").count()
+            + content.matches("function ").count();
         let field_count = content.matches("pub ").count() + content.matches("self.").count() / 3;
 
         let is_god_object = function_count > 50 || lines > 2000 || field_count > 30;
