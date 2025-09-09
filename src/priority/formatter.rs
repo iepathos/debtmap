@@ -308,49 +308,109 @@ fn format_file_aggregate_item(
     writeln!(
         output,
         "├─ {} ({} functions, total score: {:.1})",
-        item.file_path.display(),
+        item.file_path.display().to_string().bright_green(),
         item.function_count,
         item.total_score
     )
     .unwrap();
 
-    // Problematic functions warning
-    if item.problematic_functions > 0 {
-        writeln!(
-            output,
-            "├─ {} {} problematic functions (score > {:.1})",
-            formatter.emoji("⚠️", "WARNING:"),
-            item.problematic_functions,
-            5.0
-        )
-        .unwrap();
-    }
-
-    // Top issues
+    // WHY section
     writeln!(
         output,
-        "├─ {} Top issues:",
-        formatter.emoji("📊", "METRICS:")
+        "├─ {}: This file has accumulated significant technical debt across {} functions. {} functions exceed complexity thresholds, indicating systematic code quality issues that affect maintainability.",
+        formatter.emoji("WHY", "WHY").bright_magenta(),
+        item.function_count,
+        item.problematic_functions
     )
     .unwrap();
 
-    let issues_count = item.top_function_scores.len();
-    for (i, (func_name, score)) in item.top_function_scores.iter().enumerate() {
+    // ACTION section
+    writeln!(
+        output,
+        "├─ {}: Prioritize refactoring the most complex functions. Break down large functions, extract reusable components, and improve error handling.",
+        formatter.emoji("ACTION", "ACTION").bright_cyan()
+    )
+    .unwrap();
+
+    // Detailed breakdown of problematic functions
+    writeln!(
+        output,
+        "│  ├─ {}. Review and refactor top {} problematic functions",
+        1,
+        item.top_function_scores.len().min(5)
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  ├─ {}. Extract common patterns into helper functions",
+        2
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  ├─ {}. Add unit tests for complex logic sections",
+        3
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  └─ {}. Consider splitting file if it exceeds 500 lines",
+        4
+    )
+    .unwrap();
+
+    // IMPACT section
+    writeln!(
+        output,
+        "├─ {}: Reduce overall file complexity by {}%, improve test coverage, enable safer refactoring",
+        formatter.emoji("IMPACT", "IMPACT").bright_yellow(),
+        ((item.problematic_functions as f64 / item.function_count as f64) * 100.0).round() as u32
+    )
+    .unwrap();
+
+    // METRICS section
+    writeln!(
+        output,
+        "├─ {}: Functions: {}, Problematic: {}, Avg complexity: {:.1}",
+        formatter.emoji("METRICS", "METRICS").bright_blue(),
+        item.function_count,
+        item.problematic_functions,
+        item.total_score / item.function_count as f64
+    )
+    .unwrap();
+
+    // SCORING breakdown
+    writeln!(
+        output,
+        "├─ {}: Aggregate: {} | Avg per function: {:.1} | Max: {:.1}",
+        formatter.emoji("SCORING", "SCORING").bright_red(),
+        severity,
+        item.aggregate_score / item.function_count as f64,
+        item.top_function_scores
+            .first()
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0)
+    )
+    .unwrap();
+
+    // DEPENDENCIES - Top problematic functions
+    writeln!(
+        output,
+        "└─ {}: {} high-complexity functions identified",
+        formatter.emoji("DEPENDENCIES", "DEPS").bright_white(),
+        item.problematic_functions
+    )
+    .unwrap();
+
+    let issues_count = item.top_function_scores.len().min(5);
+    for (i, (func_name, score)) in item.top_function_scores.iter().take(5).enumerate() {
         let prefix = if i == issues_count - 1 {
-            "│  └─"
+            "   └─"
         } else {
-            "│  ├─"
+            "   ├─"
         };
         writeln!(output, "{} {}: {:.1}", prefix, func_name, score).unwrap();
     }
-
-    // Action
-    writeln!(
-        output,
-        "└─ {} ACTION: Comprehensive refactoring needed",
-        formatter.emoji("🔧", "FIX:")
-    )
-    .unwrap();
 }
 
 fn format_file_priority_item(
