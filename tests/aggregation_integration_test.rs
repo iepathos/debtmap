@@ -161,6 +161,7 @@ fn simple_function_2() -> i32 {
             no_aggregation: false,
             aggregation_method: Some("weighted_sum".to_string()),
             min_problematic: None,
+            no_god_object: false,
         },
     )
     .unwrap();
@@ -332,6 +333,7 @@ fn func3(a: bool, b: bool, c: bool, d: i32) -> i32 {
                 no_aggregation: false,
                 aggregation_method: Some(method.to_string()),
                 min_problematic: None,
+            no_god_object: false,
             },
         )
         .unwrap();
@@ -391,6 +393,7 @@ fn test_cli_flag_no_aggregation() {
             no_aggregation: true, // Disable aggregation
             aggregation_method: None,
             min_problematic: None,
+            no_god_object: false,
         },
     )
     .unwrap();
@@ -465,6 +468,7 @@ fn test_aggregation_with_multiple_files() {
             no_aggregation: false,
             aggregation_method: Some("weighted_sum".to_string()),
             min_problematic: None,
+            no_god_object: false,
         },
     )
     .unwrap();

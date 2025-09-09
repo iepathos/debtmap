@@ -44,6 +44,7 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - **Security vulnerability detection** - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns
 - **Resource management analysis** - Identifies inefficient allocations, nested loops, and blocking I/O patterns
 - **Code organization analysis** - Detects god objects, feature envy, primitive obsession, and magic values
+- **God object detection** - Identifies classes/modules with too many responsibilities using method count, field count, and responsibility analysis
 - **Testing quality assessment** - Analyzes test complexity, flaky patterns, and assertion quality
 - **Context-aware analysis** - Reduces false positives through intelligent context detection (enabled by default)
 - **Enhanced scoring system** - Advanced scoring differentiation for better prioritization
@@ -135,6 +136,35 @@ debtmap init
 debtmap validate ./src
 ```
 
+## God Object Detection
+
+Debtmap includes sophisticated god object detection that identifies classes and modules with too many responsibilities. A god object is detected based on:
+
+- **Method count** - Number of methods/functions in a class/module
+- **Field count** - Number of fields/attributes
+- **Responsibility count** - Number of distinct responsibilities (grouped by method naming patterns)
+- **Lines of code** - Overall size of the class/module
+
+God objects are flagged in both terminal and markdown output with detailed metrics:
+- Number of methods, fields, and responsibilities
+- God object score (0-100%)
+- Recommendations for splitting into smaller, focused modules
+
+You can configure god object thresholds in `.debtmap.toml`:
+
+```toml
+[god_object]
+enabled = true
+max_methods = 20
+max_fields = 15
+max_responsibilities = 5
+```
+
+To disable god object detection for a specific run:
+```bash
+debtmap analyze . --no-god-object
+```
+
 ## Commands
 
 ### `analyze`
@@ -167,6 +197,7 @@ Options:
   --min-priority <PRIORITY>          Minimum priority to display (low, medium, high, critical)
   --filter <CATEGORIES>              Filter by debt categories (comma-separated)
   --no-context-aware                 Disable context-aware false positive reduction (enabled by default)
+  --no-god-object                    Disable god object detection
 ```
 
 ### `init`

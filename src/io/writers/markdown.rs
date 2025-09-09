@@ -304,12 +304,27 @@ fn format_score_breakdown(items: &[UnifiedDebtItem]) -> String {
 }
 
 fn format_item_breakdown(number: usize, item: &UnifiedDebtItem) -> String {
-    format!(
+    let mut result = format!(
         "#### {}. {}\n\n{}\n",
         number,
         item.location.function,
         format_score_factors(&item.unified_score)
-    )
+    );
+    
+    // Add god object indicators if present
+    if let Some(ref god_obj) = item.god_object_indicators {
+        if god_obj.is_god_object {
+            result.push_str(&format!(
+                "- **God Object Warning**: {} methods, {} fields, {} responsibilities (score: {:.1}%)\n",
+                god_obj.method_count,
+                god_obj.field_count,
+                god_obj.responsibility_count,
+                god_obj.god_object_score
+            ));
+        }
+    }
+    
+    result
 }
 
 fn format_score_factors(score: &crate::priority::unified_scorer::UnifiedScore) -> String {

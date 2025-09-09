@@ -244,6 +244,7 @@ fn calculate_unified_debt_score(
         false, // no_aggregation - use default settings for validate
         None,  // aggregation_method - use default
         None,  // min_problematic - use default
+        false, // no_god_object - enable god object detection by default
     );
 
     unified.total_debt_score as u32
