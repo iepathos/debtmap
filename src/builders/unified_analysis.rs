@@ -41,6 +41,7 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub no_aggregation: bool,
     pub aggregation_method: Option<String>,
     pub min_problematic: Option<usize>,
+    pub no_god_object: bool,
 }
 
 pub fn perform_unified_analysis(
@@ -67,6 +68,7 @@ pub fn perform_unified_analysis(
         no_aggregation: false,
         aggregation_method: None,
         min_problematic: None,
+        no_god_object: false,
     })
 }
 
@@ -89,6 +91,7 @@ pub fn perform_unified_analysis_with_options(
         no_aggregation,
         aggregation_method,
         min_problematic,
+        no_god_object,
     } = options;
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
@@ -130,6 +133,7 @@ pub fn perform_unified_analysis_with_options(
         no_aggregation,
         aggregation_method,
         min_problematic,
+        no_god_object,
     ))
 }
 
@@ -314,6 +318,7 @@ pub fn create_unified_analysis_with_exclusions(
     no_aggregation: bool,
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
+    no_god_object: bool,
 ) -> UnifiedAnalysis {
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
 
@@ -365,7 +370,7 @@ pub fn create_unified_analysis_with_exclusions(
     }
 
     // Add file-level analysis
-    analyze_files_for_debt(&mut unified, metrics, coverage_data);
+    analyze_files_for_debt(&mut unified, metrics, coverage_data, no_god_object);
 
     // Add file aggregation analysis
     let mut aggregation_config = crate::config::get_aggregation_config();
@@ -564,6 +569,7 @@ fn convert_error_swallowing_to_unified(
                 entropy_details: None,
                 is_pure: None,
                 purity_confidence: None,
+                god_object_indicators: None,
             }
         })
         .collect()
@@ -671,6 +677,7 @@ fn analyze_files_for_debt(
     unified: &mut UnifiedAnalysis,
     metrics: &[FunctionMetrics],
     coverage_data: Option<&risk::lcov::LcovData>,
+    no_god_object: bool,
 ) {
     use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
     use crate::priority::file_metrics::{FileDebtItem, FileImpact};
@@ -688,12 +695,35 @@ fn analyze_files_for_debt(
     let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
 
     // Analyze each file
-    for (_file_path, functions) in files_map {
+    for (file_path, functions) in files_map {
         // Convert references to owned values for aggregate_functions
         let functions_owned: Vec<FunctionMetrics> = functions.iter().map(|&f| f.clone()).collect();
 
         // Get file-level metrics
         let mut file_metrics = file_analyzer.aggregate_functions(&functions_owned);
+
+        // Run god object detection if enabled
+        if !no_god_object {
+            // Try to read file content to get better god object analysis
+            if let Ok(content) = std::fs::read_to_string(&file_path) {
+                let god_indicators = file_analyzer
+                    .analyze_file(&file_path, &content)
+                    .ok()
+                    .map(|m| m.god_object_indicators)
+                    .unwrap_or_else(|| file_metrics.god_object_indicators.clone());
+                file_metrics.god_object_indicators = god_indicators;
+            }
+        } else {
+            // Disable god object detection
+            file_metrics.god_object_indicators =
+                crate::priority::file_metrics::GodObjectIndicators {
+                    methods_count: 0,
+                    fields_count: 0,
+                    responsibilities: 0,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                };
+        }
 
         // Calculate function scores for this file
         let mut function_scores = Vec::new();
@@ -711,6 +741,29 @@ fn analyze_files_for_debt(
 
         // Calculate file score
         let score = file_metrics.calculate_score();
+
+        // Update god object indicators for functions in this file
+        if file_metrics.god_object_indicators.is_god_object {
+            // Convert GodObjectIndicators to GodObjectAnalysis for UnifiedDebtItem
+            let god_analysis = crate::organization::GodObjectAnalysis {
+                is_god_object: file_metrics.god_object_indicators.is_god_object,
+                method_count: file_metrics.god_object_indicators.methods_count,
+                field_count: file_metrics.god_object_indicators.fields_count,
+                responsibility_count: file_metrics.god_object_indicators.responsibilities,
+                lines_of_code: file_metrics.total_lines,
+                complexity_sum: file_metrics.total_complexity,
+                god_object_score: file_metrics.god_object_indicators.god_object_score * 100.0, // Convert to percentage
+                recommended_splits: Vec::new(),
+                confidence: crate::organization::GodObjectConfidence::Definite,
+                responsibilities: Vec::new(),
+            };
+
+            for item in unified.items.iter_mut() {
+                if item.location.file == file_path {
+                    item.god_object_indicators = Some(god_analysis.clone());
+                }
+            }
+        }
 
         // Only add file items with significant scores
         if score > 50.0 {

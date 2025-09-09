@@ -48,6 +48,7 @@ fn main() -> Result<()> {
             no_aggregation,
             aggregation_method,
             min_problematic,
+            no_god_object,
         } => {
             // Enhanced scoring is always enabled (no need for environment variable)
 
@@ -132,6 +133,7 @@ fn main() -> Result<()> {
                 no_aggregation,
                 aggregation_method,
                 min_problematic,
+                no_god_object,
             };
             debtmap::commands::analyze::handle_analyze(config)
         }

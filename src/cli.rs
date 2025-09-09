@@ -177,6 +177,10 @@ pub enum Commands {
         /// Minimum number of problematic functions for file aggregation
         #[arg(long = "min-problematic")]
         min_problematic: Option<usize>,
+
+        /// Disable god object detection
+        #[arg(long = "no-god-object")]
+        no_god_object: bool,
     },
 
     /// Initialize configuration file

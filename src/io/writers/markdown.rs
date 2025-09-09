@@ -304,12 +304,27 @@ fn format_score_breakdown(items: &[UnifiedDebtItem]) -> String {
 }
 
 fn format_item_breakdown(number: usize, item: &UnifiedDebtItem) -> String {
-    format!(
+    let mut result = format!(
         "#### {}. {}\n\n{}\n",
         number,
         item.location.function,
         format_score_factors(&item.unified_score)
-    )
+    );
+
+    // Add god object indicators if present
+    if let Some(ref god_obj) = item.god_object_indicators {
+        if god_obj.is_god_object {
+            result.push_str(&format!(
+                "- **God Object Warning**: {} methods, {} fields, {} responsibilities (score: {:.1}%)\n",
+                god_obj.method_count,
+                god_obj.field_count,
+                god_obj.responsibility_count,
+                god_obj.god_object_score
+            ));
+        }
+    }
+
+    result
 }
 
 fn format_score_factors(score: &crate::priority::unified_scorer::UnifiedScore) -> String {
@@ -822,6 +837,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         }
     }
 
@@ -988,6 +1004,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         }
     }
 
@@ -1039,6 +1056,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         }
     }
 
@@ -1465,6 +1483,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         };
 
         let dead_code_item2 = UnifiedDebtItem {
@@ -1511,6 +1530,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         };
 
         let analysis = UnifiedAnalysis {
@@ -1633,6 +1653,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         };
 
         let testing_gap_item = create_testing_gap_item("test_func", 0.0, 10);

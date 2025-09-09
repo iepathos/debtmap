@@ -1,8 +1,11 @@
 use super::{
-    MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
+    calculate_god_object_score, determine_confidence, group_methods_by_responsibility,
+    GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds, MaintainabilityImpact,
+    OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use std::collections::HashMap;
+use std::path::Path;
 use syn::{self, visit::Visit};
 
 pub struct GodObjectDetector {
@@ -34,6 +37,102 @@ impl GodObjectDetector {
             max_fields: 10,
             max_responsibilities: 3,
             location_extractor: Some(UnifiedLocationExtractor::new(source_content)),
+        }
+    }
+
+    pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
+        let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
+        visitor.visit_file(ast);
+
+        // Get thresholds based on file extension
+        let thresholds = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            GodObjectThresholds::for_rust()
+        } else if path.extension().and_then(|s| s.to_str()) == Some("py") {
+            GodObjectThresholds::for_python()
+        } else if path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s == "js" || s == "ts")
+            .unwrap_or(false)
+        {
+            GodObjectThresholds::for_javascript()
+        } else {
+            GodObjectThresholds::default()
+        };
+
+        // Aggregate metrics from all types in the file
+        let mut total_methods = 0;
+        let mut total_fields = 0;
+        let mut all_methods = Vec::new();
+        let mut total_complexity = 0u32;
+
+        // Count methods from types (structs/impl blocks)
+        for type_info in visitor.types.values() {
+            total_methods += type_info.method_count;
+            total_fields += type_info.field_count;
+            all_methods.extend(type_info.methods.clone());
+            // Estimate complexity (rough approximation)
+            total_complexity += (type_info.method_count * 5) as u32;
+        }
+
+        // Also count standalone functions in the file
+        let standalone_functions = visitor.standalone_functions.clone();
+        total_methods += standalone_functions.len();
+        all_methods.extend(standalone_functions.clone());
+        total_complexity += (standalone_functions.len() * 5) as u32;
+
+        // Count lines (simple approximation based on AST)
+        let lines_of_code = ast.items.len() * 50; // Very rough estimate
+
+        let responsibility_groups = group_methods_by_responsibility(&all_methods);
+        let responsibility_count = responsibility_groups.len();
+
+        let god_object_score = calculate_god_object_score(
+            total_methods,
+            total_fields,
+            responsibility_count,
+            lines_of_code,
+            &thresholds,
+        );
+
+        let confidence = determine_confidence(
+            total_methods,
+            total_fields,
+            responsibility_count,
+            lines_of_code,
+            total_complexity,
+            &thresholds,
+        );
+
+        let is_god_object = confidence != GodObjectConfidence::NotGodObject;
+
+        let recommended_splits = if is_god_object {
+            let file_name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("module");
+            crate::organization::recommend_module_splits(
+                file_name,
+                &all_methods,
+                &responsibility_groups,
+            )
+        } else {
+            Vec::new()
+        };
+
+        let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
+
+        GodObjectAnalysis {
+            is_god_object,
+            method_count: total_methods,
+            field_count: total_fields,
+            responsibility_count,
+            lines_of_code,
+            complexity_sum: total_complexity,
+            god_object_score,
+            recommended_splits,
+            confidence,
+            responsibilities,
         }
     }
 
@@ -302,6 +401,7 @@ struct Responsibility {
 
 struct TypeVisitor {
     types: HashMap<String, TypeAnalysis>,
+    standalone_functions: Vec<String>,
     location_extractor: Option<UnifiedLocationExtractor>,
 }
 
@@ -309,6 +409,7 @@ impl TypeVisitor {
     fn with_location_extractor(location_extractor: Option<UnifiedLocationExtractor>) -> Self {
         Self {
             types: HashMap::new(),
+            standalone_functions: Vec::new(),
             location_extractor,
         }
     }
@@ -393,6 +494,11 @@ impl<'ast> Visit<'ast> for TypeVisitor {
         if let Some(type_name) = Self::extract_type_name(&node.self_ty) {
             self.update_type_info(&type_name, node);
         }
+    }
+
+    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+        // Track standalone functions
+        self.standalone_functions.push(node.sig.ident.to_string());
     }
 }
 

@@ -5,6 +5,7 @@ use std::path::Path;
 
 pub mod call_graph;
 pub mod context_aware;
+pub mod enhanced_analyzer;
 pub mod file_analyzer;
 pub mod function_registry;
 pub mod javascript;
@@ -20,6 +21,8 @@ pub mod trait_implementation_tracker;
 pub mod trait_resolver;
 pub mod type_registry;
 pub mod type_tracker;
+
+pub use enhanced_analyzer::{AnalysisResult, EnhancedAnalyzer};
 
 pub trait Analyzer: Send + Sync {
     fn parse(&self, content: &str, path: std::path::PathBuf) -> Result<Ast>;

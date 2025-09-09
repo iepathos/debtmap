@@ -138,3 +138,27 @@ minimum_complexity = 15      # Only flag if complexity > 15
 name_patterns = ["visit_*", "walk_*", "traverse_*"]
 orchestration_threshold = 6  # Need at least 6 delegations
 complexity_adjustment = 0.7  # Reduce complexity score by 30%
+
+# God Object detection configuration
+[god_object]
+enabled = true                # Enable god object detection
+max_methods = 20              # Maximum methods before considering a god object
+max_fields = 15               # Maximum fields before considering a god object  
+max_responsibilities = 5      # Maximum distinct responsibilities
+score_threshold = 50.0        # Minimum score to flag as god object
+
+# Language-specific thresholds
+[god_object.rust]
+max_methods = 25              # Rust allows more methods due to trait impls
+max_fields = 15
+max_responsibilities = 4
+
+[god_object.python]
+max_methods = 20
+max_fields = 20               # Python classes often have more attributes
+max_responsibilities = 5
+
+[god_object.javascript]
+max_methods = 15              # JavaScript classes should be smaller
+max_fields = 10
+max_responsibilities = 3
