@@ -94,10 +94,10 @@ impl fmt::Display for NormalizedScore {
         // Format with raw value, normalized value, and visual indicator
         let indicator = match self.scaling_method {
             ScalingMethod::Linear => "▁",      // Low score indicator
-            ScalingMethod::SquareRoot => "▃",  // Medium score indicator  
+            ScalingMethod::SquareRoot => "▃",  // Medium score indicator
             ScalingMethod::Logarithmic => "▅", // High score indicator
         };
-        
+
         // Determine severity level for color coding (when terminal supports it)
         let severity = if self.normalized < 3.0 {
             "low"
@@ -108,14 +108,11 @@ impl fmt::Display for NormalizedScore {
         } else {
             "critical"
         };
-        
+
         write!(
             f,
             "{:.1} (raw: {:.1}, {}, {})",
-            self.normalized,
-            self.raw,
-            severity,
-            indicator
+            self.normalized, self.raw, severity, indicator
         )
     }
 }
@@ -147,7 +144,7 @@ pub fn normalize_final_score_with_metadata(raw_score: f64) -> NormalizedScore {
         // Adjusted to ensure continuity at 100: sqrt(90) * 3.33 + 10 ≈ 41.59
         41.59 + (raw_score / 100.0).ln() * 10.0
     };
-    
+
     NormalizedScore {
         raw: raw_score,
         normalized,
@@ -199,14 +196,14 @@ pub fn normalize_complexity(cyclomatic: u32, cognitive: u32) -> f64 {
 pub fn generate_normalization_curve() -> Vec<(f64, f64, &'static str)> {
     // Generate sample points across different scaling regions
     let mut curve_data = Vec::new();
-    
+
     // Linear range (0-10)
     for i in 0..=10 {
         let raw = i as f64;
         let normalized = normalize_final_score(raw);
         curve_data.push((raw, normalized, "Linear"));
     }
-    
+
     // Square root range (11-100)
     let sqrt_points = vec![15, 20, 30, 40, 50, 60, 70, 80, 90, 100];
     for raw in sqrt_points {
@@ -214,7 +211,7 @@ pub fn generate_normalization_curve() -> Vec<(f64, f64, &'static str)> {
         let normalized = normalize_final_score(raw);
         curve_data.push((raw, normalized, "SquareRoot"));
     }
-    
+
     // Logarithmic range (100+)
     let log_points = vec![150, 200, 300, 500, 750, 1000, 1500, 2000];
     for raw in log_points {
@@ -222,7 +219,7 @@ pub fn generate_normalization_curve() -> Vec<(f64, f64, &'static str)> {
         let normalized = normalize_final_score(raw);
         curve_data.push((raw, normalized, "Logarithmic"));
     }
-    
+
     curve_data
 }
 
@@ -299,7 +296,7 @@ mod tests {
         // Test continuity at transition points
         // Note: Some small discontinuity is expected at transition boundaries
         let eps = 0.001;
-        
+
         // At 10.0 transition
         let below_10 = normalize_final_score(10.0 - eps);
         let at_10 = normalize_final_score(10.0);
@@ -307,7 +304,7 @@ mod tests {
         assert!((at_10 - below_10).abs() < 0.01);
         // Small jump expected here due to sqrt function starting
         assert!((above_10 - at_10).abs() < 0.11);
-        
+
         // At 100.0 transition
         let below_100 = normalize_final_score(100.0 - eps);
         let at_100 = normalize_final_score(100.0);
@@ -315,24 +312,22 @@ mod tests {
         assert!((at_100 - below_100).abs() < 0.01);
         assert!((above_100 - at_100).abs() < 0.01);
     }
-    
+
     #[test]
     fn test_normalization_monotonic() {
         // Verify ordering is preserved
         let scores = vec![1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0];
-        let normalized: Vec<_> = scores.iter()
-            .map(|&s| normalize_final_score(s))
-            .collect();
-        
+        let normalized: Vec<_> = scores.iter().map(|&s| normalize_final_score(s)).collect();
+
         for i in 1..normalized.len() {
-            assert!(normalized[i] > normalized[i-1]);
+            assert!(normalized[i] > normalized[i - 1]);
         }
     }
-    
+
     #[test]
     fn test_inverse_function() {
         let test_scores = vec![5.0, 15.0, 50.0, 150.0, 500.0];
-        
+
         for score in test_scores {
             let normalized = normalize_final_score(score);
             let denormalized = denormalize_score(normalized);
@@ -343,46 +338,61 @@ mod tests {
     #[test]
     fn test_normalization_ranges() {
         // Test that normalized scores fall within expected ranges
-        assert!(normalize_final_score(5.0) <= 10.0);   // Linear range
-        assert!(normalize_final_score(50.0) > 10.0 && normalize_final_score(50.0) <= 40.0);  // Square root range
-        assert!(normalize_final_score(200.0) > 40.0);  // Logarithmic range
+        assert!(normalize_final_score(5.0) <= 10.0); // Linear range
+        assert!(normalize_final_score(50.0) > 10.0 && normalize_final_score(50.0) <= 40.0); // Square root range
+        assert!(normalize_final_score(200.0) > 40.0); // Logarithmic range
     }
 
     #[test]
     fn test_scaling_method_detection() {
         let score1 = normalize_final_score_with_metadata(5.0);
         assert_eq!(score1.scaling_method, ScalingMethod::Linear);
-        
+
         let score2 = normalize_final_score_with_metadata(50.0);
         assert_eq!(score2.scaling_method, ScalingMethod::SquareRoot);
-        
+
         let score3 = normalize_final_score_with_metadata(200.0);
         assert_eq!(score3.scaling_method, ScalingMethod::Logarithmic);
     }
-    
+
     #[test]
     fn test_generate_normalization_curve() {
         let curve = generate_normalization_curve();
-        
+
         // Verify we have data points
         assert!(!curve.is_empty());
-        
+
         // Verify we have all three regions
-        let linear_count = curve.iter().filter(|&(_, _, region)| *region == "Linear").count();
-        let sqrt_count = curve.iter().filter(|&(_, _, region)| *region == "SquareRoot").count();
-        let log_count = curve.iter().filter(|&(_, _, region)| *region == "Logarithmic").count();
-        
+        let linear_count = curve
+            .iter()
+            .filter(|&(_, _, region)| *region == "Linear")
+            .count();
+        let sqrt_count = curve
+            .iter()
+            .filter(|&(_, _, region)| *region == "SquareRoot")
+            .count();
+        let log_count = curve
+            .iter()
+            .filter(|&(_, _, region)| *region == "Logarithmic")
+            .count();
+
         assert!(linear_count > 0);
         assert!(sqrt_count > 0);
         assert!(log_count > 0);
-        
+
         // Verify monotonic increasing
         for i in 1..curve.len() {
-            assert!(curve[i].0 >= curve[i-1].0, "Raw scores should be monotonic");
-            assert!(curve[i].1 >= curve[i-1].1, "Normalized scores should be monotonic");
+            assert!(
+                curve[i].0 >= curve[i - 1].0,
+                "Raw scores should be monotonic"
+            );
+            assert!(
+                curve[i].1 >= curve[i - 1].1,
+                "Normalized scores should be monotonic"
+            );
         }
     }
-    
+
     #[test]
     fn test_normalized_score_display() {
         let score = NormalizedScore {
@@ -390,7 +400,7 @@ mod tests {
             normalized: 16.7,
             scaling_method: ScalingMethod::SquareRoot,
         };
-        
+
         let display = format!("{}", score);
         assert!(display.contains("16.7"));
         assert!(display.contains("45.0"));

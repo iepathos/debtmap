@@ -159,15 +159,12 @@ fn process_function_coverage_parallel(
 
     // Use Mutex for thread-safe access to the functions HashMap
     let functions_mutex = Mutex::new(file_functions);
-    
+
     // Process functions in parallel
     func_boundaries.par_iter().for_each(|&func_start| {
         // Calculate function coverage for this function
-        let coverage_data = calculate_function_coverage_data(
-            func_start,
-            &func_boundaries,
-            &sorted_lines,
-        );
+        let coverage_data =
+            calculate_function_coverage_data(func_start, &func_boundaries, &sorted_lines);
 
         // Update the function in the mutex-protected HashMap
         if let Ok(mut functions) = functions_mutex.lock() {
@@ -214,7 +211,10 @@ fn calculate_function_coverage_data(
     let func_lines = &sorted_lines[start_idx..end_idx];
 
     if !func_lines.is_empty() {
-        let covered = func_lines.par_iter().filter(|(_, count)| *count > 0).count();
+        let covered = func_lines
+            .par_iter()
+            .filter(|(_, count)| *count > 0)
+            .count();
         let coverage_percentage = (covered as f64 / func_lines.len() as f64) * 100.0;
 
         // Collect uncovered lines in parallel

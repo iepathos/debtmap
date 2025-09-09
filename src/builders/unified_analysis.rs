@@ -103,9 +103,10 @@ pub fn perform_unified_analysis_with_options(
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
-    
-    let should_cache = use_cache && UnifiedAnalysisCache::should_use_cache(files.len(), coverage_file.is_some());
-    
+
+    let should_cache =
+        use_cache && UnifiedAnalysisCache::should_use_cache(files.len(), coverage_file.is_some());
+
     // Try to get cached unified analysis result
     if should_cache {
         if let Ok(mut unified_cache) = UnifiedAnalysisCache::new(Some(project_path)) {
@@ -114,7 +115,7 @@ pub fn perform_unified_analysis_with_options(
                 project_path,
                 &files,
                 results.complexity.summary.max_complexity, // Use max complexity as threshold proxy
-                50, // Default duplication threshold
+                50,                                        // Default duplication threshold
                 coverage_file.as_ref().map(|p| p.as_path()),
                 semantic_off,
                 parallel,
@@ -127,29 +128,53 @@ pub fn perform_unified_analysis_with_options(
                     }
                     return Ok(cached_analysis);
                 }
-                
+
                 // Cache miss - proceed with analysis and cache the result
                 let analysis_result = perform_unified_analysis_computation(
-                    results, coverage_file, semantic_off, project_path, verbose_macro_warnings,
-                    show_macro_stats, parallel, jobs, use_cache, multi_pass, show_attribution,
-                    no_aggregation, aggregation_method, min_problematic, no_god_object
+                    results,
+                    coverage_file,
+                    semantic_off,
+                    project_path,
+                    verbose_macro_warnings,
+                    show_macro_stats,
+                    parallel,
+                    jobs,
+                    use_cache,
+                    multi_pass,
+                    show_attribution,
+                    no_aggregation,
+                    aggregation_method,
+                    min_problematic,
+                    no_god_object,
                 )?;
-                
+
                 // Cache the computed result
                 if let Err(e) = unified_cache.put(cache_key, analysis_result.clone(), files) {
                     log::warn!("Failed to cache unified analysis: {}", e);
                 }
-                
+
                 return Ok(analysis_result);
             }
         }
     }
-    
+
     // No caching - proceed with direct computation
     perform_unified_analysis_computation(
-        results, coverage_file, semantic_off, project_path, verbose_macro_warnings,
-        show_macro_stats, parallel, jobs, use_cache, multi_pass, show_attribution,
-        no_aggregation, aggregation_method, min_problematic, no_god_object
+        results,
+        coverage_file,
+        semantic_off,
+        project_path,
+        verbose_macro_warnings,
+        show_macro_stats,
+        parallel,
+        jobs,
+        use_cache,
+        multi_pass,
+        show_attribution,
+        no_aggregation,
+        aggregation_method,
+        min_problematic,
+        no_god_object,
     )
 }
 
