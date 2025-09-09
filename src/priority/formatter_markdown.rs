@@ -1,4 +1,6 @@
-use crate::priority::{DebtType, UnifiedAnalysis, UnifiedDebtItem};
+use crate::priority::{
+    DebtItem, DebtType, FileAggregateScore, FileDebtItem, UnifiedAnalysis, UnifiedDebtItem,
+};
 use std::fmt::Write;
 
 /// Format priorities for markdown output without ANSI color codes
@@ -12,13 +14,13 @@ pub fn format_priorities_markdown(
     let version = env!("CARGO_PKG_VERSION");
     writeln!(output, "# Debtmap v{}\n", version).unwrap();
 
-    let top_items = analysis.get_top_priorities(limit);
+    let top_items = analysis.get_top_mixed_priorities(limit);
     let count = top_items.len().min(limit);
 
     writeln!(output, "## Top {} Recommendations\n", count).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
-        format_priority_item_markdown(&mut output, idx + 1, item, verbosity);
+        format_mixed_priority_item_markdown(&mut output, idx + 1, item, verbosity);
         writeln!(output).unwrap();
     }
 
@@ -36,6 +38,234 @@ pub fn format_priorities_markdown(
     }
 
     output
+}
+
+fn format_mixed_priority_item_markdown(
+    output: &mut String,
+    rank: usize,
+    item: &DebtItem,
+    verbosity: u8,
+) {
+    match item {
+        DebtItem::Function(func_item) => {
+            format_priority_item_markdown(output, rank, func_item, verbosity);
+        }
+        DebtItem::File(file_item) => {
+            format_file_priority_item_markdown(output, rank, file_item, verbosity);
+        }
+        DebtItem::FileAggregate(agg_item) => {
+            format_file_aggregate_item_markdown(output, rank, agg_item, verbosity);
+        }
+    }
+}
+
+fn format_file_priority_item_markdown(
+    output: &mut String,
+    rank: usize,
+    item: &FileDebtItem,
+    verbosity: u8,
+) {
+    let severity = get_severity_label(item.score);
+
+    // Determine file type
+    let type_label = if item.metrics.god_object_indicators.is_god_object {
+        "FILE - GOD OBJECT"
+    } else if item.metrics.total_lines > 500 {
+        "FILE - HIGH COMPLEXITY"
+    } else {
+        "FILE"
+    };
+
+    // Header with rank and score
+    writeln!(
+        output,
+        "### #{} - Score: {:.1} [{}]",
+        rank, item.score, severity
+    )
+    .unwrap();
+
+    writeln!(output, "**Type:** {}", type_label).unwrap();
+    writeln!(
+        output,
+        "**File:** `{}` ({} lines, {} functions)",
+        item.metrics.path.display(),
+        item.metrics.total_lines,
+        item.metrics.function_count
+    )
+    .unwrap();
+
+    // God object details if applicable
+    if item.metrics.god_object_indicators.is_god_object {
+        writeln!(output, "**God Object Metrics:**").unwrap();
+        writeln!(
+            output,
+            "- Methods: {}",
+            item.metrics.god_object_indicators.methods_count
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "- Fields: {}",
+            item.metrics.god_object_indicators.fields_count
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "- Responsibilities: {}",
+            item.metrics.god_object_indicators.responsibilities
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "- God Object Score: {:.1}",
+            item.metrics.god_object_indicators.god_object_score
+        )
+        .unwrap();
+    }
+
+    writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
+
+    writeln!(output, "**Impact:** {}", format_file_impact(&item.impact)).unwrap();
+
+    if verbosity >= 1 {
+        writeln!(output, "\n**Scoring Breakdown:**").unwrap();
+        writeln!(
+            output,
+            "- File size: {}",
+            score_category(item.metrics.total_lines)
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "- Functions: {}",
+            function_category(item.metrics.function_count)
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "- Complexity: {}",
+            complexity_category(item.metrics.avg_complexity)
+        )
+        .unwrap();
+        if item.metrics.function_count > 0 {
+            writeln!(
+                output,
+                "- Dependencies: {} functions may have complex interdependencies",
+                item.metrics.function_count
+            )
+            .unwrap();
+        }
+    }
+}
+
+fn format_file_aggregate_item_markdown(
+    output: &mut String,
+    rank: usize,
+    item: &FileAggregateScore,
+    verbosity: u8,
+) {
+    let severity = if item.aggregate_score >= 300.0 {
+        "CRITICAL"
+    } else if item.aggregate_score >= 200.0 {
+        "HIGH"
+    } else if item.aggregate_score >= 100.0 {
+        "MEDIUM"
+    } else {
+        "LOW"
+    };
+
+    // Header with rank and score
+    writeln!(
+        output,
+        "### #{} - Score: {:.1} [{}]",
+        rank, item.aggregate_score, severity
+    )
+    .unwrap();
+
+    writeln!(output, "**Type:** FILE AGGREGATE").unwrap();
+    writeln!(
+        output,
+        "**File:** `{}` ({} functions, total score: {:.1})",
+        item.file_path.display(),
+        item.function_count,
+        item.total_score
+    )
+    .unwrap();
+
+    if item.problematic_functions > 0 {
+        writeln!(
+            output,
+            "**Warning:** {} problematic functions (score > 5.0)",
+            item.problematic_functions
+        )
+        .unwrap();
+    }
+
+    writeln!(output, "\n**Top Issues:**").unwrap();
+    for (func_name, score) in &item.top_function_scores {
+        writeln!(output, "- `{}`: {:.1}", func_name, score).unwrap();
+    }
+
+    writeln!(output, "\n**Action:** Comprehensive refactoring needed").unwrap();
+
+    if verbosity >= 1 {
+        writeln!(
+            output,
+            "\n**Aggregation Method:** {:?}",
+            item.aggregation_method
+        )
+        .unwrap();
+    }
+}
+
+fn score_category(lines: usize) -> &'static str {
+    match lines {
+        0..=200 => "LOW",
+        201..=500 => "MODERATE",
+        501..=1000 => "HIGH",
+        _ => "CRITICAL",
+    }
+}
+
+fn function_category(count: usize) -> &'static str {
+    match count {
+        0..=10 => "LOW",
+        11..=20 => "MODERATE",
+        21..=50 => "HIGH",
+        _ => "EXCESSIVE",
+    }
+}
+
+fn complexity_category(avg: f64) -> &'static str {
+    match avg as usize {
+        0..=5 => "LOW",
+        6..=10 => "MODERATE",
+        11..=20 => "HIGH",
+        _ => "VERY HIGH",
+    }
+}
+
+fn format_file_impact(impact: &crate::priority::FileImpact) -> String {
+    let mut parts = vec![];
+
+    if impact.complexity_reduction > 0.0 {
+        parts.push(format!(
+            "Reduce complexity by {:.0}%",
+            impact.complexity_reduction
+        ));
+    }
+    if impact.test_effort > 0.0 {
+        parts.push(format!("Test effort: {:.1}", impact.test_effort));
+    }
+    if impact.maintainability_improvement > 0.0 {
+        parts.push("Enable parallel development".to_string());
+    }
+
+    if parts.is_empty() {
+        "No measurable impact".to_string()
+    } else {
+        parts.join(", ")
+    }
 }
 
 fn format_priority_item_markdown(

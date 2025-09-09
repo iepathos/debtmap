@@ -276,51 +276,69 @@ fn format_file_aggregate_item(
     config: FormattingConfig,
 ) {
     let formatter = ColoredFormatter::new(config);
+    let severity = if item.aggregate_score >= 300.0 {
+        "CRITICAL"
+    } else if item.aggregate_score >= 200.0 {
+        "HIGH"
+    } else if item.aggregate_score >= 100.0 {
+        "MEDIUM"
+    } else {
+        "LOW"
+    };
+    
+    let severity_color = get_severity_color(item.aggregate_score);
 
+    // Header with rank and score
     writeln!(
         output,
-        "{}. {} FILE AGGREGATE SCORE: {:.1}",
-        rank,
-        formatter.emoji("📁", ""),
-        item.aggregate_score
+        "#{} {} [{}]",
+        rank.to_string().bright_cyan().bold(),
+        format!("SCORE: {}", score_formatter::format_score(item.aggregate_score)).bright_yellow(),
+        format!("{} - FILE AGGREGATE", severity).color(severity_color).bold()
     )
     .unwrap();
 
+    // File path and stats
     writeln!(
         output,
-        "   └─ {} ({} functions, total score: {:.1})",
+        "├─ {} ({} functions, total score: {:.1})",
         item.file_path.display(),
         item.function_count,
         item.total_score
     )
     .unwrap();
 
+    // Problematic functions warning
     if item.problematic_functions > 0 {
         writeln!(
             output,
-            "      {} {} problematic functions (score > {:.1})",
-            formatter.emoji("⚠️", "[WARNING]"),
+            "├─ {} {} problematic functions (score > {:.1})",
+            formatter.emoji("⚠️", "WARNING:"),
             item.problematic_functions,
             5.0
         )
         .unwrap();
     }
 
+    // Top issues
     writeln!(
         output,
-        "      {} Top issues:",
-        formatter.emoji("📊", "[TOP]")
+        "├─ {} Top issues:",
+        formatter.emoji("📊", "METRICS:")
     )
     .unwrap();
 
-    for (func_name, score) in &item.top_function_scores {
-        writeln!(output, "         - {}: {:.1}", func_name, score).unwrap();
+    let issues_count = item.top_function_scores.len();
+    for (i, (func_name, score)) in item.top_function_scores.iter().enumerate() {
+        let prefix = if i == issues_count - 1 { "│  └─" } else { "│  ├─" };
+        writeln!(output, "{} {}: {:.1}", prefix, func_name, score).unwrap();
     }
 
+    // Action
     writeln!(
         output,
-        "      {} ACTION: Comprehensive refactoring needed",
-        formatter.emoji("🔧", "[ACTION]")
+        "└─ {} ACTION: Comprehensive refactoring needed",
+        formatter.emoji("🔧", "FIX:")
     )
     .unwrap();
 }
