@@ -41,6 +41,7 @@ impl PythonCallGraphAnalyzer {
     }
 
     /// Check if a function accepts callbacks
+    #[allow(dead_code)]
     fn is_callback_accepting_function(
         &self,
         func_name: &str,

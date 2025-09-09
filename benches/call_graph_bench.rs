@@ -2,8 +2,9 @@
 //!
 //! This ensures that the refactoring hasn't introduced performance regressions
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use std::hint::black_box;
 use std::path::PathBuf;
 
 fn create_test_graph(size: usize) -> CallGraph {

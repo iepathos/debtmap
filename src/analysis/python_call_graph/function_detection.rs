@@ -175,6 +175,7 @@ impl FunctionLineCollector {
     }
 
     /// Build a nested function name
+    #[allow(dead_code)]
     pub fn build_nested_function_name(&self, nested_name: &str) -> String {
         if let Some(parent) = &self.current_function {
             format!("{}.{}", parent, nested_name)

@@ -45,7 +45,7 @@ pub struct CallGraph {
 /// Internal node representation for a function
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct FunctionNode {
+pub struct FunctionNode {
     pub id: FunctionId,
     pub is_entry_point: bool,
     pub is_test: bool,

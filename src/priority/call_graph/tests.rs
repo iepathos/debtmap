@@ -1,7 +1,7 @@
 //! Unit tests for the call graph module
 
 use super::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn test_call_graph_basic() {
@@ -102,20 +102,20 @@ fn test_find_function_at_location() {
     verify_function_location_finding(&graph, &file, &functions);
 }
 
-fn create_located_functions(file: &PathBuf) -> Vec<FunctionId> {
+fn create_located_functions(file: &Path) -> Vec<FunctionId> {
     vec![
         FunctionId {
-            file: file.clone(),
+            file: file.to_path_buf(),
             name: "function_one".to_string(),
             line: 10,
         },
         FunctionId {
-            file: file.clone(),
+            file: file.to_path_buf(),
             name: "function_two".to_string(),
             line: 30,
         },
         FunctionId {
-            file: file.clone(),
+            file: file.to_path_buf(),
             name: "function_three".to_string(),
             line: 50,
         },
@@ -301,8 +301,8 @@ fn verify_multi_level_callers(graph: &CallGraph, chain: &[FunctionId]) {
     // Get all transitive callers of d with max_depth 3
     let callers = graph.get_transitive_callers(&chain[3], 3);
     assert_eq!(callers.len(), 3);
-    for i in 0..3 {
-        assert!(callers.contains(&chain[i]));
+    for node in chain.iter().take(3) {
+        assert!(callers.contains(node));
     }
 
     // Test with limited depth
@@ -406,7 +406,7 @@ fn create_complex_graph_nodes() -> Vec<FunctionId> {
     (0..6)
         .map(|i| FunctionId {
             file: PathBuf::from("test.rs"),
-            name: format!("func_{}", ('a' as u8 + i) as char),
+            name: format!("func_{}", (b'a' + i) as char),
             line: i as usize * 10 + 1,
         })
         .collect()
@@ -441,8 +441,8 @@ fn verify_complex_graph_callers(graph: &CallGraph, nodes: &[FunctionId]) {
     // Test transitive callers of f
     let callers_f = graph.get_transitive_callers(&nodes[5], 10);
     assert_eq!(callers_f.len(), 5); // All except f itself
-    for i in 0..5 {
-        assert!(callers_f.contains(&nodes[i]));
+    for node in nodes.iter().take(5) {
+        assert!(callers_f.contains(node));
     }
 
     // Test with limited depth
@@ -452,8 +452,6 @@ fn verify_complex_graph_callers(graph: &CallGraph, nodes: &[FunctionId]) {
 
 #[test]
 fn test_call_graph_serialization_roundtrip() {
-    use serde_json;
-
     let mut graph = CallGraph::new();
     let (func1, func2) = create_serialization_test_functions();
 

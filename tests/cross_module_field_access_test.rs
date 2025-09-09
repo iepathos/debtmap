@@ -120,19 +120,19 @@ fn parse_and_extract_call_graph(
 
 fn find_analyze_file_function(
     call_graph: &debtmap::priority::call_graph::CallGraph,
-) -> &debtmap::priority::call_graph::FunctionId {
+) -> debtmap::priority::call_graph::FunctionId {
     let all_functions = call_graph.find_all_functions();
     all_functions
-        .iter()
+        .into_iter()
         .find(|f| f.name.contains("analyze_file"))
         .expect("Should find analyze_file function")
 }
 
 fn verify_analyze_file_has_callers(
     call_graph: &debtmap::priority::call_graph::CallGraph,
-    analyze_file: &debtmap::priority::call_graph::FunctionId,
+    analyze_file: debtmap::priority::call_graph::FunctionId,
 ) {
-    let callers = call_graph.get_callers(analyze_file);
+    let callers = call_graph.get_callers(&analyze_file);
     assert!(
         !callers.is_empty(),
         "FrameworkPatternDetector::analyze_file should have callers from RustCallGraphBuilder::analyze_framework_patterns"
@@ -298,9 +298,9 @@ fn test_cross_module_with_actual_imports() {
     debug_print_functions(&call_graph);
 
     let analyze_file = find_analyze_file_function(&call_graph);
-    let callers = call_graph.get_callers(analyze_file);
+    let callers = call_graph.get_callers(&analyze_file);
 
-    debug_print_analyze_file_info(analyze_file, &callers);
+    debug_print_analyze_file_info(&analyze_file, &callers);
 
     assert!(
         !callers.is_empty(),
@@ -393,19 +393,19 @@ fn parse_three_modules(
 
 fn find_process_function(
     call_graph: &debtmap::priority::call_graph::CallGraph,
-) -> &debtmap::priority::call_graph::FunctionId {
+) -> debtmap::priority::call_graph::FunctionId {
     let all_functions = call_graph.find_all_functions();
     all_functions
-        .iter()
+        .into_iter()
         .find(|f| f.name.contains("DeepType::process"))
         .expect("Should find DeepType::process")
 }
 
 fn verify_process_has_callers(
     call_graph: &debtmap::priority::call_graph::CallGraph,
-    process_func: &debtmap::priority::call_graph::FunctionId,
+    process_func: debtmap::priority::call_graph::FunctionId,
 ) {
-    let callers = call_graph.get_callers(process_func);
+    let callers = call_graph.get_callers(&process_func);
     assert!(
         !callers.is_empty(),
         "DeepType::process should have callers through the cross-module field access chain"
