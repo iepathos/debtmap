@@ -1,5 +1,5 @@
 # Sequential workflow. Fix top technical item
-- shell: "just builid-release"
+- shell: "just build-release"
 
 - shell: "just coverage-lcov"
 
