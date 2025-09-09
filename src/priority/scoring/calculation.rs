@@ -1,4 +1,4 @@
-// Pure functions for scoring calculation (spec 68)
+// Pure functions for scoring calculation (spec 68, spec 101)
 
 /// Calculate coverage factor from coverage percentage
 pub fn calculate_coverage_factor(coverage_pct: f64) -> f64 {
@@ -72,34 +72,77 @@ pub fn apply_interaction_bonus(base_score: f64, coverage_pct: f64, raw_complexit
     }
 }
 
-/// Normalize final score to 0-10 range with better distribution
-pub fn normalize_final_score(raw_score: f64) -> f64 {
-    // Improved normalization for better score distribution (fixing spec 68)
-    // Raw scores are typically 0.01-2.0, so we need better granularity
+/// Structure to hold normalized score with metadata
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct NormalizedScore {
+    pub raw: f64,
+    pub normalized: f64,
+    pub scaling_method: ScalingMethod,
+}
 
-    if raw_score <= 0.01 {
-        0.0 // Trivial or fully tested
-    } else if raw_score <= 0.1 {
-        // Very low scores: map to 0-2 range
-        raw_score * 20.0 // 0.01-0.1 -> 0.2-2.0
-    } else if raw_score <= 0.3 {
-        // Low scores: map to 2-4 range
-        2.0 + (raw_score - 0.1) * 10.0 // 0.1-0.3 -> 2.0-4.0
-    } else if raw_score <= 0.6 {
-        // Medium scores: map to 4-6 range
-        4.0 + (raw_score - 0.3) * 6.67 // 0.3-0.6 -> 4.0-6.0
-    } else if raw_score <= 1.0 {
-        // Medium-high scores: map to 6-8 range
-        6.0 + (raw_score - 0.6) * 5.0 // 0.6-1.0 -> 6.0-8.0
-    } else if raw_score <= 2.0 {
-        // High scores: map to 8-9.5 range
-        8.0 + (raw_score - 1.0) * 1.5 // 1.0-2.0 -> 8.0-9.5
-    } else if raw_score <= 10.0 {
-        // Very high scores: keep existing scaling
-        9.5 + (raw_score - 2.0) * 0.25
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ScalingMethod {
+    Linear,      // 0-10
+    SquareRoot,  // 10-100
+    Logarithmic, // 100+
+}
+
+fn determine_scaling_method(score: f64) -> ScalingMethod {
+    if score <= 10.0 {
+        ScalingMethod::Linear
+    } else if score <= 100.0 {
+        ScalingMethod::SquareRoot
     } else {
-        // Extreme scores: use square root scaling for gradual increase
-        10.0 + (raw_score - 10.0).sqrt()
+        ScalingMethod::Logarithmic
+    }
+}
+
+/// Normalize final score with logarithmic scaling for high scores
+pub fn normalize_final_score_with_metadata(raw_score: f64) -> NormalizedScore {
+    let normalized = if raw_score <= 0.0 {
+        0.0
+    } else if raw_score < 10.0 {
+        // Linear scaling for low scores (unchanged)
+        raw_score
+    } else if raw_score < 100.0 {
+        // Square root scaling for medium scores
+        // Maps 10-100 to 10-40 range (approximately)
+        10.0 + (raw_score - 10.0).sqrt() * 3.33
+    } else {
+        // Logarithmic scaling for high scores
+        // Maps 100+ to 40+ range with slow growth
+        // Adjusted to ensure continuity at 100: sqrt(90) * 3.33 + 10 ≈ 41.59
+        41.59 + (raw_score / 100.0).ln() * 10.0
+    };
+    
+    NormalizedScore {
+        raw: raw_score,
+        normalized,
+        scaling_method: determine_scaling_method(raw_score),
+    }
+}
+
+/// Normalize final score to a simple f64 (backwards compatibility)
+pub fn normalize_final_score(raw_score: f64) -> f64 {
+    normalize_final_score_with_metadata(raw_score).normalized
+}
+
+/// Inverse normalization function for interpretation
+pub fn denormalize_score(normalized: f64) -> f64 {
+    if normalized <= 0.0 {
+        0.0
+    } else if normalized < 10.0 {
+        // Linear range
+        normalized
+    } else if normalized < 41.59 {
+        // Square root range (inverse)
+        let adjusted = (normalized - 10.0) / 3.33;
+        10.0 + adjusted.powf(2.0)
+    } else {
+        // Logarithmic range (inverse)
+        // Adjusted for continuity at 100
+        let log_component = (normalized - 41.59) / 10.0;
+        100.0 * log_component.exp()
     }
 }
 
@@ -188,14 +231,68 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_final_score_ranges() {
-        // Test each range boundary
-        assert_eq!(normalize_final_score(0.005), 0.0);
-        assert_eq!(normalize_final_score(0.04), 0.8); // 0.04 * 20 = 0.8
-        assert!((normalize_final_score(0.1) - 2.0).abs() < 0.01); // 0.1 is boundary -> 2.0
-        assert!((normalize_final_score(0.4) - 4.667).abs() < 0.01); // 4.0 + (0.4-0.3)*6.67 = ~4.667
-        assert!((normalize_final_score(1.5) - 8.75).abs() < 0.01); // 8.0 + (1.5-1.0)*1.5 = 8.75
-                                                                   // With no cap, 5.0 raw score: 9.5 + (5.0-2.0)*0.25 = 10.25
-        assert!((normalize_final_score(5.0) - 10.25).abs() < 0.01);
+    fn test_normalization_continuity() {
+        // Test continuity at transition points
+        // Note: Some small discontinuity is expected at transition boundaries
+        let eps = 0.001;
+        
+        // At 10.0 transition
+        let below_10 = normalize_final_score(10.0 - eps);
+        let at_10 = normalize_final_score(10.0);
+        let above_10 = normalize_final_score(10.0 + eps);
+        assert!((at_10 - below_10).abs() < 0.01);
+        // Small jump expected here due to sqrt function starting
+        assert!((above_10 - at_10).abs() < 0.11);
+        
+        // At 100.0 transition
+        let below_100 = normalize_final_score(100.0 - eps);
+        let at_100 = normalize_final_score(100.0);
+        let above_100 = normalize_final_score(100.0 + eps);
+        assert!((at_100 - below_100).abs() < 0.01);
+        assert!((above_100 - at_100).abs() < 0.01);
+    }
+    
+    #[test]
+    fn test_normalization_monotonic() {
+        // Verify ordering is preserved
+        let scores = vec![1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0];
+        let normalized: Vec<_> = scores.iter()
+            .map(|&s| normalize_final_score(s))
+            .collect();
+        
+        for i in 1..normalized.len() {
+            assert!(normalized[i] > normalized[i-1]);
+        }
+    }
+    
+    #[test]
+    fn test_inverse_function() {
+        let test_scores = vec![5.0, 15.0, 50.0, 150.0, 500.0];
+        
+        for score in test_scores {
+            let normalized = normalize_final_score(score);
+            let denormalized = denormalize_score(normalized);
+            assert!((denormalized - score).abs() < 0.1);
+        }
+    }
+
+    #[test]
+    fn test_normalization_ranges() {
+        // Test that normalized scores fall within expected ranges
+        assert!(normalize_final_score(5.0) <= 10.0);   // Linear range
+        assert!(normalize_final_score(50.0) > 10.0 && normalize_final_score(50.0) <= 40.0);  // Square root range
+        assert!(normalize_final_score(200.0) > 40.0);  // Logarithmic range
+    }
+
+    #[test]
+    fn test_scaling_method_detection() {
+        let score1 = normalize_final_score_with_metadata(5.0);
+        assert_eq!(score1.scaling_method, ScalingMethod::Linear);
+        
+        let score2 = normalize_final_score_with_metadata(50.0);
+        assert_eq!(score2.scaling_method, ScalingMethod::SquareRoot);
+        
+        let score3 = normalize_final_score_with_metadata(200.0);
+        assert_eq!(score3.scaling_method, ScalingMethod::Logarithmic);
     }
 }
