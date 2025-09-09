@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 fn create_test_graph(size: usize) -> CallGraph {
     let mut graph = CallGraph::new();
-    
+
     // Create functions
     for i in 0..size {
         let func_id = FunctionId {
@@ -18,7 +18,7 @@ fn create_test_graph(size: usize) -> CallGraph {
         };
         graph.add_function(func_id, i == 0, false, (i % 10) as u32, i * 5);
     }
-    
+
     // Create call relationships
     for i in 0..size - 1 {
         let caller = FunctionId {
@@ -37,7 +37,7 @@ fn create_test_graph(size: usize) -> CallGraph {
             call_type: CallType::Direct,
         });
     }
-    
+
     graph
 }
 
@@ -86,7 +86,7 @@ fn bench_get_callees(c: &mut Criterion) {
         name: "func_0".to_string(),
         line: 0,
     };
-    
+
     c.bench_function("get_callees", |b| {
         b.iter(|| {
             graph.get_callees(black_box(&func_id));
@@ -101,13 +101,13 @@ fn bench_transitive_callees(c: &mut Criterion) {
         name: "func_0".to_string(),
         line: 0,
     };
-    
+
     c.bench_function("get_transitive_callees_depth_3", |b| {
         b.iter(|| {
             graph.get_transitive_callees(black_box(&func_id), 3);
         });
     });
-    
+
     c.bench_function("get_transitive_callees_depth_10", |b| {
         b.iter(|| {
             graph.get_transitive_callees(black_box(&func_id), 10);
@@ -122,7 +122,7 @@ fn bench_criticality_calculation(c: &mut Criterion) {
         name: "func_50".to_string(),
         line: 500,
     };
-    
+
     c.bench_function("calculate_criticality", |b| {
         b.iter(|| {
             graph.calculate_criticality(black_box(&func_id));
@@ -137,7 +137,7 @@ fn bench_delegation_detection(c: &mut Criterion) {
         name: "func_20".to_string(),
         line: 200,
     };
-    
+
     c.bench_function("detect_delegation_pattern", |b| {
         b.iter(|| {
             graph.detect_delegation_pattern(black_box(&func_id));

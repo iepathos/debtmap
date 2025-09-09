@@ -7,10 +7,10 @@ use std::path::PathBuf;
 fn test_call_graph_basic() {
     let mut graph = CallGraph::new();
     let (main_id, helper_id) = create_test_functions();
-    
+
     add_functions_to_graph(&mut graph, &main_id, &helper_id);
     add_call_edge(&mut graph, &main_id, &helper_id);
-    
+
     verify_basic_graph_properties(&graph, &main_id, &helper_id);
 }
 
@@ -52,7 +52,7 @@ fn verify_basic_graph_properties(graph: &CallGraph, main_id: &FunctionId, helper
 fn test_transitive_dependencies() {
     let mut graph = CallGraph::new();
     let (a, b, c) = create_chain_functions();
-    
+
     add_chain_to_graph(&mut graph, &a, &b, &c);
     verify_transitive_callees(&graph, &a, &b, &c);
 }
@@ -80,7 +80,7 @@ fn add_chain_to_graph(graph: &mut CallGraph, a: &FunctionId, b: &FunctionId, c: 
     graph.add_function(a.clone(), true, false, 1, 10);
     graph.add_function(b.clone(), false, false, 2, 20);
     graph.add_function(c.clone(), false, false, 3, 30);
-    
+
     add_call_edge(graph, a, b);
     add_call_edge(graph, b, c);
 }
@@ -97,7 +97,7 @@ fn test_find_function_at_location() {
     let mut graph = CallGraph::new();
     let file = PathBuf::from("test.rs");
     let functions = create_located_functions(&file);
-    
+
     add_located_functions(&mut graph, &functions);
     verify_function_location_finding(&graph, &file, &functions);
 }
@@ -131,20 +131,29 @@ fn add_located_functions(graph: &mut CallGraph, functions: &[FunctionId]) {
 fn verify_function_location_finding(graph: &CallGraph, file: &PathBuf, _functions: &[FunctionId]) {
     // Test exact line numbers
     assert_eq!(
-        graph.find_function_at_location(file, 10).as_ref().map(|f| &f.name),
+        graph
+            .find_function_at_location(file, 10)
+            .as_ref()
+            .map(|f| &f.name),
         Some(&"function_one".to_string())
     );
     assert_eq!(
-        graph.find_function_at_location(file, 30).as_ref().map(|f| &f.name),
+        graph
+            .find_function_at_location(file, 30)
+            .as_ref()
+            .map(|f| &f.name),
         Some(&"function_two".to_string())
     );
-    
+
     // Test within range
     assert_eq!(
-        graph.find_function_at_location(file, 35).as_ref().map(|f| &f.name),
+        graph
+            .find_function_at_location(file, 35)
+            .as_ref()
+            .map(|f| &f.name),
         Some(&"function_two".to_string())
     );
-    
+
     // Test before any function
     assert_eq!(graph.find_function_at_location(file, 5), None);
 }
@@ -153,7 +162,7 @@ fn verify_function_location_finding(graph: &CallGraph, file: &PathBuf, _function
 fn test_delegation_detection() {
     let mut graph = CallGraph::new();
     let (orchestrator, workers) = create_delegation_setup();
-    
+
     setup_delegation_graph(&mut graph, &orchestrator, &workers);
     assert!(graph.detect_delegation_pattern(&orchestrator));
 }
@@ -179,11 +188,15 @@ fn create_delegation_setup() -> (FunctionId, Vec<FunctionId>) {
     (orchestrator, workers)
 }
 
-fn setup_delegation_graph(graph: &mut CallGraph, orchestrator: &FunctionId, workers: &[FunctionId]) {
+fn setup_delegation_graph(
+    graph: &mut CallGraph,
+    orchestrator: &FunctionId,
+    workers: &[FunctionId],
+) {
     graph.add_function(orchestrator.clone(), false, false, 2, 15);
     graph.add_function(workers[0].clone(), false, false, 10, 50);
     graph.add_function(workers[1].clone(), false, false, 8, 40);
-    
+
     for worker in workers {
         graph.add_call(FunctionCall {
             caller: orchestrator.clone(),
@@ -197,7 +210,7 @@ fn setup_delegation_graph(graph: &mut CallGraph, orchestrator: &FunctionId, work
 fn test_get_transitive_callers_single_level() {
     let mut graph = CallGraph::new();
     let functions = create_caller_test_functions();
-    
+
     setup_single_level_callers(&mut graph, &functions);
     verify_single_level_callers(&graph, &functions);
 }
@@ -226,7 +239,7 @@ fn setup_single_level_callers(graph: &mut CallGraph, funcs: &[FunctionId]) {
     for func in funcs {
         graph.add_function(func.clone(), false, false, 1, 10);
     }
-    
+
     // a -> b, c -> b (b has two callers)
     add_call_edge(graph, &funcs[0], &funcs[1]);
     add_call_edge(graph, &funcs[2], &funcs[1]);
@@ -243,7 +256,7 @@ fn verify_single_level_callers(graph: &CallGraph, funcs: &[FunctionId]) {
 fn test_get_transitive_callers_multi_level() {
     let mut graph = CallGraph::new();
     let chain = create_caller_chain();
-    
+
     setup_caller_chain(&mut graph, &chain);
     verify_multi_level_callers(&graph, &chain);
 }
@@ -277,10 +290,10 @@ fn setup_caller_chain(graph: &mut CallGraph, chain: &[FunctionId]) {
     for func in chain {
         graph.add_function(func.clone(), false, false, 1, 10);
     }
-    
+
     // a -> b -> c -> d (chain of calls)
-    for i in 0..chain.len()-1 {
-        add_call_edge(graph, &chain[i], &chain[i+1]);
+    for i in 0..chain.len() - 1 {
+        add_call_edge(graph, &chain[i], &chain[i + 1]);
     }
 }
 
@@ -291,7 +304,7 @@ fn verify_multi_level_callers(graph: &CallGraph, chain: &[FunctionId]) {
     for i in 0..3 {
         assert!(callers.contains(&chain[i]));
     }
-    
+
     // Test with limited depth
     let callers_depth_1 = graph.get_transitive_callers(&chain[3], 1);
     assert_eq!(callers_depth_1.len(), 1);
@@ -302,7 +315,7 @@ fn verify_multi_level_callers(graph: &CallGraph, chain: &[FunctionId]) {
 fn test_get_transitive_callers_with_cycles() {
     let mut graph = CallGraph::new();
     let cycle = create_cycle_functions();
-    
+
     setup_cycle_graph(&mut graph, &cycle);
     verify_cycle_handling(&graph, &cycle);
 }
@@ -331,7 +344,7 @@ fn setup_cycle_graph(graph: &mut CallGraph, funcs: &[FunctionId]) {
     for func in funcs {
         graph.add_function(func.clone(), false, false, 1, 10);
     }
-    
+
     // Create a cycle: a -> b -> c -> a
     add_call_edge(graph, &funcs[0], &funcs[1]);
     add_call_edge(graph, &funcs[1], &funcs[2]);
@@ -350,7 +363,7 @@ fn verify_cycle_handling(graph: &CallGraph, funcs: &[FunctionId]) {
 fn test_get_transitive_callers_no_callers() {
     let mut graph = CallGraph::new();
     let (a, b) = create_simple_pair();
-    
+
     setup_simple_graph(&mut graph, &a, &b);
     verify_no_callers(&graph, &a);
 }
@@ -384,24 +397,26 @@ fn verify_no_callers(graph: &CallGraph, func: &FunctionId) {
 fn test_get_transitive_callers_complex_graph() {
     let mut graph = CallGraph::new();
     let nodes = create_complex_graph_nodes();
-    
+
     setup_complex_graph(&mut graph, &nodes);
     verify_complex_graph_callers(&graph, &nodes);
 }
 
 fn create_complex_graph_nodes() -> Vec<FunctionId> {
-    (0..6).map(|i| FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: format!("func_{}", ('a' as u8 + i) as char),
-        line: i as usize * 10 + 1,
-    }).collect()
+    (0..6)
+        .map(|i| FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: format!("func_{}", ('a' as u8 + i) as char),
+            line: i as usize * 10 + 1,
+        })
+        .collect()
 }
 
 fn setup_complex_graph(graph: &mut CallGraph, nodes: &[FunctionId]) {
     for node in nodes {
         graph.add_function(node.clone(), false, false, 1, 10);
     }
-    
+
     // Create complex structure:
     //      a
     //     / \
@@ -429,7 +444,7 @@ fn verify_complex_graph_callers(graph: &CallGraph, nodes: &[FunctionId]) {
     for i in 0..5 {
         assert!(callers_f.contains(&nodes[i]));
     }
-    
+
     // Test with limited depth
     let callers_f_depth_2 = graph.get_transitive_callers(&nodes[5], 2);
     assert_eq!(callers_f_depth_2.len(), 4); // d, e, b, c
@@ -438,10 +453,10 @@ fn verify_complex_graph_callers(graph: &CallGraph, nodes: &[FunctionId]) {
 #[test]
 fn test_call_graph_serialization_roundtrip() {
     use serde_json;
-    
+
     let mut graph = CallGraph::new();
     let (func1, func2) = create_serialization_test_functions();
-    
+
     setup_serialization_graph(&mut graph, &func1, &func2);
     verify_serialization_roundtrip(&graph, &func1, &func2);
 }
@@ -469,7 +484,7 @@ fn setup_serialization_graph(graph: &mut CallGraph, func1: &FunctionId, func2: &
 fn verify_serialization_roundtrip(graph: &CallGraph, func1: &FunctionId, func2: &FunctionId) {
     let json = serde_json::to_string(graph).unwrap();
     let deserialized: CallGraph = serde_json::from_str(&json).unwrap();
-    
+
     assert_eq!(deserialized.get_callees(func1).len(), 1);
     assert_eq!(deserialized.get_callers(func2).len(), 1);
     assert!(deserialized.is_entry_point(func1));
@@ -549,13 +564,13 @@ fn test_select_best_cross_file_match() {
 fn verify_single_candidate_selection() {
     let caller_file = PathBuf::from("src/caller.rs");
     let other_file = PathBuf::from("src/other.rs");
-    
+
     let single_candidate = vec![FunctionId {
         file: other_file.clone(),
         name: "test_func".to_string(),
         line: 10,
     }];
-    
+
     let result = CallGraph::select_best_cross_file_match(
         single_candidate.clone(),
         &caller_file,
@@ -569,7 +584,7 @@ fn verify_exact_match_preference() {
     let caller_file = PathBuf::from("src/caller.rs");
     let other_file = PathBuf::from("src/other.rs");
     let third_file = PathBuf::from("src/third.rs");
-    
+
     let candidates = vec![
         FunctionId {
             file: other_file.clone(),
@@ -582,7 +597,7 @@ fn verify_exact_match_preference() {
             line: 20,
         },
     ];
-    
+
     let result = CallGraph::select_best_cross_file_match(candidates, &caller_file, "test_func");
     assert!(result.is_some());
     assert_eq!(result.unwrap().name, "test_func");
@@ -592,7 +607,7 @@ fn verify_qualification_preference() {
     let caller_file = PathBuf::from("src/caller.rs");
     let other_file = PathBuf::from("src/other.rs");
     let third_file = PathBuf::from("src/third.rs");
-    
+
     let candidates = vec![
         FunctionId {
             file: other_file.clone(),
@@ -605,7 +620,7 @@ fn verify_qualification_preference() {
             line: 20,
         },
     ];
-    
+
     let result = CallGraph::select_best_cross_file_match(candidates, &caller_file, "method");
     assert!(result.is_some());
     assert_eq!(result.unwrap().name, "MyStruct::method");
@@ -615,7 +630,7 @@ fn verify_qualification_preference() {
 fn test_is_test_helper_detection() {
     let mut graph = CallGraph::new();
     let functions = create_test_helper_setup();
-    
+
     setup_test_helper_graph(&mut graph, &functions);
     verify_test_helper_detection(&graph, &functions);
 }
@@ -652,16 +667,16 @@ fn create_test_helper_setup() -> Vec<FunctionId> {
 
 fn setup_test_helper_graph(graph: &mut CallGraph, funcs: &[FunctionId]) {
     // Add functions to graph
-    graph.add_function(funcs[0].clone(), false, true, 3, 20);  // test_something
-    graph.add_function(funcs[1].clone(), false, true, 4, 25);  // test_another
+    graph.add_function(funcs[0].clone(), false, true, 3, 20); // test_something
+    graph.add_function(funcs[1].clone(), false, true, 4, 25); // test_another
     graph.add_function(funcs[2].clone(), false, false, 5, 30); // validate_initial_state
     graph.add_function(funcs[3].clone(), false, false, 6, 40); // process_data
-    graph.add_function(funcs[4].clone(), true, false, 2, 15);  // main
-    
+    graph.add_function(funcs[4].clone(), true, false, 2, 15); // main
+
     // Test functions call the helper
     add_call_edge(graph, &funcs[0], &funcs[2]);
     add_call_edge(graph, &funcs[1], &funcs[2]);
-    
+
     // Main calls regular_func
     add_call_edge(graph, &funcs[4], &funcs[3]);
 }

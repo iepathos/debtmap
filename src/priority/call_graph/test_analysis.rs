@@ -63,7 +63,7 @@ impl CallGraph {
         let test_functions = Self::collect_test_functions(&self.nodes);
         let reachable_from_tests = self.find_functions_reachable_from_tests(&test_functions);
         let reachable_from_production = self.find_functions_reachable_from_production();
-        
+
         Self::filter_test_only_functions(
             reachable_from_tests,
             &reachable_from_production,

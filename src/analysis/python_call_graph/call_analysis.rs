@@ -9,7 +9,9 @@ use rustpython_parser::ast;
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::callback_patterns::{extract_call_target, find_callback_position, get_callback_argument, get_callback_patterns};
+use super::callback_patterns::{
+    extract_call_target, find_callback_position, get_callback_argument, get_callback_patterns,
+};
 use super::event_tracking::EventTracker;
 
 /// Core call analysis functionality
@@ -61,7 +63,11 @@ impl<'a> CallAnalyzer<'a> {
                 if let ast::Expr::Name(name) = &*attr_expr.value {
                     if name.id.as_str() == "self" || name.id.as_str() == "cls" {
                         // This is a method reference, track it if it's called
-                        let event_tracker = EventTracker::new(self.current_class, self.current_function, self.function_lines);
+                        let event_tracker = EventTracker::new(
+                            self.current_class,
+                            self.current_function,
+                            self.function_lines,
+                        );
                         event_tracker.track_method_reference(attr_expr, file_path, call_graph)?;
                     }
                 }
@@ -86,14 +92,26 @@ impl<'a> CallAnalyzer<'a> {
             if let ast::Expr::Name(name) = &*attr_expr.value {
                 if name.id.as_str() == "self" || name.id.as_str() == "cls" {
                     // This is an instance/class method call
-                    let event_tracker = EventTracker::new(self.current_class, self.current_function, self.function_lines);
-                    event_tracker.add_instance_method_call(&attr_expr.attr, file_path, call_graph)?;
+                    let event_tracker = EventTracker::new(
+                        self.current_class,
+                        self.current_function,
+                        self.function_lines,
+                    );
+                    event_tracker.add_instance_method_call(
+                        &attr_expr.attr,
+                        file_path,
+                        call_graph,
+                    )?;
                 }
             }
         }
 
         // Check for event handler binding patterns like obj.Bind(event, self.method)
-        let event_tracker = EventTracker::new(self.current_class, self.current_function, self.function_lines);
+        let event_tracker = EventTracker::new(
+            self.current_class,
+            self.current_function,
+            self.function_lines,
+        );
         event_tracker.check_for_event_binding(call_expr, file_path, call_graph)?;
 
         // Check for callback patterns like wx.CallAfter(nested_func, ...)
@@ -148,8 +166,16 @@ impl<'a> CallAnalyzer<'a> {
                 if let ast::Expr::Name(obj_name) = &*attr_expr.value {
                     if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" {
                         // This is a method reference passed as callback
-                        let event_tracker = EventTracker::new(self.current_class, self.current_function, self.function_lines);
-                        event_tracker.add_event_handler_reference(&attr_expr.attr, file_path, call_graph)?;
+                        let event_tracker = EventTracker::new(
+                            self.current_class,
+                            self.current_function,
+                            self.function_lines,
+                        );
+                        event_tracker.add_event_handler_reference(
+                            &attr_expr.attr,
+                            file_path,
+                            call_graph,
+                        )?;
                     }
                 }
             }
@@ -256,7 +282,9 @@ pub fn extract_while_stmt_body(while_stmt: &ast::StmtWhile) -> &[ast::Stmt] {
 }
 
 /// Pure function to extract all statement bodies from try block
-pub fn extract_try_stmt_bodies(try_stmt: &ast::StmtTry) -> (Vec<&[ast::Stmt]>, &[ast::Stmt], &[ast::Stmt]) {
+pub fn extract_try_stmt_bodies(
+    try_stmt: &ast::StmtTry,
+) -> (Vec<&[ast::Stmt]>, &[ast::Stmt], &[ast::Stmt]) {
     let mut handler_bodies = Vec::new();
     for handler in &try_stmt.handlers {
         let ast::ExceptHandler::ExceptHandler(h) = handler;
@@ -319,10 +347,18 @@ impl<'a> StatementAnalyzer<'a> {
     ) -> Result<()> {
         match stmt {
             ast::Stmt::Expr(expr_stmt) => {
-                self.call_analyzer.analyze_expr_for_calls(&expr_stmt.value, file_path, call_graph)?;
+                self.call_analyzer.analyze_expr_for_calls(
+                    &expr_stmt.value,
+                    file_path,
+                    call_graph,
+                )?;
             }
             ast::Stmt::Assign(assign_stmt) => {
-                self.call_analyzer.analyze_expr_for_calls(&assign_stmt.value, file_path, call_graph)?;
+                self.call_analyzer.analyze_expr_for_calls(
+                    &assign_stmt.value,
+                    file_path,
+                    call_graph,
+                )?;
             }
             ast::Stmt::With(with_stmt) => {
                 self.analyze_with_stmt(with_stmt, file_path, call_graph)?;
@@ -359,7 +395,8 @@ impl<'a> StatementAnalyzer<'a> {
     ) -> Result<()> {
         for item in items {
             if let ast::Expr::Call(call_expr) = &item.context_expr {
-                self.call_analyzer.analyze_call_expr(call_expr, file_path, call_graph)?;
+                self.call_analyzer
+                    .analyze_call_expr(call_expr, file_path, call_graph)?;
             }
         }
         Ok(())

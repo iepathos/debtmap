@@ -12,15 +12,15 @@ use std::path::Path;
 /// Pure function to get known event binding methods
 pub fn get_event_binding_methods() -> &'static [&'static str] {
     &[
-        "Bind",           // wxPython: obj.Bind(wx.EVT_PAINT, self.on_paint)
-        "bind",           // Tkinter: widget.bind("<Button-1>", self.on_click)
-        "connect",        // PyQt/PySide: signal.connect(self.slot)
-        "on",             // Some frameworks
+        "Bind",             // wxPython: obj.Bind(wx.EVT_PAINT, self.on_paint)
+        "bind",             // Tkinter: widget.bind("<Button-1>", self.on_click)
+        "connect",          // PyQt/PySide: signal.connect(self.slot)
+        "on",               // Some frameworks
         "addEventListener", // Web frameworks
-        "addListener",    // Event systems
-        "subscribe",      // Observer patterns
-        "observe",        // Observer patterns
-        "listen",         // Event systems
+        "addListener",      // Event systems
+        "subscribe",        // Observer patterns
+        "observe",          // Observer patterns
+        "listen",           // Event systems
     ]
 }
 
@@ -40,14 +40,14 @@ pub fn extract_method_name_from_call(call_expr: &ast::ExprCall) -> Option<&str> 
 /// Pure function to check if argument is a self/cls method reference
 pub fn is_self_or_cls_method_reference(arg: &ast::Expr) -> Option<&str> {
     match arg {
-        ast::Expr::Attribute(handler_attr) => {
-            match &*handler_attr.value {
-                ast::Expr::Name(obj_name) if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" => {
-                    Some(&handler_attr.attr)
-                }
-                _ => None,
+        ast::Expr::Attribute(handler_attr) => match &*handler_attr.value {
+            ast::Expr::Name(obj_name)
+                if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" =>
+            {
+                Some(&handler_attr.attr)
             }
-        }
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -105,8 +105,7 @@ impl<'a> EventTracker<'a> {
         file_path: &Path,
         call_graph: &mut CallGraph,
     ) -> Result<()> {
-        if let (Some(class_name), Some(caller_name)) = (self.current_class, self.current_function)
-        {
+        if let (Some(class_name), Some(caller_name)) = (self.current_class, self.current_function) {
             let handler_name = format!("{}.{}", class_name, method_name);
 
             // Use the actual line numbers we collected, or fall back to 0
@@ -145,8 +144,7 @@ impl<'a> EventTracker<'a> {
         file_path: &Path,
         call_graph: &mut CallGraph,
     ) -> Result<()> {
-        if let (Some(class_name), Some(caller_name)) = (self.current_class, self.current_function)
-        {
+        if let (Some(class_name), Some(caller_name)) = (self.current_class, self.current_function) {
             let callee_name = format!("{}.{}", class_name, method_name);
 
             // Use the actual line numbers we collected, or fall back to 0

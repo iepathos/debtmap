@@ -79,7 +79,7 @@ impl FunctionLineCollector {
         class_context: Option<&str>,
     ) {
         let lines: Vec<&str> = source.lines().collect();
-        
+
         for stmt in stmts {
             self.process_single_statement(stmt, &lines, source, class_context);
         }

@@ -19,7 +19,7 @@ impl CallGraph {
             .filter_map(|id| nodes.get(id))
             .map(|n| n.complexity as f64)
             .sum();
-        
+
         total_complexity / callees.len().max(1) as f64
     }
 
@@ -32,14 +32,15 @@ impl CallGraph {
         let Some(node) = self.nodes.get(func_id) else {
             return false;
         };
-        
+
         let callees = self.get_callees(func_id);
-        
+
         if !Self::meets_delegation_criteria(node.complexity, callees.len()) {
             return false;
         }
-        
-        let avg_callee_complexity = Self::calculate_average_callee_complexity(&callees, &self.nodes);
+
+        let avg_callee_complexity =
+            Self::calculate_average_callee_complexity(&callees, &self.nodes);
         Self::indicates_delegation(node.complexity, avg_callee_complexity)
     }
 }

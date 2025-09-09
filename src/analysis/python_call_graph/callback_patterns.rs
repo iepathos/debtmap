@@ -110,11 +110,13 @@ fn create_generic_patterns() -> Vec<CallbackPattern> {
 
 /// Get callback patterns for a given function name
 pub fn get_callback_patterns() -> Vec<CallbackPattern> {
-    [create_wx_python_patterns(),
-     create_asyncio_patterns(),
-     create_threading_patterns(),
-     create_multiprocessing_patterns(),
-     create_generic_patterns()]
+    [
+        create_wx_python_patterns(),
+        create_asyncio_patterns(),
+        create_threading_patterns(),
+        create_multiprocessing_patterns(),
+        create_generic_patterns(),
+    ]
     .into_iter()
     .flatten()
     .collect()
@@ -129,7 +131,7 @@ pub fn pattern_matches_call(
     if pattern.function_name != func_name {
         return false;
     }
-    
+
     match (&pattern.module_name, module_name) {
         (Some(pattern_module), Some(actual_module)) => pattern_module == actual_module,
         (None, _) => true, // Pattern doesn't specify module, match on function name alone

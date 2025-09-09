@@ -10,20 +10,19 @@
 //! - Nested function definitions and callback patterns
 //! - Functions passed as arguments to callback-accepting functions
 
-mod callback_patterns;
 mod call_analysis;
+mod callback_patterns;
 mod event_tracking;
 mod function_detection;
 
-use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use crate::priority::call_graph::{CallGraph, FunctionId};
 use anyhow::Result;
 use rustpython_parser::ast;
 use std::collections::HashMap;
 use std::path::Path;
 
-use callback_patterns::{extract_call_target, find_callback_position, get_callback_patterns};
 use call_analysis::{CallAnalyzer, StatementAnalyzer};
-use event_tracking::EventTracker;
+use callback_patterns::{find_callback_position, get_callback_patterns};
 use function_detection::FunctionLineCollector;
 
 /// Python-specific call graph analyzer
