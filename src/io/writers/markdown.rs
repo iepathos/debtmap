@@ -822,6 +822,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         }
     }
 
@@ -988,6 +989,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         }
     }
 
@@ -1039,6 +1041,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         }
     }
 
@@ -1465,6 +1468,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         };
 
         let dead_code_item2 = UnifiedDebtItem {
@@ -1511,6 +1515,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         };
 
         let analysis = UnifiedAnalysis {
@@ -1633,6 +1638,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         };
 
         let testing_gap_item = create_testing_gap_item("test_func", 0.0, 10);

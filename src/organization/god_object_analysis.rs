@@ -96,11 +96,23 @@ pub fn calculate_god_object_score(
     let responsibility_factor = (responsibility_count as f64 / 3.0).min(3.0);
     let size_factor = (lines_of_code as f64 / thresholds.max_lines as f64).min(3.0);
 
+    // Calculate violation count for minimum score determination
+    let mut violation_count = 0;
+    if method_count > thresholds.max_methods { violation_count += 1; }
+    if field_count > thresholds.max_fields { violation_count += 1; }
+    if responsibility_count > thresholds.max_traits { violation_count += 1; }
+    if lines_of_code > thresholds.max_lines { violation_count += 1; }
+    
     // Exponential scaling for severe violations
     let base_score = method_factor * field_factor * responsibility_factor * size_factor;
-
-    if base_score > 2.0 {
-        base_score.powf(2.0) * 25.0 // Minimum 100 for clear god objects
+    
+    // Ensure minimum score of 100 for any god object
+    if violation_count > 0 {
+        // For any god object (at least 1 violation), ensure minimum 100 points
+        // Scale up based on severity of violations
+        let min_score = 100.0;
+        let severity_multiplier = violation_count as f64;
+        (base_score * 50.0 * severity_multiplier).max(min_score)
     } else {
         base_score * 10.0
     }

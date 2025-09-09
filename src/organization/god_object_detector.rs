@@ -65,8 +65,9 @@ impl GodObjectDetector {
         let mut total_fields = 0;
         let mut all_methods = Vec::new();
         let mut total_complexity = 0u32;
-        let mut lines_of_code;
+        let lines_of_code;
 
+        // Count methods from types (structs/impl blocks)
         for (_type_name, type_info) in &visitor.types {
             total_methods += type_info.method_count;
             total_fields += type_info.field_count;
@@ -74,6 +75,12 @@ impl GodObjectDetector {
             // Estimate complexity (rough approximation)
             total_complexity += (type_info.method_count * 5) as u32;
         }
+        
+        // Also count standalone functions in the file
+        let standalone_functions = visitor.standalone_functions.clone();
+        total_methods += standalone_functions.len();
+        all_methods.extend(standalone_functions.clone());
+        total_complexity += (standalone_functions.len() * 5) as u32;
 
         // Count lines (simple approximation based on AST)
         lines_of_code = ast.items.len() * 50; // Very rough estimate
@@ -395,6 +402,7 @@ struct Responsibility {
 
 struct TypeVisitor {
     types: HashMap<String, TypeAnalysis>,
+    standalone_functions: Vec<String>,
     location_extractor: Option<UnifiedLocationExtractor>,
 }
 
@@ -402,6 +410,7 @@ impl TypeVisitor {
     fn with_location_extractor(location_extractor: Option<UnifiedLocationExtractor>) -> Self {
         Self {
             types: HashMap::new(),
+            standalone_functions: Vec::new(),
             location_extractor,
         }
     }
@@ -486,6 +495,11 @@ impl<'ast> Visit<'ast> for TypeVisitor {
         if let Some(type_name) = Self::extract_type_name(&node.self_ty) {
             self.update_type_info(&type_name, node);
         }
+    }
+    
+    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+        // Track standalone functions
+        self.standalone_functions.push(node.sig.ident.to_string());
     }
 }
 

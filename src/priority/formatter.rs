@@ -563,6 +563,28 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         item.unified_score.dependency_factor
     )
     .unwrap();
+    
+    // Display god object indicators if present
+    if let Some(ref god_obj) = item.god_object_indicators {
+        if god_obj.is_god_object {
+            writeln!(
+                output,
+                "│  └─ {} God Object: {} methods, {} fields, {} responsibilities",
+                "⚠️".bright_yellow(),
+                god_obj.method_count,
+                god_obj.field_count,
+                god_obj.responsibility_count
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "│      Score: {:.0} (Confidence: {:?})",
+                god_obj.god_object_score,
+                god_obj.confidence
+            )
+            .unwrap();
+        }
+    }
 
     writeln!(
         output,
@@ -818,6 +840,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             entropy_details: None,
+            god_object_indicators: None,
         }
     }
 
