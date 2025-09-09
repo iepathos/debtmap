@@ -10,8 +10,8 @@ pub mod recommendation_extended;
 pub use calculation::{
     apply_interaction_bonus, calculate_base_score, calculate_complexity_factor,
     calculate_coverage_factor, calculate_dependency_factor, denormalize_score,
-    normalize_complexity, normalize_final_score, normalize_final_score_with_metadata,
-    NormalizedScore, ScalingMethod,
+    generate_normalization_curve, normalize_complexity, normalize_final_score,
+    normalize_final_score_with_metadata, NormalizedScore, ScalingMethod,
 };
 
 pub use classification::{

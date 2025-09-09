@@ -1,5 +1,7 @@
 // Pure functions for scoring calculation (spec 68, spec 101)
 
+use std::fmt;
+
 /// Calculate coverage factor from coverage percentage
 pub fn calculate_coverage_factor(coverage_pct: f64) -> f64 {
     calculate_coverage_factor_with_test_flag(coverage_pct, false)
@@ -87,6 +89,37 @@ pub enum ScalingMethod {
     Logarithmic, // 100+
 }
 
+impl fmt::Display for NormalizedScore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Format with raw value, normalized value, and visual indicator
+        let indicator = match self.scaling_method {
+            ScalingMethod::Linear => "▁",      // Low score indicator
+            ScalingMethod::SquareRoot => "▃",  // Medium score indicator  
+            ScalingMethod::Logarithmic => "▅", // High score indicator
+        };
+        
+        // Determine severity level for color coding (when terminal supports it)
+        let severity = if self.normalized < 3.0 {
+            "low"
+        } else if self.normalized < 7.0 {
+            "medium"
+        } else if self.normalized < 15.0 {
+            "high"
+        } else {
+            "critical"
+        };
+        
+        write!(
+            f,
+            "{:.1} (raw: {:.1}, {}, {})",
+            self.normalized,
+            self.raw,
+            severity,
+            indicator
+        )
+    }
+}
+
 fn determine_scaling_method(score: f64) -> ScalingMethod {
     if score <= 10.0 {
         ScalingMethod::Linear
@@ -160,6 +193,37 @@ pub fn normalize_complexity(cyclomatic: u32, cognitive: u32) -> f64 {
     } else {
         6.0 + ((combined - 10.0) * 0.2).min(4.0)
     }
+}
+
+/// Generate visualization data for normalization curve
+pub fn generate_normalization_curve() -> Vec<(f64, f64, &'static str)> {
+    // Generate sample points across different scaling regions
+    let mut curve_data = Vec::new();
+    
+    // Linear range (0-10)
+    for i in 0..=10 {
+        let raw = i as f64;
+        let normalized = normalize_final_score(raw);
+        curve_data.push((raw, normalized, "Linear"));
+    }
+    
+    // Square root range (11-100)
+    let sqrt_points = vec![15, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    for raw in sqrt_points {
+        let raw = raw as f64;
+        let normalized = normalize_final_score(raw);
+        curve_data.push((raw, normalized, "SquareRoot"));
+    }
+    
+    // Logarithmic range (100+)
+    let log_points = vec![150, 200, 300, 500, 750, 1000, 1500, 2000];
+    for raw in log_points {
+        let raw = raw as f64;
+        let normalized = normalize_final_score(raw);
+        curve_data.push((raw, normalized, "Logarithmic"));
+    }
+    
+    curve_data
 }
 
 #[cfg(test)]
@@ -294,5 +358,42 @@ mod tests {
         
         let score3 = normalize_final_score_with_metadata(200.0);
         assert_eq!(score3.scaling_method, ScalingMethod::Logarithmic);
+    }
+    
+    #[test]
+    fn test_generate_normalization_curve() {
+        let curve = generate_normalization_curve();
+        
+        // Verify we have data points
+        assert!(!curve.is_empty());
+        
+        // Verify we have all three regions
+        let linear_count = curve.iter().filter(|&(_, _, region)| *region == "Linear").count();
+        let sqrt_count = curve.iter().filter(|&(_, _, region)| *region == "SquareRoot").count();
+        let log_count = curve.iter().filter(|&(_, _, region)| *region == "Logarithmic").count();
+        
+        assert!(linear_count > 0);
+        assert!(sqrt_count > 0);
+        assert!(log_count > 0);
+        
+        // Verify monotonic increasing
+        for i in 1..curve.len() {
+            assert!(curve[i].0 >= curve[i-1].0, "Raw scores should be monotonic");
+            assert!(curve[i].1 >= curve[i-1].1, "Normalized scores should be monotonic");
+        }
+    }
+    
+    #[test]
+    fn test_normalized_score_display() {
+        let score = NormalizedScore {
+            raw: 45.0,
+            normalized: 16.7,
+            scaling_method: ScalingMethod::SquareRoot,
+        };
+        
+        let display = format!("{}", score);
+        assert!(display.contains("16.7"));
+        assert!(display.contains("45.0"));
+        assert!(display.contains("critical")); // 16.7 is in the "critical" range (>15)
     }
 }
