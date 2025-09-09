@@ -310,7 +310,7 @@ fn format_item_breakdown(number: usize, item: &UnifiedDebtItem) -> String {
         item.location.function,
         format_score_factors(&item.unified_score)
     );
-    
+
     // Add god object indicators if present
     if let Some(ref god_obj) = item.god_object_indicators {
         if god_obj.is_god_object {
@@ -323,7 +323,7 @@ fn format_item_breakdown(number: usize, item: &UnifiedDebtItem) -> String {
             ));
         }
     }
-    
+
     result
 }
 

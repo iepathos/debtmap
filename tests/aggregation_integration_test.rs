@@ -333,7 +333,7 @@ fn func3(a: bool, b: bool, c: bool, d: i32) -> i32 {
                 no_aggregation: false,
                 aggregation_method: Some(method.to_string()),
                 min_problematic: None,
-            no_god_object: false,
+                no_god_object: false,
             },
         )
         .unwrap();

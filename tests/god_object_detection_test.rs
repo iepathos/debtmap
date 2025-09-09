@@ -1,6 +1,6 @@
 use debtmap::organization::{
-    calculate_god_object_score, determine_confidence, GodObjectConfidence,
-    GodObjectDetector, GodObjectThresholds,
+    calculate_god_object_score, determine_confidence, GodObjectConfidence, GodObjectDetector,
+    GodObjectThresholds,
 };
 use std::path::Path;
 use syn;
@@ -45,10 +45,23 @@ fn test_detects_file_with_many_standalone_functions() {
     let detector = GodObjectDetector::with_source_content(code);
     let analysis = detector.analyze_comprehensive(Path::new("test.rs"), &file);
 
-    assert!(analysis.is_god_object, "File with 30 functions should be detected as god object");
-    assert_eq!(analysis.method_count, 30, "Should count all 30 standalone functions");
-    assert!(analysis.god_object_score >= 100.0, "God object score should be at least 100");
-    assert_ne!(analysis.confidence, GodObjectConfidence::NotGodObject, "Should have confidence in detection");
+    assert!(
+        analysis.is_god_object,
+        "File with 30 functions should be detected as god object"
+    );
+    assert_eq!(
+        analysis.method_count, 30,
+        "Should count all 30 standalone functions"
+    );
+    assert!(
+        analysis.god_object_score >= 100.0,
+        "God object score should be at least 100"
+    );
+    assert_ne!(
+        analysis.confidence,
+        GodObjectConfidence::NotGodObject,
+        "Should have confidence in detection"
+    );
 }
 
 /// Test that rust_call_graph.rs with 270 functions would be detected as a god object
@@ -64,15 +77,24 @@ fn test_detects_rust_call_graph_scenario() {
     let detector = GodObjectDetector::with_source_content(&code);
     let analysis = detector.analyze_comprehensive(Path::new("rust_call_graph.rs"), &file);
 
-    assert!(analysis.is_god_object, "File with 270 functions should be detected as god object");
-    assert_eq!(analysis.method_count, 270, "Should count all 270 standalone functions");
-    assert!(analysis.god_object_score >= 100.0, "God object score should be at least 100 for 270 functions");
+    assert!(
+        analysis.is_god_object,
+        "File with 270 functions should be detected as god object"
+    );
+    assert_eq!(
+        analysis.method_count, 270,
+        "Should count all 270 standalone functions"
+    );
+    assert!(
+        analysis.god_object_score >= 100.0,
+        "God object score should be at least 100 for 270 functions"
+    );
     // With 270 methods but no other violations, we get Probable (3-4 violations)
     // Methods: 270 > 20 ✓, Fields: 0 < 15 ✗, Responsibilities: likely > 5 ✓, Lines: estimated > 1000 ✓, Complexity: estimated > 200 ✓
     assert!(
-        analysis.confidence == GodObjectConfidence::Probable || 
-        analysis.confidence == GodObjectConfidence::Definite,
-        "Should have high confidence with 270 functions, got {:?}", 
+        analysis.confidence == GodObjectConfidence::Probable
+            || analysis.confidence == GodObjectConfidence::Definite,
+        "Should have high confidence with 270 functions, got {:?}",
         analysis.confidence
     );
 }
@@ -81,18 +103,30 @@ fn test_detects_rust_call_graph_scenario() {
 #[test]
 fn test_minimum_score_enforcement() {
     let thresholds = GodObjectThresholds::for_rust();
-    
+
     // Test case with just above threshold (21 methods, threshold is 20)
     let score = calculate_god_object_score(21, 0, 1, 500, &thresholds);
-    assert!(score >= 100.0, "Any god object should have minimum score of 100, got {}", score);
-    
+    assert!(
+        score >= 100.0,
+        "Any god object should have minimum score of 100, got {}",
+        score
+    );
+
     // Test case with multiple violations
     let score = calculate_god_object_score(50, 30, 5, 2000, &thresholds);
-    assert!(score >= 100.0, "God object with multiple violations should have score >= 100, got {}", score);
-    
+    assert!(
+        score >= 100.0,
+        "God object with multiple violations should have score >= 100, got {}",
+        score
+    );
+
     // Test case with severe violations
     let score = calculate_god_object_score(270, 50, 10, 10000, &thresholds);
-    assert!(score > 500.0, "Severe god object should have very high score, got {}", score);
+    assert!(
+        score > 500.0,
+        "Severe god object should have very high score, got {}",
+        score
+    );
 }
 
 /// Test that mixed files with structs and standalone functions are properly analyzed
@@ -138,33 +172,42 @@ fn test_mixed_struct_and_functions() {
     let detector = GodObjectDetector::with_source_content(code);
     let analysis = detector.analyze_comprehensive(Path::new("mixed.rs"), &file);
 
-    assert!(analysis.is_god_object, "File with 25 total methods should be detected as god object");
-    assert_eq!(analysis.method_count, 25, "Should count 5 impl methods + 20 standalone functions");
+    assert!(
+        analysis.is_god_object,
+        "File with 25 total methods should be detected as god object"
+    );
+    assert_eq!(
+        analysis.method_count, 25,
+        "Should count 5 impl methods + 20 standalone functions"
+    );
     assert_eq!(analysis.field_count, 2, "Should count 2 struct fields");
-    assert!(analysis.god_object_score >= 100.0, "God object score should be at least 100");
+    assert!(
+        analysis.god_object_score >= 100.0,
+        "God object score should be at least 100"
+    );
 }
 
 /// Test confidence levels for different violation counts
 #[test]
 fn test_confidence_levels() {
     let thresholds = GodObjectThresholds::for_rust();
-    
+
     // No violations
     let confidence = determine_confidence(10, 5, 2, 500, 50, &thresholds);
     assert_eq!(confidence, GodObjectConfidence::NotGodObject);
-    
+
     // One violation (methods)
     let confidence = determine_confidence(21, 5, 2, 500, 50, &thresholds);
     assert_eq!(confidence, GodObjectConfidence::Possible);
-    
+
     // Two violations (methods and fields)
     let confidence = determine_confidence(21, 16, 2, 500, 50, &thresholds);
     assert_eq!(confidence, GodObjectConfidence::Possible);
-    
+
     // Three violations (methods, fields, responsibilities)
     let confidence = determine_confidence(21, 16, 6, 500, 50, &thresholds);
     assert_eq!(confidence, GodObjectConfidence::Probable);
-    
+
     // All violations
     let confidence = determine_confidence(21, 16, 6, 1001, 201, &thresholds);
     assert_eq!(confidence, GodObjectConfidence::Definite);

@@ -701,12 +701,13 @@ fn analyze_files_for_debt(
 
         // Get file-level metrics
         let mut file_metrics = file_analyzer.aggregate_functions(&functions_owned);
-        
+
         // Run god object detection if enabled
         if !no_god_object {
             // Try to read file content to get better god object analysis
             if let Ok(content) = std::fs::read_to_string(&file_path) {
-                let god_indicators = file_analyzer.analyze_file(&file_path, &content)
+                let god_indicators = file_analyzer
+                    .analyze_file(&file_path, &content)
                     .ok()
                     .map(|m| m.god_object_indicators)
                     .unwrap_or_else(|| file_metrics.god_object_indicators.clone());
@@ -714,13 +715,14 @@ fn analyze_files_for_debt(
             }
         } else {
             // Disable god object detection
-            file_metrics.god_object_indicators = crate::priority::file_metrics::GodObjectIndicators {
-                methods_count: 0,
-                fields_count: 0,
-                responsibilities: 0,
-                is_god_object: false,
-                god_object_score: 0.0,
-            };
+            file_metrics.god_object_indicators =
+                crate::priority::file_metrics::GodObjectIndicators {
+                    methods_count: 0,
+                    fields_count: 0,
+                    responsibilities: 0,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                };
         }
 
         // Calculate function scores for this file
@@ -739,7 +741,7 @@ fn analyze_files_for_debt(
 
         // Calculate file score
         let score = file_metrics.calculate_score();
-        
+
         // Update god object indicators for functions in this file
         if file_metrics.god_object_indicators.is_god_object {
             // Convert GodObjectIndicators to GodObjectAnalysis for UnifiedDebtItem
@@ -755,7 +757,7 @@ fn analyze_files_for_debt(
                 confidence: crate::organization::GodObjectConfidence::Definite,
                 responsibilities: Vec::new(),
             };
-            
+
             for item in unified.items.iter_mut() {
                 if item.location.file == file_path {
                     item.god_object_indicators = Some(god_analysis.clone());

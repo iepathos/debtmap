@@ -98,14 +98,22 @@ pub fn calculate_god_object_score(
 
     // Calculate violation count for minimum score determination
     let mut violation_count = 0;
-    if method_count > thresholds.max_methods { violation_count += 1; }
-    if field_count > thresholds.max_fields { violation_count += 1; }
-    if responsibility_count > thresholds.max_traits { violation_count += 1; }
-    if lines_of_code > thresholds.max_lines { violation_count += 1; }
-    
+    if method_count > thresholds.max_methods {
+        violation_count += 1;
+    }
+    if field_count > thresholds.max_fields {
+        violation_count += 1;
+    }
+    if responsibility_count > thresholds.max_traits {
+        violation_count += 1;
+    }
+    if lines_of_code > thresholds.max_lines {
+        violation_count += 1;
+    }
+
     // Exponential scaling for severe violations
     let base_score = method_factor * field_factor * responsibility_factor * size_factor;
-    
+
     // Ensure minimum score of 100 for any god object
     if violation_count > 0 {
         // For any god object (at least 1 violation), ensure minimum 100 points

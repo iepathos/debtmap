@@ -11,8 +11,8 @@ pub use god_object_analysis::{
 };
 
 pub use god_object_metrics::{
-    GodObjectMetrics, GodObjectSnapshot, MetricsSummary, FileMetricHistory, 
-    FileTrend, TrendDirection,
+    FileMetricHistory, FileTrend, GodObjectMetrics, GodObjectSnapshot, MetricsSummary,
+    TrendDirection,
 };
 
 #[derive(Debug, Clone, PartialEq)]

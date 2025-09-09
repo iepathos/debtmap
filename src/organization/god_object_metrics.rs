@@ -13,6 +13,12 @@ pub struct GodObjectMetrics {
     pub summary: MetricsSummary,
 }
 
+impl Default for GodObjectMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GodObjectMetrics {
     pub fn new() -> Self {
         Self {
@@ -224,7 +230,11 @@ fn determine_trend(score_change: f64) -> TrendDirection {
 mod tests {
     use super::*;
 
-    fn create_test_analysis(is_god_object: bool, method_count: usize, score: f64) -> GodObjectAnalysis {
+    fn create_test_analysis(
+        is_god_object: bool,
+        method_count: usize,
+        score: f64,
+    ) -> GodObjectAnalysis {
         GodObjectAnalysis {
             is_god_object,
             method_count,
@@ -247,9 +257,9 @@ mod tests {
     fn test_record_snapshot() {
         let mut metrics = GodObjectMetrics::new();
         let analysis = create_test_analysis(true, 30, 150.0);
-        
+
         metrics.record_snapshot(PathBuf::from("test.rs"), analysis);
-        
+
         assert_eq!(metrics.snapshots.len(), 1);
         assert_eq!(metrics.summary.total_snapshots, 1);
         assert_eq!(metrics.summary.total_god_objects_detected, 1);
@@ -258,11 +268,20 @@ mod tests {
     #[test]
     fn test_multiple_snapshots() {
         let mut metrics = GodObjectMetrics::new();
-        
-        metrics.record_snapshot(PathBuf::from("file1.rs"), create_test_analysis(true, 30, 150.0));
-        metrics.record_snapshot(PathBuf::from("file2.rs"), create_test_analysis(false, 10, 50.0));
-        metrics.record_snapshot(PathBuf::from("file3.rs"), create_test_analysis(true, 50, 250.0));
-        
+
+        metrics.record_snapshot(
+            PathBuf::from("file1.rs"),
+            create_test_analysis(true, 30, 150.0),
+        );
+        metrics.record_snapshot(
+            PathBuf::from("file2.rs"),
+            create_test_analysis(false, 10, 50.0),
+        );
+        metrics.record_snapshot(
+            PathBuf::from("file3.rs"),
+            create_test_analysis(true, 50, 250.0),
+        );
+
         assert_eq!(metrics.snapshots.len(), 3);
         assert_eq!(metrics.summary.total_god_objects_detected, 2);
         assert_eq!(metrics.summary.files_tracked, 3);
@@ -273,13 +292,13 @@ mod tests {
     fn test_file_trend() {
         let mut metrics = GodObjectMetrics::new();
         let file_path = PathBuf::from("evolving.rs");
-        
+
         // First snapshot - not a god object
         metrics.record_snapshot(file_path.clone(), create_test_analysis(false, 15, 75.0));
-        
+
         // Second snapshot - became a god object
         metrics.record_snapshot(file_path.clone(), create_test_analysis(true, 35, 175.0));
-        
+
         let trend = metrics.get_file_trend(&file_path).unwrap();
         assert_eq!(trend.method_count_change, 20);
         assert_eq!(trend.score_change, 100.0);
@@ -290,11 +309,20 @@ mod tests {
     #[test]
     fn test_new_god_objects() {
         let mut metrics = GodObjectMetrics::new();
-        
-        metrics.record_snapshot(PathBuf::from("file1.rs"), create_test_analysis(false, 10, 50.0));
-        metrics.record_snapshot(PathBuf::from("file1.rs"), create_test_analysis(true, 30, 150.0));
-        metrics.record_snapshot(PathBuf::from("file2.rs"), create_test_analysis(true, 25, 125.0));
-        
+
+        metrics.record_snapshot(
+            PathBuf::from("file1.rs"),
+            create_test_analysis(false, 10, 50.0),
+        );
+        metrics.record_snapshot(
+            PathBuf::from("file1.rs"),
+            create_test_analysis(true, 30, 150.0),
+        );
+        metrics.record_snapshot(
+            PathBuf::from("file2.rs"),
+            create_test_analysis(true, 25, 125.0),
+        );
+
         let new_god_objects = metrics.get_new_god_objects();
         assert_eq!(new_god_objects.len(), 2);
         assert!(new_god_objects.contains(&PathBuf::from("file1.rs")));
@@ -304,10 +332,16 @@ mod tests {
     #[test]
     fn test_resolved_god_objects() {
         let mut metrics = GodObjectMetrics::new();
-        
-        metrics.record_snapshot(PathBuf::from("file1.rs"), create_test_analysis(true, 30, 150.0));
-        metrics.record_snapshot(PathBuf::from("file1.rs"), create_test_analysis(false, 15, 75.0));
-        
+
+        metrics.record_snapshot(
+            PathBuf::from("file1.rs"),
+            create_test_analysis(true, 30, 150.0),
+        );
+        metrics.record_snapshot(
+            PathBuf::from("file1.rs"),
+            create_test_analysis(false, 15, 75.0),
+        );
+
         let resolved = metrics.get_resolved_god_objects();
         assert_eq!(resolved.len(), 1);
         assert!(resolved.contains(&PathBuf::from("file1.rs")));

@@ -563,7 +563,7 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
         item.unified_score.dependency_factor
     )
     .unwrap();
-    
+
     // Display god object indicators if present
     if let Some(ref god_obj) = item.god_object_indicators {
         if god_obj.is_god_object {
@@ -579,8 +579,7 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
             writeln!(
                 output,
                 "│      Score: {:.0} (Confidence: {:?})",
-                god_obj.god_object_score,
-                god_obj.confidence
+                god_obj.god_object_score, god_obj.confidence
             )
             .unwrap();
         }
