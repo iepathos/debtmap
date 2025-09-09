@@ -6,10 +6,13 @@ use crate::debt;
 use crate::debt::circular::analyze_module_dependencies;
 use crate::{analyzers, core::Language, io};
 use rayon::prelude::*;
+use std::io::{self as stdio, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
 use std::sync::Arc;
-use std::io::{self as stdio, Write};
+use std::thread;
+use std::time::Duration;
 
 // Maximum files to process (can be overridden by env var)
 const DEFAULT_MAX_FILES: usize = 1000;
@@ -19,43 +22,47 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_MAX_FILES);
-    
+
     let total_files = files.len().min(max_files);
     let files_to_process = &files[..total_files];
-    
+
     // Show warning if we're limiting files
     if files.len() > max_files {
-        eprintln!("⚠️  Processing limited to {} files (found {}). Set DEBTMAP_MAX_FILES to increase.", max_files, files.len());
+        eprintln!(
+            "⚠️  Processing limited to {} files (found {}). Set DEBTMAP_MAX_FILES to increase.",
+            max_files,
+            files.len()
+        );
     }
-    
+
     // Progress tracking
     let processed = Arc::new(AtomicUsize::new(0));
     let show_progress = std::env::var("DEBTMAP_QUIET").is_err() && total_files > 10;
-    
+
     if show_progress {
         eprint!("Analyzing files: 0/{}", total_files);
         let _ = stdio::stderr().flush();
     }
-    
+
     let results: Vec<FileMetrics> = files_to_process
         .par_iter()
         .filter_map(|path| {
             let result = analyze_single_file(path.as_path());
-            
+
             if show_progress {
                 let count = processed.fetch_add(1, Ordering::Relaxed) + 1;
                 eprint!("\rAnalyzing files: {}/{}", count, total_files);
                 let _ = stdio::stderr().flush();
             }
-            
+
             result
         })
         .collect();
-    
+
     if show_progress {
         eprintln!("\r✓ Analyzed {} files successfully", results.len());
     }
-    
+
     results
 }
 
@@ -125,7 +132,71 @@ pub fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyRepor
     }
 }
 
+// Default timeout per file (can be overridden by env var)
+const DEFAULT_FILE_TIMEOUT_SECS: u64 = 30;
+
 pub fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {
+    analyze_single_file_with_timeout(file_path, None)
+}
+
+pub fn analyze_single_file_with_timeout(
+    file_path: &Path,
+    timeout_secs: Option<u64>,
+) -> Option<FileMetrics> {
+    let timeout = timeout_secs
+        .or_else(|| {
+            std::env::var("DEBTMAP_FILE_TIMEOUT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+        })
+        .unwrap_or(DEFAULT_FILE_TIMEOUT_SECS);
+
+    // For very large projects, reduce per-file timeout
+    let effective_timeout = if std::env::var("DEBTMAP_MAX_FILES").is_ok() {
+        timeout.min(15) // Cap at 15 seconds for limited projects
+    } else {
+        timeout
+    };
+
+    // Quick path for small timeout or debugging
+    if effective_timeout == 0 || std::env::var("DEBTMAP_NO_TIMEOUT").is_ok() {
+        return analyze_single_file_direct(file_path);
+    }
+
+    // Set up timeout mechanism
+    let (tx, rx) = mpsc::channel();
+    let path_clone = file_path.to_path_buf();
+
+    let handle = thread::spawn(move || {
+        let result = analyze_single_file_direct(&path_clone);
+        let _ = tx.send(result); // Ignore if main thread has timed out
+    });
+
+    // Wait for result or timeout
+    match rx.recv_timeout(Duration::from_secs(effective_timeout)) {
+        Ok(result) => {
+            let _ = handle.join(); // Clean up thread
+            result
+        }
+        Err(_) => {
+            // Timeout occurred
+            let quiet = std::env::var("DEBTMAP_QUIET").is_ok();
+            if !quiet {
+                eprintln!(
+                    "⏱️  Timeout analyzing {} ({}s limit)",
+                    file_path.display(),
+                    effective_timeout
+                );
+            }
+
+            // Note: We can't force kill the thread, but it will finish eventually
+            // The main analysis continues without this file
+            None
+        }
+    }
+}
+
+fn analyze_single_file_direct(file_path: &Path) -> Option<FileMetrics> {
     let content = io::read_file(file_path).ok()?;
     let ext = file_path.extension()?.to_str()?;
     let language = Language::from_extension(ext);

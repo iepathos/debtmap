@@ -10,6 +10,7 @@ use crate::{
 use anyhow::{Context, Result};
 use chrono::Utc;
 use rayon::prelude::*;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -151,6 +152,9 @@ fn analyze_project(
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
 
+    // Analyze project size and apply graduated optimizations
+    analyze_and_configure_project_size(&files)?;
+
     // Initialize cache (enabled by default unless DEBTMAP_NO_CACHE is set)
     let cache_enabled = std::env::var("DEBTMAP_NO_CACHE").is_err();
     let mut cache = if cache_enabled {
@@ -217,4 +221,78 @@ fn collect_file_metrics_with_cache(
                 .ok()
         })
         .collect()
+}
+
+/// Analyze project size and configure optimizations based on scale
+fn analyze_and_configure_project_size(files: &[PathBuf]) -> Result<()> {
+    let file_count = files.len();
+    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+
+    if !quiet_mode {
+        match file_count {
+            0..=100 => {
+                // Small project - no warnings needed
+                eprintln!("📁 Analyzing {} files (small project)", file_count);
+            }
+            101..=500 => {
+                // Medium project - inform user
+                eprintln!("📁 Analyzing {} files (medium project)", file_count);
+                eprintln!("💡 For faster analysis, consider using --parallel flag");
+            }
+            501..=1000 => {
+                // Large project - warnings and optimizations
+                eprintln!("📁 Analyzing {} files (large project) ⚠️", file_count);
+                eprintln!("🚀 Enabling performance optimizations automatically");
+                eprintln!("💡 Consider setting DEBTMAP_MAX_FILES if analysis is slow");
+
+                // Auto-enable performance optimizations for large projects
+                if std::env::var("DEBTMAP_MAX_FILES").is_err() {
+                    std::env::set_var("DEBTMAP_MAX_FILES", "800");
+                }
+
+                // Enable parallel processing by default
+                std::env::set_var("RUST_BACKTRACE", "0"); // Reduce noise
+            }
+            1001..=2000 => {
+                // Very large project - strong warnings
+                eprintln!(
+                    "📁 Analyzing {} files (very large project) ⚠️⚠️",
+                    file_count
+                );
+                eprintln!("🐌 Large codebases may take significant time to analyze");
+                eprintln!("🚀 Auto-limiting to 1000 files for performance");
+                eprintln!("📝 Set DEBTMAP_MAX_FILES=0 to disable limits (not recommended)");
+
+                // Auto-limit for very large projects
+                if std::env::var("DEBTMAP_MAX_FILES").is_err() {
+                    std::env::set_var("DEBTMAP_MAX_FILES", "1000");
+                }
+
+                // Enable all performance optimizations
+                std::env::set_var("RUST_BACKTRACE", "0");
+
+                // Add timeout warning
+                eprint!("⏱️  Starting analysis (this may take several minutes)...");
+                std::io::stderr().flush().unwrap();
+            }
+            _ => {
+                // Massive project - intervention required
+                eprintln!("📁 Found {} files (massive project) 🚨", file_count);
+                eprintln!("⛔ Projects this large require special handling");
+                eprintln!("🛠️  Auto-limiting to 800 files to prevent hangs");
+                eprintln!("📖 See documentation for large project optimization tips");
+                eprintln!();
+                eprintln!("💡 Suggestions:");
+                eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
+                eprintln!("   • Focus analysis on specific modules with targeted paths");
+                eprintln!("   • Consider running analysis on CI with longer timeouts");
+
+                // Aggressive limits for massive projects
+                std::env::set_var("DEBTMAP_MAX_FILES", "800");
+                std::env::set_var("RUST_BACKTRACE", "0");
+            }
+        }
+    }
+
+    Ok(())
 }

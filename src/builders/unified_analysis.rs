@@ -103,6 +103,13 @@ pub fn perform_unified_analysis_with_options(
     // Select execution strategy based on options
     let execution_strategy = determine_execution_strategy(parallel, use_cache);
 
+    // Progress tracking
+    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+    if !quiet_mode {
+        eprint!("🔗 Building call graph...");
+        std::io::Write::flush(&mut std::io::stderr()).unwrap();
+    }
+
     let (framework_exclusions, function_pointer_used_functions) = match execution_strategy {
         ExecutionStrategy::Parallel => {
             build_parallel_call_graph(project_path, &mut call_graph, jobs)?
@@ -121,9 +128,21 @@ pub fn perform_unified_analysis_with_options(
         )?,
     };
 
+    if !quiet_mode {
+        eprintln!(" ✓");
+        eprint!("📊 Loading coverage data...");
+        std::io::Write::flush(&mut std::io::stderr()).unwrap();
+    }
+
     let coverage_data = load_coverage_data(coverage_file.cloned())?;
 
-    Ok(create_unified_analysis_with_exclusions(
+    if !quiet_mode {
+        eprintln!(" ✓");
+        eprint!("🎯 Creating unified analysis...");
+        std::io::Write::flush(&mut std::io::stderr()).unwrap();
+    }
+
+    let result = create_unified_analysis_with_exclusions(
         &results.complexity.metrics,
         &call_graph,
         coverage_data.as_ref(),
@@ -134,7 +153,13 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
-    ))
+    );
+
+    if !quiet_mode {
+        eprintln!(" ✓");
+    }
+
+    Ok(result)
 }
 
 /// Determines the execution strategy based on configuration options

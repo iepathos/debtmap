@@ -209,7 +209,7 @@ mod tests {
             create_test_item(DebtType::Complexity, Priority::Critical),
         ];
 
-        let categorized = categorize_debt(items);
+        let categorized = categorize_debt(&items);
         assert_eq!(categorized.len(), 3);
         assert_eq!(categorized.get(&DebtType::Todo).unwrap().len(), 2);
         assert_eq!(categorized.get(&DebtType::Fixme).unwrap().len(), 1);
@@ -225,7 +225,7 @@ mod tests {
             create_test_item(DebtType::Complexity, Priority::High),
         ];
 
-        let prioritized = prioritize_debt(items);
+        let prioritized = prioritize_debt(&items);
 
         assert_eq!(prioritized[0].priority, Priority::Critical);
         assert_eq!(prioritized[1].priority, Priority::High);
@@ -312,10 +312,10 @@ mod tests {
         // Test with empty collections
         let empty_items: Vec<DebtItem> = vec![];
 
-        let categorized = categorize_debt(empty_items.clone());
+        let categorized = categorize_debt(&empty_items);
         assert_eq!(categorized.len(), 0);
 
-        let prioritized = prioritize_debt(empty_items.clone());
+        let prioritized = prioritize_debt(&empty_items);
         assert_eq!(prioritized.len(), 0);
 
         let filtered = filter_by_priority(empty_items.clone(), Priority::High);

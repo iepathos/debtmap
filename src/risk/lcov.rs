@@ -92,14 +92,13 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
 
             Record::EndOfRecord => {
                 // First, collect and sort function start lines for boundary detection
-                let mut func_boundaries: Vec<usize> = file_functions
-                    .values()
-                    .map(|f| f.start_line)
-                    .collect();
+                let mut func_boundaries: Vec<usize> =
+                    file_functions.values().map(|f| f.start_line).collect();
                 func_boundaries.sort_unstable();
-                
+
                 // Convert file_lines HashMap to sorted Vec for efficient range queries
-                let mut sorted_lines: Vec<(usize, u64)> = file_lines.iter()
+                let mut sorted_lines: Vec<(usize, u64)> = file_lines
+                    .iter()
                     .map(|(line, count)| (*line, *count))
                     .collect();
                 sorted_lines.sort_unstable_by_key(|(line, _)| *line);
@@ -107,18 +106,18 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                 // Process each function
                 for func in file_functions.values_mut() {
                     let func_start = func.start_line;
-                    
+
                     // Find the next function's start line using binary search
                     let next_func_idx = func_boundaries
                         .binary_search(&func_start)
                         .unwrap_or_else(|idx| idx);
-                    
+
                     let func_end = if next_func_idx + 1 < func_boundaries.len() {
                         func_boundaries[next_func_idx + 1]
                     } else {
                         usize::MAX
                     };
-                    
+
                     // Binary search for function's line range in sorted_lines
                     let start_idx = sorted_lines
                         .binary_search_by_key(&func_start, |(line, _)| *line)
@@ -126,9 +125,9 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
                     let end_idx = sorted_lines
                         .binary_search_by_key(&func_end, |(line, _)| *line)
                         .unwrap_or_else(|idx| idx);
-                    
+
                     let func_lines = &sorted_lines[start_idx..end_idx];
-                    
+
                     if !func_lines.is_empty() {
                         let covered = func_lines.iter().filter(|(_, count)| *count > 0).count();
                         func.coverage_percentage =

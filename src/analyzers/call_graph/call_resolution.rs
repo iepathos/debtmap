@@ -28,30 +28,69 @@ pub struct UnresolvedCall {
 }
 
 /// Handles resolution of function calls
+use std::collections::HashMap;
+
 pub struct CallResolver<'a> {
+    #[allow(dead_code)]
     call_graph: &'a CallGraph,
     current_file: &'a PathBuf,
+    function_index: HashMap<String, Vec<FunctionId>>,
 }
 
 impl<'a> CallResolver<'a> {
     pub fn new(call_graph: &'a CallGraph, current_file: &'a PathBuf) -> Self {
+        // Build function name index once during construction
+        let mut function_index: HashMap<String, Vec<FunctionId>> = HashMap::new();
+
+        for func_id in call_graph.get_all_functions() {
+            let key = Self::normalize_path_prefix(&func_id.name);
+            function_index.entry(key).or_default().push(func_id.clone());
+
+            // Also index by just the function name without qualification
+            if let Some(simple_name) = func_id.name.split("::").last() {
+                if simple_name != func_id.name {
+                    function_index
+                        .entry(simple_name.to_string())
+                        .or_default()
+                        .push(func_id.clone());
+                }
+            }
+        }
+
         Self {
             call_graph,
             current_file,
+            function_index,
         }
     }
 
-    /// Resolve an unresolved call to a concrete function
+    /// Resolve an unresolved call to a concrete function - now O(1) lookup!
     pub fn resolve_call(&self, call: &UnresolvedCall) -> Option<FunctionId> {
-        let all_functions: Vec<FunctionId> = self.call_graph.get_all_functions().cloned().collect();
+        let normalized_name = Self::normalize_path_prefix(&call.callee_name);
 
-        // Use functional approach with clear precedence rules
-        Self::resolve_function_call(
-            &all_functions,
-            &call.callee_name,
-            self.current_file,
-            call.same_file_hint,
-        )
+        // Fast O(1) lookup instead of O(n) linear search
+        let candidates = self.function_index.get(&normalized_name).or_else(|| {
+            // Try looking up by simple name if qualified lookup fails
+            if let Some(simple_name) = call.callee_name.split("::").last() {
+                self.function_index.get(simple_name)
+            } else {
+                None
+            }
+        })?;
+
+        // Filter candidates that actually match the call pattern
+        let matching_candidates: Vec<FunctionId> = candidates
+            .iter()
+            .filter(|func| Self::is_function_match(func, &normalized_name, &call.callee_name))
+            .cloned()
+            .collect();
+
+        if matching_candidates.is_empty() {
+            return None;
+        }
+
+        // Apply resolution strategies
+        Self::select_best_candidate(matching_candidates, self.current_file, call.same_file_hint)
     }
 
     /// Pure function to resolve a function call against a list of candidates
