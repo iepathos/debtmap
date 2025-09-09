@@ -1,6 +1,7 @@
 //! Cross-file call resolution for handling method calls across modules
 
 use super::types::{CallGraph, FunctionCall, FunctionId};
+#[allow(unused_imports)]
 use std::path::{Path, PathBuf};
 
 impl CallGraph {

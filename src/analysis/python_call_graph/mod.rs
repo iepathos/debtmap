@@ -15,6 +15,7 @@ mod callback_patterns;
 mod event_tracking;
 mod function_detection;
 
+#[allow(unused_imports)]
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use anyhow::Result;
 use rustpython_parser::ast;
