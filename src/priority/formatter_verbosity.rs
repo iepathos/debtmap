@@ -3,6 +3,44 @@ use crate::priority::{score_formatter, UnifiedDebtItem};
 use colored::*;
 use std::fmt::Write;
 
+/// Format a list of line numbers into readable ranges (e.g., "10-15, 22, 30-35")
+fn format_line_ranges(lines: &[usize]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+
+    let mut sorted_lines = lines.to_vec();
+    sorted_lines.sort_unstable();
+    sorted_lines.dedup();
+
+    let mut ranges = Vec::new();
+    let mut start = sorted_lines[0];
+    let mut end = start;
+
+    for &line in &sorted_lines[1..] {
+        if line == end + 1 {
+            end = line;
+        } else {
+            if start == end {
+                ranges.push(start.to_string());
+            } else {
+                ranges.push(format!("{}-{}", start, end));
+            }
+            start = line;
+            end = line;
+        }
+    }
+
+    // Add the last range
+    if start == end {
+        ranges.push(start.to_string());
+    } else {
+        ranges.push(format!("{}-{}", start, end));
+    }
+
+    ranges.join(", ")
+}
+
 #[allow(dead_code)]
 pub fn format_priority_item_with_verbosity(
     output: &mut String,
@@ -315,6 +353,122 @@ pub fn format_priority_item_with_config(
             item.unified_score.final_score
         )
         .unwrap();
+
+        // Add detailed complexity metrics for verbosity >= 2
+        writeln!(output, "{} COMPLEXITY DETAILS:", formatter.emoji("├─", "-")).unwrap();
+        writeln!(
+            output,
+            "{}  {} Cyclomatic Complexity: {}",
+            tree_pipe,
+            formatter.emoji("├─", "-"),
+            item.cyclomatic_complexity
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} Cognitive Complexity: {}",
+            tree_pipe,
+            formatter.emoji("├─", "-"),
+            item.cognitive_complexity
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} Function Length: {} lines",
+            tree_pipe,
+            formatter.emoji("├─", "-"),
+            item.function_length
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} Nesting Depth: {}",
+            tree_pipe,
+            formatter.emoji("└─", "-"),
+            item.nesting_depth
+        )
+        .unwrap();
+
+        // Add uncovered lines information if available
+        if let Some(ref trans_cov) = item.transitive_coverage {
+            if !trans_cov.uncovered_lines.is_empty() {
+                writeln!(output, "{} COVERAGE DETAILS:", formatter.emoji("├─", "-")).unwrap();
+                writeln!(
+                    output,
+                    "{}  {} Coverage: {:.1}%",
+                    tree_pipe,
+                    formatter.emoji("├─", "-"),
+                    trans_cov.direct * 100.0
+                )
+                .unwrap();
+
+                let line_ranges = format_line_ranges(&trans_cov.uncovered_lines);
+                writeln!(
+                    output,
+                    "{}  {} Uncovered Lines: {}",
+                    tree_pipe,
+                    formatter.emoji("└─", "-"),
+                    line_ranges
+                )
+                .unwrap();
+            }
+        }
+
+        // Add call graph information for verbosity >= 2
+        if !item.upstream_callers.is_empty() || !item.downstream_callees.is_empty() {
+            writeln!(output, "{} CALL GRAPH:", formatter.emoji("├─", "-")).unwrap();
+
+            if !item.upstream_callers.is_empty() {
+                let callers = if item.upstream_callers.len() > 5 {
+                    format!(
+                        "{} (+{} more)",
+                        item.upstream_callers[..5].join(", "),
+                        item.upstream_callers.len() - 5
+                    )
+                } else {
+                    item.upstream_callers.join(", ")
+                };
+                writeln!(
+                    output,
+                    "{}  {} Called by: {}",
+                    tree_pipe,
+                    formatter.emoji("├─", "-"),
+                    callers
+                )
+                .unwrap();
+            }
+
+            if !item.downstream_callees.is_empty() {
+                let callees = if item.downstream_callees.len() > 5 {
+                    format!(
+                        "{} (+{} more)",
+                        item.downstream_callees[..5].join(", "),
+                        item.downstream_callees.len() - 5
+                    )
+                } else {
+                    item.downstream_callees.join(", ")
+                };
+                writeln!(
+                    output,
+                    "{}  {} Calls: {}",
+                    tree_pipe,
+                    formatter.emoji("└─", "-"),
+                    callees
+                )
+                .unwrap();
+            } else if !item.upstream_callers.is_empty() {
+                // Change the last caller line to use └─ if there are no callees
+                writeln!(
+                    output,
+                    "{}  {} Dependencies: {} upstream, {} downstream",
+                    tree_pipe,
+                    formatter.emoji("└─", "-"),
+                    item.upstream_dependencies,
+                    item.downstream_dependencies
+                )
+                .unwrap();
+            }
+        }
     }
 
     // Rest of the item formatting remains the same

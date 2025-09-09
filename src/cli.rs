@@ -118,9 +118,9 @@ pub enum Commands {
         #[arg(long = "plain")]
         plain: bool,
 
-        /// Enable parallel call graph construction for better performance
-        #[arg(long = "parallel")]
-        parallel: bool,
+        /// Disable parallel call graph construction (enabled by default)
+        #[arg(long = "no-parallel")]
+        no_parallel: bool,
 
         /// Number of threads for parallel processing (0 = use all cores)
         #[arg(long = "jobs", short = 'j', default_value = "0")]

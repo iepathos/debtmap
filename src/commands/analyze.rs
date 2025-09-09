@@ -78,6 +78,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         languages,
         config.threshold_complexity,
         config.threshold_duplication,
+        config.parallel,
     )?;
 
     let unified_analysis = unified_analysis::perform_unified_analysis_with_options(
@@ -147,13 +148,14 @@ fn analyze_project(
     languages: Vec<Language>,
     complexity_threshold: u32,
     duplication_threshold: usize,
+    parallel_enabled: bool,
 ) -> Result<AnalysisResults> {
     let config = config::get_config();
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
 
     // Analyze project size and apply graduated optimizations
-    analyze_and_configure_project_size(&files)?;
+    analyze_and_configure_project_size(&files, parallel_enabled)?;
 
     // Initialize cache (enabled by default unless DEBTMAP_NO_CACHE is set)
     let cache_enabled = std::env::var("DEBTMAP_NO_CACHE").is_err();
@@ -224,7 +226,7 @@ fn collect_file_metrics_with_cache(
 }
 
 /// Analyze project size and configure optimizations based on scale
-fn analyze_and_configure_project_size(files: &[PathBuf]) -> Result<()> {
+fn analyze_and_configure_project_size(files: &[PathBuf], parallel_enabled: bool) -> Result<()> {
     let file_count = files.len();
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
 
@@ -237,7 +239,13 @@ fn analyze_and_configure_project_size(files: &[PathBuf]) -> Result<()> {
             101..=500 => {
                 // Medium project - inform user
                 eprintln!("📁 Analyzing {} files (medium project)", file_count);
-                eprintln!("💡 For faster analysis, consider using --parallel flag");
+                if parallel_enabled {
+                    eprintln!("💡 Parallel processing enabled for better performance");
+                } else {
+                    eprintln!(
+                        "💡 Using sequential processing (use default for better performance)"
+                    );
+                }
             }
             501..=1000 => {
                 // Large project - warnings and optimizations
