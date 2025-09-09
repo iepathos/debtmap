@@ -314,10 +314,10 @@ fn format_file_aggregate_item(
     )
     .unwrap();
 
-    // WHY section
+    // WHY section - explain what file aggregate means
     writeln!(
         output,
-        "├─ {}: This file has accumulated significant technical debt across {} functions. {} functions exceed complexity thresholds, indicating systematic code quality issues that affect maintainability.",
+        "├─ {}: File aggregate combines complexity scores from {} individual functions to identify files with widespread technical debt. Unlike single file-level issues (god objects, high line count), this represents accumulated complexity across multiple functions. {} functions exceed complexity thresholds.",
         formatter.emoji("WHY", "WHY").bright_magenta(),
         item.function_count,
         item.problematic_functions

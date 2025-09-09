@@ -449,13 +449,42 @@ pub fn create_unified_analysis_with_exclusions(
     min_problematic: Option<usize>,
     no_god_object: bool,
 ) -> UnifiedAnalysis {
+    use std::time::Instant;
+    let start = Instant::now();
+    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+
+    // Step 1: Initialize unified analysis with data flow graph
+    let step_start = Instant::now();
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
+    if !quiet_mode {
+        eprintln!("  ⏱️  Data flow graph creation: {:?}", step_start.elapsed());
+    }
 
+    // Step 2: Populate purity analysis
+    let step_start = Instant::now();
     unified.populate_purity_analysis(metrics);
+    if !quiet_mode {
+        eprintln!(
+            "  ⏱️  Purity analysis ({} functions): {:?}",
+            metrics.len(),
+            step_start.elapsed()
+        );
+    }
 
+    // Step 3: Find test-only functions
+    let step_start = Instant::now();
     let test_only_functions: HashSet<_> =
         call_graph.find_test_only_functions().into_iter().collect();
+    if !quiet_mode {
+        eprintln!(
+            "  ⏱️  Test function detection ({} found): {:?}",
+            test_only_functions.len(),
+            step_start.elapsed()
+        );
+    }
 
+    // Step 4: Setup debt aggregator
+    let step_start = Instant::now();
     let mut debt_aggregator = DebtAggregator::new();
     if let Some(debt_items) = debt_items {
         let function_mappings: Vec<(AggregatorFunctionId, usize, usize)> = metrics
@@ -474,9 +503,17 @@ pub fn create_unified_analysis_with_exclusions(
         let debt_items_vec: Vec<DebtItem> = debt_items.to_vec();
         debt_aggregator.aggregate_debt(debt_items_vec, &function_mappings);
     }
+    if !quiet_mode {
+        eprintln!("  ⏱️  Debt aggregator setup: {:?}", step_start.elapsed());
+    }
 
+    // Step 5: Per-function debt analysis (main loop)
+    let step_start = Instant::now();
+    let mut processed_count = 0;
+    let mut skipped_count = 0;
     for metric in metrics {
         if should_skip_metric_for_debt_analysis(metric, call_graph, &test_only_functions) {
+            skipped_count += 1;
             continue;
         }
         let item = create_debt_item_from_metric_with_aggregator(
@@ -489,19 +526,44 @@ pub fn create_unified_analysis_with_exclusions(
             Some(&unified.data_flow_graph),
         );
         unified.add_item(item);
+        processed_count += 1;
+    }
+    if !quiet_mode {
+        eprintln!(
+            "  ⏱️  Per-function analysis ({} processed, {} skipped): {:?}",
+            processed_count,
+            skipped_count,
+            step_start.elapsed()
+        );
     }
 
+    // Step 6: Error swallowing analysis
+    let step_start = Instant::now();
+    let mut error_swallow_count = 0;
     if let Some(debt_items) = debt_items {
         let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
+        error_swallow_count = error_swallowing_items.len();
         for item in error_swallowing_items {
             unified.add_item(item);
         }
     }
+    if !quiet_mode && error_swallow_count > 0 {
+        eprintln!(
+            "  ⏱️  Error swallowing conversion ({} items): {:?}",
+            error_swallow_count,
+            step_start.elapsed()
+        );
+    }
 
-    // Add file-level analysis
+    // Step 7: File-level analysis
+    let step_start = Instant::now();
     analyze_files_for_debt(&mut unified, metrics, coverage_data, no_god_object);
+    if !quiet_mode {
+        eprintln!("  ⏱️  File-level analysis: {:?}", step_start.elapsed());
+    }
 
-    // Add file aggregation analysis
+    // Step 8: File aggregation analysis
+    let step_start = Instant::now();
     let mut aggregation_config = crate::config::get_aggregation_config();
 
     // Override with CLI flags
@@ -560,12 +622,28 @@ pub fn create_unified_analysis_with_exclusions(
 
         unified.file_aggregates = im::Vector::from(file_aggregates);
     }
+    if !quiet_mode {
+        eprintln!(
+            "  ⏱️  File aggregation (enabled={}): {:?}",
+            aggregation_config.enabled,
+            step_start.elapsed()
+        );
+    }
 
+    // Step 9: Final sorting and impact calculation
+    let step_start = Instant::now();
     unified.sort_by_priority();
     unified.calculate_total_impact();
 
     if let Some(lcov) = coverage_data {
         unified.overall_coverage = Some(lcov.get_overall_coverage());
+    }
+    if !quiet_mode {
+        eprintln!(
+            "  ⏱️  Final sorting & impact calc: {:?}",
+            step_start.elapsed()
+        );
+        eprintln!("  ⏱️  TOTAL unified analysis time: {:?}", start.elapsed());
     }
 
     unified
