@@ -188,6 +188,62 @@ fn default_unknown_multiplier() -> f64 {
     1.0 // No adjustment for unknown functions
 }
 
+/// Score normalization configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NormalizationConfig {
+    /// Threshold for linear scaling (default: 10.0)
+    #[serde(default = "default_linear_threshold")]
+    pub linear_threshold: f64,
+
+    /// Threshold for logarithmic scaling (default: 100.0)
+    #[serde(default = "default_logarithmic_threshold")]
+    pub logarithmic_threshold: f64,
+
+    /// Multiplier for square root scaling (default: 3.33)
+    #[serde(default = "default_sqrt_multiplier")]
+    pub sqrt_multiplier: f64,
+
+    /// Multiplier for logarithmic scaling (default: 10.0)
+    #[serde(default = "default_log_multiplier")]
+    pub log_multiplier: f64,
+
+    /// Whether to show raw scores alongside normalized scores
+    #[serde(default = "default_show_raw_scores")]
+    pub show_raw_scores: bool,
+}
+
+impl Default for NormalizationConfig {
+    fn default() -> Self {
+        Self {
+            linear_threshold: default_linear_threshold(),
+            logarithmic_threshold: default_logarithmic_threshold(),
+            sqrt_multiplier: default_sqrt_multiplier(),
+            log_multiplier: default_log_multiplier(),
+            show_raw_scores: default_show_raw_scores(),
+        }
+    }
+}
+
+fn default_linear_threshold() -> f64 {
+    10.0
+}
+
+fn default_logarithmic_threshold() -> f64 {
+    100.0
+}
+
+fn default_sqrt_multiplier() -> f64 {
+    3.33
+}
+
+fn default_log_multiplier() -> f64 {
+    10.0
+}
+
+fn default_show_raw_scores() -> bool {
+    true
+}
+
 /// Context-aware detection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextConfig {
@@ -448,6 +504,10 @@ pub struct DebtmapConfig {
     /// File-level score aggregation configuration
     #[serde(default)]
     pub aggregation: Option<crate::priority::AggregationConfig>,
+
+    /// Score normalization configuration
+    #[serde(default)]
+    pub normalization: Option<NormalizationConfig>,
 }
 
 impl DebtmapConfig {

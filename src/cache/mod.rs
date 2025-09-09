@@ -10,4 +10,6 @@ pub use auto_pruner::{
 pub use cache_location::{CacheLocation, CacheStrategy};
 pub use call_graph_cache::{CacheEntry, CacheKey, CallGraphCache};
 pub use shared_cache::{CacheStats, SharedCache};
-pub use unified_analysis_cache::{UnifiedAnalysisCache, UnifiedAnalysisCacheEntry, UnifiedAnalysisCacheKey};
+pub use unified_analysis_cache::{
+    UnifiedAnalysisCache, UnifiedAnalysisCacheEntry, UnifiedAnalysisCacheKey,
+};

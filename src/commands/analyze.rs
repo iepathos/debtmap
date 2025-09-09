@@ -66,7 +66,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             cache.clear()?;
             log::info!("File metrics cache cleared");
         }
-        
+
         // Also clear unified analysis cache
         use crate::cache::UnifiedAnalysisCache;
         if let Ok(mut unified_cache) = UnifiedAnalysisCache::new(Some(&config.path)) {

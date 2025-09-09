@@ -66,39 +66,39 @@ impl UnifiedAnalysisCache {
     ) -> Result<UnifiedAnalysisCacheKey> {
         // Hash source files content and modification times
         let mut hasher = Sha256::new();
-        
+
         // Add project path
         hasher.update(project_path.to_string_lossy().as_bytes());
-        
+
         // Sort files for consistent hashing
         let mut sorted_files = source_files.to_vec();
         sorted_files.sort();
-        
+
         for file in &sorted_files {
             if let Ok(content) = std::fs::read_to_string(file) {
                 hasher.update(file.to_string_lossy().as_bytes());
-                hasher.update(&content.as_bytes());
-                
+                hasher.update(content.as_bytes());
+
                 // Include modification time for cache invalidation
                 if let Ok(metadata) = std::fs::metadata(file) {
                     if let Ok(modified) = metadata.modified() {
                         if let Ok(duration) = modified.duration_since(SystemTime::UNIX_EPOCH) {
-                            hasher.update(&duration.as_secs().to_le_bytes());
+                            hasher.update(duration.as_secs().to_le_bytes());
                         }
                     }
                 }
             }
         }
-        
+
         let source_hash = format!("{:x}", hasher.finalize());
 
         // Generate config hash
         let mut config_hasher = Sha256::new();
-        config_hasher.update(&complexity_threshold.to_le_bytes());
-        config_hasher.update(&duplication_threshold.to_le_bytes());
-        config_hasher.update(&[semantic_off as u8]);
-        config_hasher.update(&[parallel as u8]);
-        
+        config_hasher.update(complexity_threshold.to_le_bytes());
+        config_hasher.update(duplication_threshold.to_le_bytes());
+        config_hasher.update([semantic_off as u8]);
+        config_hasher.update([parallel as u8]);
+
         let config_hash = format!("{:x}", config_hasher.finalize());
 
         // Generate coverage hash if present
@@ -173,8 +173,9 @@ impl UnifiedAnalysisCache {
         let cache_key = self.generate_shared_cache_key(&key);
         let data = serde_json::to_vec(&entry)
             .context("Failed to serialize unified analysis cache entry")?;
-        
-        self.shared_cache.put(&cache_key, "unified_analysis", &data)
+
+        self.shared_cache
+            .put(&cache_key, "unified_analysis", &data)
             .context("Failed to store unified analysis in shared cache")?;
 
         log::info!("Unified analysis cached successfully");
@@ -238,25 +239,26 @@ mod tests {
     fn test_cache_key_generation() {
         let temp_dir = TempDir::new().unwrap();
         let project_path = temp_dir.path();
-        
+
         // Create test files
         let file1 = project_path.join("test1.rs");
         let file2 = project_path.join("test2.rs");
         std::fs::write(&file1, "fn test1() {}").unwrap();
         std::fs::write(&file2, "fn test2() {}").unwrap();
-        
+
         let files = vec![file1, file2];
-        
+
         let key = UnifiedAnalysisCache::generate_key(
             project_path,
             &files,
-            10,  // complexity_threshold
-            50,  // duplication_threshold
-            None, // coverage_file
+            10,    // complexity_threshold
+            50,    // duplication_threshold
+            None,  // coverage_file
             false, // semantic_off
             true,  // parallel
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         assert!(!key.source_hash.is_empty());
         assert!(!key.config_hash.is_empty());
         assert_eq!(key.project_path, project_path);

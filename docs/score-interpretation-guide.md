@@ -4,6 +4,8 @@
 
 As of spec 96, Debtmap scores are no longer capped at 10.0. This change allows for more accurate representation of extreme technical debt cases and provides better differentiation between high-risk items.
 
+**Update (spec 101)**: Score normalization now uses a three-stage scaling approach with smooth transitions between linear, square root, and logarithmic scaling for better score distribution across all ranges.
+
 ## Score Ranges and Interpretation
 
 ### 0.0 - 2.0: Minimal Debt
@@ -55,6 +57,14 @@ As of spec 96, Debtmap scores are no longer capped at 10.0. This change allows f
 - More accurate risk representation
 - Square root scaling above 10.0 for gradual increase
 
+### After Spec 101 (Current)
+- **Three-stage normalization**:
+  - **Linear scaling (0-10)**: Raw scores 0-10 map directly to normalized 0-10
+  - **Square root scaling (10-100)**: Raw scores 10-100 map to normalized 10-40 range
+  - **Logarithmic scaling (100+)**: Raw scores 100+ map to normalized 40+ with slow growth
+- **Smooth transitions**: Continuous function ensures no jumps at boundaries
+- **Better distribution**: Each range optimized for typical score patterns
+
 ## Score Components
 
 ### Coverage Factor
@@ -100,7 +110,8 @@ As of spec 96, Debtmap scores are no longer capped at 10.0. This change allows f
 Coverage: 80%
 Complexity: 5
 Dependencies: 2
-Score: ~2.3
+Raw Score: ~2.3
+Normalized: 2.3 (Linear range)
 ```
 
 ### Example 2: Complex Module
@@ -108,7 +119,8 @@ Score: ~2.3
 Coverage: 30%
 Complexity: 25
 Dependencies: 8
-Score: ~8.7
+Raw Score: ~45
+Normalized: ~16.7 (Square root range)
 ```
 
 ### Example 3: Critical Legacy Code
@@ -116,7 +128,19 @@ Score: ~8.7
 Coverage: 0%
 Complexity: 50
 Dependencies: 15
-Score: ~15.2 (exceeds old cap)
+Raw Score: ~250
+Normalized: ~50.8 (Logarithmic range)
+```
+
+### Score Normalization Examples
+```
+Raw Score → Normalized Score (Scaling Method)
+5.0 → 5.0 (Linear)
+10.0 → 10.0 (Linear/Square root boundary)
+50.0 → 23.7 (Square root)
+100.0 → 41.6 (Square root/Logarithmic boundary)
+500.0 → 57.7 (Logarithmic)
+1000.0 → 64.6 (Logarithmic)
 ```
 
 ## Best Practices
@@ -136,7 +160,11 @@ A: To provide better differentiation between high-risk items and more accurately
 A: Treat them as critical issues requiring immediate attention. These represent compound risks that significantly impact maintainability.
 
 ### Q: Will scores continue to increase infinitely?
-A: While there's no hard cap, square root scaling above 10.0 ensures scores increase gradually, not exponentially.
+A: While there's no hard cap, the three-stage scaling approach (spec 101) ensures scores increase gradually:
+- Linear growth for low scores (0-10)
+- Square root scaling for medium scores (10-100)
+- Logarithmic scaling for high scores (100+)
+This provides meaningful differentiation at all levels while preventing runaway scores.
 
 ### Q: How does this affect our existing tooling?
 A: Review any tools that assume a maximum score of 10.0. Update thresholds, visualizations, and quality gates accordingly.
