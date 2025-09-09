@@ -1,7 +1,7 @@
 # Sequential workflow. Fix top technical item
-- shell: "cargo build --release --bin debtmap"
+- shell: "just builid-release"
 
-- shell: "cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage --timeout 120"
+- shell: "just coverage-lcov"
 
 - claude: "/debtmap"
   commit_required: true
