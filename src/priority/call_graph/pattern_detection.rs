@@ -5,13 +5,11 @@ use im::HashMap;
 
 impl CallGraph {
     /// Pure function to check if delegation pattern criteria are met
-    #[cfg(test)]
     pub fn meets_delegation_criteria(orchestrator_complexity: u32, callee_count: usize) -> bool {
         orchestrator_complexity <= 3 && callee_count >= 2
     }
 
     /// Pure function to calculate average complexity of callees
-    #[cfg(test)]
     pub fn calculate_average_callee_complexity(
         callees: &[FunctionId],
         nodes: &HashMap<FunctionId, FunctionNode>,
@@ -26,7 +24,6 @@ impl CallGraph {
     }
 
     /// Pure function to determine if complexity indicates delegation
-    #[cfg(test)]
     pub fn indicates_delegation(orchestrator_complexity: u32, avg_callee_complexity: f64) -> bool {
         avg_callee_complexity > orchestrator_complexity as f64 * 1.5
     }

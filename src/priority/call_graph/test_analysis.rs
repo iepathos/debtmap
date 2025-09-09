@@ -38,7 +38,6 @@ impl CallGraph {
     }
 
     /// Pure function to check if a node is a production entry point
-    #[cfg(test)]
     pub fn is_production_entry_point(node: &FunctionNode, callers: &[FunctionId]) -> bool {
         !node.is_test && (node.is_entry_point || callers.is_empty())
     }

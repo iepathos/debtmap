@@ -281,13 +281,11 @@ impl CallGraph {
     }
 
     /// Pure function to filter functions by file
-    #[cfg(test)]
     pub fn functions_in_file<'a>(nodes: &'a HashMap<FunctionId, FunctionNode>, file: &PathBuf) -> Vec<&'a FunctionId> {
         nodes.keys().filter(|id| &id.file == file).collect()
     }
 
     /// Pure function to find the best matching function by line proximity
-    #[cfg(test)]
     pub fn find_best_line_match(functions: &[&FunctionId], target_line: usize) -> Option<FunctionId> {
         functions
             .iter()

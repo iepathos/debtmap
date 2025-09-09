@@ -4,13 +4,11 @@ use super::types::{CallGraph, FunctionId};
 
 impl CallGraph {
     /// Pure function to calculate entry point criticality factor
-    #[cfg(test)]
     pub fn entry_point_criticality_factor(is_entry_point: bool) -> f64 {
         if is_entry_point { 2.0 } else { 1.0 }
     }
 
     /// Pure function to calculate dependency count criticality factor
-    #[cfg(test)]
     pub fn dependency_count_criticality_factor(dependency_count: usize) -> f64 {
         match dependency_count {
             count if count > 5 => 1.5,
@@ -20,7 +18,6 @@ impl CallGraph {
     }
 
     /// Pure function to check if any caller is an entry point
-    #[cfg(test)]
     pub fn has_entry_point_caller<F>(callers: &[FunctionId], is_entry_point_fn: F) -> bool
     where
         F: Fn(&FunctionId) -> bool,
@@ -29,7 +26,6 @@ impl CallGraph {
     }
 
     /// Pure function to calculate entry point caller criticality factor
-    #[cfg(test)]
     pub fn entry_point_caller_criticality_factor(has_entry_point_caller: bool) -> f64 {
         if has_entry_point_caller { 1.3 } else { 1.0 }
     }
