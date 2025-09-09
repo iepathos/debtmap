@@ -2,11 +2,17 @@ use crate::common::SourceLocation;
 use syn;
 
 pub mod god_object_analysis;
+pub mod god_object_metrics;
 
 pub use god_object_analysis::{
     calculate_god_object_score, determine_confidence, group_methods_by_responsibility,
     recommend_module_splits, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
     ModuleSplit,
+};
+
+pub use god_object_metrics::{
+    GodObjectMetrics, GodObjectSnapshot, MetricsSummary, FileMetricHistory, 
+    FileTrend, TrendDirection,
 };
 
 #[derive(Debug, Clone, PartialEq)]
