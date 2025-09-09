@@ -337,27 +337,43 @@ impl CallGraph {
         visited
     }
 
+    /// Pure function to check if delegation pattern criteria are met
+    fn meets_delegation_criteria(orchestrator_complexity: u32, callee_count: usize) -> bool {
+        orchestrator_complexity <= 3 && callee_count >= 2
+    }
+
+    /// Pure function to calculate average complexity of callees
+    fn calculate_average_callee_complexity(
+        callees: &[FunctionId],
+        nodes: &HashMap<FunctionId, FunctionNode>,
+    ) -> f64 {
+        let total_complexity: f64 = callees
+            .iter()
+            .filter_map(|id| nodes.get(id))
+            .map(|n| n.complexity as f64)
+            .sum();
+        
+        total_complexity / callees.len().max(1) as f64
+    }
+
+    /// Pure function to determine if complexity indicates delegation
+    fn indicates_delegation(orchestrator_complexity: u32, avg_callee_complexity: f64) -> bool {
+        avg_callee_complexity > orchestrator_complexity as f64 * 1.5
+    }
+
     pub fn detect_delegation_pattern(&self, func_id: &FunctionId) -> bool {
-        if let Some(node) = self.nodes.get(func_id) {
-            let callees = self.get_callees(func_id);
-
-            // Delegation pattern requires:
-            // 1. Low complexity in the orchestrator
-            // 2. Multiple functions being coordinated (not just one wrapper call)
-            // 3. Callees doing the real work (higher complexity)
-            if node.complexity <= 3 && callees.len() >= 2 {
-                let avg_callee_complexity: f64 = callees
-                    .iter()
-                    .filter_map(|id| self.nodes.get(id))
-                    .map(|n| n.complexity as f64)
-                    .sum::<f64>()
-                    / callees.len().max(1) as f64;
-
-                // Delegates if callees are more complex on average
-                return avg_callee_complexity > node.complexity as f64 * 1.5;
-            }
+        let Some(node) = self.nodes.get(func_id) else {
+            return false;
+        };
+        
+        let callees = self.get_callees(func_id);
+        
+        if !Self::meets_delegation_criteria(node.complexity, callees.len()) {
+            return false;
         }
-        false
+        
+        let avg_callee_complexity = Self::calculate_average_callee_complexity(&callees, &self.nodes);
+        Self::indicates_delegation(node.complexity, avg_callee_complexity)
     }
 
     pub fn find_entry_points(&self) -> Vec<FunctionId> {
@@ -396,57 +412,74 @@ impl CallGraph {
         self.nodes.keys().cloned().collect()
     }
 
-    /// Identify functions that are only reachable from test functions
-    /// These are test infrastructure functions (mocks, helpers, fixtures, etc.)
-    pub fn find_test_only_functions(&self) -> HashSet<FunctionId> {
-        // Step 1: Identify all test functions
-        let test_functions: HashSet<FunctionId> = self
-            .nodes
+    /// Pure function to identify all test functions from nodes
+    fn collect_test_functions(nodes: &HashMap<FunctionId, FunctionNode>) -> HashSet<FunctionId> {
+        nodes
             .iter()
             .filter(|(_, node)| node.is_test)
             .map(|(id, _)| id.clone())
-            .collect();
+            .collect()
+    }
 
-        // Step 2: Find all functions reachable from test functions (including tests themselves)
+    /// Pure function to check if a node is a production entry point
+    fn is_production_entry_point(node: &FunctionNode, callers: &[FunctionId]) -> bool {
+        !node.is_test && (node.is_entry_point || callers.is_empty())
+    }
+
+    /// Pure function to filter test-only functions from reachable sets
+    fn filter_test_only_functions(
+        reachable_from_tests: HashSet<FunctionId>,
+        reachable_from_production: &HashSet<FunctionId>,
+        nodes: &HashMap<FunctionId, FunctionNode>,
+    ) -> HashSet<FunctionId> {
+        reachable_from_tests
+            .into_iter()
+            .filter(|id| {
+                !reachable_from_production.contains(id)
+                    && nodes.get(id).is_some_and(|node| !node.is_test)
+            })
+            .collect()
+    }
+
+    /// Identify functions that are only reachable from test functions
+    /// These are test infrastructure functions (mocks, helpers, fixtures, etc.)
+    pub fn find_test_only_functions(&self) -> HashSet<FunctionId> {
+        let test_functions = Self::collect_test_functions(&self.nodes);
+        let reachable_from_tests = self.find_functions_reachable_from_tests(&test_functions);
+        let reachable_from_production = self.find_functions_reachable_from_production();
+        
+        Self::filter_test_only_functions(
+            reachable_from_tests,
+            &reachable_from_production,
+            &self.nodes,
+        )
+    }
+
+    /// Find all functions reachable from test functions (including tests themselves)
+    fn find_functions_reachable_from_tests(
+        &self,
+        test_functions: &HashSet<FunctionId>,
+    ) -> HashSet<FunctionId> {
         let mut reachable_from_tests = test_functions.clone();
-        for test_fn in &test_functions {
-            // Get all transitive callees (functions called by this test)
+        for test_fn in test_functions {
             let callees = self.get_transitive_callees(test_fn, usize::MAX);
             reachable_from_tests.extend(callees);
         }
+        reachable_from_tests
+    }
 
-        // Step 3: Find all functions reachable from non-test code
+    /// Find all functions reachable from production (non-test) entry points
+    fn find_functions_reachable_from_production(&self) -> HashSet<FunctionId> {
         let mut reachable_from_production = HashSet::new();
         for (id, node) in &self.nodes {
-            // Skip test functions entirely
-            if node.is_test {
-                continue;
-            }
-
-            // Non-test functions that are either:
-            // 1. Marked as entry points
-            // 2. Have no callers (top-level functions)
-            if node.is_entry_point || self.get_callers(id).is_empty() {
+            let callers = self.get_callers(id);
+            if Self::is_production_entry_point(node, &callers) {
                 reachable_from_production.insert(id.clone());
                 let callees = self.get_transitive_callees(id, usize::MAX);
                 reachable_from_production.extend(callees);
             }
         }
-
-        // Step 4: Test-only functions are those reachable from tests but NOT from production
-        // This excludes test functions themselves (they're not infrastructure, they ARE tests)
-        let test_only: HashSet<FunctionId> = reachable_from_tests
-            .into_iter()
-            .filter(|id| {
-                // Must be:
-                // 1. NOT in production reachable set
-                // 2. NOT a test function itself (test functions are not infrastructure)
-                !reachable_from_production.contains(id)
-                    && self.nodes.get(id).is_some_and(|node| !node.is_test)
-            })
-            .collect();
-
-        test_only
+        reachable_from_production
     }
 
     pub fn get_function_calls(&self, func_id: &FunctionId) -> Vec<FunctionCall> {
@@ -466,32 +499,43 @@ impl CallGraph {
         self.nodes.is_empty()
     }
 
+    /// Pure function to calculate entry point criticality factor
+    fn entry_point_criticality_factor(is_entry_point: bool) -> f64 {
+        if is_entry_point { 2.0 } else { 1.0 }
+    }
+
+    /// Pure function to calculate dependency count criticality factor
+    fn dependency_count_criticality_factor(dependency_count: usize) -> f64 {
+        match dependency_count {
+            count if count > 5 => 1.5,
+            count if count > 2 => 1.2,
+            _ => 1.0,
+        }
+    }
+
+    /// Pure function to check if any caller is an entry point
+    fn has_entry_point_caller<F>(callers: &[FunctionId], is_entry_point_fn: F) -> bool
+    where
+        F: Fn(&FunctionId) -> bool,
+    {
+        callers.iter().any(is_entry_point_fn)
+    }
+
+    /// Pure function to calculate entry point caller criticality factor
+    fn entry_point_caller_criticality_factor(has_entry_point_caller: bool) -> f64 {
+        if has_entry_point_caller { 1.3 } else { 1.0 }
+    }
+
     pub fn calculate_criticality(&self, func_id: &FunctionId) -> f64 {
-        let mut criticality = 1.0;
-
-        // Entry points are critical
-        if self.is_entry_point(func_id) {
-            criticality *= 2.0;
-        }
-
-        // Functions with many dependents are critical
-        let dependency_count = self.get_dependency_count(func_id);
-        if dependency_count > 5 {
-            criticality *= 1.5;
-        } else if dependency_count > 2 {
-            criticality *= 1.2;
-        }
-
-        // Functions called by entry points are critical
+        let base_criticality = 1.0;
+        let entry_factor = Self::entry_point_criticality_factor(self.is_entry_point(func_id));
+        let dependency_factor = Self::dependency_count_criticality_factor(self.get_dependency_count(func_id));
+        
         let callers = self.get_callers(func_id);
-        for caller in &callers {
-            if self.is_entry_point(caller) {
-                criticality *= 1.3;
-                break;
-            }
-        }
-
-        criticality
+        let has_entry_caller = Self::has_entry_point_caller(&callers, |id| self.is_entry_point(id));
+        let caller_factor = Self::entry_point_caller_criticality_factor(has_entry_caller);
+        
+        base_criticality * entry_factor * dependency_factor * caller_factor
     }
 
     /// Build a map of all functions by name
@@ -516,28 +560,25 @@ impl CallGraph {
             .collect()
     }
 
+    /// Pure function to filter functions by file
+    fn functions_in_file<'a>(nodes: &'a HashMap<FunctionId, FunctionNode>, file: &PathBuf) -> Vec<&'a FunctionId> {
+        nodes.keys().filter(|id| &id.file == file).collect()
+    }
+
+    /// Pure function to find the best matching function by line proximity
+    fn find_best_line_match(functions: &[&FunctionId], target_line: usize) -> Option<FunctionId> {
+        functions
+            .iter()
+            .filter(|func_id| func_id.line <= target_line)
+            .min_by_key(|func_id| target_line - func_id.line)
+            .map(|&func_id| func_id.clone())
+    }
+
     /// Find a function at a specific file and line location
     /// Returns the function that contains the given line
     pub fn find_function_at_location(&self, file: &PathBuf, line: usize) -> Option<FunctionId> {
-        // Find all functions in the specified file
-        let functions_in_file: Vec<_> = self.nodes.keys().filter(|id| &id.file == file).collect();
-
-        // Find the function that contains this line
-        // We'll return the function with the closest line number that's <= the target line
-        let mut best_match: Option<&FunctionId> = None;
-        let mut best_distance = usize::MAX;
-
-        for func_id in functions_in_file {
-            if func_id.line <= line {
-                let distance = line - func_id.line;
-                if distance < best_distance {
-                    best_distance = distance;
-                    best_match = Some(func_id);
-                }
-            }
-        }
-
-        best_match.cloned()
+        let functions_in_file = Self::functions_in_file(&self.nodes, file);
+        Self::find_best_line_match(&functions_in_file, line)
     }
 
     /// Advanced call resolution using sophisticated matching strategies

@@ -38,10 +38,9 @@ impl PythonCallGraphAnalyzer {
         Self::default()
     }
 
-    /// Get callback patterns for a given function name
-    fn get_callback_patterns() -> Vec<CallbackPattern> {
+    /// Pure function to create wxPython callback patterns
+    fn create_wx_python_patterns() -> Vec<CallbackPattern> {
         vec![
-            // wxPython
             CallbackPattern {
                 function_name: "CallAfter".to_string(),
                 module_name: Some("wx".to_string()),
@@ -52,7 +51,12 @@ impl PythonCallGraphAnalyzer {
                 module_name: Some("wx".to_string()),
                 argument_position: 1,
             },
-            // asyncio
+        ]
+    }
+
+    /// Pure function to create asyncio callback patterns
+    fn create_asyncio_patterns() -> Vec<CallbackPattern> {
+        vec![
             CallbackPattern {
                 function_name: "create_task".to_string(),
                 module_name: Some("asyncio".to_string()),
@@ -68,7 +72,12 @@ impl PythonCallGraphAnalyzer {
                 module_name: None,
                 argument_position: 1,
             },
-            // threading
+        ]
+    }
+
+    /// Pure function to create threading callback patterns
+    fn create_threading_patterns() -> Vec<CallbackPattern> {
+        vec![
             CallbackPattern {
                 function_name: "Timer".to_string(),
                 module_name: Some("threading".to_string()),
@@ -79,7 +88,12 @@ impl PythonCallGraphAnalyzer {
                 module_name: Some("threading".to_string()),
                 argument_position: 0,
             },
-            // multiprocessing
+        ]
+    }
+
+    /// Pure function to create multiprocessing callback patterns
+    fn create_multiprocessing_patterns() -> Vec<CallbackPattern> {
+        vec![
             CallbackPattern {
                 function_name: "Process".to_string(),
                 module_name: Some("multiprocessing".to_string()),
@@ -90,7 +104,12 @@ impl PythonCallGraphAnalyzer {
                 module_name: None,
                 argument_position: 0,
             },
-            // Generic patterns
+        ]
+    }
+
+    /// Pure function to create generic callback patterns
+    fn create_generic_patterns() -> Vec<CallbackPattern> {
+        vec![
             CallbackPattern {
                 function_name: "schedule".to_string(),
                 module_name: None,
@@ -114,6 +133,47 @@ impl PythonCallGraphAnalyzer {
         ]
     }
 
+    /// Get callback patterns for a given function name
+    fn get_callback_patterns() -> Vec<CallbackPattern> {
+        [Self::create_wx_python_patterns(),
+         Self::create_asyncio_patterns(),
+         Self::create_threading_patterns(),
+         Self::create_multiprocessing_patterns(),
+         Self::create_generic_patterns()]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
+    /// Pure function to check if pattern matches function call
+    fn pattern_matches_call(
+        pattern: &CallbackPattern,
+        func_name: &str,
+        module_name: Option<&str>,
+    ) -> bool {
+        if pattern.function_name != func_name {
+            return false;
+        }
+        
+        match (&pattern.module_name, module_name) {
+            (Some(pattern_module), Some(actual_module)) => pattern_module == actual_module,
+            (None, _) => true, // Pattern doesn't specify module, match on function name alone
+            (Some(_), None) => false, // Pattern requires module but none provided
+        }
+    }
+
+    /// Pure function to find callback position for function
+    fn find_callback_position(
+        patterns: &[CallbackPattern],
+        func_name: &str,
+        module_name: Option<&str>,
+    ) -> Option<usize> {
+        patterns
+            .iter()
+            .find(|pattern| Self::pattern_matches_call(pattern, func_name, module_name))
+            .map(|pattern| pattern.argument_position)
+    }
+
     /// Check if a function accepts callbacks
     fn is_callback_accepting_function(
         &self,
@@ -121,22 +181,7 @@ impl PythonCallGraphAnalyzer {
         module_name: Option<&str>,
     ) -> Option<usize> {
         let patterns = Self::get_callback_patterns();
-        for pattern in patterns {
-            if pattern.function_name == func_name {
-                // If module_name is specified in pattern, check it matches
-                if let Some(pattern_module) = &pattern.module_name {
-                    if let Some(actual_module) = module_name {
-                        if pattern_module == actual_module {
-                            return Some(pattern.argument_position);
-                        }
-                    }
-                } else {
-                    // Pattern doesn't specify module, so match on function name alone
-                    return Some(pattern.argument_position);
-                }
-            }
-        }
-        None
+        Self::find_callback_position(&patterns, func_name, module_name)
     }
 
     /// Build a nested function name
@@ -205,6 +250,36 @@ impl PythonCallGraphAnalyzer {
             .unwrap_or(1)
     }
 
+    /// Pure function to extract function info from function definition
+    fn extract_function_info(
+        func_name: &str,
+        definition_prefix: &str,
+        class_context: Option<&str>,
+        lines: &[&str],
+    ) -> (String, usize) {
+        let qualified_name = Self::build_function_name(func_name, class_context);
+        let line = Self::find_function_line(func_name, definition_prefix, lines);
+        (qualified_name, line)
+    }
+
+    /// Pure function to process a regular function definition statement
+    fn process_function_def(
+        func_def: &ast::StmtFunctionDef,
+        class_context: Option<&str>,
+        lines: &[&str],
+    ) -> (String, usize) {
+        Self::extract_function_info(&func_def.name, "def", class_context, lines)
+    }
+
+    /// Pure function to process an async function definition statement
+    fn process_async_function_def(
+        func_def: &ast::StmtAsyncFunctionDef,
+        class_context: Option<&str>,
+        lines: &[&str],
+    ) -> (String, usize) {
+        Self::extract_function_info(&func_def.name, "async def", class_context, lines)
+    }
+
     /// Collect line numbers for all functions in the module using text search
     fn collect_function_lines(
         &mut self,
@@ -213,49 +288,49 @@ impl PythonCallGraphAnalyzer {
         class_context: Option<&str>,
     ) {
         let lines: Vec<&str> = source.lines().collect();
-
+        
         for stmt in stmts {
-            match stmt {
-                ast::Stmt::FunctionDef(func_def) => {
-                    let func_name = Self::build_function_name(&func_def.name, class_context);
-                    let line = Self::find_function_line(&func_def.name, "def", &lines);
-                    self.function_lines.insert(func_name.clone(), line);
-
-                    // Track this function as we descend to find nested functions
-                    let prev_function = self.current_function.clone();
-                    self.current_function = Some(func_name.clone());
-
-                    // Collect nested functions - this already handles nested functions,
-                    // so we don't need to call collect_function_lines recursively
-                    self.collect_nested_functions_in_body(&func_def.body, source, &func_name);
-
-                    self.current_function = prev_function;
-                }
-                ast::Stmt::AsyncFunctionDef(func_def) => {
-                    let func_name = Self::build_function_name(&func_def.name, class_context);
-                    let line = Self::find_function_line(&func_def.name, "async def", &lines);
-                    self.function_lines.insert(func_name.clone(), line);
-
-                    // Track this function as we descend to find nested functions
-                    let prev_function = self.current_function.clone();
-                    self.current_function = Some(func_name.clone());
-
-                    // Collect nested functions - this already handles nested functions,
-                    // so we don't need to call collect_function_lines recursively
-                    self.collect_nested_functions_in_body(&func_def.body, source, &func_name);
-
-                    self.current_function = prev_function;
-                }
-                ast::Stmt::ClassDef(class_def) => {
-                    self.collect_function_lines(
-                        &class_def.body,
-                        source,
-                        Some(class_def.name.as_ref()),
-                    );
-                }
-                _ => {}
-            }
+            self.process_single_statement(stmt, &lines, source, class_context);
         }
+    }
+
+    /// Process a single statement for function line collection
+    fn process_single_statement(
+        &mut self,
+        stmt: &ast::Stmt,
+        lines: &[&str],
+        source: &str,
+        class_context: Option<&str>,
+    ) {
+        match stmt {
+            ast::Stmt::FunctionDef(func_def) => {
+                let (func_name, line) = Self::process_function_def(func_def, class_context, lines);
+                self.function_lines.insert(func_name.clone(), line);
+                self.process_function_with_nested(&func_def.body, source, func_name);
+            }
+            ast::Stmt::AsyncFunctionDef(func_def) => {
+                let (func_name, line) = Self::process_async_function_def(func_def, class_context, lines);
+                self.function_lines.insert(func_name.clone(), line);
+                self.process_function_with_nested(&func_def.body, source, func_name);
+            }
+            ast::Stmt::ClassDef(class_def) => {
+                self.collect_function_lines(&class_def.body, source, Some(class_def.name.as_ref()));
+            }
+            _ => {}
+        }
+    }
+
+    /// Process a function body while tracking nested functions
+    fn process_function_with_nested(
+        &mut self,
+        body: &[ast::Stmt],
+        source: &str,
+        func_name: String,
+    ) {
+        let prev_function = self.current_function.clone();
+        self.current_function = Some(func_name.clone());
+        self.collect_nested_functions_in_body(body, source, &func_name);
+        self.current_function = prev_function;
     }
 
     /// Collect nested functions within a function body
@@ -425,6 +500,66 @@ impl PythonCallGraphAnalyzer {
         Ok(())
     }
 
+    /// Pure function to extract statement bodies for analysis
+    fn extract_if_stmt_bodies(if_stmt: &ast::StmtIf) -> (&[ast::Stmt], &[ast::Stmt]) {
+        (&if_stmt.body, &if_stmt.orelse)
+    }
+
+    /// Pure function to extract for loop body
+    fn extract_for_stmt_body(for_stmt: &ast::StmtFor) -> &[ast::Stmt] {
+        &for_stmt.body
+    }
+
+    /// Pure function to extract while loop body
+    fn extract_while_stmt_body(while_stmt: &ast::StmtWhile) -> &[ast::Stmt] {
+        &while_stmt.body
+    }
+
+    /// Pure function to extract all statement bodies from try block
+    fn extract_try_stmt_bodies(try_stmt: &ast::StmtTry) -> (Vec<&[ast::Stmt]>, &[ast::Stmt], &[ast::Stmt]) {
+        let mut handler_bodies = Vec::new();
+        for handler in &try_stmt.handlers {
+            let ast::ExceptHandler::ExceptHandler(h) = handler;
+            handler_bodies.push(h.body.as_slice());
+        }
+        (handler_bodies, &try_stmt.orelse, &try_stmt.finalbody)
+    }
+
+    /// Analyze control flow statement by processing its bodies
+    fn analyze_control_flow_stmt(
+        &mut self,
+        stmt: &ast::Stmt,
+        file_path: &Path,
+        call_graph: &mut CallGraph,
+    ) -> Result<()> {
+        match stmt {
+            ast::Stmt::If(if_stmt) => {
+                let (body, orelse) = Self::extract_if_stmt_bodies(if_stmt);
+                self.analyze_stmt_list(body, file_path, call_graph)?;
+                self.analyze_stmt_list(orelse, file_path, call_graph)?;
+            }
+            ast::Stmt::For(for_stmt) => {
+                let body = Self::extract_for_stmt_body(for_stmt);
+                self.analyze_stmt_list(body, file_path, call_graph)?;
+            }
+            ast::Stmt::While(while_stmt) => {
+                let body = Self::extract_while_stmt_body(while_stmt);
+                self.analyze_stmt_list(body, file_path, call_graph)?;
+            }
+            ast::Stmt::Try(try_stmt) => {
+                let (handler_bodies, orelse, finalbody) = Self::extract_try_stmt_bodies(try_stmt);
+                self.analyze_stmt_list(&try_stmt.body, file_path, call_graph)?;
+                for handler_body in handler_bodies {
+                    self.analyze_stmt_list(handler_body, file_path, call_graph)?;
+                }
+                self.analyze_stmt_list(orelse, file_path, call_graph)?;
+                self.analyze_stmt_list(finalbody, file_path, call_graph)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     fn analyze_stmt_for_calls(
         &mut self,
         stmt: &ast::Stmt,
@@ -436,49 +571,14 @@ impl PythonCallGraphAnalyzer {
                 self.analyze_expr_for_calls(&expr_stmt.value, file_path, call_graph)?;
             }
             ast::Stmt::Assign(assign_stmt) => {
-                // Also analyze the value being assigned for calls
                 self.analyze_expr_for_calls(&assign_stmt.value, file_path, call_graph)?;
             }
             ast::Stmt::With(with_stmt) => {
                 self.analyze_with_stmt(with_stmt, file_path, call_graph)?;
             }
-            ast::Stmt::If(if_stmt) => {
-                for s in &if_stmt.body {
-                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                }
-                for s in &if_stmt.orelse {
-                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                }
+            _ => {
+                self.analyze_control_flow_stmt(stmt, file_path, call_graph)?;
             }
-            ast::Stmt::For(for_stmt) => {
-                for s in &for_stmt.body {
-                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                }
-            }
-            ast::Stmt::While(while_stmt) => {
-                for s in &while_stmt.body {
-                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                }
-            }
-            ast::Stmt::Try(try_stmt) => {
-                for s in &try_stmt.body {
-                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                }
-                for handler in &try_stmt.handlers {
-                    let ast::ExceptHandler::ExceptHandler(h) = handler;
-                    for s in &h.body {
-                        self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                    }
-                }
-                // Also analyze the else and finally blocks
-                for s in &try_stmt.orelse {
-                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                }
-                for s in &try_stmt.finalbody {
-                    self.analyze_stmt_for_calls(s, file_path, call_graph)?;
-                }
-            }
-            _ => {}
         }
         Ok(())
     }
@@ -540,6 +640,34 @@ impl PythonCallGraphAnalyzer {
         Ok(())
     }
 
+    /// Pure function to extract function and module name from call expression
+    fn extract_call_target(call_expr: &ast::ExprCall) -> Option<(String, Option<String>)> {
+        match &*call_expr.func {
+            ast::Expr::Name(name) => Some((name.id.to_string(), None)),
+            ast::Expr::Attribute(attr_expr) => {
+                let func_name = attr_expr.attr.to_string();
+                let module_name = match &*attr_expr.value {
+                    ast::Expr::Name(module) => Some(module.id.to_string()),
+                    _ => None, // More complex expression like obj.method.CallAfter
+                };
+                Some((func_name, module_name))
+            }
+            _ => None,
+        }
+    }
+
+    /// Pure function to get callback argument if valid callback position exists
+    fn get_callback_argument(
+        call_expr: &ast::ExprCall,
+        callback_position: usize,
+    ) -> Option<&ast::Expr> {
+        if call_expr.args.len() > callback_position {
+            Some(&call_expr.args[callback_position])
+        } else {
+            None
+        }
+    }
+
     /// Check for callback patterns where functions are passed as arguments
     fn check_for_callback_patterns(
         &mut self,
@@ -548,30 +676,15 @@ impl PythonCallGraphAnalyzer {
         call_graph: &mut CallGraph,
     ) -> Result<()> {
         // Extract the function name and module being called
-        let (func_name, module_name) = match &*call_expr.func {
-            ast::Expr::Name(name) => (name.id.to_string(), None),
-            ast::Expr::Attribute(attr_expr) => {
-                // Handle module.function pattern (e.g., wx.CallAfter)
-                if let ast::Expr::Name(module) = &*attr_expr.value {
-                    (attr_expr.attr.to_string(), Some(module.id.to_string()))
-                } else {
-                    // Could be a more complex expression like obj.method.CallAfter
-                    (attr_expr.attr.to_string(), None)
-                }
-            }
-            _ => return Ok(()),
+        let Some((func_name, module_name)) = Self::extract_call_target(call_expr) else {
+            return Ok(());
         };
 
         // Check if this is a callback-accepting function
         if let Some(callback_position) =
             self.is_callback_accepting_function(&func_name, module_name.as_deref())
         {
-            // Check if we have enough arguments
-            if call_expr.args.len() > callback_position {
-                // Get the argument at the callback position
-                let callback_arg = &call_expr.args[callback_position];
-
-                // Check if it's a function reference
+            if let Some(callback_arg) = Self::get_callback_argument(call_expr, callback_position) {
                 self.track_function_argument(callback_arg, file_path, call_graph)?;
             }
         }
@@ -660,6 +773,36 @@ impl PythonCallGraphAnalyzer {
         Ok(())
     }
 
+    /// Pure function to extract method name from attribute call
+    fn extract_method_name_from_call(call_expr: &ast::ExprCall) -> Option<&str> {
+        match &*call_expr.func {
+            ast::Expr::Attribute(attr_expr) => Some(&attr_expr.attr),
+            _ => None,
+        }
+    }
+
+    /// Pure function to check if argument is a self/cls method reference
+    fn is_self_or_cls_method_reference(arg: &ast::Expr) -> Option<&str> {
+        match arg {
+            ast::Expr::Attribute(handler_attr) => {
+                match &*handler_attr.value {
+                    ast::Expr::Name(obj_name) if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" => {
+                        Some(&handler_attr.attr)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Pure function to find self/cls method references in arguments
+    fn find_method_references_in_args(args: &[ast::Expr]) -> Vec<&str> {
+        args.iter()
+            .filter_map(Self::is_self_or_cls_method_reference)
+            .collect()
+    }
+
     fn check_for_event_binding(
         &mut self,
         call_expr: &ast::ExprCall,
@@ -667,44 +810,39 @@ impl PythonCallGraphAnalyzer {
         call_graph: &mut CallGraph,
     ) -> Result<()> {
         // Check if this is a method call like obj.Bind(...)
-        if let ast::Expr::Attribute(attr_expr) = &*call_expr.func {
-            let method_name = &attr_expr.attr;
-
-            // Look for common event binding methods
+        if let Some(method_name) = Self::extract_method_name_from_call(call_expr) {
             if self.is_event_binding_method(method_name) {
-                // Check all arguments for method references like self.on_paint
-                for arg in &call_expr.args {
-                    if let ast::Expr::Attribute(handler_attr) = arg {
-                        if let ast::Expr::Name(obj_name) = &*handler_attr.value {
-                            if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" {
-                                // This is a method reference passed as event handler
-                                self.add_event_handler_reference(
-                                    &handler_attr.attr,
-                                    file_path,
-                                    call_graph,
-                                )?;
-                            }
-                        }
-                    }
+                let method_refs = Self::find_method_references_in_args(&call_expr.args);
+                for method_ref in method_refs {
+                    self.add_event_handler_reference(method_ref, file_path, call_graph)?;
                 }
             }
         }
         Ok(())
     }
 
+    /// Pure function to get known event binding methods
+    fn get_event_binding_methods() -> &'static [&'static str] {
+        &[
+            "Bind",           // wxPython: obj.Bind(wx.EVT_PAINT, self.on_paint)
+            "bind",           // Tkinter: widget.bind("<Button-1>", self.on_click)
+            "connect",        // PyQt/PySide: signal.connect(self.slot)
+            "on",             // Some frameworks
+            "addEventListener", // Web frameworks
+            "addListener",    // Event systems
+            "subscribe",      // Observer patterns
+            "observe",        // Observer patterns
+            "listen",         // Event systems
+        ]
+    }
+
+    /// Pure function to check if method name is an event binding method
+    fn is_event_binding_method_name(method_name: &str) -> bool {
+        Self::get_event_binding_methods().contains(&method_name)
+    }
+
     fn is_event_binding_method(&self, method_name: &str) -> bool {
-        matches!(
-            method_name,
-            "Bind" |           // wxPython: obj.Bind(wx.EVT_PAINT, self.on_paint)
-            "bind" |           // Tkinter: widget.bind("<Button-1>", self.on_click)
-            "connect" |        // PyQt/PySide: signal.connect(self.slot)
-            "on" |             // Some frameworks
-            "addEventListener" | // Web frameworks
-            "addListener" |    // Event systems
-            "subscribe" |      // Observer patterns
-            "observe" |        // Observer patterns
-            "listen" // Event systems
-        )
+        Self::is_event_binding_method_name(method_name)
     }
 
     fn add_event_handler_reference(
