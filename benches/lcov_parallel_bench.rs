@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use debtmap::risk::lcov::{parse_lcov_file, FunctionCoverage, LcovData};
-use std::collections::HashMap;
+use criterion::{criterion_group, criterion_main, Criterion};
+use debtmap::risk::lcov::parse_lcov_file;
+use std::hint::black_box;
 use std::io::Write;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
@@ -50,7 +50,7 @@ fn benchmark_lcov_parsing(c: &mut Criterion) {
 
     // Benchmark coverage queries
     let data = parse_lcov_file(temp_file.path()).unwrap();
-    let test_paths: Vec<PathBuf> = (0..50)
+    let _test_paths: Vec<PathBuf> = (0..50)
         .map(|i| PathBuf::from(format!("/path/to/file_{}.rs", i)))
         .collect();
 

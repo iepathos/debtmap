@@ -3,7 +3,6 @@ use debtmap::organization::{
     GodObjectThresholds,
 };
 use std::path::Path;
-use syn;
 
 /// Test that a file with many standalone functions is detected as a god object
 #[test]

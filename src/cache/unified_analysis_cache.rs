@@ -267,9 +267,9 @@ mod tests {
 
     #[test]
     fn test_should_use_cache() {
-        assert_eq!(UnifiedAnalysisCache::should_use_cache(10, false), false);
-        assert_eq!(UnifiedAnalysisCache::should_use_cache(25, false), true);
-        assert_eq!(UnifiedAnalysisCache::should_use_cache(10, true), true);
-        assert_eq!(UnifiedAnalysisCache::should_use_cache(100, true), true);
+        assert!(!UnifiedAnalysisCache::should_use_cache(10, false));
+        assert!(UnifiedAnalysisCache::should_use_cache(25, false));
+        assert!(UnifiedAnalysisCache::should_use_cache(10, true));
+        assert!(UnifiedAnalysisCache::should_use_cache(100, true));
     }
 }

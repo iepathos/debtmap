@@ -179,6 +179,7 @@ pub fn perform_unified_analysis_with_options(
 }
 
 /// Perform the actual unified analysis computation (extracted for caching)
+#[allow(clippy::too_many_arguments)]
 fn perform_unified_analysis_computation(
     results: &AnalysisResults,
     coverage_file: Option<&PathBuf>,

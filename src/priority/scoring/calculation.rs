@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn test_normalization_monotonic() {
         // Verify ordering is preserved
-        let scores = vec![1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0];
+        let scores = [1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0];
         let normalized: Vec<_> = scores.iter().map(|&s| normalize_final_score(s)).collect();
 
         for i in 1..normalized.len() {
