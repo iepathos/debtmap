@@ -65,7 +65,6 @@ impl GodObjectDetector {
         let mut total_fields = 0;
         let mut all_methods = Vec::new();
         let mut total_complexity = 0u32;
-        
 
         // Count methods from types (structs/impl blocks)
         for type_info in visitor.types.values() {
