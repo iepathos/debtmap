@@ -1,14 +1,8 @@
 use debtmap::analyzers::rust_call_graph::extract_call_graph_multi_file;
 use std::path::PathBuf;
 
-#[test]
-fn test_cross_module_field_access_chain() {
-    // This test reproduces the exact cross-module pattern from the actual codebase
-    // where RustCallGraphBuilder in mod.rs calls FrameworkPatternDetector::analyze_file
-    // in framework_patterns.rs through a field access chain
-
-    // Module 1: framework_patterns.rs equivalent
-    let framework_patterns_code = r#"
+fn create_framework_patterns_code() -> &'static str {
+    r#"
 use std::path::Path;
 use anyhow::Result;
 
@@ -35,10 +29,11 @@ impl FrameworkPatternDetector {
         &self.patterns
     }
 }
-"#;
+"#
+}
 
-    // Module 2: mod.rs equivalent
-    let mod_code = r#"
+fn create_mod_code() -> &'static str {
+    r#"
 use std::path::Path;
 use anyhow::Result;
 
@@ -104,33 +99,40 @@ fn main() {
     let path = std::path::Path::new("test.rs");
     builder.analyze_framework_patterns(path, "test content").unwrap();
 }
-"#;
+"#
+}
 
-    // Parse both files
+fn parse_and_extract_call_graph(
+    framework_code: &str,
+    mod_code: &str,
+) -> debtmap::priority::call_graph::CallGraph {
     let framework_file =
-        syn::parse_file(framework_patterns_code).expect("Should parse framework_patterns code");
+        syn::parse_file(framework_code).expect("Should parse framework_patterns code");
     let mod_file = syn::parse_file(mod_code).expect("Should parse mod code");
 
-    // Simulate multi-file extraction as done in the actual codebase
     let files = vec![
         (framework_file, PathBuf::from("framework_patterns.rs")),
         (mod_file, PathBuf::from("mod.rs")),
     ];
 
-    let call_graph = extract_call_graph_multi_file(&files);
+    extract_call_graph_multi_file(&files)
+}
 
-    // Get all functions in the call graph
+fn find_analyze_file_function(
+    call_graph: &debtmap::priority::call_graph::CallGraph,
+) -> &debtmap::priority::call_graph::FunctionId {
     let all_functions = call_graph.find_all_functions();
-
-    // Find the analyze_file function from framework_patterns
-    let analyze_file = all_functions
+    all_functions
         .iter()
         .find(|f| f.name.contains("analyze_file"))
-        .expect("Should find analyze_file function");
+        .expect("Should find analyze_file function")
+}
 
-    // Check for callers
+fn verify_analyze_file_has_callers(
+    call_graph: &debtmap::priority::call_graph::CallGraph,
+    analyze_file: &debtmap::priority::call_graph::FunctionId,
+) {
     let callers = call_graph.get_callers(analyze_file);
-
     assert!(
         !callers.is_empty(),
         "FrameworkPatternDetector::analyze_file should have callers from RustCallGraphBuilder::analyze_framework_patterns"
@@ -138,11 +140,22 @@ fn main() {
 }
 
 #[test]
-fn test_cross_module_with_actual_imports() {
-    // Even more realistic test with proper module structure
+fn test_cross_module_field_access_chain() {
+    // This test reproduces the exact cross-module pattern from the actual codebase
+    // where RustCallGraphBuilder in mod.rs calls FrameworkPatternDetector::analyze_file
+    // in framework_patterns.rs through a field access chain
 
-    // File 1: src/framework_patterns.rs
-    let framework_patterns_code = r#"
+    let framework_code = create_framework_patterns_code();
+    let mod_code = create_mod_code();
+
+    let call_graph = parse_and_extract_call_graph(framework_code, mod_code);
+    let analyze_file = find_analyze_file_function(&call_graph);
+
+    verify_analyze_file_has_callers(&call_graph, analyze_file);
+}
+
+fn create_realistic_framework_patterns_code() -> &'static str {
+    r#"
 use std::path::Path;
 use anyhow::Result;
 use im::Vector;
@@ -183,10 +196,11 @@ impl Default for FrameworkPatternDetector {
         Self::new()
     }
 }
-"#;
+"#
+}
 
-    // File 2: src/mod.rs (using the framework_patterns module)
-    let mod_code = r#"
+fn create_realistic_mod_code() -> &'static str {
+    r#"
 mod framework_patterns;
 
 use framework_patterns::FrameworkPatternDetector;
@@ -249,44 +263,44 @@ pub fn process_file(path: &Path) -> Result<()> {
     let _graph = builder.build();
     Ok(())
 }
-"#;
+"#
+}
 
-    // Parse both files
-    let framework_file =
-        syn::parse_file(framework_patterns_code).expect("Should parse framework_patterns code");
-    let mod_file = syn::parse_file(mod_code).expect("Should parse mod code");
-
-    // Create multi-file call graph
-    let files = vec![
-        (framework_file, PathBuf::from("src/framework_patterns.rs")),
-        (mod_file, PathBuf::from("src/mod.rs")),
-    ];
-
-    let call_graph = extract_call_graph_multi_file(&files);
-
-    // Debug: Print all functions found
+fn debug_print_functions(call_graph: &debtmap::priority::call_graph::CallGraph) {
     let all_functions = call_graph.find_all_functions();
     println!("All functions found:");
     for func in &all_functions {
         println!("  - {} at {}:{}", func.name, func.file.display(), func.line);
     }
+}
 
-    // Find analyze_file
-    let analyze_file = all_functions
-        .iter()
-        .find(|f| f.name.contains("analyze_file"))
-        .expect("Should find analyze_file function");
-
+fn debug_print_analyze_file_info(
+    analyze_file: &debtmap::priority::call_graph::FunctionId,
+    callers: &[debtmap::priority::call_graph::FunctionId],
+) {
     println!(
         "\nChecking function: {} at {}:{}",
         analyze_file.name,
         analyze_file.file.display(),
         analyze_file.line
     );
-
-    // Check for callers
-    let callers = call_graph.get_callers(analyze_file);
     println!("Callers of analyze_file: {:?}", callers);
+}
+
+#[test]
+fn test_cross_module_with_actual_imports() {
+    // Even more realistic test with proper module structure
+
+    let framework_code = create_realistic_framework_patterns_code();
+    let mod_code = create_realistic_mod_code();
+
+    let call_graph = parse_and_extract_call_graph(framework_code, mod_code);
+    debug_print_functions(&call_graph);
+
+    let analyze_file = find_analyze_file_function(&call_graph);
+    let callers = call_graph.get_callers(analyze_file);
+
+    debug_print_analyze_file_info(analyze_file, &callers);
 
     assert!(
         !callers.is_empty(),
@@ -294,12 +308,8 @@ pub fn process_file(path: &Path) -> Result<()> {
     );
 }
 
-#[test]
-fn test_deep_nested_cross_module_access() {
-    // Test even deeper nesting across modules
-
-    // Module 1: Inner type
-    let inner_module = r#"
+fn create_inner_module_code() -> &'static str {
+    r#"
 pub struct DeepType {
     value: i32,
 }
@@ -314,10 +324,11 @@ impl DeepType {
         self.value
     }
 }
-"#;
+"#
+}
 
-    // Module 2: Middle type that uses Inner
-    let middle_module = r#"
+fn create_middle_module_code() -> &'static str {
+    r#"
 pub struct DeepType;
 
 pub struct MiddleType {
@@ -331,10 +342,11 @@ impl MiddleType {
         }
     }
 }
-"#;
+"#
+}
 
-    // Module 3: Outer type that uses Middle
-    let outer_module = r#"
+fn create_outer_module_code() -> &'static str {
+    r#"
 pub struct MiddleType;
 
 pub struct OuterType {
@@ -358,34 +370,58 @@ fn main() {
     let mut outer = OuterType::new();
     let _result = outer.do_work();
 }
-"#;
+"#
+}
 
-    // Parse all modules
-    let inner_file = syn::parse_file(inner_module).expect("Should parse inner module");
-    let middle_file = syn::parse_file(middle_module).expect("Should parse middle module");
-    let outer_file = syn::parse_file(outer_module).expect("Should parse outer module");
+fn parse_three_modules(
+    inner_code: &str,
+    middle_code: &str,
+    outer_code: &str,
+) -> debtmap::priority::call_graph::CallGraph {
+    let inner_file = syn::parse_file(inner_code).expect("Should parse inner module");
+    let middle_file = syn::parse_file(middle_code).expect("Should parse middle module");
+    let outer_file = syn::parse_file(outer_code).expect("Should parse outer module");
 
-    // Create multi-file call graph
     let files = vec![
         (inner_file, PathBuf::from("inner.rs")),
         (middle_file, PathBuf::from("middle.rs")),
         (outer_file, PathBuf::from("outer.rs")),
     ];
 
-    let call_graph = extract_call_graph_multi_file(&files);
+    extract_call_graph_multi_file(&files)
+}
 
-    // Find DeepType::process
+fn find_process_function(
+    call_graph: &debtmap::priority::call_graph::CallGraph,
+) -> &debtmap::priority::call_graph::FunctionId {
     let all_functions = call_graph.find_all_functions();
-    let process_func = all_functions
+    all_functions
         .iter()
         .find(|f| f.name.contains("DeepType::process"))
-        .expect("Should find DeepType::process");
+        .expect("Should find DeepType::process")
+}
 
-    // Check if it has callers (it should, from OuterType::do_work)
+fn verify_process_has_callers(
+    call_graph: &debtmap::priority::call_graph::CallGraph,
+    process_func: &debtmap::priority::call_graph::FunctionId,
+) {
     let callers = call_graph.get_callers(process_func);
-
     assert!(
         !callers.is_empty(),
         "DeepType::process should have callers through the cross-module field access chain"
     );
+}
+
+#[test]
+fn test_deep_nested_cross_module_access() {
+    // Test even deeper nesting across modules
+
+    let inner_code = create_inner_module_code();
+    let middle_code = create_middle_module_code();
+    let outer_code = create_outer_module_code();
+
+    let call_graph = parse_three_modules(inner_code, middle_code, outer_code);
+    let process_func = find_process_function(&call_graph);
+
+    verify_process_has_callers(&call_graph, process_func);
 }

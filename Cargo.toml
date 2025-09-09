@@ -107,3 +107,7 @@ debug = true
 name = "cache_pruning"
 harness = false
 
+[[bench]]
+name = "call_graph_bench"
+harness = false
+

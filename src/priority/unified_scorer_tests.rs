@@ -41,19 +41,17 @@ mod tests {
         assert!(score.final_score <= 10.0);
     }
 
-    #[test]
-    fn test_simple_io_wrapper_with_coverage_zero_score() {
-        // Create a simple I/O wrapper function with test coverage
+    fn create_simple_io_wrapper() -> FunctionMetrics {
         let mut func = create_test_metrics();
         func.name = "extract_module_from_import".to_string();
         func.cyclomatic = 1;
         func.cognitive = 1;
         func.length = 3;
         func.nesting = 1;
+        func
+    }
 
-        let call_graph = CallGraph::new();
-
-        // Create mock coverage data showing function is tested
+    fn create_full_coverage_data(func: &FunctionMetrics) -> LcovData {
         let mut lcov = LcovData::default();
         lcov.functions.insert(
             func.file.clone(),
@@ -65,14 +63,26 @@ mod tests {
                 uncovered_lines: vec![],
             }],
         );
+        lcov
+    }
 
-        // Calculate priority score with coverage
-        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
-
-        // Tested simple I/O wrapper should have zero score (not technical debt)
+    fn assert_zero_debt_score(score: &UnifiedScore) {
         assert_eq!(score.final_score, 0.0);
         assert_eq!(score.complexity_factor, 0.0);
         assert_eq!(score.coverage_factor, 0.0);
+    }
+
+    #[test]
+    fn test_simple_io_wrapper_with_coverage_zero_score() {
+        // Create a simple I/O wrapper function with test coverage
+        let func = create_simple_io_wrapper();
+        let call_graph = CallGraph::new();
+        let lcov = create_full_coverage_data(&func);
+        
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
+        
+        // Tested simple I/O wrapper should have zero score (not technical debt)
+        assert_zero_debt_score(&score);
     }
 
     #[test]
@@ -97,86 +107,71 @@ mod tests {
         );
     }
     
-    #[test]
-    fn test_zero_coverage_prioritization() {
-        // Test spec 98: Functions with 0% coverage get 10x boost
-        let mut func = create_test_metrics();
-        func.cyclomatic = 5;
-        func.cognitive = 8;
-        func.is_test = false;
-
-        let call_graph = CallGraph::new();
-        
-        // Create mock coverage data with 0% coverage
-        let mut lcov = LcovData::default();
-        lcov.functions.insert(
-            func.file.clone(),
-            vec![FunctionCoverage {
-                name: func.name.clone(),
-                start_line: func.line,
-                execution_count: 0, // Zero coverage
-                coverage_percentage: 0.0,
-                uncovered_lines: vec![],
-            }],
-        );
-
-        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
-        
-        // Zero coverage should result in minimum score of 50 (spec 98)
+    fn assert_zero_coverage_boost(score: &UnifiedScore) {
         assert!(
             score.final_score >= 50.0,
             "Zero coverage functions should score at least 50.0, got {}",
             score.final_score
         );
     }
-    
-    #[test]
-    fn test_low_coverage_prioritization() {
-        // Test spec 98: Functions with <20% coverage get 5x boost
-        let mut func = create_test_metrics();
-        func.cyclomatic = 5;
-        func.cognitive = 8;
-        func.is_test = false;
 
+    #[test]
+    fn test_zero_coverage_prioritization() {
+        // Test spec 98: Functions with 0% coverage get 10x boost
+        let func = create_test_function_for_coverage();
         let call_graph = CallGraph::new();
         
-        // Create mock coverage data with 10% coverage
+        let lcov = create_coverage_function(&func, 0, 0.0);
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
+        
+        assert_zero_coverage_boost(&score);
+    }
+    
+    fn create_coverage_function(func: &FunctionMetrics, execution_count: i32, coverage_percentage: f64) -> LcovData {
         let mut lcov = LcovData::default();
         lcov.functions.insert(
             func.file.clone(),
             vec![FunctionCoverage {
                 name: func.name.clone(),
                 start_line: func.line,
-                execution_count: 1, 
-                coverage_percentage: 10.0,
+                execution_count,
+                coverage_percentage,
                 uncovered_lines: vec![],
             }],
         );
+        lcov
+    }
 
-        let score_low = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
-        
-        // Create mock coverage data with 50% coverage for comparison
-        let mut lcov_mid = LcovData::default();
-        lcov_mid.functions.insert(
-            func.file.clone(),
-            vec![FunctionCoverage {
-                name: func.name.clone(),
-                start_line: func.line,
-                execution_count: 5, 
-                coverage_percentage: 50.0,
-                uncovered_lines: vec![],
-            }],
-        );
-        
-        let score_mid = calculate_unified_priority(&func, &call_graph, Some(&lcov_mid), None);
-        
-        // Low coverage should score significantly higher than mid coverage
+    fn create_test_function_for_coverage() -> FunctionMetrics {
+        let mut func = create_test_metrics();
+        func.cyclomatic = 5;
+        func.cognitive = 8;
+        func.is_test = false;
+        func
+    }
+
+    fn assert_low_coverage_boost(score_low: &UnifiedScore, score_mid: &UnifiedScore) {
         assert!(
             score_low.final_score > score_mid.final_score * 2.0,
             "10% coverage ({}) should score much higher than 50% coverage ({})",
             score_low.final_score,
             score_mid.final_score
         );
+    }
+
+    #[test]
+    fn test_low_coverage_prioritization() {
+        // Test spec 98: Functions with <20% coverage get 5x boost
+        let func = create_test_function_for_coverage();
+        let call_graph = CallGraph::new();
+        
+        let lcov_low = create_coverage_function(&func, 1, 10.0);
+        let lcov_mid = create_coverage_function(&func, 5, 50.0);
+        
+        let score_low = calculate_unified_priority(&func, &call_graph, Some(&lcov_low), None);
+        let score_mid = calculate_unified_priority(&func, &call_graph, Some(&lcov_mid), None);
+        
+        assert_low_coverage_boost(&score_low, &score_mid);
     }
     
     #[test]
