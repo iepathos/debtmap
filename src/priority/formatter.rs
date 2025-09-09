@@ -358,29 +358,155 @@ fn format_file_priority_item(
     writeln!(
         output,
         "{} {} ({} lines, {} functions)",
-        formatter.emoji("└─", "└─").bright_blue(),
+        formatter.emoji("├─", "└─").bright_blue(),
         item.metrics.path.display().to_string().bright_green(),
         item.metrics.total_lines,
         item.metrics.function_count
     )
     .unwrap();
 
-    writeln!(
-        output,
-        "   {} {}",
-        formatter.emoji("📋", "ACTION:").bright_yellow(),
-        item.recommendation
-    )
-    .unwrap();
-
-    if item.metrics.god_object_indicators.is_god_object {
-        writeln!(
-            output,
-            "   {} Methods: {}, Fields: {}, Responsibilities: {}",
-            formatter.emoji("⚠️", "METRICS:").bright_red(),
+    // Add WHY section
+    let why_message = if item.metrics.god_object_indicators.is_god_object {
+        format!(
+            "This file violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
             item.metrics.god_object_indicators.methods_count,
             item.metrics.god_object_indicators.fields_count,
             item.metrics.god_object_indicators.responsibilities
+        )
+    } else if item.metrics.total_lines > 500 {
+        format!(
+            "File exceeds recommended size with {} lines. Large files are harder to navigate, understand, and maintain. Consider breaking into smaller, focused modules.",
+            item.metrics.total_lines
+        )
+    } else {
+        "File exhibits high complexity that impacts maintainability and testability.".to_string()
+    };
+
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("├─ WHY:", "└─ WHY:").bright_blue(),
+        why_message.bright_white()
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("├─ ACTION:", "└─ ACTION:").bright_yellow(),
+        item.recommendation.bright_green().bold()
+    )
+    .unwrap();
+
+    // Add implementation steps for god objects
+    if item.metrics.god_object_indicators.is_god_object {
+        writeln!(
+            output,
+            "{}  {} 1. Identify cohesive groups of methods and fields",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 2. Extract each group into a separate module/class",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 3. Create interfaces/traits for clean boundaries",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 4. Update imports and references throughout codebase",
+            formatter.emoji("│", ""),
+            formatter.emoji("└─", "-").cyan()
+        )
+        .unwrap();
+    }
+
+    // Add IMPACT section
+    let impact = if item.metrics.god_object_indicators.is_god_object {
+        format!(
+            "Reduce complexity by {}%, improve testability, enable parallel development",
+            ((item.metrics.total_lines as f64 / 200.0 - 1.0) * 100.0).min(80.0) as i32
+        )
+    } else {
+        format!(
+            "Improve maintainability, reduce file size by {}%",
+            ((item.metrics.total_lines as f64 / 500.0 - 1.0) * 100.0).min(50.0) as i32
+        )
+    };
+
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("├─ IMPACT:", "└─ IMPACT:").bright_blue(),
+        impact.bright_cyan()
+    )
+    .unwrap();
+
+    // Add detailed metrics
+    if item.metrics.god_object_indicators.is_god_object {
+        writeln!(
+            output,
+            "{} Methods: {}, Fields: {}, Responsibilities: {}",
+            formatter.emoji("├─ METRICS:", "└─ METRICS:").bright_blue(),
+            item.metrics
+                .god_object_indicators
+                .methods_count
+                .to_string()
+                .yellow(),
+            item.metrics
+                .god_object_indicators
+                .fields_count
+                .to_string()
+                .yellow(),
+            item.metrics
+                .god_object_indicators
+                .responsibilities
+                .to_string()
+                .yellow()
+        )
+        .unwrap();
+    }
+
+    // Add SCORING breakdown
+    writeln!(
+        output,
+        "{} File size: {} | Functions: {} | Complexity: HIGH",
+        formatter.emoji("├─ SCORING:", "└─ SCORING:").bright_blue(),
+        if item.metrics.total_lines > 1000 {
+            "CRITICAL"
+        } else if item.metrics.total_lines > 500 {
+            "HIGH"
+        } else {
+            "MEDIUM"
+        },
+        if item.metrics.function_count > 50 {
+            "EXCESSIVE"
+        } else if item.metrics.function_count > 20 {
+            "HIGH"
+        } else {
+            "MODERATE"
+        }
+    )
+    .unwrap();
+
+    // Add DEPENDENCIES if we have high function count
+    if item.metrics.function_count > 10 {
+        writeln!(
+            output,
+            "{} {} functions may have complex interdependencies",
+            formatter
+                .emoji("└─ DEPENDENCIES:", "└─ DEPENDENCIES:")
+                .bright_blue(),
+            item.metrics.function_count.to_string().cyan()
         )
         .unwrap();
     }

@@ -328,6 +328,16 @@ pub fn format_priority_item_with_config(
     )
     .unwrap();
 
+    // Add WHY section (the rationale)
+    writeln!(
+        output,
+        "{} {}",
+        format!("{} WHY:", formatter.emoji("├─", "-")).bright_blue(),
+        item.recommendation.rationale.bright_white()
+    )
+    .unwrap();
+
+    // Show ACTION with full details
     writeln!(
         output,
         "{} {}",
@@ -335,6 +345,25 @@ pub fn format_priority_item_with_config(
         item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
+
+    // Show implementation steps if available
+    if !item.recommendation.implementation_steps.is_empty() {
+        for (i, step) in item.recommendation.implementation_steps.iter().enumerate() {
+            let prefix = if i == item.recommendation.implementation_steps.len() - 1 {
+                formatter.emoji("│  └─", "   -")
+            } else {
+                formatter.emoji("│  ├─", "   -")
+            };
+            writeln!(
+                output,
+                "{} {}. {}",
+                prefix,
+                (i + 1).to_string().cyan(),
+                step.bright_white()
+            )
+            .unwrap();
+        }
+    }
 
     writeln!(
         output,
@@ -431,12 +460,128 @@ pub fn format_priority_item_with_config(
         }
     }
 
-    // Add coverage details section when coverage data is available and function has incomplete coverage
+    // Add SCORING breakdown for verbosity >= 1
+    if (1..2).contains(&verbosity) {
+        let _weights = crate::config::get_scoring_weights();
+
+        // Calculate the individual factor contributions
+        let coverage_contribution = if let Some(ref trans_cov) = item.transitive_coverage {
+            let coverage_pct = trans_cov.direct * 100.0;
+            if coverage_pct == 0.0 {
+                "CRITICAL (0% coverage)"
+            } else if coverage_pct < 20.0 {
+                "HIGH (low coverage)"
+            } else if coverage_pct < 50.0 {
+                "MEDIUM (partial coverage)"
+            } else {
+                "LOW"
+            }
+        } else {
+            "HIGH (no data)"
+        };
+
+        let complexity_contribution = if item.unified_score.complexity_factor > 10.0 {
+            "VERY HIGH"
+        } else if item.unified_score.complexity_factor > 5.0 {
+            "HIGH"
+        } else if item.unified_score.complexity_factor > 3.0 {
+            "MEDIUM"
+        } else {
+            "LOW"
+        };
+
+        let dependency_contribution = if item.unified_score.dependency_factor > 10.0 {
+            "CRITICAL PATH"
+        } else if item.unified_score.dependency_factor > 5.0 {
+            "HIGH"
+        } else if item.unified_score.dependency_factor > 2.0 {
+            "MEDIUM"
+        } else {
+            "LOW"
+        };
+
+        writeln!(
+            output,
+            "{} Coverage: {} | Complexity: {} | Dependencies: {}",
+            format!("{} SCORING:", formatter.emoji("├─", "-")).bright_blue(),
+            coverage_contribution.bright_yellow(),
+            complexity_contribution.bright_yellow(),
+            dependency_contribution.bright_yellow()
+        )
+        .unwrap();
+    }
+
+    // Add COVERAGE section with percentage display
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
+        let coverage_status = match coverage_pct {
+            0.0 => "🔴 UNTESTED".to_string(),
+            c if c < 20.0 => format!("🟠 LOW ({:.1}%)", c),
+            c if c < 50.0 => format!("🟡 PARTIAL ({:.1}%)", c),
+            c if c < 80.0 => format!("🟨 MODERATE ({:.1}%)", c),
+            c if c < 95.0 => format!("🟢 GOOD ({:.1}%)", c),
+            _ => format!("✅ EXCELLENT ({:.1}%)", coverage_pct),
+        };
 
-        // Show coverage details for functions with less than 100% coverage that have uncovered lines
-        if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() {
+        // Add uncovered lines summary to the coverage line if present
+        let uncovered_summary = if !trans_cov.uncovered_lines.is_empty() {
+            let mut sorted_lines = trans_cov.uncovered_lines.clone();
+            sorted_lines.sort_unstable();
+
+            // Group consecutive lines for display
+            let mut ranges = Vec::new();
+            let mut current_start = sorted_lines[0];
+            let mut current_end = sorted_lines[0];
+
+            for &line in &sorted_lines[1..] {
+                if line == current_end + 1 {
+                    current_end = line;
+                } else {
+                    ranges.push((current_start, current_end));
+                    current_start = line;
+                    current_end = line;
+                }
+            }
+            ranges.push((current_start, current_end));
+
+            let formatted_ranges: Vec<String> = ranges
+                .iter()
+                .take(5) // Show first 5 ranges
+                .map(|&(start, end)| {
+                    if start == end {
+                        format!("{}", start)
+                    } else {
+                        format!("{}-{}", start, end)
+                    }
+                })
+                .collect();
+
+            let more_indicator = if ranges.len() > 5 {
+                format!(", ... ({} total gaps)", trans_cov.uncovered_lines.len())
+            } else {
+                String::new()
+            };
+
+            format!(
+                " - Missing lines: {}{}",
+                formatted_ranges.join(", "),
+                more_indicator
+            )
+        } else {
+            String::new()
+        };
+
+        writeln!(
+            output,
+            "{} {}{}",
+            format!("{} COVERAGE:", formatter.emoji("├─", "-")).bright_blue(),
+            coverage_status.bright_yellow(),
+            uncovered_summary.bright_red()
+        )
+        .unwrap();
+
+        // Show detailed coverage analysis for functions with less than 100% coverage
+        if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() && verbosity >= 2 {
             writeln!(
                 output,
                 "{}",
@@ -520,14 +665,25 @@ pub fn format_priority_item_with_config(
         }
     }
 
-    // Add rationale
-    writeln!(
-        output,
-        "{} {}",
-        formatter.emoji("└─ WHY:", "- WHY:").bright_blue(),
-        item.recommendation.rationale
-    )
-    .unwrap();
+    // Add RELATED items if any
+    if !item.recommendation.related_items.is_empty() {
+        writeln!(
+            output,
+            "{} {} related items to address:",
+            format!("{} RELATED:", formatter.emoji("├─", "-")).bright_blue(),
+            item.recommendation.related_items.len().to_string().cyan()
+        )
+        .unwrap();
+
+        for (i, related) in item.recommendation.related_items.iter().enumerate() {
+            let prefix = if i == item.recommendation.related_items.len() - 1 {
+                formatter.emoji("│  └─", "   -")
+            } else {
+                formatter.emoji("│  ├─", "   -")
+            };
+            writeln!(output, "{} {}", prefix, related.bright_magenta()).unwrap();
+        }
+    }
 }
 
 /// Analyze coverage gaps to provide specific testing recommendations
