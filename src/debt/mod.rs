@@ -15,15 +15,15 @@ use crate::core::{DebtItem, DebtType};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub fn categorize_debt(items: Vec<DebtItem>) -> HashMap<DebtType, Vec<DebtItem>> {
-    items.into_iter().fold(HashMap::new(), |mut acc, item| {
+pub fn categorize_debt(items: &[DebtItem]) -> HashMap<DebtType, Vec<DebtItem>> {
+    items.iter().fold(HashMap::new(), |mut acc, item| {
         acc.entry(item.debt_type).or_default().push(item.clone());
         acc
     })
 }
 
-pub fn prioritize_debt(items: Vec<DebtItem>) -> Vec<DebtItem> {
-    let mut sorted = items;
+pub fn prioritize_debt(items: &[DebtItem]) -> Vec<DebtItem> {
+    let mut sorted: Vec<DebtItem> = items.to_vec();
     sorted.sort_by_key(|item| std::cmp::Reverse(item.priority));
     sorted
 }

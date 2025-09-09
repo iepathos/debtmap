@@ -91,37 +91,54 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
             }
 
             Record::EndOfRecord => {
-                // Collect all function start lines for boundary detection
-                let func_start_lines: Vec<usize> =
-                    file_functions.values().map(|f| f.start_line).collect();
+                // First, collect and sort function start lines for boundary detection
+                let mut func_boundaries: Vec<usize> = file_functions
+                    .values()
+                    .map(|f| f.start_line)
+                    .collect();
+                func_boundaries.sort_unstable();
+                
+                // Convert file_lines HashMap to sorted Vec for efficient range queries
+                let mut sorted_lines: Vec<(usize, u64)> = file_lines.iter()
+                    .map(|(line, count)| (*line, *count))
+                    .collect();
+                sorted_lines.sort_unstable_by_key(|(line, _)| *line);
 
-                // Calculate coverage percentage for functions based on line data
+                // Process each function
                 for func in file_functions.values_mut() {
-                    // Find the next function start line to determine this function's boundary
-                    let next_func_line = func_start_lines
-                        .iter()
-                        .filter(|line| **line > func.start_line)
-                        .min()
-                        .copied();
-
-                    let func_lines: Vec<_> = file_lines
-                        .iter()
-                        .filter(|(line, _)| {
-                            **line >= func.start_line
-                                && next_func_line.is_none_or(|next| **line < next)
-                        })
-                        .collect();
-
+                    let func_start = func.start_line;
+                    
+                    // Find the next function's start line using binary search
+                    let next_func_idx = func_boundaries
+                        .binary_search(&func_start)
+                        .unwrap_or_else(|idx| idx);
+                    
+                    let func_end = if next_func_idx + 1 < func_boundaries.len() {
+                        func_boundaries[next_func_idx + 1]
+                    } else {
+                        usize::MAX
+                    };
+                    
+                    // Binary search for function's line range in sorted_lines
+                    let start_idx = sorted_lines
+                        .binary_search_by_key(&func_start, |(line, _)| *line)
+                        .unwrap_or_else(|idx| idx);
+                    let end_idx = sorted_lines
+                        .binary_search_by_key(&func_end, |(line, _)| *line)
+                        .unwrap_or_else(|idx| idx);
+                    
+                    let func_lines = &sorted_lines[start_idx..end_idx];
+                    
                     if !func_lines.is_empty() {
-                        let covered = func_lines.iter().filter(|(_, count)| **count > 0).count();
+                        let covered = func_lines.iter().filter(|(_, count)| *count > 0).count();
                         func.coverage_percentage =
                             (covered as f64 / func_lines.len() as f64) * 100.0;
 
                         // Collect uncovered lines
                         func.uncovered_lines = func_lines
                             .iter()
-                            .filter(|(_, count)| **count == 0)
-                            .map(|(line, _)| **line)
+                            .filter(|(_, count)| *count == 0)
+                            .map(|(line, _)| *line)
                             .collect();
                     } else if func.execution_count > 0 {
                         // If we have execution count but no line data, assume it's covered

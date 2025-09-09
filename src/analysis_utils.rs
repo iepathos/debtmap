@@ -7,12 +7,56 @@ use crate::debt::circular::analyze_module_dependencies;
 use crate::{analyzers, core::Language, io};
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::io::{self as stdio, Write};
+
+// Maximum files to process (can be overridden by env var)
+const DEFAULT_MAX_FILES: usize = 1000;
 
 pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
-    files
+    let max_files = std::env::var("DEBTMAP_MAX_FILES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(DEFAULT_MAX_FILES);
+    
+    let total_files = files.len().min(max_files);
+    let files_to_process = &files[..total_files];
+    
+    // Show warning if we're limiting files
+    if files.len() > max_files {
+        eprintln!("⚠️  Processing limited to {} files (found {}). Set DEBTMAP_MAX_FILES to increase.", max_files, files.len());
+    }
+    
+    // Progress tracking
+    let processed = Arc::new(AtomicUsize::new(0));
+    let show_progress = std::env::var("DEBTMAP_QUIET").is_err() && total_files > 10;
+    
+    if show_progress {
+        eprint!("Analyzing files: 0/{}", total_files);
+        let _ = stdio::stderr().flush();
+    }
+    
+    let results: Vec<FileMetrics> = files_to_process
         .par_iter()
-        .filter_map(|path| analyze_single_file(path.as_path()))
-        .collect()
+        .filter_map(|path| {
+            let result = analyze_single_file(path.as_path());
+            
+            if show_progress {
+                let count = processed.fetch_add(1, Ordering::Relaxed) + 1;
+                eprint!("\rAnalyzing files: {}/{}", count, total_files);
+                let _ = stdio::stderr().flush();
+            }
+            
+            result
+        })
+        .collect();
+    
+    if show_progress {
+        eprintln!("\r✓ Analyzed {} files successfully", results.len());
+    }
+    
+    results
 }
 
 pub fn extract_all_functions(file_metrics: &[FileMetrics]) -> Vec<FunctionMetrics> {
@@ -53,8 +97,8 @@ pub fn build_technical_debt_report(
     all_debt_items: Vec<DebtItem>,
     duplications: Vec<DuplicationBlock>,
 ) -> TechnicalDebtReport {
-    let debt_by_type = debt::categorize_debt(all_debt_items.clone());
-    let priorities = debt::prioritize_debt(all_debt_items.clone())
+    let debt_by_type = debt::categorize_debt(&all_debt_items);
+    let priorities = debt::prioritize_debt(&all_debt_items)
         .into_iter()
         .map(|item| item.priority)
         .collect();
