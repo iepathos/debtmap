@@ -544,7 +544,7 @@ def complex_function(data):
 #[test]
 fn test_map_cmp_op_helpers() {
     use debtmap::complexity::languages::python::PythonEntropyAnalyzer;
-    
+
     // Test comparison operator mapping
     assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::Eq), "==");
     assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::NotEq), "!=");
@@ -553,35 +553,74 @@ fn test_map_cmp_op_helpers() {
     assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::Gt), ">");
     assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::GtE), ">=");
     assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::Is), "is");
-    assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::IsNot), "is not");
+    assert_eq!(
+        PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::IsNot),
+        "is not"
+    );
     assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::In), "in");
-    assert_eq!(PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::NotIn), "not in");
+    assert_eq!(
+        PythonEntropyAnalyzer::map_cmp_op(&ast::CmpOp::NotIn),
+        "not in"
+    );
 }
 
 #[test]
 fn test_map_unary_op_helpers() {
     use debtmap::complexity::languages::python::PythonEntropyAnalyzer;
-    
+
     // Test unary operator mapping
-    assert_eq!(PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::Not), "not");
-    assert_eq!(PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::Invert), "~");
-    assert_eq!(PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::UAdd), "+");
-    assert_eq!(PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::USub), "-");
+    assert_eq!(
+        PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::Not),
+        "not"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::Invert),
+        "~"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::UAdd),
+        "+"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_unary_op(&ast::UnaryOp::USub),
+        "-"
+    );
 }
 
 #[test]
 fn test_map_constant_type_helpers() {
     use debtmap::complexity::languages::python::PythonEntropyAnalyzer;
     use rustpython_parser::ast::Constant;
-    
+
     // Test constant type mapping
-    assert_eq!(PythonEntropyAnalyzer::map_constant_type(&Constant::None), "None");
-    assert_eq!(PythonEntropyAnalyzer::map_constant_type(&Constant::Bool(true)), "bool");
-    assert_eq!(PythonEntropyAnalyzer::map_constant_type(&Constant::Bool(false)), "bool");
-    assert_eq!(PythonEntropyAnalyzer::map_constant_type(&Constant::Str("test".into())), "string");
-    assert_eq!(PythonEntropyAnalyzer::map_constant_type(&Constant::Int(42.into())), "int");
-    assert_eq!(PythonEntropyAnalyzer::map_constant_type(&Constant::Float(1.23)), "float");
-    assert_eq!(PythonEntropyAnalyzer::map_constant_type(&Constant::Ellipsis), "...");
+    assert_eq!(
+        PythonEntropyAnalyzer::map_constant_type(&Constant::None),
+        "None"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_constant_type(&Constant::Bool(true)),
+        "bool"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_constant_type(&Constant::Bool(false)),
+        "bool"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_constant_type(&Constant::Str("test".into())),
+        "string"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_constant_type(&Constant::Int(42.into())),
+        "int"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_constant_type(&Constant::Float(1.23)),
+        "float"
+    );
+    assert_eq!(
+        PythonEntropyAnalyzer::map_constant_type(&Constant::Ellipsis),
+        "..."
+    );
 }
 
 #[test]
@@ -605,20 +644,38 @@ def binary_ops():
     };
 
     let tokens = analyzer.extract_tokens(&module.body);
-    
+
     // Check that binary operators are extracted
-    let bin_ops: Vec<_> = tokens.iter()
-        .filter(|t| matches!(t.to_category(), debtmap::complexity::entropy_core::TokenCategory::Operator))
+    let bin_ops: Vec<_> = tokens
+        .iter()
+        .filter(|t| {
+            matches!(
+                t.to_category(),
+                debtmap::complexity::entropy_core::TokenCategory::Operator
+            )
+        })
         .collect();
-    
+
     assert!(!bin_ops.is_empty(), "Should extract binary operators");
-    
+
     // Verify specific operators are present
     let op_values: Vec<String> = bin_ops.iter().map(|t| t.value().to_string()).collect();
-    assert!(op_values.contains(&"Add".to_string()), "Should detect addition");
-    assert!(op_values.contains(&"Sub".to_string()), "Should detect subtraction");
-    assert!(op_values.contains(&"Mult".to_string()), "Should detect multiplication");
-    assert!(op_values.contains(&"Div".to_string()), "Should detect division");
+    assert!(
+        op_values.contains(&"Add".to_string()),
+        "Should detect addition"
+    );
+    assert!(
+        op_values.contains(&"Sub".to_string()),
+        "Should detect subtraction"
+    );
+    assert!(
+        op_values.contains(&"Mult".to_string()),
+        "Should detect multiplication"
+    );
+    assert!(
+        op_values.contains(&"Div".to_string()),
+        "Should detect division"
+    );
 }
 
 #[test]
@@ -639,15 +696,11 @@ def bool_ops():
     };
 
     let tokens = analyzer.extract_tokens(&module.body);
-    
+
     // Check that boolean operators are extracted
-    let and_ops: Vec<_> = tokens.iter()
-        .filter(|t| t.value() == "and")
-        .collect();
-    let or_ops: Vec<_> = tokens.iter()
-        .filter(|t| t.value() == "or")
-        .collect();
-    
+    let and_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "and").collect();
+    let or_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "or").collect();
+
     assert!(!and_ops.is_empty(), "Should extract 'and' operators");
     assert!(!or_ops.is_empty(), "Should extract 'or' operators");
 }
@@ -671,13 +724,13 @@ def unary_ops():
     };
 
     let tokens = analyzer.extract_tokens(&module.body);
-    
+
     // Check that unary operators are extracted
     let not_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "not").collect();
     let neg_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "-").collect();
     let pos_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "+").collect();
     let inv_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "~").collect();
-    
+
     assert!(!not_ops.is_empty(), "Should extract 'not' operator");
     assert!(!neg_ops.is_empty(), "Should extract negation operator");
     assert!(!pos_ops.is_empty(), "Should extract positive operator");
@@ -709,14 +762,14 @@ def compare_ops():
     };
 
     let tokens = analyzer.extract_tokens(&module.body);
-    
+
     // Check that comparison operators are extracted
     let eq_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "==").collect();
     let ne_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "!=").collect();
     let lt_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "<").collect();
     let is_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "is").collect();
     let in_ops: Vec<_> = tokens.iter().filter(|t| t.value() == "in").collect();
-    
+
     assert!(!eq_ops.is_empty(), "Should extract equality operator");
     assert!(!ne_ops.is_empty(), "Should extract inequality operator");
     assert!(!lt_ops.is_empty(), "Should extract less than operator");
@@ -743,24 +796,37 @@ def comprehensions():
     };
 
     let tokens = analyzer.extract_tokens(&module.body);
-    
+
     // Check that comprehension tokens are created
-    let list_comp_tokens: Vec<_> = tokens.iter()
+    let list_comp_tokens: Vec<_> = tokens
+        .iter()
         .filter(|t| t.value().contains("list_comp"))
         .collect();
-    let set_comp_tokens: Vec<_> = tokens.iter()
+    let set_comp_tokens: Vec<_> = tokens
+        .iter()
         .filter(|t| t.value().contains("set_comp"))
         .collect();
-    let dict_comp_tokens: Vec<_> = tokens.iter()
+    let dict_comp_tokens: Vec<_> = tokens
+        .iter()
         .filter(|t| t.value().contains("dict_comp"))
         .collect();
-    let gen_tokens: Vec<_> = tokens.iter()
+    let gen_tokens: Vec<_> = tokens
+        .iter()
         .filter(|t| t.value().contains("generator"))
         .collect();
-    
-    assert!(!list_comp_tokens.is_empty(), "Should detect list comprehension");
-    assert!(!set_comp_tokens.is_empty(), "Should detect set comprehension");
-    assert!(!dict_comp_tokens.is_empty(), "Should detect dict comprehension");
+
+    assert!(
+        !list_comp_tokens.is_empty(),
+        "Should detect list comprehension"
+    );
+    assert!(
+        !set_comp_tokens.is_empty(),
+        "Should detect set comprehension"
+    );
+    assert!(
+        !dict_comp_tokens.is_empty(),
+        "Should detect dict comprehension"
+    );
     assert!(!gen_tokens.is_empty(), "Should detect generator expression");
 }
 
@@ -805,18 +871,54 @@ async def all_expressions():
     };
 
     let tokens = analyzer.extract_tokens(&module.body);
-    
+
     // Verify various token types are extracted
-    assert!(tokens.iter().any(|t| t.value() == "lambda"), "Should detect lambda");
-    assert!(tokens.iter().any(|t| t.value() == "if"), "Should detect if expression");
-    assert!(tokens.iter().any(|t| t.value() == "await"), "Should detect await");
-    assert!(tokens.iter().any(|t| t.value() == "yield"), "Should detect yield");
-    assert!(tokens.iter().any(|t| t.value() == "from"), "Should detect yield from");
-    assert!(tokens.iter().any(|t| t.value() == "call"), "Should detect function call");
-    assert!(tokens.iter().any(|t| t.value() == ":="), "Should detect walrus operator");
-    assert!(tokens.iter().any(|t| t.value() == "None"), "Should detect None constant");
-    assert!(tokens.iter().any(|t| t.value() == "bool"), "Should detect bool constant");
-    assert!(tokens.iter().any(|t| t.value() == "string"), "Should detect string constant");
-    assert!(tokens.iter().any(|t| t.value() == "int"), "Should detect int constant");
-    assert!(tokens.iter().any(|t| t.value() == "float"), "Should detect float constant");
+    assert!(
+        tokens.iter().any(|t| t.value() == "lambda"),
+        "Should detect lambda"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "if"),
+        "Should detect if expression"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "await"),
+        "Should detect await"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "yield"),
+        "Should detect yield"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "from"),
+        "Should detect yield from"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "call"),
+        "Should detect function call"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == ":="),
+        "Should detect walrus operator"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "None"),
+        "Should detect None constant"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "bool"),
+        "Should detect bool constant"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "string"),
+        "Should detect string constant"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "int"),
+        "Should detect int constant"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "float"),
+        "Should detect float constant"
+    );
 }

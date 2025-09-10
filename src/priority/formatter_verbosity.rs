@@ -1,6 +1,6 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
-use crate::priority::{score_formatter, UnifiedDebtItem};
 use crate::priority::unified_scorer::EntropyDetails;
+use crate::priority::{score_formatter, UnifiedDebtItem};
 use colored::*;
 use std::fmt::Write;
 
@@ -39,7 +39,10 @@ fn format_coverage_status(coverage_pct: f64) -> String {
 }
 
 // Pure function to format coverage factor description
-fn format_coverage_factor_description(item: &UnifiedDebtItem, weights: &crate::config::ScoringWeights) -> Option<String> {
+fn format_coverage_factor_description(
+    item: &UnifiedDebtItem,
+    weights: &crate::config::ScoringWeights,
+) -> Option<String> {
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
         match coverage_pct {
@@ -106,7 +109,7 @@ fn classify_complexity_contribution(complexity_factor: f64) -> &'static str {
     }
 }
 
-// Pure function to classify dependency contribution  
+// Pure function to classify dependency contribution
 fn classify_dependency_contribution(dependency_factor: f64) -> &'static str {
     match dependency_factor {
         d if d > 10.0 => "CRITICAL PATH",
@@ -121,15 +124,15 @@ fn group_lines_into_ranges(lines: &[usize]) -> Vec<(usize, usize)> {
     if lines.is_empty() {
         return Vec::new();
     }
-    
+
     let mut sorted_lines = lines.to_vec();
     sorted_lines.sort_unstable();
     sorted_lines.dedup();
-    
+
     let mut ranges = Vec::new();
     let mut current_start = sorted_lines[0];
     let mut current_end = sorted_lines[0];
-    
+
     for &line in &sorted_lines[1..] {
         if line == current_end + 1 {
             current_end = line;
@@ -162,34 +165,37 @@ fn format_uncovered_lines_summary(uncovered_lines: &[usize], max_ranges: usize) 
     if uncovered_lines.is_empty() {
         return String::new();
     }
-    
+
     let ranges = group_lines_into_ranges(uncovered_lines);
     let formatted_ranges = format_ranges(&ranges);
-    
-    let display_ranges: Vec<String> = formatted_ranges
-        .iter()
-        .take(max_ranges)
-        .cloned()
-        .collect();
-    
+
+    let display_ranges: Vec<String> = formatted_ranges.iter().take(max_ranges).cloned().collect();
+
     let more_indicator = if ranges.len() > max_ranges {
         format!(", ... ({} total gaps)", uncovered_lines.len())
     } else {
         String::new()
     };
-    
-    format!(" - Missing lines: {}{}", display_ranges.join(", "), more_indicator)
+
+    format!(
+        " - Missing lines: {}{}",
+        display_ranges.join(", "),
+        more_indicator
+    )
 }
 
 // Pure function to collect main scoring factors
-fn collect_scoring_factors(item: &UnifiedDebtItem, weights: &crate::config::ScoringWeights) -> Vec<String> {
+fn collect_scoring_factors(
+    item: &UnifiedDebtItem,
+    weights: &crate::config::ScoringWeights,
+) -> Vec<String> {
     let mut factors = vec![];
-    
+
     // Coverage factor
     if let Some(desc) = format_coverage_factor_description(item, weights) {
         factors.push(desc);
     }
-    
+
     // Complexity factor
     if item.unified_score.complexity_factor > 5.0 {
         factors.push(format!(
@@ -199,7 +205,7 @@ fn collect_scoring_factors(item: &UnifiedDebtItem, weights: &crate::config::Scor
     } else if item.unified_score.complexity_factor > 3.0 {
         factors.push("Moderate complexity".to_string());
     }
-    
+
     // Dependency factor
     if item.unified_score.dependency_factor > 5.0 {
         factors.push(format!(
@@ -207,7 +213,7 @@ fn collect_scoring_factors(item: &UnifiedDebtItem, weights: &crate::config::Scor
             weights.dependency * 100.0
         ));
     }
-    
+
     // Performance specific factors
     match &item.debt_type {
         crate::priority::DebtType::NestedLoops { depth, .. } => {
@@ -224,7 +230,7 @@ fn collect_scoring_factors(item: &UnifiedDebtItem, weights: &crate::config::Scor
         }
         _ => {}
     }
-    
+
     factors
 }
 
@@ -244,7 +250,7 @@ fn calculate_score_factors(item: &UnifiedDebtItem) -> ScoreFactors {
     } else {
         (1.0, 0.0)
     };
-    
+
     ScoreFactors {
         coverage_gap,
         coverage_pct,
@@ -263,7 +269,7 @@ fn format_coverage_detail(has_coverage: bool, gap: f64, pct: f64) -> String {
     }
 }
 
-// Pure function to format complexity detail  
+// Pure function to format complexity detail
 fn format_complexity_detail(entropy: &Option<EntropyDetails>) -> String {
     if let Some(ref e) = entropy {
         format!(" (entropy-adjusted from {})", e.original_complexity)
@@ -365,7 +371,7 @@ pub fn format_priority_item_with_config(
         let weights = crate::config::get_scoring_weights();
 
         // Calculate main contributing factors
-        let factors = collect_scoring_factors(item, &weights);
+        let factors = collect_scoring_factors(item, weights);
 
         // Add coverage indicator to score line (spec 98)
         let coverage_indicator = get_coverage_indicator(item);
@@ -439,7 +445,7 @@ pub fn format_priority_item_with_config(
         let coverage_detail = format_coverage_detail(
             item.transitive_coverage.is_some(),
             factors.coverage_gap,
-            factors.coverage_pct
+            factors.coverage_pct,
         );
         writeln!(
             output,
@@ -778,8 +784,10 @@ pub fn format_priority_item_with_config(
 
         // Calculate the individual factor contributions
         let coverage_contribution = classify_coverage_contribution(item);
-        let complexity_contribution = classify_complexity_contribution(item.unified_score.complexity_factor);
-        let dependency_contribution = classify_dependency_contribution(item.unified_score.dependency_factor);
+        let complexity_contribution =
+            classify_complexity_contribution(item.unified_score.complexity_factor);
+        let dependency_contribution =
+            classify_dependency_contribution(item.unified_score.dependency_factor);
 
         writeln!(
             output,
@@ -827,7 +835,7 @@ pub fn format_priority_item_with_config(
 
             // Group consecutive lines into ranges for better readability
             let ranges = group_lines_into_ranges(&sorted_lines);
-            
+
             // Format uncovered lines/ranges
             let formatted_ranges = format_ranges(&ranges);
 
@@ -900,16 +908,31 @@ pub fn format_priority_item_with_config(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::{DebtType, UnifiedScore, UnifiedDebtItem};
+    use crate::priority::{DebtType, UnifiedDebtItem, UnifiedScore};
     use std::path::PathBuf;
 
     #[test]
     fn test_classify_coverage_percentage() {
-        assert_eq!(classify_coverage_percentage(0.0), (" [🔴 UNTESTED]", "🔴 UNTESTED"));
-        assert_eq!(classify_coverage_percentage(10.0), (" [🟠 LOW COVERAGE]", "🟠 LOW COVERAGE"));
-        assert_eq!(classify_coverage_percentage(19.9), (" [🟠 LOW COVERAGE]", "🟠 LOW COVERAGE"));
-        assert_eq!(classify_coverage_percentage(20.0), (" [🟡 PARTIAL COVERAGE]", "🟡 PARTIAL COVERAGE"));
-        assert_eq!(classify_coverage_percentage(49.9), (" [🟡 PARTIAL COVERAGE]", "🟡 PARTIAL COVERAGE"));
+        assert_eq!(
+            classify_coverage_percentage(0.0),
+            (" [🔴 UNTESTED]", "🔴 UNTESTED")
+        );
+        assert_eq!(
+            classify_coverage_percentage(10.0),
+            (" [🟠 LOW COVERAGE]", "🟠 LOW COVERAGE")
+        );
+        assert_eq!(
+            classify_coverage_percentage(19.9),
+            (" [🟠 LOW COVERAGE]", "🟠 LOW COVERAGE")
+        );
+        assert_eq!(
+            classify_coverage_percentage(20.0),
+            (" [🟡 PARTIAL COVERAGE]", "🟡 PARTIAL COVERAGE")
+        );
+        assert_eq!(
+            classify_coverage_percentage(49.9),
+            (" [🟡 PARTIAL COVERAGE]", "🟡 PARTIAL COVERAGE")
+        );
         assert_eq!(classify_coverage_percentage(50.0), ("", ""));
         assert_eq!(classify_coverage_percentage(100.0), ("", ""));
     }
@@ -928,19 +951,19 @@ mod tests {
     fn test_format_line_ranges() {
         // Test empty input
         assert_eq!(format_line_ranges(&[]), "");
-        
+
         // Test single line
         assert_eq!(format_line_ranges(&[42]), "42");
-        
+
         // Test consecutive lines
         assert_eq!(format_line_ranges(&[1, 2, 3]), "1-3");
-        
+
         // Test mixed ranges
         assert_eq!(format_line_ranges(&[1, 2, 3, 5, 7, 8, 9]), "1-3, 5, 7-9");
-        
+
         // Test unsorted input (should be sorted)
         assert_eq!(format_line_ranges(&[9, 1, 3, 2, 5]), "1-3, 5, 9");
-        
+
         // Test duplicates (should be deduplicated)
         assert_eq!(format_line_ranges(&[1, 1, 2, 2, 3]), "1-3");
     }
@@ -951,11 +974,11 @@ mod tests {
         let lines = vec![1, 2, 3, 5, 7, 8, 9, 11, 13, 14, 15];
         let ranges = group_lines_into_ranges(&lines);
         assert_eq!(ranges, vec![(1, 3), (5, 5), (7, 9), (11, 11), (13, 15)]);
-        
+
         // Test with no input
         let ranges = group_lines_into_ranges(&[]);
         assert!(ranges.is_empty());
-        
+
         // Test with single line
         let ranges = group_lines_into_ranges(&[5]);
         assert_eq!(ranges, vec![(5, 5)]);
@@ -999,61 +1022,71 @@ mod tests {
             security: 0.0,
             organization: 0.0,
         };
-        
+
         // Test with no coverage data and high coverage factor
         let mut item = create_test_item();
         item.unified_score.coverage_factor = 10.0;
         item.unified_score.complexity_factor = 3.5;
         item.unified_score.dependency_factor = 1.0;
-        
+
         let factors = collect_scoring_factors(&item, &weights);
         assert!(factors.iter().any(|f| f.contains("UNTESTED")));
         assert!(factors.iter().any(|f| f.contains("Moderate complexity")));
-        
+
         // Test with nested loops debt type
         item.debt_type = DebtType::NestedLoops {
             depth: 3,
             complexity_estimate: "O(n^3)".to_string(),
         };
         let factors = collect_scoring_factors(&item, &weights);
-        assert!(factors.iter().any(|f| f.contains("Performance impact (High)")));
+        assert!(factors
+            .iter()
+            .any(|f| f.contains("Performance impact (High)")));
         assert!(factors.iter().any(|f| f.contains("3 level nested loops")));
     }
 
     #[test]
     fn test_analyze_coverage_gaps() {
         let mut item = create_test_item();
-        
+
         // Test large consecutive block detection
         let lines = vec![10, 11, 12, 13, 14, 15, 20];
         let recommendations = analyze_coverage_gaps(&lines, &item);
-        assert!(recommendations.iter().any(|r| r.contains("6 consecutive lines")));
-        
+        assert!(recommendations
+            .iter()
+            .any(|r| r.contains("6 consecutive lines")));
+
         // Test scattered lines detection
         let scattered = vec![1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
         let recommendations = analyze_coverage_gaps(&scattered, &item);
-        assert!(recommendations.iter().any(|r| r.contains("Scattered uncovered lines")));
-        
+        assert!(recommendations
+            .iter()
+            .any(|r| r.contains("Scattered uncovered lines")));
+
         // Test high complexity with coverage gaps
-        item.cyclomatic_complexity = 11;  
+        item.cyclomatic_complexity = 11;
         // Need more than (complexity * 2) / 2 lines to trigger low branch coverage
-        let many_lines = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+        let many_lines = vec![
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+        ];
         let recommendations = analyze_coverage_gaps(&many_lines, &item);
         // Now (1.0 - 23/22) = negative, which triggers the condition
         assert!(recommendations.iter().any(|r| r.contains("branches")));
-        
+
         // Test scattered lines detection - needs > 10 lines with max_consecutive < 3
         let scattered = vec![1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41]; // 11 lines, all non-consecutive
         let recommendations = analyze_coverage_gaps(&scattered, &item);
         assert!(recommendations.iter().any(|r| r.contains("Scattered")));
-        
+
         // Test with ComplexityHotspot debt type
         item.debt_type = DebtType::ComplexityHotspot {
             cyclomatic: 20,
             cognitive: 30,
         };
         let recommendations = analyze_coverage_gaps(&lines, &item);
-        assert!(recommendations.iter().any(|r| r.contains("Complex function")));
+        assert!(recommendations
+            .iter()
+            .any(|r| r.contains("Complex function")));
     }
 
     // Helper function to create a test UnifiedDebtItem
