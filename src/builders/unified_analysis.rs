@@ -259,7 +259,11 @@ fn perform_unified_analysis_computation(
         no_god_object,
     );
 
-    if !quiet_mode {
+    // Only print the checkmark if not in parallel mode (parallel mode prints its own progress)
+    let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    if !quiet_mode && !parallel_enabled {
         eprintln!(" ✓");
     }
 
@@ -699,11 +703,6 @@ fn create_unified_analysis_parallel(
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
-
-    // Print newline to complete the "Creating unified analysis..." line
-    if std::env::var("DEBTMAP_QUIET").is_err() {
-        eprintln!();
-    }
 
     // Phase 1: Parallel initialization
     let (data_flow_graph, _purity, test_only_functions, debt_aggregator) =

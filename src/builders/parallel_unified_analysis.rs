@@ -12,14 +12,14 @@ use crate::{
 };
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 // Pure functional transformations module
 mod transformations {
     use super::*;
-    
+
     /// Pure function to create function mappings from metrics
     pub fn create_function_mappings(
         metrics: &[FunctionMetrics],
@@ -37,7 +37,7 @@ mod transformations {
             })
             .collect()
     }
-    
+
     /// Pure function to transform metrics into purity map
     pub fn metrics_to_purity_map(metrics: &[FunctionMetrics]) -> HashMap<String, bool> {
         metrics
@@ -45,17 +45,7 @@ mod transformations {
             .map(|m| (m.name.clone(), m.is_pure.unwrap_or(false)))
             .collect()
     }
-    
-    /// Pure function to aggregate timing information
-    pub fn aggregate_phase_timings(
-        data_flow_time: Duration,
-        purity_time: Duration,
-        test_time: Duration,
-        debt_time: Duration,
-    ) -> (Duration, Duration, Duration, Duration) {
-        (data_flow_time, purity_time, test_time, debt_time)
-    }
-    
+
     /// Pure predicate for determining if progress should be shown
     pub fn should_show_progress(quiet_mode: bool, progress_enabled: bool) -> bool {
         !quiet_mode && progress_enabled
@@ -65,28 +55,22 @@ mod transformations {
 // Pure predicates module for filtering logic
 mod predicates {
     use super::*;
-    
+
     /// Pure predicate: should skip test functions
     pub fn is_test_function(metric: &FunctionMetrics) -> bool {
         metric.is_test || metric.in_test_module
     }
-    
+
     /// Pure predicate: is closure function
     pub fn is_closure(metric: &FunctionMetrics) -> bool {
         metric.name.contains("<closure@")
     }
-    
+
     /// Pure predicate: is trivial function
-    pub fn is_trivial_function(
-        metric: &FunctionMetrics,
-        callee_count: usize,
-    ) -> bool {
-        metric.cyclomatic == 1 
-            && metric.cognitive == 0 
-            && metric.length <= 3 
-            && callee_count == 1
+    pub fn is_trivial_function(metric: &FunctionMetrics, callee_count: usize) -> bool {
+        metric.cyclomatic == 1 && metric.cognitive == 0 && metric.length <= 3 && callee_count == 1
     }
-    
+
     /// Pure predicate: should process metric
     pub fn should_process_metric(
         metric: &FunctionMetrics,
@@ -97,18 +81,18 @@ mod predicates {
         if is_test_function(metric) || is_closure(metric) {
             return false;
         }
-        
+
         let func_id = FunctionId {
             file: metric.file.clone(),
             name: metric.name.clone(),
             line: metric.line,
         };
-        
+
         // Skip if in test-only functions set
         if test_only_functions.contains(&func_id) {
             return false;
         }
-        
+
         // Skip trivial functions
         !is_trivial_function(metric, callee_count)
     }
@@ -118,8 +102,8 @@ mod predicates {
 mod file_analysis {
     use super::*;
     use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
-    use crate::priority::file_metrics::{FileImpact, GodObjectIndicators, FileDebtMetrics};
-    
+    use crate::priority::file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators};
+
     /// Pure function to aggregate function metrics into file metrics
     pub fn aggregate_file_metrics(
         functions: &[FunctionMetrics],
@@ -128,19 +112,20 @@ mod file_analysis {
         let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
         file_analyzer.aggregate_functions(functions)
     }
-    
+
     /// Pure function to analyze god object indicators from file content
     pub fn analyze_god_object_indicators(
         content: &str,
-        file_path: &PathBuf,
+        file_path: &Path,
         coverage_data: Option<&LcovData>,
     ) -> Result<GodObjectIndicators, String> {
         let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
-        file_analyzer.analyze_file(file_path, content)
+        file_analyzer
+            .analyze_file(file_path, content)
             .map(|analyzed| analyzed.god_object_indicators)
             .map_err(|e| format!("Failed to analyze god object: {}", e))
     }
-    
+
     /// Pure function to create default god object indicators
     pub fn default_god_object_indicators() -> GodObjectIndicators {
         GodObjectIndicators {
@@ -151,12 +136,12 @@ mod file_analysis {
             god_object_score: 0.0,
         }
     }
-    
+
     /// Pure function to determine if file should be included based on score
     pub fn should_include_file(score: f64) -> bool {
         score > 50.0
     }
-    
+
     /// Pure function to calculate file impact
     pub fn calculate_file_impact(file_metrics: &FileDebtMetrics, score: f64) -> FileImpact {
         FileImpact {
@@ -167,15 +152,12 @@ mod file_analysis {
             test_effort: file_metrics.uncovered_lines as f64 * 0.1,
         }
     }
-    
+
     /// Pure transformation: create FileDebtItem from metrics
-    pub fn create_file_debt_item(
-        file_metrics: FileDebtMetrics,
-        score: f64,
-    ) -> FileDebtItem {
+    pub fn create_file_debt_item(file_metrics: FileDebtMetrics, score: f64) -> FileDebtItem {
         let recommendation = file_metrics.generate_recommendation();
         let impact = calculate_file_impact(&file_metrics, score);
-        
+
         FileDebtItem {
             metrics: file_metrics,
             score,
@@ -396,17 +378,17 @@ impl ParallelUnifiedAnalysisBuilder {
     ) {
         let start = Instant::now();
         let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-        let show_progress = transformations::should_show_progress(quiet_mode, self.options.progress);
+        let show_progress =
+            transformations::should_show_progress(quiet_mode, self.options.progress);
 
         if show_progress {
-            eprintln!("  🚀 Starting parallel phase 1 (initialization)...");
+            eprintln!(" ✓");
+            eprintln!("🚀 Starting parallel phase 1 (initialization)...");
         }
 
         // Execute parallel initialization tasks
-        let (data_flow, purity, test_funcs, debt_agg) = self.execute_phase1_tasks(
-            metrics,
-            debt_items,
-        );
+        let (data_flow, purity, test_funcs, debt_agg) =
+            self.execute_phase1_tasks(metrics, debt_items);
 
         let phase1_time = start.elapsed();
         if show_progress {
@@ -415,7 +397,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         (data_flow, purity, test_funcs, debt_agg)
     }
-    
+
     /// Execute the 4 parallel initialization tasks
     fn execute_phase1_tasks(
         &mut self,
@@ -443,16 +425,37 @@ impl ParallelUnifiedAnalysisBuilder {
         // Execute all 4 initialization steps in parallel
         rayon::scope(|s| {
             // Task 1: Data flow graph creation
-            self.spawn_data_flow_task(s, Arc::clone(&call_graph), Arc::clone(&data_flow_result), Arc::clone(&timings));
-            
+            self.spawn_data_flow_task(
+                s,
+                Arc::clone(&call_graph),
+                Arc::clone(&data_flow_result),
+                Arc::clone(&timings),
+            );
+
             // Task 2: Purity analysis
-            self.spawn_purity_task(s, Arc::clone(&metrics_arc), Arc::clone(&purity_result), Arc::clone(&timings));
-            
+            self.spawn_purity_task(
+                s,
+                Arc::clone(&metrics_arc),
+                Arc::clone(&purity_result),
+                Arc::clone(&timings),
+            );
+
             // Task 3: Test detection
-            self.spawn_test_detection_task(s, Arc::clone(&call_graph), Arc::clone(&test_funcs_result), Arc::clone(&timings));
-            
+            self.spawn_test_detection_task(
+                s,
+                Arc::clone(&call_graph),
+                Arc::clone(&test_funcs_result),
+                Arc::clone(&timings),
+            );
+
             // Task 4: Debt aggregation
-            self.spawn_debt_aggregation_task(s, Arc::clone(&metrics_arc), debt_items_opt, Arc::clone(&debt_agg_result), Arc::clone(&timings));
+            self.spawn_debt_aggregation_task(
+                s,
+                Arc::clone(&metrics_arc),
+                debt_items_opt,
+                Arc::clone(&debt_agg_result),
+                Arc::clone(&timings),
+            );
         });
 
         // Extract results
@@ -468,7 +471,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         (data_flow, purity, test_funcs, debt_agg)
     }
-    
+
     fn spawn_data_flow_task<'a>(
         &self,
         scope: &rayon::Scope<'a>,
@@ -487,7 +490,7 @@ impl ParallelUnifiedAnalysisBuilder {
             }
         });
     }
-    
+
     fn spawn_purity_task<'a>(
         &self,
         scope: &rayon::Scope<'a>,
@@ -506,7 +509,7 @@ impl ParallelUnifiedAnalysisBuilder {
             }
         });
     }
-    
+
     fn spawn_test_detection_task<'a>(
         &self,
         scope: &rayon::Scope<'a>,
@@ -526,7 +529,7 @@ impl ParallelUnifiedAnalysisBuilder {
             }
         });
     }
-    
+
     fn spawn_debt_aggregation_task<'a>(
         &self,
         scope: &rayon::Scope<'a>,
@@ -552,10 +555,10 @@ impl ParallelUnifiedAnalysisBuilder {
             }
         });
     }
-    
+
     fn report_phase1_completion(&self, phase1_time: Duration) {
         eprintln!(
-            "  ✅ Phase 1 complete in {:?} (DF: {:?}, Purity: {:?}, Test: {:?}, Debt: {:?})",
+            "✅ Phase 1 complete in {:?} (DF: {:?}, Purity: {:?}, Test: {:?}, Debt: {:?})",
             phase1_time,
             self.timings.data_flow_creation,
             self.timings.purity_analysis,
@@ -578,10 +581,11 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
         let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-        let show_progress = transformations::should_show_progress(quiet_mode, self.options.progress);
+        let show_progress =
+            transformations::should_show_progress(quiet_mode, self.options.progress);
 
         if show_progress {
-            eprintln!("  🚀 Starting parallel phase 2 (function analysis)...");
+            eprintln!("🚀 Starting parallel phase 2 (function analysis)...");
         }
 
         // Create analysis context for the pipeline
@@ -595,17 +599,14 @@ impl ParallelUnifiedAnalysisBuilder {
         };
 
         // Functional pipeline for processing metrics
-        let items: Vec<UnifiedDebtItem> = self.process_metrics_pipeline(
-            metrics,
-            test_only_functions,
-            &context,
-        );
+        let items: Vec<UnifiedDebtItem> =
+            self.process_metrics_pipeline(metrics, test_only_functions, &context);
 
         self.timings.function_analysis = start.elapsed();
 
         if show_progress {
             eprintln!(
-                "  ✅ Phase 2 complete in {:?} ({} items processed)",
+                "✅ Phase 2 complete in {:?} ({} items processed)",
                 self.timings.function_analysis,
                 items.len()
             );
@@ -613,7 +614,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         items
     }
-    
+
     /// Process metrics through a functional pipeline
     fn process_metrics_pipeline(
         &self,
@@ -623,12 +624,10 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         metrics
             .par_iter()
-            .filter_map(|metric| {
-                self.process_single_metric(metric, test_only_functions, context)
-            })
+            .filter_map(|metric| self.process_single_metric(metric, test_only_functions, context))
             .collect()
     }
-    
+
     /// Process a single metric through the filtering and transformation pipeline
     fn process_single_metric(
         &self,
@@ -643,16 +642,16 @@ impl ParallelUnifiedAnalysisBuilder {
             line: metric.line,
         };
         let callee_count = self.call_graph.get_callees(&func_id).len();
-        
+
         // Apply filtering predicates
         if !predicates::should_process_metric(metric, test_only_functions, callee_count) {
             return None;
         }
-        
+
         // Transform metric to debt item
         Some(self.metric_to_debt_item(metric, context))
     }
-    
+
     /// Transform a metric into a debt item (pure transformation)
     fn metric_to_debt_item(
         &self,
@@ -670,7 +669,6 @@ impl ParallelUnifiedAnalysisBuilder {
         )
     }
 
-
     /// Execute phase 3: Parallel file analysis
     pub fn execute_phase3_parallel(
         &mut self,
@@ -682,7 +680,7 @@ impl ParallelUnifiedAnalysisBuilder {
         let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
 
         if !quiet_mode && self.options.progress {
-            eprintln!("  🚀 Starting parallel phase 3 (file analysis)...");
+            eprintln!("🚀 Starting parallel phase 3 (file analysis)...");
         }
 
         // Group functions by file
@@ -706,7 +704,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         if !quiet_mode && self.options.progress {
             eprintln!(
-                "  ✅ Phase 3 complete in {:?} ({} file items)",
+                "✅ Phase 3 complete in {:?} ({} file items)",
                 self.timings.file_analysis,
                 file_items.len()
             );
@@ -717,44 +715,45 @@ impl ParallelUnifiedAnalysisBuilder {
 
     fn analyze_file_parallel(
         &self,
-        file_path: &PathBuf,
+        file_path: &Path,
         functions: &[&FunctionMetrics],
         coverage_data: Option<&LcovData>,
         no_god_object: bool,
     ) -> Option<FileDebtItem> {
         // Transform to owned functions
         let functions_owned: Vec<FunctionMetrics> = functions.iter().map(|&f| f.clone()).collect();
-        
+
         // Pure: aggregate function metrics
-        let mut file_metrics = file_analysis::aggregate_file_metrics(&functions_owned, coverage_data);
-        
+        let mut file_metrics =
+            file_analysis::aggregate_file_metrics(&functions_owned, coverage_data);
+
         // Handle god object detection with separated I/O
         file_metrics.god_object_indicators = if no_god_object {
             file_analysis::default_god_object_indicators()
         } else {
             self.analyze_god_object_with_io(file_path, coverage_data)
-                .unwrap_or_else(|| file_analysis::default_god_object_indicators())
+                .unwrap_or_else(file_analysis::default_god_object_indicators)
         };
-        
+
         // Pure: calculate score and decide if to include
         let score = file_metrics.calculate_score();
-        
+
         if file_analysis::should_include_file(score) {
             Some(file_analysis::create_file_debt_item(file_metrics, score))
         } else {
             None
         }
     }
-    
+
     /// I/O wrapper for god object analysis
     fn analyze_god_object_with_io(
         &self,
-        file_path: &PathBuf,
+        file_path: &Path,
         coverage_data: Option<&LcovData>,
     ) -> Option<crate::priority::file_metrics::GodObjectIndicators> {
         // I/O: Read file content
         let content = std::fs::read_to_string(file_path).ok()?;
-        
+
         // Pure: Analyze content
         file_analysis::analyze_god_object_indicators(&content, file_path, coverage_data).ok()
     }
@@ -814,23 +813,17 @@ impl ParallelUnifiedAnalysisBuilder {
             + self.timings.sorting;
 
         if !quiet_mode && self.options.progress {
+            eprintln!("⏱️  Total parallel analysis time: {:?}", self.timings.total);
+            eprintln!("  - Data flow: {:?}", self.timings.data_flow_creation);
+            eprintln!("  - Purity: {:?}", self.timings.purity_analysis);
+            eprintln!("  - Test detection: {:?}", self.timings.test_detection);
+            eprintln!("  - Debt aggregation: {:?}", self.timings.debt_aggregation);
             eprintln!(
-                "  ⏱️  Total parallel analysis time: {:?}",
-                self.timings.total
-            );
-            eprintln!("    - Data flow: {:?}", self.timings.data_flow_creation);
-            eprintln!("    - Purity: {:?}", self.timings.purity_analysis);
-            eprintln!("    - Test detection: {:?}", self.timings.test_detection);
-            eprintln!(
-                "    - Debt aggregation: {:?}",
-                self.timings.debt_aggregation
-            );
-            eprintln!(
-                "    - Function analysis: {:?}",
+                "  - Function analysis: {:?}",
                 self.timings.function_analysis
             );
-            eprintln!("    - File analysis: {:?}", self.timings.file_analysis);
-            eprintln!("    - Sorting: {:?}", self.timings.sorting);
+            eprintln!("  - File analysis: {:?}", self.timings.file_analysis);
+            eprintln!("  - Sorting: {:?}", self.timings.sorting);
         }
 
         (unified, self.timings)
