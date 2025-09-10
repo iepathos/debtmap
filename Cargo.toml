@@ -115,3 +115,7 @@ harness = false
 name = "lcov_parallel_bench"
 harness = false
 
+[[bench]]
+name = "parallel_performance"
+harness = false
+
