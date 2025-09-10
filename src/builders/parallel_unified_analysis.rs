@@ -346,6 +346,7 @@ impl ParallelUnifiedAnalysisBuilder {
     }
 
     /// Execute phase 2: Parallel function processing
+    #[allow(clippy::too_many_arguments)]
     pub fn execute_phase2_parallel(
         &mut self,
         metrics: &[FunctionMetrics],

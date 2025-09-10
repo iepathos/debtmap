@@ -5,7 +5,6 @@ mod stress_tests {
     };
     use debtmap::core::FunctionMetrics;
     use debtmap::priority::call_graph::{CallGraph, CallType, FunctionId};
-    use std::collections::HashSet;
     use std::path::PathBuf;
     use std::time::{Duration, Instant};
 
@@ -32,7 +31,7 @@ mod stress_tests {
                     file: file_path.clone(),
                     name,
                     line: func_idx * 50 + 10,
-                    length: 10 + (func_idx % 40) as usize, // Varying function lengths
+                    length: 10 + (func_idx % 40), // Varying function lengths
                     cyclomatic: 1 + (func_idx % 15) as u32, // Varying complexity
                     cognitive: (func_idx % 10) as u32,
                     nesting: (func_idx % 4) as u32,
@@ -40,7 +39,15 @@ mod stress_tests {
                     in_test_module: is_test,
                     visibility: Some("pub".to_string()),
                     is_trait_method: func_idx % 20 == 0,
-                    entropy_score: Some(0.5 + (func_idx as f64 * 0.01) % 0.5),
+                    entropy_score: Some(debtmap::complexity::entropy_core::EntropyScore {
+                        token_entropy: 0.5 + (func_idx as f64 * 0.01) % 0.5,
+                        pattern_repetition: 0.2,
+                        branch_similarity: 0.3,
+                        effective_complexity: func_idx as f64 * 0.7,
+                        unique_variables: 5,
+                        max_nesting: 2,
+                        dampening_applied: 0.9,
+                    }),
                     is_pure: Some(func_idx % 3 != 0),
                     purity_confidence: Some(if func_idx % 3 != 0 { 0.8 } else { 0.2 }),
                 });
@@ -71,7 +78,7 @@ mod stress_tests {
                     .unwrap_or(false),
                 metric.is_test,
                 metric.cyclomatic,
-                metric.length as u32,
+                metric.length,
             );
         }
 
@@ -100,7 +107,7 @@ mod stress_tests {
                     if j % 2 == 0 {
                         CallType::Direct
                     } else {
-                        CallType::Indirect
+                        CallType::Delegate // Using Delegate instead of non-existent Indirect
                     },
                 );
             }
@@ -127,7 +134,7 @@ mod stress_tests {
         let start = Instant::now();
 
         // Execute all phases
-        let (data_flow, purity, test_funcs, debt_agg) =
+        let (data_flow, _purity, test_funcs, debt_agg) =
             builder.execute_phase1_parallel(&metrics, None);
         let phase1_time = start.elapsed();
 
@@ -145,7 +152,7 @@ mod stress_tests {
         let file_items = builder.execute_phase3_parallel(&metrics, None, false);
         let phase3_time = start.elapsed() - phase1_time - phase2_time;
 
-        let (unified, timings) = builder.build(data_flow, purity, items, file_items, None);
+        let (unified, _timings) = builder.build(data_flow, _purity, items, file_items, None);
         let total_time = start.elapsed();
 
         // Assertions
@@ -194,7 +201,7 @@ mod stress_tests {
         let start = Instant::now();
 
         // Execute all phases
-        let (data_flow, purity, test_funcs, debt_agg) =
+        let (data_flow, _purity, test_funcs, debt_agg) =
             builder.execute_phase1_parallel(&metrics, None);
         let items = builder.execute_phase2_parallel(
             &metrics,
@@ -206,7 +213,7 @@ mod stress_tests {
             None,
         );
         let file_items = builder.execute_phase3_parallel(&metrics, None, false);
-        let (unified, _timings) = builder.build(data_flow, purity, items, file_items, None);
+        let (unified, _timings) = builder.build(data_flow, _purity, items, file_items, None);
 
         let total_time = start.elapsed();
 
@@ -249,7 +256,7 @@ mod stress_tests {
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
 
         // Should complete without excessive memory usage
-        let (data_flow, purity, test_funcs, debt_agg) =
+        let (data_flow, _purity, test_funcs, debt_agg) =
             builder.execute_phase1_parallel(&metrics, None);
         let items = builder.execute_phase2_parallel(
             &metrics,
@@ -261,7 +268,7 @@ mod stress_tests {
             None,
         );
         let file_items = builder.execute_phase3_parallel(&metrics, None, false);
-        let (unified, _) = builder.build(data_flow, purity, items, file_items, None);
+        let (unified, _) = builder.build(data_flow, _purity, items, file_items, None);
 
         assert_eq!(unified.items.len(), 40000);
         println!("Memory pressure test passed with 40,000 functions");
@@ -287,7 +294,7 @@ mod stress_tests {
                 true,
                 metric.is_test,
                 metric.cyclomatic,
-                metric.length as u32,
+                metric.length,
             );
         }
 
@@ -324,7 +331,7 @@ mod stress_tests {
         let start = Instant::now();
 
         // This should handle the complex graph efficiently
-        let (data_flow, purity, test_funcs, debt_agg) =
+        let (data_flow, _purity, test_funcs, debt_agg) =
             builder.execute_phase1_parallel(&metrics, None);
         let items = builder.execute_phase2_parallel(
             &metrics,
@@ -372,9 +379,9 @@ mod stress_tests {
 
             let start = Instant::now();
 
-            let (data_flow, purity, test_funcs, debt_agg) =
+            let (data_flow, _purity, test_funcs, debt_agg) =
                 builder.execute_phase1_parallel(&metrics, None);
-            let items = builder.execute_phase2_parallel(
+            let _items = builder.execute_phase2_parallel(
                 &metrics,
                 &test_funcs,
                 &debt_agg,

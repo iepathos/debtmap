@@ -1,9 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use debtmap::builders::parallel_unified_analysis::{
-    ParallelUnifiedAnalysis, ParallelUnifiedAnalysisOptions,
-};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use debtmap::builders::parallel_unified_analysis::ParallelUnifiedAnalysisOptions;
 use debtmap::builders::unified_analysis::UnifiedAnalysisBuilder;
 use debtmap::priority::UnifiedAnalysis;
+use std::hint::black_box;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
