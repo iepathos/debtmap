@@ -66,34 +66,41 @@ impl GodObjectDetector {
             .values()
             .max_by_key(|t| t.method_count + t.field_count * 2);
 
-        // If no types found, this isn't a god object (just a module with functions)
+        // Count standalone functions in addition to methods from types
+        let standalone_count = visitor.standalone_functions.len();
+        
+        // Combine methods from the primary type (if any) with standalone functions
         let (total_methods, total_fields, all_methods, total_complexity) =
             if let Some(type_info) = primary_type {
-                // Focus on the largest type for god object detection
-                let all_methods = type_info.methods.clone();
-                let total_complexity = (type_info.method_count * 5) as u32;
+                // Combine struct methods with standalone functions
+                let mut all_methods = type_info.methods.clone();
+                all_methods.extend(visitor.standalone_functions.clone());
+                
+                let total_methods = type_info.method_count + standalone_count;
+                let total_complexity = (total_methods * 5) as u32;
 
-                // Only count the primary type's methods and fields
                 (
-                    type_info.method_count,
+                    total_methods,
                     type_info.field_count,
                     all_methods,
                     total_complexity,
                 )
             } else {
-                // No struct/impl blocks found - this is just a module with functions
-                // Modules with standalone functions are not god objects
-                (0, 0, Vec::new(), 0)
+                // No struct/impl blocks found - count standalone functions
+                let all_methods = visitor.standalone_functions.clone();
+                let total_complexity = (standalone_count * 5) as u32;
+                
+                (standalone_count, 0, all_methods, total_complexity)
             };
 
         // Count actual lines more accurately by looking at span information
         // For now, use a better heuristic based on item count and complexity
-        let lines_of_code = if let Some(type_info) = visitor.types.values().next() {
-            // Estimate based on methods and fields
-            type_info.method_count * 15 + type_info.field_count * 2 + 50
+        let lines_of_code = if let Some(type_info) = primary_type {
+            // Estimate based on methods, fields, and standalone functions
+            type_info.method_count * 15 + type_info.field_count * 2 + standalone_count * 10 + 50
         } else {
             // If no types, estimate based on standalone functions
-            visitor.standalone_functions.len() * 10 + 20
+            standalone_count * 10 + 20
         };
 
         let responsibility_groups = group_methods_by_responsibility(&all_methods);
