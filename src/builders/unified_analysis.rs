@@ -242,7 +242,7 @@ fn perform_unified_analysis_computation(
 
     if !quiet_mode {
         eprintln!(" ✓");
-        eprint!("🎯 Creating unified analysis...");
+        eprint!("🎯 Creating unified analysis... ");
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
@@ -699,6 +699,11 @@ fn create_unified_analysis_parallel(
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
+
+    // Print newline to complete the "Creating unified analysis..." line
+    if std::env::var("DEBTMAP_QUIET").is_err() {
+        eprintln!();
+    }
 
     // Phase 1: Parallel initialization
     let (data_flow_graph, _purity, test_only_functions, debt_aggregator) =
