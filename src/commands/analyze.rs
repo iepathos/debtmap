@@ -59,6 +59,11 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     configure_output(&config);
     set_threshold_preset(config.threshold_preset);
 
+    // Set jobs environment variable for parallel processing
+    if config.jobs > 0 {
+        std::env::set_var("DEBTMAP_JOBS", config.jobs.to_string());
+    }
+
     // Handle cache flags
     if config.clear_cache {
         // Clear cache using the shared cache system
@@ -157,6 +162,10 @@ fn analyze_project(
     duplication_threshold: usize,
     parallel_enabled: bool,
 ) -> Result<AnalysisResults> {
+    // Set environment variables for parallel processing
+    if parallel_enabled {
+        std::env::set_var("DEBTMAP_PARALLEL", "true");
+    }
     let config = config::get_config();
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;

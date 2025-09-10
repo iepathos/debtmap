@@ -1,4 +1,4 @@
-use super::{call_graph, parallel_call_graph};
+use super::{call_graph, parallel_call_graph, parallel_unified_analysis};
 use crate::{
     analysis::diagnostics::{DetailLevel, DiagnosticReporter, OutputFormat},
     analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
@@ -449,6 +449,30 @@ pub fn create_unified_analysis_with_exclusions(
     min_problematic: Option<usize>,
     no_god_object: bool,
 ) -> UnifiedAnalysis {
+    // Check if parallel mode is enabled
+    let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
+    let jobs = std::env::var("DEBTMAP_JOBS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok());
+
+    if parallel_enabled {
+        return create_unified_analysis_parallel(
+            metrics,
+            call_graph,
+            coverage_data,
+            framework_exclusions,
+            function_pointer_used_functions,
+            debt_items,
+            no_aggregation,
+            aggregation_method,
+            min_problematic,
+            no_god_object,
+            jobs,
+        );
+    }
     use std::time::Instant;
     let start = Instant::now();
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
@@ -649,6 +673,108 @@ pub fn create_unified_analysis_with_exclusions(
     unified
 }
 
+#[allow(clippy::too_many_arguments)]
+fn create_unified_analysis_parallel(
+    metrics: &[FunctionMetrics],
+    call_graph: &priority::CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    framework_exclusions: &HashSet<priority::call_graph::FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<priority::call_graph::FunctionId>>,
+    debt_items: Option<&[DebtItem]>,
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
+    min_problematic: Option<usize>,
+    no_god_object: bool,
+    jobs: Option<usize>,
+) -> UnifiedAnalysis {
+    use parallel_unified_analysis::{
+        ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
+    };
+
+    let options = ParallelUnifiedAnalysisOptions {
+        parallel: true,
+        jobs,
+        batch_size: 100,
+        progress: std::env::var("DEBTMAP_QUIET").is_err(),
+    };
+
+    let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
+
+    // Phase 1: Parallel initialization
+    let (data_flow_graph, _purity, test_only_functions, debt_aggregator) =
+        builder.execute_phase1_parallel(metrics, debt_items);
+
+    // Phase 2: Parallel function processing
+    let items = builder.execute_phase2_parallel(
+        metrics,
+        &test_only_functions,
+        &debt_aggregator,
+        &data_flow_graph,
+        coverage_data,
+        framework_exclusions,
+        function_pointer_used_functions,
+    );
+
+    // Add error swallowing items
+    let mut all_items = items;
+    if let Some(debt_items) = debt_items {
+        let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
+        all_items.extend(error_swallowing_items);
+    }
+
+    // Phase 3: Parallel file analysis
+    let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
+
+    // Build final unified analysis
+    let (mut unified, _timings) = builder.build(
+        data_flow_graph,
+        _purity,
+        all_items,
+        file_items,
+        coverage_data,
+    );
+
+    // Handle aggregation
+    let mut aggregation_config = crate::config::get_aggregation_config();
+
+    if no_aggregation {
+        aggregation_config.enabled = false;
+    }
+
+    if let Some(method_str) = aggregation_method {
+        aggregation_config.method = match method_str.as_str() {
+            "sum" => priority::aggregation::AggregationMethod::Sum,
+            "weighted_sum" => priority::aggregation::AggregationMethod::WeightedSum,
+            "logarithmic_sum" => priority::aggregation::AggregationMethod::LogarithmicSum,
+            "max_plus_average" => priority::aggregation::AggregationMethod::MaxPlusAverage,
+            _ => aggregation_config.method,
+        };
+    }
+
+    if let Some(min_prob) = min_problematic {
+        aggregation_config.min_functions_for_aggregation = min_prob;
+    }
+
+    if aggregation_config.enabled {
+        let items_vec: Vec<UnifiedDebtItem> = unified.items.iter().cloned().collect();
+        let file_aggregates = if !items_vec.is_empty() {
+            priority::aggregation::AggregationPipeline::aggregate_from_debt_items(
+                &items_vec,
+                &aggregation_config,
+            )
+        } else {
+            priority::aggregation::AggregationPipeline::aggregate_from_metrics(
+                metrics,
+                &aggregation_config,
+            )
+        };
+
+        unified.file_aggregates = im::Vector::from(file_aggregates);
+    }
+
+    unified
+}
+
 fn should_skip_metric_for_debt_analysis(
     metric: &FunctionMetrics,
     call_graph: &priority::CallGraph,
@@ -682,7 +808,7 @@ fn should_skip_metric_for_debt_analysis(
     false
 }
 
-fn create_debt_item_from_metric_with_aggregator(
+pub(super) fn create_debt_item_from_metric_with_aggregator(
     metric: &FunctionMetrics,
     call_graph: &priority::CallGraph,
     coverage_data: Option<&risk::lcov::LcovData>,
