@@ -1,0 +1,79 @@
+{
+  "location": {
+    "file": "./src/complexity/languages/python.rs",
+    "function": "PythonEntropyAnalyzer::extract_tokens_from_expr",
+    "line": 172
+  },
+  "debt_type": {
+    "ComplexityHotspot": {
+      "cyclomatic": 48,
+      "cognitive": 71
+    }
+  },
+  "unified_score": {
+    "complexity_factor": 10.0,
+    "coverage_factor": 10.0,
+    "dependency_factor": 3.0,
+    "role_multiplier": 1.3,
+    "final_score": 114.6247668512767
+  },
+  "function_role": "PureLogic",
+  "recommendation": {
+    "primary_action": "Decompose into 16 smaller functions using Result chaining",
+    "rationale": "Extreme complexity (48), needs functional decomposition",
+    "implementation_steps": [
+      "Identify distinct phases in the function:",
+      "  • Input validation → validate_inputs() -> Result<ValidatedInput, Error>",
+      "  • Data transformation → transform_data(input) -> Result<ProcessedData, Error>",
+      "  • Business logic → apply_business_rules(data) -> Result<Output, Error>",
+      "  • Side effects → perform_side_effects(output) -> Result<(), Error>",
+      "Add property-based tests using proptest or quickcheck for 100% coverage gap",
+      "Use Result combinators to chain operations:",
+      "  • map() for transformations",
+      "  • and_then() for operations that can fail",
+      "  • map_err() for error context"
+    ],
+    "related_items": []
+  },
+  "expected_impact": {
+    "coverage_improvement": 0.0,
+    "lines_reduction": 0,
+    "complexity_reduction": 24.0,
+    "risk_reduction": 19.58404281231209
+  },
+  "transitive_coverage": null,
+  "upstream_dependencies": 3,
+  "downstream_dependencies": 11,
+  "upstream_callers": [
+    "PythonEntropyAnalyzer::extract_tokens_from_comprehension",
+    "PythonEntropyAnalyzer::extract_tokens_from_stmt",
+    "PythonEntropyAnalyzer::extract_tokens_from_expr"
+  ],
+  "downstream_callees": [
+    "PythonEntropyAnalyzer::extract_tokens_from_comprehension",
+    "GenericToken::function_call",
+    "GenericToken::literal",
+    "PythonEntropyAnalyzer::extract_tokens_from_expr",
+    "GenericToken::keyword",
+    "GenericToken::value",
+    "GenericToken::operator",
+    "normalize_identifier",
+    "GenericToken::control_flow",
+    "GenericToken::new",
+    "GenericToken::identifier"
+  ],
+  "nesting_depth": 3,
+  "function_length": 154,
+  "cyclomatic_complexity": 48,
+  "cognitive_complexity": 71,
+  "entropy_details": {
+    "entropy_score": 0.22785859544375897,
+    "pattern_repetition": 0.9506849315068492,
+    "original_complexity": 48,
+    "adjusted_complexity": 24,
+    "dampening_factor": 0.5
+  },
+  "is_pure": false,
+  "purity_confidence": 1.0,
+  "god_object_indicators": null
+}
