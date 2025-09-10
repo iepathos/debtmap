@@ -172,10 +172,7 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     fn extract_tokens_from_expr(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
         match expr {
             ast::Expr::BoolOp(bool_op) => {
-                let op = match bool_op.op {
-                    ast::BoolOp::And => "and",
-                    ast::BoolOp::Or => "or",
-                };
+                let op = Self::classify_bool_op(bool_op.op);
                 tokens.push(GenericToken::operator(op.to_string()));
                 for value in &bool_op.values {
                     self.extract_tokens_from_expr(value, tokens);
@@ -188,12 +185,7 @@ impl<'a> PythonEntropyAnalyzer<'a> {
                 self.extract_tokens_from_expr(&bin_op.right, tokens);
             }
             ast::Expr::UnaryOp(unary_op) => {
-                let op = match unary_op.op {
-                    ast::UnaryOp::Not => "not",
-                    ast::UnaryOp::Invert => "~",
-                    ast::UnaryOp::UAdd => "+",
-                    ast::UnaryOp::USub => "-",
-                };
+                let op = Self::classify_unary_op(unary_op.op);
                 tokens.push(GenericToken::operator(op.to_string()));
                 self.extract_tokens_from_expr(&unary_op.operand, tokens);
             }
@@ -209,33 +201,23 @@ impl<'a> PythonEntropyAnalyzer<'a> {
                 self.extract_tokens_from_expr(&if_exp.orelse, tokens);
             }
             ast::Expr::ListComp(list_comp) => {
-                tokens.push(GenericToken::new(
-                    TokenCategory::Custom("list_comp".to_string()),
-                    1.1,
-                    "list_comp".to_string(),
-                ));
-                self.extract_tokens_from_expr(&list_comp.elt, tokens);
-                for gen in &list_comp.generators {
-                    self.extract_tokens_from_comprehension(gen, tokens);
-                }
+                self.extract_comprehension_tokens(
+                    "list_comp",
+                    &list_comp.elt,
+                    &list_comp.generators,
+                    tokens,
+                );
             }
             ast::Expr::SetComp(set_comp) => {
-                tokens.push(GenericToken::new(
-                    TokenCategory::Custom("set_comp".to_string()),
-                    1.1,
-                    "set_comp".to_string(),
-                ));
-                self.extract_tokens_from_expr(&set_comp.elt, tokens);
-                for gen in &set_comp.generators {
-                    self.extract_tokens_from_comprehension(gen, tokens);
-                }
+                self.extract_comprehension_tokens(
+                    "set_comp",
+                    &set_comp.elt,
+                    &set_comp.generators,
+                    tokens,
+                );
             }
             ast::Expr::DictComp(dict_comp) => {
-                tokens.push(GenericToken::new(
-                    TokenCategory::Custom("dict_comp".to_string()),
-                    1.1,
-                    "dict_comp".to_string(),
-                ));
+                tokens.push(Self::create_comprehension_token("dict_comp"));
                 self.extract_tokens_from_expr(&dict_comp.key, tokens);
                 self.extract_tokens_from_expr(&dict_comp.value, tokens);
                 for gen in &dict_comp.generators {
@@ -243,15 +225,12 @@ impl<'a> PythonEntropyAnalyzer<'a> {
                 }
             }
             ast::Expr::GeneratorExp(gen_exp) => {
-                tokens.push(GenericToken::new(
-                    TokenCategory::Custom("generator".to_string()),
-                    1.1,
-                    "generator".to_string(),
-                ));
-                self.extract_tokens_from_expr(&gen_exp.elt, tokens);
-                for gen in &gen_exp.generators {
-                    self.extract_tokens_from_comprehension(gen, tokens);
-                }
+                self.extract_comprehension_tokens(
+                    "generator",
+                    &gen_exp.elt,
+                    &gen_exp.generators,
+                    tokens,
+                );
             }
             ast::Expr::Await(await_expr) => {
                 tokens.push(GenericToken::keyword("await".to_string()));
@@ -271,18 +250,7 @@ impl<'a> PythonEntropyAnalyzer<'a> {
             ast::Expr::Compare(compare) => {
                 self.extract_tokens_from_expr(&compare.left, tokens);
                 for op in &compare.ops {
-                    let op_str = match op {
-                        ast::CmpOp::Eq => "==",
-                        ast::CmpOp::NotEq => "!=",
-                        ast::CmpOp::Lt => "<",
-                        ast::CmpOp::LtE => "<=",
-                        ast::CmpOp::Gt => ">",
-                        ast::CmpOp::GtE => ">=",
-                        ast::CmpOp::Is => "is",
-                        ast::CmpOp::IsNot => "is not",
-                        ast::CmpOp::In => "in",
-                        ast::CmpOp::NotIn => "not in",
-                    };
+                    let op_str = Self::classify_compare_op(op);
                     tokens.push(GenericToken::operator(op_str.to_string()));
                 }
                 for comp in &compare.comparators {
@@ -300,17 +268,7 @@ impl<'a> PythonEntropyAnalyzer<'a> {
                 tokens.push(GenericToken::identifier(normalize_identifier(&name.id)));
             }
             ast::Expr::Constant(constant) => {
-                let const_type = match &constant.value {
-                    rustpython_parser::ast::Constant::None => "None",
-                    rustpython_parser::ast::Constant::Bool(_) => "bool",
-                    rustpython_parser::ast::Constant::Str(_) => "string",
-                    rustpython_parser::ast::Constant::Bytes(_) => "bytes",
-                    rustpython_parser::ast::Constant::Int(_) => "int",
-                    rustpython_parser::ast::Constant::Float(_) => "float",
-                    rustpython_parser::ast::Constant::Complex { .. } => "complex",
-                    rustpython_parser::ast::Constant::Ellipsis => "...",
-                    rustpython_parser::ast::Constant::Tuple(_) => "tuple",
-                };
+                let const_type = Self::classify_constant(&constant.value);
                 tokens.push(GenericToken::literal(const_type.to_string()));
             }
             ast::Expr::NamedExpr(named) => {
@@ -320,6 +278,79 @@ impl<'a> PythonEntropyAnalyzer<'a> {
                 self.extract_tokens_from_expr(&named.value, tokens);
             }
             _ => {}
+        }
+    }
+
+    // Pure function to classify boolean operators
+    fn classify_bool_op(op: ast::BoolOp) -> &'static str {
+        match op {
+            ast::BoolOp::And => "and",
+            ast::BoolOp::Or => "or",
+        }
+    }
+
+    // Pure function to classify unary operators
+    fn classify_unary_op(op: ast::UnaryOp) -> &'static str {
+        match op {
+            ast::UnaryOp::Not => "not",
+            ast::UnaryOp::Invert => "~",
+            ast::UnaryOp::UAdd => "+",
+            ast::UnaryOp::USub => "-",
+        }
+    }
+
+    // Pure function to classify comparison operators
+    fn classify_compare_op(op: &ast::CmpOp) -> &'static str {
+        match op {
+            ast::CmpOp::Eq => "==",
+            ast::CmpOp::NotEq => "!=",
+            ast::CmpOp::Lt => "<",
+            ast::CmpOp::LtE => "<=",
+            ast::CmpOp::Gt => ">",
+            ast::CmpOp::GtE => ">=",
+            ast::CmpOp::Is => "is",
+            ast::CmpOp::IsNot => "is not",
+            ast::CmpOp::In => "in",
+            ast::CmpOp::NotIn => "not in",
+        }
+    }
+
+    // Pure function to classify constant types
+    fn classify_constant(value: &rustpython_parser::ast::Constant) -> &'static str {
+        match value {
+            rustpython_parser::ast::Constant::None => "None",
+            rustpython_parser::ast::Constant::Bool(_) => "bool",
+            rustpython_parser::ast::Constant::Str(_) => "string",
+            rustpython_parser::ast::Constant::Bytes(_) => "bytes",
+            rustpython_parser::ast::Constant::Int(_) => "int",
+            rustpython_parser::ast::Constant::Float(_) => "float",
+            rustpython_parser::ast::Constant::Complex { .. } => "complex",
+            rustpython_parser::ast::Constant::Ellipsis => "...",
+            rustpython_parser::ast::Constant::Tuple(_) => "tuple",
+        }
+    }
+
+    // Pure function to create comprehension token
+    fn create_comprehension_token(comp_type: &str) -> GenericToken {
+        GenericToken::new(
+            TokenCategory::Custom(comp_type.to_string()),
+            1.1,
+            comp_type.to_string(),
+        )
+    }
+
+    // Extract tokens from comprehensions (list, set, generator)
+    fn extract_comprehension_tokens(
+        &self,
+        comp_type: &str,
+        elt: &ast::Expr,
+        generators: &[ast::Comprehension],
+        tokens: &mut Vec<GenericToken>,
+    ) {
+        tokens.push(Self::create_comprehension_token(comp_type));
+        self.extract_tokens_from_expr(elt, tokens);
+        for gen in generators {
+            self.extract_tokens_from_comprehension(gen, tokens);
         }
     }
 
