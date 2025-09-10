@@ -184,11 +184,11 @@ fn test_parallel_vs_sequential_consistency() {
 #[test]
 fn test_large_codebase_parallel_analysis() {
     use std::time::Instant;
-    
+
     // Create a large set of metrics simulating a real codebase
     let metrics = create_test_metrics(500);
     let mut call_graph = CallGraph::new();
-    
+
     // Add functions to call graph
     for metric in &metrics {
         let func_id = debtmap::priority::call_graph::FunctionId {
@@ -204,7 +204,7 @@ fn test_large_codebase_parallel_analysis() {
             metric.length as u32,
         );
     }
-    
+
     // Add some call relationships
     for i in 0..metrics.len() - 1 {
         if i % 5 == 0 {
@@ -225,21 +225,21 @@ fn test_large_codebase_parallel_analysis() {
             );
         }
     }
-    
+
     let options = ParallelUnifiedAnalysisOptions {
         parallel: true,
         jobs: None, // Use all cores
         batch_size: 100,
         progress: false,
     };
-    
+
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
-    
+
     let start = Instant::now();
-    
+
     // Execute all phases
     let (data_flow, purity, test_funcs, debt_agg) = builder.execute_phase1_parallel(&metrics, None);
-    
+
     let items = builder.execute_phase2_parallel(
         &metrics,
         &test_funcs,
@@ -249,33 +249,44 @@ fn test_large_codebase_parallel_analysis() {
         &Default::default(),
         None,
     );
-    
+
     let file_items = builder.execute_phase3_parallel(&metrics, None, false);
-    
+
     let (unified, timings) = builder.build(data_flow, purity, items, file_items, None);
-    
+
     let duration = start.elapsed();
-    
+
     // Verify results
     assert!(!unified.items.is_empty());
     assert!(!unified.file_items.is_empty());
-    
+
     // Performance check - should be fast even for 500 functions
-    assert!(duration.as_secs() < 2, "Large codebase analysis took too long: {:?}", duration);
-    
+    assert!(
+        duration.as_secs() < 2,
+        "Large codebase analysis took too long: {:?}",
+        duration
+    );
+
     // Verify timing breakdown
     assert!(timings.total > std::time::Duration::from_secs(0));
-    assert_eq!(timings.total, timings.data_flow_creation + timings.purity_analysis + 
-               timings.test_detection + timings.debt_aggregation + 
-               timings.function_analysis + timings.file_analysis + 
-               timings.aggregation + timings.sorting);
+    assert_eq!(
+        timings.total,
+        timings.data_flow_creation
+            + timings.purity_analysis
+            + timings.test_detection
+            + timings.debt_aggregation
+            + timings.function_analysis
+            + timings.file_analysis
+            + timings.aggregation
+            + timings.sorting
+    );
 }
 
 #[test]
 fn test_parallel_analysis_different_batch_sizes() {
     let metrics = create_test_metrics(200);
     let call_graph = CallGraph::new();
-    
+
     for batch_size in [10, 50, 100, 200] {
         let options = ParallelUnifiedAnalysisOptions {
             parallel: true,
@@ -283,11 +294,12 @@ fn test_parallel_analysis_different_batch_sizes() {
             batch_size,
             progress: false,
         };
-        
+
         let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
-        
-        let (data_flow, purity, test_funcs, debt_agg) = builder.execute_phase1_parallel(&metrics, None);
-        
+
+        let (data_flow, purity, test_funcs, debt_agg) =
+            builder.execute_phase1_parallel(&metrics, None);
+
         let items = builder.execute_phase2_parallel(
             &metrics,
             &test_funcs,
@@ -297,7 +309,7 @@ fn test_parallel_analysis_different_batch_sizes() {
             &Default::default(),
             None,
         );
-        
+
         // All batch sizes should produce the same number of items
         assert_eq!(items.len(), metrics.len());
     }
@@ -307,34 +319,34 @@ fn test_parallel_analysis_different_batch_sizes() {
 fn test_parallel_analysis_with_coverage_data() {
     use debtmap::risk::lcov::LcovData;
     use std::collections::HashMap;
-    
+
     let metrics = create_test_metrics(100);
     let call_graph = CallGraph::new();
-    
+
     // Create mock coverage data
     let mut coverage_data = LcovData {
         files: HashMap::new(),
     };
-    
+
     for metric in &metrics {
         let file_path = metric.file.to_str().unwrap().to_string();
         let mut lines = HashMap::new();
         lines.insert(metric.line, 10); // Each function hit 10 times
         coverage_data.files.insert(file_path, lines);
     }
-    
+
     let options = ParallelUnifiedAnalysisOptions {
         parallel: true,
         jobs: Some(4),
         batch_size: 25,
         progress: false,
     };
-    
+
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
-    
-    let (data_flow, purity, test_funcs, debt_agg) = 
+
+    let (data_flow, purity, test_funcs, debt_agg) =
         builder.execute_phase1_parallel(&metrics, Some(&coverage_data));
-    
+
     let items = builder.execute_phase2_parallel(
         &metrics,
         &test_funcs,
@@ -344,7 +356,7 @@ fn test_parallel_analysis_with_coverage_data() {
         &Default::default(),
         None,
     );
-    
+
     // Verify coverage is applied
     for item in &items {
         assert!(item.coverage_hit_count.is_some());
@@ -358,19 +370,19 @@ fn test_parallel_analysis_memory_efficiency() {
     // by processing a very large number of small functions
     let metrics = create_test_metrics(1000);
     let call_graph = CallGraph::new();
-    
+
     let options = ParallelUnifiedAnalysisOptions {
         parallel: true,
-        jobs: Some(2), // Limit parallelism to control memory
+        jobs: Some(2),  // Limit parallelism to control memory
         batch_size: 50, // Small batches
         progress: false,
     };
-    
+
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph, options);
-    
+
     // This should complete without running out of memory
     let (data_flow, purity, test_funcs, debt_agg) = builder.execute_phase1_parallel(&metrics, None);
-    
+
     let items = builder.execute_phase2_parallel(
         &metrics,
         &test_funcs,
@@ -380,6 +392,6 @@ fn test_parallel_analysis_memory_efficiency() {
         &Default::default(),
         None,
     );
-    
+
     assert_eq!(items.len(), metrics.len());
 }

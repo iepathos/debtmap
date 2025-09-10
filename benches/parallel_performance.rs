@@ -9,7 +9,7 @@ use tempfile::TempDir;
 
 fn create_test_project(num_files: usize) -> TempDir {
     let temp_dir = TempDir::new().unwrap();
-    
+
     for i in 0..num_files {
         let file_path = temp_dir.path().join(format!("file_{}.rs", i));
         let content = format!(
@@ -52,67 +52,51 @@ fn create_test_project(num_files: usize) -> TempDir {
         );
         std::fs::write(file_path, content).unwrap();
     }
-    
+
     temp_dir
 }
 
 fn benchmark_sequential_analysis(c: &mut Criterion) {
     let mut group = c.benchmark_group("sequential_analysis");
-    
+
     for size in [10, 50, 100, 250].iter() {
         let temp_dir = create_test_project(*size);
         let path = temp_dir.path().to_path_buf();
-        
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &path,
-            |b, path| {
-                b.iter(|| {
-                    let builder = UnifiedAnalysisBuilder::new();
-                    let analysis = builder
-                        .with_path(path.clone())
-                        .build()
-                        .unwrap();
-                    black_box(analysis.run().unwrap());
-                });
-            },
-        );
+
+        group.bench_with_input(BenchmarkId::from_parameter(size), &path, |b, path| {
+            b.iter(|| {
+                let builder = UnifiedAnalysisBuilder::new();
+                let analysis = builder.with_path(path.clone()).build().unwrap();
+                black_box(analysis.run().unwrap());
+            });
+        });
     }
-    
+
     group.finish();
 }
 
 fn benchmark_parallel_analysis(c: &mut Criterion) {
     let mut group = c.benchmark_group("parallel_analysis");
-    
+
     for size in [10, 50, 100, 250].iter() {
         let temp_dir = create_test_project(*size);
         let path = temp_dir.path().to_path_buf();
-        
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &path,
-            |b, path| {
-                b.iter(|| {
-                    let options = ParallelUnifiedAnalysisOptions {
-                        parallel: true,
-                        jobs: None,
-                        batch_size: 100,
-                        progress: false,
-                    };
-                    
-                    let analysis = ParallelUnifiedAnalysis::new(
-                        path.clone(),
-                        None,
-                        None,
-                        options,
-                    );
-                    black_box(analysis.run().unwrap());
-                });
-            },
-        );
+
+        group.bench_with_input(BenchmarkId::from_parameter(size), &path, |b, path| {
+            b.iter(|| {
+                let options = ParallelUnifiedAnalysisOptions {
+                    parallel: true,
+                    jobs: None,
+                    batch_size: 100,
+                    progress: false,
+                };
+
+                let analysis = ParallelUnifiedAnalysis::new(path.clone(), None, None, options);
+                black_box(analysis.run().unwrap());
+            });
+        });
     }
-    
+
     group.finish();
 }
 
@@ -120,7 +104,7 @@ fn benchmark_parallel_with_job_counts(c: &mut Criterion) {
     let mut group = c.benchmark_group("parallel_jobs_comparison");
     let temp_dir = create_test_project(100);
     let path = temp_dir.path().to_path_buf();
-    
+
     for jobs in [1, 2, 4, 8].iter() {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}_jobs", jobs)),
@@ -133,19 +117,14 @@ fn benchmark_parallel_with_job_counts(c: &mut Criterion) {
                         batch_size: 100,
                         progress: false,
                     };
-                    
-                    let analysis = ParallelUnifiedAnalysis::new(
-                        path.clone(),
-                        None,
-                        None,
-                        options,
-                    );
+
+                    let analysis = ParallelUnifiedAnalysis::new(path.clone(), None, None, options);
                     black_box(analysis.run().unwrap());
                 });
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -153,7 +132,7 @@ fn benchmark_batch_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("batch_size_comparison");
     let temp_dir = create_test_project(200);
     let path = temp_dir.path().to_path_buf();
-    
+
     for batch_size in [10, 50, 100, 200].iter() {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("batch_{}", batch_size)),
@@ -166,19 +145,14 @@ fn benchmark_batch_sizes(c: &mut Criterion) {
                         batch_size: *batch_size,
                         progress: false,
                     };
-                    
-                    let analysis = ParallelUnifiedAnalysis::new(
-                        path.clone(),
-                        None,
-                        None,
-                        options,
-                    );
+
+                    let analysis = ParallelUnifiedAnalysis::new(path.clone(), None, None, options);
                     black_box(analysis.run().unwrap());
                 });
             },
         );
     }
-    
+
     group.finish();
 }
 
