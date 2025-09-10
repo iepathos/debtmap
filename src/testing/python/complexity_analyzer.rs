@@ -1,21 +1,25 @@
-use super::{Severity, TestIssueType, TestQualityIssue};
+use super::{config::ComplexityConfig, Severity, TestIssueType, TestQualityIssue};
 use rustpython_parser::ast::{self, Expr, Stmt};
 
 pub struct TestComplexityAnalyzer {
-    complexity_threshold: u32,
+    config: ComplexityConfig,
 }
 
 impl TestComplexityAnalyzer {
     pub fn new() -> Self {
         Self {
-            complexity_threshold: 10,
+            config: ComplexityConfig::default(),
         }
     }
 
     pub fn with_threshold(threshold: u32) -> Self {
-        Self {
-            complexity_threshold: threshold,
-        }
+        let mut config = ComplexityConfig::default();
+        config.threshold = threshold;
+        Self { config }
+    }
+
+    pub fn with_config(config: ComplexityConfig) -> Self {
+        Self { config }
     }
 
     pub fn analyze_test_function(
@@ -24,7 +28,7 @@ impl TestComplexityAnalyzer {
     ) -> Option<TestQualityIssue> {
         let complexity = self.calculate_complexity(&func_def.body);
 
-        if complexity > self.complexity_threshold {
+        if complexity > self.config.threshold {
             Some(TestQualityIssue {
                 issue_type: TestIssueType::OverlyComplex(complexity),
                 test_name: func_def.name.to_string(),
@@ -48,22 +52,22 @@ impl TestComplexityAnalyzer {
         let nesting_depth = self.calculate_max_nesting(body, 0);
         let line_count = body.len() as u32;
 
-        // Weight different factors
-        complexity += conditional_count * 2;
-        complexity += loop_count * 3;
-        complexity += if assertion_count > 5 {
-            (assertion_count - 5) * 1
+        // Weight different factors using configuration
+        complexity += conditional_count * self.config.conditional_weight;
+        complexity += loop_count * self.config.loop_weight;
+        complexity += if assertion_count > self.config.assertion_threshold {
+            (assertion_count - self.config.assertion_threshold) * self.config.assertion_weight
         } else {
             0
         };
-        complexity += mock_count * 2;
-        complexity += if nesting_depth > 2 {
-            (nesting_depth - 2) * 2
+        complexity += mock_count * self.config.mock_weight;
+        complexity += if nesting_depth > self.config.nesting_threshold {
+            (nesting_depth - self.config.nesting_threshold) * self.config.nesting_weight
         } else {
             0
         };
-        complexity += if line_count > 20 {
-            (line_count - 20) / 5
+        complexity += if line_count > self.config.line_threshold {
+            (line_count - self.config.line_threshold) / self.config.line_divisor
         } else {
             0
         };
@@ -345,11 +349,11 @@ impl TestComplexityAnalyzer {
     }
 
     fn get_severity(&self, complexity: u32) -> Severity {
-        if complexity > self.complexity_threshold * 3 {
+        if complexity > self.config.threshold * 3 {
             Severity::Critical
-        } else if complexity > self.complexity_threshold * 2 {
+        } else if complexity > self.config.threshold * 2 {
             Severity::High
-        } else if complexity > self.complexity_threshold {
+        } else if complexity > self.config.threshold {
             Severity::Medium
         } else {
             Severity::Low
@@ -368,7 +372,7 @@ impl TestComplexityAnalyzer {
             suggestions.push("Consider using parametrized tests instead of loops");
         }
 
-        if assertion_count > 5 {
+        if assertion_count > self.config.assertion_threshold {
             suggestions.push("Split into multiple focused test functions");
         }
 
@@ -376,18 +380,18 @@ impl TestComplexityAnalyzer {
             suggestions.push("Reduce mocking by using test fixtures or factories");
         }
 
-        if nesting_depth > 2 {
+        if nesting_depth > self.config.nesting_threshold {
             suggestions.push("Extract helper functions to reduce nesting");
         }
 
-        if body.len() > 20 {
+        if body.len() as u32 > self.config.line_threshold {
             suggestions.push("Break down into smaller, more focused tests");
         }
 
         if suggestions.is_empty() {
             format!(
                 "Test complexity score {} exceeds threshold {}",
-                complexity, self.complexity_threshold
+                complexity, self.config.threshold
             )
         } else {
             suggestions.join("; ")

@@ -1,28 +1,37 @@
 use super::{
     assertion_patterns::AssertionDetector, complexity_analyzer::TestComplexityAnalyzer,
-    flaky_patterns::FlakyPatternDetector, framework_detector::detect_test_framework, TestFramework,
-    TestQualityIssue,
+    config::PythonTestConfig, flaky_patterns::FlakyPatternDetector,
+    framework_detector::detect_test_framework, TestFramework, TestQualityIssue,
 };
 use rustpython_parser::ast::{self, Stmt};
 use std::path::PathBuf;
 
 pub struct PythonTestAnalyzer {
     framework: TestFramework,
-    complexity_threshold: u32,
+    config: PythonTestConfig,
 }
 
 impl PythonTestAnalyzer {
     pub fn new() -> Self {
         Self {
             framework: TestFramework::Unknown,
-            complexity_threshold: 10,
+            config: PythonTestConfig::default(),
+        }
+    }
+
+    pub fn with_config(config: PythonTestConfig) -> Self {
+        Self {
+            framework: TestFramework::Unknown,
+            config,
         }
     }
 
     pub fn with_threshold(threshold: u32) -> Self {
+        let mut config = PythonTestConfig::default();
+        config.complexity.threshold = threshold;
         Self {
             framework: TestFramework::Unknown,
-            complexity_threshold: threshold,
+            config,
         }
     }
 
@@ -99,7 +108,7 @@ impl PythonTestAnalyzer {
         }
 
         // Check complexity
-        let complexity_analyzer = TestComplexityAnalyzer::with_threshold(self.complexity_threshold);
+        let complexity_analyzer = TestComplexityAnalyzer::with_config(self.config.complexity.clone());
         if let Some(issue) = complexity_analyzer.analyze_test_function(func_def) {
             issues.push(issue);
         }
@@ -170,7 +179,7 @@ impl PythonTestAnalyzer {
     fn check_excessive_mocking(&self, func_def: &ast::StmtFunctionDef) -> Option<TestQualityIssue> {
         let mock_count = self.count_mocks(func_def);
 
-        if mock_count > 5 {
+        if mock_count > self.config.mocking.max_mocks {
             Some(TestQualityIssue {
                 issue_type: super::TestIssueType::ExcessiveMocking(mock_count),
                 test_name: func_def.name.to_string(),
