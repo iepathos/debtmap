@@ -21,6 +21,17 @@ map:
           /fix-debt-item --json '${item}'
         commit_required: true
         timeout: 300
+        validate:
+          claude: |
+            /prodigy-validate-debt-fix --json '${item}' --output .prodigy/debt-validation-result.json
+          result_file: ".prodigy/debt-validation-result.json"
+          threshold: 90  # Debt item should be at least 90% resolved
+          on_incomplete:
+            claude: |
+              /prodigy-complete-debt-fix --json '${item}' --gaps ${validation.gaps}
+            max_attempts: 3
+            fail_workflow: false  # Continue even if we can't fully resolve
+            commit_required: true  # Require commit to verify fixes were made
       
       # Run tests to verify the fix
       - shell: "just test"

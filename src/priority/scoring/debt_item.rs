@@ -20,6 +20,7 @@ use crate::priority::{
         generate_resource_leak_recommendation, generate_resource_management_recommendation,
         generate_string_concat_recommendation, generate_usage_hints,
     },
+    scoring::rust_recommendations::generate_rust_refactoring_recommendation,
     semantic_classifier::classify_function_role,
     ActionableRecommendation, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
     TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
@@ -1417,7 +1418,81 @@ fn generate_recommendation_with_coverage_and_data_flow(
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> ActionableRecommendation {
-    let (primary_action, rationale, steps) = match debt_type {
+    // For Rust files with complexity debt, use Rust-specific recommendations
+    let is_rust_file = func
+        .file
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e == "rs")
+        .unwrap_or(false);
+
+    let (primary_action, rationale, steps) = if is_rust_file {
+        if let DebtType::ComplexityHotspot { cyclomatic, .. } = debt_type {
+            let coverage_percent = coverage.as_ref().map(|c| c.direct).unwrap_or(0.0);
+
+            // Create a temporary UnifiedDebtItem for the Rust recommendation function
+            let temp_item = UnifiedDebtItem {
+                location: Location {
+                    file: func.file.clone(),
+                    function: func.name.clone(),
+                    line: func.line,
+                },
+                debt_type: debt_type.clone(),
+                unified_score: _score.clone(),
+                function_role: role,
+                recommendation: ActionableRecommendation {
+                    primary_action: String::new(),
+                    rationale: String::new(),
+                    implementation_steps: vec![],
+                    related_items: vec![],
+                },
+                expected_impact: ImpactMetrics {
+                    risk_reduction: 0.0,
+                    complexity_reduction: 0.0,
+                    coverage_improvement: 0.0,
+                    lines_reduction: 0,
+                },
+                transitive_coverage: coverage.clone(),
+                upstream_dependencies: 0,
+                downstream_dependencies: 0,
+                upstream_callers: vec![],
+                downstream_callees: vec![],
+                nesting_depth: func.nesting,
+                function_length: func.length,
+                cyclomatic_complexity: *cyclomatic,
+                cognitive_complexity: func.cognitive,
+                entropy_details: None,
+                is_pure: func.is_pure,
+                purity_confidence: func.purity_confidence,
+                god_object_indicators: None,
+            };
+
+            generate_rust_refactoring_recommendation(&temp_item, *cyclomatic, coverage_percent)
+        } else {
+            // For non-complexity debt in Rust files, use standard recommendations
+            generate_standard_recommendation(func, debt_type, role, coverage, data_flow)
+        }
+    } else {
+        // For non-Rust files, use standard recommendations
+        generate_standard_recommendation(func, debt_type, role, coverage, data_flow)
+    };
+
+    ActionableRecommendation {
+        primary_action,
+        rationale,
+        implementation_steps: steps,
+        related_items: vec![],
+    }
+}
+
+fn generate_standard_recommendation(
+    func: &FunctionMetrics,
+    debt_type: &DebtType,
+    role: FunctionRole,
+    coverage: &Option<TransitiveCoverage>,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> (String, String, Vec<String>) {
+    match debt_type {
         DebtType::DeadCode {
             visibility,
             usage_hints,
@@ -1523,13 +1598,6 @@ fn generate_recommendation_with_coverage_and_data_flow(
             collection_type,
             inefficiency_type,
         } => generate_collection_inefficiency_recommendation(collection_type, inefficiency_type),
-    };
-
-    ActionableRecommendation {
-        primary_action,
-        rationale,
-        implementation_steps: steps,
-        related_items: vec![],
     }
 }
 

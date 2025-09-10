@@ -60,29 +60,41 @@ impl GodObjectDetector {
             GodObjectThresholds::default()
         };
 
-        // Aggregate metrics from all types in the file
-        let mut total_methods = 0;
-        let mut total_fields = 0;
-        let mut all_methods = Vec::new();
-        let mut total_complexity = 0u32;
+        // Find the largest type (struct with most methods) as primary god object candidate
+        let primary_type = visitor
+            .types
+            .values()
+            .max_by_key(|t| t.method_count + t.field_count * 2);
 
-        // Count methods from types (structs/impl blocks)
-        for type_info in visitor.types.values() {
-            total_methods += type_info.method_count;
-            total_fields += type_info.field_count;
-            all_methods.extend(type_info.methods.clone());
-            // Estimate complexity (rough approximation)
-            total_complexity += (type_info.method_count * 5) as u32;
-        }
+        // If no types found, this isn't a god object (just a module with functions)
+        let (total_methods, total_fields, all_methods, total_complexity) =
+            if let Some(type_info) = primary_type {
+                // Focus on the largest type for god object detection
+                let all_methods = type_info.methods.clone();
+                let total_complexity = (type_info.method_count * 5) as u32;
 
-        // Also count standalone functions in the file
-        let standalone_functions = visitor.standalone_functions.clone();
-        total_methods += standalone_functions.len();
-        all_methods.extend(standalone_functions.clone());
-        total_complexity += (standalone_functions.len() * 5) as u32;
+                // Only count the primary type's methods and fields
+                (
+                    type_info.method_count,
+                    type_info.field_count,
+                    all_methods,
+                    total_complexity,
+                )
+            } else {
+                // No struct/impl blocks found - this is just a module with functions
+                // Modules with standalone functions are not god objects
+                (0, 0, Vec::new(), 0)
+            };
 
-        // Count lines (simple approximation based on AST)
-        let lines_of_code = ast.items.len() * 50; // Very rough estimate
+        // Count actual lines more accurately by looking at span information
+        // For now, use a better heuristic based on item count and complexity
+        let lines_of_code = if let Some(type_info) = visitor.types.values().next() {
+            // Estimate based on methods and fields
+            type_info.method_count * 15 + type_info.field_count * 2 + 50
+        } else {
+            // If no types, estimate based on standalone functions
+            visitor.standalone_functions.len() * 10 + 20
+        };
 
         let responsibility_groups = group_methods_by_responsibility(&all_methods);
         let responsibility_count = responsibility_groups.len();

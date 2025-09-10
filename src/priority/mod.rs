@@ -385,11 +385,13 @@ impl UnifiedAnalysis {
     pub fn get_top_mixed_priorities(&self, n: usize) -> Vector<DebtItem> {
         // Combine function, file, and file aggregate items, sorted by score
         let mut all_items: Vec<DebtItem> = Vec::new();
+        let mut seen_file_paths = std::collections::HashSet::new();
 
         // Add file aggregate items (if enabled)
         let aggregation_config = crate::config::get_aggregation_config();
         if aggregation_config.enabled {
             for item in &self.file_aggregates {
+                seen_file_paths.insert(item.file_path.clone());
                 all_items.push(DebtItem::FileAggregate(Box::new(item.clone())));
             }
         }
@@ -406,9 +408,12 @@ impl UnifiedAnalysis {
             }
         }
 
-        // Add file items
+        // Add file items that aren't already represented by aggregates
         for item in &self.file_items {
-            all_items.push(DebtItem::File(Box::new(item.clone())));
+            // Skip if this file has an aggregate (avoid duplication)
+            if !seen_file_paths.contains(&item.metrics.path) {
+                all_items.push(DebtItem::File(Box::new(item.clone())));
+            }
         }
 
         // Sort by score descending

@@ -5,6 +5,7 @@ pub mod classification;
 pub mod debt_item;
 pub mod recommendation;
 pub mod recommendation_extended;
+pub mod rust_recommendations;
 
 // Re-export commonly used items
 pub use calculation::{
