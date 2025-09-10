@@ -1,9 +1,10 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use debtmap::builders::parallel_unified_analysis::ParallelUnifiedAnalysisOptions;
-use debtmap::builders::unified_analysis::UnifiedAnalysisBuilder;
-use debtmap::priority::UnifiedAnalysis;
+use debtmap::builders::unified_analysis::{
+    perform_unified_analysis_with_options, UnifiedAnalysisOptions,
+};
+use debtmap::core::Language;
+use debtmap::utils::analysis_helpers::analyze_project;
 use std::hint::black_box;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 fn create_test_project(num_files: usize) -> TempDir {
@@ -62,13 +63,37 @@ fn benchmark_sequential_analysis(c: &mut Criterion) {
         let temp_dir = create_test_project(*size);
         let path = temp_dir.path().to_path_buf();
 
-        group.bench_with_input(BenchmarkId::from_parameter(size), &path, |b, path| {
-            b.iter(|| {
-                let builder = UnifiedAnalysisBuilder::new();
-                let analysis = builder.with_path(path.clone()).build().unwrap();
-                black_box(analysis.run().unwrap());
-            });
-        });
+        // Analyze files first to get results
+        let results = analyze_project(path.clone(), vec![Language::Rust], 15, 50).unwrap();
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(size),
+            &(&results, &path),
+            |b, (results, path)| {
+                b.iter(|| {
+                    let options = UnifiedAnalysisOptions {
+                        results,
+                        coverage_file: None,
+                        semantic_off: false,
+                        project_path: path,
+                        verbose_macro_warnings: false,
+                        show_macro_stats: false,
+                        parallel: false,
+                        jobs: 0,
+                        use_cache: false,
+                        multi_pass: false,
+                        show_attribution: false,
+                        aggregate_only: false,
+                        no_aggregation: false,
+                        aggregation_method: None,
+                        min_problematic: None,
+                        no_god_object: false,
+                    };
+                    let analysis = perform_unified_analysis_with_options(options).unwrap();
+                    black_box(analysis);
+                });
+            },
+        );
     }
 
     group.finish();
@@ -81,19 +106,37 @@ fn benchmark_parallel_analysis(c: &mut Criterion) {
         let temp_dir = create_test_project(*size);
         let path = temp_dir.path().to_path_buf();
 
-        group.bench_with_input(BenchmarkId::from_parameter(size), &path, |b, path| {
-            b.iter(|| {
-                let options = ParallelUnifiedAnalysisOptions {
-                    parallel: true,
-                    jobs: None,
-                    batch_size: 100,
-                    progress: false,
-                };
+        // Analyze files first to get results
+        let results = analyze_project(path.clone(), vec![Language::Rust], 15, 50).unwrap();
 
-                let analysis = ParallelUnifiedAnalysis::new(path.clone(), None, None, options);
-                black_box(analysis.run().unwrap());
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::from_parameter(size),
+            &(&results, &path),
+            |b, (results, path)| {
+                b.iter(|| {
+                    let options = UnifiedAnalysisOptions {
+                        results,
+                        coverage_file: None,
+                        semantic_off: false,
+                        project_path: path,
+                        verbose_macro_warnings: false,
+                        show_macro_stats: false,
+                        parallel: true,
+                        jobs: 4,
+                        use_cache: false,
+                        multi_pass: false,
+                        show_attribution: false,
+                        aggregate_only: false,
+                        no_aggregation: false,
+                        aggregation_method: None,
+                        min_problematic: None,
+                        no_god_object: false,
+                    };
+                    let analysis = perform_unified_analysis_with_options(options).unwrap();
+                    black_box(analysis);
+                });
+            },
+        );
     }
 
     group.finish();
@@ -104,21 +147,35 @@ fn benchmark_parallel_with_job_counts(c: &mut Criterion) {
     let temp_dir = create_test_project(100);
     let path = temp_dir.path().to_path_buf();
 
+    // Analyze files first to get results
+    let results = analyze_project(path.clone(), vec![Language::Rust], 15, 50).unwrap();
+
     for jobs in [1, 2, 4, 8].iter() {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}_jobs", jobs)),
-            &(*jobs, &path),
-            |b, (jobs, path)| {
+            &(*jobs, &path, &results),
+            |b, (jobs, path, results)| {
                 b.iter(|| {
-                    let options = ParallelUnifiedAnalysisOptions {
+                    let options = UnifiedAnalysisOptions {
+                        results,
+                        coverage_file: None,
+                        semantic_off: false,
+                        project_path: path,
+                        verbose_macro_warnings: false,
+                        show_macro_stats: false,
                         parallel: true,
-                        jobs: Some(*jobs),
-                        batch_size: 100,
-                        progress: false,
+                        jobs: *jobs,
+                        use_cache: false,
+                        multi_pass: false,
+                        show_attribution: false,
+                        aggregate_only: false,
+                        no_aggregation: false,
+                        aggregation_method: None,
+                        min_problematic: None,
+                        no_god_object: false,
                     };
-
-                    let analysis = ParallelUnifiedAnalysis::new(path.clone(), None, None, options);
-                    black_box(analysis.run().unwrap());
+                    let analysis = perform_unified_analysis_with_options(options).unwrap();
+                    black_box(analysis);
                 });
             },
         );
@@ -127,26 +184,41 @@ fn benchmark_parallel_with_job_counts(c: &mut Criterion) {
     group.finish();
 }
 
-fn benchmark_batch_sizes(c: &mut Criterion) {
-    let mut group = c.benchmark_group("batch_size_comparison");
-    let temp_dir = create_test_project(200);
-    let path = temp_dir.path().to_path_buf();
+fn benchmark_file_counts(c: &mut Criterion) {
+    let mut group = c.benchmark_group("file_count_scaling");
 
-    for batch_size in [10, 50, 100, 200].iter() {
+    for size in [10, 50, 100, 200, 500].iter() {
+        let temp_dir = create_test_project(*size);
+        let path = temp_dir.path().to_path_buf();
+
+        // Analyze files first to get results
+        let results = analyze_project(path.clone(), vec![Language::Rust], 15, 50).unwrap();
+
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("batch_{}", batch_size)),
-            &(*batch_size, &path),
-            |b, (batch_size, path)| {
+            BenchmarkId::from_parameter(format!("{}_files", size)),
+            &(&results, &path),
+            |b, (results, path)| {
                 b.iter(|| {
-                    let options = ParallelUnifiedAnalysisOptions {
+                    let options = UnifiedAnalysisOptions {
+                        results,
+                        coverage_file: None,
+                        semantic_off: false,
+                        project_path: path,
+                        verbose_macro_warnings: false,
+                        show_macro_stats: false,
                         parallel: true,
-                        jobs: None,
-                        batch_size: *batch_size,
-                        progress: false,
+                        jobs: 4,
+                        use_cache: false,
+                        multi_pass: false,
+                        show_attribution: false,
+                        aggregate_only: false,
+                        no_aggregation: false,
+                        aggregation_method: None,
+                        min_problematic: None,
+                        no_god_object: false,
                     };
-
-                    let analysis = ParallelUnifiedAnalysis::new(path.clone(), None, None, options);
-                    black_box(analysis.run().unwrap());
+                    let analysis = perform_unified_analysis_with_options(options).unwrap();
+                    black_box(analysis);
                 });
             },
         );
@@ -160,6 +232,6 @@ criterion_group!(
     benchmark_sequential_analysis,
     benchmark_parallel_analysis,
     benchmark_parallel_with_job_counts,
-    benchmark_batch_sizes
+    benchmark_file_counts
 );
 criterion_main!(benches);

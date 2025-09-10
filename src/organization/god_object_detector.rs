@@ -68,14 +68,14 @@ impl GodObjectDetector {
 
         // Count standalone functions in addition to methods from types
         let standalone_count = visitor.standalone_functions.len();
-        
+
         // Combine methods from the primary type (if any) with standalone functions
         let (total_methods, total_fields, all_methods, total_complexity) =
             if let Some(type_info) = primary_type {
                 // Combine struct methods with standalone functions
                 let mut all_methods = type_info.methods.clone();
                 all_methods.extend(visitor.standalone_functions.clone());
-                
+
                 let total_methods = type_info.method_count + standalone_count;
                 let total_complexity = (total_methods * 5) as u32;
 
@@ -89,7 +89,7 @@ impl GodObjectDetector {
                 // No struct/impl blocks found - count standalone functions
                 let all_methods = visitor.standalone_functions.clone();
                 let total_complexity = (standalone_count * 5) as u32;
-                
+
                 (standalone_count, 0, all_methods, total_complexity)
             };
 
