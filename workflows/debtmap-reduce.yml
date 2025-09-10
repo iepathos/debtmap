@@ -26,14 +26,14 @@ map:
       - shell: "just test"
         on_failure:
           claude: "/prodigy-debug-test-failure --output '${shell.output}'"
-          max_attempts: 2
+          max_attempts: 5
           fail_workflow: false
       
       # Check formatting and linting
       - shell: "just fmt-check && just lint"
         on_failure:
           claude: "/prodigy-lint '${shell.output}'"
-          max_attempts: 2
+          max_attempts: 5
           fail_workflow: false
   
   # Parallelization settings
@@ -53,14 +53,14 @@ reduce:
     - shell: "just test"
       on_failure:
         claude: "/prodigy-debug-test-failure --output '${shell.output}'"
-        max_attempts: 3
+        max_attempts: 5
         fail_workflow: true  # Fail if tests don't pass after merging
     
     # Check formatting and linting
     - shell: "just fmt-check && just lint"
       on_failure:
         claude: "/prodigy-lint ${shell.output}"
-        max_attempts: 3
+        max_attempts: 5
         fail_workflow: false
           
     # Re-run debtmap to measure improvements
