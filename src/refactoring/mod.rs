@@ -340,6 +340,25 @@ impl PatternRecognitionEngine {
         }
     }
 
+    /// Format patterns into a comma-separated string
+    fn format_patterns<T: std::fmt::Debug>(patterns: &[T]) -> String {
+        patterns
+            .iter()
+            .map(|p| format!("{:?}", p))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    /// Map complexity level to priority
+    fn complexity_to_priority(complexity: &ComplexityLevel) -> Priority {
+        match complexity {
+            ComplexityLevel::Severe => Priority::Critical,
+            ComplexityLevel::High => Priority::High,
+            ComplexityLevel::Moderate => Priority::Medium,
+            _ => Priority::Low,
+        }
+    }
+
     fn generate_recommendations(
         &self,
         opportunities: &[RefactoringOpportunity],
@@ -365,10 +384,7 @@ impl PatternRecognitionEngine {
                                 "Extract {} pure functions using direct functional transformation. \
                                 Apply patterns: {}",
                                 suggested_functions.len(),
-                                functional_patterns.iter()
-                                    .map(|p| format!("{:?}", p))
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
+                                Self::format_patterns(functional_patterns)
                             )
                         }
                         ComplexityLevel::High => {
@@ -391,23 +407,13 @@ impl PatternRecognitionEngine {
                     Recommendation {
                         title: format!("Extract pure functions from {}", source_function),
                         description,
-                        priority: match complexity_level {
-                            ComplexityLevel::Severe => Priority::Critical,
-                            ComplexityLevel::High => Priority::High,
-                            ComplexityLevel::Moderate => Priority::Medium,
-                            _ => Priority::Low,
-                        },
+                        priority: Self::complexity_to_priority(complexity_level),
                         effort_estimate: effort_estimate.clone(),
                         benefits: benefits.clone(),
                         example: example.as_ref().map(|e| RefactoringExample {
                             before: e.before_imperative.clone(),
                             after: e.after_functional.clone(),
-                            explanation: e
-                                .patterns_applied
-                                .iter()
-                                .map(|p| format!("{:?}", p))
-                                .collect::<Vec<_>>()
-                                .join(", "),
+                            explanation: Self::format_patterns(&e.patterns_applied),
                         }),
                     }
                 }
@@ -421,11 +427,7 @@ impl PatternRecognitionEngine {
                     title: format!("Convert {} to functional style", imperative_function),
                     description: format!(
                         "Apply functional patterns: {}",
-                        target_patterns
-                            .iter()
-                            .map(|p| format!("{:?}", p))
-                            .collect::<Vec<_>>()
-                            .join(", ")
+                        Self::format_patterns(target_patterns)
                     ),
                     priority: Priority::Medium,
                     effort_estimate: effort_estimate.clone(),
