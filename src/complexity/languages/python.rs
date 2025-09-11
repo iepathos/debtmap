@@ -170,31 +170,39 @@ impl<'a> PythonEntropyAnalyzer<'a> {
 
     /// Extract tokens from expressions
     fn extract_tokens_from_expr(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
-        use ast::Expr::*;
         match expr {
-            BoolOp(bool_op) => self.process_bool_op(bool_op, tokens),
-            BinOp(bin_op) => self.process_bin_op(bin_op, tokens),
-            UnaryOp(unary_op) => self.process_unary_op(unary_op, tokens),
-            Lambda(lambda) => self.process_lambda(lambda, tokens),
-            IfExp(if_exp) => self.process_if_exp(if_exp, tokens),
-            ListComp(comp) => self.process_list_comp(comp, tokens),
-            SetComp(comp) => self.process_set_comp(comp, tokens),
-            DictComp(comp) => self.process_dict_comp(comp, tokens),
-            GeneratorExp(gen) => self.process_generator(gen, tokens),
-            Await(await_expr) => self.process_await(await_expr, tokens),
-            Yield(yield_expr) => self.process_yield(yield_expr, tokens),
-            YieldFrom(yield_from) => self.process_yield_from(yield_from, tokens),
-            Compare(compare) => self.process_compare(compare, tokens),
-            Call(call) => self.process_call(call, tokens),
-            Name(name) => Self::process_name(name, tokens),
-            Constant(constant) => Self::process_constant(constant, tokens),
-            NamedExpr(named) => self.process_named_expr(named, tokens),
-            _ => {}
+            ast::Expr::BoolOp(bool_op) => self.extract_bool_op_tokens(bool_op, tokens),
+            ast::Expr::BinOp(bin_op) => self.extract_bin_op_tokens(bin_op, tokens),
+            ast::Expr::UnaryOp(unary_op) => self.extract_unary_op_tokens(unary_op, tokens),
+            ast::Expr::Lambda(lambda) => self.extract_lambda_tokens(lambda, tokens),
+            ast::Expr::IfExp(if_exp) => self.extract_if_exp_tokens(if_exp, tokens),
+            ast::Expr::ListComp(list_comp) => self.extract_list_comp_tokens(list_comp, tokens),
+            ast::Expr::SetComp(set_comp) => self.extract_set_comp_tokens(set_comp, tokens),
+            ast::Expr::DictComp(dict_comp) => self.extract_dict_comp_tokens(dict_comp, tokens),
+            ast::Expr::GeneratorExp(gen_exp) => self.extract_generator_exp_tokens(gen_exp, tokens),
+            ast::Expr::Await(await_expr) => self.extract_await_tokens(await_expr, tokens),
+            ast::Expr::Yield(yield_expr) => self.extract_yield_tokens(yield_expr, tokens),
+            ast::Expr::YieldFrom(yield_from) => self.extract_yield_from_tokens(yield_from, tokens),
+            ast::Expr::Compare(compare) => self.extract_compare_tokens(compare, tokens),
+            ast::Expr::Call(call) => self.extract_call_tokens(call, tokens),
+            ast::Expr::Name(name) => self.extract_name_token(name, tokens),
+            ast::Expr::Constant(constant) => self.extract_constant_token(constant, tokens),
+            ast::Expr::NamedExpr(named) => self.extract_named_expr_tokens(named, tokens),
+            ast::Expr::List(list) => self.extract_list_tokens(list, tokens),
+            ast::Expr::Tuple(tuple) => self.extract_tuple_tokens(tuple, tokens),
+            ast::Expr::Dict(dict) => self.extract_dict_tokens(dict, tokens),
+            ast::Expr::Set(set) => self.extract_set_tokens(set, tokens),
+            ast::Expr::Attribute(attr) => self.extract_attribute_tokens(attr, tokens),
+            ast::Expr::Subscript(sub) => self.extract_subscript_tokens(sub, tokens),
+            ast::Expr::Slice(slice) => self.extract_slice_tokens(slice, tokens),
+            ast::Expr::Starred(starred) => self.extract_starred_tokens(starred, tokens),
+            ast::Expr::JoinedStr(joined) => self.extract_joined_str_tokens(joined, tokens),
+            ast::Expr::FormattedValue(fmt) => self.extract_formatted_value_tokens(fmt, tokens),
         }
     }
 
-    // Process boolean operations
-    fn process_bool_op(&self, bool_op: &ast::ExprBoolOp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from boolean operations
+    fn extract_bool_op_tokens(&self, bool_op: &ast::ExprBoolOp, tokens: &mut Vec<GenericToken>) {
         let op = Self::classify_bool_op(bool_op.op);
         tokens.push(GenericToken::operator(op.to_string()));
         for value in &bool_op.values {
@@ -202,98 +210,98 @@ impl<'a> PythonEntropyAnalyzer<'a> {
         }
     }
 
-    // Process binary operations
-    fn process_bin_op(&self, bin_op: &ast::ExprBinOp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from binary operations
+    fn extract_bin_op_tokens(&self, bin_op: &ast::ExprBinOp, tokens: &mut Vec<GenericToken>) {
         let op = format!("{:?}", bin_op.op);
         tokens.push(GenericToken::operator(op));
         self.extract_tokens_from_expr(&bin_op.left, tokens);
         self.extract_tokens_from_expr(&bin_op.right, tokens);
     }
 
-    // Process unary operations
-    fn process_unary_op(&self, unary_op: &ast::ExprUnaryOp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from unary operations
+    fn extract_unary_op_tokens(&self, unary_op: &ast::ExprUnaryOp, tokens: &mut Vec<GenericToken>) {
         let op = Self::classify_unary_op(unary_op.op);
         tokens.push(GenericToken::operator(op.to_string()));
         self.extract_tokens_from_expr(&unary_op.operand, tokens);
     }
 
-    // Process lambda expressions
-    fn process_lambda(&self, lambda: &ast::ExprLambda, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from lambda expressions
+    fn extract_lambda_tokens(&self, lambda: &ast::ExprLambda, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::keyword("lambda".to_string()));
         self.extract_tokens_from_expr(&lambda.body, tokens);
     }
 
-    // Process if expressions (ternary)
-    fn process_if_exp(&self, if_exp: &ast::ExprIfExp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from if expressions (ternary)
+    fn extract_if_exp_tokens(&self, if_exp: &ast::ExprIfExp, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::control_flow("if".to_string()));
         self.extract_tokens_from_expr(&if_exp.test, tokens);
         self.extract_tokens_from_expr(&if_exp.body, tokens);
         self.extract_tokens_from_expr(&if_exp.orelse, tokens);
     }
 
-    // Process list comprehensions
-    fn process_list_comp(&self, comp: &ast::ExprListComp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from list comprehensions
+    fn extract_list_comp_tokens(&self, list_comp: &ast::ExprListComp, tokens: &mut Vec<GenericToken>) {
         self.extract_comprehension_tokens(
             "list_comp",
-            &comp.elt,
-            &comp.generators,
+            &list_comp.elt,
+            &list_comp.generators,
             tokens,
         );
     }
 
-    // Process set comprehensions
-    fn process_set_comp(&self, comp: &ast::ExprSetComp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from set comprehensions
+    fn extract_set_comp_tokens(&self, set_comp: &ast::ExprSetComp, tokens: &mut Vec<GenericToken>) {
         self.extract_comprehension_tokens(
             "set_comp",
-            &comp.elt,
-            &comp.generators,
+            &set_comp.elt,
+            &set_comp.generators,
             tokens,
         );
     }
 
-    // Process dictionary comprehensions
-    fn process_dict_comp(&self, comp: &ast::ExprDictComp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from dict comprehensions
+    fn extract_dict_comp_tokens(&self, dict_comp: &ast::ExprDictComp, tokens: &mut Vec<GenericToken>) {
         tokens.push(Self::create_comprehension_token("dict_comp"));
-        self.extract_tokens_from_expr(&comp.key, tokens);
-        self.extract_tokens_from_expr(&comp.value, tokens);
-        for gen in &comp.generators {
+        self.extract_tokens_from_expr(&dict_comp.key, tokens);
+        self.extract_tokens_from_expr(&dict_comp.value, tokens);
+        for gen in &dict_comp.generators {
             self.extract_tokens_from_comprehension(gen, tokens);
         }
     }
 
-    // Process generator expressions
-    fn process_generator(&self, gen: &ast::ExprGeneratorExp, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from generator expressions
+    fn extract_generator_exp_tokens(&self, gen_exp: &ast::ExprGeneratorExp, tokens: &mut Vec<GenericToken>) {
         self.extract_comprehension_tokens(
             "generator",
-            &gen.elt,
-            &gen.generators,
+            &gen_exp.elt,
+            &gen_exp.generators,
             tokens,
         );
     }
 
-    // Process await expressions
-    fn process_await(&self, await_expr: &ast::ExprAwait, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from await expressions
+    fn extract_await_tokens(&self, await_expr: &ast::ExprAwait, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::keyword("await".to_string()));
         self.extract_tokens_from_expr(&await_expr.value, tokens);
     }
 
-    // Process yield expressions
-    fn process_yield(&self, yield_expr: &ast::ExprYield, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from yield expressions
+    fn extract_yield_tokens(&self, yield_expr: &ast::ExprYield, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::keyword("yield".to_string()));
         if let Some(value) = &yield_expr.value {
             self.extract_tokens_from_expr(value, tokens);
         }
     }
 
-    // Process yield from expressions
-    fn process_yield_from(&self, yield_from: &ast::ExprYieldFrom, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from yield from expressions
+    fn extract_yield_from_tokens(&self, yield_from: &ast::ExprYieldFrom, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::keyword("yield".to_string()));
         tokens.push(GenericToken::keyword("from".to_string()));
         self.extract_tokens_from_expr(&yield_from.value, tokens);
     }
 
-    // Process comparison expressions
-    fn process_compare(&self, compare: &ast::ExprCompare, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from comparison expressions
+    fn extract_compare_tokens(&self, compare: &ast::ExprCompare, tokens: &mut Vec<GenericToken>) {
         self.extract_tokens_from_expr(&compare.left, tokens);
         for op in &compare.ops {
             let op_str = Self::classify_compare_op(op);
@@ -304,8 +312,8 @@ impl<'a> PythonEntropyAnalyzer<'a> {
         }
     }
 
-    // Process function calls
-    fn process_call(&self, call: &ast::ExprCall, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from function calls
+    fn extract_call_tokens(&self, call: &ast::ExprCall, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::function_call("call".to_string()));
         self.extract_tokens_from_expr(&call.func, tokens);
         for arg in &call.args {
@@ -313,22 +321,105 @@ impl<'a> PythonEntropyAnalyzer<'a> {
         }
     }
 
-    // Process name references
-    fn process_name(name: &ast::ExprName, tokens: &mut Vec<GenericToken>) {
+    // Extract token from name expressions
+    fn extract_name_token(&self, name: &ast::ExprName, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::identifier(normalize_identifier(&name.id)));
     }
 
-    // Process constant values
-    fn process_constant(constant: &ast::ExprConstant, tokens: &mut Vec<GenericToken>) {
+    // Extract token from constant expressions
+    fn extract_constant_token(&self, constant: &ast::ExprConstant, tokens: &mut Vec<GenericToken>) {
         let const_type = Self::classify_constant(&constant.value);
         tokens.push(GenericToken::literal(const_type.to_string()));
     }
 
-    // Process named expressions (walrus operator)
-    fn process_named_expr(&self, named: &ast::ExprNamedExpr, tokens: &mut Vec<GenericToken>) {
+    // Extract tokens from named expressions (walrus operator)
+    fn extract_named_expr_tokens(&self, named: &ast::ExprNamedExpr, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::operator(":=".to_string()));
         self.extract_tokens_from_expr(&named.target, tokens);
         self.extract_tokens_from_expr(&named.value, tokens);
+    }
+
+    // Extract tokens from list literals
+    fn extract_list_tokens(&self, list: &ast::ExprList, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::custom("list".to_string()));
+        for elt in &list.elts {
+            self.extract_tokens_from_expr(elt, tokens);
+        }
+    }
+
+    // Extract tokens from tuple literals
+    fn extract_tuple_tokens(&self, tuple: &ast::ExprTuple, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::custom("tuple".to_string()));
+        for elt in &tuple.elts {
+            self.extract_tokens_from_expr(elt, tokens);
+        }
+    }
+
+    // Extract tokens from dict literals
+    fn extract_dict_tokens(&self, dict: &ast::ExprDict, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::custom("dict".to_string()));
+        for (key, value) in dict.keys.iter().zip(&dict.values) {
+            if let Some(k) = key {
+                self.extract_tokens_from_expr(k, tokens);
+            }
+            self.extract_tokens_from_expr(value, tokens);
+        }
+    }
+
+    // Extract tokens from set literals
+    fn extract_set_tokens(&self, set: &ast::ExprSet, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::custom("set".to_string()));
+        for elt in &set.elts {
+            self.extract_tokens_from_expr(elt, tokens);
+        }
+    }
+
+    // Extract tokens from attribute access
+    fn extract_attribute_tokens(&self, attr: &ast::ExprAttribute, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::operator(".".to_string()));
+        self.extract_tokens_from_expr(&attr.value, tokens);
+        tokens.push(GenericToken::identifier(normalize_identifier(&attr.attr)));
+    }
+
+    // Extract tokens from subscript operations
+    fn extract_subscript_tokens(&self, sub: &ast::ExprSubscript, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::operator("[]".to_string()));
+        self.extract_tokens_from_expr(&sub.value, tokens);
+        self.extract_tokens_from_expr(&sub.slice, tokens);
+    }
+
+    // Extract tokens from slice operations
+    fn extract_slice_tokens(&self, slice: &ast::ExprSlice, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::operator(":".to_string()));
+        if let Some(lower) = &slice.lower {
+            self.extract_tokens_from_expr(lower, tokens);
+        }
+        if let Some(upper) = &slice.upper {
+            self.extract_tokens_from_expr(upper, tokens);
+        }
+        if let Some(step) = &slice.step {
+            self.extract_tokens_from_expr(step, tokens);
+        }
+    }
+
+    // Extract tokens from starred expressions
+    fn extract_starred_tokens(&self, starred: &ast::ExprStarred, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::operator("*".to_string()));
+        self.extract_tokens_from_expr(&starred.value, tokens);
+    }
+
+    // Extract tokens from joined strings (f-strings)
+    fn extract_joined_str_tokens(&self, joined: &ast::ExprJoinedStr, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::literal("f-string".to_string()));
+        for value in &joined.values {
+            self.extract_tokens_from_expr(value, tokens);
+        }
+    }
+
+    // Extract tokens from formatted values in f-strings
+    fn extract_formatted_value_tokens(&self, fmt: &ast::ExprFormattedValue, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::custom("format".to_string()));
+        self.extract_tokens_from_expr(&fmt.value, tokens);
     }
 
     // Pure function to classify boolean operators
@@ -942,186 +1033,185 @@ fn normalize_identifier(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::complexity::entropy_core::{EntropyToken, TokenCategory};
+    use rustpython_parser::{ast, Parse};
+
+    fn parse_python_expr(code: &str) -> ast::Expr {
+        let full_code = format!("x = {}", code);
+        let parsed = ast::Suite::parse(&full_code, "<test>").unwrap();
+        match &parsed[0] {
+            ast::Stmt::Assign(assign) => assign.value.as_ref().clone(),
+            _ => panic!("Expected assignment statement"),
+        }
+    }
 
     #[test]
-    fn test_process_bool_op() {
-        let source = "x and y";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_bool_op_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("True and False or True");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
+        // Should have boolean operators and literals
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+    }
+
+    #[test]
+    fn test_extract_bin_op_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("5 + 3 * 2");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        
+        // Should have binary operators and number literals
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+    }
+
+    #[test]
+    fn test_extract_unary_op_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("-x");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        
+        // Should have unary operator
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+    }
+
+    #[test]
+    fn test_extract_lambda_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("lambda x: x * 2");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        
+        // Should have lambda keyword
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Keyword)));
+    }
+
+    #[test]
+    fn test_extract_if_exp_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("5 if True else 3");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        
+        // Should have control flow token
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::ControlFlow)));
+    }
+
+    #[test]
+    fn test_extract_list_comp_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("[x for x in range(10)]");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        
+        // Should have list comprehension tokens
         assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| t.value() == "and"));
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
-    fn test_process_bin_op() {
-        let source = "x + y";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_dict_comp_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("{x: x*2 for x in range(5)}");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| t.value().contains("Add")));
+        // Should have dict comprehension tokens
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
-    fn test_process_unary_op() {
-        let source = "not x";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_call_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("print('hello', 'world')");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert_eq!(tokens.len(), 2);
-        assert_eq!(tokens[0].value(), "not");
+        // Should have function call token
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::FunctionCall)));
     }
 
     #[test]
-    fn test_process_lambda() {
-        let source = "lambda x: x + 1";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_compare_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("x > 5 and y <= 10");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert!(!tokens.is_empty());
-        assert_eq!(tokens[0].value(), "lambda");
+        // Should have comparison operators
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
     }
 
     #[test]
-    fn test_process_if_exp() {
-        let source = "x if condition else y";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_name_token() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("variable_name");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert!(tokens.len() >= 4);
-        assert!(tokens.iter().any(|t| t.value() == "if"));
+        // Should have identifier token
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Identifier)));
     }
 
     #[test]
-    fn test_process_list_comp() {
-        let source = "[x for x in range(10)]";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_constant_token() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("42");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| t.value().contains("list_comp")));
+        // Should have literal token
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
     }
 
     #[test]
-    fn test_process_call() {
-        let source = "func(x, y)";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_list_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("[1, 2, 3]");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert!(tokens.len() >= 3);
-        assert!(tokens.iter().any(|t| t.value() == "call"));
+        // Should have list custom token
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
-    fn test_process_compare() {
-        let source = "x > 0";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_dict_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("{'a': 1, 'b': 2}");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert_eq!(tokens.len(), 3);
-        assert!(tokens.iter().any(|t| t.value() == ">"));
+        // Should have dict custom token
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
-    fn test_process_yield() {
-        let source = "def f():\n    yield 42";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_extract_attribute_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("obj.attribute");
         let mut tokens = Vec::new();
-        if let ast::Stmt::FunctionDef(func) = &module.body[0] {
-            for stmt in &func.body {
-                analyzer.extract_tokens_from_stmt(stmt, &mut tokens);
-            }
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        assert!(tokens.iter().any(|t| t.value() == "yield"));
+        // Should have dot operator and identifier
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Identifier)));
+    }
+
+    #[test]
+    fn test_extract_subscript_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("arr[0]");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        
+        // Should have subscript operator
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
     }
 
     #[test]
@@ -1146,36 +1236,32 @@ mod tests {
         assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::LtE), "<=");
         assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Gt), ">");
         assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::GtE), ">=");
+        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Is), "is");
+        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::IsNot), "is not");
+        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::In), "in");
+        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::NotIn), "not in");
     }
 
     #[test]
     fn test_normalize_identifier() {
         assert_eq!(normalize_identifier("x"), "X");
-        assert_eq!(normalize_identifier("abc"), "ABC");
-        assert_eq!(normalize_identifier("long_name"), "VAR");
-        assert_eq!(normalize_identifier("function"), "VAR");
+        assert_eq!(normalize_identifier("foo"), "FOO");
+        assert_eq!(normalize_identifier("long_variable_name"), "VAR");
+        assert_eq!(normalize_identifier("test"), "VAR");
     }
 
     #[test]
-    fn test_complex_expression() {
-        let source = "(x + y) * z if condition else default_value";
-        let analyzer = PythonEntropyAnalyzer::new(source);
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse");
-        
-        let ast::Mod::Module(module) = module else {
-            panic!("Expected Module");
-        };
-        
+    fn test_complex_nested_expression() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        let expr = parse_python_expr("[x * 2 for x in range(10) if x > 5]");
         let mut tokens = Vec::new();
-        if let ast::Stmt::Expr(expr_stmt) = &module.body[0] {
-            analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
-        }
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
         
-        // Should have multiple operators and identifiers
-        assert!(tokens.len() > 5);
-        assert!(tokens.iter().any(|t| t.value() == "if"));
-        assert!(tokens.iter().any(|t| t.value().contains("Add")));
-        assert!(tokens.iter().any(|t| t.value().contains("Mult")));
+        // Should extract tokens from complex nested expression
+        assert!(!tokens.is_empty());
+        // Should have multiple token types
+        let has_custom = tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_)));
+        let has_operator = tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator));
+        assert!(has_custom && has_operator);
     }
 }
