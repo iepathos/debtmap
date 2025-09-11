@@ -3,6 +3,18 @@ use crate::complexity::entropy_traits::{AnalyzerHelpers, GenericToken};
 use rustpython_parser::ast;
 use std::collections::HashSet;
 
+/// Categories for expression types to simplify pattern matching
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExprCategory {
+    Operator,
+    ControlFlow,
+    Comprehension,
+    Literal,
+    Collection,
+    Access,
+    Special,
+}
+
 /// Python-specific entropy analyzer implementation
 pub struct PythonEntropyAnalyzer<'a> {
     _source: &'a str,
@@ -220,36 +232,107 @@ impl<'a> PythonEntropyAnalyzer<'a> {
         }
     }
 
-    /// Extract tokens from expressions
+    /// Extract tokens from expressions - delegating to specialized handlers
     fn extract_tokens_from_expr(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
+        // Delegate to categorized handlers based on expression type
+        match Self::categorize_expression(expr) {
+            ExprCategory::Operator => self.extract_operator_tokens(expr, tokens),
+            ExprCategory::ControlFlow => self.extract_control_flow_tokens(expr, tokens),
+            ExprCategory::Comprehension => self.extract_comprehension_expr_tokens(expr, tokens),
+            ExprCategory::Literal => self.extract_literal_tokens(expr, tokens),
+            ExprCategory::Collection => self.extract_collection_tokens(expr, tokens),
+            ExprCategory::Access => self.extract_access_tokens(expr, tokens),
+            ExprCategory::Special => self.extract_special_tokens(expr, tokens),
+        }
+    }
+
+    // Pure function to categorize expressions
+    fn categorize_expression(expr: &ast::Expr) -> ExprCategory {
+        use ast::Expr::*;
+        match expr {
+            BoolOp(_) | BinOp(_) | UnaryOp(_) | Compare(_) => ExprCategory::Operator,
+            Lambda(_) | IfExp(_) | Await(_) | Yield(_) | YieldFrom(_) => ExprCategory::ControlFlow,
+            ListComp(_) | SetComp(_) | DictComp(_) | GeneratorExp(_) => ExprCategory::Comprehension,
+            Name(_) | Constant(_) => ExprCategory::Literal,
+            List(_) | Tuple(_) | Dict(_) | Set(_) => ExprCategory::Collection,
+            Attribute(_) | Subscript(_) | Slice(_) | Starred(_) => ExprCategory::Access,
+            Call(_) | NamedExpr(_) | JoinedStr(_) | FormattedValue(_) => ExprCategory::Special,
+        }
+    }
+
+    // Extract tokens from operator expressions
+    fn extract_operator_tokens(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
         match expr {
             ast::Expr::BoolOp(bool_op) => self.extract_bool_op_tokens(bool_op, tokens),
             ast::Expr::BinOp(bin_op) => self.extract_bin_op_tokens(bin_op, tokens),
             ast::Expr::UnaryOp(unary_op) => self.extract_unary_op_tokens(unary_op, tokens),
+            ast::Expr::Compare(compare) => self.extract_compare_tokens(compare, tokens),
+            _ => {}
+        }
+    }
+
+    // Extract tokens from control flow expressions
+    fn extract_control_flow_tokens(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
+        match expr {
             ast::Expr::Lambda(lambda) => self.extract_lambda_tokens(lambda, tokens),
             ast::Expr::IfExp(if_exp) => self.extract_if_exp_tokens(if_exp, tokens),
+            ast::Expr::Await(await_expr) => self.extract_await_tokens(await_expr, tokens),
+            ast::Expr::Yield(yield_expr) => self.extract_yield_tokens(yield_expr, tokens),
+            ast::Expr::YieldFrom(yield_from) => self.extract_yield_from_tokens(yield_from, tokens),
+            _ => {}
+        }
+    }
+
+    // Extract tokens from comprehension expressions
+    fn extract_comprehension_expr_tokens(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
+        match expr {
             ast::Expr::ListComp(list_comp) => self.extract_list_comp_tokens(list_comp, tokens),
             ast::Expr::SetComp(set_comp) => self.extract_set_comp_tokens(set_comp, tokens),
             ast::Expr::DictComp(dict_comp) => self.extract_dict_comp_tokens(dict_comp, tokens),
             ast::Expr::GeneratorExp(gen_exp) => self.extract_generator_exp_tokens(gen_exp, tokens),
-            ast::Expr::Await(await_expr) => self.extract_await_tokens(await_expr, tokens),
-            ast::Expr::Yield(yield_expr) => self.extract_yield_tokens(yield_expr, tokens),
-            ast::Expr::YieldFrom(yield_from) => self.extract_yield_from_tokens(yield_from, tokens),
-            ast::Expr::Compare(compare) => self.extract_compare_tokens(compare, tokens),
-            ast::Expr::Call(call) => self.extract_call_tokens(call, tokens),
+            _ => {}
+        }
+    }
+
+    // Extract tokens from literal expressions
+    fn extract_literal_tokens(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
+        match expr {
             ast::Expr::Name(name) => self.extract_name_token(name, tokens),
             ast::Expr::Constant(constant) => self.extract_constant_token(constant, tokens),
-            ast::Expr::NamedExpr(named) => self.extract_named_expr_tokens(named, tokens),
-            ast::Expr::List(list) => self.extract_list_tokens(list, tokens),
-            ast::Expr::Tuple(tuple) => self.extract_tuple_tokens(tuple, tokens),
+            _ => {}
+        }
+    }
+
+    // Extract tokens from collection expressions
+    fn extract_collection_tokens(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
+        match expr {
+            ast::Expr::List(list) => self.extract_container_tokens("list", &list.elts, tokens),
+            ast::Expr::Tuple(tuple) => self.extract_container_tokens("tuple", &tuple.elts, tokens),
             ast::Expr::Dict(dict) => self.extract_dict_tokens(dict, tokens),
-            ast::Expr::Set(set) => self.extract_set_tokens(set, tokens),
+            ast::Expr::Set(set) => self.extract_container_tokens("set", &set.elts, tokens),
+            _ => {}
+        }
+    }
+
+    // Extract tokens from access expressions
+    fn extract_access_tokens(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
+        match expr {
             ast::Expr::Attribute(attr) => self.extract_attribute_tokens(attr, tokens),
             ast::Expr::Subscript(sub) => self.extract_subscript_tokens(sub, tokens),
             ast::Expr::Slice(slice) => self.extract_slice_tokens(slice, tokens),
             ast::Expr::Starred(starred) => self.extract_starred_tokens(starred, tokens),
+            _ => {}
+        }
+    }
+
+    // Extract tokens from special expressions
+    fn extract_special_tokens(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
+        match expr {
+            ast::Expr::Call(call) => self.extract_call_tokens(call, tokens),
+            ast::Expr::NamedExpr(named) => self.extract_named_expr_tokens(named, tokens),
             ast::Expr::JoinedStr(joined) => self.extract_joined_str_tokens(joined, tokens),
             ast::Expr::FormattedValue(fmt) => self.extract_formatted_value_tokens(fmt, tokens),
+            _ => {}
         }
     }
 
@@ -264,10 +347,11 @@ impl<'a> PythonEntropyAnalyzer<'a> {
 
     // Extract tokens from binary operations
     fn extract_bin_op_tokens(&self, bin_op: &ast::ExprBinOp, tokens: &mut Vec<GenericToken>) {
-        let op = format!("{:?}", bin_op.op);
-        tokens.push(GenericToken::operator(op));
-        self.extract_tokens_from_expr(&bin_op.left, tokens);
-        self.extract_tokens_from_expr(&bin_op.right, tokens);
+        self.extract_operator_with_operands(
+            format!("{:?}", bin_op.op),
+            &[&*bin_op.left, &*bin_op.right],
+            tokens,
+        );
     }
 
     // Extract tokens from unary operations
@@ -277,10 +361,22 @@ impl<'a> PythonEntropyAnalyzer<'a> {
         self.extract_tokens_from_expr(&unary_op.operand, tokens);
     }
 
+    // Helper: Extract operator with operands
+    fn extract_operator_with_operands(
+        &self,
+        operator: String,
+        operands: &[&ast::Expr],
+        tokens: &mut Vec<GenericToken>,
+    ) {
+        tokens.push(GenericToken::operator(operator));
+        for operand in operands {
+            self.extract_tokens_from_expr(operand, tokens);
+        }
+    }
+
     // Extract tokens from lambda expressions
     fn extract_lambda_tokens(&self, lambda: &ast::ExprLambda, tokens: &mut Vec<GenericToken>) {
-        tokens.push(GenericToken::keyword("lambda".to_string()));
-        self.extract_tokens_from_expr(&lambda.body, tokens);
+        self.extract_keyword_with_expr("lambda", &lambda.body, tokens);
     }
 
     // Extract tokens from if expressions (ternary)
@@ -335,8 +431,18 @@ impl<'a> PythonEntropyAnalyzer<'a> {
 
     // Extract tokens from await expressions
     fn extract_await_tokens(&self, await_expr: &ast::ExprAwait, tokens: &mut Vec<GenericToken>) {
-        tokens.push(GenericToken::keyword("await".to_string()));
-        self.extract_tokens_from_expr(&await_expr.value, tokens);
+        self.extract_keyword_with_expr("await", &await_expr.value, tokens);
+    }
+
+    // Helper: Extract keyword with single expression
+    fn extract_keyword_with_expr(
+        &self,
+        keyword: &str,
+        expr: &ast::Expr,
+        tokens: &mut Vec<GenericToken>,
+    ) {
+        tokens.push(GenericToken::keyword(keyword.to_string()));
+        self.extract_tokens_from_expr(expr, tokens);
     }
 
     // Extract tokens from yield expressions
@@ -396,23 +502,22 @@ impl<'a> PythonEntropyAnalyzer<'a> {
         named: &ast::ExprNamedExpr,
         tokens: &mut Vec<GenericToken>,
     ) {
-        tokens.push(GenericToken::operator(":=".to_string()));
-        self.extract_tokens_from_expr(&named.target, tokens);
-        self.extract_tokens_from_expr(&named.value, tokens);
+        self.extract_operator_with_operands(
+            ":=".to_string(),
+            &[&*named.target, &*named.value],
+            tokens,
+        );
     }
 
-    // Extract tokens from list literals
-    fn extract_list_tokens(&self, list: &ast::ExprList, tokens: &mut Vec<GenericToken>) {
-        tokens.push(GenericToken::custom("list".to_string()));
-        for elt in &list.elts {
-            self.extract_tokens_from_expr(elt, tokens);
-        }
-    }
-
-    // Extract tokens from tuple literals
-    fn extract_tuple_tokens(&self, tuple: &ast::ExprTuple, tokens: &mut Vec<GenericToken>) {
-        tokens.push(GenericToken::custom("tuple".to_string()));
-        for elt in &tuple.elts {
+    // Consolidated container token extraction
+    fn extract_container_tokens(
+        &self,
+        container_type: &str,
+        elements: &[ast::Expr],
+        tokens: &mut Vec<GenericToken>,
+    ) {
+        tokens.push(GenericToken::custom(container_type.to_string()));
+        for elt in elements {
             self.extract_tokens_from_expr(elt, tokens);
         }
     }
@@ -428,14 +533,6 @@ impl<'a> PythonEntropyAnalyzer<'a> {
         }
     }
 
-    // Extract tokens from set literals
-    fn extract_set_tokens(&self, set: &ast::ExprSet, tokens: &mut Vec<GenericToken>) {
-        tokens.push(GenericToken::custom("set".to_string()));
-        for elt in &set.elts {
-            self.extract_tokens_from_expr(elt, tokens);
-        }
-    }
-
     // Extract tokens from attribute access
     fn extract_attribute_tokens(&self, attr: &ast::ExprAttribute, tokens: &mut Vec<GenericToken>) {
         tokens.push(GenericToken::operator(".".to_string()));
@@ -445,9 +542,7 @@ impl<'a> PythonEntropyAnalyzer<'a> {
 
     // Extract tokens from subscript operations
     fn extract_subscript_tokens(&self, sub: &ast::ExprSubscript, tokens: &mut Vec<GenericToken>) {
-        tokens.push(GenericToken::operator("[]".to_string()));
-        self.extract_tokens_from_expr(&sub.value, tokens);
-        self.extract_tokens_from_expr(&sub.slice, tokens);
+        self.extract_operator_with_operands("[]".to_string(), &[&*sub.value, &*sub.slice], tokens);
     }
 
     // Extract tokens from slice operations
@@ -1198,6 +1293,64 @@ mod tests {
         assert!(tokens
             .iter()
             .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+    }
+
+    #[test]
+    fn test_extract_container_tokens() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test list
+        let list_expr = parse_python_expr("[1, 2, 3]");
+        let mut list_tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&list_expr, &mut list_tokens);
+        assert!(list_tokens.iter().any(|t| t.value() == "list"));
+
+        // Test tuple
+        let tuple_expr = parse_python_expr("(1, 2, 3)");
+        let mut tuple_tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&tuple_expr, &mut tuple_tokens);
+        assert!(tuple_tokens.iter().any(|t| t.value() == "tuple"));
+
+        // Test set
+        let set_expr = parse_python_expr("{1, 2, 3}");
+        let mut set_tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&set_expr, &mut set_tokens);
+        assert!(set_tokens.iter().any(|t| t.value() == "set"));
+    }
+
+    #[test]
+    fn test_extract_operator_with_operands() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test binary operation (uses the helper internally)
+        let expr = parse_python_expr("a + b");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+
+        // Test named expression (walrus operator)
+        let walrus_expr = parse_python_expr("(x := 5)");
+        let mut walrus_tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&walrus_expr, &mut walrus_tokens);
+        assert!(walrus_tokens.iter().any(|t| t.value() == ":="));
+    }
+
+    #[test]
+    fn test_extract_keyword_with_expr() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test lambda (uses the helper internally)
+        let lambda_expr = parse_python_expr("lambda x: x");
+        let mut lambda_tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&lambda_expr, &mut lambda_tokens);
+        assert!(lambda_tokens.iter().any(|t| t.value() == "lambda"));
+
+        // Test await would require async context, so we test the pattern through lambda
+        assert!(lambda_tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Keyword)));
     }
 
     #[test]
@@ -2069,5 +2222,483 @@ mod tests {
         assert!(tokens.iter().any(|t| t.value() == "assert"));
         assert!(tokens.iter().any(|t| t.value() == "raise"));
         assert!(tokens.iter().any(|t| t.value() == "return"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_expr_all_branches() {
+        // Comprehensive test to ensure all 28 expression type branches are covered
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test that each expression type produces tokens and doesn't panic
+        let test_cases = vec![
+            // 1. BoolOp
+            "True and False",
+            // 2. BinOp
+            "5 + 3",
+            // 3. UnaryOp
+            "not x",
+            // 4. Lambda
+            "lambda x: x",
+            // 5. IfExp (ternary)
+            "5 if True else 3",
+            // 6. ListComp
+            "[x for x in range(5)]",
+            // 7. SetComp
+            "{x for x in range(5)}",
+            // 8. DictComp
+            "{x: y for x in range(5)}",
+            // 9. GeneratorExp
+            "(x for x in range(5))",
+            // 10. Await - tested separately in async context
+            // 11. Yield - tested separately in function context
+            // 12. YieldFrom - tested separately in function context
+            // 13. Compare
+            "x > 5",
+            // 14. Call
+            "func(arg)",
+            // 15. Name
+            "variable",
+            // 16. Constant - multiple types
+            "42",
+            "'string'",
+            "None",
+            "True",
+            "False",
+            // 17. NamedExpr (walrus)
+            "(x := 5)",
+            // 18. List
+            "[1, 2]",
+            // 19. Tuple
+            "(1, 2)",
+            // 20. Dict
+            "{'a': 1}",
+            // 21. Set
+            "{1, 2}",
+            // 22. Attribute
+            "obj.attr",
+            // 23. Subscript
+            "arr[0]",
+            // 24. Slice
+            "arr[1:10:2]",
+            // 25. Starred
+            "*args",
+            // 26. JoinedStr (f-string)
+            "f'hello'",
+            // 27. FormattedValue (in f-string)
+            "f'{value:.2f}'",
+        ];
+
+        // Test all expressions parse and generate tokens
+        for expr_str in &test_cases {
+            let expr = parse_python_expr(expr_str);
+            let mut tokens = Vec::new();
+            analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+            // Check that tokens were generated
+            assert!(
+                !tokens.is_empty(),
+                "Expression '{}' should generate tokens",
+                expr_str
+            );
+        }
+
+        // Verify we're testing a comprehensive set of expressions
+        assert!(
+            test_cases.len() >= 28,
+            "Should test all major expression types"
+        );
+
+        // Test specific token categories for key expressions
+        let bool_op_expr = parse_python_expr("True and False");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&bool_op_expr, &mut tokens);
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+
+        let call_expr = parse_python_expr("func()");
+        tokens.clear();
+        analyzer.extract_tokens_from_expr(&call_expr, &mut tokens);
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::FunctionCall)));
+
+        let literal_expr = parse_python_expr("42");
+        tokens.clear();
+        analyzer.extract_tokens_from_expr(&literal_expr, &mut tokens);
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_expr_edge_cases() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test empty collections
+        let empty_cases = vec![
+            "[]", // empty list
+            "{}", // empty dict
+            "()", // empty tuple
+        ];
+
+        for expr_str in empty_cases {
+            let expr = parse_python_expr(expr_str);
+            let mut tokens = Vec::new();
+            analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+            assert!(
+                !tokens.is_empty(),
+                "Empty {} should still produce tokens",
+                expr_str
+            );
+        }
+
+        // Test nested expressions
+        let nested_expr = parse_python_expr("[[1, 2], [3, 4]]");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&nested_expr, &mut tokens);
+        assert!(tokens.iter().filter(|t| t.value() == "list").count() >= 2);
+
+        // Test complex chained expressions
+        let chained_expr = parse_python_expr("obj.method().attr[0].value");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&chained_expr, &mut tokens);
+        assert!(tokens.iter().any(|t| t.value() == "call"));
+        assert!(tokens.iter().filter(|t| t.value() == ".").count() >= 2);
+        assert!(tokens.iter().any(|t| t.value() == "[]"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_expr_async_context() {
+        // Test await expression in async function context
+        let source = "async def func():\n    await something()";
+        let analyzer = PythonEntropyAnalyzer::new(source);
+        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+            .expect("Failed to parse");
+
+        let ast::Mod::Module(module) = module else {
+            panic!("Expected Module");
+        };
+
+        if let ast::Stmt::AsyncFunctionDef(func) = &module.body[0] {
+            if let ast::Stmt::Expr(expr_stmt) = &func.body[0] {
+                let mut tokens = Vec::new();
+                analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
+                assert!(tokens.iter().any(|t| t.value() == "await"));
+                assert!(tokens.iter().any(|t| t.value() == "call"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_extract_tokens_from_expr_yield_context() {
+        // Test yield expressions in generator function
+        let source = "def gen():\n    yield 42\n    yield from other()";
+        let analyzer = PythonEntropyAnalyzer::new(source);
+        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+            .expect("Failed to parse");
+
+        let ast::Mod::Module(module) = module else {
+            panic!("Expected Module");
+        };
+
+        if let ast::Stmt::FunctionDef(func) = &module.body[0] {
+            // Test yield
+            if let ast::Stmt::Expr(expr_stmt) = &func.body[0] {
+                let mut tokens = Vec::new();
+                analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
+                assert!(tokens.iter().any(|t| t.value() == "yield"));
+                // Check for literal token instead of exact value
+                assert!(tokens
+                    .iter()
+                    .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+            }
+            // Test yield from
+            if let ast::Stmt::Expr(expr_stmt) = &func.body[1] {
+                let mut tokens = Vec::new();
+                analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
+                assert!(tokens.iter().any(|t| t.value() == "yield"));
+                assert!(tokens.iter().any(|t| t.value() == "from"));
+                // Check for function call for other()
+                assert!(tokens
+                    .iter()
+                    .any(|t| matches!(t.to_category(), TokenCategory::FunctionCall)));
+            }
+        } else {
+            panic!("Expected FunctionDef");
+        }
+    }
+
+    #[test]
+    fn test_categorize_expression_operators() {
+        // Test operator categorization
+        let bool_op = parse_python_expr("True and False");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&bool_op),
+            ExprCategory::Operator
+        );
+
+        let bin_op = parse_python_expr("1 + 2");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&bin_op),
+            ExprCategory::Operator
+        );
+
+        let unary_op = parse_python_expr("not True");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&unary_op),
+            ExprCategory::Operator
+        );
+
+        let compare = parse_python_expr("x > 5");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&compare),
+            ExprCategory::Operator
+        );
+    }
+
+    #[test]
+    fn test_categorize_expression_control_flow() {
+        // Test control flow categorization
+        let lambda = parse_python_expr("lambda x: x + 1");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&lambda),
+            ExprCategory::ControlFlow
+        );
+
+        let if_exp = parse_python_expr("1 if True else 2");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&if_exp),
+            ExprCategory::ControlFlow
+        );
+    }
+
+    #[test]
+    fn test_categorize_expression_comprehensions() {
+        // Test comprehension categorization
+        let list_comp = parse_python_expr("[x for x in range(10)]");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&list_comp),
+            ExprCategory::Comprehension
+        );
+
+        let set_comp = parse_python_expr("{x for x in range(10)}");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&set_comp),
+            ExprCategory::Comprehension
+        );
+
+        let dict_comp = parse_python_expr("{x: x*2 for x in range(10)}");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&dict_comp),
+            ExprCategory::Comprehension
+        );
+
+        let gen_exp = parse_python_expr("(x for x in range(10))");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&gen_exp),
+            ExprCategory::Comprehension
+        );
+    }
+
+    #[test]
+    fn test_categorize_expression_literals() {
+        // Test literal categorization
+        let name = parse_python_expr("variable_name");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&name),
+            ExprCategory::Literal
+        );
+
+        let constant = parse_python_expr("42");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&constant),
+            ExprCategory::Literal
+        );
+    }
+
+    #[test]
+    fn test_categorize_expression_collections() {
+        // Test collection categorization
+        let list = parse_python_expr("[1, 2, 3]");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&list),
+            ExprCategory::Collection
+        );
+
+        let tuple = parse_python_expr("(1, 2, 3)");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&tuple),
+            ExprCategory::Collection
+        );
+
+        let dict = parse_python_expr("{'a': 1, 'b': 2}");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&dict),
+            ExprCategory::Collection
+        );
+
+        let set = parse_python_expr("{1, 2, 3}");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&set),
+            ExprCategory::Collection
+        );
+    }
+
+    #[test]
+    fn test_categorize_expression_access() {
+        // Test access pattern categorization
+        let attr = parse_python_expr("obj.attribute");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&attr),
+            ExprCategory::Access
+        );
+
+        let subscript = parse_python_expr("list[0]");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&subscript),
+            ExprCategory::Access
+        );
+
+        let slice = parse_python_expr("list[1:3]");
+        // Note: slice is embedded in subscript, so we test the subscript
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&slice),
+            ExprCategory::Access
+        );
+
+        let starred = parse_python_expr("*args");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&starred),
+            ExprCategory::Access
+        );
+    }
+
+    #[test]
+    fn test_categorize_expression_special() {
+        // Test special expression categorization
+        let call = parse_python_expr("func(1, 2)");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&call),
+            ExprCategory::Special
+        );
+
+        let named = parse_python_expr("(x := 5)");
+        assert_eq!(
+            PythonEntropyAnalyzer::categorize_expression(&named),
+            ExprCategory::Special
+        );
+    }
+
+    #[test]
+    fn test_extract_tokens_with_categorization() {
+        // Test that the refactored extract_tokens_from_expr still works correctly
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test a complex expression with multiple categories
+        let expr = parse_python_expr("[x * 2 for x in range(10) if x > 5]");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        // Should have extracted tokens from the comprehension
+        assert!(!tokens.is_empty());
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+    }
+
+    #[test]
+    fn test_operator_token_extraction() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test each operator type
+        let test_cases = vec![
+            ("True and False", "and"),
+            ("1 + 2", "Add"),
+            ("not True", "not"),
+            ("x == y", "=="),
+        ];
+
+        for (expr_str, expected_op) in test_cases {
+            let expr = parse_python_expr(expr_str);
+            let mut tokens = Vec::new();
+            analyzer.extract_operator_tokens(&expr, &mut tokens);
+
+            assert!(
+                !tokens.is_empty(),
+                "Failed to extract tokens for {}",
+                expr_str
+            );
+            assert!(
+                tokens.iter().any(|t| t.value().contains(expected_op)),
+                "Expected operator '{}' not found in tokens for {}",
+                expected_op,
+                expr_str
+            );
+        }
+    }
+
+    #[test]
+    fn test_control_flow_token_extraction() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test control flow expressions
+        let lambda = parse_python_expr("lambda x: x + 1");
+        let mut tokens = Vec::new();
+        analyzer.extract_control_flow_tokens(&lambda, &mut tokens);
+        assert!(tokens.iter().any(|t| t.value() == "lambda"));
+
+        let if_exp = parse_python_expr("1 if True else 2");
+        tokens.clear();
+        analyzer.extract_control_flow_tokens(&if_exp, &mut tokens);
+        assert!(tokens.iter().any(|t| t.value() == "if"));
+    }
+
+    #[test]
+    fn test_comprehension_token_extraction() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test comprehension expressions
+        let list_comp = parse_python_expr("[x for x in range(10)]");
+        let mut tokens = Vec::new();
+        analyzer.extract_comprehension_expr_tokens(&list_comp, &mut tokens);
+        assert!(!tokens.is_empty());
+        assert!(tokens.iter().any(|t| t.value() == "list_comp"));
+    }
+
+    #[test]
+    fn test_collection_token_extraction() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test collection expressions
+        let list = parse_python_expr("[1, 2, 3]");
+        let mut tokens = Vec::new();
+        analyzer.extract_collection_tokens(&list, &mut tokens);
+        assert!(tokens.iter().any(|t| t.value() == "list"));
+
+        let dict = parse_python_expr("{'a': 1}");
+        tokens.clear();
+        analyzer.extract_collection_tokens(&dict, &mut tokens);
+        assert!(tokens.iter().any(|t| t.value() == "dict"));
+    }
+
+    #[test]
+    fn test_edge_cases_and_complex_expressions() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+
+        // Test deeply nested expression
+        let nested = parse_python_expr("{'key': [x * 2 for x in (1, 2, 3) if x > 1]}");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&nested, &mut tokens);
+
+        // Should handle nested structures correctly
+        assert!(tokens.iter().any(|t| t.value() == "dict"));
+        assert!(tokens.iter().any(|t| t.value() == "list_comp"));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
     }
 }

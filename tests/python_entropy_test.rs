@@ -855,3 +855,618 @@ async def all_expressions():
         "Should detect float constant"
     );
 }
+
+#[test]
+fn test_extract_tokens_from_expr_visitor_pattern() {
+    // Test all 28 branches of the extract_tokens_from_expr visitor pattern
+    let source = r#"
+def comprehensive_expressions():
+    # All expression types to test the visitor pattern
+    
+    # Boolean operations
+    bool_result = a and b or c
+    
+    # Binary operations
+    bin_result = x + y - z * w / q % r ** s
+    
+    # Unary operations
+    unary_result = not a
+    neg = -x
+    pos = +y
+    inv = ~z
+    
+    # Lambda
+    func = lambda x, y: x + y
+    
+    # If expression (ternary)
+    tern = a if condition else b
+    
+    # List comprehension
+    list_comp = [x * 2 for x in range(10) if x > 0]
+    
+    # Set comprehension
+    set_comp = {x * 2 for x in range(10)}
+    
+    # Dict comprehension
+    dict_comp = {x: x * 2 for x in range(10)}
+    
+    # Generator expression
+    gen_exp = (x * 2 for x in range(10))
+    
+    # Await expression
+    awaited = await async_func()
+    
+    # Yield expressions
+    yield value
+    yield from generator
+    
+    # Comparison
+    comp = a == b != c < d <= e > f >= g
+    is_check = x is None
+    is_not_check = y is not None
+    in_check = z in container
+    not_in_check = w not in container
+    
+    # Function call
+    result = func(arg1, arg2, keyword=value)
+    
+    # Name (identifier)
+    name = variable_name
+    
+    # Constants
+    none_const = None
+    bool_const = True
+    str_const = "string"
+    int_const = 42
+    float_const = 3.14
+    
+    # Named expression (walrus operator)
+    if (n := len(items)) > 0:
+        print(n)
+    
+    # Collection literals
+    list_lit = [1, 2, 3]
+    tuple_lit = (1, 2, 3)
+    dict_lit = {"key": "value", "foo": "bar"}
+    set_lit = {1, 2, 3}
+    
+    # Attribute access
+    attr = obj.attribute
+    
+    # Subscript
+    item = container[index]
+    
+    # Slice
+    sliced = sequence[start:stop:step]
+    
+    # Starred expression
+    unpacked = [*items, extra]
+    
+    # JoinedStr (f-string)
+    f_string = f"Value: {value}"
+    
+    # FormattedValue (inside f-string)
+    formatted = f"{expr:.2f}"
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Verify that all expression types are properly extracted
+    // This tests all 28 branches of the visitor pattern
+
+    // Boolean operations
+    assert!(
+        tokens.iter().any(|t| t.value() == "and"),
+        "Should extract 'and' operator"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "or"),
+        "Should extract 'or' operator"
+    );
+
+    // Binary operations (various)
+    assert!(
+        tokens.iter().any(|t| t.value().contains("Add")),
+        "Should extract addition"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("Sub")),
+        "Should extract subtraction"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("Mult")),
+        "Should extract multiplication"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("Div")),
+        "Should extract division"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("Mod")),
+        "Should extract modulo"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("Pow")),
+        "Should extract power"
+    );
+
+    // Unary operations
+    assert!(
+        tokens.iter().any(|t| t.value() == "not"),
+        "Should extract 'not' operator"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "-"),
+        "Should extract negation"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "+"),
+        "Should extract positive"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "~"),
+        "Should extract invert"
+    );
+
+    // Lambda
+    assert!(
+        tokens.iter().any(|t| t.value() == "lambda"),
+        "Should extract lambda"
+    );
+
+    // If expression
+    assert!(
+        tokens.iter().any(|t| t.value() == "if"),
+        "Should extract if expression"
+    );
+
+    // Comprehensions
+    assert!(
+        tokens.iter().any(|t| t.value().contains("list_comp")),
+        "Should extract list comprehension"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("set_comp")),
+        "Should extract set comprehension"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("dict_comp")),
+        "Should extract dict comprehension"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("generator")),
+        "Should extract generator expression"
+    );
+
+    // Async/await
+    assert!(
+        tokens.iter().any(|t| t.value() == "await"),
+        "Should extract await"
+    );
+
+    // Yield
+    assert!(
+        tokens.iter().any(|t| t.value() == "yield"),
+        "Should extract yield"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "from"),
+        "Should extract yield from"
+    );
+
+    // Comparisons
+    assert!(
+        tokens.iter().any(|t| t.value() == "=="),
+        "Should extract equality"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "!="),
+        "Should extract inequality"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "<"),
+        "Should extract less than"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "<="),
+        "Should extract less than or equal"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == ">"),
+        "Should extract greater than"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == ">="),
+        "Should extract greater than or equal"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "is"),
+        "Should extract 'is' operator"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "in"),
+        "Should extract 'in' operator"
+    );
+
+    // Function calls
+    assert!(
+        tokens.iter().any(|t| t.value() == "call"),
+        "Should extract function call"
+    );
+
+    // Named expression (walrus)
+    assert!(
+        tokens.iter().any(|t| t.value() == ":="),
+        "Should extract walrus operator"
+    );
+
+    // Constants
+    assert!(
+        tokens.iter().any(|t| t.value() == "None"),
+        "Should extract None"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "bool"),
+        "Should extract bool constant"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "string"),
+        "Should extract string constant"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "int"),
+        "Should extract int constant"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "float"),
+        "Should extract float constant"
+    );
+
+    // Collections
+    assert!(
+        tokens.iter().any(|t| t.value() == "list"),
+        "Should extract list literal"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "tuple"),
+        "Should extract tuple literal"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "dict"),
+        "Should extract dict literal"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "set"),
+        "Should extract set literal"
+    );
+
+    // Attribute and subscript
+    assert!(
+        tokens.iter().any(|t| t.value() == "."),
+        "Should extract attribute access"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "[]"),
+        "Should extract subscript"
+    );
+
+    // Slice (uses : operator)
+    assert!(
+        tokens.iter().any(|t| t.value() == ":"),
+        "Should extract slice operator"
+    );
+
+    // Starred
+    assert!(
+        tokens.iter().any(|t| t.value() == "*"),
+        "Should extract starred expression"
+    );
+
+    // F-strings
+    assert!(
+        tokens.iter().any(|t| t.value() == "f-string"),
+        "Should extract f-string"
+    );
+}
+
+#[test]
+fn test_extract_tokens_from_expr_edge_cases() {
+    // Test edge cases and complex nested expressions
+    let source = r#"
+def edge_cases():
+    # Deeply nested expressions
+    nested = (a and (b or (c and (d or e))))
+    
+    # Chained comparisons
+    chained = 0 < x < 10 <= y <= 100
+    
+    # Complex arithmetic
+    complex_math = (a + b) * (c - d) / (e % f) ** (g // h)
+    
+    # Nested comprehensions
+    nested_comp = [[x * y for x in range(3)] for y in range(3)]
+    
+    # Multiple starred expressions
+    combined = [*list1, *list2, extra]
+    
+    # Complex f-string
+    complex_f = f"Result: {x + y:.2f} at {time.now()}"
+    
+    # Nested ternary
+    nested_tern = a if b else (c if d else e)
+    
+    # Complex lambda
+    complex_lambda = lambda x, y=10, *args, **kwargs: x + y + sum(args)
+    
+    # Mixed collections
+    mixed = {"list": [1, 2, 3], "tuple": (4, 5, 6), "set": {7, 8, 9}}
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Verify token extraction doesn't fail on complex expressions
+    assert!(
+        !tokens.is_empty(),
+        "Should extract tokens from complex expressions"
+    );
+
+    // Check that nested structures are properly handled
+    let operator_count = tokens
+        .iter()
+        .filter(|t| {
+            matches!(
+                t.to_category(),
+                debtmap::complexity::entropy_core::TokenCategory::Operator
+            )
+        })
+        .count();
+
+    assert!(
+        operator_count > 10,
+        "Should extract multiple operators from nested expressions"
+    );
+
+    // Verify comprehensions are detected even when nested
+    let comp_tokens = tokens.iter().filter(|t| t.value().contains("comp")).count();
+    assert!(comp_tokens > 0, "Should detect nested comprehensions");
+}
+
+#[test]
+fn test_extract_tokens_from_expr_recursion() {
+    // Test that recursive calls work properly
+    let source = r#"
+def recursive_expressions():
+    # Expression that would cause deep recursion in visitor
+    deeply_nested = (
+        func1(
+            func2(
+                func3(
+                    [x for x in range(10) if x > 0],
+                    {"key": lambda y: y * 2}
+                ),
+                (1, 2, 3)
+            ),
+            await async_func()
+        )
+    )
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Verify deep recursion is handled
+    assert!(
+        !tokens.is_empty(),
+        "Should handle deeply nested expressions"
+    );
+
+    // Check that all nested elements are extracted
+    assert!(
+        tokens.iter().any(|t| t.value() == "call"),
+        "Should extract nested function calls"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value().contains("list_comp")),
+        "Should extract nested list comprehension"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "lambda"),
+        "Should extract nested lambda"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "dict"),
+        "Should extract nested dict"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "tuple"),
+        "Should extract nested tuple"
+    );
+    assert!(
+        tokens.iter().any(|t| t.value() == "await"),
+        "Should extract nested await"
+    );
+}
+
+#[test]
+fn test_extract_collection_literals() {
+    let source = r#"
+def collections():
+    # List literal
+    my_list = [1, 2, 3, 4]
+    
+    # Tuple literal  
+    my_tuple = (1, 2, 3)
+    
+    # Dict literal
+    my_dict = {"key1": "value1", "key2": "value2"}
+    
+    # Set literal
+    my_set = {1, 2, 3, 4}
+    
+    # Nested collections
+    nested = [[1, 2], [3, 4]]
+    complex_dict = {"a": [1, 2], "b": (3, 4)}
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that collection type tokens are created
+    let list_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "list").collect();
+    let tuple_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "tuple").collect();
+    let dict_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "dict").collect();
+    let set_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "set").collect();
+
+    assert!(!list_tokens.is_empty(), "Should detect list literals");
+    assert!(!tuple_tokens.is_empty(), "Should detect tuple literals");
+    assert!(!dict_tokens.is_empty(), "Should detect dict literals");
+    assert!(!set_tokens.is_empty(), "Should detect set literals");
+}
+
+#[test]
+fn test_extract_attribute_subscript_slice() {
+    let source = r#"
+def access_patterns():
+    # Attribute access
+    value = obj.attribute
+    nested = obj.attr1.attr2.attr3
+    
+    # Subscript access
+    item = my_list[0]
+    element = my_dict["key"]
+    
+    # Slice access
+    subset = my_list[1:5]
+    step_slice = my_list[::2]
+    full_slice = my_list[start:end:step]
+    
+    # Complex combinations
+    complex = obj.attr[0].method()[1:3]
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that access pattern tokens are created
+    let attr_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == ".").collect();
+    let subscript_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "[]").collect();
+    let slice_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == ":").collect();
+
+    assert!(!attr_tokens.is_empty(), "Should detect attribute access");
+    assert!(
+        !subscript_tokens.is_empty(),
+        "Should detect subscript access"
+    );
+    assert!(!slice_tokens.is_empty(), "Should detect slice operations");
+}
+
+#[test]
+fn test_extract_starred_expressions() {
+    let source = r#"
+def starred_expressions():
+    # Starred in assignment
+    first, *rest = [1, 2, 3, 4, 5]
+    
+    # Starred in function call
+    result = func(*args, **kwargs)
+    
+    # Starred in list literal
+    combined = [*list1, *list2]
+    
+    # Starred in tuple
+    data = (*tuple1, *tuple2)
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that starred expression tokens are created
+    let starred_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "*").collect();
+
+    assert!(
+        !starred_tokens.is_empty(),
+        "Should detect starred expressions"
+    );
+}
+
+#[test]
+fn test_extract_joined_str_formatted_value() {
+    let source = r#"
+def formatted_strings():
+    # F-strings (JoinedStr)
+    name = "Alice"
+    greeting = f"Hello, {name}!"
+    
+    # Complex f-string with expressions
+    result = f"The sum is {2 + 2}"
+    
+    # Nested formatting
+    formatted = f"Value: {value:.2f}"
+    
+    # Multiple expressions
+    message = f"{greeting} Your score is {score}"
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that f-string tokens are created
+    let fstring_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "f-string").collect();
+    let format_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "format").collect();
+
+    assert!(
+        !fstring_tokens.is_empty() || !format_tokens.is_empty(),
+        "Should detect formatted strings"
+    );
+}
