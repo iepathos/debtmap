@@ -146,7 +146,7 @@ def test_with_inline_mocks():
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
         
         // Will have issues due to no assertions
-        assert!(issues.len() > 0);
+        assert!(issues.len() > 0, "Expected at least one issue, but found: {:?}", issues);
     }
 
     #[test]

@@ -167,6 +167,40 @@ impl AssertionDetector {
                         }
                     }
                 }
+                // Check inside nested blocks
+                Stmt::With(with_stmt) => {
+                    if self.has_setup_code(&with_stmt.body) {
+                        return true;
+                    }
+                }
+                Stmt::If(if_stmt) => {
+                    if self.has_setup_code(&if_stmt.body) || self.has_setup_code(&if_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::For(for_stmt) => {
+                    if self.has_setup_code(&for_stmt.body) || self.has_setup_code(&for_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::While(while_stmt) => {
+                    if self.has_setup_code(&while_stmt.body) || self.has_setup_code(&while_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::Try(try_stmt) => {
+                    if self.has_setup_code(&try_stmt.body) 
+                        || self.has_setup_code(&try_stmt.orelse)
+                        || self.has_setup_code(&try_stmt.finalbody) {
+                        return true;
+                    }
+                    for handler in &try_stmt.handlers {
+                        let ast::ExceptHandler::ExceptHandler(h) = handler;
+                        if self.has_setup_code(&h.body) {
+                            return true;
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -175,17 +209,53 @@ impl AssertionDetector {
 
     fn has_action_code(&self, body: &[Stmt]) -> bool {
         // Look for function calls that aren't assertions
-        let mut call_count = 0;
         for stmt in body {
-            if let Stmt::Expr(expr_stmt) = stmt {
-                if let Expr::Call(_) = &*expr_stmt.value {
-                    if !self.is_assertion(stmt) {
-                        call_count += 1;
+            match stmt {
+                Stmt::Expr(expr_stmt) => {
+                    if let Expr::Call(_) = &*expr_stmt.value {
+                        if !self.is_assertion(stmt) {
+                            return true;
+                        }
                     }
                 }
+                // Check inside nested blocks
+                Stmt::With(with_stmt) => {
+                    if self.has_action_code(&with_stmt.body) {
+                        return true;
+                    }
+                }
+                Stmt::If(if_stmt) => {
+                    if self.has_action_code(&if_stmt.body) || self.has_action_code(&if_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::For(for_stmt) => {
+                    if self.has_action_code(&for_stmt.body) || self.has_action_code(&for_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::While(while_stmt) => {
+                    if self.has_action_code(&while_stmt.body) || self.has_action_code(&while_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::Try(try_stmt) => {
+                    if self.has_action_code(&try_stmt.body) 
+                        || self.has_action_code(&try_stmt.orelse)
+                        || self.has_action_code(&try_stmt.finalbody) {
+                        return true;
+                    }
+                    for handler in &try_stmt.handlers {
+                        let ast::ExceptHandler::ExceptHandler(h) = handler;
+                        if self.has_action_code(&h.body) {
+                            return true;
+                        }
+                    }
+                }
+                _ => {}
             }
         }
-        call_count > 0
+        false
     }
 
     fn suggest_assertions(&self, body: &[Stmt]) -> String {
