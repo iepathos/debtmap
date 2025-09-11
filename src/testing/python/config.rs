@@ -6,8 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Configuration for Python test quality analysis
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PythonTestConfig {
     /// Configuration for complexity analysis
     pub complexity: ComplexityConfig,
@@ -21,7 +20,6 @@ pub struct PythonTestConfig {
     /// Configuration for excessive mocking detection
     pub mocking: MockingConfig,
 }
-
 
 /// Configuration for test complexity analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
