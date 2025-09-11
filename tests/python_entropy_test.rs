@@ -472,22 +472,37 @@ def process_with_walrus(items):
 fn test_entropy_score_integration() {
     // Test that entropy scores are properly integrated into function metrics
     let source = r#"
-def simple_function():
-    return 42
+def simple_function(x):
+    # Repetitive simple operations
+    a = x + 1
+    b = x + 1  
+    c = x + 1
+    d = x + 1
+    return a + b + c + d
 
-def complex_function(data):
+def complex_function(data, mode, threshold):
     if data is None:
         return None
     
     results = []
+    cache = {}
+    
     for item in data:
-        if item > 0:
-            if item % 2 == 0:
-                results.append(item * 2)
+        if item > threshold:
+            if mode == 'square':
+                val = item ** 2
+                cache[item] = val
+                results.append(val)
+            elif mode == 'factorial':
+                fact = 1
+                for i in range(1, item + 1):
+                    fact *= i
+                results.append(fact)
             else:
-                results.append(item * 3)
+                transformed = item * 2 + threshold
+                results.append(transformed)
         else:
-            results.append(0)
+            results.append(item)
     
     return results
 "#;
