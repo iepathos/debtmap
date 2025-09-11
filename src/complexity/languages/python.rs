@@ -919,6 +919,7 @@ fn normalize_identifier(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::complexity::entropy_traits::GenericToken;
     use rustpython_parser::ast;
 
     // Helper function to create a test analyzer
@@ -944,6 +945,21 @@ mod tests {
         (*assign.value).clone()
     }
 
+    // Helper function for end-to-end token extraction tests
+    fn parse_and_extract_tokens(source: &str) -> Vec<GenericToken> {
+        let module =
+            rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>").unwrap();
+        let analyzer = PythonEntropyAnalyzer::new(source);
+
+        match module {
+            rustpython_parser::ast::Mod::Module(module) => {
+                analyzer.extract_python_tokens(&module.body)
+            }
+            _ => vec![],
+        }
+    }
+
+    // Unit tests for individual handlers
     #[test]
     fn test_handle_bool_op() {
         let analyzer = create_test_analyzer();
@@ -1198,5 +1214,185 @@ mod tests {
             tokens.iter().any(|t| t.value().contains("list_comp")),
             "Should contain list comprehension"
         );
+    }
+
+    // End-to-end integration tests
+    #[test]
+    fn test_extract_tokens_from_bool_op() {
+        let source = "x and y or z";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract operators and identifiers
+        assert!(tokens.iter().any(|t| t.value() == "and"));
+        assert!(tokens.iter().any(|t| t.value() == "or"));
+        assert!(tokens.iter().any(|t| t.value() == "X")); // normalized identifier
+        assert!(tokens.iter().any(|t| t.value() == "Y"));
+        assert!(tokens.iter().any(|t| t.value() == "Z"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_bin_op() {
+        let source = "a + b * c";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract binary operators
+        assert!(tokens.iter().any(|t| t.value().contains("Add")));
+        assert!(tokens.iter().any(|t| t.value().contains("Mult")));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_unary_op() {
+        let source = "not x\n-y\n~z";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract unary operators
+        assert!(tokens.iter().any(|t| t.value() == "not"));
+        assert!(tokens.iter().any(|t| t.value() == "-"));
+        assert!(tokens.iter().any(|t| t.value() == "~"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_lambda() {
+        let source = "lambda x: x + 1";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract lambda keyword
+        assert!(tokens.iter().any(|t| t.value() == "lambda"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_if_exp() {
+        let source = "x if condition else y";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract if control flow
+        assert!(tokens.iter().any(|t| t.value() == "if"));
+        assert!(tokens.iter().any(|t| t.value() == "VAR")); // condition is normalized
+    }
+
+    #[test]
+    fn test_extract_tokens_from_list_comprehension() {
+        let source = "[x for x in range(10) if x > 5]";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract comprehension tokens
+        assert!(tokens.iter().any(|t| t.value() == "list_comp"));
+        assert!(tokens.iter().any(|t| t.value() == "for"));
+        assert!(tokens.iter().any(|t| t.value() == "in"));
+        assert!(tokens.iter().any(|t| t.value() == "if"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_dict_comprehension() {
+        let source = "{k: v for k, v in items}";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract dict comprehension tokens
+        assert!(tokens.iter().any(|t| t.value() == "dict_comp"));
+        assert!(tokens.iter().any(|t| t.value() == "for"));
+        assert!(tokens.iter().any(|t| t.value() == "in"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_generator_exp() {
+        let source = "(x for x in range(10))";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract generator tokens
+        assert!(tokens.iter().any(|t| t.value() == "generator"));
+        assert!(tokens.iter().any(|t| t.value() == "for"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_await_expr() {
+        let source = "async def f():\n    await something()";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract await keyword
+        assert!(tokens.iter().any(|t| t.value() == "await"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_yield_expr() {
+        let source = "def f():\n    yield x\n    yield from y";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract yield keywords
+        assert!(tokens.iter().any(|t| t.value() == "yield"));
+        assert!(tokens.iter().any(|t| t.value() == "from"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_compare() {
+        let source = "x < y <= z";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract comparison operators
+        assert!(tokens.iter().any(|t| t.value() == "<"));
+        assert!(tokens.iter().any(|t| t.value() == "<="));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_call() {
+        let source = "func(arg1, arg2)";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract function call
+        assert!(tokens.iter().any(|t| t.value() == "call"));
+        assert!(tokens.iter().any(|t| t.value() == "VAR")); // func is normalized
+    }
+
+    #[test]
+    fn test_extract_tokens_from_named_expr() {
+        let source = "(x := 42)";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract walrus operator
+        assert!(tokens.iter().any(|t| t.value() == ":="));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_constants() {
+        let source = "42\n'string'\nTrue\nNone";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should extract literal types
+        assert!(tokens.iter().any(|t| t.value() == "int"));
+        assert!(tokens.iter().any(|t| t.value() == "string"));
+        assert!(tokens.iter().any(|t| t.value() == "bool"));
+        assert!(tokens.iter().any(|t| t.value() == "None"));
+    }
+
+    #[test]
+    fn test_normalize_identifier() {
+        assert_eq!(normalize_identifier("x"), "X");
+        assert_eq!(normalize_identifier("xy"), "XY");
+        assert_eq!(normalize_identifier("xyz"), "XYZ");
+        assert_eq!(normalize_identifier("long_name"), "VAR");
+        assert_eq!(normalize_identifier("another_long_name"), "VAR");
+    }
+
+    #[test]
+    fn test_complex_nested_expression() {
+        let source = "[x + y for x in range(10) if x > 5 and y < 3]";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should handle nested expressions within comprehensions
+        assert!(tokens.iter().any(|t| t.value() == "list_comp"));
+        assert!(tokens.iter().any(|t| t.value().contains("Add")));
+        assert!(tokens.iter().any(|t| t.value() == "and"));
+        assert!(tokens.iter().any(|t| t.value() == ">"));
+        assert!(tokens.iter().any(|t| t.value() == "<"));
+    }
+
+    #[test]
+    fn test_deeply_nested_expression() {
+        let source = "lambda x: (x if x > 0 else -x) + (y if y > 0 else -y)";
+        let tokens = parse_and_extract_tokens(source);
+
+        // Should handle deeply nested conditional expressions
+        assert!(tokens.iter().any(|t| t.value() == "lambda"));
+        assert!(tokens.iter().filter(|t| t.value() == "if").count() >= 2);
+        assert!(tokens.iter().any(|t| t.value().contains("Add")));
     }
 }
