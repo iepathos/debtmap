@@ -83,6 +83,11 @@ impl TestComplexityAnalyzer {
                     count += 1;
                     count += self.count_conditionals_in_stmt(stmt);
                 }
+                Stmt::Try(try_stmt) => {
+                    // Each except handler is a conditional branch
+                    count += try_stmt.handlers.len() as u32;
+                    count += self.count_conditionals_in_stmt(stmt);
+                }
                 _ => count += self.count_conditionals_in_stmt(stmt),
             }
         }

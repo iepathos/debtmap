@@ -104,12 +104,22 @@ impl FlakyPatternDetector {
     }
 
     fn is_timing_call(&self, stmt: &Stmt) -> bool {
-        if let Stmt::Expr(expr_stmt) = stmt {
-            if let Expr::Call(call) = &*expr_stmt.value {
-                return self.is_timing_function(&call.func);
+        match stmt {
+            Stmt::Expr(expr_stmt) => {
+                if let Expr::Call(call) = &*expr_stmt.value {
+                    return self.is_timing_function(&call.func);
+                }
+                false
             }
+            Stmt::Assign(assign_stmt) => {
+                // Check if the assigned value is a timing call
+                if let Expr::Call(call) = &*assign_stmt.value {
+                    return self.is_timing_function(&call.func);
+                }
+                false
+            }
+            _ => false,
         }
-        false
     }
 
     fn is_timing_function(&self, expr: &Expr) -> bool {
@@ -191,23 +201,41 @@ impl FlakyPatternDetector {
     }
 
     fn is_random_call(&self, stmt: &Stmt) -> bool {
-        if let Stmt::Expr(expr_stmt) = stmt {
-            if let Expr::Call(call) = &*expr_stmt.value {
-                return self.is_random_function(&call.func);
+        match stmt {
+            Stmt::Expr(expr_stmt) => {
+                if let Expr::Call(call) = &*expr_stmt.value {
+                    return self.is_random_function(&call.func);
+                }
+                false
             }
+            Stmt::Assign(assign_stmt) => {
+                // Check if the assigned value is a random call
+                if let Expr::Call(call) = &*assign_stmt.value {
+                    return self.is_random_function(&call.func);
+                }
+                false
+            }
+            _ => false,
         }
-        false
     }
 
     fn is_random_function(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Attribute(attr) => {
+                let method = attr.attr.as_str();
+                // Check for uuid methods
+                if method == "uuid4" || method == "uuid1" {
+                    return true;
+                }
+                
                 if let Expr::Name(name) = &*attr.value {
                     let module = name.id.as_str();
-                    module == "random" || module == "secrets"
-                } else {
-                    false
+                    // Check for random and secrets modules
+                    if module == "random" || module == "secrets" || module == "uuid" {
+                        return true;
+                    }
                 }
+                false
             }
             Expr::Name(name) => {
                 let func_name = name.id.as_str();
@@ -239,17 +267,66 @@ impl FlakyPatternDetector {
             if self.is_external_call(stmt) {
                 return true;
             }
+            if self.contains_external_calls_in_stmt(stmt) {
+                return true;
+            }
         }
         false
     }
 
-    fn is_external_call(&self, stmt: &Stmt) -> bool {
-        if let Stmt::Expr(expr_stmt) = stmt {
-            if let Expr::Call(call) = &*expr_stmt.value {
-                return self.is_external_function(&call.func);
+    fn contains_external_calls_in_stmt(&self, stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::If(if_stmt) => {
+                self.contains_external_calls(&if_stmt.body)
+                    || self.contains_external_calls(&if_stmt.orelse)
             }
+            Stmt::For(for_stmt) => {
+                self.contains_external_calls(&for_stmt.body)
+                    || self.contains_external_calls(&for_stmt.orelse)
+            }
+            Stmt::While(while_stmt) => {
+                self.contains_external_calls(&while_stmt.body)
+                    || self.contains_external_calls(&while_stmt.orelse)
+            }
+            Stmt::With(with_stmt) => self.contains_external_calls(&with_stmt.body),
+            Stmt::Try(try_stmt) => {
+                self.contains_external_calls(&try_stmt.body)
+                    || try_stmt.handlers.iter().any(|h| {
+                        let ast::ExceptHandler::ExceptHandler(handler) = h;
+                        self.contains_external_calls(&handler.body)
+                    })
+                    || self.contains_external_calls(&try_stmt.orelse)
+                    || self.contains_external_calls(&try_stmt.finalbody)
+            }
+            _ => false,
         }
-        false
+    }
+
+    fn is_external_call(&self, stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::Expr(expr_stmt) => {
+                if let Expr::Call(call) = &*expr_stmt.value {
+                    return self.is_external_function(&call.func);
+                }
+                false
+            }
+            Stmt::Assign(assign_stmt) => {
+                // Check if the assigned value is an external call
+                if let Expr::Call(call) = &*assign_stmt.value {
+                    // For chained calls like urllib.urlopen().read(), check the inner call
+                    if let Expr::Attribute(attr) = &*call.func {
+                        if let Expr::Call(inner_call) = &*attr.value {
+                            if self.is_external_function(&inner_call.func) {
+                                return true;
+                            }
+                        }
+                    }
+                    return self.is_external_function(&call.func);
+                }
+                false
+            }
+            _ => false,
+        }
     }
 
     fn is_external_function(&self, expr: &Expr) -> bool {
@@ -422,41 +499,139 @@ impl FlakyPatternDetector {
 
     fn contains_network_calls(&self, body: &[Stmt]) -> bool {
         for stmt in body {
-            if self.is_network_call(stmt) {
+            // Check with statements specially to avoid double-checking
+            if let Stmt::With(with_stmt) = stmt {
+                for item in &with_stmt.items {
+                    if let Expr::Call(call) = &item.context_expr {
+                        if self.is_network_function(&call.func) {
+                            return true;
+                        }
+                    }
+                }
+                // Also check the body of the with statement
+                if self.contains_network_calls(&with_stmt.body) {
+                    return true;
+                }
+            } else if let Stmt::AsyncWith(async_with_stmt) = stmt {
+                // Handle async with statements
+                for item in &async_with_stmt.items {
+                    if let Expr::Call(call) = &item.context_expr {
+                        if self.is_network_function(&call.func) {
+                            return true;
+                        }
+                    }
+                }
+                // Also check the body of the async with statement
+                if self.contains_network_calls(&async_with_stmt.body) {
+                    return true;
+                }
+            } else if self.is_network_call(stmt) {
+                return true;
+            } else if self.contains_network_calls_in_stmt(stmt) {
                 return true;
             }
         }
         false
     }
 
-    fn is_network_call(&self, stmt: &Stmt) -> bool {
-        if let Stmt::Expr(expr_stmt) = stmt {
-            if let Expr::Call(call) = &*expr_stmt.value {
-                return self.is_network_function(&call.func);
+    fn contains_network_calls_in_stmt(&self, stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::If(if_stmt) => {
+                self.contains_network_calls(&if_stmt.body)
+                    || self.contains_network_calls(&if_stmt.orelse)
             }
+            Stmt::For(for_stmt) => {
+                self.contains_network_calls(&for_stmt.body)
+                    || self.contains_network_calls(&for_stmt.orelse)
+            }
+            Stmt::While(while_stmt) => {
+                self.contains_network_calls(&while_stmt.body)
+                    || self.contains_network_calls(&while_stmt.orelse)
+            }
+            Stmt::With(with_stmt) => self.contains_network_calls(&with_stmt.body),
+            Stmt::Try(try_stmt) => {
+                self.contains_network_calls(&try_stmt.body)
+                    || try_stmt.handlers.iter().any(|h| {
+                        let ast::ExceptHandler::ExceptHandler(handler) = h;
+                        self.contains_network_calls(&handler.body)
+                    })
+                    || self.contains_network_calls(&try_stmt.orelse)
+                    || self.contains_network_calls(&try_stmt.finalbody)
+            }
+            Stmt::AsyncWith(async_with_stmt) => self.contains_network_calls(&async_with_stmt.body),
+            _ => false,
         }
-        false
+    }
+
+    fn is_network_call(&self, stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::Expr(expr_stmt) => {
+                // Check direct call
+                if let Expr::Call(call) = &*expr_stmt.value {
+                    return self.is_network_function(&call.func);
+                }
+                // Check await expressions
+                if let Expr::Await(await_expr) = &*expr_stmt.value {
+                    if let Expr::Call(call) = &*await_expr.value {
+                        return self.is_network_function(&call.func);
+                    }
+                }
+                false
+            }
+            Stmt::Assign(assign_stmt) => {
+                // Check if the assigned value is a network call
+                if let Expr::Call(call) = &*assign_stmt.value {
+                    return self.is_network_function(&call.func);
+                }
+                // Check await expressions
+                if let Expr::Await(await_expr) = &*assign_stmt.value {
+                    if let Expr::Call(call) = &*await_expr.value {
+                        return self.is_network_function(&call.func);
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
     }
 
     fn is_network_function(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Attribute(attr) => {
                 let method = attr.attr.as_str();
+                // Common network methods
                 if method == "connect"
                     || method == "send"
                     || method == "recv"
                     || method == "listen"
                     || method == "accept"
                     || method == "bind"
+                    || method == "get"
+                    || method == "post"
+                    || method == "put"
+                    || method == "delete"
+                    || method == "ClientSession"
                 {
                     return true;
                 }
+                
+                // Check for module.method patterns
                 if let Expr::Name(name) = &*attr.value {
                     let module = name.id.as_str();
-                    module == "socket" || module == "asyncio" || module == "aiohttp"
-                } else {
-                    false
+                    if module == "socket" || module == "asyncio" || module == "aiohttp" {
+                        return true;
+                    }
                 }
+                
+                // Check for session.get() and similar patterns
+                if let Expr::Name(name) = &*attr.value {
+                    let var_name = name.id.as_str();
+                    if var_name == "session" && (method == "get" || method == "post" || method == "put" || method == "delete") {
+                        return true;
+                    }
+                }
+                
+                false
             }
             Expr::Name(name) => {
                 let func_name = name.id.as_str();
@@ -484,20 +659,84 @@ impl FlakyPatternDetector {
 
     fn contains_threading_calls(&self, body: &[Stmt]) -> bool {
         for stmt in body {
-            if self.is_threading_call(stmt) {
+            // Check with statements for threading executors
+            if let Stmt::With(with_stmt) = stmt {
+                for item in &with_stmt.items {
+                    if let Expr::Call(call) = &item.context_expr {
+                        if self.is_threading_function(&call.func) {
+                            return true;
+                        }
+                    }
+                }
+                // Also check the body of the with statement
+                if self.contains_threading_calls(&with_stmt.body) {
+                    return true;
+                }
+            } else if let Stmt::AsyncWith(async_with_stmt) = stmt {
+                for item in &async_with_stmt.items {
+                    if let Expr::Call(call) = &item.context_expr {
+                        if self.is_threading_function(&call.func) {
+                            return true;
+                        }
+                    }
+                }
+                // Also check the body of the async with statement
+                if self.contains_threading_calls(&async_with_stmt.body) {
+                    return true;
+                }
+            } else if self.is_threading_call(stmt) {
+                return true;
+            } else if self.contains_threading_calls_in_stmt(stmt) {
                 return true;
             }
         }
         false
     }
 
-    fn is_threading_call(&self, stmt: &Stmt) -> bool {
-        if let Stmt::Expr(expr_stmt) = stmt {
-            if let Expr::Call(call) = &*expr_stmt.value {
-                return self.is_threading_function(&call.func);
+    fn contains_threading_calls_in_stmt(&self, stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::If(if_stmt) => {
+                self.contains_threading_calls(&if_stmt.body)
+                    || self.contains_threading_calls(&if_stmt.orelse)
             }
+            Stmt::For(for_stmt) => {
+                self.contains_threading_calls(&for_stmt.body)
+                    || self.contains_threading_calls(&for_stmt.orelse)
+            }
+            Stmt::While(while_stmt) => {
+                self.contains_threading_calls(&while_stmt.body)
+                    || self.contains_threading_calls(&while_stmt.orelse)
+            }
+            Stmt::Try(try_stmt) => {
+                self.contains_threading_calls(&try_stmt.body)
+                    || try_stmt.handlers.iter().any(|h| {
+                        let ast::ExceptHandler::ExceptHandler(handler) = h;
+                        self.contains_threading_calls(&handler.body)
+                    })
+                    || self.contains_threading_calls(&try_stmt.orelse)
+                    || self.contains_threading_calls(&try_stmt.finalbody)
+            }
+            _ => false,
         }
-        false
+    }
+
+    fn is_threading_call(&self, stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::Expr(expr_stmt) => {
+                if let Expr::Call(call) = &*expr_stmt.value {
+                    return self.is_threading_function(&call.func);
+                }
+                false
+            }
+            Stmt::Assign(assign_stmt) => {
+                // Check if the assigned value is a threading call
+                if let Expr::Call(call) = &*assign_stmt.value {
+                    return self.is_threading_function(&call.func);
+                }
+                false
+            }
+            _ => false,
+        }
     }
 
     fn is_threading_function(&self, expr: &Expr) -> bool {
@@ -509,15 +748,30 @@ impl FlakyPatternDetector {
                     || method == "join"
                     || method == "Process"
                     || method == "Pool"
+                    || method == "ThreadPoolExecutor"
+                    || method == "ProcessPoolExecutor"
+                    || method == "submit"
                 {
                     return true;
                 }
+                // Check for module.something patterns
                 if let Expr::Name(name) = &*attr.value {
                     let module = name.id.as_str();
-                    module == "threading" || module == "multiprocessing" || module == "concurrent"
-                } else {
-                    false
+                    if module == "threading" || module == "multiprocessing" || module == "concurrent" {
+                        return true;
+                    }
                 }
+                // Check for nested module patterns like concurrent.futures
+                if let Expr::Attribute(inner_attr) = &*attr.value {
+                    if let Expr::Name(name) = &*inner_attr.value {
+                        let module = name.id.as_str();
+                        let submodule = inner_attr.attr.as_str();
+                        if module == "concurrent" && submodule == "futures" {
+                            return true;
+                        }
+                    }
+                }
+                false
             }
             Expr::Name(name) => {
                 let func_name = name.id.as_str();
@@ -532,6 +786,44 @@ impl FlakyPatternDetector {
             if self.is_synchronization_primitive(stmt) {
                 return true;
             }
+            // Check nested statements
+            match stmt {
+                Stmt::If(if_stmt) => {
+                    if self.has_proper_synchronization(&if_stmt.body) 
+                        || self.has_proper_synchronization(&if_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::For(for_stmt) => {
+                    if self.has_proper_synchronization(&for_stmt.body) 
+                        || self.has_proper_synchronization(&for_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::While(while_stmt) => {
+                    if self.has_proper_synchronization(&while_stmt.body) 
+                        || self.has_proper_synchronization(&while_stmt.orelse) {
+                        return true;
+                    }
+                }
+                Stmt::With(with_stmt) => {
+                    if self.has_proper_synchronization(&with_stmt.body) {
+                        return true;
+                    }
+                }
+                Stmt::Try(try_stmt) => {
+                    if self.has_proper_synchronization(&try_stmt.body)
+                        || try_stmt.handlers.iter().any(|h| {
+                            let ast::ExceptHandler::ExceptHandler(handler) = h;
+                            self.has_proper_synchronization(&handler.body)
+                        })
+                        || self.has_proper_synchronization(&try_stmt.orelse)
+                        || self.has_proper_synchronization(&try_stmt.finalbody) {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
         }
         false
     }
@@ -540,13 +832,30 @@ impl FlakyPatternDetector {
         match stmt {
             Stmt::With(with_stmt) => {
                 for item in &with_stmt.items {
+                    // Check if it's a direct Lock() call
                     if let Expr::Call(call) = &item.context_expr {
                         if self.is_lock_function(&call.func) {
                             return true;
                         }
                     }
+                    // Check if it's a variable that might be a lock (common pattern)
+                    if let Expr::Name(name) = &item.context_expr {
+                        let var_name = name.id.as_str();
+                        if var_name == "lock" || var_name == "sem" || var_name == "mutex" 
+                            || var_name == "semaphore" || var_name == "event" {
+                            return true;
+                        }
+                    }
                 }
                 false
+            }
+            // Also check assignments of lock primitives
+            Stmt::Assign(assign_stmt) => {
+                if let Expr::Call(call) = &*assign_stmt.value {
+                    self.is_lock_function(&call.func)
+                } else {
+                    false
+                }
             }
             _ => false,
         }
