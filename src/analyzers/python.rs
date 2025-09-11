@@ -76,6 +76,19 @@ impl Analyzer for PythonAnalyzer {
                     resource_analyzer.analyze(&python_ast.module, &python_ast.path);
                 metrics.debt_items.extend(resource_debt_items);
 
+                // Add test quality analysis
+                let mut test_analyzer = crate::testing::python::analyzer::PythonTestAnalyzer::new();
+                let test_issues =
+                    test_analyzer.analyze_module(&python_ast.module, &python_ast.path);
+                for issue in test_issues {
+                    metrics.debt_items.push(
+                        crate::testing::python::convert_test_issue_to_debt_item(
+                            issue,
+                            &python_ast.path,
+                        ),
+                    );
+                }
+
                 metrics
             }
             _ => FileMetrics {
