@@ -279,10 +279,8 @@ impl AssertionDetector {
                     match &self.framework {
                         TestFramework::Unittest => {
                             suggestions.push(format!("self.assertIsNotNone({})", var_name));
-                            suggestions.push(format!(
-                                "self.assertEqual({}, expected_value)",
-                                var_name
-                            ));
+                            suggestions
+                                .push(format!("self.assertEqual({}, expected_value)", var_name));
                         }
                         TestFramework::Pytest | TestFramework::Unknown => {
                             suggestions.push(format!("assert {} is not None", var_name));
@@ -290,8 +288,7 @@ impl AssertionDetector {
                         }
                         TestFramework::Nose => {
                             suggestions.push(format!("assert_is_not_none({})", var_name));
-                            suggestions
-                                .push(format!("assert_equal({}, expected_value)", var_name));
+                            suggestions.push(format!("assert_equal({}, expected_value)", var_name));
                         }
                         _ => {}
                     }
