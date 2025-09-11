@@ -5,6 +5,12 @@ pub struct TestComplexityAnalyzer {
     config: ComplexityConfig,
 }
 
+impl Default for TestComplexityAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TestComplexityAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -273,7 +279,7 @@ impl TestComplexityAnalyzer {
 
     fn is_mock_context(&self, expr: &Expr) -> bool {
         if let Expr::Call(call) = expr {
-            self.is_mock_call(&*call.func)
+            self.is_mock_call(&call.func)
         } else {
             false
         }
@@ -298,7 +304,7 @@ impl TestComplexityAnalyzer {
 
     fn is_mock_decorator(&self, expr: &Expr) -> bool {
         match expr {
-            Expr::Call(call) => self.is_mock_call(&*call.func),
+            Expr::Call(call) => self.is_mock_call(&call.func),
             Expr::Attribute(attr) => {
                 attr.attr.as_str() == "patch" || attr.attr.as_str() == "patch_object"
             }
@@ -336,8 +342,7 @@ impl TestComplexityAnalyzer {
                     let mut depth = self.calculate_max_nesting(&try_stmt.body, current_depth + 1);
                     for handler in &try_stmt.handlers {
                         let ast::ExceptHandler::ExceptHandler(h) = handler;
-                        depth =
-                            depth.max(self.calculate_max_nesting(&h.body, current_depth + 1));
+                        depth = depth.max(self.calculate_max_nesting(&h.body, current_depth + 1));
                     }
                     depth =
                         depth.max(self.calculate_max_nesting(&try_stmt.orelse, current_depth + 1));

@@ -39,7 +39,9 @@ def test_complex():
         let module = parse_python_code(code);
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
         // Should not flag as complex with threshold of 20
-        assert!(issues.iter().all(|i| !matches!(i.issue_type, TestIssueType::OverlyComplex(_))));
+        assert!(issues
+            .iter()
+            .all(|i| !matches!(i.issue_type, TestIssueType::OverlyComplex(_))));
     }
 
     #[test]
@@ -68,7 +70,7 @@ def test_without_assertions():
 "#;
         let module = parse_python_code(code);
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         assert_eq!(issues.len(), 1);
         assert!(matches!(issues[0].issue_type, TestIssueType::NoAssertions));
     }
@@ -84,7 +86,7 @@ async def test_async_without_assertions():
 "#;
         let module = parse_python_code(code);
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         assert_eq!(issues.len(), 1);
         assert!(matches!(issues[0].issue_type, TestIssueType::NoAssertions));
     }
@@ -105,12 +107,11 @@ class TestExample:
 "#;
         let module = parse_python_code(code);
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         // Should find one issue for test_method_one (no assertions)
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].test_name, "test_method_one");
     }
-
 
     #[test]
     fn test_check_excessive_mocking() {
@@ -127,8 +128,10 @@ def test_with_many_mocks(mock1, mock2, mock3, mock4, mock5, mock6):
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
-        assert!(issues.iter().any(|i| matches!(i.issue_type, TestIssueType::ExcessiveMocking(_))));
+
+        assert!(issues
+            .iter()
+            .any(|i| matches!(i.issue_type, TestIssueType::ExcessiveMocking(_))));
     }
 
     #[test]
@@ -144,9 +147,13 @@ def test_with_inline_mocks():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         // Will have issues due to no assertions
-        assert!(issues.len() > 0, "Expected at least one issue, but found: {:?}", issues);
+        assert!(
+            issues.len() > 0,
+            "Expected at least one issue, but found: {:?}",
+            issues
+        );
     }
 
     #[test]
@@ -160,8 +167,10 @@ def test_modifies_global():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
-        assert!(issues.iter().any(|i| matches!(i.issue_type, TestIssueType::PoorIsolation)));
+
+        assert!(issues
+            .iter()
+            .any(|i| matches!(i.issue_type, TestIssueType::PoorIsolation)));
     }
 
     #[test]
@@ -178,9 +187,11 @@ def test_with_proper_cleanup():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         // Should not report poor isolation when cleanup is present
-        assert!(!issues.iter().any(|i| matches!(i.issue_type, TestIssueType::PoorIsolation)));
+        assert!(!issues
+            .iter()
+            .any(|i| matches!(i.issue_type, TestIssueType::PoorIsolation)));
     }
 
     #[test]
@@ -193,12 +204,14 @@ def test_modifies_os():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         // Should have multiple issues: no assertions and potentially poor isolation
         // Since we're modifying os/sys but have no assertions, we should find issues
         assert!(issues.len() > 0);
         // At minimum should have no assertions issue
-        assert!(issues.iter().any(|i| matches!(i.issue_type, TestIssueType::NoAssertions)));
+        assert!(issues
+            .iter()
+            .any(|i| matches!(i.issue_type, TestIssueType::NoAssertions)));
     }
 
     #[test]
@@ -213,9 +226,11 @@ def test_with_context_manager():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         // Should not report poor isolation when context manager is used
-        assert!(!issues.iter().any(|i| matches!(i.issue_type, TestIssueType::PoorIsolation)));
+        assert!(!issues
+            .iter()
+            .any(|i| matches!(i.issue_type, TestIssueType::PoorIsolation)));
     }
 
     #[test]
@@ -240,7 +255,7 @@ def test_multiple_problems():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::with_threshold(5);
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         // Should detect multiple issues
         assert!(issues.len() >= 3); // No assertions, excessive mocking, poor isolation, complexity
     }
@@ -251,7 +266,7 @@ def test_multiple_problems():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         assert_eq!(issues.len(), 0);
     }
 
@@ -270,7 +285,7 @@ def create_fixture():
         let module = parse_python_code(code);
         let mut analyzer = PythonTestAnalyzer::new();
         let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
-        
+
         assert_eq!(issues.len(), 0);
     }
 }

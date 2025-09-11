@@ -5,11 +5,18 @@ mod tests {
     use rustpython_parser::ast;
 
     fn parse_function(code: &str) -> ast::StmtFunctionDef {
-        let full_code = format!("def test_func():\n{}", code.lines().map(|l| format!("    {}", l)).collect::<Vec<_>>().join("\n"));
-        let module: ast::Mod = rustpython_parser::parse(&full_code, rustpython_parser::Mode::Module, "<test>")
-            .expect("Failed to parse")
-            .into();
-        
+        let full_code = format!(
+            "def test_func():\n{}",
+            code.lines()
+                .map(|l| format!("    {}", l))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let module: ast::Mod =
+            rustpython_parser::parse(&full_code, rustpython_parser::Mode::Module, "<test>")
+                .expect("Failed to parse")
+                .into();
+
         if let ast::Mod::Module(ast::ModModule { body, .. }) = module {
             if let Some(ast::Stmt::FunctionDef(func)) = body.into_iter().next() {
                 return func;
@@ -32,7 +39,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("x = 1\ny = 2\nresult = x + y");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_some());
         let issue = issue.unwrap();
         assert!(matches!(issue.issue_type, TestIssueType::NoAssertions));
@@ -43,7 +50,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("x = 1\nassert x == 1");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion
     }
 
@@ -52,7 +59,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Unittest);
         let func = parse_function("x = 1\nself.assertEqual(x, 1)");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion
     }
 
@@ -61,22 +68,22 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Nose);
         let func = parse_function("x = 1\nassert_equal(x, 1)");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion
     }
 
     #[test]
     fn test_unknown_framework_checks_all() {
         let detector = AssertionDetector::new(TestFramework::Unknown);
-        
+
         // Test with pytest style
         let func = parse_function("x = 1\nassert x == 1");
         assert!(detector.analyze_test_function(&func).is_none());
-        
+
         // Test with unittest style
         let func = parse_function("x = 1\nself.assertEqual(x, 1)");
         assert!(detector.analyze_test_function(&func).is_none());
-        
+
         // Test with nose style
         let func = parse_function("x = 1\nassert_equal(x, 1)");
         assert!(detector.analyze_test_function(&func).is_none());
@@ -87,7 +94,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("x = 1\nif x > 0:\n    assert x == 1");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion in if block
     }
 
@@ -96,7 +103,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("for i in range(3):\n    assert i >= 0");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion in loop
     }
 
@@ -105,7 +112,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("i = 0\nwhile i < 3:\n    assert i >= 0\n    i += 1");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion in while loop
     }
 
@@ -114,7 +121,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("with open('file') as f:\n    data = f.read()\n    assert data");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion in with block
     }
 
@@ -123,16 +130,17 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("try:\n    x = 1\n    assert x == 1\nexcept:\n    pass");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion in try block
     }
 
     #[test]
     fn test_assertions_in_except_block() {
         let detector = AssertionDetector::new(TestFramework::Pytest);
-        let func = parse_function("try:\n    x = 1/0\nexcept ZeroDivisionError as e:\n    assert str(e)");
+        let func =
+            parse_function("try:\n    x = 1/0\nexcept ZeroDivisionError as e:\n    assert str(e)");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion in except block
     }
 
@@ -141,23 +149,25 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("with pytest.raises(ValueError):\n    raise ValueError('test')");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // pytest.raises is an assertion
     }
 
     #[test]
     fn test_pytest_warns_context_manager() {
         let detector = AssertionDetector::new(TestFramework::Pytest);
-        let func = parse_function("with pytest.warns(UserWarning):\n    warnings.warn('test', UserWarning)");
+        let func = parse_function(
+            "with pytest.warns(UserWarning):\n    warnings.warn('test', UserWarning)",
+        );
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // pytest.warns is an assertion
     }
 
     #[test]
     fn test_unittest_self_assertions() {
         let detector = AssertionDetector::new(TestFramework::Unittest);
-        
+
         // Test various unittest assertions
         let assertions = vec![
             "self.assertEqual(1, 1)",
@@ -168,18 +178,21 @@ mod tests {
             "self.assertIn('a', 'abc')",
             "self.assertRaises(ValueError)",
         ];
-        
+
         for assertion in assertions {
             let func = parse_function(&format!("x = 1\n{}", assertion));
-            assert!(detector.analyze_test_function(&func).is_none(), 
-                    "Failed for assertion: {}", assertion);
+            assert!(
+                detector.analyze_test_function(&func).is_none(),
+                "Failed for assertion: {}",
+                assertion
+            );
         }
     }
 
     #[test]
     fn test_nose_assert_functions() {
         let detector = AssertionDetector::new(TestFramework::Nose);
-        
+
         let assertions = vec![
             "assert_equal(1, 1)",
             "assert_true(True)",
@@ -188,11 +201,14 @@ mod tests {
             "ok_(True)",
             "eq_(1, 1)",
         ];
-        
+
         for assertion in assertions {
             let func = parse_function(&format!("x = 1\n{}", assertion));
-            assert!(detector.analyze_test_function(&func).is_none(),
-                    "Failed for assertion: {}", assertion);
+            assert!(
+                detector.analyze_test_function(&func).is_none(),
+                "Failed for assertion: {}",
+                assertion
+            );
         }
     }
 
@@ -201,7 +217,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Doctest);
         let func = parse_function("x = 1\ny = 2");
         let issue = detector.analyze_test_function(&func);
-        
+
         // Doctest has setup code but no assertions, however since it's Doctest,
         // it should report the issue (because Doctest patterns are in comments, not code)
         assert!(issue.is_some());
@@ -212,7 +228,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("pass");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // No setup or action code
     }
 
@@ -221,7 +237,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("# This is a comment\npass");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none());
     }
 
@@ -230,7 +246,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("data = {'key': 'value'}\nresult = process(data)");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_some());
         if let Some(issue) = issue {
             assert!(matches!(issue.issue_type, TestIssueType::NoAssertions));
@@ -242,7 +258,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("do_something()\nprocess_data()");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_some());
         if let Some(issue) = issue {
             assert!(matches!(issue.issue_type, TestIssueType::NoAssertions));
@@ -254,7 +270,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Unittest);
         let func = parse_function("result = calculate()");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_some());
         if let Some(issue) = issue {
             assert!(issue.suggestion.contains("self.assert"));
@@ -266,7 +282,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Pytest);
         let func = parse_function("result = calculate()");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_some());
         if let Some(issue) = issue {
             assert!(issue.suggestion.contains("assert"));
@@ -278,7 +294,7 @@ mod tests {
         let detector = AssertionDetector::new(TestFramework::Nose);
         let func = parse_function("result = calculate()");
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_some());
         if let Some(issue) = issue {
             assert!(issue.suggestion.contains("assert_"));
@@ -288,7 +304,8 @@ mod tests {
     #[test]
     fn test_complex_nested_assertions() {
         let detector = AssertionDetector::new(TestFramework::Pytest);
-        let func = parse_function(r#"
+        let func = parse_function(
+            r#"
 data = prepare_data()
 if data:
     for item in data:
@@ -298,9 +315,10 @@ if data:
                 assert result > 0
         except Exception:
             pass
-"#);
+"#,
+        );
         let issue = detector.analyze_test_function(&func);
-        
+
         assert!(issue.is_none()); // Has assertion deep in nesting
     }
 }

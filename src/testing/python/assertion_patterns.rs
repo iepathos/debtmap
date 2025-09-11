@@ -124,7 +124,7 @@ impl AssertionDetector {
             Expr::Attribute(attr) => {
                 let attr_name = attr.attr.as_str();
                 (attr_name == "raises" || attr_name == "warns" || attr_name == "deprecated_call")
-                    && self.is_pytest_module(&*attr.value)
+                    && self.is_pytest_module(&attr.value)
             }
             _ => false,
         }
@@ -179,19 +179,23 @@ impl AssertionDetector {
                     }
                 }
                 Stmt::For(for_stmt) => {
-                    if self.has_setup_code(&for_stmt.body) || self.has_setup_code(&for_stmt.orelse) {
+                    if self.has_setup_code(&for_stmt.body) || self.has_setup_code(&for_stmt.orelse)
+                    {
                         return true;
                     }
                 }
                 Stmt::While(while_stmt) => {
-                    if self.has_setup_code(&while_stmt.body) || self.has_setup_code(&while_stmt.orelse) {
+                    if self.has_setup_code(&while_stmt.body)
+                        || self.has_setup_code(&while_stmt.orelse)
+                    {
                         return true;
                     }
                 }
                 Stmt::Try(try_stmt) => {
-                    if self.has_setup_code(&try_stmt.body) 
+                    if self.has_setup_code(&try_stmt.body)
                         || self.has_setup_code(&try_stmt.orelse)
-                        || self.has_setup_code(&try_stmt.finalbody) {
+                        || self.has_setup_code(&try_stmt.finalbody)
+                    {
                         return true;
                     }
                     for handler in &try_stmt.handlers {
@@ -225,24 +229,30 @@ impl AssertionDetector {
                     }
                 }
                 Stmt::If(if_stmt) => {
-                    if self.has_action_code(&if_stmt.body) || self.has_action_code(&if_stmt.orelse) {
+                    if self.has_action_code(&if_stmt.body) || self.has_action_code(&if_stmt.orelse)
+                    {
                         return true;
                     }
                 }
                 Stmt::For(for_stmt) => {
-                    if self.has_action_code(&for_stmt.body) || self.has_action_code(&for_stmt.orelse) {
+                    if self.has_action_code(&for_stmt.body)
+                        || self.has_action_code(&for_stmt.orelse)
+                    {
                         return true;
                     }
                 }
                 Stmt::While(while_stmt) => {
-                    if self.has_action_code(&while_stmt.body) || self.has_action_code(&while_stmt.orelse) {
+                    if self.has_action_code(&while_stmt.body)
+                        || self.has_action_code(&while_stmt.orelse)
+                    {
                         return true;
                     }
                 }
                 Stmt::Try(try_stmt) => {
-                    if self.has_action_code(&try_stmt.body) 
+                    if self.has_action_code(&try_stmt.body)
                         || self.has_action_code(&try_stmt.orelse)
-                        || self.has_action_code(&try_stmt.finalbody) {
+                        || self.has_action_code(&try_stmt.finalbody)
+                    {
                         return true;
                     }
                     for handler in &try_stmt.handlers {

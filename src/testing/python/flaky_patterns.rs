@@ -3,6 +3,12 @@ use rustpython_parser::ast::{self, Expr, Stmt};
 
 pub struct FlakyPatternDetector;
 
+impl Default for FlakyPatternDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FlakyPatternDetector {
     pub fn new() -> Self {
         Self
@@ -227,7 +233,7 @@ impl FlakyPatternDetector {
                 if method == "uuid4" || method == "uuid1" {
                     return true;
                 }
-                
+
                 if let Expr::Name(name) = &*attr.value {
                     let module = name.id.as_str();
                     // Check for random and secrets modules
@@ -614,7 +620,7 @@ impl FlakyPatternDetector {
                 {
                     return true;
                 }
-                
+
                 // Check for module.method patterns
                 if let Expr::Name(name) = &*attr.value {
                     let module = name.id.as_str();
@@ -622,15 +628,20 @@ impl FlakyPatternDetector {
                         return true;
                     }
                 }
-                
+
                 // Check for session.get() and similar patterns
                 if let Expr::Name(name) = &*attr.value {
                     let var_name = name.id.as_str();
-                    if var_name == "session" && (method == "get" || method == "post" || method == "put" || method == "delete") {
+                    if var_name == "session"
+                        && (method == "get"
+                            || method == "post"
+                            || method == "put"
+                            || method == "delete")
+                    {
                         return true;
                     }
                 }
-                
+
                 false
             }
             Expr::Name(name) => {
@@ -757,7 +768,10 @@ impl FlakyPatternDetector {
                 // Check for module.something patterns
                 if let Expr::Name(name) = &*attr.value {
                     let module = name.id.as_str();
-                    if module == "threading" || module == "multiprocessing" || module == "concurrent" {
+                    if module == "threading"
+                        || module == "multiprocessing"
+                        || module == "concurrent"
+                    {
                         return true;
                     }
                 }
@@ -789,20 +803,23 @@ impl FlakyPatternDetector {
             // Check nested statements
             match stmt {
                 Stmt::If(if_stmt) => {
-                    if self.has_proper_synchronization(&if_stmt.body) 
-                        || self.has_proper_synchronization(&if_stmt.orelse) {
+                    if self.has_proper_synchronization(&if_stmt.body)
+                        || self.has_proper_synchronization(&if_stmt.orelse)
+                    {
                         return true;
                     }
                 }
                 Stmt::For(for_stmt) => {
-                    if self.has_proper_synchronization(&for_stmt.body) 
-                        || self.has_proper_synchronization(&for_stmt.orelse) {
+                    if self.has_proper_synchronization(&for_stmt.body)
+                        || self.has_proper_synchronization(&for_stmt.orelse)
+                    {
                         return true;
                     }
                 }
                 Stmt::While(while_stmt) => {
-                    if self.has_proper_synchronization(&while_stmt.body) 
-                        || self.has_proper_synchronization(&while_stmt.orelse) {
+                    if self.has_proper_synchronization(&while_stmt.body)
+                        || self.has_proper_synchronization(&while_stmt.orelse)
+                    {
                         return true;
                     }
                 }
@@ -818,7 +835,8 @@ impl FlakyPatternDetector {
                             self.has_proper_synchronization(&handler.body)
                         })
                         || self.has_proper_synchronization(&try_stmt.orelse)
-                        || self.has_proper_synchronization(&try_stmt.finalbody) {
+                        || self.has_proper_synchronization(&try_stmt.finalbody)
+                    {
                         return true;
                     }
                 }
@@ -841,8 +859,12 @@ impl FlakyPatternDetector {
                     // Check if it's a variable that might be a lock (common pattern)
                     if let Expr::Name(name) = &item.context_expr {
                         let var_name = name.id.as_str();
-                        if var_name == "lock" || var_name == "sem" || var_name == "mutex" 
-                            || var_name == "semaphore" || var_name == "event" {
+                        if var_name == "lock"
+                            || var_name == "sem"
+                            || var_name == "mutex"
+                            || var_name == "semaphore"
+                            || var_name == "event"
+                        {
                             return true;
                         }
                     }

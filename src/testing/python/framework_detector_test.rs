@@ -298,7 +298,7 @@ class TestSecond(unittest.TestCase):
         let module = parse_module(code);
         let mut detector = FrameworkDetector::new();
         detector.analyze_module(&module);
-        
+
         // Should detect multiple unittest classes
         assert_eq!(detector.detect_framework(), TestFramework::Unittest);
     }

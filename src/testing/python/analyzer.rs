@@ -11,6 +11,12 @@ pub struct PythonTestAnalyzer {
     config: PythonTestConfig,
 }
 
+impl Default for PythonTestAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PythonTestAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -108,7 +114,8 @@ impl PythonTestAnalyzer {
         }
 
         // Check complexity
-        let complexity_analyzer = TestComplexityAnalyzer::with_config(self.config.complexity.clone());
+        let complexity_analyzer =
+            TestComplexityAnalyzer::with_config(self.config.complexity.clone());
         if let Some(issue) = complexity_analyzer.analyze_test_function(func_def) {
             issues.push(issue);
         }

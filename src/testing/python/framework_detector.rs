@@ -10,6 +10,12 @@ pub struct FrameworkDetector {
     pytest_fixture_count: usize,
 }
 
+impl Default for FrameworkDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FrameworkDetector {
     pub fn new() -> Self {
         Self {
