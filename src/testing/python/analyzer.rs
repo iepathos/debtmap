@@ -4,7 +4,7 @@ use super::{
     framework_detector::detect_test_framework, TestFramework, TestQualityIssue,
 };
 use rustpython_parser::ast::{self, Stmt};
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct PythonTestAnalyzer {
     framework: TestFramework,
@@ -41,7 +41,7 @@ impl PythonTestAnalyzer {
         }
     }
 
-    pub fn analyze_module(&mut self, module: &ast::Mod, _path: &PathBuf) -> Vec<TestQualityIssue> {
+    pub fn analyze_module(&mut self, module: &ast::Mod, _path: &Path) -> Vec<TestQualityIssue> {
         // Detect the test framework first
         self.framework = detect_test_framework(module);
 

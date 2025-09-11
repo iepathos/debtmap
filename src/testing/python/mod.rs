@@ -120,7 +120,7 @@ mod flaky_patterns_test;
 mod framework_detector_test;
 
 use crate::core::{DebtItem, DebtType, Priority};
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TestFramework {
@@ -167,7 +167,7 @@ pub enum FlakinessType {
     ThreadingIssue,
 }
 
-pub fn convert_test_issue_to_debt_item(issue: TestQualityIssue, path: &PathBuf) -> DebtItem {
+pub fn convert_test_issue_to_debt_item(issue: TestQualityIssue, path: &Path) -> DebtItem {
     let (priority, message, context, debt_type) = match issue.issue_type {
         TestIssueType::NoAssertions => (
             Priority::High,
@@ -214,7 +214,7 @@ pub fn convert_test_issue_to_debt_item(issue: TestQualityIssue, path: &PathBuf) 
         id: format!("python-test-{}-{}", path.display(), issue.line),
         debt_type,
         priority,
-        file: path.clone(),
+        file: path.to_path_buf(),
         line: issue.line,
         column: None,
         message,

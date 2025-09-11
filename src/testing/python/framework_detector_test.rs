@@ -7,7 +7,6 @@ mod tests {
     fn parse_module(code: &str) -> ast::Mod {
         rustpython_parser::parse(code, rustpython_parser::Mode::Module, "<test>")
             .expect("Failed to parse")
-            .into()
     }
 
     #[test]

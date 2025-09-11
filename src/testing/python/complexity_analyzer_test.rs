@@ -14,8 +14,7 @@ mod tests {
         );
         let module: ast::Mod =
             rustpython_parser::parse(&full_code, rustpython_parser::Mode::Module, "<test>")
-                .expect("Failed to parse")
-                .into();
+                .expect("Failed to parse");
 
         if let ast::Mod::Module(ast::ModModule { body, .. }) = module {
             if let Some(ast::Stmt::FunctionDef(func)) = body.into_iter().next() {

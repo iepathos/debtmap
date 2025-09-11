@@ -274,28 +274,26 @@ impl AssertionDetector {
         // Look for variables that might need assertions
         for stmt in body {
             if let Stmt::Assign(assign) = stmt {
-                if let Some(target) = assign.targets.first() {
-                    if let Expr::Name(name) = target {
-                        let var_name = name.id.as_str();
-                        match &self.framework {
-                            TestFramework::Unittest => {
-                                suggestions.push(format!("self.assertIsNotNone({})", var_name));
-                                suggestions.push(format!(
-                                    "self.assertEqual({}, expected_value)",
-                                    var_name
-                                ));
-                            }
-                            TestFramework::Pytest | TestFramework::Unknown => {
-                                suggestions.push(format!("assert {} is not None", var_name));
-                                suggestions.push(format!("assert {} == expected_value", var_name));
-                            }
-                            TestFramework::Nose => {
-                                suggestions.push(format!("assert_is_not_none({})", var_name));
-                                suggestions
-                                    .push(format!("assert_equal({}, expected_value)", var_name));
-                            }
-                            _ => {}
+                if let Some(Expr::Name(name)) = assign.targets.first() {
+                    let var_name = name.id.as_str();
+                    match &self.framework {
+                        TestFramework::Unittest => {
+                            suggestions.push(format!("self.assertIsNotNone({})", var_name));
+                            suggestions.push(format!(
+                                "self.assertEqual({}, expected_value)",
+                                var_name
+                            ));
                         }
+                        TestFramework::Pytest | TestFramework::Unknown => {
+                            suggestions.push(format!("assert {} is not None", var_name));
+                            suggestions.push(format!("assert {} == expected_value", var_name));
+                        }
+                        TestFramework::Nose => {
+                            suggestions.push(format!("assert_is_not_none({})", var_name));
+                            suggestions
+                                .push(format!("assert_equal({}, expected_value)", var_name));
+                        }
+                        _ => {}
                     }
                 }
             }

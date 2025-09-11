@@ -8,7 +8,6 @@ mod tests {
     fn parse_python_code(code: &str) -> ast::Mod {
         rustpython_parser::parse(code, rustpython_parser::Mode::Module, "<test>")
             .expect("Failed to parse test code")
-            .into()
     }
 
     #[test]
@@ -150,7 +149,7 @@ def test_with_inline_mocks():
 
         // Will have issues due to no assertions
         assert!(
-            issues.len() > 0,
+            !issues.is_empty(),
             "Expected at least one issue, but found: {:?}",
             issues
         );
@@ -207,7 +206,7 @@ def test_modifies_os():
 
         // Should have multiple issues: no assertions and potentially poor isolation
         // Since we're modifying os/sys but have no assertions, we should find issues
-        assert!(issues.len() > 0);
+        assert!(!issues.is_empty());
         // At minimum should have no assertions issue
         assert!(issues
             .iter()

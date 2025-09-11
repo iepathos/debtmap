@@ -531,9 +531,7 @@ impl FlakyPatternDetector {
                 if self.contains_network_calls(&async_with_stmt.body) {
                     return true;
                 }
-            } else if self.is_network_call(stmt) {
-                return true;
-            } else if self.contains_network_calls_in_stmt(stmt) {
+            } else if self.is_network_call(stmt) || self.contains_network_calls_in_stmt(stmt) {
                 return true;
             }
         }
@@ -695,9 +693,7 @@ impl FlakyPatternDetector {
                 if self.contains_threading_calls(&async_with_stmt.body) {
                     return true;
                 }
-            } else if self.is_threading_call(stmt) {
-                return true;
-            } else if self.contains_threading_calls_in_stmt(stmt) {
+            } else if self.is_threading_call(stmt) || self.contains_threading_calls_in_stmt(stmt) {
                 return true;
             }
         }

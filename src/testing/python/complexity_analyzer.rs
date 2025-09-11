@@ -19,8 +19,10 @@ impl TestComplexityAnalyzer {
     }
 
     pub fn with_threshold(threshold: u32) -> Self {
-        let mut config = ComplexityConfig::default();
-        config.threshold = threshold;
+        let config = ComplexityConfig {
+            threshold,
+            ..Default::default()
+        };
         Self { config }
     }
 
@@ -312,6 +314,7 @@ impl TestComplexityAnalyzer {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn calculate_max_nesting(&self, body: &[Stmt], current_depth: u32) -> u32 {
         let mut max_depth = current_depth;
 
