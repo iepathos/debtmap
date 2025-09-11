@@ -171,114 +171,141 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     /// Extract tokens from expressions
     fn extract_tokens_from_expr(&self, expr: &ast::Expr, tokens: &mut Vec<GenericToken>) {
         match expr {
-            ast::Expr::BoolOp(bool_op) => {
-                let op = Self::classify_bool_op(bool_op.op);
-                tokens.push(GenericToken::operator(op.to_string()));
-                for value in &bool_op.values {
-                    self.extract_tokens_from_expr(value, tokens);
-                }
-            }
-            ast::Expr::BinOp(bin_op) => {
-                let op = format!("{:?}", bin_op.op);
-                tokens.push(GenericToken::operator(op));
-                self.extract_tokens_from_expr(&bin_op.left, tokens);
-                self.extract_tokens_from_expr(&bin_op.right, tokens);
-            }
-            ast::Expr::UnaryOp(unary_op) => {
-                let op = Self::classify_unary_op(unary_op.op);
-                tokens.push(GenericToken::operator(op.to_string()));
-                self.extract_tokens_from_expr(&unary_op.operand, tokens);
-            }
-            ast::Expr::Lambda(lambda) => {
-                tokens.push(GenericToken::keyword("lambda".to_string()));
-                self.extract_tokens_from_expr(&lambda.body, tokens);
-            }
-            ast::Expr::IfExp(if_exp) => {
-                // Ternary operator
-                tokens.push(GenericToken::control_flow("if".to_string()));
-                self.extract_tokens_from_expr(&if_exp.test, tokens);
-                self.extract_tokens_from_expr(&if_exp.body, tokens);
-                self.extract_tokens_from_expr(&if_exp.orelse, tokens);
-            }
-            ast::Expr::ListComp(list_comp) => {
-                self.extract_comprehension_tokens(
-                    "list_comp",
-                    &list_comp.elt,
-                    &list_comp.generators,
-                    tokens,
-                );
-            }
-            ast::Expr::SetComp(set_comp) => {
-                self.extract_comprehension_tokens(
-                    "set_comp",
-                    &set_comp.elt,
-                    &set_comp.generators,
-                    tokens,
-                );
-            }
-            ast::Expr::DictComp(dict_comp) => {
-                tokens.push(Self::create_comprehension_token("dict_comp"));
-                self.extract_tokens_from_expr(&dict_comp.key, tokens);
-                self.extract_tokens_from_expr(&dict_comp.value, tokens);
-                for gen in &dict_comp.generators {
-                    self.extract_tokens_from_comprehension(gen, tokens);
-                }
-            }
-            ast::Expr::GeneratorExp(gen_exp) => {
-                self.extract_comprehension_tokens(
-                    "generator",
-                    &gen_exp.elt,
-                    &gen_exp.generators,
-                    tokens,
-                );
-            }
-            ast::Expr::Await(await_expr) => {
-                tokens.push(GenericToken::keyword("await".to_string()));
-                self.extract_tokens_from_expr(&await_expr.value, tokens);
-            }
-            ast::Expr::Yield(yield_expr) => {
-                tokens.push(GenericToken::keyword("yield".to_string()));
-                if let Some(value) = &yield_expr.value {
-                    self.extract_tokens_from_expr(value, tokens);
-                }
-            }
-            ast::Expr::YieldFrom(yield_from) => {
-                tokens.push(GenericToken::keyword("yield".to_string()));
-                tokens.push(GenericToken::keyword("from".to_string()));
-                self.extract_tokens_from_expr(&yield_from.value, tokens);
-            }
-            ast::Expr::Compare(compare) => {
-                self.extract_tokens_from_expr(&compare.left, tokens);
-                for op in &compare.ops {
-                    let op_str = Self::classify_compare_op(op);
-                    tokens.push(GenericToken::operator(op_str.to_string()));
-                }
-                for comp in &compare.comparators {
-                    self.extract_tokens_from_expr(comp, tokens);
-                }
-            }
-            ast::Expr::Call(call) => {
-                tokens.push(GenericToken::function_call("call".to_string()));
-                self.extract_tokens_from_expr(&call.func, tokens);
-                for arg in &call.args {
-                    self.extract_tokens_from_expr(arg, tokens);
-                }
-            }
-            ast::Expr::Name(name) => {
-                tokens.push(GenericToken::identifier(normalize_identifier(&name.id)));
-            }
-            ast::Expr::Constant(constant) => {
-                let const_type = Self::classify_constant(&constant.value);
-                tokens.push(GenericToken::literal(const_type.to_string()));
-            }
-            ast::Expr::NamedExpr(named) => {
-                // Walrus operator :=
-                tokens.push(GenericToken::operator(":=".to_string()));
-                self.extract_tokens_from_expr(&named.target, tokens);
-                self.extract_tokens_from_expr(&named.value, tokens);
-            }
+            ast::Expr::BoolOp(bool_op) => self.handle_bool_op(bool_op, tokens),
+            ast::Expr::BinOp(bin_op) => self.handle_bin_op(bin_op, tokens),
+            ast::Expr::UnaryOp(unary_op) => self.handle_unary_op(unary_op, tokens),
+            ast::Expr::Lambda(lambda) => self.handle_lambda(lambda, tokens),
+            ast::Expr::IfExp(if_exp) => self.handle_if_exp(if_exp, tokens),
+            ast::Expr::ListComp(list_comp) => self.handle_list_comp(list_comp, tokens),
+            ast::Expr::SetComp(set_comp) => self.handle_set_comp(set_comp, tokens),
+            ast::Expr::DictComp(dict_comp) => self.handle_dict_comp(dict_comp, tokens),
+            ast::Expr::GeneratorExp(gen_exp) => self.handle_generator_exp(gen_exp, tokens),
+            ast::Expr::Await(await_expr) => self.handle_await(await_expr, tokens),
+            ast::Expr::Yield(yield_expr) => self.handle_yield(yield_expr, tokens),
+            ast::Expr::YieldFrom(yield_from) => self.handle_yield_from(yield_from, tokens),
+            ast::Expr::Compare(compare) => self.handle_compare(compare, tokens),
+            ast::Expr::Call(call) => self.handle_call(call, tokens),
+            ast::Expr::Name(name) => self.handle_name(name, tokens),
+            ast::Expr::Constant(constant) => self.handle_constant(constant, tokens),
+            ast::Expr::NamedExpr(named) => self.handle_named_expr(named, tokens),
             _ => {}
         }
+    }
+
+    // Handler functions for each expression type
+    fn handle_bool_op(&self, bool_op: &ast::ExprBoolOp, tokens: &mut Vec<GenericToken>) {
+        let op = Self::classify_bool_op(bool_op.op);
+        tokens.push(GenericToken::operator(op.to_string()));
+        for value in &bool_op.values {
+            self.extract_tokens_from_expr(value, tokens);
+        }
+    }
+
+    fn handle_bin_op(&self, bin_op: &ast::ExprBinOp, tokens: &mut Vec<GenericToken>) {
+        let op = format!("{:?}", bin_op.op);
+        tokens.push(GenericToken::operator(op));
+        self.extract_tokens_from_expr(&bin_op.left, tokens);
+        self.extract_tokens_from_expr(&bin_op.right, tokens);
+    }
+
+    fn handle_unary_op(&self, unary_op: &ast::ExprUnaryOp, tokens: &mut Vec<GenericToken>) {
+        let op = Self::classify_unary_op(unary_op.op);
+        tokens.push(GenericToken::operator(op.to_string()));
+        self.extract_tokens_from_expr(&unary_op.operand, tokens);
+    }
+
+    fn handle_lambda(&self, lambda: &ast::ExprLambda, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::keyword("lambda".to_string()));
+        self.extract_tokens_from_expr(&lambda.body, tokens);
+    }
+
+    fn handle_if_exp(&self, if_exp: &ast::ExprIfExp, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::control_flow("if".to_string()));
+        self.extract_tokens_from_expr(&if_exp.test, tokens);
+        self.extract_tokens_from_expr(&if_exp.body, tokens);
+        self.extract_tokens_from_expr(&if_exp.orelse, tokens);
+    }
+
+    fn handle_list_comp(&self, list_comp: &ast::ExprListComp, tokens: &mut Vec<GenericToken>) {
+        self.extract_comprehension_tokens(
+            "list_comp",
+            &list_comp.elt,
+            &list_comp.generators,
+            tokens,
+        );
+    }
+
+    fn handle_set_comp(&self, set_comp: &ast::ExprSetComp, tokens: &mut Vec<GenericToken>) {
+        self.extract_comprehension_tokens("set_comp", &set_comp.elt, &set_comp.generators, tokens);
+    }
+
+    fn handle_dict_comp(&self, dict_comp: &ast::ExprDictComp, tokens: &mut Vec<GenericToken>) {
+        tokens.push(Self::create_comprehension_token("dict_comp"));
+        self.extract_tokens_from_expr(&dict_comp.key, tokens);
+        self.extract_tokens_from_expr(&dict_comp.value, tokens);
+        for gen in &dict_comp.generators {
+            self.extract_tokens_from_comprehension(gen, tokens);
+        }
+    }
+
+    fn handle_generator_exp(
+        &self,
+        gen_exp: &ast::ExprGeneratorExp,
+        tokens: &mut Vec<GenericToken>,
+    ) {
+        self.extract_comprehension_tokens("generator", &gen_exp.elt, &gen_exp.generators, tokens);
+    }
+
+    fn handle_await(&self, await_expr: &ast::ExprAwait, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::keyword("await".to_string()));
+        self.extract_tokens_from_expr(&await_expr.value, tokens);
+    }
+
+    fn handle_yield(&self, yield_expr: &ast::ExprYield, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::keyword("yield".to_string()));
+        if let Some(value) = &yield_expr.value {
+            self.extract_tokens_from_expr(value, tokens);
+        }
+    }
+
+    fn handle_yield_from(&self, yield_from: &ast::ExprYieldFrom, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::keyword("yield".to_string()));
+        tokens.push(GenericToken::keyword("from".to_string()));
+        self.extract_tokens_from_expr(&yield_from.value, tokens);
+    }
+
+    fn handle_compare(&self, compare: &ast::ExprCompare, tokens: &mut Vec<GenericToken>) {
+        self.extract_tokens_from_expr(&compare.left, tokens);
+        for op in &compare.ops {
+            let op_str = Self::classify_compare_op(op);
+            tokens.push(GenericToken::operator(op_str.to_string()));
+        }
+        for comp in &compare.comparators {
+            self.extract_tokens_from_expr(comp, tokens);
+        }
+    }
+
+    fn handle_call(&self, call: &ast::ExprCall, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::function_call("call".to_string()));
+        self.extract_tokens_from_expr(&call.func, tokens);
+        for arg in &call.args {
+            self.extract_tokens_from_expr(arg, tokens);
+        }
+    }
+
+    fn handle_name(&self, name: &ast::ExprName, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::identifier(normalize_identifier(&name.id)));
+    }
+
+    fn handle_constant(&self, constant: &ast::ExprConstant, tokens: &mut Vec<GenericToken>) {
+        let const_type = Self::classify_constant(&constant.value);
+        tokens.push(GenericToken::literal(const_type.to_string()));
+    }
+
+    fn handle_named_expr(&self, named: &ast::ExprNamedExpr, tokens: &mut Vec<GenericToken>) {
+        tokens.push(GenericToken::operator(":=".to_string()));
+        self.extract_tokens_from_expr(&named.target, tokens);
+        self.extract_tokens_from_expr(&named.value, tokens);
     }
 
     // Pure function to classify boolean operators
@@ -886,5 +913,290 @@ fn normalize_identifier(name: &str) -> String {
         "VAR".to_string()
     } else {
         name.to_uppercase()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustpython_parser::ast;
+
+    // Helper function to create a test analyzer
+    fn create_test_analyzer() -> PythonEntropyAnalyzer<'static> {
+        PythonEntropyAnalyzer::new("")
+    }
+
+    // Helper function to parse Python expression
+    fn parse_expr(source: &str) -> ast::Expr {
+        let full_source = format!("x = {}", source);
+        let module =
+            rustpython_parser::parse(&full_source, rustpython_parser::Mode::Module, "<test>")
+                .expect("Failed to parse");
+
+        let ast::Mod::Module(module) = module else {
+            panic!("Expected Module");
+        };
+
+        let ast::Stmt::Assign(assign) = &module.body[0] else {
+            panic!("Expected assignment");
+        };
+
+        (*assign.value).clone()
+    }
+
+    #[test]
+    fn test_handle_bool_op() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("True and False or True");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.len() > 0,
+            "Should extract tokens from boolean operation"
+        );
+    }
+
+    #[test]
+    fn test_handle_bin_op() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("5 + 3 * 2");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.len() > 0,
+            "Should extract tokens from binary operation"
+        );
+    }
+
+    #[test]
+    fn test_handle_unary_op() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("not True");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.iter().any(|t| t.value().contains("not")),
+            "Should contain 'not' operator"
+        );
+    }
+
+    #[test]
+    fn test_handle_lambda() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("lambda x: x * 2");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.iter().any(|t| t.value().contains("lambda")),
+            "Should contain 'lambda' keyword"
+        );
+    }
+
+    #[test]
+    fn test_handle_if_exp() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("5 if True else 3");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.iter().any(|t| t.value().contains("if")),
+            "Should contain 'if' control flow"
+        );
+    }
+
+    #[test]
+    fn test_handle_list_comp() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("[x * 2 for x in range(10)]");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.iter().any(|t| t.value().contains("list_comp")),
+            "Should contain list comprehension token"
+        );
+    }
+
+    #[test]
+    fn test_handle_call() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("print('hello')");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.iter().any(|t| t.value().contains("call")),
+            "Should contain function call token"
+        );
+    }
+
+    #[test]
+    fn test_handle_constant() {
+        let analyzer = create_test_analyzer();
+
+        // Test string constant
+        let expr = parse_expr("'hello'");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        assert!(
+            tokens.iter().any(|t| t.value().contains("string")),
+            "Should identify string constant"
+        );
+
+        // Test integer constant
+        let expr = parse_expr("42");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+        assert!(
+            tokens.iter().any(|t| t.value().contains("int")),
+            "Should identify integer constant"
+        );
+    }
+
+    #[test]
+    fn test_handle_compare() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("x > 5 and y < 10");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(tokens.len() > 0, "Should extract tokens from comparison");
+    }
+
+    #[test]
+    fn test_classify_bool_op() {
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_bool_op(ast::BoolOp::And),
+            "and"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_bool_op(ast::BoolOp::Or),
+            "or"
+        );
+    }
+
+    #[test]
+    fn test_classify_unary_op() {
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_unary_op(ast::UnaryOp::Not),
+            "not"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_unary_op(ast::UnaryOp::Invert),
+            "~"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_unary_op(ast::UnaryOp::UAdd),
+            "+"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_unary_op(ast::UnaryOp::USub),
+            "-"
+        );
+    }
+
+    #[test]
+    fn test_classify_compare_op() {
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Eq),
+            "=="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::NotEq),
+            "!="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Lt),
+            "<"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::LtE),
+            "<="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Gt),
+            ">"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::GtE),
+            ">="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Is),
+            "is"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::IsNot),
+            "is not"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::In),
+            "in"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::NotIn),
+            "not in"
+        );
+    }
+
+    #[test]
+    fn test_handle_yield() {
+        let analyzer = create_test_analyzer();
+
+        // Note: yield expressions need special handling, using simpler test
+        let source = "def f(): yield 5";
+        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+            .expect("Failed to parse");
+
+        let ast::Mod::Module(module) = module else {
+            panic!("Expected Module");
+        };
+
+        let ast::Stmt::FunctionDef(func) = &module.body[0] else {
+            panic!("Expected function");
+        };
+
+        let ast::Stmt::Expr(expr_stmt) = &func.body[0] else {
+            panic!("Expected expression statement");
+        };
+
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
+
+        assert!(
+            tokens.iter().any(|t| t.value().contains("yield")),
+            "Should contain 'yield' keyword"
+        );
+    }
+
+    #[test]
+    fn test_complex_expression() {
+        let analyzer = create_test_analyzer();
+        let expr = parse_expr("[x * 2 if x > 0 else x / 2 for x in range(10) if x % 2 == 0]");
+        let mut tokens = Vec::new();
+
+        analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+
+        assert!(
+            tokens.len() > 5,
+            "Complex expression should generate multiple tokens"
+        );
+        assert!(
+            tokens.iter().any(|t| t.value().contains("list_comp")),
+            "Should contain list comprehension"
+        );
     }
 }
