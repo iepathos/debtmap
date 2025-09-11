@@ -24,8 +24,8 @@ engine = "Llvm"
 # Parallel test execution
 parallel = true
 
-# Number of parallel jobs (adjust based on CPU cores)
-jobs = 4
+# Number of parallel jobs - optimized for 12-core CPU
+jobs = 12
 
 # Timeout for tests
 timeout = "5m"
