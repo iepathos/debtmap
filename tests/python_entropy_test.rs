@@ -1309,3 +1309,164 @@ def recursive_expressions():
         "Should extract nested await"
     );
 }
+
+#[test]
+fn test_extract_collection_literals() {
+    let source = r#"
+def collections():
+    # List literal
+    my_list = [1, 2, 3, 4]
+    
+    # Tuple literal  
+    my_tuple = (1, 2, 3)
+    
+    # Dict literal
+    my_dict = {"key1": "value1", "key2": "value2"}
+    
+    # Set literal
+    my_set = {1, 2, 3, 4}
+    
+    # Nested collections
+    nested = [[1, 2], [3, 4]]
+    complex_dict = {"a": [1, 2], "b": (3, 4)}
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that collection type tokens are created
+    let list_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "list").collect();
+    let tuple_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "tuple").collect();
+    let dict_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "dict").collect();
+    let set_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "set").collect();
+
+    assert!(!list_tokens.is_empty(), "Should detect list literals");
+    assert!(!tuple_tokens.is_empty(), "Should detect tuple literals");
+    assert!(!dict_tokens.is_empty(), "Should detect dict literals");
+    assert!(!set_tokens.is_empty(), "Should detect set literals");
+}
+
+#[test]
+fn test_extract_attribute_subscript_slice() {
+    let source = r#"
+def access_patterns():
+    # Attribute access
+    value = obj.attribute
+    nested = obj.attr1.attr2.attr3
+    
+    # Subscript access
+    item = my_list[0]
+    element = my_dict["key"]
+    
+    # Slice access
+    subset = my_list[1:5]
+    step_slice = my_list[::2]
+    full_slice = my_list[start:end:step]
+    
+    # Complex combinations
+    complex = obj.attr[0].method()[1:3]
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that access pattern tokens are created
+    let attr_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == ".").collect();
+    let subscript_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "[]").collect();
+    let slice_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == ":").collect();
+
+    assert!(!attr_tokens.is_empty(), "Should detect attribute access");
+    assert!(
+        !subscript_tokens.is_empty(),
+        "Should detect subscript access"
+    );
+    assert!(!slice_tokens.is_empty(), "Should detect slice operations");
+}
+
+#[test]
+fn test_extract_starred_expressions() {
+    let source = r#"
+def starred_expressions():
+    # Starred in assignment
+    first, *rest = [1, 2, 3, 4, 5]
+    
+    # Starred in function call
+    result = func(*args, **kwargs)
+    
+    # Starred in list literal
+    combined = [*list1, *list2]
+    
+    # Starred in tuple
+    data = (*tuple1, *tuple2)
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that starred expression tokens are created
+    let starred_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "*").collect();
+
+    assert!(
+        !starred_tokens.is_empty(),
+        "Should detect starred expressions"
+    );
+}
+
+#[test]
+fn test_extract_joined_str_formatted_value() {
+    let source = r#"
+def formatted_strings():
+    # F-strings (JoinedStr)
+    name = "Alice"
+    greeting = f"Hello, {name}!"
+    
+    # Complex f-string with expressions
+    result = f"The sum is {2 + 2}"
+    
+    # Nested formatting
+    formatted = f"Value: {value:.2f}"
+    
+    # Multiple expressions
+    message = f"{greeting} Your score is {score}"
+"#;
+
+    let analyzer = PythonEntropyAnalyzer::new(source);
+    let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+        .expect("Failed to parse Python code");
+
+    let ast::Mod::Module(module) = module else {
+        panic!("Expected Module");
+    };
+
+    let tokens = analyzer.extract_tokens(&module.body);
+
+    // Check that f-string tokens are created
+    let fstring_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "f-string").collect();
+    let format_tokens: Vec<_> = tokens.iter().filter(|t| t.value() == "format").collect();
+
+    assert!(
+        !fstring_tokens.is_empty() || !format_tokens.is_empty(),
+        "Should detect formatted strings"
+    );
+}
