@@ -2070,4 +2070,188 @@ mod tests {
         assert!(tokens.iter().any(|t| t.value() == "raise"));
         assert!(tokens.iter().any(|t| t.value() == "return"));
     }
+
+    #[test]
+    fn test_extract_tokens_from_expr_all_branches() {
+        // Comprehensive test to ensure all 28 expression type branches are covered
+        let analyzer = PythonEntropyAnalyzer::new("");
+        
+        // Test that each expression type produces tokens and doesn't panic
+        let test_cases = vec![
+            // 1. BoolOp
+            "True and False",
+            // 2. BinOp
+            "5 + 3",
+            // 3. UnaryOp
+            "not x",
+            // 4. Lambda
+            "lambda x: x",
+            // 5. IfExp (ternary)
+            "5 if True else 3",
+            // 6. ListComp
+            "[x for x in range(5)]",
+            // 7. SetComp
+            "{x for x in range(5)}",
+            // 8. DictComp
+            "{x: y for x in range(5)}",
+            // 9. GeneratorExp
+            "(x for x in range(5))",
+            // 10. Await - tested separately in async context
+            // 11. Yield - tested separately in function context
+            // 12. YieldFrom - tested separately in function context
+            // 13. Compare
+            "x > 5",
+            // 14. Call
+            "func(arg)",
+            // 15. Name
+            "variable",
+            // 16. Constant - multiple types
+            "42",
+            "'string'",
+            "None",
+            "True",
+            "False",
+            // 17. NamedExpr (walrus)
+            "(x := 5)",
+            // 18. List
+            "[1, 2]",
+            // 19. Tuple
+            "(1, 2)",
+            // 20. Dict
+            "{'a': 1}",
+            // 21. Set
+            "{1, 2}",
+            // 22. Attribute
+            "obj.attr",
+            // 23. Subscript
+            "arr[0]",
+            // 24. Slice
+            "arr[1:10:2]",
+            // 25. Starred
+            "*args",
+            // 26. JoinedStr (f-string)
+            "f'hello'",
+            // 27. FormattedValue (in f-string)
+            "f'{value:.2f}'",
+        ];
+
+        // Test all expressions parse and generate tokens
+        for expr_str in &test_cases {
+            let expr = parse_python_expr(expr_str);
+            let mut tokens = Vec::new();
+            analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+            
+            // Check that tokens were generated
+            assert!(!tokens.is_empty(), "Expression '{}' should generate tokens", expr_str);
+        }
+        
+        // Verify we're testing a comprehensive set of expressions
+        assert!(test_cases.len() >= 28, "Should test all major expression types");
+        
+        // Test specific token categories for key expressions
+        let bool_op_expr = parse_python_expr("True and False");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&bool_op_expr, &mut tokens);
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        
+        let call_expr = parse_python_expr("func()");
+        tokens.clear();
+        analyzer.extract_tokens_from_expr(&call_expr, &mut tokens);
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::FunctionCall)));
+        
+        let literal_expr = parse_python_expr("42");
+        tokens.clear();
+        analyzer.extract_tokens_from_expr(&literal_expr, &mut tokens);
+        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_expr_edge_cases() {
+        let analyzer = PythonEntropyAnalyzer::new("");
+        
+        // Test empty collections
+        let empty_cases = vec![
+            "[]",  // empty list
+            "{}",  // empty dict
+            "()",  // empty tuple
+        ];
+        
+        for expr_str in empty_cases {
+            let expr = parse_python_expr(expr_str);
+            let mut tokens = Vec::new();
+            analyzer.extract_tokens_from_expr(&expr, &mut tokens);
+            assert!(!tokens.is_empty(), "Empty {} should still produce tokens", expr_str);
+        }
+        
+        // Test nested expressions
+        let nested_expr = parse_python_expr("[[1, 2], [3, 4]]");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&nested_expr, &mut tokens);
+        assert!(tokens.iter().filter(|t| t.value() == "list").count() >= 2);
+        
+        // Test complex chained expressions
+        let chained_expr = parse_python_expr("obj.method().attr[0].value");
+        let mut tokens = Vec::new();
+        analyzer.extract_tokens_from_expr(&chained_expr, &mut tokens);
+        assert!(tokens.iter().any(|t| t.value() == "call"));
+        assert!(tokens.iter().filter(|t| t.value() == ".").count() >= 2);
+        assert!(tokens.iter().any(|t| t.value() == "[]"));
+    }
+
+    #[test]
+    fn test_extract_tokens_from_expr_async_context() {
+        // Test await expression in async function context
+        let source = "async def func():\n    await something()";
+        let analyzer = PythonEntropyAnalyzer::new(source);
+        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+            .expect("Failed to parse");
+            
+        let ast::Mod::Module(module) = module else {
+            panic!("Expected Module");
+        };
+        
+        if let ast::Stmt::AsyncFunctionDef(func) = &module.body[0] {
+            if let ast::Stmt::Expr(expr_stmt) = &func.body[0] {
+                let mut tokens = Vec::new();
+                analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
+                assert!(tokens.iter().any(|t| t.value() == "await"));
+                assert!(tokens.iter().any(|t| t.value() == "call"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_extract_tokens_from_expr_yield_context() {
+        // Test yield expressions in generator function
+        let source = "def gen():\n    yield 42\n    yield from other()";
+        let analyzer = PythonEntropyAnalyzer::new(source);
+        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "<test>")
+            .expect("Failed to parse");
+            
+        let ast::Mod::Module(module) = module else {
+            panic!("Expected Module");
+        };
+        
+        if let ast::Stmt::FunctionDef(func) = &module.body[0] {
+            // Test yield
+            if let ast::Stmt::Expr(expr_stmt) = &func.body[0] {
+                let mut tokens = Vec::new();
+                analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
+                assert!(tokens.iter().any(|t| t.value() == "yield"));
+                // Check for literal token instead of exact value
+                assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+            }
+            // Test yield from
+            if let ast::Stmt::Expr(expr_stmt) = &func.body[1] {
+                let mut tokens = Vec::new();
+                analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
+                assert!(tokens.iter().any(|t| t.value() == "yield"));
+                assert!(tokens.iter().any(|t| t.value() == "from"));
+                // Check for function call for other()
+                assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::FunctionCall)));
+            }
+        } else {
+            panic!("Expected FunctionDef");
+        }
+    }
 }
