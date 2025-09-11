@@ -292,7 +292,11 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     }
 
     // Extract tokens from list comprehensions
-    fn extract_list_comp_tokens(&self, list_comp: &ast::ExprListComp, tokens: &mut Vec<GenericToken>) {
+    fn extract_list_comp_tokens(
+        &self,
+        list_comp: &ast::ExprListComp,
+        tokens: &mut Vec<GenericToken>,
+    ) {
         self.extract_comprehension_tokens(
             "list_comp",
             &list_comp.elt,
@@ -303,16 +307,15 @@ impl<'a> PythonEntropyAnalyzer<'a> {
 
     // Extract tokens from set comprehensions
     fn extract_set_comp_tokens(&self, set_comp: &ast::ExprSetComp, tokens: &mut Vec<GenericToken>) {
-        self.extract_comprehension_tokens(
-            "set_comp",
-            &set_comp.elt,
-            &set_comp.generators,
-            tokens,
-        );
+        self.extract_comprehension_tokens("set_comp", &set_comp.elt, &set_comp.generators, tokens);
     }
 
     // Extract tokens from dict comprehensions
-    fn extract_dict_comp_tokens(&self, dict_comp: &ast::ExprDictComp, tokens: &mut Vec<GenericToken>) {
+    fn extract_dict_comp_tokens(
+        &self,
+        dict_comp: &ast::ExprDictComp,
+        tokens: &mut Vec<GenericToken>,
+    ) {
         tokens.push(Self::create_comprehension_token("dict_comp"));
         self.extract_tokens_from_expr(&dict_comp.key, tokens);
         self.extract_tokens_from_expr(&dict_comp.value, tokens);
@@ -322,13 +325,12 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     }
 
     // Extract tokens from generator expressions
-    fn extract_generator_exp_tokens(&self, gen_exp: &ast::ExprGeneratorExp, tokens: &mut Vec<GenericToken>) {
-        self.extract_comprehension_tokens(
-            "generator",
-            &gen_exp.elt,
-            &gen_exp.generators,
-            tokens,
-        );
+    fn extract_generator_exp_tokens(
+        &self,
+        gen_exp: &ast::ExprGeneratorExp,
+        tokens: &mut Vec<GenericToken>,
+    ) {
+        self.extract_comprehension_tokens("generator", &gen_exp.elt, &gen_exp.generators, tokens);
     }
 
     // Extract tokens from await expressions
@@ -346,7 +348,11 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     }
 
     // Extract tokens from yield from expressions
-    fn extract_yield_from_tokens(&self, yield_from: &ast::ExprYieldFrom, tokens: &mut Vec<GenericToken>) {
+    fn extract_yield_from_tokens(
+        &self,
+        yield_from: &ast::ExprYieldFrom,
+        tokens: &mut Vec<GenericToken>,
+    ) {
         tokens.push(GenericToken::keyword("yield".to_string()));
         tokens.push(GenericToken::keyword("from".to_string()));
         self.extract_tokens_from_expr(&yield_from.value, tokens);
@@ -385,7 +391,11 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     }
 
     // Extract tokens from named expressions (walrus operator)
-    fn extract_named_expr_tokens(&self, named: &ast::ExprNamedExpr, tokens: &mut Vec<GenericToken>) {
+    fn extract_named_expr_tokens(
+        &self,
+        named: &ast::ExprNamedExpr,
+        tokens: &mut Vec<GenericToken>,
+    ) {
         tokens.push(GenericToken::operator(":=".to_string()));
         self.extract_tokens_from_expr(&named.target, tokens);
         self.extract_tokens_from_expr(&named.value, tokens);
@@ -461,7 +471,11 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     }
 
     // Extract tokens from joined strings (f-strings)
-    fn extract_joined_str_tokens(&self, joined: &ast::ExprJoinedStr, tokens: &mut Vec<GenericToken>) {
+    fn extract_joined_str_tokens(
+        &self,
+        joined: &ast::ExprJoinedStr,
+        tokens: &mut Vec<GenericToken>,
+    ) {
         tokens.push(GenericToken::literal("f-string".to_string()));
         for value in &joined.values {
             self.extract_tokens_from_expr(value, tokens);
@@ -469,7 +483,11 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     }
 
     // Extract tokens from formatted values in f-strings
-    fn extract_formatted_value_tokens(&self, fmt: &ast::ExprFormattedValue, tokens: &mut Vec<GenericToken>) {
+    fn extract_formatted_value_tokens(
+        &self,
+        fmt: &ast::ExprFormattedValue,
+        tokens: &mut Vec<GenericToken>,
+    ) {
         tokens.push(GenericToken::custom("format".to_string()));
         self.extract_tokens_from_expr(&fmt.value, tokens);
     }
@@ -1103,10 +1121,14 @@ mod tests {
         let expr = parse_python_expr("True and False or True");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have boolean operators and literals
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
     }
 
     #[test]
@@ -1115,10 +1137,14 @@ mod tests {
         let expr = parse_python_expr("5 + 3 * 2");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have binary operators and number literals
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
     }
 
     #[test]
@@ -1127,9 +1153,11 @@ mod tests {
         let expr = parse_python_expr("-x");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have unary operator
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
     }
 
     #[test]
@@ -1138,9 +1166,11 @@ mod tests {
         let expr = parse_python_expr("lambda x: x * 2");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have lambda keyword
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Keyword)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Keyword)));
     }
 
     #[test]
@@ -1149,9 +1179,11 @@ mod tests {
         let expr = parse_python_expr("5 if True else 3");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have control flow token
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::ControlFlow)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::ControlFlow)));
     }
 
     #[test]
@@ -1160,10 +1192,12 @@ mod tests {
         let expr = parse_python_expr("[x for x in range(10)]");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have list comprehension tokens
         assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1172,9 +1206,11 @@ mod tests {
         let expr = parse_python_expr("{x: x*2 for x in range(5)}");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have dict comprehension tokens
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1183,9 +1219,11 @@ mod tests {
         let expr = parse_python_expr("print('hello', 'world')");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have function call token
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::FunctionCall)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::FunctionCall)));
     }
 
     #[test]
@@ -1194,9 +1232,11 @@ mod tests {
         let expr = parse_python_expr("x > 5 and y <= 10");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have comparison operators
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
     }
 
     #[test]
@@ -1205,9 +1245,11 @@ mod tests {
         let expr = parse_python_expr("variable_name");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have identifier token
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Identifier)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Identifier)));
     }
 
     #[test]
@@ -1216,9 +1258,11 @@ mod tests {
         let expr = parse_python_expr("42");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have literal token
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
     }
 
     #[test]
@@ -1227,9 +1271,11 @@ mod tests {
         let expr = parse_python_expr("[1, 2, 3]");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have list custom token
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1238,9 +1284,11 @@ mod tests {
         let expr = parse_python_expr("{'a': 1, 'b': 2}");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have dict custom token
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1249,10 +1297,14 @@ mod tests {
         let expr = parse_python_expr("obj.attribute");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have dot operator and identifier
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Identifier)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Identifier)));
     }
 
     #[test]
@@ -1261,9 +1313,11 @@ mod tests {
         let expr = parse_python_expr("arr[0]");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have subscript operator
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
     }
 
     #[test]
@@ -1465,10 +1519,12 @@ mod tests {
         let expr = parse_python_expr("{x for x in range(10)}");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have set comprehension tokens
         assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1477,10 +1533,12 @@ mod tests {
         let expr = parse_python_expr("(x for x in range(10))");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have generator tokens
         assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1494,7 +1552,9 @@ mod tests {
                 let mut tokens = Vec::new();
                 analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
                 // Should have yield keyword
-                assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Keyword)));
+                assert!(tokens
+                    .iter()
+                    .any(|t| matches!(t.to_category(), TokenCategory::Keyword)));
             }
         }
     }
@@ -1510,7 +1570,13 @@ mod tests {
                 let mut tokens = Vec::new();
                 analyzer.extract_tokens_from_expr(&expr_stmt.value, &mut tokens);
                 // Should have yield and from keywords
-                assert!(tokens.iter().filter(|t| matches!(t.to_category(), TokenCategory::Keyword)).count() >= 2);
+                assert!(
+                    tokens
+                        .iter()
+                        .filter(|t| matches!(t.to_category(), TokenCategory::Keyword))
+                        .count()
+                        >= 2
+                );
             }
         }
     }
@@ -1522,7 +1588,7 @@ mod tests {
         let expr = parse_python_expr("(x := 5)");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have walrus operator
         assert!(tokens.iter().any(|t| {
             if let TokenCategory::Operator = t.to_category() {
@@ -1539,10 +1605,14 @@ mod tests {
         let expr = parse_python_expr("(1, 2, 3)");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have tuple custom token and literals
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
     }
 
     #[test]
@@ -1551,9 +1621,11 @@ mod tests {
         let expr = parse_python_expr("{1, 2, 3}");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have set custom token
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1562,9 +1634,11 @@ mod tests {
         let expr = parse_python_expr("arr[1:10:2]");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have slice operators
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
     }
 
     #[test]
@@ -1575,7 +1649,7 @@ mod tests {
         let expr = parse_python_expr(code);
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have star operator
         assert!(tokens.iter().any(|t| {
             if let TokenCategory::Operator = t.to_category() {
@@ -1593,10 +1667,12 @@ mod tests {
         let expr = parse_python_expr("f'Hello {name}'");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have f-string tokens
         assert!(!tokens.is_empty());
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
     }
 
     #[test]
@@ -1606,7 +1682,7 @@ mod tests {
         let expr = parse_python_expr("f'{value:.2f}'");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have formatted value tokens
         assert!(!tokens.is_empty());
     }
@@ -1640,49 +1716,91 @@ mod tests {
         let expr = parse_python_expr("[x * 2 for x in range(10) if x > 5]");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should have comprehension, operators, and control flow
         assert!(tokens.len() > 5);
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator)));
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::ControlFlow)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::ControlFlow)));
     }
 
     #[test]
     fn test_extract_tokens_edge_cases() {
         let analyzer = PythonEntropyAnalyzer::new("");
-        
+
         // Empty list
         let expr = parse_python_expr("[]");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
-        
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+
         // Empty dict
         let expr = parse_python_expr("{}");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
-        
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_))));
+
         // None constant
         let expr = parse_python_expr("None");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        assert!(tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Literal)));
+        assert!(tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Literal)));
     }
 
     #[test]
     fn test_classify_compare_op() {
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Eq), "==");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::NotEq), "!=");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Lt), "<");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::LtE), "<=");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Gt), ">");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::GtE), ">=");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Is), "is");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::IsNot), "is not");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::In), "in");
-        assert_eq!(PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::NotIn), "not in");
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Eq),
+            "=="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::NotEq),
+            "!="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Lt),
+            "<"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::LtE),
+            "<="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Gt),
+            ">"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::GtE),
+            ">="
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::Is),
+            "is"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::IsNot),
+            "is not"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::In),
+            "in"
+        );
+        assert_eq!(
+            PythonEntropyAnalyzer::classify_compare_op(&ast::CmpOp::NotIn),
+            "not in"
+        );
     }
 
     #[test]
@@ -1699,12 +1817,16 @@ mod tests {
         let expr = parse_python_expr("[x * 2 for x in range(10) if x > 5]");
         let mut tokens = Vec::new();
         analyzer.extract_tokens_from_expr(&expr, &mut tokens);
-        
+
         // Should extract tokens from complex nested expression
         assert!(!tokens.is_empty());
         // Should have multiple token types
-        let has_custom = tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Custom(_)));
-        let has_operator = tokens.iter().any(|t| matches!(t.to_category(), TokenCategory::Operator));
+        let has_custom = tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Custom(_)));
+        let has_operator = tokens
+            .iter()
+            .any(|t| matches!(t.to_category(), TokenCategory::Operator));
         assert!(has_custom && has_operator);
     }
 
