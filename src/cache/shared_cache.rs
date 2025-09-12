@@ -805,34 +805,16 @@ impl SharedCache {
     /// Clear all cache entries for this project
     pub fn clear_project(&self) -> Result<()> {
         // Clear all files in all components
-        for component in &[
+        let components = [
             "call_graphs",
             "analysis",
             "metadata",
             "temp",
             "file_metrics",
-        ] {
-            let component_path = self.location.get_component_path(component);
-            if component_path.exists() {
-                // Remove all files in component directory and sharded subdirectories
-                for entry in fs::read_dir(&component_path)? {
-                    let entry = entry?;
-                    let path = entry.path();
-                    if path.is_file() {
-                        fs::remove_file(&path)?;
-                    } else if path.is_dir() {
-                        // Remove files in sharded subdirectories
-                        for subentry in fs::read_dir(&path)? {
-                            let subentry = subentry?;
-                            if subentry.path().is_file() {
-                                fs::remove_file(subentry.path())?;
-                            }
-                        }
-                        // Remove the now-empty shard directory
-                        fs::remove_dir(&path).ok();
-                    }
-                }
-            }
+        ];
+
+        for component in &components {
+            self.clear_component_files(component)?;
         }
 
         // Clear index
@@ -847,6 +829,38 @@ impl SharedCache {
         }
 
         self.save_index()?;
+        Ok(())
+    }
+
+    /// Clear all files in a component directory
+    fn clear_component_files(&self, component: &str) -> Result<()> {
+        let component_path = self.location.get_component_path(component);
+        if !component_path.exists() {
+            return Ok(());
+        }
+
+        for entry in fs::read_dir(&component_path)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() {
+                fs::remove_file(&path)?;
+                continue;
+            }
+
+            if path.is_dir() {
+                // Remove files in sharded subdirectories
+                for subentry in fs::read_dir(&path)? {
+                    let subentry = subentry?;
+                    if subentry.path().is_file() {
+                        fs::remove_file(subentry.path())?;
+                    }
+                }
+                // Try to remove the now-empty shard directory
+                let _ = fs::remove_dir(&path);
+            }
+        }
+
         Ok(())
     }
 
@@ -1074,106 +1088,121 @@ impl SharedCache {
     pub fn trigger_pruning(&self) -> Result<PruneStats> {
         let start = SystemTime::now();
 
-        if let Some(ref pruner) = self.auto_pruner {
-            let entries_to_remove = {
-                let index = self
-                    .index
-                    .read()
-                    .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-                pruner.calculate_entries_to_remove(&index)
-            };
-
-            if entries_to_remove.is_empty() {
+        // Early return if no pruner configured - use cleanup fallback
+        let pruner = match &self.auto_pruner {
+            Some(p) => p,
+            None => {
+                self.cleanup()?;
+                let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
+                let stats = self.get_stats();
                 return Ok(PruneStats {
                     entries_removed: 0,
                     bytes_freed: 0,
-                    entries_remaining: self.get_stats().entry_count,
-                    bytes_remaining: self.get_stats().total_size,
-                    duration_ms: 0,
+                    entries_remaining: stats.entry_count,
+                    bytes_remaining: stats.total_size,
+                    duration_ms: duration,
                     files_deleted: 0,
                     files_not_found: 0,
                 });
             }
+        };
 
-            let mut bytes_freed = 0u64;
-            let mut files_deleted = 0usize;
-            let mut files_not_found = 0usize;
+        // Calculate entries to remove
+        let entries_to_remove = {
+            let index = self
+                .index
+                .read()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            pruner.calculate_entries_to_remove(&index)
+        };
 
-            // Remove from index
-            {
-                let mut index = self
-                    .index
-                    .write()
-                    .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-                for (key, metadata) in &entries_to_remove {
-                    if index.entries.remove(key).is_some() {
-                        bytes_freed += metadata.size_bytes;
-                    }
-                }
-
-                index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
-                index.last_cleanup = Some(SystemTime::now());
-            }
-
-            // Delete files and track missing ones
-            for (key, _) in &entries_to_remove {
-                let mut any_file_found = false;
-                for component in &[
-                    "call_graphs",
-                    "analysis",
-                    "metadata",
-                    "temp",
-                    "file_metrics",
-                    "test",
-                ] {
-                    let cache_path = self.get_cache_file_path(key, component);
-                    if cache_path.exists() {
-                        any_file_found = true;
-                        match fs::remove_file(&cache_path) {
-                            Ok(_) => files_deleted += 1,
-                            Err(e) => {
-                                log::warn!("Failed to delete cache file {:?}: {}", cache_path, e);
-                            }
-                        }
-                    }
-                }
-                if !any_file_found {
-                    files_not_found += 1;
-                    log::debug!("No files found for cache entry: {}", key);
-                }
-            }
-
-            self.save_index()?;
-
-            let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
-            let final_stats = self.get_stats();
-
-            Ok(PruneStats {
-                entries_removed: entries_to_remove.len(),
-                bytes_freed,
-                entries_remaining: final_stats.entry_count,
-                bytes_remaining: final_stats.total_size,
-                duration_ms: duration,
-                files_deleted,
-                files_not_found,
-            })
-        } else {
-            // Fallback to old cleanup method
-            self.cleanup()?;
-            let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
-            let stats = self.get_stats();
-
-            Ok(PruneStats {
+        // Early return if nothing to remove
+        if entries_to_remove.is_empty() {
+            return Ok(PruneStats {
                 entries_removed: 0,
                 bytes_freed: 0,
-                entries_remaining: stats.entry_count,
-                bytes_remaining: stats.total_size,
-                duration_ms: duration,
+                entries_remaining: self.get_stats().entry_count,
+                bytes_remaining: self.get_stats().total_size,
+                duration_ms: 0,
                 files_deleted: 0,
                 files_not_found: 0,
-            })
+            });
         }
+
+        // Remove entries from index and calculate bytes freed
+        let mut bytes_freed = 0u64;
+        {
+            let mut index = self
+                .index
+                .write()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+
+            for (key, metadata) in &entries_to_remove {
+                if index.entries.remove(key).is_some() {
+                    bytes_freed += metadata.size_bytes;
+                }
+            }
+
+            index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
+            index.last_cleanup = Some(SystemTime::now());
+        }
+
+        // Delete files and count results
+        let (files_deleted, files_not_found) = self.delete_pruned_files(&entries_to_remove);
+
+        self.save_index()?;
+
+        let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
+        let final_stats = self.get_stats();
+
+        Ok(PruneStats {
+            entries_removed: entries_to_remove.len(),
+            bytes_freed,
+            entries_remaining: final_stats.entry_count,
+            bytes_remaining: final_stats.total_size,
+            duration_ms: duration,
+            files_deleted,
+            files_not_found,
+        })
+    }
+
+    /// Delete files for pruned entries and return counts
+    fn delete_pruned_files(&self, entries_to_remove: &[(String, CacheMetadata)]) -> (usize, usize) {
+        let mut files_deleted = 0usize;
+        let mut files_not_found = 0usize;
+        let components = [
+            "call_graphs",
+            "analysis",
+            "metadata",
+            "temp",
+            "file_metrics",
+            "test",
+        ];
+
+        for (key, _) in entries_to_remove {
+            let mut any_file_found = false;
+
+            for component in &components {
+                let cache_path = self.get_cache_file_path(key, component);
+                if !cache_path.exists() {
+                    continue;
+                }
+
+                any_file_found = true;
+                if fs::remove_file(&cache_path).is_ok() {
+                    files_deleted += 1;
+                } else {
+                    log::warn!("Failed to delete cache file: {:?}", cache_path);
+                }
+            }
+
+            if !any_file_found {
+                files_not_found += 1;
+                log::debug!("No files found for cache entry: {}", key);
+            }
+        }
+
+        (files_deleted, files_not_found)
     }
 
     /// Prune entries with a specific strategy

@@ -267,7 +267,7 @@ fn test_recommendation_generation_completeness() {
                 function_count: 40,
                 ..Default::default()
             },
-            "Split",  // Changed from "Break into" to match new recommendation format
+            "Split", // Changed from "Break into" to match new recommendation format
         ),
         (
             FileDebtMetrics {
