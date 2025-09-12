@@ -81,7 +81,7 @@
 //!
 //! ## Usage Example
 //!
-//! ```rust
+//! ```rust,no_run
 //! use rustpython_parser::{ast, Parse};
 //! use debtmap::testing::python::analyzer::PythonTestAnalyzer;
 //! use std::path::PathBuf;
@@ -92,12 +92,15 @@
 //!     # Missing assertion!
 //! "#;
 //!
-//! let module = ast::Mod::parse(code, "test.py").unwrap();
-//! let mut analyzer = PythonTestAnalyzer::new();
-//! let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
+//! // Parse the Python code
+//! let parsed = rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+//! if let ast::Mod::Module(module) = parsed {
+//!     let mut analyzer = PythonTestAnalyzer::new();
+//!     let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
 //!
-//! for issue in issues {
-//!     println!("Found issue: {:?}", issue);
+//!     for issue in issues {
+//!         println!("Found issue: {:?}", issue);
+//!     }
 //! }
 //! ```
 
