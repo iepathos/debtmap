@@ -1101,14 +1101,16 @@ fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
     // More realistic: sqrt of cyclomatic complexity + 2 for edge cases
     // This accounts for the fact that tests often cover multiple paths
     let ideal_test_cases = ((cyclomatic as f64).sqrt() * 1.5 + 2.0).ceil() as u32;
-    
+
     let current_test_cases = if coverage_pct > 0.0 {
         (ideal_test_cases as f64 * coverage_pct).ceil() as u32
     } else {
         0
     };
 
-    ideal_test_cases.saturating_sub(current_test_cases).min(cyclomatic)
+    ideal_test_cases
+        .saturating_sub(current_test_cases)
+        .min(cyclomatic)
 }
 
 /// Calculate approximate test cases for simple functions

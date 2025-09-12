@@ -731,9 +731,10 @@ impl ParallelUnifiedAnalysisBuilder {
         if let Ok(content) = std::fs::read_to_string(file_path) {
             let actual_line_count = content.lines().count();
             file_metrics.total_lines = actual_line_count;
-            
+
             // Recalculate uncovered lines based on actual line count
-            file_metrics.uncovered_lines = ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
+            file_metrics.uncovered_lines =
+                ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
 
             // Handle god object detection with accurate line count
             file_metrics.god_object_indicators = if no_god_object {
@@ -745,7 +746,8 @@ impl ParallelUnifiedAnalysisBuilder {
                         // Update based on actual line count
                         if actual_line_count > 2000 || file_metrics.function_count > 50 {
                             indicators.is_god_object = true;
-                            indicators.god_object_score = (file_metrics.function_count as f64 / 50.0).min(2.0);
+                            indicators.god_object_score =
+                                (file_metrics.function_count as f64 / 50.0).min(2.0);
                             indicators.methods_count = file_metrics.function_count;
                         }
                         indicators

@@ -459,9 +459,9 @@ fn format_file_priority_item(
     let type_label = if item.metrics.god_object_indicators.is_god_object {
         // Distinguish between god objects (classes) and god modules (procedural files)
         if item.metrics.god_object_indicators.fields_count > 5 {
-            "FILE - GOD OBJECT"  // Actual class with many fields
+            "FILE - GOD OBJECT" // Actual class with many fields
         } else {
-            "FILE - GOD MODULE"  // Procedural file with many functions
+            "FILE - GOD MODULE" // Procedural file with many functions
         }
     } else if item.metrics.total_lines > 500 {
         "FILE - HIGH COMPLEXITY"
@@ -1221,6 +1221,138 @@ mod tests {
         assert!(!output_plain.contains("lines of code")); // Should not show 0 lines
         assert!(!output_plain.contains("average complexity")); // Should not show 0 complexity
         assert!(output_plain.contains("1 actionable items prioritized"));
+    }
+
+    #[test]
+    fn test_format_priority_item_basic() {
+        let mut output = String::new();
+        let item = create_test_item(5.0);
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("#1 SCORE: 5.0"));
+        assert!(plain.contains("test_func()"));
+        assert!(plain.contains("Add unit tests"));
+    }
+
+    #[test]
+    fn test_format_priority_item_with_complexity() {
+        let mut output = String::new();
+        let mut item = create_test_item(8.0);
+        item.cyclomatic_complexity = 15;
+        item.cognitive_complexity = 20;
+        format_priority_item(&mut output, 2, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("COMPLEXITY:"));
+        assert!(plain.contains("cyclomatic=15"));
+    }
+
+    #[test]
+    fn test_format_priority_item_with_dependencies() {
+        let mut output = String::new();
+        let mut item = create_test_item(7.0);
+        item.upstream_dependencies = 3;
+        item.downstream_dependencies = 2;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("DEPENDENCIES:"));
+        assert!(plain.contains("3 upstream"));
+    }
+
+    #[test]
+    fn test_format_priority_item_with_callers() {
+        let mut output = String::new();
+        let mut item = create_test_item(6.0);
+        item.upstream_callers = vec!["caller1".to_string(), "caller2".to_string()];
+        item.upstream_dependencies = 2;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("CALLERS:"));
+        assert!(plain.contains("caller1, caller2"));
+    }
+
+    #[test]
+    fn test_format_priority_item_many_callers() {
+        let mut output = String::new();
+        let mut item = create_test_item(6.5);
+        item.upstream_callers = vec![
+            "c1".to_string(),
+            "c2".to_string(),
+            "c3".to_string(),
+            "c4".to_string(),
+            "c5".to_string(),
+        ];
+        item.upstream_dependencies = 5;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("... (2 more)"));
+    }
+
+    #[test]
+    fn test_format_priority_item_with_callees() {
+        let mut output = String::new();
+        let mut item = create_test_item(7.5);
+        item.downstream_callees = vec!["func1".to_string(), "func2".to_string()];
+        item.downstream_dependencies = 2;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("CALLS:"));
+        assert!(plain.contains("func1, func2"));
+    }
+
+    #[test]
+    fn test_format_priority_item_dead_code() {
+        let mut output = String::new();
+        let mut item = create_test_item(4.0);
+        item.debt_type = DebtType::DeadCode {
+            visibility: FunctionVisibility::Public,
+            cyclomatic: 5,
+            cognitive: 7,
+            usage_hints: vec!["Consider removing".to_string()],
+        };
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("VISIBILITY:"));
+        assert!(plain.contains("Consider removing"));
+    }
+
+    #[test]
+    fn test_format_priority_item_critical_severity() {
+        let mut output = String::new();
+        let item = create_test_item(9.5);
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("[CRITICAL]"));
+    }
+
+    #[test]
+    fn test_format_priority_item_low_severity() {
+        let mut output = String::new();
+        let item = create_test_item(2.0);
+        format_priority_item(&mut output, 3, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(plain.contains("[LOW]"));
+    }
+
+    #[test]
+    fn test_format_priority_item_no_complexity() {
+        let mut output = String::new();
+        let mut item = create_test_item(3.0);
+        item.cyclomatic_complexity = 0;
+        item.cognitive_complexity = 0;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(!plain.contains("COMPLEXITY:"));
+    }
+
+    #[test]
+    fn test_format_priority_item_no_dependencies() {
+        let mut output = String::new();
+        let mut item = create_test_item(3.5);
+        item.upstream_dependencies = 0;
+        item.downstream_dependencies = 0;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+        assert!(!plain.contains("DEPENDENCIES:"));
     }
 
     #[test]
