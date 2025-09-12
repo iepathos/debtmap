@@ -1092,18 +1092,23 @@ fn get_role_display_name(role: FunctionRole) -> &'static str {
 }
 
 /// Calculate test cases needed based on complexity and current coverage
+/// A more realistic estimate: not every branch needs a separate test case
 fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
     if coverage_pct >= 1.0 {
         return 0;
     }
 
+    // More realistic: sqrt of cyclomatic complexity + 2 for edge cases
+    // This accounts for the fact that tests often cover multiple paths
+    let ideal_test_cases = ((cyclomatic as f64).sqrt() * 1.5 + 2.0).ceil() as u32;
+    
     let current_test_cases = if coverage_pct > 0.0 {
-        (cyclomatic as f64 * coverage_pct).ceil() as u32
+        (ideal_test_cases as f64 * coverage_pct).ceil() as u32
     } else {
         0
     };
 
-    cyclomatic.saturating_sub(current_test_cases)
+    ideal_test_cases.saturating_sub(current_test_cases).min(cyclomatic)
 }
 
 /// Calculate approximate test cases for simple functions
@@ -1764,19 +1769,20 @@ mod tests {
 
     #[test]
     fn test_calculate_needed_test_cases_no_coverage() {
-        // When coverage is 0%, all test cases needed
-        assert_eq!(calculate_needed_test_cases(10, 0.0), 10);
-        assert_eq!(calculate_needed_test_cases(25, 0.0), 25);
+        // When coverage is 0%, we use sqrt formula: sqrt(10) * 1.5 + 2 ≈ 7
+        assert_eq!(calculate_needed_test_cases(10, 0.0), 7);
+        // sqrt(25) * 1.5 + 2 = 5 * 1.5 + 2 = 9.5 ≈ 10
+        assert_eq!(calculate_needed_test_cases(25, 0.0), 10);
     }
 
     #[test]
     fn test_calculate_needed_test_cases_partial_coverage() {
-        // When 50% covered, half test cases needed
-        assert_eq!(calculate_needed_test_cases(10, 0.5), 5);
-        // When 80% covered, 20% test cases needed
-        assert_eq!(calculate_needed_test_cases(10, 0.8), 2);
-        // Rounding up for fractional cases
-        assert_eq!(calculate_needed_test_cases(10, 0.25), 7);
+        // When 50% covered, ideal is 7, current is 3.5 ≈ 4, needed is 3
+        assert_eq!(calculate_needed_test_cases(10, 0.5), 3);
+        // When 80% covered, ideal is 7, current is 5.6 ≈ 6, needed is 1
+        assert_eq!(calculate_needed_test_cases(10, 0.8), 1);
+        // When 25% covered, ideal is 7, current is 1.75 ≈ 2, needed is 5
+        assert_eq!(calculate_needed_test_cases(10, 0.25), 5);
     }
 
     #[test]

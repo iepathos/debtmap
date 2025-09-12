@@ -66,23 +66,6 @@ impl SimplifiedPythonDetector {
                 });
             }
         }
-
-        // Check if test function lacks assertions
-        let func_name = func_def.name.as_str();
-        if (func_name.starts_with("test_") || func_name.starts_with("Test"))
-            && !Self::has_assertions(&func_def.body)
-        {
-            self.debt_items.push(DebtItem {
-                id: format!("py-test-no-assert-{}", self.debt_items.len()),
-                debt_type: DebtType::TestQuality,
-                priority: Priority::Medium,
-                file: self.path.clone(),
-                line: 1,
-                column: None,
-                message: format!("Test function '{}' has no assertions", func_name),
-                context: None,
-            });
-        }
     }
 
     fn check_class_patterns(&mut self, class_def: &ast::StmtClassDef) {
@@ -138,30 +121,6 @@ impl SimplifiedPythonDetector {
             expr,
             ast::Expr::List(_) | ast::Expr::Dict(_) | ast::Expr::Set(_)
         )
-    }
-
-    fn has_assertions(body: &[ast::Stmt]) -> bool {
-        for stmt in body {
-            if matches!(stmt, ast::Stmt::Assert(_)) {
-                return true;
-            }
-            // Recursively check nested blocks
-            match stmt {
-                ast::Stmt::If(if_stmt) => {
-                    if Self::has_assertions(&if_stmt.body) || Self::has_assertions(&if_stmt.orelse)
-                    {
-                        return true;
-                    }
-                }
-                ast::Stmt::With(with_stmt) => {
-                    if Self::has_assertions(&with_stmt.body) {
-                        return true;
-                    }
-                }
-                _ => {}
-            }
-        }
-        false
     }
 
     pub fn get_debt_items(self) -> Vec<DebtItem> {

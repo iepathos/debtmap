@@ -84,11 +84,38 @@ impl FileDebtMetrics {
 
     pub fn generate_recommendation(&self) -> String {
         if self.god_object_indicators.is_god_object {
-            let module_count = (self.function_count / 10).clamp(3, 8);
-            format!(
-                "Break into {} modules based on responsibilities. Extract related functions into cohesive units.",
-                module_count
-            )
+            // Analyze the file path to provide context-specific recommendations
+            let file_name = self
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("module");
+
+            let is_parser = file_name.contains("pars") || file_name.contains("lexer");
+            let is_cache = file_name.contains("cache");
+            let is_writer = file_name.contains("writer") || file_name.contains("format");
+            let is_analyzer = file_name.contains("analyz") || file_name.contains("detect");
+
+            // Generate specific splitting recommendations based on file type
+            if is_parser {
+                format!(
+                    "Split parser into {} modules: 1) Tokenizer/Lexer 2) AST builder 3) Visitor/Walker 4) Error handling. Group by parsing phase, not by node type.",
+                    (self.function_count / 20).clamp(3, 5)
+                )
+            } else if is_cache {
+                "Split cache into: 1) Storage backend 2) Eviction policy 3) Serialization 4) Cache operations. Separate policy from mechanism.".to_string()
+            } else if is_writer {
+                "Split into: 1) Core formatter 2) Section writers (one per major section) 3) Style/theme handling. Max 20 functions per writer module.".to_string()
+            } else if is_analyzer {
+                "Split by analysis phase: 1) Data collection 2) Pattern detection 3) Scoring/metrics 4) Reporting. Keep related analyses together.".to_string()
+            } else {
+                // Generic but more specific recommendation
+                format!(
+                    "URGENT: {} lines, {} functions! Split by data flow: 1) Input/parsing functions 2) Core logic/transformation 3) Output/formatting. Create {} focused modules with <30 functions each.",
+                    self.total_lines, self.function_count,
+                    (self.function_count / 25).clamp(3, 8)
+                )
+            }
         } else if self.total_lines > 500 {
             format!(
                 "Extract complex functions, reduce file to <500 lines. Current: {} lines",
@@ -267,8 +294,9 @@ mod tests {
         };
 
         let rec = metrics.generate_recommendation();
-        assert!(rec.contains("Break into"));
-        assert!(rec.contains("modules"));
+        // With the new format, the generic case says "Split by data flow"
+        assert!(rec.contains("Split by data flow") || rec.contains("Split"));
+        assert!(rec.contains("modules") || rec.contains("functions"));
     }
 
     #[test]

@@ -727,13 +727,39 @@ impl ParallelUnifiedAnalysisBuilder {
         let mut file_metrics =
             file_analysis::aggregate_file_metrics(&functions_owned, coverage_data);
 
-        // Handle god object detection with separated I/O
-        file_metrics.god_object_indicators = if no_god_object {
-            file_analysis::default_god_object_indicators()
+        // Read file content to get accurate line count
+        if let Ok(content) = std::fs::read_to_string(file_path) {
+            let actual_line_count = content.lines().count();
+            file_metrics.total_lines = actual_line_count;
+            
+            // Recalculate uncovered lines based on actual line count
+            file_metrics.uncovered_lines = ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
+
+            // Handle god object detection with accurate line count
+            file_metrics.god_object_indicators = if no_god_object {
+                file_analysis::default_god_object_indicators()
+            } else {
+                file_analysis::analyze_god_object_indicators(&content, file_path, coverage_data)
+                    .unwrap_or_else(|_| {
+                        let mut indicators = file_analysis::default_god_object_indicators();
+                        // Update based on actual line count
+                        if actual_line_count > 2000 || file_metrics.function_count > 50 {
+                            indicators.is_god_object = true;
+                            indicators.god_object_score = (file_metrics.function_count as f64 / 50.0).min(2.0);
+                            indicators.methods_count = file_metrics.function_count;
+                        }
+                        indicators
+                    })
+            };
         } else {
-            self.analyze_god_object_with_io(file_path, coverage_data)
-                .unwrap_or_else(file_analysis::default_god_object_indicators)
-        };
+            // Fallback to estimated metrics if file can't be read
+            file_metrics.god_object_indicators = if no_god_object {
+                file_analysis::default_god_object_indicators()
+            } else {
+                self.analyze_god_object_with_io(file_path, coverage_data)
+                    .unwrap_or_else(file_analysis::default_god_object_indicators)
+            };
+        }
 
         // Pure: calculate score and decide if to include
         let score = file_metrics.calculate_score();

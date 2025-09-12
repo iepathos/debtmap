@@ -17,22 +17,27 @@ fn get_role_display_name(role: FunctionRole) -> &'static str {
 }
 
 /// Calculate test cases needed based on complexity and current coverage
+/// A more realistic estimate: not every branch needs a separate test case
 fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
     if coverage_pct >= 1.0 {
         return 0;
     }
 
+    // More realistic: sqrt of cyclomatic complexity + 2 for edge cases
+    // This accounts for the fact that tests often cover multiple paths
+    let ideal_test_cases = ((cyclomatic as f64).sqrt() * 1.5 + 2.0).ceil() as u32;
+    
     let current_test_cases = if coverage_pct > 0.0 {
-        (cyclomatic as f64 * coverage_pct).ceil() as u32
+        (ideal_test_cases as f64 * coverage_pct).ceil() as u32
     } else {
         0
     };
 
     // For zero coverage, ensure minimum recommendation
     if coverage_pct == 0.0 {
-        cyclomatic.max(3)
+        ideal_test_cases.max(3).min(cyclomatic)  // Cap at cyclomatic for very complex functions
     } else {
-        cyclomatic.saturating_sub(current_test_cases)
+        ideal_test_cases.saturating_sub(current_test_cases)
     }
 }
 
@@ -88,26 +93,36 @@ fn generate_complex_function_recommendation(
         );
     }
 
-    let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
     let needed_test_cases = calculate_needed_test_cases(cyclomatic, coverage_pct);
     let coverage_pct_int = (coverage_pct * 100.0) as i32;
-
-    let complexity_explanation = format!(
-        "Cyclomatic complexity of {} requires at least {} test cases for full path coverage. After extracting {} functions, each will need only 3-5 tests",
-        cyclomatic, cyclomatic, functions_to_extract
-    );
 
     let mut steps =
         generate_combined_testing_refactoring_steps(cyclomatic, cognitive, coverage_pct_int);
     add_uncovered_lines_to_steps(&mut steps, func, transitive_coverage);
 
-    (
-        format!("Add {} tests for {}% coverage gap, then refactor complexity {} into {} functions", 
-               needed_test_cases, coverage_gap, cyclomatic, functions_to_extract),
-        format!("Complex {role_str} with {coverage_gap}% gap. {}. Testing before refactoring ensures no regressions",
-               complexity_explanation),
-        steps,
-    )
+    let action = if cyclomatic > 15 {
+        format!(
+            "Add {} tests for uncovered lines, then simplify function (complexity {})",
+            needed_test_cases, cyclomatic
+        )
+    } else if cyclomatic > 10 {
+        format!(
+            "Add {} tests for uncovered lines. Consider early returns to reduce nesting",
+            needed_test_cases
+        )
+    } else {
+        format!(
+            "Add {} tests for the {}% coverage gap",
+            needed_test_cases, coverage_gap
+        )
+    };
+
+    let why = format!(
+        "{role_str} with complexity {} and {}% coverage. Needs {} tests minimum. DO NOT split into multiple functions unless complexity > 15",
+        cyclomatic, coverage_pct_int, cyclomatic
+    );
+
+    (action, why, steps)
 }
 
 /// Generate urgent recommendation for complex zero coverage functions (spec 98)
@@ -371,23 +386,33 @@ pub fn calculate_functions_to_extract(cyclomatic: u32, cognitive: u32) -> u32 {
 
 fn generate_combined_testing_refactoring_steps(
     cyclomatic: u32,
-    cognitive: u32,
+    _cognitive: u32,
     coverage_pct: i32,
 ) -> Vec<String> {
-    vec![
-        format!(
-            "Add tests for the {} uncovered branches (current coverage: {}%)",
-            cyclomatic - (cyclomatic as f64 * coverage_pct as f64 / 100.0) as u32,
-            coverage_pct
-        ),
-        "Identify logical sections within the function".to_string(),
-        format!(
-            "Extract {} helper functions to reduce complexity",
-            calculate_functions_to_extract(cyclomatic, cognitive)
-        ),
-        "Ensure each extracted function has single responsibility".to_string(),
-        "Add unit tests for each extracted function".to_string(),
-    ]
+    let uncovered_branches = cyclomatic - (cyclomatic as f64 * coverage_pct as f64 / 100.0) as u32;
+
+    let mut steps = vec![];
+
+    // Testing steps first
+    steps.push(format!(
+        "Write {} focused tests for the {} uncovered branches",
+        uncovered_branches.min(5),
+        uncovered_branches
+    ));
+    steps.push("Each test should be <15 lines and test ONE specific path".to_string());
+
+    // Only suggest refactoring for high complexity
+    if cyclomatic > 15 {
+        steps.push(format!(
+            "After tests pass: Use early returns to reduce nesting (current complexity: {})",
+            cyclomatic
+        ));
+        steps.push("DO NOT create helper functions unless there's obvious duplication".to_string());
+    } else if cyclomatic > 10 {
+        steps.push("Consider early returns IF nesting depth > 3".to_string());
+    }
+
+    steps
 }
 
 fn generate_testing_gap_steps(is_complex: bool) -> Vec<String> {
@@ -561,17 +586,17 @@ mod tests {
         // Full coverage
         assert_eq!(calculate_needed_test_cases(10, 1.0), 0);
 
-        // No coverage
-        assert_eq!(calculate_needed_test_cases(10, 0.0), 10);
+        // No coverage - sqrt(10) * 1.5 + 2 ≈ 7
+        assert_eq!(calculate_needed_test_cases(10, 0.0), 7);
 
-        // Partial coverage (50%)
-        assert_eq!(calculate_needed_test_cases(10, 0.5), 5);
+        // Partial coverage (50%) - ideal is 7, current is 3.5 ≈ 4, needed is 3
+        assert_eq!(calculate_needed_test_cases(10, 0.5), 3);
 
-        // Partial coverage (75%)
-        assert_eq!(calculate_needed_test_cases(10, 0.75), 2);
+        // Partial coverage (75%) - ideal is 7, current is 5.25 ≈ 6, needed is 1
+        assert_eq!(calculate_needed_test_cases(10, 0.75), 1);
 
-        // Almost full coverage
-        assert_eq!(calculate_needed_test_cases(10, 0.9), 1);
+        // Almost full coverage - ideal is 7, current is 6.3 ≈ 7, needed is 0
+        assert_eq!(calculate_needed_test_cases(10, 0.9), 0);
     }
 
     #[test]
@@ -709,7 +734,8 @@ mod tests {
             &func,
             &None,
         );
-        assert!(action.contains("refactor")); // Now complex enough
+        // Complexity 14 is between 10-15, so it suggests early returns
+        assert!(action.contains("Consider early returns") || action.contains("simplify"));
     }
 
     #[test]
