@@ -1039,18 +1039,34 @@ fn analyze_files_for_debt(
         // Get file-level metrics
         let mut file_metrics = file_analyzer.aggregate_functions(&functions_owned);
 
-        // Run god object detection if enabled
-        if !no_god_object {
-            // Try to read file content to get better god object analysis
-            if let Ok(content) = std::fs::read_to_string(&file_path) {
+        // Read file content to get accurate line count and god object analysis
+        if let Ok(content) = std::fs::read_to_string(&file_path) {
+            // Get accurate line count
+            let actual_line_count = content.lines().count();
+            file_metrics.total_lines = actual_line_count;
+            
+            // Recalculate uncovered lines based on actual line count
+            file_metrics.uncovered_lines = ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
+            
+            // Run god object detection if enabled
+            if !no_god_object {
                 let god_indicators = file_analyzer
                     .analyze_file(&file_path, &content)
                     .ok()
                     .map(|m| m.god_object_indicators)
                     .unwrap_or_else(|| file_metrics.god_object_indicators.clone());
                 file_metrics.god_object_indicators = god_indicators;
+                
+                // Update god object detection based on actual line count
+                if actual_line_count > 2000 || file_metrics.function_count > 50 {
+                    file_metrics.god_object_indicators.is_god_object = true;
+                    if file_metrics.god_object_indicators.god_object_score == 0.0 {
+                        file_metrics.god_object_indicators.god_object_score = 
+                            (file_metrics.function_count as f64 / 50.0).min(2.0);
+                    }
+                }
             }
-        } else {
+        } else if !no_god_object {
             // Disable god object detection
             file_metrics.god_object_indicators =
                 crate::priority::file_metrics::GodObjectIndicators {

@@ -17,22 +17,27 @@ fn get_role_display_name(role: FunctionRole) -> &'static str {
 }
 
 /// Calculate test cases needed based on complexity and current coverage
+/// A more realistic estimate: not every branch needs a separate test case
 fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
     if coverage_pct >= 1.0 {
         return 0;
     }
 
+    // More realistic: sqrt of cyclomatic complexity + 2 for edge cases
+    // This accounts for the fact that tests often cover multiple paths
+    let ideal_test_cases = ((cyclomatic as f64).sqrt() * 1.5 + 2.0).ceil() as u32;
+    
     let current_test_cases = if coverage_pct > 0.0 {
-        (cyclomatic as f64 * coverage_pct).ceil() as u32
+        (ideal_test_cases as f64 * coverage_pct).ceil() as u32
     } else {
         0
     };
 
     // For zero coverage, ensure minimum recommendation
     if coverage_pct == 0.0 {
-        cyclomatic.max(3)
+        ideal_test_cases.max(3).min(cyclomatic)  // Cap at cyclomatic for very complex functions
     } else {
-        cyclomatic.saturating_sub(current_test_cases)
+        ideal_test_cases.saturating_sub(current_test_cases)
     }
 }
 

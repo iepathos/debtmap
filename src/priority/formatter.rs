@@ -343,7 +343,7 @@ fn format_file_aggregate_item(
     )
     .unwrap();
 
-    // Specific, prescriptive actions
+    // Specific, prescriptive actions with concrete refactoring patterns
     if item.problematic_functions > 0 {
         writeln!(
             output,
@@ -359,8 +359,28 @@ fn format_file_aggregate_item(
         .unwrap();
         writeln!(
             output,
-            "│  ├─ {}. For each function: If complexity > 10, use early returns to reduce nesting",
+            "│  ├─ {}. For each function: If complexity > 10, apply these patterns:",
             3
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "│  │   • Extract guard clauses: Convert nested if-else to early returns",
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "│  │   • Extract validation: Move input checks to separate function",
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "│  │   • Replace conditionals with map/filter when processing collections",
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "│  │   • Extract complex boolean expressions into named predicates",
         )
         .unwrap();
         writeln!(
@@ -435,9 +455,14 @@ fn format_file_priority_item(
     let severity = get_severity_label(item.score);
     let severity_color = get_severity_color(item.score);
 
-    // Determine if this is a god object
+    // Determine file type label based on characteristics
     let type_label = if item.metrics.god_object_indicators.is_god_object {
-        "FILE - GOD OBJECT"
+        // Distinguish between god objects (classes) and god modules (procedural files)
+        if item.metrics.god_object_indicators.fields_count > 5 {
+            "FILE - GOD OBJECT"  // Actual class with many fields
+        } else {
+            "FILE - GOD MODULE"  // Procedural file with many functions
+        }
     } else if item.metrics.total_lines > 500 {
         "FILE - HIGH COMPLEXITY"
     } else {
@@ -467,12 +492,19 @@ fn format_file_priority_item(
 
     // Add WHY section
     let why_message = if item.metrics.god_object_indicators.is_god_object {
-        format!(
-            "This file violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
-            item.metrics.god_object_indicators.methods_count,
-            item.metrics.god_object_indicators.fields_count,
-            item.metrics.god_object_indicators.responsibilities
-        )
+        if item.metrics.god_object_indicators.fields_count > 5 {
+            format!(
+                "This class violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
+                item.metrics.god_object_indicators.methods_count,
+                item.metrics.god_object_indicators.fields_count,
+                item.metrics.god_object_indicators.responsibilities
+            )
+        } else {
+            format!(
+                "This module contains {} functions in a single file, violating module cohesion principles. Large procedural modules are difficult to navigate, understand, and maintain.",
+                item.metrics.function_count
+            )
+        }
     } else if item.metrics.total_lines > 500 {
         format!(
             "File exceeds recommended size with {} lines. Large files are harder to navigate, understand, and maintain. Consider breaking into smaller, focused modules.",
@@ -498,7 +530,7 @@ fn format_file_priority_item(
     )
     .unwrap();
 
-    // Add specific implementation steps for god objects
+    // Add specific implementation steps based on file type
     if item.metrics.god_object_indicators.is_god_object {
         let file_name = item
             .metrics
@@ -507,22 +539,55 @@ fn format_file_priority_item(
             .and_then(|s| s.to_str())
             .unwrap_or("module");
 
-        // Provide specific steps based on file characteristics
-        writeln!(
-            output,
-            "{}  {} 1. Run `grep -n \"^pub fn\\|^fn\" {}` to list all functions",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan(),
-            item.metrics.path.display()
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "{}  {} 2. Group functions by: a) shared data access b) similar names c) call relationships",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
-        )
-        .unwrap();
+        // Provide specific steps based on whether it's a god object or god module
+        if item.metrics.god_object_indicators.fields_count > 5 {
+            // God Object (class with many fields)
+            writeln!(
+                output,
+                "{}  {} 1. Identify distinct responsibilities in the class",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-").cyan()
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {} 2. Group methods and fields by responsibility",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-").cyan()
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {} 3. Extract each group into a separate focused class",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-").cyan()
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {} 4. Use composition or dependency injection to connect the new classes",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-").cyan()
+            )
+            .unwrap();
+        } else {
+            // God Module (many functions, few fields)
+            writeln!(
+                output,
+                "{}  {} 1. Run `grep -n \"^pub fn\\|^fn\" {}` to list all functions",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-").cyan(),
+                item.metrics.path.display()
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {} 2. Group functions by: a) AST node types they handle b) similar prefixes c) data flow patterns",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-").cyan()
+            )
+            .unwrap();
+        }
         writeln!(
             output,
             "{}  {} 3. Create new files: `{}_core.rs`, `{}_io.rs`, `{}_utils.rs` (adjust names to match groups)",
