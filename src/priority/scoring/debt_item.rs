@@ -1769,19 +1769,20 @@ mod tests {
 
     #[test]
     fn test_calculate_needed_test_cases_no_coverage() {
-        // When coverage is 0%, all test cases needed
-        assert_eq!(calculate_needed_test_cases(10, 0.0), 10);
-        assert_eq!(calculate_needed_test_cases(25, 0.0), 25);
+        // When coverage is 0%, we use sqrt formula: sqrt(10) * 1.5 + 2 ≈ 7
+        assert_eq!(calculate_needed_test_cases(10, 0.0), 7);
+        // sqrt(25) * 1.5 + 2 = 5 * 1.5 + 2 = 9.5 ≈ 10
+        assert_eq!(calculate_needed_test_cases(25, 0.0), 10);
     }
 
     #[test]
     fn test_calculate_needed_test_cases_partial_coverage() {
-        // When 50% covered, half test cases needed
-        assert_eq!(calculate_needed_test_cases(10, 0.5), 5);
-        // When 80% covered, 20% test cases needed
-        assert_eq!(calculate_needed_test_cases(10, 0.8), 2);
-        // Rounding up for fractional cases
-        assert_eq!(calculate_needed_test_cases(10, 0.25), 7);
+        // When 50% covered, ideal is 7, current is 3.5 ≈ 4, needed is 3
+        assert_eq!(calculate_needed_test_cases(10, 0.5), 3);
+        // When 80% covered, ideal is 7, current is 5.6 ≈ 6, needed is 1
+        assert_eq!(calculate_needed_test_cases(10, 0.8), 1);
+        // When 25% covered, ideal is 7, current is 1.75 ≈ 2, needed is 5
+        assert_eq!(calculate_needed_test_cases(10, 0.25), 5);
     }
 
     #[test]

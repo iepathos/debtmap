@@ -586,17 +586,17 @@ mod tests {
         // Full coverage
         assert_eq!(calculate_needed_test_cases(10, 1.0), 0);
 
-        // No coverage
-        assert_eq!(calculate_needed_test_cases(10, 0.0), 10);
+        // No coverage - sqrt(10) * 1.5 + 2 ≈ 7
+        assert_eq!(calculate_needed_test_cases(10, 0.0), 7);
 
-        // Partial coverage (50%)
-        assert_eq!(calculate_needed_test_cases(10, 0.5), 5);
+        // Partial coverage (50%) - ideal is 7, current is 3.5 ≈ 4, needed is 3
+        assert_eq!(calculate_needed_test_cases(10, 0.5), 3);
 
-        // Partial coverage (75%)
-        assert_eq!(calculate_needed_test_cases(10, 0.75), 2);
+        // Partial coverage (75%) - ideal is 7, current is 5.25 ≈ 6, needed is 1
+        assert_eq!(calculate_needed_test_cases(10, 0.75), 1);
 
-        // Almost full coverage
-        assert_eq!(calculate_needed_test_cases(10, 0.9), 1);
+        // Almost full coverage - ideal is 7, current is 6.3 ≈ 7, needed is 0
+        assert_eq!(calculate_needed_test_cases(10, 0.9), 0);
     }
 
     #[test]
