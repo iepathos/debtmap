@@ -324,40 +324,52 @@ fn format_file_aggregate_item(
     )
     .unwrap();
 
-    // ACTION section
+    // ACTION section - Be specific about what to fix
+    let top_functions = item.top_function_scores.len().min(2);
+    let action_msg = if item.problematic_functions > 0 {
+        format!(
+            "Fix ONLY the top {} functions listed below. DO NOT refactor the entire file. Focus on functions with complexity > 10 or coverage < 60%",
+            top_functions
+        )
+    } else {
+        "No immediate action needed - monitor for future degradation".to_string()
+    };
+
     writeln!(
         output,
-        "├─ {}: Prioritize refactoring the most complex functions. Break down large functions, extract reusable components, and improve error handling.",
-        formatter.emoji("ACTION", "ACTION").bright_cyan()
+        "├─ {}: {}",
+        formatter.emoji("ACTION", "ACTION").bright_cyan(),
+        action_msg
     )
     .unwrap();
 
-    // Detailed breakdown of problematic functions
-    writeln!(
-        output,
-        "│  ├─ {}. Review and refactor top {} problematic functions",
-        1,
-        item.top_function_scores.len().min(5)
-    )
-    .unwrap();
-    writeln!(
-        output,
-        "│  ├─ {}. Extract common patterns into helper functions",
-        2
-    )
-    .unwrap();
-    writeln!(
-        output,
-        "│  ├─ {}. Add unit tests for complex logic sections",
-        3
-    )
-    .unwrap();
-    writeln!(
-        output,
-        "│  └─ {}. Consider splitting file if it exceeds 500 lines",
-        4
-    )
-    .unwrap();
+    // Specific, prescriptive actions
+    if item.problematic_functions > 0 {
+        writeln!(
+            output,
+            "│  ├─ {}. Fix ONLY these {} functions (listed in DEPENDENCIES below)",
+            1, top_functions
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "│  ├─ {}. For each function: If coverage < 60%, add tests for uncovered lines ONLY",
+            2
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "│  ├─ {}. For each function: If complexity > 10, use early returns to reduce nesting",
+            3
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "│  └─ {}. DO NOT: Create new files, add abstraction layers, or refactor working code",
+            4
+        )
+        .unwrap();
+    }
 
     // IMPACT section
     writeln!(
@@ -486,32 +498,49 @@ fn format_file_priority_item(
     )
     .unwrap();
 
-    // Add implementation steps for god objects
+    // Add specific implementation steps for god objects
     if item.metrics.god_object_indicators.is_god_object {
+        let file_name = item
+            .metrics
+            .path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("module");
+
+        // Provide specific steps based on file characteristics
         writeln!(
             output,
-            "{}  {} 1. Identify cohesive groups of methods and fields",
+            "{}  {} 1. Run `grep -n \"^pub fn\\|^fn\" {}` to list all functions",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan(),
+            item.metrics.path.display()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 2. Group functions by: a) shared data access b) similar names c) call relationships",
             formatter.emoji("│", ""),
             formatter.emoji("├─", "-").cyan()
         )
         .unwrap();
         writeln!(
             output,
-            "{}  {} 2. Extract each group into a separate module/class",
+            "{}  {} 3. Create new files: `{}_core.rs`, `{}_io.rs`, `{}_utils.rs` (adjust names to match groups)",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan(),
+            file_name, file_name, file_name
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 4. Move functions in groups of 10-20, test after each move",
             formatter.emoji("│", ""),
             formatter.emoji("├─", "-").cyan()
         )
         .unwrap();
         writeln!(
             output,
-            "{}  {} 3. Create interfaces/traits for clean boundaries",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "{}  {} 4. Update imports and references throughout codebase",
+            "{}  {} 5. DO NOT: Try to fix everything at once. Move incrementally, test frequently",
             formatter.emoji("│", ""),
             formatter.emoji("└─", "-").cyan()
         )

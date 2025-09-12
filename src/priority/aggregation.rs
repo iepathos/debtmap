@@ -116,7 +116,7 @@ fn default_problem_threshold() -> f64 {
 }
 
 fn default_min_functions() -> usize {
-    2
+    10 // Raised threshold - only aggregate files with many functions
 }
 
 fn default_display_top_functions() -> usize {
@@ -151,16 +151,35 @@ impl AggregationPipeline {
 
     pub fn aggregate_file_scores(&mut self) -> Vec<FileAggregateScore> {
         for (path, functions) in &self.function_scores {
-            // Skip files with too few functions if configured
-            if functions.len() < self.config.min_functions_for_aggregation {
-                continue;
-            }
-
+            // More intelligent criteria for aggregation
             let total_score: f64 = functions.iter().map(|f| f.score).sum();
             let problematic = functions
                 .iter()
                 .filter(|f| f.score > self.config.problem_threshold)
                 .count();
+            let avg_score = if !functions.is_empty() {
+                total_score / functions.len() as f64
+            } else {
+                0.0
+            };
+
+            // Only aggregate if this is likely a god object or has widespread issues
+            let should_aggregate =
+                // God object: Many functions with many problems
+                (functions.len() >= 20 && problematic >= 5) ||
+                // Large problematic file
+                (functions.len() >= 10 && problematic >= functions.len() / 2) ||
+                // High average complexity across many functions
+                (functions.len() >= 10 && avg_score > 8.0) ||
+                // Configured minimum with high problem density
+                (functions.len() >= self.config.min_functions_for_aggregation &&
+                 problematic as f64 / functions.len() as f64 > 0.75);
+
+            if !should_aggregate {
+                continue;
+            }
+
+            // Already calculated above, no need to recalculate
 
             let mut top_functions: Vec<_> = functions
                 .iter()
@@ -308,26 +327,24 @@ mod tests {
             enabled: true,
             method: AggregationMethod::WeightedSum,
             problem_threshold: 5.0,
-            min_functions_for_aggregation: 2,
+            min_functions_for_aggregation: 10, // Updated to match new default
             display_top_functions: 3,
         };
 
         let mut pipeline = AggregationPipeline::new(config);
 
-        // Add scores for file1
-        pipeline.add_function_score(PathBuf::from("file1.rs"), "func1".to_string(), 10.0);
-        pipeline.add_function_score(PathBuf::from("file1.rs"), "func2".to_string(), 8.0);
-        pipeline.add_function_score(PathBuf::from("file1.rs"), "func3".to_string(), 3.0);
-
-        // Add scores for file2
-        pipeline.add_function_score(PathBuf::from("file2.rs"), "func4".to_string(), 15.0);
-        pipeline.add_function_score(PathBuf::from("file2.rs"), "func5".to_string(), 2.0);
+        // Add enough scores to meet the new stricter criteria
+        // Need at least 10 functions with 75% problematic to trigger aggregation
+        for i in 0..12 {
+            let score = if i < 10 { 10.0 } else { 3.0 }; // 10 problematic, 2 not
+            pipeline.add_function_score(PathBuf::from("file1.rs"), format!("func{}", i), score);
+        }
 
         let aggregates = pipeline.aggregate_file_scores();
 
-        assert_eq!(aggregates.len(), 2);
+        assert_eq!(aggregates.len(), 1); // Only file1 should aggregate
         assert!(aggregates[0].aggregate_score > 0.0);
-        assert_eq!(aggregates[0].function_count, 3);
-        assert_eq!(aggregates[0].problematic_functions, 2); // func1 and func2 > 5.0
+        assert_eq!(aggregates[0].function_count, 12);
+        assert_eq!(aggregates[0].problematic_functions, 10); // 10 functions > 5.0
     }
 }

@@ -204,27 +204,46 @@ fn generate_simple_extraction_recommendation(
     cyclo: u32,
     coverage_percent: f64,
 ) -> (String, String, Vec<String>) {
-    let action = format!(
-        "Extract {} helper functions using early returns",
-        (cyclo / 5).max(2)
+    let coverage_gap = ((1.0 - coverage_percent) * 100.0) as u32;
+    let tests_needed = ((cyclo as f64) * (1.0 - coverage_percent)).ceil() as u32;
+
+    let action = if coverage_gap > 40 {
+        format!("Add {} tests for {}% coverage gap. NO refactoring needed (complexity {} is acceptable)", 
+                tests_needed, coverage_gap, cyclo)
+    } else if cyclo > 10 {
+        "Use early returns to reduce nesting. Add tests for uncovered branches".to_string()
+    } else {
+        format!(
+            "Maintain current structure. Add {} tests if needed",
+            tests_needed.max(1)
+        )
+    };
+
+    let why = format!(
+        "Complexity {} is manageable. Coverage at {:.0}%. Focus on test coverage, not refactoring",
+        cyclo,
+        coverage_percent * 100.0
     );
 
-    let mut steps = vec![
-        "Apply guard clause pattern:".to_string(),
-        "  • Use ? operator for early error returns".to_string(),
-        "  • Extract validation to separate function".to_string(),
-        "  • Use match expressions over if-else chains".to_string(),
-    ];
+    let mut steps = vec![];
 
-    if coverage_percent < 0.8 {
-        steps.push("Add unit tests focusing on edge cases and error paths".to_string());
+    if coverage_gap > 20 {
+        steps.push(format!(
+            "Write {} focused tests for uncovered branches",
+            tests_needed
+        ));
+        steps.push("Each test should be <15 lines and test ONE path".to_string());
     }
 
-    (
-        action,
-        format!("Low complexity ({}), minor refactoring needed", cyclo),
-        steps,
-    )
+    if cyclo > 10 {
+        steps.push("IF nesting > 3: Use early returns with ? operator".to_string());
+        steps.push("DO NOT extract functions unless there's clear duplication".to_string());
+    } else {
+        steps.push("DO NOT refactor - current structure is fine".to_string());
+        steps.push("Focus on test coverage only".to_string());
+    }
+
+    (action, why, steps)
 }
 
 /// Generate file-level recommendations for Rust modules
