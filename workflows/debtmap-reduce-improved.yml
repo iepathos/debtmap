@@ -16,9 +16,12 @@ map:
   # Commands to execute for each debt item
   agent_template:
     commands:
-      # Fix the specific debt item with clear, prescriptive instructions
+      # Fix the specific debt item with clear instructions
       - claude: |
-          /fix-debt-item --json '${item}' --rules '
+          Analyze this technical debt item and fix it following these rules:
+          
+          ${item}
+          
           CRITICAL RULES:
           1. If this is a FILE AGGREGATE: Only fix the TOP 2 most complex functions listed, NOT the entire file
           2. If coverage is <80%: Write MINIMAL focused tests for uncovered branches ONLY
@@ -34,51 +37,56 @@ map:
           - Each test should be <10 lines
           
           For COMPLEXITY issues (only if cyclomatic > 10):
-          - Extract ONLY if there is obvious duplication
+          - Extract ONLY if there's obvious duplication
           - Prefer early returns over nested ifs
           - Combine related conditions
           - DO NOT create "pure function" wrappers
           
-          REMEMBER: Less code is better. Minimal changes. Test coverage > refactoring.'
+          REMEMBER: Less code is better. Minimal changes. Test coverage > refactoring.
         commit_required: true
         timeout: 300
         validate:
           claude: |
-            /prodigy-validate-debt-fix --json '${item}' --output .prodigy/debt-validation-result.json --check '
+            Check if the fix actually reduced debt:
             1. Did coverage increase for the specific function?
             2. If refactored, is the code actually simpler (fewer lines)?
-            3. Do all tests pass?'
+            3. Do all tests pass?
+            
+            Output JSON: {"success": bool, "coverage_improved": bool, "complexity_reduced": bool}
           result_file: ".prodigy/debt-validation-result.json"
-          threshold: 90  # Debt item should be at least 90% resolved
+          threshold: 90
           on_incomplete:
             claude: |
-              /prodigy-complete-debt-fix --json '${item}' --gaps ${validation.gaps} --focus 'Add ONLY the missing test cases for uncovered lines.'
+              The fix was incomplete. Focus on:
+              ${validation.gaps}
+              
+              Add ONLY the missing test cases for uncovered lines.
             max_attempts: 2
-            fail_workflow: false  # Continue even if we can't fully resolve
-            commit_required: true  # Require commit to verify fixes were made
+            fail_workflow: false
+            commit_required: true
       
       # Run tests to verify the fix
       - shell: "just test"
         on_failure:
-          claude: "/prodigy-debug-test-failure --output '${shell.output}' --instruction 'Fix ONLY the failing test, do not refactor'"
+          claude: "Fix ONLY the failing test, don't refactor: ${shell.output}"
           max_attempts: 3
           fail_workflow: false
       
       # Check formatting and linting
       - shell: "just fmt-check && just lint"
         on_failure:
-          claude: "/prodigy-lint '${shell.output}' --instruction 'Fix formatting/lint issues only'"
+          claude: "Fix formatting/lint issues only: ${shell.output}"
           max_attempts: 2
           fail_workflow: false
   
   # Parallelization settings
   max_parallel: 3  # Fewer parallel agents for better quality
-  timeout_per_agent: 600s  # 10 minutes per agent
-  retry_on_failure: 1  # Retry once if an agent fails
+  timeout_per_agent: 600s
+  retry_on_failure: 1
   
   # Focus on high-impact items
   filter: "unified_score.final_score >= 20"  # Higher threshold - focus on worst issues
-  sort_by: "unified_score.final_score DESC"  # Process highest score items first
+  sort_by: "unified_score.final_score DESC"
   max_items: 5  # Fewer items, better quality
 
 # Reduce phase: Aggregate results and finalize
@@ -87,14 +95,14 @@ reduce:
     # Run full test suite after all fixes
     - shell: "just test"
       on_failure:
-        claude: "/prodigy-debug-test-failure --output '${shell.output}' --instruction 'Fix test failures without adding new code'"
+        claude: "Fix test failures without adding new code: ${shell.output}"
         max_attempts: 3
-        fail_workflow: true  # Fail if tests don't pass after merging
+        fail_workflow: true
     
     # Check formatting and linting
     - shell: "just fmt-check && just lint"
       on_failure:
-        claude: "/prodigy-lint ${shell.output} --instruction 'Fix formatting only'"
+        claude: "Fix formatting only: ${shell.output}"
         max_attempts: 2
         fail_workflow: false
           
@@ -106,13 +114,16 @@ reduce:
     
     # Compare debt metrics and create final commit with summary
     - claude: |
-        /prodigy-compare-debt-results \
-          --before debtmap.json \
-          --after debtmap-after.json \
-          --map-results '${map.results}' \
-          --successful ${map.successful} \
-          --failed ${map.failed} \
-          --total ${map.total} \
-          --check 'Verify: 1) Total debt score should be LOWER 2) Coverage % should be HIGHER 3) LOC should be SIMILAR or LOWER 4) Functions with complexity >10 should be FEWER. If debt score went UP or LOC increased significantly, mark as FAILED.'
+        Compare the debt scores and create a summary:
+        
+        Before: debtmap.json
+        After: debtmap-after.json
+        
+        Report:
+        1. Total debt score change (should be LOWER)
+        2. Coverage % change (should be HIGHER)
+        3. Total lines of code change (should be SIMILAR or LOWER)
+        4. Number of functions with complexity > 10 (should be LOWER)
+        
+        If debt score went UP or LOC increased significantly, mark as FAILED.
       commit_required: true
-
