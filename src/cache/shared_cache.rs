@@ -812,7 +812,7 @@ impl SharedCache {
             "temp",
             "file_metrics",
         ];
-        
+
         for component in &components {
             self.clear_component_files(component)?;
         }
@@ -842,12 +842,12 @@ impl SharedCache {
         for entry in fs::read_dir(&component_path)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() {
                 fs::remove_file(&path)?;
                 continue;
             }
-            
+
             if path.is_dir() {
                 // Remove files in sharded subdirectories
                 for subentry in fs::read_dir(&path)? {
@@ -860,7 +860,7 @@ impl SharedCache {
                 let _ = fs::remove_dir(&path);
             }
         }
-        
+
         Ok(())
     }
 
@@ -1181,13 +1181,13 @@ impl SharedCache {
 
         for (key, _) in entries_to_remove {
             let mut any_file_found = false;
-            
+
             for component in &components {
                 let cache_path = self.get_cache_file_path(key, component);
                 if !cache_path.exists() {
                     continue;
                 }
-                
+
                 any_file_found = true;
                 if fs::remove_file(&cache_path).is_ok() {
                     files_deleted += 1;
@@ -1195,13 +1195,13 @@ impl SharedCache {
                     log::warn!("Failed to delete cache file: {:?}", cache_path);
                 }
             }
-            
+
             if !any_file_found {
                 files_not_found += 1;
                 log::debug!("No files found for cache entry: {}", key);
             }
         }
-        
+
         (files_deleted, files_not_found)
     }
 
