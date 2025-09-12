@@ -459,9 +459,9 @@ fn format_file_priority_item(
     let type_label = if item.metrics.god_object_indicators.is_god_object {
         // Distinguish between god objects (classes) and god modules (procedural files)
         if item.metrics.god_object_indicators.fields_count > 5 {
-            "FILE - GOD OBJECT"  // Actual class with many fields
+            "FILE - GOD OBJECT" // Actual class with many fields
         } else {
-            "FILE - GOD MODULE"  // Procedural file with many functions
+            "FILE - GOD MODULE" // Procedural file with many functions
         }
     } else if item.metrics.total_lines > 500 {
         "FILE - HIGH COMPLEXITY"
@@ -694,6 +694,19 @@ fn format_file_priority_item(
     }
 }
 
+// Helper function to format a list with truncation
+fn format_truncated_list(items: &[String], max_display: usize) -> String {
+    if items.len() <= max_display {
+        items.join(", ")
+    } else {
+        format!(
+            "{}, ... ({} more)",
+            items[..max_display].join(", "),
+            items.len() - max_display
+        )
+    }
+}
+
 pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
     let severity = get_severity_label(item.unified_score.final_score);
     let severity_color = get_severity_color(item.unified_score.final_score);
@@ -766,29 +779,13 @@ pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebt
 
         // Add upstream callers if present
         if !item.upstream_callers.is_empty() {
-            let callers_display = if item.upstream_callers.len() <= 3 {
-                item.upstream_callers.join(", ")
-            } else {
-                format!(
-                    "{}, ... ({} more)",
-                    item.upstream_callers[..3].join(", "),
-                    item.upstream_callers.len() - 3
-                )
-            };
+            let callers_display = format_truncated_list(&item.upstream_callers, 3);
             writeln!(output, "│  ├─ CALLERS: {}", callers_display.cyan()).unwrap();
         }
 
         // Add downstream callees if present
         if !item.downstream_callees.is_empty() {
-            let callees_display = if item.downstream_callees.len() <= 3 {
-                item.downstream_callees.join(", ")
-            } else {
-                format!(
-                    "{}, ... ({} more)",
-                    item.downstream_callees[..3].join(", "),
-                    item.downstream_callees.len() - 3
-                )
-            };
+            let callees_display = format_truncated_list(&item.downstream_callees, 3);
             writeln!(output, "│  └─ CALLS: {}", callees_display.bright_magenta()).unwrap();
         }
     }
@@ -1095,6 +1092,34 @@ mod tests {
         // Simple regex to strip ANSI escape codes
         let re = regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap();
         re.replace_all(s, "").to_string()
+    }
+
+    #[test]
+    fn test_format_truncated_list() {
+        // Test with list smaller than max
+        let items = vec!["one".to_string(), "two".to_string()];
+        assert_eq!(format_truncated_list(&items, 3), "one, two");
+
+        // Test with list exactly at max
+        let items = vec!["one".to_string(), "two".to_string(), "three".to_string()];
+        assert_eq!(format_truncated_list(&items, 3), "one, two, three");
+
+        // Test with list larger than max
+        let items = vec![
+            "one".to_string(),
+            "two".to_string(),
+            "three".to_string(),
+            "four".to_string(),
+            "five".to_string(),
+        ];
+        assert_eq!(
+            format_truncated_list(&items, 3),
+            "one, two, three, ... (2 more)"
+        );
+
+        // Test empty list
+        let items: Vec<String> = vec![];
+        assert_eq!(format_truncated_list(&items, 3), "");
     }
 
     fn create_test_item(score: f64) -> UnifiedDebtItem {
