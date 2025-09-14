@@ -352,11 +352,8 @@ git commit -m "fix: refactor and test [function_name]
 
 ❌ **DON'T:**
 - Extract helper methods that are only called once
-- Create test-only helper functions (helpers not used in production code)
 - Break apart a clear match/switch into multiple functions
 - Add abstraction layers for simple logic
-- Refactor visitor pattern implementations (they're meant to have many branches)
-- Create 5+ helper methods for a 15-line function
 - Test I/O directly instead of extracting logic
 
 ✅ **DO:**

@@ -2,6 +2,7 @@
 // This file contains the additional generate_* functions extracted from unified_scorer.rs
 
 use crate::core::FunctionMetrics;
+use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
 
@@ -567,7 +568,6 @@ pub fn generate_complexity_recommendation_with_patterns_and_coverage(
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> (String, String, Vec<String>) {
-    use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
 
     // Early return for coverage-focused recommendation
     if should_prioritize_coverage(coverage) {
@@ -605,7 +605,6 @@ fn analyze_extraction_patterns(
     func: &FunctionMetrics,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> Vec<crate::extraction_patterns::ExtractionSuggestion> {
-    use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
 
     let analyzer = UnifiedExtractionAnalyzer::new();
     let file_metrics = create_minimal_file_metrics(func);

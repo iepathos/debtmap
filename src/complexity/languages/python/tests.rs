@@ -2,7 +2,6 @@
 mod tests {
     use super::super::*;
     use crate::complexity::entropy_core::{EntropyToken, TokenCategory};
-    use crate::complexity::entropy_traits::GenericToken;
     use rustpython_parser::{ast, Parse};
 
     fn parse_python_expr(code: &str) -> ast::Expr {
