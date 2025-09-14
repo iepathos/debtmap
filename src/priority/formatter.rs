@@ -1112,6 +1112,7 @@ mod tests {
     use super::*;
     use crate::formatting::{ColorMode, EmojiMode};
     use crate::priority::call_graph::CallGraph;
+    use crate::priority::file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
     use crate::priority::unified_scorer::Location;
     use crate::priority::{ActionableRecommendation, ImpactMetrics, UnifiedScore};
     use std::path::PathBuf;
@@ -1682,5 +1683,214 @@ mod tests {
     #[test]
     fn test_format_role_unknown() {
         assert_eq!(format_role(FunctionRole::Unknown), "Unknown");
+    }
+
+    // Helper function to create test FileDebtItem
+    fn create_test_file_debt_item() -> FileDebtItem {
+        FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/test_file.rs"),
+                total_lines: 1500,
+                function_count: 45,
+                class_count: 2,
+                avg_complexity: 12.5,
+                max_complexity: 35,
+                total_complexity: 562,
+                coverage_percent: 0.35,
+                uncovered_lines: 975,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 45,
+                    fields_count: 12,
+                    responsibilities: 8,
+                    is_god_object: true,
+                    god_object_score: 0.85,
+                },
+                function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
+            },
+            score: 75.5,
+            priority_rank: 1,
+            recommendation: "Split this god object into smaller, focused modules".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 45.0,
+                maintainability_improvement: 0.65,
+                test_effort: 20.0,
+            },
+        }
+    }
+
+    #[test]
+    fn test_format_file_priority_item_god_object() {
+        let mut output = String::new();
+        let item = create_test_file_debt_item();
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 1, &item, config);
+
+        // Strip ANSI codes for testing
+        let clean_output = strip_ansi_codes(&output);
+
+        // Check header elements
+        assert!(clean_output.contains("#1"));
+        assert!(clean_output.contains("SCORE: 75.5"));
+        assert!(clean_output.contains("[CRITICAL]"));
+        assert!(clean_output.contains("FILE - GOD OBJECT"));
+
+        // Check file path
+        assert!(clean_output.contains("src/test_file.rs"));
+        assert!(clean_output.contains("(1500 lines, 45 functions)"));
+
+        // Check metrics
+        assert!(clean_output.contains("This module contains 45 functions"));
+        assert!(clean_output.contains("Average complexity: 12.5"));
+
+        // Check recommendation
+        assert!(clean_output.contains("Split this god object into smaller, focused modules"));
+
+        // Check impact
+        assert!(clean_output.contains("IMPACT:"));
+        assert!(clean_output.contains("complexity"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_god_module() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        // Make it a god module (many functions, few fields)
+        item.metrics.god_object_indicators.fields_count = 2;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 2, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(clean_output.contains("FILE - GOD MODULE"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_high_complexity() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        // Not a god object but high complexity
+        item.metrics.god_object_indicators.is_god_object = false;
+        item.metrics.total_lines = 600;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 3, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(clean_output.contains("FILE - HIGH COMPLEXITY"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_regular_file() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        // Regular file
+        item.metrics.god_object_indicators.is_god_object = false;
+        item.metrics.total_lines = 300;
+        item.score = 35.0;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 4, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(clean_output.contains("[LOW - FILE]"));
+        assert!(!clean_output.contains("GOD"));
+        assert!(!clean_output.contains("HIGH COMPLEXITY"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_with_dependencies() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        item.metrics.function_scores = vec![9.5, 8.7, 7.9, 7.2, 6.8, 5.9, 5.1];
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 1, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        // Should show top functions
+        assert!(clean_output.contains("DEPENDENCIES:"));
+        assert!(clean_output.contains("high-complexity functions"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_no_coverage() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        item.metrics.coverage_percent = 0.0;
+        item.metrics.uncovered_lines = item.metrics.total_lines;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 1, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        // Should mention no coverage
+        assert!(clean_output.contains("Coverage: 0.0%"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_good_coverage() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        item.metrics.coverage_percent = 0.92;
+        item.metrics.uncovered_lines = 120;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 1, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        // Should show good coverage
+        assert!(clean_output.contains("Coverage: 92.0%"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_scoring_section() {
+        let mut output = String::new();
+        let item = create_test_file_debt_item();
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 1, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        // Check scoring section
+        assert!(clean_output.contains("SCORING:"));
+        assert!(clean_output.contains("File size:"));
+        assert!(clean_output.contains("Functions:"));
+        assert!(clean_output.contains("Complexity:"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_high_score() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        item.score = 95.0;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 1, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(clean_output.contains("[CRITICAL]"));
+        assert!(clean_output.contains("SCORE: 95.0"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_medium_score() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        item.score = 55.0;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item(&mut output, 1, &item, config);
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(clean_output.contains("[MEDIUM]"));
     }
 }

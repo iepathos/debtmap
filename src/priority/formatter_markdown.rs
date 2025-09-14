@@ -626,7 +626,10 @@ fn format_dependency_list(items: &[String], max_shown: usize, list_type: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::{FunctionVisibility, ImpactMetrics, UnifiedScore};
+    use crate::priority::{
+        ActionableRecommendation, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
+        TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
+    };
 
     #[test]
     fn test_get_severity_label() {
@@ -859,5 +862,208 @@ mod tests {
         ];
         let result = format_dependency_list(&items, 3, "Dependencies");
         assert_eq!(result, "- **Dependencies:** func1, func2, func3");
+    }
+
+    // Helper function to create test UnifiedDebtItem
+    fn create_test_debt_item() -> UnifiedDebtItem {
+        use std::path::PathBuf;
+
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                line: 100,
+                function: "test_function".to_string(),
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 25,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 7.0,
+                coverage_factor: 8.0,
+                dependency_factor: 6.0,
+                role_multiplier: 1.2,
+                final_score: 8.5,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Refactor complex function".to_string(),
+                rationale: "High complexity makes it hard to maintain".to_string(),
+                implementation_steps: vec![
+                    "Extract helper functions".to_string(),
+                    "Add unit tests".to_string(),
+                ],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 5.0,
+                risk_reduction: 0.2,
+                coverage_improvement: 25.0,
+                lines_reduction: 30,
+            },
+            transitive_coverage: Some(TransitiveCoverage {
+                direct: 0.45,
+                transitive: 0.55,
+                propagated_from: vec![],
+                uncovered_lines: vec![101, 102, 103],
+            }),
+            upstream_dependencies: 3,
+            downstream_dependencies: 5,
+            upstream_callers: vec![
+                "caller1".to_string(),
+                "caller2".to_string(),
+                "caller3".to_string(),
+            ],
+            downstream_callees: vec![
+                "callee1".to_string(),
+                "callee2".to_string(),
+            ],
+            nesting_depth: 3,
+            function_length: 150,
+            cyclomatic_complexity: 15,
+            cognitive_complexity: 25,
+            entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
+            god_object_indicators: None,
+        }
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_minimal_verbosity() {
+        let mut output = String::new();
+        let item = create_test_debt_item();
+
+        format_priority_item_markdown(&mut output, 1, &item, 0);
+
+        // Check basic elements are present
+        assert!(output.contains("#1 - Score: 8.5 [HIGH]"));
+        assert!(output.contains("**Type:** Complexity"));
+        assert!(output.contains("**Location:** `test.rs:100 test_function()`"));
+        assert!(output.contains("**Action:** Refactor complex function"));
+        assert!(output.contains("**Impact:**"));
+        assert!(output.contains("**Complexity:** cyclomatic=15, cognitive=25"));
+        assert!(output.contains("**Why:** High complexity makes it hard to maintain"));
+
+        // Should NOT include score breakdown or dependencies at verbosity 0
+        assert!(!output.contains("#### Dependencies"));
+        assert!(!output.contains("Coverage Gap"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_verbosity_1() {
+        let mut output = String::new();
+        let item = create_test_debt_item();
+
+        format_priority_item_markdown(&mut output, 2, &item, 1);
+
+        // Should include main factors but not full breakdown
+        assert!(output.contains("#2 - Score: 8.5 [HIGH]"));
+        assert!(output.contains("Main factors"));
+
+        // Should include dependencies section
+        assert!(output.contains("#### Dependencies"));
+        assert!(output.contains("**Upstream:** 3 | **Downstream:** 5"));
+
+        // Should NOT include caller/callee lists at verbosity 1
+        assert!(!output.contains("Called by"));
+        assert!(!output.contains("Calls"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_verbosity_2() {
+        let mut output = String::new();
+        let item = create_test_debt_item();
+
+        format_priority_item_markdown(&mut output, 3, &item, 2);
+
+        // Should include full score breakdown
+        assert!(output.contains("Score Calculation"));
+        assert!(output.contains("Component"));
+        assert!(output.contains("Complexity"));
+
+        // Should include dependencies with detailed lists
+        assert!(output.contains("#### Dependencies"));
+        assert!(output.contains("**Upstream:** 3 | **Downstream:** 5"));
+        assert!(output.contains("Called by"));
+        assert!(output.contains("caller1, caller2, caller3"));
+        assert!(output.contains("Calls"));
+        assert!(output.contains("callee1, callee2"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_critical_score() {
+        let mut output = String::new();
+        let mut item = create_test_debt_item();
+        item.unified_score.final_score = 9.5;
+
+        format_priority_item_markdown(&mut output, 1, &item, 0);
+
+        assert!(output.contains("[CRITICAL]"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_low_score() {
+        let mut output = String::new();
+        let mut item = create_test_debt_item();
+        item.unified_score.final_score = 3.5;
+
+        format_priority_item_markdown(&mut output, 1, &item, 0);
+
+        assert!(output.contains("[LOW]"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_no_complexity() {
+        let mut output = String::new();
+        let mut item = create_test_debt_item();
+        item.debt_type = DebtType::Risk {
+            risk_score: 7.5,
+            factors: vec!["Factor1".to_string()],
+        };
+
+        format_priority_item_markdown(&mut output, 1, &item, 0);
+
+        // Should not have complexity section for Risk type
+        assert!(!output.contains("**Complexity:**"));
+        assert!(output.contains("**Type:** Risk"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_empty_dependencies() {
+        let mut output = String::new();
+        let mut item = create_test_debt_item();
+        item.upstream_callers.clear();
+        item.downstream_callees.clear();
+
+        format_priority_item_markdown(&mut output, 1, &item, 2);
+
+        // Should still show dependency counts but no lists
+        assert!(output.contains("**Upstream:** 3 | **Downstream:** 5"));
+        assert!(!output.contains("Called by"));
+        assert!(!output.contains("Calls"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_large_rank() {
+        let mut output = String::new();
+        let item = create_test_debt_item();
+
+        format_priority_item_markdown(&mut output, 999, &item, 0);
+
+        assert!(output.contains("#999 - Score:"));
+    }
+
+    #[test]
+    fn test_format_priority_item_markdown_no_transitive_coverage() {
+        let mut output = String::new();
+        let mut item = create_test_debt_item();
+        item.transitive_coverage = None;
+
+        format_priority_item_markdown(&mut output, 1, &item, 2);
+
+        // Should still work without transitive coverage
+        assert!(output.contains("#1 - Score: 8.5"));
+        // Coverage information should be omitted in breakdown
     }
 }
