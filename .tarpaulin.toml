@@ -37,7 +37,7 @@ follow-exec = false
 avoid-cfg-tarpaulin = true
 
 # Include test functions in coverage to track what they call
-include-tests = true
+include-tests = false
 
 # Output formats
 out = ["Html", "Json", "Lcov"]
