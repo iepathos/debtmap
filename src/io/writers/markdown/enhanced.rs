@@ -30,7 +30,6 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
     }
 
     fn write_priority_section(&mut self, analysis: &UnifiedAnalysis) -> anyhow::Result<()> {
-
         writeln!(self.writer(), "## Priority Technical Debt")?;
         writeln!(self.writer())?;
 
@@ -77,7 +76,6 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
     }
 
     fn write_file_aggregates_section(&mut self, analysis: &UnifiedAnalysis) -> anyhow::Result<()> {
-
         if analysis.file_aggregates.is_empty() {
             return Ok(());
         }
@@ -205,7 +203,6 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
     }
 
     fn write_call_graph_insights(&mut self, analysis: &UnifiedAnalysis) -> anyhow::Result<()> {
-
         if self.verbosity() < 2 {
             return Ok(());
         }
@@ -259,7 +256,6 @@ impl<W: Write> MarkdownWriter<W> {
         &mut self,
         items: &[UnifiedDebtItem],
     ) -> anyhow::Result<()> {
-
         let breakdown = format_score_breakdown(items);
         write!(self.writer(), "{}", breakdown)?;
         Ok(())

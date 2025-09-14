@@ -1309,3 +1309,328 @@ pub fn generate_collection_inefficiency_recommendation(
         ],
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn create_test_function(name: &str, visibility: Option<&str>) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 8,
+            nesting: 2,
+            length: 50,
+            is_test: false,
+            visibility: visibility.map(|v| v.to_string()),
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        }
+    }
+
+    fn create_test_function_with_file(
+        name: &str,
+        file: &str,
+        visibility: Option<&str>,
+    ) -> FunctionMetrics {
+        let mut func = create_test_function(name, visibility);
+        func.file = PathBuf::from(file);
+        func
+    }
+
+    #[test]
+    fn test_generate_enhanced_dead_code_hints_public() {
+        let func = create_test_function("my_function", Some("pub"));
+        let visibility = FunctionVisibility::Public;
+
+        let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+
+        assert!(!hints.is_empty());
+        assert!(hints.contains(&"Public function - verify not used by external crates".to_string()));
+    }
+
+    #[test]
+    fn test_generate_enhanced_dead_code_hints_private() {
+        let func = create_test_function("my_function", None);
+        let visibility = FunctionVisibility::Private;
+
+        let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+
+        assert!(!hints.is_empty());
+        assert!(
+            hints.contains(&"Private function - safe to remove if no local callers".to_string())
+        );
+    }
+
+    #[test]
+    fn test_generate_enhanced_dead_code_hints_crate() {
+        let func = create_test_function("my_function", Some("pub(crate)"));
+        let visibility = FunctionVisibility::Crate;
+
+        let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+
+        assert!(!hints.is_empty());
+        assert!(
+            hints.contains(&"Crate-visible function - check for usage within crate".to_string())
+        );
+    }
+
+    #[test]
+    fn test_generate_enhanced_dead_code_hints_test_file() {
+        let func =
+            create_test_function_with_file("helper_function", "tests/integration_test.rs", None);
+        let visibility = FunctionVisibility::Private;
+
+        let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+
+        assert!(hints.len() >= 2);
+        assert!(
+            hints.contains(&"Private function - safe to remove if no local callers".to_string())
+        );
+        assert!(hints.contains(&"Test-related function - may be test helper".to_string()));
+    }
+
+    #[test]
+    fn test_generate_enhanced_dead_code_hints_test_function() {
+        let func = create_test_function("test_something", None);
+        let visibility = FunctionVisibility::Private;
+
+        let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+
+        assert!(hints.len() >= 2);
+        assert!(
+            hints.contains(&"Private function - safe to remove if no local callers".to_string())
+        );
+        assert!(hints.contains(&"Test function - verify no test dependencies".to_string()));
+    }
+
+    #[test]
+    fn test_generate_enhanced_dead_code_hints_test_file_and_test_function() {
+        let func =
+            create_test_function_with_file("test_helper", "src/tests/helpers.rs", Some("pub"));
+        let visibility = FunctionVisibility::Public;
+
+        let hints = generate_enhanced_dead_code_hints(&func, &visibility);
+
+        assert!(hints.len() >= 3);
+        assert!(hints.contains(&"Public function - verify not used by external crates".to_string()));
+        assert!(hints.contains(&"Test-related function - may be test helper".to_string()));
+        assert!(hints.contains(&"Test function - verify no test dependencies".to_string()));
+    }
+
+    #[test]
+    fn test_classify_complexity_level() {
+        assert!(matches!(classify_complexity_level(1), ComplexityLevel::Low));
+        assert!(matches!(classify_complexity_level(4), ComplexityLevel::Low));
+        assert!(matches!(
+            classify_complexity_level(5),
+            ComplexityLevel::LowModerate
+        ));
+        assert!(matches!(
+            classify_complexity_level(6),
+            ComplexityLevel::LowModerate
+        ));
+        assert!(matches!(
+            classify_complexity_level(7),
+            ComplexityLevel::Moderate
+        ));
+        assert!(matches!(
+            classify_complexity_level(10),
+            ComplexityLevel::Moderate
+        ));
+        assert!(matches!(
+            classify_complexity_level(11),
+            ComplexityLevel::High
+        ));
+        assert!(matches!(
+            classify_complexity_level(20),
+            ComplexityLevel::High
+        ));
+    }
+
+    #[test]
+    fn test_determine_visibility() {
+        let public_func = create_test_function("test", Some("pub"));
+        assert!(matches!(
+            determine_visibility(&public_func),
+            FunctionVisibility::Public
+        ));
+
+        let crate_func = create_test_function("test", Some("pub(crate)"));
+        assert!(matches!(
+            determine_visibility(&crate_func),
+            FunctionVisibility::Crate
+        ));
+
+        let super_func = create_test_function("test", Some("pub(super)"));
+        assert!(matches!(
+            determine_visibility(&super_func),
+            FunctionVisibility::Crate
+        ));
+
+        let private_func = create_test_function("test", None);
+        assert!(matches!(
+            determine_visibility(&private_func),
+            FunctionVisibility::Private
+        ));
+    }
+
+    #[test]
+    fn test_generate_usage_hints_basic() {
+        let func = create_test_function("unused_func", None);
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "unused_func".to_string(),
+            line: 10,
+        };
+
+        let hints = generate_usage_hints(&func, &call_graph, &func_id);
+
+        assert!(!hints.is_empty());
+        // Should contain visibility hint and possibly other hints
+        assert!(hints.iter().any(|h| h.contains("Private function")));
+    }
+
+    #[test]
+    fn test_generate_low_complexity_recommendation() {
+        // Test with coverage issue
+        let (action, rationale, steps) = generate_low_complexity_recommendation(3, true);
+
+        assert!(action.contains("unit tests"));
+        assert!(rationale.contains("Low complexity"));
+        assert!(!steps.is_empty());
+        assert!(steps.iter().any(|s| s.contains("unit tests")));
+
+        // Test without coverage issue (cyclo <= 3)
+        let (action2, rationale2, steps2) = generate_low_complexity_recommendation(3, false);
+
+        assert!(action2.contains("Simplify function structure"));
+        assert!(rationale2.contains("Low complexity"));
+        assert!(!steps2.is_empty());
+    }
+
+    #[test]
+    fn test_generate_low_moderate_complexity_recommendation() {
+        // Test with good coverage
+        let (action, rationale, steps) = generate_low_moderate_complexity_recommendation(5, true);
+
+        assert!(action.contains("Extract"));
+        assert!(action.contains("pure functions"));
+        assert!(rationale.contains("Low-moderate complexity"));
+        assert!(!steps.is_empty());
+
+        // Test without good coverage
+        let (action2, rationale2, steps2) =
+            generate_low_moderate_complexity_recommendation(5, false);
+
+        assert!(action2.contains("Extract"));
+        assert!(action2.contains("comprehensive tests"));
+        assert!(rationale2.contains("Low-moderate complexity"));
+        assert!(steps2.iter().any(|s| s.contains("test")));
+    }
+
+    #[test]
+    fn test_generate_moderate_complexity_recommendation() {
+        // Test with good coverage
+        let (action, rationale, steps) = generate_moderate_complexity_recommendation(9, true);
+
+        assert!(action.contains("Extract"));
+        assert!(action.contains("pure functions"));
+        assert!(rationale.contains("Moderate complexity"));
+        assert!(!steps.is_empty());
+        assert!(steps.iter().any(|s| s.contains("logical sections")));
+
+        // Test without good coverage
+        let (action2, rationale2, steps2) = generate_moderate_complexity_recommendation(9, false);
+
+        assert!(action2.contains("Extract"));
+        assert!(action2.contains("comprehensive tests"));
+        assert!(rationale2.contains("Moderate complexity"));
+        assert!(steps2.iter().any(|s| s.contains("unit tests")));
+    }
+
+    #[test]
+    fn test_generate_high_complexity_recommendation() {
+        // Test with good coverage
+        let (action, rationale, steps) = generate_high_complexity_recommendation(15, true, false);
+
+        assert!(action.contains("Decompose"));
+        assert!(action.contains("pure functions"));
+        assert!(rationale.contains("High complexity"));
+        assert!(!steps.is_empty());
+
+        // Test with coverage issue
+        let (action2, rationale2, steps2) =
+            generate_high_complexity_recommendation(15, false, true);
+
+        assert!(action2.contains("Add"));
+        assert!(action2.contains("tests"));
+        assert!(action2.contains("decompose"));
+        assert!(rationale2.contains("High complexity"));
+        assert!(!steps2.is_empty());
+
+        // Test without good coverage and no coverage issue
+        let (action3, rationale3, steps3) =
+            generate_high_complexity_recommendation(15, false, false);
+
+        assert!(action3.contains("Decompose"));
+        assert!(action3.contains("comprehensive tests"));
+        assert!(rationale3.contains("High complexity"));
+        assert!(!steps3.is_empty());
+    }
+
+    #[test]
+    fn test_generate_complexity_hotspot_recommendation() {
+        let (action, rationale, steps) = generate_complexity_hotspot_recommendation(20, 30);
+
+        assert!(action.contains("Extract"));
+        assert!(action.contains("pure functions"));
+        assert!(rationale.contains("High complexity"));
+        assert!(rationale.contains("cyclo=20"));
+        assert!(rationale.contains("cog=30"));
+        assert!(!steps.is_empty());
+        assert!(steps.iter().any(|s| s.contains("branch clusters")));
+        assert!(steps.iter().any(|s| s.contains("property-based testing")));
+    }
+
+    #[test]
+    fn test_detect_file_language() {
+        use std::path::Path;
+
+        assert_eq!(
+            detect_file_language(Path::new("test.rs")),
+            crate::core::Language::Rust
+        );
+        assert_eq!(
+            detect_file_language(Path::new("test.py")),
+            crate::core::Language::Python
+        );
+        assert_eq!(
+            detect_file_language(Path::new("test.js")),
+            crate::core::Language::JavaScript
+        );
+        assert_eq!(
+            detect_file_language(Path::new("test.jsx")),
+            crate::core::Language::JavaScript
+        );
+        assert_eq!(
+            detect_file_language(Path::new("test.ts")),
+            crate::core::Language::JavaScript
+        );
+        assert_eq!(
+            detect_file_language(Path::new("test.tsx")),
+            crate::core::Language::JavaScript
+        );
+        assert_eq!(
+            detect_file_language(Path::new("test.unknown")),
+            crate::core::Language::Rust
+        );
+    }
+}

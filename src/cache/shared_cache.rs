@@ -37,6 +37,14 @@ struct PruningConfig {
     is_test_environment: bool,
 }
 
+/// Pruning strategy selection
+#[derive(Debug, Clone, PartialEq)]
+enum PruningStrategyType {
+    NoAutoPruner,      // No auto pruner configured
+    SyncPruning,       // Use synchronous pruning
+    BackgroundPruning, // Use background pruning
+}
+
 /// Internal cache statistics for pruning decisions
 #[derive(Debug, Clone)]
 struct InternalCacheStats {
@@ -585,6 +593,48 @@ impl SharedCache {
         Ok(())
     }
 
+    /// Determine the appropriate pruning strategy - pure function
+    fn determine_pruning_strategy(
+        config: &PruningConfig,
+        has_auto_pruner: bool,
+        has_background_pruner: bool,
+    ) -> PruningStrategyType {
+        if !has_auto_pruner {
+            return PruningStrategyType::NoAutoPruner;
+        }
+
+        if config.use_sync_pruning {
+            return PruningStrategyType::SyncPruning;
+        }
+
+        if has_background_pruner {
+            PruningStrategyType::BackgroundPruning
+        } else {
+            PruningStrategyType::SyncPruning
+        }
+    }
+
+    /// Execute the determined pruning strategy
+    fn execute_pruning_strategy(
+        &self,
+        strategy: PruningStrategyType,
+        key: &str,
+        data_len: usize,
+    ) -> Result<()> {
+        match strategy {
+            PruningStrategyType::NoAutoPruner => self.maybe_cleanup(),
+            PruningStrategyType::SyncPruning => self.execute_sync_pruning(key, data_len),
+            PruningStrategyType::BackgroundPruning => {
+                if let Some(bg_pruner) = &self.background_pruner {
+                    if !bg_pruner.is_running() {
+                        bg_pruner.start_if_needed(self.index.clone());
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+
     /// Handle pre-insertion pruning based on configuration
     fn handle_pre_insertion_pruning(
         &self,
@@ -592,67 +642,60 @@ impl SharedCache {
         data_len: usize,
         config: &PruningConfig,
     ) -> Result<()> {
-        // Early return for no pruner case
-        if self.auto_pruner.is_none() {
-            return self.maybe_cleanup();
-        }
+        let strategy = Self::determine_pruning_strategy(
+            config,
+            self.auto_pruner.is_some(),
+            self.background_pruner.is_some(),
+        );
+        self.execute_pruning_strategy(strategy, key, data_len)
+    }
 
-        // Determine pruning strategy
-        match (config.use_sync_pruning, self.background_pruner.as_ref()) {
-            // Explicit sync pruning requested
-            (true, _) => self.execute_sync_pruning(key, data_len),
+    /// Check if post-insertion pruning should occur - pure predicate
+    fn should_perform_post_insertion_pruning(
+        config: &PruningConfig,
+        has_auto_pruner: bool,
+    ) -> bool {
+        has_auto_pruner && config.use_sync_pruning
+    }
 
-            // Background pruning available and not sync requested
-            (false, Some(bg_pruner)) => {
-                if !bg_pruner.is_running() {
-                    bg_pruner.start_if_needed(self.index.clone());
-                }
-                Ok(())
-            }
-
-            // Fallback to sync pruning when no background pruner
-            (false, None) => self.execute_sync_pruning(key, data_len),
+    /// Log debug information for post-insertion pruning in test mode
+    fn log_post_insertion_debug(stats: &CacheStats, pruner: &AutoPruner) {
+        if cfg!(test) {
+            println!(
+                "Post-insertion check: size={}/{}, count={}/{}",
+                stats.total_size, pruner.max_size_bytes, stats.entry_count, pruner.max_entries
+            );
+            println!("Triggering post-insertion pruning due to limit exceeded");
         }
     }
 
-    /// Handle post-insertion pruning if needed
-    fn handle_post_insertion_pruning(&self, config: &PruningConfig) -> Result<()> {
-        // For synchronous operation (especially tests), check if we exceeded limits after adding entry
-        if self.auto_pruner.is_some() && config.use_sync_pruning {
-            let stats = self.get_stats();
-            if let Some(ref pruner) = self.auto_pruner {
-                let cache_stats = InternalCacheStats {
-                    total_size: stats.total_size,
-                    entry_count: stats.entry_count,
-                };
+    /// Execute post-insertion pruning check and action
+    fn execute_post_insertion_check(&self) -> Result<()> {
+        let stats = self.get_stats();
+        if let Some(ref pruner) = self.auto_pruner {
+            let cache_stats = InternalCacheStats {
+                total_size: stats.total_size,
+                entry_count: stats.entry_count,
+            };
 
-                if Self::should_prune_after_insertion(pruner, &cache_stats) {
-                    // Always print debug in test mode
-                    if cfg!(test) {
-                        println!(
-                            "Post-insertion check: size={}/{}, count={}/{}",
-                            stats.total_size,
-                            pruner.max_size_bytes,
-                            stats.entry_count,
-                            pruner.max_entries
-                        );
-                        println!("Triggering post-insertion pruning due to limit exceeded");
-                    }
-                    self.trigger_pruning()?;
-                }
+            if Self::should_prune_after_insertion(pruner, &cache_stats) {
+                Self::log_post_insertion_debug(&stats, pruner);
+                self.trigger_pruning()?;
             }
         }
         Ok(())
     }
 
-    /// Store a cache entry with explicit pruning configuration  
-    fn put_with_config(
-        &self,
-        key: &str,
-        component: &str,
-        data: &[u8],
-        config: &PruningConfig,
-    ) -> Result<()> {
+    /// Handle post-insertion pruning if needed
+    fn handle_post_insertion_pruning(&self, config: &PruningConfig) -> Result<()> {
+        if Self::should_perform_post_insertion_pruning(config, self.auto_pruner.is_some()) {
+            self.execute_post_insertion_check()?;
+        }
+        Ok(())
+    }
+
+    /// Log configuration details for debugging in test environment - pure function
+    fn log_config_if_test_environment(config: &PruningConfig) {
         if config.is_test_environment {
             log::debug!(
                 "use_sync_pruning={}, auto_prune={}, cfg_test={}",
@@ -661,25 +704,50 @@ impl SharedCache {
                 config.is_test_environment
             );
         }
+    }
 
-        // Handle pre-insertion pruning/cleanup
-        self.handle_pre_insertion_pruning(key, data.len(), config)?;
+    /// Execute index update operation with proper lock management
+    fn execute_index_update(&self, key: &str, data_len: usize) -> Result<()> {
+        let mut index = self
+            .index
+            .write()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+        let metadata = Self::create_cache_metadata(data_len);
+        Self::update_index_with_entry(&mut index, key.to_string(), metadata);
+        Ok(())
+    }
 
+    /// Execute the core cache storage operation - coordinates all steps
+    fn execute_cache_storage(&self, key: &str, component: &str, data: &[u8]) -> Result<()> {
         // Write cache file atomically
         let cache_path = self.get_cache_file_path(key, component);
         Self::write_cache_file_atomically(&cache_path, data)?;
 
         // Update index with new entry
-        {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-            let metadata = Self::create_cache_metadata(data.len());
-            Self::update_index_with_entry(&mut index, key.to_string(), metadata);
-        }
+        self.execute_index_update(key, data.len())?;
 
+        // Persist index changes
         self.save_index()?;
+
+        Ok(())
+    }
+
+    /// Store a cache entry with explicit pruning configuration
+    fn put_with_config(
+        &self,
+        key: &str,
+        component: &str,
+        data: &[u8],
+        config: &PruningConfig,
+    ) -> Result<()> {
+        // Log configuration for debugging
+        Self::log_config_if_test_environment(config);
+
+        // Handle pre-insertion pruning/cleanup
+        self.handle_pre_insertion_pruning(key, data.len(), config)?;
+
+        // Execute core storage operations
+        self.execute_cache_storage(key, component, data)?;
 
         // Handle post-insertion pruning if needed
         self.handle_post_insertion_pruning(config)?;

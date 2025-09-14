@@ -10,6 +10,7 @@ pub fn generate_rust_refactoring_recommendation(
     let is_async = function_name.contains("async") || function_name.contains("poll");
     let is_builder = function_name.contains("build") || function_name.contains("new");
     let is_parser = function_name.contains("parse") || function_name.contains("from_");
+    let nesting_depth = item.nesting_depth;
 
     // Determine refactoring strategy based on function characteristics
     if cyclo > 30 {
@@ -23,7 +24,7 @@ pub fn generate_rust_refactoring_recommendation(
     } else if cyclo > 15 {
         generate_functional_decomposition_recommendation(cyclo, coverage_percent)
     } else {
-        generate_simple_extraction_recommendation(cyclo, coverage_percent)
+        generate_simple_extraction_recommendation(cyclo, coverage_percent, nesting_depth)
     }
 }
 
@@ -203,28 +204,47 @@ fn generate_functional_decomposition_recommendation(
 fn generate_simple_extraction_recommendation(
     cyclo: u32,
     coverage_percent: f64,
+    nesting_depth: u32,
 ) -> (String, String, Vec<String>) {
     let coverage_gap = ((1.0 - coverage_percent) * 100.0) as u32;
     let tests_needed = ((cyclo as f64) * (1.0 - coverage_percent)).ceil() as u32;
 
+    // Generate specific action based on actual metrics
     let action = if coverage_gap > 40 {
-        format!("Add {} tests for {}% coverage gap. NO refactoring needed (complexity {} is acceptable)", 
+        format!("Add {} tests for {}% coverage gap. NO refactoring needed (complexity {} is acceptable)",
                 tests_needed, coverage_gap, cyclo)
+    } else if cyclo > 10 && nesting_depth > 3 {
+        format!("Reduce nesting from {} levels using early returns. Add {} tests for uncovered branches",
+                nesting_depth, tests_needed)
     } else if cyclo > 10 {
-        "Use early returns to reduce nesting. Add tests for uncovered branches".to_string()
+        format!(
+            "Apply early returns to simplify control flow. Add {} tests for uncovered branches",
+            tests_needed
+        )
+    } else if coverage_gap > 0 {
+        format!(
+            "Maintain current structure. Add {} tests for {}% coverage gap",
+            tests_needed.max(1),
+            coverage_gap
+        )
+    } else {
+        "Function is well-tested and simple. No action required".to_string()
+    };
+
+    let why = if coverage_gap > 0 {
+        format!(
+            "Complexity {} is manageable. Coverage at {:.0}%. Focus on test coverage, not refactoring",
+            cyclo,
+            coverage_percent * 100.0
+        )
     } else {
         format!(
-            "Maintain current structure. Add {} tests if needed",
-            tests_needed.max(1)
+            "Complexity {} with full coverage. Well-maintained function",
+            cyclo
         )
     };
 
-    let why = format!(
-        "Complexity {} is manageable. Coverage at {:.0}%. Focus on test coverage, not refactoring",
-        cyclo,
-        coverage_percent * 100.0
-    );
-
+    // Generate specific steps based on actual values, no conditional "IF" statements
     let mut steps = vec![];
 
     if coverage_gap > 20 {
@@ -233,17 +253,47 @@ fn generate_simple_extraction_recommendation(
             tests_needed
         ));
         steps.push("Each test should be <15 lines and test ONE path".to_string());
+
+        // Add specific guidance based on complexity
+        if cyclo <= 5 {
+            steps.push("Test edge cases and boundary conditions".to_string());
+        } else if cyclo <= 10 {
+            steps.push("Focus on testing each decision branch independently".to_string());
+        }
     }
 
-    if cyclo > 10 {
-        steps.push("IF nesting > 3: Use early returns with ? operator".to_string());
+    // Provide specific refactoring guidance based on actual nesting depth
+    if nesting_depth > 3 && cyclo > 10 {
+        steps.push(format!(
+            "Current nesting depth is {} levels - use early returns with ? operator",
+            nesting_depth
+        ));
+        steps.push("Extract deeply nested blocks into separate functions".to_string());
         steps.push(
-            "Extract functions only when there's clear duplication or logical separation"
-                .to_string(),
+            "Replace nested if-else chains with match expressions where appropriate".to_string(),
         );
-    } else {
+    } else if nesting_depth > 2 && cyclo > 5 {
+        steps.push(format!(
+            "Nesting depth of {} can be reduced with guard clauses",
+            nesting_depth
+        ));
+        steps.push("Move validation checks to the beginning with early returns".to_string());
+    } else if cyclo > 10 {
+        steps.push("Extract helper functions for complex boolean expressions".to_string());
+        steps.push("Consider using match expressions instead of if-else chains".to_string());
+    } else if cyclo > 5 {
         steps.push("Current structure is acceptable - prioritize test coverage".to_string());
-        steps.push("Consider minor improvements like guard clauses if beneficial".to_string());
+        if nesting_depth > 1 {
+            steps.push("Consider extracting guard clauses for precondition checks".to_string());
+        }
+    } else {
+        steps.push("Current structure is clean and simple".to_string());
+        if coverage_gap > 0 {
+            steps.push(format!(
+                "Focus on adding the {} missing tests",
+                tests_needed
+            ));
+        }
     }
 
     (action, why, steps)

@@ -13,87 +13,116 @@ pub fn determine_debt_type(
     call_graph: &CallGraph,
     func_id: &FunctionId,
 ) -> DebtType {
-    // Determine primary debt type based on metrics
-    if let Some(cov) = coverage {
-        // Any untested function (< 20% coverage) that isn't a test itself is a testing gap
-        // Even simple functions need basic tests
-        if cov.direct < 0.2 && !func.is_test {
-            return DebtType::TestingGap {
-                coverage: cov.direct,
-                cyclomatic: func.cyclomatic,
-                cognitive: func.cognitive,
-            };
-        }
+    // Early return for testing gaps
+    if let Some(testing_gap) = check_testing_gap(func, coverage) {
+        return testing_gap;
     }
 
-    if func.cyclomatic > 10 || func.cognitive > 15 {
-        return DebtType::ComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        };
+    // Early return for complexity hotspots
+    if let Some(hotspot) = check_complexity_hotspot(func) {
+        return hotspot;
     }
 
-    // Check for dead code before falling back to generic risk
-    if is_dead_code(func, call_graph, func_id, None) {
-        return DebtType::DeadCode {
-            visibility: determine_visibility(func),
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-            usage_hints: generate_usage_hints(func, call_graph, func_id),
-        };
+    // Early return for dead code
+    if let Some(dead_code) = check_dead_code(func, call_graph, func_id) {
+        return dead_code;
     }
 
-    // Get role for later checks
+    // Classify based on role and complexity
     let role = classify_function_role(func, func_id, call_graph);
+    classify_by_role_and_complexity(func, &role, coverage)
+}
 
-    // Low complexity functions that are I/O wrappers or entry points
-    // should not be flagged as technical debt
-    if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        // Check if it's an I/O wrapper or entry point
-        if role == FunctionRole::IOWrapper
-            || role == FunctionRole::EntryPoint
-            || role == FunctionRole::PatternMatch
-        {
-            // These are acceptable patterns, not debt
-            return DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
-            };
-        }
+// Pure helper functions for debt classification
+fn check_testing_gap(
+    func: &FunctionMetrics,
+    coverage: &Option<TransitiveCoverage>,
+) -> Option<DebtType> {
+    coverage
+        .as_ref()
+        .filter(|cov| cov.direct < 0.2 && !func.is_test)
+        .map(|cov| DebtType::TestingGap {
+            coverage: cov.direct,
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+        })
+}
 
-        // Pure logic functions that are very simple are not debt
-        if role == FunctionRole::PureLogic && func.length <= 10 {
-            // Simple pure functions like formatters don't need to be flagged
-            // Return minimal risk to indicate no real debt
-            return DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Trivial pure function - not technical debt".to_string()],
-            };
-        }
+fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
+    (func.cyclomatic > 10 || func.cognitive > 15).then(|| DebtType::ComplexityHotspot {
+        cyclomatic: func.cyclomatic,
+        cognitive: func.cognitive,
+    })
+}
+
+fn check_dead_code(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+) -> Option<DebtType> {
+    is_dead_code(func, call_graph, func_id, None).then(|| DebtType::DeadCode {
+        visibility: determine_visibility(func),
+        cyclomatic: func.cyclomatic,
+        cognitive: func.cognitive,
+        usage_hints: generate_usage_hints(func, call_graph, func_id),
+    })
+}
+
+fn classify_by_role_and_complexity(
+    func: &FunctionMetrics,
+    role: &FunctionRole,
+    coverage: &Option<TransitiveCoverage>,
+) -> DebtType {
+    // Handle simple functions
+    if is_simple_function(func) {
+        return classify_simple_by_role(func, role);
     }
 
-    // Only flag as risk-based debt if there's actual complexity or other indicators
-    if func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50 {
-        DebtType::Risk {
+    // Handle complex functions
+    if needs_risk_assessment(func) {
+        return DebtType::Risk {
             risk_score: calculate_risk_score(func),
             factors: identify_risk_factors(func, coverage),
-        }
-    } else {
-        // Simple functions with cyclomatic <= 5 and cognitive <= 8 and length <= 50
-        // Simple functions are not debt in themselves
-        if role == FunctionRole::PureLogic {
-            // Simple pure functions are not debt - return minimal risk
-            DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Simple pure function - minimal risk".to_string()],
-            }
-        } else {
-            // Other simple functions - minimal risk
-            DebtType::Risk {
-                risk_score: 0.1,
-                factors: vec!["Simple function with low complexity".to_string()],
-            }
-        }
+        };
+    }
+
+    // Default case for functions that fall between simple and complex
+    match role {
+        FunctionRole::PureLogic => DebtType::Risk {
+            risk_score: 0.0,
+            factors: vec!["Simple pure function - minimal risk".to_string()],
+        },
+        _ => DebtType::Risk {
+            risk_score: 0.1,
+            factors: vec!["Simple function with low complexity".to_string()],
+        },
+    }
+}
+
+fn is_simple_function(func: &FunctionMetrics) -> bool {
+    func.cyclomatic <= 3 && func.cognitive <= 5
+}
+
+fn needs_risk_assessment(func: &FunctionMetrics) -> bool {
+    func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50
+}
+
+fn classify_simple_by_role(func: &FunctionMetrics, role: &FunctionRole) -> DebtType {
+    use FunctionRole::*;
+
+    match role {
+        IOWrapper | EntryPoint | PatternMatch => DebtType::Risk {
+            risk_score: 0.0,
+            factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
+        },
+        PureLogic if func.length <= 10 => DebtType::Risk {
+            risk_score: 0.0,
+            factors: vec!["Trivial pure function - not technical debt".to_string()],
+        },
+        _ => DebtType::Risk {
+            risk_score: 0.1,
+            factors: vec!["Simple function with low complexity".to_string()],
+        },
     }
 }
 
@@ -340,34 +369,41 @@ fn identify_risk_factors(
     func: &FunctionMetrics,
     coverage: &Option<TransitiveCoverage>,
 ) -> Vec<String> {
-    let mut factors = Vec::new();
-
-    if func.cyclomatic > 5 {
-        factors.push(format!(
-            "Moderate complexity (cyclomatic: {})",
-            func.cyclomatic
-        ));
-    }
-
-    if func.cognitive > 8 {
-        factors.push(format!("Cognitive complexity: {}", func.cognitive));
-    }
-
-    if func.length > 50 {
-        factors.push(format!("Long function ({} lines)", func.length));
-    }
-
-    if let Some(cov) = coverage {
-        if cov.direct < 0.5 {
-            factors.push(format!("Low coverage: {:.0}%", cov.direct * 100.0));
-        }
-    }
+    let factors = [
+        complexity_factor(func),
+        cognitive_factor(func),
+        length_factor(func),
+        coverage_factor(coverage),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
 
     if factors.is_empty() {
-        factors.push("Potential improvement opportunity".to_string());
+        vec!["Potential improvement opportunity".to_string()]
+    } else {
+        factors
     }
+}
 
-    factors
+// Pure predicates for risk factors
+fn complexity_factor(func: &FunctionMetrics) -> Option<String> {
+    (func.cyclomatic > 5).then(|| format!("Moderate complexity (cyclomatic: {})", func.cyclomatic))
+}
+
+fn cognitive_factor(func: &FunctionMetrics) -> Option<String> {
+    (func.cognitive > 8).then(|| format!("Cognitive complexity: {}", func.cognitive))
+}
+
+fn length_factor(func: &FunctionMetrics) -> Option<String> {
+    (func.length > 50).then(|| format!("Long function ({} lines)", func.length))
+}
+
+fn coverage_factor(coverage: &Option<TransitiveCoverage>) -> Option<String> {
+    coverage
+        .as_ref()
+        .filter(|cov| cov.direct < 0.5)
+        .map(|cov| format!("Low coverage: {:.0}%", cov.direct * 100.0))
 }
 
 fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
@@ -503,4 +539,197 @@ fn has_testing_gap(coverage: f64, is_test: bool) -> bool {
 
 fn is_complexity_hotspot_by_metrics(cyclomatic: u32, cognitive: u32) -> bool {
     cyclomatic > 5 || cognitive > 8
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::FunctionMetrics;
+    use crate::priority::call_graph::{CallGraph, FunctionId};
+    use std::path::PathBuf;
+
+    fn create_test_function(name: &str, visibility: Option<&str>) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 10,
+            cyclomatic: 5,
+            cognitive: 8,
+            nesting: 2,
+            length: 50,
+            is_test: false,
+            visibility: visibility.map(|v| v.to_string()),
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        }
+    }
+
+    #[test]
+    fn test_generate_usage_hints_public_function() {
+        let func = create_test_function("test_func", Some("pub"));
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 10,
+        };
+
+        let hints = generate_usage_hints(&func, &call_graph, &func_id);
+
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0], "Public function with no internal callers");
+    }
+
+    #[test]
+    fn test_generate_usage_hints_private_function() {
+        let func = create_test_function("test_func", None);
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test_func".to_string(),
+            line: 10,
+        };
+
+        let hints = generate_usage_hints(&func, &call_graph, &func_id);
+
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0], "Private function with no callers");
+    }
+
+    #[test]
+    fn test_generate_usage_hints_underscore_prefix() {
+        let func = create_test_function("_internal_func", None);
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "_internal_func".to_string(),
+            line: 10,
+        };
+
+        let hints = generate_usage_hints(&func, &call_graph, &func_id);
+
+        assert_eq!(hints.len(), 2);
+        assert_eq!(hints[0], "Private function with no callers");
+        assert_eq!(
+            hints[1],
+            "Name starts with underscore (often indicates internal/unused)"
+        );
+    }
+
+    #[test]
+    fn test_generate_usage_hints_deprecated_name() {
+        let func = create_test_function("old_deprecated_function", Some("pub"));
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "old_deprecated_function".to_string(),
+            line: 10,
+        };
+
+        let hints = generate_usage_hints(&func, &call_graph, &func_id);
+
+        assert_eq!(hints.len(), 2);
+        assert_eq!(hints[0], "Public function with no internal callers");
+        assert_eq!(hints[1], "Name suggests obsolete functionality");
+    }
+
+    #[test]
+    fn test_generate_usage_hints_legacy_function() {
+        let func = create_test_function("legacy_handler", None);
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "legacy_handler".to_string(),
+            line: 10,
+        };
+
+        let hints = generate_usage_hints(&func, &call_graph, &func_id);
+
+        assert_eq!(hints.len(), 2);
+        assert!(hints.contains(&"Private function with no callers".to_string()));
+        assert!(hints.contains(&"Name suggests obsolete functionality".to_string()));
+    }
+
+    #[test]
+    fn test_generate_usage_hints_multiple_indicators() {
+        let func = create_test_function("_old_deprecated_helper", Some("pub"));
+        let call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "_old_deprecated_helper".to_string(),
+            line: 10,
+        };
+
+        let hints = generate_usage_hints(&func, &call_graph, &func_id);
+
+        assert_eq!(hints.len(), 3);
+        assert!(hints.contains(&"Public function with no internal callers".to_string()));
+        assert!(hints.contains(
+            &"Name starts with underscore (often indicates internal/unused)".to_string()
+        ));
+        assert!(hints.contains(&"Name suggests obsolete functionality".to_string()));
+    }
+
+    #[test]
+    fn test_has_testing_gap_low_coverage() {
+        assert!(has_testing_gap(0.1, false));
+        assert!(has_testing_gap(0.19, false));
+        assert!(!has_testing_gap(0.2, false));
+        assert!(!has_testing_gap(0.5, false));
+    }
+
+    #[test]
+    fn test_has_testing_gap_is_test() {
+        assert!(!has_testing_gap(0.0, true));
+        assert!(!has_testing_gap(0.1, true));
+        assert!(!has_testing_gap(0.5, true));
+    }
+
+    #[test]
+    fn test_is_complexity_hotspot_by_metrics() {
+        assert!(is_complexity_hotspot_by_metrics(6, 5));
+        assert!(is_complexity_hotspot_by_metrics(3, 9));
+        assert!(is_complexity_hotspot_by_metrics(10, 10));
+        assert!(!is_complexity_hotspot_by_metrics(5, 8));
+        assert!(!is_complexity_hotspot_by_metrics(3, 5));
+    }
+
+    fn test_extract_visibility(func: &FunctionMetrics) -> FunctionVisibility {
+        match func.visibility.as_deref() {
+            Some("pub") => FunctionVisibility::Public,
+            Some("pub(crate)") => FunctionVisibility::Crate,
+            _ => FunctionVisibility::Private,
+        }
+    }
+
+    #[test]
+    fn test_function_visibility_extraction() {
+        let public_func = create_test_function("test", Some("pub"));
+        assert_eq!(
+            test_extract_visibility(&public_func),
+            FunctionVisibility::Public
+        );
+
+        let crate_func = create_test_function("test", Some("pub(crate)"));
+        assert_eq!(
+            test_extract_visibility(&crate_func),
+            FunctionVisibility::Crate
+        );
+
+        let private_func = create_test_function("test", None);
+        assert_eq!(
+            test_extract_visibility(&private_func),
+            FunctionVisibility::Private
+        );
+
+        // pub(super) maps to Private visibility since we don't have Module variant
+        let module_func = create_test_function("test", Some("pub(super)"));
+        assert_eq!(
+            test_extract_visibility(&module_func),
+            FunctionVisibility::Private
+        );
+    }
 }
