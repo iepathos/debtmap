@@ -37,7 +37,9 @@ impl StatementProcessor {
 
             // Definition statements
             FunctionDef(func_def) => Self::process_function_def(analyzer, func_def, tokens),
-            AsyncFunctionDef(func_def) => Self::process_async_function_def(analyzer, func_def, tokens),
+            AsyncFunctionDef(func_def) => {
+                Self::process_async_function_def(analyzer, func_def, tokens)
+            }
             ClassDef(class_def) => Self::process_class_def(analyzer, class_def, tokens),
 
             // Assignment statements
@@ -47,7 +49,7 @@ impl StatementProcessor {
 
             // Expression statement
             Expr(expr_stmt) => analyzer.extract_tokens_from_expr(&expr_stmt.value, tokens),
-            
+
             // Other statements (pass, break, continue, etc.)
             _ => Self::process_other_stmt(stmt, tokens),
         }
@@ -65,7 +67,7 @@ impl StatementProcessor {
         tokens.push(GenericToken::control_flow("if".to_string()));
         analyzer.extract_tokens_from_expr(&if_stmt.test, tokens);
         analyzer.process_stmt_body(&if_stmt.body, tokens);
-        
+
         if !if_stmt.orelse.is_empty() {
             tokens.push(GenericToken::keyword("else".to_string()));
             analyzer.process_stmt_body(&if_stmt.orelse, tokens);
@@ -81,7 +83,7 @@ impl StatementProcessor {
         tokens.push(GenericToken::control_flow("while".to_string()));
         analyzer.extract_tokens_from_expr(&while_stmt.test, tokens);
         analyzer.process_stmt_body(&while_stmt.body, tokens);
-        
+
         if !while_stmt.orelse.is_empty() {
             tokens.push(GenericToken::keyword("else".to_string()));
             analyzer.process_stmt_body(&while_stmt.orelse, tokens);
@@ -99,7 +101,7 @@ impl StatementProcessor {
         tokens.push(GenericToken::keyword("in".to_string()));
         analyzer.extract_tokens_from_expr(&for_stmt.iter, tokens);
         analyzer.process_stmt_body(&for_stmt.body, tokens);
-        
+
         if !for_stmt.orelse.is_empty() {
             tokens.push(GenericToken::keyword("else".to_string()));
             analyzer.process_stmt_body(&for_stmt.orelse, tokens);
@@ -113,21 +115,21 @@ impl StatementProcessor {
         tokens: &mut Vec<GenericToken>,
     ) {
         tokens.push(GenericToken::keyword("with".to_string()));
-        
+
         // Process each context manager
         for (i, item) in with_stmt.items.iter().enumerate() {
             if i > 0 {
                 tokens.push(GenericToken::operator(",".to_string()));
             }
             analyzer.extract_tokens_from_expr(&item.context_expr, tokens);
-            
+
             // Handle 'as' clause
             if let Some(optional_vars) = &item.optional_vars {
                 tokens.push(GenericToken::keyword("as".to_string()));
                 analyzer.extract_tokens_from_expr(optional_vars, tokens);
             }
         }
-        
+
         analyzer.process_stmt_body(&with_stmt.body, tokens);
     }
 
@@ -139,20 +141,20 @@ impl StatementProcessor {
     ) {
         tokens.push(GenericToken::control_flow("match".to_string()));
         analyzer.extract_tokens_from_expr(&match_stmt.subject, tokens);
-        
+
         for case in &match_stmt.cases {
             tokens.push(GenericToken::keyword("case".to_string()));
-            
+
             // Process the case pattern
             // Process the case pattern directly (no longer optional in newer AST)
             tokens.push(GenericToken::identifier("pattern".to_string()));
-            
+
             // Process guard condition
             if let Some(guard) = &case.guard {
                 tokens.push(GenericToken::keyword("if".to_string()));
                 analyzer.extract_tokens_from_expr(guard, tokens);
             }
-            
+
             analyzer.process_stmt_body(&case.body, tokens);
         }
     }
@@ -175,13 +177,13 @@ impl StatementProcessor {
                     if let Some(exception_type) = &h.type_ {
                         analyzer.extract_tokens_from_expr(exception_type, tokens);
                     }
-                    
+
                     // Process exception name binding
                     if let Some(name) = &h.name {
                         tokens.push(GenericToken::keyword("as".to_string()));
                         tokens.push(GenericToken::identifier(normalize_identifier(name)));
                     }
-                    
+
                     analyzer.process_stmt_body(&h.body, tokens);
                 }
             }
@@ -192,7 +194,7 @@ impl StatementProcessor {
             tokens.push(GenericToken::keyword("else".to_string()));
             analyzer.process_stmt_body(&try_stmt.orelse, tokens);
         }
-        
+
         // Process finally clause
         if !try_stmt.finalbody.is_empty() {
             tokens.push(GenericToken::keyword("finally".to_string()));
@@ -222,10 +224,10 @@ impl StatementProcessor {
         tokens: &mut Vec<GenericToken>,
     ) {
         tokens.push(GenericToken::keyword("raise".to_string()));
-        
+
         if let Some(exc) = &raise_stmt.exc {
             analyzer.extract_tokens_from_expr(exc, tokens);
-            
+
             // Handle 'from' clause
             if let Some(cause) = &raise_stmt.cause {
                 tokens.push(GenericToken::keyword("from".to_string()));
@@ -242,7 +244,7 @@ impl StatementProcessor {
     ) {
         tokens.push(GenericToken::keyword("assert".to_string()));
         analyzer.extract_tokens_from_expr(&assert_stmt.test, tokens);
-        
+
         // Handle optional assertion message
         if let Some(msg) = &assert_stmt.msg {
             tokens.push(GenericToken::operator(",".to_string()));
@@ -263,22 +265,22 @@ impl StatementProcessor {
         tokens.push(GenericToken::identifier(normalize_identifier(
             &func_def.name,
         )));
-        
+
         // Process decorators
         for decorator in &func_def.decorator_list {
             tokens.push(GenericToken::keyword("@".to_string()));
             analyzer.extract_tokens_from_expr(decorator, tokens);
         }
-        
+
         // Process parameters
         Self::process_function_parameters(&func_def.args, tokens);
-        
+
         // Process return annotation
         if let Some(returns) = &func_def.returns {
             tokens.push(GenericToken::operator("->".to_string()));
             analyzer.extract_tokens_from_expr(returns, tokens);
         }
-        
+
         analyzer.process_stmt_body(&func_def.body, tokens);
     }
 
@@ -293,22 +295,22 @@ impl StatementProcessor {
         tokens.push(GenericToken::identifier(normalize_identifier(
             &func_def.name,
         )));
-        
+
         // Process decorators
         for decorator in &func_def.decorator_list {
             tokens.push(GenericToken::keyword("@".to_string()));
             analyzer.extract_tokens_from_expr(decorator, tokens);
         }
-        
+
         // Process parameters
         Self::process_function_parameters(&func_def.args, tokens);
-        
+
         // Process return annotation
         if let Some(returns) = &func_def.returns {
             tokens.push(GenericToken::operator("->".to_string()));
             analyzer.extract_tokens_from_expr(returns, tokens);
         }
-        
+
         analyzer.process_stmt_body(&func_def.body, tokens);
     }
 
@@ -322,13 +324,13 @@ impl StatementProcessor {
         tokens.push(GenericToken::identifier(normalize_identifier(
             &class_def.name,
         )));
-        
+
         // Process decorators
         for decorator in &class_def.decorator_list {
             tokens.push(GenericToken::keyword("@".to_string()));
             analyzer.extract_tokens_from_expr(decorator, tokens);
         }
-        
+
         // Process base classes
         if !class_def.bases.is_empty() {
             for (i, base) in class_def.bases.iter().enumerate() {
@@ -338,7 +340,7 @@ impl StatementProcessor {
                 analyzer.extract_tokens_from_expr(base, tokens);
             }
         }
-        
+
         // Process keyword arguments (like metaclass)
         for keyword in &class_def.keywords {
             if let Some(arg) = &keyword.arg {
@@ -347,23 +349,22 @@ impl StatementProcessor {
             }
             analyzer.extract_tokens_from_expr(&keyword.value, tokens);
         }
-        
+
         analyzer.process_stmt_body(&class_def.body, tokens);
     }
 
     /// Helper function to process function parameters
-    fn process_function_parameters(
-        parameters: &ast::Arguments,
-        tokens: &mut Vec<GenericToken>,
-    ) {
+    fn process_function_parameters(parameters: &ast::Arguments, tokens: &mut Vec<GenericToken>) {
         // Process positional arguments
         for (i, arg) in parameters.args.iter().enumerate() {
             if i > 0 {
                 tokens.push(GenericToken::operator(",".to_string()));
             }
-            tokens.push(GenericToken::identifier(normalize_identifier(&arg.def.arg.to_string())));
+            tokens.push(GenericToken::identifier(normalize_identifier(
+                arg.def.arg.as_ref(),
+            )));
         }
-        
+
         // Process *args
         if let Some(vararg) = &parameters.vararg {
             if !parameters.args.is_empty() {
@@ -372,18 +373,23 @@ impl StatementProcessor {
             tokens.push(GenericToken::operator("*".to_string()));
             tokens.push(GenericToken::identifier(normalize_identifier(&vararg.arg)));
         }
-        
+
         // Process keyword-only arguments
         for (i, arg) in parameters.kwonlyargs.iter().enumerate() {
             if i > 0 || !parameters.args.is_empty() || parameters.vararg.is_some() {
                 tokens.push(GenericToken::operator(",".to_string()));
             }
-            tokens.push(GenericToken::identifier(normalize_identifier(&arg.def.arg.to_string())));
+            tokens.push(GenericToken::identifier(normalize_identifier(
+                arg.def.arg.as_ref(),
+            )));
         }
-        
+
         // Process **kwargs
         if let Some(kwarg) = &parameters.kwarg {
-            if !parameters.args.is_empty() || parameters.vararg.is_some() || !parameters.kwonlyargs.is_empty() {
+            if !parameters.args.is_empty()
+                || parameters.vararg.is_some()
+                || !parameters.kwonlyargs.is_empty()
+            {
                 tokens.push(GenericToken::operator(",".to_string()));
             }
             tokens.push(GenericToken::operator("**".to_string()));
@@ -407,7 +413,7 @@ impl StatementProcessor {
             }
             analyzer.extract_tokens_from_expr(target, tokens);
         }
-        
+
         tokens.push(GenericToken::operator("=".to_string()));
         analyzer.extract_tokens_from_expr(&assign_stmt.value, tokens);
     }
@@ -419,11 +425,11 @@ impl StatementProcessor {
         tokens: &mut Vec<GenericToken>,
     ) {
         analyzer.extract_tokens_from_expr(&aug_assign.target, tokens);
-        
+
         // Convert operator to string representation
         let op_str = Self::augmented_operator_to_string(&aug_assign.op);
         tokens.push(GenericToken::operator(format!("{}=", op_str)));
-        
+
         analyzer.extract_tokens_from_expr(&aug_assign.value, tokens);
     }
 
@@ -434,11 +440,11 @@ impl StatementProcessor {
         tokens: &mut Vec<GenericToken>,
     ) {
         analyzer.extract_tokens_from_expr(&ann_assign.target, tokens);
-        
+
         // Add type annotation
         tokens.push(GenericToken::operator(":".to_string()));
         analyzer.extract_tokens_from_expr(&ann_assign.annotation, tokens);
-        
+
         // Add assignment if present
         if let Some(value) = &ann_assign.value {
             tokens.push(GenericToken::operator("=".to_string()));
@@ -523,7 +529,7 @@ impl StatementProcessor {
                     tokens.push(GenericToken::identifier(normalize_identifier(module)));
                 }
                 tokens.push(GenericToken::keyword("import".to_string()));
-                
+
                 for (i, alias) in import_from.names.iter().enumerate() {
                     if i > 0 {
                         tokens.push(GenericToken::operator(",".to_string()));

@@ -364,7 +364,8 @@ fn format_file_aggregate_item(
     }
 
     // IMPACT section
-    let impact_percentage = calculate_impact_percentage(item.problematic_functions, item.function_count);
+    let impact_percentage =
+        calculate_impact_percentage(item.problematic_functions, item.function_count);
     writeln!(
         output,
         "├─ {}: Reduce overall file complexity by {}%, improve test coverage, enable safer refactoring",
@@ -1203,7 +1204,10 @@ mod tests {
         }
     }
 
-    fn create_test_file_aggregate(score: f64, function_count: usize) -> priority::FileAggregateScore {
+    fn create_test_file_aggregate(
+        score: f64,
+        function_count: usize,
+    ) -> priority::FileAggregateScore {
         use crate::priority::aggregation::AggregationMethod;
 
         priority::FileAggregateScore {
@@ -1239,7 +1243,8 @@ mod tests {
         assert!(clean_output.contains("total score: 1750.0"));
 
         // Verify WHY section
-        assert!(clean_output.contains("File aggregate combines complexity scores from 10 individual functions"));
+        assert!(clean_output
+            .contains("File aggregate combines complexity scores from 10 individual functions"));
         assert!(clean_output.contains("5 functions exceed complexity thresholds"));
 
         // Verify ACTION section with specific refactoring patterns
@@ -1324,7 +1329,9 @@ mod tests {
         let clean_output = strip_ansi_codes(&output);
 
         // Should show no action needed
-        assert!(clean_output.contains("No immediate action needed - monitor for future degradation"));
+        assert!(
+            clean_output.contains("No immediate action needed - monitor for future degradation")
+        );
 
         // Should not show refactoring steps
         assert!(!clean_output.contains("Extract guard clauses"));

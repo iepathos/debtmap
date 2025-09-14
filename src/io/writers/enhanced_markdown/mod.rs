@@ -45,19 +45,28 @@ fn should_show_complexity_insight(avg_complexity: f64) -> bool {
 }
 
 fn should_show_coverage_insight(coverage: Option<f64>) -> bool {
-    coverage.map_or(false, |c| c < 0.5)
+    coverage.is_some_and(|c| c < 0.5)
 }
 
 fn format_critical_complexity_insight(count: usize) -> String {
-    format!("- ⚠️ **{}** critical complexity issues require immediate attention", count)
+    format!(
+        "- ⚠️ **{}** critical complexity issues require immediate attention",
+        count
+    )
 }
 
 fn format_high_complexity_insight(avg: f64) -> String {
-    format!("- 📈 Average complexity ({:.1}) exceeds recommended threshold", avg)
+    format!(
+        "- 📈 Average complexity ({:.1}) exceeds recommended threshold",
+        avg
+    )
 }
 
 fn format_low_coverage_insight(coverage: f64) -> String {
-    format!("- 🔴 Code coverage ({:.1}%) is below minimum recommended level", coverage * 100.0)
+    format!(
+        "- 🔴 Code coverage ({:.1}%) is below minimum recommended level",
+        coverage * 100.0
+    )
 }
 
 impl<W: Write> EnhancedMarkdownWriter<W> {
@@ -151,7 +160,12 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         let health_score = calculate_health_score(results, coverage_percentage.map(|r| r * 100.0));
         let avg_complexity = calculate_average_complexity(results);
 
-        self.write_health_status_section(health_score, avg_complexity, coverage_percentage, results)?;
+        self.write_health_status_section(
+            health_score,
+            avg_complexity,
+            coverage_percentage,
+            results,
+        )?;
         self.write_key_insights_section(avg_complexity, coverage_percentage, unified_analysis)?;
 
         writeln!(self.writer)?;
@@ -168,7 +182,10 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         // Write section header
         if self.config.collapsible_sections {
             writeln!(self.writer, "<details open>")?;
-            writeln!(self.writer, "<summary><strong>📊 Health Status</strong></summary>\n")?;
+            writeln!(
+                self.writer,
+                "<summary><strong>📊 Health Status</strong></summary>\n"
+            )?;
         } else {
             writeln!(self.writer, "### 📊 Health Status\n")?;
         }
@@ -178,7 +195,9 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         writeln!(self.writer, "|--------|-------|--------|")?;
 
         // Write individual metrics
-        writeln!(self.writer, "{}",
+        writeln!(
+            self.writer,
+            "{}",
             format_health_metric(
                 "**Overall Health**",
                 format!("{}% {}", health_score, get_health_emoji(health_score)),
@@ -186,7 +205,9 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
             )
         )?;
 
-        writeln!(self.writer, "{}",
+        writeln!(
+            self.writer,
+            "{}",
             format_health_metric(
                 "**Average Complexity**",
                 format!("{:.2}", avg_complexity),
@@ -195,7 +216,9 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         )?;
 
         if let Some(coverage) = coverage_percentage {
-            writeln!(self.writer, "{}",
+            writeln!(
+                self.writer,
+                "{}",
                 format_health_metric(
                     "**Code Coverage**",
                     format!("{:.1}%", coverage * 100.0),
@@ -204,7 +227,9 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
             )?;
         }
 
-        writeln!(self.writer, "{}",
+        writeln!(
+            self.writer,
+            "{}",
             format_health_metric(
                 "**Technical Debt**",
                 format!("{} items", results.technical_debt.items.len()),
@@ -480,10 +505,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         Ok(())
     }
 
-
-// Pure functions for recommendations
-
-
+    // Pure functions for recommendations
 
     fn write_complexity_hotspots(&mut self, results: &AnalysisResults) -> Result<()> {
         self.toc_builder.add_entry(2, "Complexity Hotspots");
@@ -728,7 +750,8 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         writeln!(self.writer, "### 🚨 Priority Actions\n")?;
 
         if let Some(analysis) = unified_analysis {
-            let priority_items: Vec<_> = analysis.items
+            let priority_items: Vec<_> = analysis
+                .items
                 .iter()
                 .take(3)
                 .enumerate()
@@ -788,7 +811,10 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::priority::{DebtType, ActionableRecommendation, ImpactMetrics, FunctionRole, UnifiedScore, Location, UnifiedDebtItem as DebtItem};
+    use crate::priority::{
+        ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location,
+        UnifiedDebtItem as DebtItem, UnifiedScore,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -843,19 +869,28 @@ mod tests {
     #[test]
     fn test_format_critical_complexity_insight() {
         let result = format_critical_complexity_insight(3);
-        assert_eq!(result, "- ⚠️ **3** critical complexity issues require immediate attention");
+        assert_eq!(
+            result,
+            "- ⚠️ **3** critical complexity issues require immediate attention"
+        );
     }
 
     #[test]
     fn test_format_high_complexity_insight() {
         let result = format_high_complexity_insight(12.5);
-        assert_eq!(result, "- 📈 Average complexity (12.5) exceeds recommended threshold");
+        assert_eq!(
+            result,
+            "- 📈 Average complexity (12.5) exceeds recommended threshold"
+        );
     }
 
     #[test]
     fn test_format_low_coverage_insight() {
         let result = format_low_coverage_insight(0.35);
-        assert_eq!(result, "- 🔴 Code coverage (35.0%) is below minimum recommended level");
+        assert_eq!(
+            result,
+            "- 🔴 Code coverage (35.0%) is below minimum recommended level"
+        );
     }
 
     #[test]
@@ -877,7 +912,10 @@ mod tests {
         assert!(100 > 50);
     }
 
-    fn generate_strategic_recommendations_test(avg_complexity: f64, debt_count: usize) -> Vec<String> {
+    fn generate_strategic_recommendations_test(
+        avg_complexity: f64,
+        debt_count: usize,
+    ) -> Vec<String> {
         let mut recommendations = Vec::new();
         let mut index = 1;
 
@@ -927,20 +965,20 @@ mod tests {
         let items = vec![
             create_test_debt_item(DebtType::ComplexityHotspot {
                 cyclomatic: 25,
-                cognitive: 20
+                cognitive: 20,
             }),
             create_test_debt_item(DebtType::ComplexityHotspot {
                 cyclomatic: 15,
-                cognitive: 12
+                cognitive: 12,
             }),
             create_test_debt_item(DebtType::ComplexityHotspot {
                 cyclomatic: 30,
-                cognitive: 25
+                cognitive: 25,
             }),
             create_test_debt_item(DebtType::TestingGap {
                 coverage: 0.3,
                 cyclomatic: 10,
-                cognitive: 8
+                cognitive: 8,
             }),
         ];
 

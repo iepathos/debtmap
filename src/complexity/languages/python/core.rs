@@ -69,30 +69,60 @@ impl<'a> PythonEntropyAnalyzer<'a> {
             If(if_stmt) => {
                 let mut patterns = vec!["if".to_string()];
                 patterns.extend(self.detect_patterns_in_expr(&if_stmt.test));
-                patterns.extend(if_stmt.body.iter().flat_map(|s| self.detect_patterns_in_stmt(s)));
-                patterns.extend(if_stmt.orelse.iter().flat_map(|s| self.detect_patterns_in_stmt(s)));
+                patterns.extend(
+                    if_stmt
+                        .body
+                        .iter()
+                        .flat_map(|s| self.detect_patterns_in_stmt(s)),
+                );
+                patterns.extend(
+                    if_stmt
+                        .orelse
+                        .iter()
+                        .flat_map(|s| self.detect_patterns_in_stmt(s)),
+                );
                 patterns
             }
             While(while_stmt) => {
                 let mut patterns = vec!["while".to_string()];
                 patterns.extend(self.detect_patterns_in_expr(&while_stmt.test));
-                patterns.extend(while_stmt.body.iter().flat_map(|s| self.detect_patterns_in_stmt(s)));
+                patterns.extend(
+                    while_stmt
+                        .body
+                        .iter()
+                        .flat_map(|s| self.detect_patterns_in_stmt(s)),
+                );
                 patterns
             }
             For(for_stmt) => {
                 let mut patterns = vec!["for".to_string()];
                 patterns.extend(self.detect_patterns_in_expr(&for_stmt.iter));
-                patterns.extend(for_stmt.body.iter().flat_map(|s| self.detect_patterns_in_stmt(s)));
+                patterns.extend(
+                    for_stmt
+                        .body
+                        .iter()
+                        .flat_map(|s| self.detect_patterns_in_stmt(s)),
+                );
                 patterns
             }
             FunctionDef(func_def) => {
                 let mut patterns = vec![format!("def:{}", func_def.name)];
-                patterns.extend(func_def.body.iter().flat_map(|s| self.detect_patterns_in_stmt(s)));
+                patterns.extend(
+                    func_def
+                        .body
+                        .iter()
+                        .flat_map(|s| self.detect_patterns_in_stmt(s)),
+                );
                 patterns
             }
             ClassDef(class_def) => {
                 let mut patterns = vec![format!("class:{}", class_def.name)];
-                patterns.extend(class_def.body.iter().flat_map(|s| self.detect_patterns_in_stmt(s)));
+                patterns.extend(
+                    class_def
+                        .body
+                        .iter()
+                        .flat_map(|s| self.detect_patterns_in_stmt(s)),
+                );
                 patterns
             }
             Expr(expr_stmt) => self.detect_patterns_in_expr(&expr_stmt.value),
@@ -130,18 +160,29 @@ impl<'a> PythonEntropyAnalyzer<'a> {
     fn extract_branch_group(&self, stmt: &ast::Stmt) -> Option<BranchGroup> {
         use ast::Stmt::*;
         match stmt {
+            FunctionDef(func_def) => {
+                // Recursively check function body for branch groups
+                func_def
+                    .body
+                    .iter()
+                    .find_map(|s| self.extract_branch_group(s))
+            }
             If(if_stmt) => {
                 let mut group = BranchGroup::new();
 
                 // Add if branch
-                let if_tokens = if_stmt.body.iter()
+                let if_tokens = if_stmt
+                    .body
+                    .iter()
                     .flat_map(|s| self.extract_tokens_from_stmt(s))
                     .collect();
                 group.add_branch(if_tokens);
 
                 // Add else branch if present
                 if !if_stmt.orelse.is_empty() {
-                    let else_tokens = if_stmt.orelse.iter()
+                    let else_tokens = if_stmt
+                        .orelse
+                        .iter()
                         .flat_map(|s| self.extract_tokens_from_stmt(s))
                         .collect();
                     group.add_branch(else_tokens);
@@ -152,7 +193,9 @@ impl<'a> PythonEntropyAnalyzer<'a> {
             Match(match_stmt) => {
                 let mut group = BranchGroup::new();
                 for case in &match_stmt.cases {
-                    let case_tokens = case.body.iter()
+                    let case_tokens = case
+                        .body
+                        .iter()
                         .flat_map(|s| self.extract_tokens_from_stmt(s))
                         .collect();
                     group.add_branch(case_tokens);
@@ -189,7 +232,12 @@ impl<'a> PythonEntropyAnalyzer<'a> {
             AnnAssign(ann_assign) => self.collect_variables_from_expr(&ann_assign.target),
             For(for_stmt) => {
                 let mut vars = self.collect_variables_from_expr(&for_stmt.target);
-                vars.extend(for_stmt.body.iter().flat_map(|s| self.collect_variables_from_stmt(s)));
+                vars.extend(
+                    for_stmt
+                        .body
+                        .iter()
+                        .flat_map(|s| self.collect_variables_from_stmt(s)),
+                );
                 vars
             }
             FunctionDef(func_def) => {
@@ -220,53 +268,57 @@ impl<'a> PythonEntropyAnalyzer<'a> {
             .unwrap_or(0)
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn calculate_stmt_nesting(&self, stmt: &ast::Stmt, current_depth: u32) -> u32 {
         use ast::Stmt::*;
         match stmt {
             If(if_stmt) => {
-                let if_depth = if_stmt.body.iter()
+                let if_depth = if_stmt
+                    .body
+                    .iter()
                     .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
                     .max()
                     .unwrap_or(current_depth + 1);
 
-                let else_depth = if_stmt.orelse.iter()
+                let else_depth = if_stmt
+                    .orelse
+                    .iter()
                     .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
                     .max()
                     .unwrap_or(current_depth);
 
                 if_depth.max(else_depth)
             }
-            While(while_stmt) => {
-                while_stmt.body.iter()
-                    .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
-                    .max()
-                    .unwrap_or(current_depth + 1)
-            }
-            For(for_stmt) => {
-                for_stmt.body.iter()
-                    .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
-                    .max()
-                    .unwrap_or(current_depth + 1)
-
-            }
-            FunctionDef(func_def) => {
-                func_def.body.iter()
-                    .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
-                    .max()
-                    .unwrap_or(current_depth + 1)
-            }
-            AsyncFunctionDef(func_def) => {
-                func_def.body.iter()
-                    .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
-                    .max()
-                    .unwrap_or(current_depth + 1)
-            }
-            ClassDef(class_def) => {
-                class_def.body.iter()
-                    .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
-                    .max()
-                    .unwrap_or(current_depth + 1)
-            }
+            While(while_stmt) => while_stmt
+                .body
+                .iter()
+                .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
+                .max()
+                .unwrap_or(current_depth + 1),
+            For(for_stmt) => for_stmt
+                .body
+                .iter()
+                .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
+                .max()
+                .unwrap_or(current_depth + 1),
+            FunctionDef(func_def) => func_def
+                .body
+                .iter()
+                .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
+                .max()
+                .unwrap_or(current_depth + 1),
+            AsyncFunctionDef(func_def) => func_def
+                .body
+                .iter()
+                .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
+                .max()
+                .unwrap_or(current_depth + 1),
+            ClassDef(class_def) => class_def
+                .body
+                .iter()
+                .map(|s| self.calculate_stmt_nesting(s, current_depth + 1))
+                .max()
+                .unwrap_or(current_depth + 1),
             _ => current_depth,
         }
     }

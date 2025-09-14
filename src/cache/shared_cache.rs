@@ -1206,7 +1206,10 @@ impl SharedCache {
     }
 
     /// Calculate which entries should be pruned - pure function
-    fn calculate_entries_to_prune(&self, pruner: &AutoPruner) -> Result<Vec<(String, CacheMetadata)>> {
+    fn calculate_entries_to_prune(
+        &self,
+        pruner: &AutoPruner,
+    ) -> Result<Vec<(String, CacheMetadata)>> {
         let index = self
             .index
             .read()
@@ -1215,7 +1218,10 @@ impl SharedCache {
     }
 
     /// Remove entries from index and return bytes freed
-    fn remove_entries_from_index(&self, entries_to_remove: &[(String, CacheMetadata)]) -> Result<u64> {
+    fn remove_entries_from_index(
+        &self,
+        entries_to_remove: &[(String, CacheMetadata)],
+    ) -> Result<u64> {
         let mut index = self
             .index
             .write()
@@ -1223,9 +1229,7 @@ impl SharedCache {
 
         let bytes_freed = entries_to_remove
             .iter()
-            .filter_map(|(key, metadata)| {
-                index.entries.remove(key).map(|_| metadata.size_bytes)
-            })
+            .filter_map(|(key, metadata)| index.entries.remove(key).map(|_| metadata.size_bytes))
             .sum();
 
         index.total_size = index.entries.values().map(|m| m.size_bytes).sum();

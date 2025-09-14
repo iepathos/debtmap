@@ -114,12 +114,25 @@ impl UniversalEntropyCalculator {
 
         self.cache_misses += 1;
 
-        // Extract tokens and calculate Shannon entropy
+        // Extract tokens
         let tokens = analyzer.extract_tokens(node);
-        let token_entropy = self.shannon_entropy(&tokens);
 
-        // Detect pattern repetition
+        // Use our new pure functions for better entropy calculation
+        use crate::complexity::entropy_analysis::{
+            calculate_repetition_score, calculate_weighted_entropy,
+        };
+
+        // Calculate weighted entropy (considers both category and token level)
+        let token_entropy = calculate_weighted_entropy(&tokens);
+
+        // Calculate repetition score from actual token sequences
+        let token_repetition = calculate_repetition_score(&tokens);
+
+        // Detect structural patterns (existing behavior for control flow patterns)
         let patterns = analyzer.detect_patterns(node);
+
+        // Use the higher of token repetition or structural pattern repetition
+        let pattern_repetition = token_repetition.max(patterns.repetition_ratio);
 
         // Calculate branch similarity
         let branch_similarity = analyzer.calculate_branch_similarity(node);
@@ -129,11 +142,11 @@ impl UniversalEntropyCalculator {
 
         // Calculate effective complexity
         let effective_complexity =
-            self.adjust_complexity(token_entropy, patterns.repetition_ratio, branch_similarity);
+            self.adjust_complexity(token_entropy, pattern_repetition, branch_similarity);
 
         let score = EntropyScore {
             token_entropy,
-            pattern_repetition: patterns.repetition_ratio,
+            pattern_repetition,
             branch_similarity,
             effective_complexity,
             unique_variables,
@@ -185,15 +198,22 @@ impl UniversalEntropyCalculator {
     }
 
     /// Adjust complexity based on patterns and similarity
+    /// This is a pure function that reduces entropy based on repetition
     pub fn adjust_complexity(&self, entropy: f64, patterns: f64, similarity: f64) -> f64 {
+        // Pattern reduction: high repetition reduces complexity
+        // If patterns = 1.0 (100% repetitive), factor = 0.7 (30% reduction max)
         let pattern_factor = 1.0 - (patterns * self.config.pattern_weight);
+
+        // Similarity reduction: similar branches reduce complexity
+        // If similarity = 1.0 (identical branches), factor = 0.8 (20% reduction max)
         let similarity_factor = 1.0 - (similarity * self.config.similarity_weight);
 
+        // Apply reductions
         let adjusted = entropy * pattern_factor * similarity_factor;
 
-        // Apply threshold
+        // Apply threshold dampening for very low complexity
         if adjusted < self.config.base_threshold {
-            adjusted * 0.5 // Reduce score for low complexity
+            adjusted * 0.5 // Further reduce score for trivially simple code
         } else {
             adjusted
         }
@@ -231,6 +251,7 @@ impl UniversalEntropyCalculator {
 pub trait EntropyToken: Clone + Hash + Eq {
     fn to_category(&self) -> TokenCategory;
     fn weight(&self) -> f64;
+    fn value(&self) -> &str;
 }
 
 /// Trait for language-specific entropy analysis

@@ -20,27 +20,15 @@ impl ExpressionProcessor {
         tokens: &mut Vec<GenericToken>,
     ) {
         match categorize_expression(expr) {
-            ExprCategory::Operator => {
-                tokens.extend(extract_operator_tokens(expr))
-            }
-            ExprCategory::ControlFlow => {
-                tokens.extend(extract_control_flow_tokens(expr))
-            }
+            ExprCategory::Operator => tokens.extend(extract_operator_tokens(expr)),
+            ExprCategory::ControlFlow => tokens.extend(extract_control_flow_tokens(expr)),
             ExprCategory::Comprehension => {
                 tokens.extend(extract_comprehension_expr_tokens(analyzer, expr))
             }
-            ExprCategory::Literal => {
-                tokens.extend(extract_literal_tokens(expr))
-            }
-            ExprCategory::Collection => {
-                tokens.extend(extract_collection_tokens(analyzer, expr))
-            }
-            ExprCategory::Access => {
-                tokens.extend(extract_access_tokens(analyzer, expr))
-            }
-            ExprCategory::Special => {
-                tokens.extend(extract_special_tokens(analyzer, expr))
-            }
+            ExprCategory::Literal => tokens.extend(extract_literal_tokens(expr)),
+            ExprCategory::Collection => tokens.extend(extract_collection_tokens(analyzer, expr)),
+            ExprCategory::Access => tokens.extend(extract_access_tokens(analyzer, expr)),
+            ExprCategory::Special => tokens.extend(extract_special_tokens(analyzer, expr)),
         }
     }
 
@@ -71,7 +59,9 @@ pub fn categorize_expression(expr: &ast::Expr) -> ExprCategory {
         Constant(_) | JoinedStr(_) | FormattedValue(_) => ExprCategory::Literal,
         List(_) | Tuple(_) | Set(_) | Dict(_) => ExprCategory::Collection,
         Attribute(_) | Subscript(_) | Slice(_) => ExprCategory::Access,
-        Call(_) | Starred(_) | Name(_) | Yield(_) | YieldFrom(_) | Await(_) | NamedExpr(_) => ExprCategory::Special,
+        Call(_) | Starred(_) | Name(_) | Yield(_) | YieldFrom(_) | Await(_) | NamedExpr(_) => {
+            ExprCategory::Special
+        }
     }
 }
 
@@ -134,7 +124,7 @@ pub fn extract_literal_tokens(expr: &ast::Expr) -> Vec<GenericToken> {
                 Constant::Ellipsis => "...".to_string(),
             };
             vec![GenericToken::literal(value)]
-        },
+        }
         JoinedStr(joined_str) => extract_join_str_tokens(joined_str),
         FormattedValue(formatted_value) => extract_formatted_value_tokens(formatted_value),
         _ => vec![],
@@ -242,8 +232,8 @@ pub fn extract_bin_op_tokens(bin_op: &ast::ExprBinOp) -> Vec<GenericToken> {
     tokens.push(GenericToken::operator(op_str.to_string()));
 
     // Recursively process nested expressions
-    tokens.extend(extract_nested_expr_tokens(&*bin_op.left));
-    tokens.extend(extract_nested_expr_tokens(&*bin_op.right));
+    tokens.extend(extract_nested_expr_tokens(&bin_op.left));
+    tokens.extend(extract_nested_expr_tokens(&bin_op.right));
 
     tokens
 }
@@ -257,7 +247,14 @@ fn extract_nested_expr_tokens(expr: &ast::Expr) -> Vec<GenericToken> {
         UnaryOp(unary_op) => extract_unary_op_tokens(unary_op),
         Compare(compare) => extract_compare_tokens(compare),
         Constant(_) => extract_literal_tokens(expr),
-        _ => vec![] // Skip other expression types for now
+        NamedExpr(named_expr) => {
+            // Extract walrus operator (:=) and its operands
+            let mut tokens = Vec::new();
+            tokens.push(GenericToken::operator(":=".to_string()));
+            tokens.extend(extract_nested_expr_tokens(&named_expr.value));
+            tokens
+        }
+        _ => vec![], // Skip other expression types for now
     }
 }
 
@@ -275,7 +272,13 @@ pub fn extract_unary_op_tokens(unary_op: &ast::ExprUnaryOp) -> Vec<GenericToken>
 
 /// Extract tokens from comparison operations - pure function
 fn extract_compare_tokens(compare: &ast::ExprCompare) -> Vec<GenericToken> {
-    compare.ops.iter().map(|op| {
+    let mut tokens = Vec::new();
+
+    // Extract tokens from left operand (including NamedExpr)
+    tokens.extend(extract_nested_expr_tokens(&compare.left));
+
+    // Extract comparison operators
+    for op in &compare.ops {
         let op_str = match op {
             ast::CmpOp::Eq => "==",
             ast::CmpOp::NotEq => "!=",
@@ -288,8 +291,15 @@ fn extract_compare_tokens(compare: &ast::ExprCompare) -> Vec<GenericToken> {
             ast::CmpOp::In => "in",
             ast::CmpOp::NotIn => "not in",
         };
-        GenericToken::operator(op_str.to_string())
-    }).collect()
+        tokens.push(GenericToken::operator(op_str.to_string()));
+    }
+
+    // Extract tokens from comparators
+    for comparator in &compare.comparators {
+        tokens.extend(extract_nested_expr_tokens(comparator));
+    }
+
+    tokens
 }
 
 // ============================================================================
@@ -321,9 +331,9 @@ pub fn extract_if_exp_tokens(if_exp: &ast::ExprIfExp) -> Vec<GenericToken> {
     ];
 
     // Extract operator tokens from test, body, and else branches
-    tokens.extend(extract_nested_expr_tokens(&*if_exp.test));
-    tokens.extend(extract_nested_expr_tokens(&*if_exp.body));
-    tokens.extend(extract_nested_expr_tokens(&*if_exp.orelse));
+    tokens.extend(extract_nested_expr_tokens(&if_exp.test));
+    tokens.extend(extract_nested_expr_tokens(&if_exp.body));
+    tokens.extend(extract_nested_expr_tokens(&if_exp.orelse));
 
     tokens
 }
@@ -705,17 +715,14 @@ pub fn extract_starred_tokens(
 /// Extract tokens from joined strings (f-strings)
 pub fn extract_join_str_tokens(joined_str: &ast::ExprJoinedStr) -> Vec<GenericToken> {
     let mut tokens = vec![GenericToken::literal("f-string".to_string())];
-    tokens.extend(
-        joined_str
-            .values
-            .iter()
-            .flat_map(|value| extract_literal_tokens(value))
-    );
+    tokens.extend(joined_str.values.iter().flat_map(extract_literal_tokens));
     tokens
 }
 
 /// Extract tokens from formatted values (f-string components)
-pub fn extract_formatted_value_tokens(_formatted_value: &ast::ExprFormattedValue) -> Vec<GenericToken> {
+pub fn extract_formatted_value_tokens(
+    _formatted_value: &ast::ExprFormattedValue,
+) -> Vec<GenericToken> {
     vec![GenericToken::custom("formatted_value".to_string())]
 }
 
@@ -743,56 +750,60 @@ pub fn collect_variables_from_expr(expr: &ast::Expr) -> HashSet<String> {
             vars.extend(collect_variables_from_expr(&bin_op.right));
             vars
         }
-        BoolOp(bool_op) => {
-            bool_op.values.iter()
-                .flat_map(collect_variables_from_expr)
-                .collect()
-        }
+        BoolOp(bool_op) => bool_op
+            .values
+            .iter()
+            .flat_map(collect_variables_from_expr)
+            .collect(),
         Compare(compare) => {
             let mut vars = collect_variables_from_expr(&compare.left);
             vars.extend(
-                compare.comparators.iter()
-                    .flat_map(collect_variables_from_expr)
+                compare
+                    .comparators
+                    .iter()
+                    .flat_map(collect_variables_from_expr),
             );
             vars
         }
         Call(call) => {
             let mut vars = collect_variables_from_expr(&call.func);
+            vars.extend(call.args.iter().flat_map(collect_variables_from_expr));
             vars.extend(
-                call.args.iter()
-                    .flat_map(collect_variables_from_expr)
-            );
-            vars.extend(
-                call.keywords.iter()
-                    .flat_map(|kw| collect_variables_from_expr(&kw.value))
+                call.keywords
+                    .iter()
+                    .flat_map(|kw| collect_variables_from_expr(&kw.value)),
             );
             vars
         }
-        List(list) => {
-            list.elts.iter()
-                .flat_map(collect_variables_from_expr)
-                .collect()
-        }
-        Tuple(tuple) => {
-            tuple.elts.iter()
-                .flat_map(collect_variables_from_expr)
-                .collect()
-        }
+        List(list) => list
+            .elts
+            .iter()
+            .flat_map(collect_variables_from_expr)
+            .collect(),
+        Tuple(tuple) => tuple
+            .elts
+            .iter()
+            .flat_map(collect_variables_from_expr)
+            .collect(),
         Dict(dict) => {
-            let key_vars: HashSet<String> = dict.keys.iter()
+            let key_vars: HashSet<String> = dict
+                .keys
+                .iter()
                 .filter_map(|key| key.as_ref())
                 .flat_map(collect_variables_from_expr)
                 .collect();
-            let value_vars: HashSet<String> = dict.values.iter()
+            let value_vars: HashSet<String> = dict
+                .values
+                .iter()
                 .flat_map(collect_variables_from_expr)
                 .collect();
             key_vars.union(&value_vars).cloned().collect()
         }
-        Set(set) => {
-            set.elts.iter()
-                .flat_map(collect_variables_from_expr)
-                .collect()
-        }
+        Set(set) => set
+            .elts
+            .iter()
+            .flat_map(collect_variables_from_expr)
+            .collect(),
         ListComp(list_comp) => collect_comprehension_variables(list_comp),
         SetComp(set_comp) => collect_set_comp_variables(set_comp),
         DictComp(dict_comp) => collect_dict_comp_variables(dict_comp),
@@ -811,26 +822,17 @@ pub fn collect_patterns(pattern: &ast::Pattern) -> Vec<String> {
         MatchSingleton(match_singleton) => vec![format!("singleton:{:?}", match_singleton.value)],
         MatchSequence(match_sequence) => {
             let mut patterns = vec!["sequence".to_string()];
-            patterns.extend(
-                match_sequence.patterns.iter()
-                    .flat_map(collect_patterns)
-            );
+            patterns.extend(match_sequence.patterns.iter().flat_map(collect_patterns));
             patterns
         }
         MatchMapping(match_mapping) => {
             let mut patterns = vec!["mapping".to_string()];
-            patterns.extend(
-                match_mapping.patterns.iter()
-                    .flat_map(collect_patterns)
-            );
+            patterns.extend(match_mapping.patterns.iter().flat_map(collect_patterns));
             patterns
         }
         MatchClass(match_class) => {
             let mut patterns = vec![format!("class:{:?}", match_class.cls)];
-            patterns.extend(
-                match_class.patterns.iter()
-                    .flat_map(collect_patterns)
-            );
+            patterns.extend(match_class.patterns.iter().flat_map(collect_patterns));
             patterns
         }
         MatchStar(match_star) => {
@@ -852,10 +854,7 @@ pub fn collect_patterns(pattern: &ast::Pattern) -> Vec<String> {
         }
         MatchOr(match_or) => {
             let mut patterns = vec!["or".to_string()];
-            patterns.extend(
-                match_or.patterns.iter()
-                    .flat_map(collect_patterns)
-            );
+            patterns.extend(match_or.patterns.iter().flat_map(collect_patterns));
             patterns
         }
     }
@@ -986,8 +985,8 @@ mod tests {
             let tokens = extract_bin_op_tokens(&bin_op);
             // Should extract all operators
             assert!(tokens.iter().any(|t| t.value() == "Mult")); // Top level
-            assert!(tokens.iter().any(|t| t.value() == "Add"));  // Left nested
-            assert!(tokens.iter().any(|t| t.value() == "Sub"));  // Right nested
+            assert!(tokens.iter().any(|t| t.value() == "Add")); // Left nested
+            assert!(tokens.iter().any(|t| t.value() == "Sub")); // Right nested
         } else {
             panic!("Expected BinOp");
         }

@@ -568,22 +568,21 @@ pub fn generate_complexity_recommendation_with_patterns_and_coverage(
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> (String, String, Vec<String>) {
-
     // Early return for coverage-focused recommendation
     if should_prioritize_coverage(coverage) {
-        return generate_coverage_focused_recommendation(func, cyclomatic, cognitive, coverage.as_ref().unwrap());
+        return generate_coverage_focused_recommendation(
+            func,
+            cyclomatic,
+            cognitive,
+            coverage.as_ref().unwrap(),
+        );
     }
 
     // Analyze extraction patterns
     let suggestions = analyze_extraction_patterns(func, data_flow);
 
     if !suggestions.is_empty() {
-        generate_pattern_based_recommendation(
-            func,
-            cyclomatic,
-            &suggestions,
-            coverage,
-        )
+        generate_pattern_based_recommendation(func, cyclomatic, &suggestions, coverage)
     } else {
         // Fall back to heuristic recommendations
         generate_heuristic_recommendations_with_line_estimates(
@@ -605,7 +604,6 @@ fn analyze_extraction_patterns(
     func: &FunctionMetrics,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> Vec<crate::extraction_patterns::ExtractionSuggestion> {
-
     let analyzer = UnifiedExtractionAnalyzer::new();
     let file_metrics = create_minimal_file_metrics(func);
     analyzer.analyze_function(func, &file_metrics, data_flow)
@@ -639,7 +637,12 @@ fn generate_pattern_based_recommendation(
     let predicted_complexity = cyclomatic.saturating_sub(total_reduction);
 
     // Build action string
-    let action = build_action_string(&action_parts, cyclomatic, predicted_complexity, suggestions.len());
+    let action = build_action_string(
+        &action_parts,
+        cyclomatic,
+        predicted_complexity,
+        suggestions.len(),
+    );
 
     // Generate rationale
     let rationale = build_rationale(cyclomatic, suggestions.len());
@@ -665,10 +668,9 @@ fn generate_pattern_based_recommendation(
 fn process_suggestions(
     suggestions: &[&crate::extraction_patterns::ExtractionSuggestion],
 ) -> (Vec<String>, Vec<String>, u32) {
-    suggestions
-        .iter()
-        .enumerate()
-        .fold((Vec::new(), Vec::new(), 0u32), |(mut actions, mut steps, mut total), (i, suggestion)| {
+    suggestions.iter().enumerate().fold(
+        (Vec::new(), Vec::new(), 0u32),
+        |(mut actions, mut steps, mut total), (i, suggestion)| {
             actions.push(format!(
                 "{} (confidence: {:.0}%)",
                 suggestion.suggested_name,
@@ -686,11 +688,14 @@ fn process_suggestions(
                 suggestion.complexity_reduction.predicted_cyclomatic
             ));
 
-            total += suggestion.complexity_reduction.current_cyclomatic
+            total += suggestion
+                .complexity_reduction
+                .current_cyclomatic
                 .saturating_sub(suggestion.complexity_reduction.predicted_cyclomatic);
 
             (actions, steps, total)
-        })
+        },
+    )
 }
 
 // Build action string - pure function
@@ -710,9 +715,7 @@ fn build_action_string(
     } else {
         format!(
             "Extract {} identified patterns to reduce complexity from {} to {}",
-            total_suggestions,
-            cyclomatic,
-            predicted_complexity
+            total_suggestions, cyclomatic, predicted_complexity
         )
     }
 }
@@ -807,12 +810,8 @@ pub fn generate_heuristic_recommendations_with_line_estimates(
     let characteristics = analyze_function_characteristics(func, cyclomatic, cognitive, data_flow);
 
     // Generate extraction recommendations based on patterns
-    let (extractions, steps, complexity_reduction) = generate_extraction_recommendations(
-        &characteristics,
-        cyclomatic,
-        cognitive,
-        func.nesting,
-    );
+    let (extractions, steps, complexity_reduction) =
+        generate_extraction_recommendations(&characteristics, cyclomatic, cognitive, func.nesting);
 
     // Add purity-based recommendations
     let mut all_steps = steps;
@@ -940,7 +939,10 @@ fn generate_extraction_recommendations(
 fn generate_purity_recommendations(characteristics: &FunctionCharacteristics) -> Vec<String> {
     match (characteristics.is_pure, characteristics.purity_confidence) {
         (true, conf) if conf > 0.8 => {
-            vec!["Function is likely pure - focus on breaking down into smaller pure functions".to_string()]
+            vec![
+                "Function is likely pure - focus on breaking down into smaller pure functions"
+                    .to_string(),
+            ]
         }
         (_, conf) if conf < 0.3 => {
             vec!["Isolate side effects at function boundaries before extraction".to_string()]
@@ -998,7 +1000,10 @@ fn build_heuristic_action(
     let target_complexity = cyclomatic.saturating_sub(complexity_reduction);
 
     if extractions.is_empty() {
-        format!("Refactor to reduce complexity from {} → ~{}", cyclomatic, target_complexity)
+        format!(
+            "Refactor to reduce complexity from {} → ~{}",
+            cyclomatic, target_complexity
+        )
     } else {
         format!(
             "Extract {} to reduce complexity {} → ~{}",

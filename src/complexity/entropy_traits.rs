@@ -76,6 +76,10 @@ impl EntropyToken for GenericToken {
     fn weight(&self) -> f64 {
         self.weight
     }
+
+    fn value(&self) -> &str {
+        &self.value
+    }
 }
 
 /// Base implementation helpers for language analyzers
