@@ -914,10 +914,7 @@ mod tests {
                 "caller2".to_string(),
                 "caller3".to_string(),
             ],
-            downstream_callees: vec![
-                "callee1".to_string(),
-                "callee2".to_string(),
-            ],
+            downstream_callees: vec!["callee1".to_string(), "callee2".to_string()],
             nesting_depth: 3,
             function_length: 150,
             cyclomatic_complexity: 15,

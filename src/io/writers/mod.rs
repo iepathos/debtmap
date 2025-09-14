@@ -4,5 +4,5 @@ pub mod markdown;
 pub mod terminal;
 
 pub use json::JsonWriter;
-pub use markdown::MarkdownWriter;
+pub use markdown::{EnhancedMarkdownWriter, MarkdownWriter};
 pub use terminal::TerminalWriter;

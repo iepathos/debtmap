@@ -1659,4 +1659,240 @@ mod tests {
         assert_eq!(to_remove_50.len(), 1);
         assert!(to_remove_50.contains(&"old_entry".to_string()));
     }
+
+    #[test]
+    fn test_put_with_config_test_environment() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Set environment variables
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let test_config = PruningConfig {
+            auto_prune_enabled: false,
+            use_sync_pruning: false,
+            is_test_environment: true,
+        };
+
+        let key = "test_key";
+        let component = "test_component";
+        let data = b"test data for config";
+
+        // Test put_with_config in test environment
+        cache
+            .put_with_config(key, component, data, &test_config)
+            .unwrap();
+
+        // Verify the data was stored correctly
+        assert!(cache.exists(key, component));
+        let retrieved = cache.get(key, component).unwrap();
+        assert_eq!(retrieved, data);
+
+        // Verify index was updated
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 1);
+        assert!(stats.total_size >= data.len() as u64);
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_put_with_config_sync_pruning_enabled() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "true");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let sync_prune_config = PruningConfig {
+            auto_prune_enabled: true,
+            use_sync_pruning: true,
+            is_test_environment: false,
+        };
+
+        let key = "sync_prune_key";
+        let component = "sync_component";
+        let data = b"data with sync pruning";
+
+        // Test put_with_config with sync pruning
+        cache
+            .put_with_config(key, component, data, &sync_prune_config)
+            .unwrap();
+
+        // Verify the data was stored correctly
+        assert!(cache.exists(key, component));
+        let retrieved = cache.get(key, component).unwrap();
+        assert_eq!(retrieved, data);
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_put_with_config_auto_prune_disabled() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let no_prune_config = PruningConfig {
+            auto_prune_enabled: false,
+            use_sync_pruning: false,
+            is_test_environment: false,
+        };
+
+        let key = "no_prune_key";
+        let component = "no_prune_component";
+        let data = b"data with no auto pruning";
+
+        // Test put_with_config with auto pruning disabled
+        cache
+            .put_with_config(key, component, data, &no_prune_config)
+            .unwrap();
+
+        // Verify the data was stored correctly
+        assert!(cache.exists(key, component));
+        let retrieved = cache.get(key, component).unwrap();
+        assert_eq!(retrieved, data);
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_put_with_config_multiple_entries() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let config = PruningConfig {
+            auto_prune_enabled: false,
+            use_sync_pruning: false,
+            is_test_environment: true,
+        };
+
+        // Store multiple entries with the same config
+        let entries = vec![
+            ("key1", "component1", b"data1" as &[u8]),
+            ("key2", "component2", b"data2"),
+            ("key3", "component1", b"data3"),
+        ];
+
+        for (key, component, data) in &entries {
+            cache
+                .put_with_config(key, component, data, &config)
+                .unwrap();
+        }
+
+        // Verify all entries were stored correctly
+        for (key, component, expected_data) in &entries {
+            assert!(cache.exists(key, component));
+            let retrieved = cache.get(key, component).unwrap();
+            assert_eq!(retrieved, *expected_data);
+        }
+
+        // Verify index reflects all entries
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 3);
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_put_with_config_overwrites_existing() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let config = PruningConfig {
+            auto_prune_enabled: false,
+            use_sync_pruning: false,
+            is_test_environment: false,
+        };
+
+        let key = "overwrite_key";
+        let component = "overwrite_component";
+        let original_data = b"original data";
+        let new_data = b"updated data that is longer";
+
+        // Store original data
+        cache
+            .put_with_config(key, component, original_data, &config)
+            .unwrap();
+        assert!(cache.exists(key, component));
+        let retrieved = cache.get(key, component).unwrap();
+        assert_eq!(retrieved, original_data);
+
+        // Overwrite with new data
+        cache
+            .put_with_config(key, component, new_data, &config)
+            .unwrap();
+        assert!(cache.exists(key, component));
+        let retrieved = cache.get(key, component).unwrap();
+        assert_eq!(retrieved, new_data);
+
+        // Verify index still shows only one entry
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 1);
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_put_with_config_large_data() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let config = PruningConfig {
+            auto_prune_enabled: false,
+            use_sync_pruning: false,
+            is_test_environment: true,
+        };
+
+        let key = "large_data_key";
+        let component = "large_component";
+        let large_data = vec![0u8; 1024 * 1024]; // 1MB of data
+
+        // Test put_with_config with large data
+        cache
+            .put_with_config(key, component, &large_data, &config)
+            .unwrap();
+
+        // Verify the data was stored correctly
+        assert!(cache.exists(key, component));
+        let retrieved = cache.get(key, component).unwrap();
+        assert_eq!(retrieved, large_data);
+
+        // Verify index reflects the large size
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 1);
+        assert!(stats.total_size >= large_data.len() as u64);
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
 }

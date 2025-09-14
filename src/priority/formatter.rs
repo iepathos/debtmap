@@ -472,6 +472,230 @@ fn format_top_functions_list(output: &mut String, top_function_scores: &[(String
     }
 }
 
+// Pure function to determine file type label based on characteristics
+fn determine_file_type_label(
+    is_god_object: bool,
+    fields_count: usize,
+    total_lines: usize,
+) -> &'static str {
+    if is_god_object {
+        // Distinguish between god objects (classes) and god modules (procedural files)
+        if fields_count > 5 {
+            "FILE - GOD OBJECT" // Actual class with many fields
+        } else {
+            "FILE - GOD MODULE" // Procedural file with many functions
+        }
+    } else if total_lines > 500 {
+        "FILE - HIGH COMPLEXITY"
+    } else {
+        "FILE"
+    }
+}
+
+// Pure function to generate WHY explanation message
+fn generate_why_message(
+    is_god_object: bool,
+    fields_count: usize,
+    methods_count: usize,
+    responsibilities: usize,
+    function_count: usize,
+    total_lines: usize,
+) -> String {
+    if is_god_object {
+        if fields_count > 5 {
+            format!(
+                "This class violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
+                methods_count,
+                fields_count,
+                responsibilities
+            )
+        } else {
+            format!(
+                "This module contains {} functions in a single file, violating module cohesion principles. Large procedural modules are difficult to navigate, understand, and maintain.",
+                function_count
+            )
+        }
+    } else if total_lines > 500 {
+        format!(
+            "File exceeds recommended size with {} lines. Large files are harder to navigate, understand, and maintain. Consider breaking into smaller, focused modules.",
+            total_lines
+        )
+    } else {
+        "File exhibits high complexity that impacts maintainability and testability.".to_string()
+    }
+}
+
+// Pure function to format implementation steps for god objects
+fn format_god_object_steps(
+    output: &mut String,
+    formatter: &ColoredFormatter,
+    fields_count: usize,
+    file_path: &std::path::Path,
+    file_name: &str,
+) {
+    if fields_count > 5 {
+        // God Object (class with many fields)
+        writeln!(
+            output,
+            "{}  {} 1. Identify distinct responsibilities in the class",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 2. Group methods and fields by responsibility",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 3. Extract each group into a separate focused class",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 4. Use composition or dependency injection to connect the new classes",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+    } else {
+        // God Module (many functions, few fields)
+        writeln!(
+            output,
+            "{}  {} 1. Run `grep -n \"^pub fn\\|^fn\" {}` to list all functions",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan(),
+            file_path.display()
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "{}  {} 2. Group functions by: a) AST node types they handle b) similar prefixes c) data flow patterns",
+            formatter.emoji("│", ""),
+            formatter.emoji("├─", "-").cyan()
+        )
+        .unwrap();
+    }
+
+    // Common steps for both god objects and modules
+    writeln!(
+        output,
+        "{}  {} 3. Create new files: `{}_core.rs`, `{}_io.rs`, `{}_utils.rs` (adjust names to match groups)",
+        formatter.emoji("│", ""),
+        formatter.emoji("├─", "-").cyan(),
+        file_name, file_name, file_name
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "{}  {} 4. Move functions in groups of 10-20, test after each move",
+        formatter.emoji("│", ""),
+        formatter.emoji("├─", "-").cyan()
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "{}  {} 5. DO NOT: Try to fix everything at once. Move incrementally, test frequently",
+        formatter.emoji("│", ""),
+        formatter.emoji("└─", "-").cyan()
+    )
+    .unwrap();
+}
+
+// Pure function to calculate impact message
+fn calculate_impact_message(is_god_object: bool, total_lines: usize) -> String {
+    if is_god_object {
+        format!(
+            "Reduce complexity by {}%, improve testability, enable parallel development",
+            ((total_lines as f64 / 200.0 - 1.0) * 100.0).min(80.0) as i32
+        )
+    } else {
+        format!(
+            "Improve maintainability, reduce file size by {}%",
+            ((total_lines as f64 / 500.0 - 1.0) * 100.0).min(50.0) as i32
+        )
+    }
+}
+
+// Function to format detailed metrics section
+fn format_detailed_metrics(
+    output: &mut String,
+    formatter: &ColoredFormatter,
+    is_god_object: bool,
+    methods_count: usize,
+    fields_count: usize,
+    responsibilities: usize,
+) {
+    if is_god_object {
+        writeln!(
+            output,
+            "{} Methods: {}, Fields: {}, Responsibilities: {}",
+            formatter.emoji("├─ METRICS:", "└─ METRICS:").bright_blue(),
+            methods_count.to_string().yellow(),
+            fields_count.to_string().yellow(),
+            responsibilities.to_string().yellow()
+        )
+        .unwrap();
+    }
+}
+
+// Pure functions to determine file size and function count classifications
+fn classify_file_size(total_lines: usize) -> &'static str {
+    if total_lines > 1000 {
+        "CRITICAL"
+    } else if total_lines > 500 {
+        "HIGH"
+    } else {
+        "MEDIUM"
+    }
+}
+
+fn classify_function_count(function_count: usize) -> &'static str {
+    if function_count > 50 {
+        "EXCESSIVE"
+    } else if function_count > 20 {
+        "HIGH"
+    } else {
+        "MODERATE"
+    }
+}
+
+// Function to format scoring breakdown and dependencies
+fn format_scoring_and_dependencies(
+    output: &mut String,
+    formatter: &ColoredFormatter,
+    total_lines: usize,
+    function_count: usize,
+) {
+    // Add SCORING breakdown
+    writeln!(
+        output,
+        "{} File size: {} | Functions: {} | Complexity: HIGH",
+        formatter.emoji("├─ SCORING:", "└─ SCORING:").bright_blue(),
+        classify_file_size(total_lines),
+        classify_function_count(function_count)
+    )
+    .unwrap();
+
+    // Add DEPENDENCIES if we have high function count
+    if function_count > 10 {
+        writeln!(
+            output,
+            "{} {} functions may have complex interdependencies",
+            formatter
+                .emoji("└─ DEPENDENCIES:", "└─ DEPENDENCIES:")
+                .bright_blue(),
+            function_count.to_string().cyan()
+        )
+        .unwrap();
+    }
+}
+
 fn format_file_priority_item(
     output: &mut String,
     rank: usize,
@@ -482,19 +706,11 @@ fn format_file_priority_item(
     let severity = get_severity_label(item.score);
     let severity_color = get_severity_color(item.score);
 
-    // Determine file type label based on characteristics
-    let type_label = if item.metrics.god_object_indicators.is_god_object {
-        // Distinguish between god objects (classes) and god modules (procedural files)
-        if item.metrics.god_object_indicators.fields_count > 5 {
-            "FILE - GOD OBJECT" // Actual class with many fields
-        } else {
-            "FILE - GOD MODULE" // Procedural file with many functions
-        }
-    } else if item.metrics.total_lines > 500 {
-        "FILE - HIGH COMPLEXITY"
-    } else {
-        "FILE"
-    };
+    let type_label = determine_file_type_label(
+        item.metrics.god_object_indicators.is_god_object,
+        item.metrics.god_object_indicators.fields_count,
+        item.metrics.total_lines,
+    );
 
     writeln!(
         output,
@@ -517,29 +733,14 @@ fn format_file_priority_item(
     )
     .unwrap();
 
-    // Add WHY section
-    let why_message = if item.metrics.god_object_indicators.is_god_object {
-        if item.metrics.god_object_indicators.fields_count > 5 {
-            format!(
-                "This class violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
-                item.metrics.god_object_indicators.methods_count,
-                item.metrics.god_object_indicators.fields_count,
-                item.metrics.god_object_indicators.responsibilities
-            )
-        } else {
-            format!(
-                "This module contains {} functions in a single file, violating module cohesion principles. Large procedural modules are difficult to navigate, understand, and maintain.",
-                item.metrics.function_count
-            )
-        }
-    } else if item.metrics.total_lines > 500 {
-        format!(
-            "File exceeds recommended size with {} lines. Large files are harder to navigate, understand, and maintain. Consider breaking into smaller, focused modules.",
-            item.metrics.total_lines
-        )
-    } else {
-        "File exhibits high complexity that impacts maintainability and testability.".to_string()
-    };
+    let why_message = generate_why_message(
+        item.metrics.god_object_indicators.is_god_object,
+        item.metrics.god_object_indicators.fields_count,
+        item.metrics.god_object_indicators.methods_count,
+        item.metrics.god_object_indicators.responsibilities,
+        item.metrics.function_count,
+        item.metrics.total_lines,
+    );
 
     writeln!(
         output,
@@ -557,7 +758,6 @@ fn format_file_priority_item(
     )
     .unwrap();
 
-    // Add specific implementation steps based on file type
     if item.metrics.god_object_indicators.is_god_object {
         let file_name = item
             .metrics
@@ -566,91 +766,19 @@ fn format_file_priority_item(
             .and_then(|s| s.to_str())
             .unwrap_or("module");
 
-        // Provide specific steps based on whether it's a god object or god module
-        if item.metrics.god_object_indicators.fields_count > 5 {
-            // God Object (class with many fields)
-            writeln!(
-                output,
-                "{}  {} 1. Identify distinct responsibilities in the class",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-").cyan()
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {} 2. Group methods and fields by responsibility",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-").cyan()
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {} 3. Extract each group into a separate focused class",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-").cyan()
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {} 4. Use composition or dependency injection to connect the new classes",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-").cyan()
-            )
-            .unwrap();
-        } else {
-            // God Module (many functions, few fields)
-            writeln!(
-                output,
-                "{}  {} 1. Run `grep -n \"^pub fn\\|^fn\" {}` to list all functions",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-").cyan(),
-                item.metrics.path.display()
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {} 2. Group functions by: a) AST node types they handle b) similar prefixes c) data flow patterns",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-").cyan()
-            )
-            .unwrap();
-        }
-        writeln!(
+        format_god_object_steps(
             output,
-            "{}  {} 3. Create new files: `{}_core.rs`, `{}_io.rs`, `{}_utils.rs` (adjust names to match groups)",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan(),
-            file_name, file_name, file_name
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "{}  {} 4. Move functions in groups of 10-20, test after each move",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "{}  {} 5. DO NOT: Try to fix everything at once. Move incrementally, test frequently",
-            formatter.emoji("│", ""),
-            formatter.emoji("└─", "-").cyan()
-        )
-        .unwrap();
+            &formatter,
+            item.metrics.god_object_indicators.fields_count,
+            &item.metrics.path,
+            file_name,
+        );
     }
 
-    // Add IMPACT section
-    let impact = if item.metrics.god_object_indicators.is_god_object {
-        format!(
-            "Reduce complexity by {}%, improve testability, enable parallel development",
-            ((item.metrics.total_lines as f64 / 200.0 - 1.0) * 100.0).min(80.0) as i32
-        )
-    } else {
-        format!(
-            "Improve maintainability, reduce file size by {}%",
-            ((item.metrics.total_lines as f64 / 500.0 - 1.0) * 100.0).min(50.0) as i32
-        )
-    };
+    let impact = calculate_impact_message(
+        item.metrics.god_object_indicators.is_god_object,
+        item.metrics.total_lines,
+    );
 
     writeln!(
         output,
@@ -660,65 +788,21 @@ fn format_file_priority_item(
     )
     .unwrap();
 
-    // Add detailed metrics
-    if item.metrics.god_object_indicators.is_god_object {
-        writeln!(
-            output,
-            "{} Methods: {}, Fields: {}, Responsibilities: {}",
-            formatter.emoji("├─ METRICS:", "└─ METRICS:").bright_blue(),
-            item.metrics
-                .god_object_indicators
-                .methods_count
-                .to_string()
-                .yellow(),
-            item.metrics
-                .god_object_indicators
-                .fields_count
-                .to_string()
-                .yellow(),
-            item.metrics
-                .god_object_indicators
-                .responsibilities
-                .to_string()
-                .yellow()
-        )
-        .unwrap();
-    }
-
-    // Add SCORING breakdown
-    writeln!(
+    format_detailed_metrics(
         output,
-        "{} File size: {} | Functions: {} | Complexity: HIGH",
-        formatter.emoji("├─ SCORING:", "└─ SCORING:").bright_blue(),
-        if item.metrics.total_lines > 1000 {
-            "CRITICAL"
-        } else if item.metrics.total_lines > 500 {
-            "HIGH"
-        } else {
-            "MEDIUM"
-        },
-        if item.metrics.function_count > 50 {
-            "EXCESSIVE"
-        } else if item.metrics.function_count > 20 {
-            "HIGH"
-        } else {
-            "MODERATE"
-        }
-    )
-    .unwrap();
+        &formatter,
+        item.metrics.god_object_indicators.is_god_object,
+        item.metrics.god_object_indicators.methods_count,
+        item.metrics.god_object_indicators.fields_count,
+        item.metrics.god_object_indicators.responsibilities,
+    );
 
-    // Add DEPENDENCIES if we have high function count
-    if item.metrics.function_count > 10 {
-        writeln!(
-            output,
-            "{} {} functions may have complex interdependencies",
-            formatter
-                .emoji("└─ DEPENDENCIES:", "└─ DEPENDENCIES:")
-                .bright_blue(),
-            item.metrics.function_count.to_string().cyan()
-        )
-        .unwrap();
-    }
+    format_scoring_and_dependencies(
+        output,
+        &formatter,
+        item.metrics.total_lines,
+        item.metrics.function_count,
+    );
 }
 
 // Helper function to format a list with truncation
@@ -1112,7 +1196,9 @@ mod tests {
     use super::*;
     use crate::formatting::{ColorMode, EmojiMode};
     use crate::priority::call_graph::CallGraph;
-    use crate::priority::file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+    use crate::priority::file_metrics::{
+        FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators,
+    };
     use crate::priority::unified_scorer::Location;
     use crate::priority::{ActionableRecommendation, ImpactMetrics, UnifiedScore};
     use std::path::PathBuf;
@@ -1732,8 +1818,10 @@ mod tests {
         // Check header elements
         assert!(clean_output.contains("#1"));
         assert!(clean_output.contains("SCORE: 75.5"));
-        assert!(clean_output.contains("[CRITICAL - FILE - GOD OBJECT]") ||
-                clean_output.contains("[HIGH - FILE - GOD OBJECT]"));
+        assert!(
+            clean_output.contains("[CRITICAL - FILE - GOD OBJECT]")
+                || clean_output.contains("[HIGH - FILE - GOD OBJECT]")
+        );
 
         // Check file path
         assert!(clean_output.contains("src/test_file.rs"));
@@ -1835,7 +1923,11 @@ mod tests {
 
         let clean_output = strip_ansi_codes(&output);
         // The coverage info might be in WHY or METRICS section
-        assert!(clean_output.contains("0.0%") || clean_output.contains("0%") || clean_output.contains("no coverage"));
+        assert!(
+            clean_output.contains("0.0%")
+                || clean_output.contains("0%")
+                || clean_output.contains("no coverage")
+        );
     }
 
     #[test]

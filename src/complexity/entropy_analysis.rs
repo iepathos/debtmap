@@ -252,4 +252,142 @@ mod tests {
         let diversity = calculate_token_diversity(&diverse);
         assert_eq!(diversity, 1.0, "Unique tokens should have max diversity");
     }
+
+    #[test]
+    fn test_calculate_weighted_entropy() {
+        // Test with empty tokens
+        let empty: Vec<GenericToken> = vec![];
+        assert_eq!(calculate_weighted_entropy(&empty), 0.0);
+
+        // Test with single token type
+        let uniform = vec![
+            GenericToken::operator("+".to_string()),
+            GenericToken::operator("+".to_string()),
+            GenericToken::operator("+".to_string()),
+        ];
+        let entropy = calculate_weighted_entropy(&uniform);
+        assert!(
+            entropy < 0.3,
+            "Uniform tokens should have low entropy: {}",
+            entropy
+        );
+
+        // Test with diverse tokens
+        let diverse = vec![
+            GenericToken::keyword("if".to_string()),
+            GenericToken::operator("+".to_string()),
+            GenericToken::identifier("x".to_string()),
+            GenericToken::literal("1".to_string()),
+            GenericToken::control_flow("while".to_string()),
+            GenericToken::function_call("print".to_string()),
+        ];
+        let entropy = calculate_weighted_entropy(&diverse);
+        assert!(
+            entropy > 0.5,
+            "Diverse tokens should have high entropy: {}",
+            entropy
+        );
+    }
+
+    #[test]
+    fn test_detect_repetitive_sequences_edge_cases() {
+        // Test with empty input
+        let empty: Vec<GenericToken> = vec![];
+        let patterns = detect_repetitive_sequences(&empty, 2);
+        assert_eq!(patterns.len(), 0);
+
+        // Test with tokens shorter than window
+        let short = vec![GenericToken::identifier("x".to_string())];
+        let patterns = detect_repetitive_sequences(&short, 2);
+        assert_eq!(patterns.len(), 0);
+
+        // Test with no repetitions
+        let unique = vec![
+            GenericToken::identifier("a".to_string()),
+            GenericToken::identifier("b".to_string()),
+            GenericToken::identifier("c".to_string()),
+            GenericToken::identifier("d".to_string()),
+        ];
+        let patterns = detect_repetitive_sequences(&unique, 2);
+        assert_eq!(
+            patterns.len(),
+            0,
+            "Should find no patterns in unique sequence"
+        );
+    }
+
+    #[test]
+    fn test_calculate_repetition_score_edge_cases() {
+        // Empty tokens
+        let empty: Vec<GenericToken> = vec![];
+        assert_eq!(calculate_repetition_score(&empty), 0.0);
+
+        // Single token
+        let single = vec![GenericToken::identifier("x".to_string())];
+        assert_eq!(calculate_repetition_score(&single), 0.0);
+
+        // Two tokens
+        let two = vec![
+            GenericToken::identifier("x".to_string()),
+            GenericToken::identifier("y".to_string()),
+        ];
+        let score = calculate_repetition_score(&two);
+        assert!(
+            score < 0.1,
+            "Two different tokens should have minimal repetition"
+        );
+    }
+
+    #[test]
+    fn test_token_diversity_edge_cases() {
+        // Empty input
+        let empty: Vec<GenericToken> = vec![];
+        assert_eq!(calculate_token_diversity(&empty), 0.0);
+
+        // Single token
+        let single = vec![GenericToken::identifier("x".to_string())];
+        assert_eq!(calculate_token_diversity(&single), 1.0);
+
+        // Half repetitive
+        let half = vec![
+            GenericToken::identifier("x".to_string()),
+            GenericToken::identifier("x".to_string()),
+            GenericToken::identifier("y".to_string()),
+            GenericToken::identifier("y".to_string()),
+        ];
+        assert_eq!(calculate_token_diversity(&half), 0.5);
+    }
+
+    #[test]
+    fn test_weighted_entropy_with_different_weights() {
+        // Test that different token types with different weights affect entropy
+        let weighted = vec![
+            GenericToken::control_flow("if".to_string()), // weight 1.2
+            GenericToken::keyword("let".to_string()),     // weight 1.0
+            GenericToken::operator("+".to_string()),      // weight 0.8
+            GenericToken::identifier("x".to_string()),    // weight 0.5
+            GenericToken::literal("1".to_string()),       // weight 0.3
+        ];
+
+        let entropy = calculate_weighted_entropy(&weighted);
+        assert!(
+            entropy > 0.0 && entropy < 1.0,
+            "Weighted entropy should be between 0 and 1"
+        );
+    }
+
+    #[test]
+    fn test_pattern_detection_with_overlapping_patterns() {
+        let tokens = vec![
+            GenericToken::identifier("a".to_string()),
+            GenericToken::identifier("b".to_string()),
+            GenericToken::identifier("a".to_string()),
+            GenericToken::identifier("b".to_string()),
+            GenericToken::identifier("a".to_string()),
+        ];
+
+        // Window size 2 should find "a,b" pattern
+        let patterns = detect_repetitive_sequences(&tokens, 2);
+        assert!(patterns.len() > 0, "Should detect overlapping patterns");
+    }
 }
