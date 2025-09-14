@@ -328,7 +328,7 @@ fn format_file_aggregate_item(
     let top_functions = item.top_function_scores.len().min(2);
     let action_msg = if item.problematic_functions > 0 {
         format!(
-            "Fix ONLY the top {} functions listed below. DO NOT refactor the entire file. Focus on functions with complexity > 10 or coverage < 60%",
+            "Focus on the top {} high-complexity functions listed below (complexity > 10 or coverage < 60%)",
             top_functions
         )
     } else {
@@ -347,7 +347,7 @@ fn format_file_aggregate_item(
     if item.problematic_functions > 0 {
         writeln!(
             output,
-            "│  ├─ {}. Fix ONLY these {} functions (listed in DEPENDENCIES below)",
+            "│  ├─ {}. Start with these {} functions (listed in DEPENDENCIES below)",
             1, top_functions
         )
         .unwrap();
@@ -385,7 +385,7 @@ fn format_file_aggregate_item(
         .unwrap();
         writeln!(
             output,
-            "│  └─ {}. DO NOT: Create new files, add abstraction layers, or refactor working code",
+            "│  └─ {}. Keep refactoring focused: Extract helpers as needed, but avoid over-engineering",
             4
         )
         .unwrap();

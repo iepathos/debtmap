@@ -237,10 +237,10 @@ fn generate_simple_extraction_recommendation(
 
     if cyclo > 10 {
         steps.push("IF nesting > 3: Use early returns with ? operator".to_string());
-        steps.push("DO NOT extract functions unless there's clear duplication".to_string());
+        steps.push("Extract functions only when there's clear duplication or logical separation".to_string());
     } else {
-        steps.push("DO NOT refactor - current structure is fine".to_string());
-        steps.push("Focus on test coverage only".to_string());
+        steps.push("Current structure is acceptable - prioritize test coverage".to_string());
+        steps.push("Consider minor improvements like guard clauses if beneficial".to_string());
     }
 
     (action, why, steps)
