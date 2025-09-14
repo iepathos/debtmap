@@ -323,9 +323,9 @@ impl SharedCache {
     }
 
     /// Execute a fallible operation with exponential backoff retry
-    fn retry_with_backoff<T, F>(mut operation: F, operation_name: &str) -> Result<T>
+    fn retry_with_backoff<T, F>(operation: F, operation_name: &str) -> Result<T>
     where
-        F: FnMut() -> Result<T>,
+        F: Fn() -> Result<T>,
     {
         const MAX_ATTEMPTS: usize = 3;
         const BASE_DELAY_MS: u64 = 10;

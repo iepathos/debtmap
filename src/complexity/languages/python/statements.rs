@@ -496,7 +496,7 @@ impl StatementProcessor {
             }
             Delete(delete) => {
                 tokens.push(GenericToken::keyword("del".to_string()));
-                for (i, target) in delete.targets.iter().enumerate() {
+                for (i, _target) in delete.targets.iter().enumerate() {
                     if i > 0 {
                         tokens.push(GenericToken::operator(",".to_string()));
                     }

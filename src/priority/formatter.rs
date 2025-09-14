@@ -269,6 +269,37 @@ fn format_mixed_priority_item(
     }
 }
 
+// Pure function to determine severity level from score
+fn determine_file_aggregate_severity(score: f64) -> &'static str {
+    match score {
+        s if s >= 300.0 => "CRITICAL",
+        s if s >= 200.0 => "HIGH",
+        s if s >= 100.0 => "MEDIUM",
+        _ => "LOW",
+    }
+}
+
+// Pure function to generate action message
+fn generate_action_message(problematic_functions: usize, top_functions: usize) -> String {
+    if problematic_functions > 0 {
+        format!(
+            "Focus on the top {} high-complexity functions listed below (complexity > 10 or coverage < 60%)",
+            top_functions
+        )
+    } else {
+        "No immediate action needed - monitor for future degradation".to_string()
+    }
+}
+
+// Pure function to calculate impact percentage
+fn calculate_impact_percentage(problematic: usize, total: usize) -> u32 {
+    if total == 0 {
+        0
+    } else {
+        ((problematic as f64 / total as f64) * 100.0).round() as u32
+    }
+}
+
 fn format_file_aggregate_item(
     output: &mut String,
     rank: usize,
@@ -276,16 +307,7 @@ fn format_file_aggregate_item(
     config: FormattingConfig,
 ) {
     let formatter = ColoredFormatter::new(config);
-    let severity = if item.aggregate_score >= 300.0 {
-        "CRITICAL"
-    } else if item.aggregate_score >= 200.0 {
-        "HIGH"
-    } else if item.aggregate_score >= 100.0 {
-        "MEDIUM"
-    } else {
-        "LOW"
-    };
-
+    let severity = determine_file_aggregate_severity(item.aggregate_score);
     let severity_color = get_severity_color(item.aggregate_score);
 
     // Header with rank and score
@@ -326,14 +348,7 @@ fn format_file_aggregate_item(
 
     // ACTION section - Be specific about what to fix
     let top_functions = item.top_function_scores.len().min(2);
-    let action_msg = if item.problematic_functions > 0 {
-        format!(
-            "Focus on the top {} high-complexity functions listed below (complexity > 10 or coverage < 60%)",
-            top_functions
-        )
-    } else {
-        "No immediate action needed - monitor for future degradation".to_string()
-    };
+    let action_msg = generate_action_message(item.problematic_functions, top_functions);
 
     writeln!(
         output,
@@ -345,58 +360,16 @@ fn format_file_aggregate_item(
 
     // Specific, prescriptive actions with concrete refactoring patterns
     if item.problematic_functions > 0 {
-        writeln!(
-            output,
-            "│  ├─ {}. Start with these {} functions (listed in DEPENDENCIES below)",
-            1, top_functions
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "│  ├─ {}. For each function: If coverage < 60%, add tests for uncovered lines ONLY",
-            2
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "│  ├─ {}. For each function: If complexity > 10, apply these patterns:",
-            3
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "│  │   • Extract guard clauses: Convert nested if-else to early returns",
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "│  │   • Extract validation: Move input checks to separate function",
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "│  │   • Replace conditionals with map/filter when processing collections",
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "│  │   • Extract complex boolean expressions into named predicates",
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "│  └─ {}. Keep refactoring focused: Extract helpers as needed, but avoid over-engineering",
-            4
-        )
-        .unwrap();
+        format_refactoring_steps(output, top_functions);
     }
 
     // IMPACT section
+    let impact_percentage = calculate_impact_percentage(item.problematic_functions, item.function_count);
     writeln!(
         output,
         "├─ {}: Reduce overall file complexity by {}%, improve test coverage, enable safer refactoring",
         formatter.emoji("IMPACT", "IMPACT").bright_yellow(),
-        ((item.problematic_functions as f64 / item.function_count as f64) * 100.0).round() as u32
+        impact_percentage
     )
     .unwrap();
 
@@ -434,8 +407,61 @@ fn format_file_aggregate_item(
     )
     .unwrap();
 
-    let issues_count = item.top_function_scores.len().min(5);
-    for (i, (func_name, score)) in item.top_function_scores.iter().take(5).enumerate() {
+    format_top_functions_list(output, &item.top_function_scores);
+}
+
+// Pure function to format refactoring steps
+fn format_refactoring_steps(output: &mut String, top_functions: usize) {
+    writeln!(
+        output,
+        "│  ├─ {}. Start with these {} functions (listed in DEPENDENCIES below)",
+        1, top_functions
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  ├─ {}. For each function: If coverage < 60%, add tests for uncovered lines ONLY",
+        2
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  ├─ {}. For each function: If complexity > 10, apply these patterns:",
+        3
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  │   • Extract guard clauses: Convert nested if-else to early returns",
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  │   • Extract validation: Move input checks to separate function",
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  │   • Replace conditionals with map/filter when processing collections",
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  │   • Extract complex boolean expressions into named predicates",
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "│  └─ {}. Keep refactoring focused: Extract helpers as needed, but avoid over-engineering",
+        4
+    )
+    .unwrap();
+}
+
+// Pure function to format top functions list
+fn format_top_functions_list(output: &mut String, top_function_scores: &[(String, f64)]) {
+    let issues_count = top_function_scores.len().min(5);
+    for (i, (func_name, score)) in top_function_scores.iter().take(5).enumerate() {
         let prefix = if i == issues_count - 1 {
             "   └─"
         } else {
@@ -1083,6 +1109,7 @@ fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::formatting::{ColorMode, EmojiMode};
     use crate::priority::call_graph::CallGraph;
     use crate::priority::unified_scorer::Location;
     use crate::priority::{ActionableRecommendation, ImpactMetrics, UnifiedScore};
@@ -1174,6 +1201,180 @@ mod tests {
             entropy_details: None,
             god_object_indicators: None,
         }
+    }
+
+    fn create_test_file_aggregate(score: f64, function_count: usize) -> priority::FileAggregateScore {
+        use crate::priority::aggregation::AggregationMethod;
+
+        priority::FileAggregateScore {
+            file_path: PathBuf::from("test_aggregate.rs"),
+            function_count,
+            problematic_functions: (function_count / 2).max(1),
+            total_score: score * function_count as f64 / 2.0,
+            aggregate_score: score,
+            top_function_scores: vec![
+                ("high_complexity_func1".to_string(), score * 0.4),
+                ("high_complexity_func2".to_string(), score * 0.3),
+                ("medium_complexity_func".to_string(), score * 0.2),
+                ("low_complexity_func".to_string(), score * 0.1),
+            ],
+            aggregation_method: AggregationMethod::WeightedSum,
+        }
+    }
+
+    #[test]
+    fn test_format_file_aggregate_item_critical() {
+        let mut output = String::new();
+        let item = create_test_file_aggregate(350.0, 10);
+        format_file_aggregate_item(&mut output, 1, &item, FormattingConfig::default());
+
+        let clean_output = strip_ansi_codes(&output);
+
+        // Verify critical severity
+        assert!(clean_output.contains("[CRITICAL - FILE AGGREGATE]"));
+        assert!(clean_output.contains("SCORE: 350"));
+
+        // Verify file info
+        assert!(clean_output.contains("test_aggregate.rs (10 functions"));
+        assert!(clean_output.contains("total score: 1750.0"));
+
+        // Verify WHY section
+        assert!(clean_output.contains("File aggregate combines complexity scores from 10 individual functions"));
+        assert!(clean_output.contains("5 functions exceed complexity thresholds"));
+
+        // Verify ACTION section with specific refactoring patterns
+        assert!(clean_output.contains("Focus on the top 2 high-complexity functions"));
+        assert!(clean_output.contains("Extract guard clauses"));
+        assert!(clean_output.contains("Extract validation"));
+        assert!(clean_output.contains("Replace conditionals with map/filter"));
+
+        // Verify METRICS section
+        assert!(clean_output.contains("Functions: 10, Problematic: 5"));
+
+        // Verify top functions are listed
+        assert!(clean_output.contains("high_complexity_func1: 140.0"));
+        assert!(clean_output.contains("high_complexity_func2: 105.0"));
+    }
+
+    #[test]
+    fn test_format_file_aggregate_item_high() {
+        let mut output = String::new();
+        let item = create_test_file_aggregate(250.0, 8);
+        format_file_aggregate_item(&mut output, 2, &item, FormattingConfig::default());
+
+        let clean_output = strip_ansi_codes(&output);
+
+        // Verify high severity
+        assert!(clean_output.contains("[HIGH - FILE AGGREGATE]"));
+        assert!(clean_output.contains("SCORE: 250"));
+
+        // Verify function count and scores
+        assert!(clean_output.contains("8 functions"));
+        assert!(clean_output.contains("total score: 1000.0"));
+
+        // Verify problematic functions identified
+        assert!(clean_output.contains("4 functions exceed complexity thresholds"));
+
+        // Verify IMPACT section calculation
+        assert!(clean_output.contains("Reduce overall file complexity by 50%"));
+    }
+
+    #[test]
+    fn test_format_file_aggregate_item_medium() {
+        let mut output = String::new();
+        let item = create_test_file_aggregate(150.0, 6);
+        format_file_aggregate_item(&mut output, 3, &item, FormattingConfig::default());
+
+        let clean_output = strip_ansi_codes(&output);
+
+        // Verify medium severity
+        assert!(clean_output.contains("[MEDIUM - FILE AGGREGATE]"));
+        assert!(clean_output.contains("SCORE: 150"));
+
+        // Verify average complexity calculation
+        assert!(clean_output.contains("Avg complexity: 75.0"));
+
+        // Verify SCORING breakdown
+        assert!(clean_output.contains("Aggregate: MEDIUM"));
+        assert!(clean_output.contains("Avg per function: 25.0"));
+        assert!(clean_output.contains("Max: 60.0"));
+    }
+
+    #[test]
+    fn test_format_file_aggregate_item_low() {
+        let mut output = String::new();
+        let item = create_test_file_aggregate(50.0, 4);
+        format_file_aggregate_item(&mut output, 4, &item, FormattingConfig::default());
+
+        let clean_output = strip_ansi_codes(&output);
+
+        // Verify low severity
+        assert!(clean_output.contains("[LOW - FILE AGGREGATE]"));
+        assert!(clean_output.contains("SCORE: 50.0"));
+    }
+
+    #[test]
+    fn test_format_file_aggregate_item_no_problematic_functions() {
+        let mut output = String::new();
+        let mut item = create_test_file_aggregate(50.0, 4);
+        item.problematic_functions = 0;
+
+        format_file_aggregate_item(&mut output, 5, &item, FormattingConfig::default());
+
+        let clean_output = strip_ansi_codes(&output);
+
+        // Should show no action needed
+        assert!(clean_output.contains("No immediate action needed - monitor for future degradation"));
+
+        // Should not show refactoring steps
+        assert!(!clean_output.contains("Extract guard clauses"));
+        assert!(!clean_output.contains("Extract validation"));
+    }
+
+    #[test]
+    fn test_format_file_aggregate_item_with_emoji_config() {
+        let mut output = String::new();
+        let item = create_test_file_aggregate(200.0, 5);
+        let config = FormattingConfig {
+            color: ColorMode::Auto,
+            emoji: EmojiMode::Always,
+        };
+
+        format_file_aggregate_item(&mut output, 1, &item, config);
+
+        // With emoji enabled, should contain emoji characters
+        assert!(output.contains("📍") || output.contains("WHY"));
+        assert!(output.contains("🎯") || output.contains("ACTION"));
+        assert!(output.contains("💥") || output.contains("IMPACT"));
+    }
+
+    #[test]
+    fn test_format_file_aggregate_item_edge_cases() {
+        // Test with minimal functions
+        let mut output = String::new();
+        let mut item = create_test_file_aggregate(100.0, 1);
+        item.top_function_scores = vec![("only_func".to_string(), 100.0)];
+
+        format_file_aggregate_item(&mut output, 1, &item, FormattingConfig::default());
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(clean_output.contains("1 functions"));
+        assert!(clean_output.contains("only_func: 100.0"));
+
+        // Test with many top functions (should limit to 5)
+        let mut item = create_test_file_aggregate(500.0, 20);
+        item.top_function_scores = (0..10)
+            .map(|i| (format!("func_{}", i), 50.0 - i as f64))
+            .collect();
+
+        output.clear();
+        format_file_aggregate_item(&mut output, 1, &item, FormattingConfig::default());
+
+        let clean_output = strip_ansi_codes(&output);
+        // Should only show first 5 functions
+        assert!(clean_output.contains("func_0"));
+        assert!(clean_output.contains("func_4"));
+        assert!(!clean_output.contains("func_5"));
     }
 
     #[test]

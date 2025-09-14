@@ -182,16 +182,30 @@ pub fn extract_special_tokens(
 
 /// Extract tokens from boolean operations - pure function
 pub fn extract_bool_op_tokens(bool_op: &ast::ExprBoolOp) -> Vec<GenericToken> {
+    let mut tokens = Vec::new();
+
+    // Add operator token
     let op_token = match bool_op.op {
         ast::BoolOp::And => "and",
         ast::BoolOp::Or => "or",
     };
+    tokens.push(GenericToken::operator(op_token.to_string()));
 
-    vec![GenericToken::operator(op_token.to_string())]
+    // Process nested values to extract literals
+    for value in &bool_op.values {
+        if let ast::Expr::Constant(constant) = value {
+            tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+        }
+    }
+
+    tokens
 }
 
 /// Extract tokens from binary operations - pure function
 pub fn extract_bin_op_tokens(bin_op: &ast::ExprBinOp) -> Vec<GenericToken> {
+    let mut tokens = Vec::new();
+
+    // Add operator token
     let op_str = match bin_op.op {
         ast::Operator::Add => "+",
         ast::Operator::Sub => "-",
@@ -207,8 +221,17 @@ pub fn extract_bin_op_tokens(bin_op: &ast::ExprBinOp) -> Vec<GenericToken> {
         ast::Operator::BitAnd => "&",
         ast::Operator::FloorDiv => "//",
     };
+    tokens.push(GenericToken::operator(op_str.to_string()));
 
-    vec![GenericToken::operator(op_str.to_string())]
+    // Process nested expressions for literals
+    if let ast::Expr::Constant(constant) = &*bin_op.left {
+        tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+    }
+    if let ast::Expr::Constant(constant) = &*bin_op.right {
+        tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+    }
+
+    tokens
 }
 
 /// Extract tokens from unary operations - pure function
@@ -247,12 +270,12 @@ fn extract_compare_tokens(compare: &ast::ExprCompare) -> Vec<GenericToken> {
 // ============================================================================
 
 /// Extract tokens from lambda expressions
-pub fn extract_lambda_tokens(lambda: &ast::ExprLambda) -> Vec<GenericToken> {
-    vec![GenericToken::control_flow("lambda".to_string())]
+pub fn extract_lambda_tokens(_lambda: &ast::ExprLambda) -> Vec<GenericToken> {
+    vec![GenericToken::keyword("lambda".to_string())]
 }
 
 /// Extract tokens from if expressions
-pub fn extract_if_exp_tokens(if_exp: &ast::ExprIfExp) -> Vec<GenericToken> {
+pub fn extract_if_exp_tokens(_if_exp: &ast::ExprIfExp) -> Vec<GenericToken> {
     vec![
         GenericToken::control_flow("if".to_string()),
         GenericToken::control_flow("else".to_string()),
@@ -268,7 +291,7 @@ pub fn extract_list_comp_tokens(
     analyzer: &PythonEntropyAnalyzer,
     list_comp: &ast::ExprListComp,
 ) -> Vec<GenericToken> {
-    let mut tokens = vec![GenericToken::custom("[".to_string())];
+    let mut tokens = vec![GenericToken::operator("list_comp".to_string())];
 
     // Process element expression
     analyzer.extract_tokens_from_expr(&list_comp.elt, &mut tokens);
@@ -280,6 +303,19 @@ pub fn extract_list_comp_tokens(
         tokens.push(GenericToken::keyword("in".to_string()));
         analyzer.extract_tokens_from_expr(&generator.iter, &mut tokens);
 
+        // Add literal tokens for range arguments if present
+        if let ast::Expr::Call(call) = &generator.iter {
+            if let ast::Expr::Name(name) = &*call.func {
+                if name.id.as_str() == "range" {
+                    for arg in &call.args {
+                        if let ast::Expr::Constant(constant) = arg {
+                            tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+                        }
+                    }
+                }
+            }
+        }
+
         // Process conditions
         for if_clause in &generator.ifs {
             tokens.push(GenericToken::control_flow("if".to_string()));
@@ -287,7 +323,7 @@ pub fn extract_list_comp_tokens(
         }
     }
 
-    tokens.push(GenericToken::custom("]".to_string()));
+    tokens.push(GenericToken::operator("for".to_string())); // Add for keyword
     tokens
 }
 
@@ -512,13 +548,16 @@ pub fn extract_list_tokens(
     analyzer: &PythonEntropyAnalyzer,
     list: &ast::ExprList,
 ) -> Vec<GenericToken> {
-    let mut tokens = vec![GenericToken::custom("[".to_string())];
+    let mut tokens = vec![GenericToken::operator("list".to_string())];
 
     for elt in &list.elts {
-        analyzer.extract_tokens_from_expr(elt, &mut tokens);
+        if let ast::Expr::Constant(constant) = elt {
+            tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+        } else {
+            analyzer.extract_tokens_from_expr(elt, &mut tokens);
+        }
     }
 
-    tokens.push(GenericToken::custom("]".to_string()));
     tokens
 }
 
@@ -527,13 +566,16 @@ pub fn extract_tuple_tokens(
     analyzer: &PythonEntropyAnalyzer,
     tuple: &ast::ExprTuple,
 ) -> Vec<GenericToken> {
-    let mut tokens = vec![GenericToken::custom("(".to_string())];
+    let mut tokens = vec![GenericToken::operator("tuple".to_string())];
 
     for elt in &tuple.elts {
-        analyzer.extract_tokens_from_expr(elt, &mut tokens);
+        if let ast::Expr::Constant(constant) = elt {
+            tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+        } else {
+            analyzer.extract_tokens_from_expr(elt, &mut tokens);
+        }
     }
 
-    tokens.push(GenericToken::custom(")".to_string()));
     tokens
 }
 
@@ -542,17 +584,23 @@ pub fn extract_dict_tokens(
     analyzer: &PythonEntropyAnalyzer,
     dict: &ast::ExprDict,
 ) -> Vec<GenericToken> {
-    let mut tokens = vec![GenericToken::custom("{".to_string())];
+    let mut tokens = vec![GenericToken::operator("dict".to_string())];
 
     for (key, value) in dict.keys.iter().zip(dict.values.iter()) {
         if let Some(key_expr) = key {
-            analyzer.extract_tokens_from_expr(key_expr, &mut tokens);
+            if let ast::Expr::Constant(constant) = key_expr {
+                tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+            } else {
+                analyzer.extract_tokens_from_expr(key_expr, &mut tokens);
+            }
         }
-        tokens.push(GenericToken::custom(":".to_string()));
-        analyzer.extract_tokens_from_expr(value, &mut tokens);
+        if let ast::Expr::Constant(constant) = value {
+            tokens.push(GenericToken::literal(format!("{:?}", constant.value)));
+        } else {
+            analyzer.extract_tokens_from_expr(value, &mut tokens);
+        }
     }
 
-    tokens.push(GenericToken::custom("}".to_string()));
     tokens
 }
 
@@ -607,7 +655,7 @@ pub fn extract_join_str_tokens(joined_str: &ast::ExprJoinedStr) -> Vec<GenericTo
 }
 
 /// Extract tokens from formatted values (f-string components)
-pub fn extract_formatted_value_tokens(formatted_value: &ast::ExprFormattedValue) -> Vec<GenericToken> {
+pub fn extract_formatted_value_tokens(_formatted_value: &ast::ExprFormattedValue) -> Vec<GenericToken> {
     vec![GenericToken::custom("formatted_value".to_string())]
 }
 
@@ -695,6 +743,7 @@ pub fn collect_variables_from_expr(expr: &ast::Expr) -> HashSet<String> {
 }
 
 /// Collects patterns from match statements - pure function
+#[allow(dead_code)]
 pub fn collect_patterns(pattern: &ast::Pattern) -> Vec<String> {
     use ast::Pattern::*;
     match pattern {
@@ -753,6 +802,7 @@ pub fn collect_patterns(pattern: &ast::Pattern) -> Vec<String> {
 }
 
 /// Classifies comprehension items - pure function
+#[allow(dead_code)]
 pub fn classify_item(item: &str) -> String {
     if item.contains("for") {
         "generator".to_string()
