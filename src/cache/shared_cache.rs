@@ -44,6 +44,115 @@ struct InternalCacheStats {
     entry_count: usize,
 }
 
+/// Retry strategy for handling transient failures with exponential backoff
+struct RetryStrategy {
+    max_attempts: usize,
+    base_delay_ms: u64,
+}
+
+impl RetryStrategy {
+    fn new(max_attempts: usize, base_delay_ms: u64) -> Self {
+        Self {
+            max_attempts,
+            base_delay_ms,
+        }
+    }
+
+    /// Execute operation with retry logic - functional approach
+    fn execute<T, F>(&self, mut operation: F, operation_name: &str) -> Result<T>
+    where
+        F: FnMut() -> Result<T>,
+    {
+        let mut last_error = None;
+
+        for attempt in 0..self.max_attempts {
+            match self.try_operation(&mut operation, attempt) {
+                Ok(value) => return Ok(value),
+                Err(e) => {
+                    if self.should_retry(&e, attempt) {
+                        self.apply_backoff(attempt);
+                        last_error = Some(e);
+                    } else {
+                        return Err(e.context(format!(
+                            "Operation '{}' failed after {} attempts",
+                            operation_name,
+                            attempt + 1
+                        )));
+                    }
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            anyhow::anyhow!(
+                "Operation '{}' failed after {} attempts",
+                operation_name,
+                self.max_attempts
+            )
+        }))
+    }
+
+    /// Try the operation once
+    fn try_operation<T, F>(&self, operation: &mut F, attempt: usize) -> Result<T>
+    where
+        F: FnMut() -> Result<T>,
+    {
+        operation().map_err(|e| {
+            if attempt == self.max_attempts - 1 {
+                e.context(format!("Final attempt {} failed", attempt + 1))
+            } else {
+                e
+            }
+        })
+    }
+
+    /// Check if error is retryable
+    fn should_retry(&self, error: &anyhow::Error, attempt: usize) -> bool {
+        // Don't retry on last attempt
+        if attempt >= self.max_attempts - 1 {
+            return false;
+        }
+
+        // Check if error is transient
+        self.is_transient_error(error)
+    }
+
+    /// Determine if an error is transient and worth retrying
+    fn is_transient_error(&self, error: &anyhow::Error) -> bool {
+        error.chain().any(|err| {
+            err.downcast_ref::<std::io::Error>()
+                .map(|io_err| Self::is_retryable_io_error(io_err.kind()))
+                .unwrap_or(false)
+        })
+    }
+
+    /// Check if IO error kind is retryable
+    fn is_retryable_io_error(kind: std::io::ErrorKind) -> bool {
+        use std::io::ErrorKind;
+
+        matches!(
+            kind,
+            ErrorKind::AlreadyExists
+                | ErrorKind::NotFound
+                | ErrorKind::Interrupted
+                | ErrorKind::PermissionDenied // May be transient due to file locks
+        )
+    }
+
+    /// Apply exponential backoff with jitter
+    fn apply_backoff(&self, attempt: usize) {
+        let delay = self.calculate_delay(attempt);
+        std::thread::sleep(delay);
+    }
+
+    /// Calculate delay with exponential backoff and jitter
+    fn calculate_delay(&self, attempt: usize) -> Duration {
+        let base_delay_ms = self.base_delay_ms * (1 << attempt);
+        let jitter_ms = base_delay_ms / 4; // 25% jitter
+        Duration::from_millis(base_delay_ms + jitter_ms)
+    }
+}
+
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
     pub location: CacheLocation,
@@ -218,51 +327,14 @@ impl SharedCache {
     where
         F: FnMut() -> Result<T>,
     {
-        use std::io::ErrorKind;
-        use std::time::Duration;
-
         const MAX_ATTEMPTS: usize = 3;
         const BASE_DELAY_MS: u64 = 10;
 
-        for attempt in 0..MAX_ATTEMPTS {
-            match operation() {
-                Ok(result) => return Ok(result),
-                Err(e) => {
-                    // Check if this is a potentially transient error
-                    let is_retryable = e.chain().any(|err| {
-                        if let Some(io_err) = err.downcast_ref::<std::io::Error>() {
-                            matches!(
-                                io_err.kind(),
-                                ErrorKind::AlreadyExists |
-                                ErrorKind::NotFound |
-                                ErrorKind::Interrupted |
-                                // Note: PermissionDenied is often not transient, but in concurrent
-                                // scenarios it might be due to temporary file locks
-                                ErrorKind::PermissionDenied
-                            )
-                        } else {
-                            false
-                        }
-                    });
+        // Create retry strategy
+        let retry_strategy = RetryStrategy::new(MAX_ATTEMPTS, BASE_DELAY_MS);
 
-                    if !is_retryable || attempt == MAX_ATTEMPTS - 1 {
-                        return Err(e.context(format!(
-                            "Operation '{}' failed after {} attempts",
-                            operation_name,
-                            attempt + 1
-                        )));
-                    }
-
-                    // Exponential backoff with simple jitter
-                    let delay_ms = BASE_DELAY_MS * (1 << attempt);
-                    // Simple deterministic jitter to avoid contention
-                    let jitter_ms = delay_ms / 4; // 25% jitter
-                    std::thread::sleep(Duration::from_millis(delay_ms + jitter_ms));
-                }
-            }
-        }
-
-        unreachable!("Retry loop should have returned or failed by now")
+        // Execute with retry logic
+        retry_strategy.execute(operation, operation_name)
     }
 
     /// Create directories safely with proper race condition handling and retries
@@ -1088,75 +1160,108 @@ impl SharedCache {
     pub fn trigger_pruning(&self) -> Result<PruneStats> {
         let start = SystemTime::now();
 
-        // Early return if no pruner configured - use cleanup fallback
+        // Early return with fallback for no pruner case
         let pruner = match &self.auto_pruner {
             Some(p) => p,
-            None => {
-                self.cleanup()?;
-                let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
-                let stats = self.get_stats();
-                return Ok(PruneStats {
-                    entries_removed: 0,
-                    bytes_freed: 0,
-                    entries_remaining: stats.entry_count,
-                    bytes_remaining: stats.total_size,
-                    duration_ms: duration,
-                    files_deleted: 0,
-                    files_not_found: 0,
-                });
-            }
+            None => return self.execute_fallback_cleanup(start),
         };
 
-        // Calculate entries to remove
-        let entries_to_remove = {
-            let index = self
-                .index
-                .read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-            pruner.calculate_entries_to_remove(&index)
-        };
+        // Calculate entries to remove (pure function)
+        let entries_to_remove = self.calculate_entries_to_prune(pruner)?;
 
-        // Early return if nothing to remove
+        // Early return if nothing to prune
         if entries_to_remove.is_empty() {
-            return Ok(PruneStats {
-                entries_removed: 0,
-                bytes_freed: 0,
-                entries_remaining: self.get_stats().entry_count,
-                bytes_remaining: self.get_stats().total_size,
-                duration_ms: 0,
-                files_deleted: 0,
-                files_not_found: 0,
-            });
+            return Ok(self.create_empty_prune_stats());
         }
 
-        // Remove entries from index and calculate bytes freed
-        let mut bytes_freed = 0u64;
-        {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-            for (key, metadata) in &entries_to_remove {
-                if index.entries.remove(key).is_some() {
-                    bytes_freed += metadata.size_bytes;
-                }
-            }
-
-            index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
-            index.last_cleanup = Some(SystemTime::now());
-        }
-
-        // Delete files and count results
+        // Execute pruning operations
+        let bytes_freed = self.remove_entries_from_index(&entries_to_remove)?;
         let (files_deleted, files_not_found) = self.delete_pruned_files(&entries_to_remove);
-
         self.save_index()?;
 
+        // Create result stats
+        self.create_prune_stats(
+            start,
+            entries_to_remove.len(),
+            bytes_freed,
+            files_deleted,
+            files_not_found,
+        )
+    }
+
+    /// Execute fallback cleanup when no pruner is configured
+    fn execute_fallback_cleanup(&self, start: SystemTime) -> Result<PruneStats> {
+        self.cleanup()?;
+        let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
+        let stats = self.get_stats();
+        Ok(PruneStats {
+            entries_removed: 0,
+            bytes_freed: 0,
+            entries_remaining: stats.entry_count,
+            bytes_remaining: stats.total_size,
+            duration_ms: duration,
+            files_deleted: 0,
+            files_not_found: 0,
+        })
+    }
+
+    /// Calculate which entries should be pruned - pure function
+    fn calculate_entries_to_prune(&self, pruner: &AutoPruner) -> Result<Vec<(String, CacheMetadata)>> {
+        let index = self
+            .index
+            .read()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+        Ok(pruner.calculate_entries_to_remove(&index))
+    }
+
+    /// Remove entries from index and return bytes freed
+    fn remove_entries_from_index(&self, entries_to_remove: &[(String, CacheMetadata)]) -> Result<u64> {
+        let mut index = self
+            .index
+            .write()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+
+        let bytes_freed = entries_to_remove
+            .iter()
+            .filter_map(|(key, metadata)| {
+                index.entries.remove(key).map(|_| metadata.size_bytes)
+            })
+            .sum();
+
+        index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
+        index.last_cleanup = Some(SystemTime::now());
+
+        Ok(bytes_freed)
+    }
+
+    /// Create empty stats when no pruning is needed
+    fn create_empty_prune_stats(&self) -> PruneStats {
+        let stats = self.get_stats();
+        PruneStats {
+            entries_removed: 0,
+            bytes_freed: 0,
+            entries_remaining: stats.entry_count,
+            bytes_remaining: stats.total_size,
+            duration_ms: 0,
+            files_deleted: 0,
+            files_not_found: 0,
+        }
+    }
+
+    /// Create prune stats from operation results
+    fn create_prune_stats(
+        &self,
+        start: SystemTime,
+        entries_removed: usize,
+        bytes_freed: u64,
+        files_deleted: usize,
+        files_not_found: usize,
+    ) -> Result<PruneStats> {
         let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
         let final_stats = self.get_stats();
 
         Ok(PruneStats {
-            entries_removed: entries_to_remove.len(),
+            entries_removed,
             bytes_freed,
             entries_remaining: final_stats.entry_count,
             bytes_remaining: final_stats.total_size,
