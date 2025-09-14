@@ -219,7 +219,7 @@ pub fn extract_bool_op_tokens(bool_op: &ast::ExprBoolOp) -> Vec<GenericToken> {
     tokens
 }
 
-/// Extract tokens from binary operations - pure function
+/// Extract tokens from binary operations - pure function with full recursion
 pub fn extract_bin_op_tokens(bin_op: &ast::ExprBinOp) -> Vec<GenericToken> {
     let mut tokens = Vec::new();
 
@@ -241,15 +241,24 @@ pub fn extract_bin_op_tokens(bin_op: &ast::ExprBinOp) -> Vec<GenericToken> {
     };
     tokens.push(GenericToken::operator(op_str.to_string()));
 
-    // Process nested expressions for literals
-    if let ast::Expr::Constant(_) = &*bin_op.left {
-        tokens.extend(extract_literal_tokens(&*bin_op.left));
-    }
-    if let ast::Expr::Constant(_) = &*bin_op.right {
-        tokens.extend(extract_literal_tokens(&*bin_op.right));
-    }
+    // Recursively process nested expressions
+    tokens.extend(extract_nested_expr_tokens(&*bin_op.left));
+    tokens.extend(extract_nested_expr_tokens(&*bin_op.right));
 
     tokens
+}
+
+/// Helper function to extract tokens from nested expressions - pure function
+fn extract_nested_expr_tokens(expr: &ast::Expr) -> Vec<GenericToken> {
+    use ast::Expr::*;
+    match expr {
+        BinOp(nested_bin_op) => extract_bin_op_tokens(nested_bin_op),
+        BoolOp(bool_op) => extract_bool_op_tokens(bool_op),
+        UnaryOp(unary_op) => extract_unary_op_tokens(unary_op),
+        Compare(compare) => extract_compare_tokens(compare),
+        Constant(_) => extract_literal_tokens(expr),
+        _ => vec![] // Skip other expression types for now
+    }
 }
 
 /// Extract tokens from unary operations - pure function
@@ -304,12 +313,19 @@ pub fn extract_lambda_tokens(lambda: &ast::ExprLambda) -> Vec<GenericToken> {
     tokens
 }
 
-/// Extract tokens from if expressions
-pub fn extract_if_exp_tokens(_if_exp: &ast::ExprIfExp) -> Vec<GenericToken> {
-    vec![
+/// Extract tokens from if expressions - extracts operators from branches
+pub fn extract_if_exp_tokens(if_exp: &ast::ExprIfExp) -> Vec<GenericToken> {
+    let mut tokens = vec![
         GenericToken::control_flow("if".to_string()),
         GenericToken::control_flow("else".to_string()),
-    ]
+    ];
+
+    // Extract operator tokens from test, body, and else branches
+    tokens.extend(extract_nested_expr_tokens(&*if_exp.test));
+    tokens.extend(extract_nested_expr_tokens(&*if_exp.body));
+    tokens.extend(extract_nested_expr_tokens(&*if_exp.orelse));
+
+    tokens
 }
 
 // ============================================================================
@@ -925,6 +941,58 @@ fn collect_generator_variables(gen_exp: &ast::ExprGeneratorExp) -> HashSet<Strin
 // ============================================================================
 // Pattern Collection
 // ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustpython_parser::{ast, parse, Mode};
+
+    fn parse_expr(code: &str) -> ast::Expr {
+        let parsed = parse(code, Mode::Expression, "<test>").unwrap();
+        match parsed {
+            ast::Mod::Expression(expr) => *expr.body,
+            _ => panic!("Expected expression"),
+        }
+    }
+
+    #[test]
+    fn test_extract_nested_expr_tokens_with_binary_op() {
+        let expr = parse_expr("x * 2");
+        let tokens = extract_nested_expr_tokens(&expr);
+        assert!(tokens.iter().any(|t| t.value() == "Mult"));
+        assert!(tokens.iter().any(|t| t.value() == "int"));
+    }
+
+    #[test]
+    fn test_extract_nested_expr_tokens_with_nested_binary() {
+        let expr = parse_expr("x * 2 + y");
+        let tokens = extract_nested_expr_tokens(&expr);
+        // Should get both Add (outer) and Mult (inner)
+        assert!(tokens.iter().any(|t| t.value() == "Add"));
+        assert!(tokens.iter().any(|t| t.value() == "Mult"));
+    }
+
+    #[test]
+    fn test_extract_nested_expr_tokens_with_boolean() {
+        let expr = parse_expr("x and y");
+        let tokens = extract_nested_expr_tokens(&expr);
+        assert!(tokens.iter().any(|t| t.value() == "and"));
+    }
+
+    #[test]
+    fn test_extract_bin_op_tokens_deeply_nested() {
+        let expr = parse_expr("(a + b) * (c - d)");
+        if let ast::Expr::BinOp(bin_op) = expr {
+            let tokens = extract_bin_op_tokens(&bin_op);
+            // Should extract all operators
+            assert!(tokens.iter().any(|t| t.value() == "Mult")); // Top level
+            assert!(tokens.iter().any(|t| t.value() == "Add"));  // Left nested
+            assert!(tokens.iter().any(|t| t.value() == "Sub"));  // Right nested
+        } else {
+            panic!("Expected BinOp");
+        }
+    }
+}
 
 fn collect_expression_patterns(expr: &ast::Expr, patterns: &mut Vec<String>) {
     use ast::Expr::*;

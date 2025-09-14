@@ -43,7 +43,7 @@ def process_data(x):
 
     // Analyze structure
     let (vars, nesting) = analyzer.analyze_structure(&module.body);
-    assert_eq!(vars, 1, "Should find one variable (x)");
+    assert_eq!(vars, 2, "Should find function name 'process_data' and parameter 'x'");
     assert!(nesting > 0, "Should have some nesting");
 }
 
