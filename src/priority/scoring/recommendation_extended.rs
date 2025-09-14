@@ -569,39 +569,108 @@ pub fn generate_complexity_recommendation_with_patterns_and_coverage(
 ) -> (String, String, Vec<String>) {
     use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
 
-    // Check if coverage is the primary issue
-    if let Some(cov) = coverage {
-        if cov.direct < 0.8 && !cov.uncovered_lines.is_empty() {
-            // Coverage is poor - prioritize testing over refactoring
-            return generate_coverage_focused_recommendation(func, cyclomatic, cognitive, cov);
-        }
+    // Early return for coverage-focused recommendation
+    if should_prioritize_coverage(coverage) {
+        return generate_coverage_focused_recommendation(func, cyclomatic, cognitive, coverage.as_ref().unwrap());
     }
 
-    // Try to analyze extraction patterns
-    let analyzer = UnifiedExtractionAnalyzer::new();
+    // Analyze extraction patterns
+    let suggestions = analyze_extraction_patterns(func, data_flow);
 
-    // Create a minimal FileMetrics for the analyzer
-    let file_metrics = crate::core::FileMetrics {
+    if !suggestions.is_empty() {
+        generate_pattern_based_recommendation(
+            func,
+            cyclomatic,
+            &suggestions,
+            coverage,
+        )
+    } else {
+        // Fall back to heuristic recommendations
+        generate_heuristic_recommendations_with_line_estimates(
+            func, cyclomatic, cognitive, coverage, data_flow,
+        )
+    }
+}
+
+// Pure function to check if coverage should be prioritized
+fn should_prioritize_coverage(coverage: &Option<TransitiveCoverage>) -> bool {
+    coverage
+        .as_ref()
+        .map(|cov| cov.direct < 0.8 && !cov.uncovered_lines.is_empty())
+        .unwrap_or(false)
+}
+
+// Pure function to analyze extraction patterns
+fn analyze_extraction_patterns(
+    func: &FunctionMetrics,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> Vec<crate::extraction_patterns::ExtractionSuggestion> {
+    use crate::extraction_patterns::{ExtractionAnalyzer, UnifiedExtractionAnalyzer};
+
+    let analyzer = UnifiedExtractionAnalyzer::new();
+    let file_metrics = create_minimal_file_metrics(func);
+    analyzer.analyze_function(func, &file_metrics, data_flow)
+}
+
+// Pure function to create minimal file metrics
+fn create_minimal_file_metrics(func: &FunctionMetrics) -> crate::core::FileMetrics {
+    crate::core::FileMetrics {
         path: func.file.clone(),
         language: detect_file_language(&func.file),
         complexity: crate::core::ComplexityMetrics::default(),
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
-    };
+    }
+}
 
-    let suggestions = analyzer.analyze_function(func, &file_metrics, data_flow);
+// Generate pattern-based recommendation using functional composition
+fn generate_pattern_based_recommendation(
+    func: &FunctionMetrics,
+    cyclomatic: u32,
+    suggestions: &[crate::extraction_patterns::ExtractionSuggestion],
+    coverage: &Option<TransitiveCoverage>,
+) -> (String, String, Vec<String>) {
+    // Process top 3 suggestions
+    let top_suggestions: Vec<_> = suggestions.iter().take(3).collect();
 
-    // If we have intelligent suggestions from AST analysis, use them
-    if !suggestions.is_empty() {
-        // Generate pattern-based recommendation
-        let mut action_parts = vec![];
-        let mut steps = vec![];
-        let mut total_complexity_reduction = 0u32;
+    // Extract action parts and calculate reduction using iterator chains
+    let (action_parts, extraction_steps, total_reduction) = process_suggestions(&top_suggestions);
 
-        for (i, suggestion) in suggestions.iter().enumerate().take(3) {
-            // Include top 3 patterns
-            action_parts.push(format!(
+    let predicted_complexity = cyclomatic.saturating_sub(total_reduction);
+
+    // Build action string
+    let action = build_action_string(&action_parts, cyclomatic, predicted_complexity, suggestions.len());
+
+    // Generate rationale
+    let rationale = build_rationale(cyclomatic, suggestions.len());
+
+    // Build steps
+    let mut steps = extraction_steps;
+
+    // Add coverage-related steps if needed
+    if !has_good_coverage(coverage) {
+        steps.extend(generate_coverage_steps(func, coverage, suggestions.len()));
+    }
+
+    // Add final metric
+    steps.push(format!(
+        "Expected complexity reduction: {}%",
+        calculate_reduction_percentage(total_reduction, cyclomatic)
+    ));
+
+    (action, rationale, steps)
+}
+
+// Process suggestions to extract data - pure function
+fn process_suggestions(
+    suggestions: &[&crate::extraction_patterns::ExtractionSuggestion],
+) -> (Vec<String>, Vec<String>, u32) {
+    suggestions
+        .iter()
+        .enumerate()
+        .fold((Vec::new(), Vec::new(), 0u32), |(mut actions, mut steps, mut total), (i, suggestion)| {
+            actions.push(format!(
                 "{} (confidence: {:.0}%)",
                 suggestion.suggested_name,
                 suggestion.confidence * 100.0
@@ -618,95 +687,112 @@ pub fn generate_complexity_recommendation_with_patterns_and_coverage(
                 suggestion.complexity_reduction.predicted_cyclomatic
             ));
 
-            total_complexity_reduction += suggestion
-                .complexity_reduction
-                .current_cyclomatic
+            total += suggestion.complexity_reduction.current_cyclomatic
                 .saturating_sub(suggestion.complexity_reduction.predicted_cyclomatic);
-        }
 
-        let predicted_complexity = cyclomatic.saturating_sub(total_complexity_reduction);
+            (actions, steps, total)
+        })
+}
 
-        // Create action with specific pattern names
-        let action = if !action_parts.is_empty() {
-            format!(
-                "Extract {} to reduce complexity from {} to ~{}",
-                action_parts.join(", "),
-                cyclomatic,
-                predicted_complexity
-            )
-        } else {
-            format!(
-                "Extract {} identified patterns to reduce complexity from {} to {}",
-                suggestions.len(),
-                cyclomatic,
-                predicted_complexity
-            )
-        };
-
-        // Provide detailed explanation of why these extractions are recommended
-        let pattern_benefits = match suggestions.len() {
-            1 => "This extraction will create a focused, testable unit".to_string(),
-            2 => "These extractions will separate distinct concerns into testable units".to_string(),
-            _ => format!("These {} extractions will decompose the function into smaller, focused units that are easier to test and understand", suggestions.len()),
-        };
-
-        let complexity_explanation = if cyclomatic > 15 {
-            format!("Cyclomatic complexity of {} indicates {} independent execution paths, requiring at least {} test cases for full path coverage", 
-                    cyclomatic, cyclomatic, cyclomatic)
-        } else if cyclomatic > 10 {
-            format!("Cyclomatic complexity of {} indicates {} independent paths through the code, making thorough testing difficult", 
-                    cyclomatic, cyclomatic)
-        } else if cyclomatic > 5 {
-            format!("Cyclomatic complexity of {} indicates {} independent paths requiring {} test cases minimum - extraction will reduce this to 3-5 tests per function",
-                    cyclomatic, cyclomatic, cyclomatic)
-        } else {
-            format!("Cyclomatic complexity of {} indicates moderate complexity that can be improved through extraction", cyclomatic)
-        };
-
-        let rationale = format!(
-            "{}. Function has {} extractable patterns that can be isolated. {}. Target complexity per function is 5 or less for optimal maintainability.",
-            complexity_explanation,
-            suggestions.len(),
-            pattern_benefits
-        );
-
-        // Add testing steps only if coverage is low
-        let has_good_coverage = coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
-
-        if !has_good_coverage {
-            // Add uncovered lines information if available
-            if let Some(cov) = coverage {
-                if !cov.uncovered_lines.is_empty() {
-                    use crate::priority::scoring::recommendation::analyze_uncovered_lines;
-                    let uncovered_recommendations =
-                        analyze_uncovered_lines(func, &cov.uncovered_lines);
-                    for (i, rec) in uncovered_recommendations.into_iter().enumerate() {
-                        steps.insert(i, rec);
-                    }
-                }
-            }
-
-            steps.push(format!(
-                "{}. Write unit tests for each extracted pure function",
-                suggestions.len() + 2
-            ));
-            steps.push(format!(
-                "{}. Add property-based tests for complex transformations",
-                suggestions.len() + 3
-            ));
-        }
-
-        steps.push(format!(
-            "Expected complexity reduction: {}%",
-            (total_complexity_reduction as f32 / cyclomatic as f32 * 100.0) as u32
-        ));
-
-        (action, rationale, steps)
-    } else {
-        // Fall back to heuristic recommendations with estimated line ranges
-        generate_heuristic_recommendations_with_line_estimates(
-            func, cyclomatic, cognitive, coverage, data_flow,
+// Build action string - pure function
+fn build_action_string(
+    action_parts: &[String],
+    cyclomatic: u32,
+    predicted_complexity: u32,
+    total_suggestions: usize,
+) -> String {
+    if !action_parts.is_empty() {
+        format!(
+            "Extract {} to reduce complexity from {} to ~{}",
+            action_parts.join(", "),
+            cyclomatic,
+            predicted_complexity
         )
+    } else {
+        format!(
+            "Extract {} identified patterns to reduce complexity from {} to {}",
+            total_suggestions,
+            cyclomatic,
+            predicted_complexity
+        )
+    }
+}
+
+// Build rationale - pure function
+fn build_rationale(cyclomatic: u32, num_patterns: usize) -> String {
+    let complexity_explanation = explain_complexity(cyclomatic);
+    let pattern_benefits = explain_pattern_benefits(num_patterns);
+
+    format!(
+        "{}. Function has {} extractable patterns that can be isolated. {}. Target complexity per function is 5 or less for optimal maintainability.",
+        complexity_explanation,
+        num_patterns,
+        pattern_benefits
+    )
+}
+
+// Explain complexity level - pure function
+fn explain_complexity(cyclomatic: u32) -> String {
+    match cyclomatic {
+        16.. => format!("Cyclomatic complexity of {} indicates {} independent execution paths, requiring at least {} test cases for full path coverage",
+                cyclomatic, cyclomatic, cyclomatic),
+        11..=15 => format!("Cyclomatic complexity of {} indicates {} independent paths through the code, making thorough testing difficult",
+                cyclomatic, cyclomatic),
+        6..=10 => format!("Cyclomatic complexity of {} indicates {} independent paths requiring {} test cases minimum - extraction will reduce this to 3-5 tests per function",
+                cyclomatic, cyclomatic, cyclomatic),
+        _ => format!("Cyclomatic complexity of {} indicates moderate complexity that can be improved through extraction", cyclomatic),
+    }
+}
+
+// Explain pattern benefits - pure function
+fn explain_pattern_benefits(num_patterns: usize) -> String {
+    match num_patterns {
+        1 => "This extraction will create a focused, testable unit".to_string(),
+        2 => "These extractions will separate distinct concerns into testable units".to_string(),
+        _ => format!("These {} extractions will decompose the function into smaller, focused units that are easier to test and understand", num_patterns),
+    }
+}
+
+// Check coverage quality - pure function
+fn has_good_coverage(coverage: &Option<TransitiveCoverage>) -> bool {
+    coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false)
+}
+
+// Generate coverage-related steps
+fn generate_coverage_steps(
+    func: &FunctionMetrics,
+    coverage: &Option<TransitiveCoverage>,
+    num_suggestions: usize,
+) -> Vec<String> {
+    let mut steps = Vec::new();
+
+    // Add uncovered lines analysis if available
+    if let Some(cov) = coverage {
+        if !cov.uncovered_lines.is_empty() {
+            use crate::priority::scoring::recommendation::analyze_uncovered_lines;
+            steps.extend(analyze_uncovered_lines(func, &cov.uncovered_lines));
+        }
+    }
+
+    // Add testing recommendations
+    steps.push(format!(
+        "{}. Write unit tests for each extracted pure function",
+        num_suggestions + 2
+    ));
+    steps.push(format!(
+        "{}. Add property-based tests for complex transformations",
+        num_suggestions + 3
+    ));
+
+    steps
+}
+
+// Calculate reduction percentage - pure function
+fn calculate_reduction_percentage(reduction: u32, total: u32) -> u32 {
+    if total > 0 {
+        (reduction as f32 / total as f32 * 100.0) as u32
+    } else {
+        0
     }
 }
 
@@ -718,136 +804,234 @@ pub fn generate_heuristic_recommendations_with_line_estimates(
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> (String, String, Vec<String>) {
-    // Analyze function characteristics from available metrics
-    let has_high_branching = cyclomatic > 7;
-    let has_deep_nesting = func.nesting > 3;
-    let is_pure = func.is_pure.unwrap_or(false);
-    let purity_confidence = func.purity_confidence.unwrap_or(0.0);
+    // Extract function characteristics
+    let characteristics = analyze_function_characteristics(func, cyclomatic, cognitive, data_flow);
 
-    // Get variable dependencies if data flow is available
-    let num_dependencies = if let Some(df) = data_flow {
-        let func_id = crate::priority::call_graph::FunctionId {
-            file: func.file.clone(),
-            name: func.name.clone(),
-            line: func.line,
-        };
-        df.get_variable_dependencies(&func_id)
-            .map(|d| d.len())
-            .unwrap_or(0)
-    } else {
-        0
-    };
+    // Generate extraction recommendations based on patterns
+    let (extractions, steps, complexity_reduction) = generate_extraction_recommendations(
+        &characteristics,
+        cyclomatic,
+        cognitive,
+        func.nesting,
+    );
 
-    // Generate targeted recommendations based on patterns
+    // Add purity-based recommendations
+    let mut all_steps = steps;
+    all_steps.extend(generate_purity_recommendations(&characteristics));
+
+    // Add coverage-based steps
+    all_steps.extend(generate_heuristic_coverage_steps(
+        func,
+        coverage,
+        &extractions,
+        cyclomatic,
+    ));
+
+    // Build final action and rationale
+    let action = build_heuristic_action(&extractions, cyclomatic, complexity_reduction);
+    let rationale = build_heuristic_rationale(
+        cyclomatic,
+        cognitive,
+        func.nesting,
+        &extractions,
+        complexity_reduction,
+    );
+
+    (action, rationale, all_steps)
+}
+
+// Pure function to analyze function characteristics
+#[derive(Debug, Clone)]
+struct FunctionCharacteristics {
+    has_high_branching: bool,
+    has_deep_nesting: bool,
+    has_complex_cognition: bool,
+    num_dependencies: usize,
+    is_pure: bool,
+    purity_confidence: f32,
+}
+
+fn analyze_function_characteristics(
+    func: &FunctionMetrics,
+    cyclomatic: u32,
+    cognitive: u32,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> FunctionCharacteristics {
+    FunctionCharacteristics {
+        has_high_branching: cyclomatic > 7,
+        has_deep_nesting: func.nesting > 3,
+        has_complex_cognition: cognitive > cyclomatic * 2,
+        num_dependencies: extract_dependencies_count(func, data_flow),
+        is_pure: func.is_pure.unwrap_or(false),
+        purity_confidence: func.purity_confidence.unwrap_or(0.0),
+    }
+}
+
+// Pure function to extract dependencies count
+fn extract_dependencies_count(
+    func: &FunctionMetrics,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> usize {
+    data_flow
+        .and_then(|df| {
+            let func_id = crate::priority::call_graph::FunctionId {
+                file: func.file.clone(),
+                name: func.name.clone(),
+                line: func.line,
+            };
+            df.get_variable_dependencies(&func_id).map(|d| d.len())
+        })
+        .unwrap_or(0)
+}
+
+// Generate extraction recommendations using functional patterns
+fn generate_extraction_recommendations(
+    characteristics: &FunctionCharacteristics,
+    cyclomatic: u32,
+    cognitive: u32,
+    nesting: u32,
+) -> (Vec<&'static str>, Vec<String>, u32) {
+    let mut extractions = Vec::new();
     let mut steps = Vec::new();
-    let mut suggested_extractions = Vec::new();
-    let mut complexity_reduction = 0;
+    let mut reduction = 0u32;
 
-    if has_high_branching {
-        suggested_extractions.push("validation logic");
+    // Use pattern matching for cleaner logic
+    if characteristics.has_high_branching {
+        extractions.push("validation logic");
+        let branches_to_extract = cyclomatic / 4;
         steps.push(format!(
             "Identify validation checks from {} branches → extract as validate_*()",
-            cyclomatic / 4
+            branches_to_extract
         ));
-        complexity_reduction += cyclomatic / 4;
+        reduction += branches_to_extract;
     }
 
-    if has_deep_nesting {
-        suggested_extractions.push("nested processing");
+    if characteristics.has_deep_nesting {
+        extractions.push("nested processing");
         steps.push(format!(
             "Extract nested logic (depth {}) → process_*() functions",
-            func.nesting
+            nesting
         ));
-        complexity_reduction += 2;
+        reduction += 2;
     }
 
-    if cognitive > cyclomatic * 2 {
-        suggested_extractions.push("complex calculations");
+    if characteristics.has_complex_cognition {
+        extractions.push("complex calculations");
+        let calc_complexity = cognitive / 5;
         steps.push(format!(
             "Extract calculations from {} cognitive complexity → calculate_*()",
-            cognitive / 5
+            calc_complexity
         ));
-        complexity_reduction += cognitive / 5;
+        reduction += calc_complexity;
     }
 
-    if num_dependencies > 5 {
-        suggested_extractions.push("data transformation pipeline");
+    if characteristics.num_dependencies > 5 {
+        extractions.push("data transformation pipeline");
         steps.push(format!(
             "Create data transformation pipeline to manage {} dependencies",
-            num_dependencies
+            characteristics.num_dependencies
         ));
-        complexity_reduction += 1;
+        reduction += 1;
     }
 
-    if is_pure && purity_confidence > 0.8 {
-        steps.push(
-            "Function is likely pure - focus on breaking down into smaller pure functions"
-                .to_string(),
-        );
-    } else if purity_confidence < 0.3 {
-        steps.push("Isolate side effects at function boundaries before extraction".to_string());
-    }
+    (extractions, steps, reduction)
+}
 
-    // Add testing recommendation only if coverage is low
+// Generate purity-based recommendations - pure function
+fn generate_purity_recommendations(characteristics: &FunctionCharacteristics) -> Vec<String> {
+    match (characteristics.is_pure, characteristics.purity_confidence) {
+        (true, conf) if conf > 0.8 => {
+            vec!["Function is likely pure - focus on breaking down into smaller pure functions".to_string()]
+        }
+        (_, conf) if conf < 0.3 => {
+            vec!["Isolate side effects at function boundaries before extraction".to_string()]
+        }
+        _ => vec![],
+    }
+}
+
+// Generate coverage-based steps for heuristic recommendations
+fn generate_heuristic_coverage_steps(
+    func: &FunctionMetrics,
+    coverage: &Option<TransitiveCoverage>,
+    extractions: &[&str],
+    cyclomatic: u32,
+) -> Vec<String> {
+    let mut steps = Vec::new();
     let has_good_coverage = coverage.as_ref().map(|c| c.direct >= 0.8).unwrap_or(false);
 
-    // Add uncovered lines info if available
+    // Add uncovered lines analysis
     if let Some(cov) = coverage {
         if !cov.uncovered_lines.is_empty() && !has_good_coverage {
             use crate::priority::scoring::recommendation::analyze_uncovered_lines;
-            let uncovered_recommendations = analyze_uncovered_lines(func, &cov.uncovered_lines);
-            // Add uncovered lines info at the beginning
-            for rec in uncovered_recommendations.into_iter().rev() {
-                steps.insert(0, rec);
-            }
+            let uncovered_recs = analyze_uncovered_lines(func, &cov.uncovered_lines);
+            steps.extend(uncovered_recs);
         }
     }
 
+    // Add test count recommendation
     if !has_good_coverage {
-        let test_count = if suggested_extractions.is_empty() {
-            // If no specific extractions suggested, base on complexity
-            (cyclomatic / 2).max(3)
-        } else {
-            // Test count based on extraction suggestions (3-5 tests per function)
-            suggested_extractions.len() as u32 * 4
-        };
-
+        let test_count = calculate_test_count(extractions, cyclomatic);
         steps.push(format!(
             "Add {} unit tests (3-5 per extracted function)",
             test_count
         ));
     }
 
-    // Generate action and rationale
-    let action = if suggested_extractions.is_empty() {
-        format!(
-            "Refactor to reduce complexity from {} → ~{}",
-            cyclomatic,
-            cyclomatic.saturating_sub(complexity_reduction)
-        )
+    steps
+}
+
+// Calculate recommended test count - pure function
+fn calculate_test_count(extractions: &[&str], cyclomatic: u32) -> u32 {
+    if extractions.is_empty() {
+        (cyclomatic / 2).max(3)
+    } else {
+        (extractions.len() as u32) * 4
+    }
+}
+
+// Build action string for heuristic recommendations - pure function
+fn build_heuristic_action(
+    extractions: &[&str],
+    cyclomatic: u32,
+    complexity_reduction: u32,
+) -> String {
+    let target_complexity = cyclomatic.saturating_sub(complexity_reduction);
+
+    if extractions.is_empty() {
+        format!("Refactor to reduce complexity from {} → ~{}", cyclomatic, target_complexity)
     } else {
         format!(
             "Extract {} to reduce complexity {} → ~{}",
-            suggested_extractions.join(", "),
+            extractions.join(", "),
             cyclomatic,
-            cyclomatic.saturating_sub(complexity_reduction)
+            target_complexity
         )
+    }
+}
+
+// Build rationale for heuristic recommendations - pure function
+fn build_heuristic_rationale(
+    cyclomatic: u32,
+    cognitive: u32,
+    nesting: u32,
+    extractions: &[&str],
+    complexity_reduction: u32,
+) -> String {
+    let reduction_percentage = if cyclomatic > 0 {
+        (complexity_reduction as f32 / cyclomatic as f32 * 100.0) as u32
+    } else {
+        0
     };
 
-    let rationale = format!(
+    format!(
         "Complex function (cyclo={}, cog={}, nesting={}) with {} suggested extraction patterns. Predicted complexity reduction: {}%",
         cyclomatic,
         cognitive,
-        func.nesting,
-        suggested_extractions.len(),
-        if cyclomatic > 0 {
-            (complexity_reduction as f32 / cyclomatic as f32 * 100.0) as u32
-        } else {
-            0
-        }
-    );
-
-    (action, rationale, steps)
+        nesting,
+        extractions.len(),
+        reduction_percentage
+    )
 }
 
 /// Generate recommendation for resource management debt
