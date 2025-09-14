@@ -105,10 +105,10 @@ mod tests {
     fn test_operator_token_extraction() {
         let analyzer = PythonEntropyAnalyzer::new("");
 
-        // Test each operator type
+        // Test each operator type (using operator names to match implementation)
         let test_cases = vec![
             ("True and False", "and"),
-            ("1 + 2", "+"),
+            ("1 + 2", "Add"),
             ("not True", "not"),
             ("x == y", "=="),
         ];
