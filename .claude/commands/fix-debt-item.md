@@ -284,12 +284,17 @@ Create a descriptive commit message that includes:
 - The specific function and file that was fixed
 - The metrics that guided the fix
 
-**For refactoring commits:**
+**For refactoring commits (with functional patterns):**
 ```bash
 git add -A
-git commit -m "refactor: reduce complexity in [function_name]
+git commit -m "refactor: reduce complexity using functional patterns
 
 - Applied: [action from item.recommendation.primary_action]
+- Functional patterns used:
+  * Extracted N pure functions
+  * Replaced loops with iterator chains
+  * Used pattern matching for control flow
+  * Separated I/O from business logic
 - Complexity: [item.cyclomatic_complexity] → [new_complexity] (adjusted: [item.entropy_details.adjusted_complexity])
 - Entropy: [item.entropy_details.entropy_score], Repetition: [item.entropy_details.pattern_repetition]
 - Function: [item.location.function] in [item.location.file]
@@ -330,15 +335,18 @@ git commit -m "fix: refactor and test [function_name]
 
 ## Implementation Guidelines
 
-### Functional Programming Principles
+### Functional Programming Principles (Core Approach)
 
 **Always Prefer:**
-- **Pure functions** over stateful methods
+- **Pure functions** over stateful methods - no side effects, deterministic
 - **Immutability** - use `&self` instead of `&mut self` where possible
 - **Function composition** - build complex behavior from simple functions
-- **Pattern matching** over if-else chains
-- **Iterator chains** over imperative loops
+- **Pattern matching** over if-else chains - more expressive and safe
+- **Iterator chains** over imperative loops - map/filter/fold patterns
 - **Type-driven design** - use the type system to enforce invariants
+- **Early returns** - reduce nesting with guard clauses
+- **Option/Result combinators** - chain operations without nesting
+- **Separation of concerns** - I/O at edges, pure logic in core
 
 ### Common Pitfalls to Avoid
 
@@ -359,14 +367,14 @@ git commit -m "fix: refactor and test [function_name]
 - Accept that some functions legitimately have high complexity
 - Test the extracted pure functions thoroughly
 
-### Idiomatic Rust Patterns
+### Idiomatic Rust Patterns with Functional Focus
 
 **Use these Rust idioms:**
 ```rust
 // Use ? for error propagation
 let data = read_file()?;
 
-// Prefer &str over String in parameters
+// Prefer &str over String in parameters (immutability)
 fn process(input: &str) -> Result<String, Error>
 
 // Use #[derive] for common traits
@@ -376,11 +384,28 @@ struct Data { ... }
 // Use From/Into for type conversions
 impl From<String> for MyType { ... }
 
-// Prefer iterators over indexing
-items.iter().map(|x| x.process())
+// Prefer iterators over indexing (functional style)
+items.iter()
+    .filter(|x| x.is_valid())
+    .map(|x| x.process())
+    .collect()
 
-// Use Option/Result combinators
-value.map(|v| v.transform()).unwrap_or_default()
+// Use Option/Result combinators (functional chains)
+value
+    .and_then(|v| validate(v))
+    .map(|v| transform(v))
+    .unwrap_or_default()
+
+// Extract pure predicates
+fn is_valid_item(item: &Item) -> bool {
+    item.score > 0 && !item.name.is_empty()
+}
+
+// Use flat_map for nested collections
+items.iter()
+    .flat_map(|x| x.children.iter())
+    .filter(|c| is_valid_item(c))
+    .collect()
 ```
 
 ### Example of Good Refactoring
@@ -408,13 +433,17 @@ impl MyStruct {
 ## Success Criteria
 
 The fix is complete when:
-- [ ] The specific function has been refactored or tested
+- [ ] The specific function has been refactored using functional patterns
+- [ ] Pure functions extracted where possible (no side effects)
+- [ ] Iterator chains used instead of imperative loops
+- [ ] Pattern matching replaces complex conditionals
+- [ ] I/O separated from business logic
 - [ ] All tests pass (`just ci`)
-- [ ] Code follows functional programming patterns
+- [ ] Code follows functional programming principles
 - [ ] Implementation uses idiomatic Rust patterns
 - [ ] Changes are minimal and focused
 - [ ] Backward compatibility is maintained
-- [ ] **Changes are committed with descriptive message including metrics**
+- [ ] **Changes are committed with descriptive message including metrics and patterns used**
 
 ## Notes
 
