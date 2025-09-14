@@ -1063,4 +1063,362 @@ mod tests {
         assert!(output.contains("#1 - Score: 8.5"));
         // Coverage information should be omitted in breakdown
     }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_basic() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/main.rs"),
+                total_lines: 250,
+                function_count: 10,
+                class_count: 2,
+                avg_complexity: 5.5,
+                max_complexity: 12,
+                total_complexity: 55,
+                coverage_percent: 0.75,
+                uncovered_lines: 25,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 5,
+                    fields_count: 3,
+                    responsibilities: 2,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                },
+                function_scores: vec![10.0, 8.0, 6.0],
+            },
+            score: 45.2,
+            priority_rank: 1,
+            recommendation: "Refactor complex functions".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 15.0,
+                maintainability_improvement: 20.0,
+                test_effort: 10.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 1, &item, 0);
+
+        assert!(output.contains("### #1 - Score: 45.2"));
+        assert!(output.contains("**Type:** FILE"));
+        assert!(output.contains("src/main.rs"));
+        assert!(output.contains("250 lines, 10 functions"));
+        assert!(output.contains("**Recommendation:** Refactor complex functions"));
+        assert!(!output.contains("**God Object Metrics:**"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_god_object() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/god_class.rs"),
+                total_lines: 800,
+                function_count: 50,
+                class_count: 1,
+                avg_complexity: 8.5,
+                max_complexity: 25,
+                total_complexity: 425,
+                coverage_percent: 0.60,
+                uncovered_lines: 320,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 45,
+                    fields_count: 20,
+                    responsibilities: 8,
+                    is_god_object: true,
+                    god_object_score: 3.5,
+                },
+                function_scores: vec![],
+            },
+            score: 125.8,
+            priority_rank: 1,
+            recommendation: "Split into multiple focused modules".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 50.0,
+                maintainability_improvement: 60.0,
+                test_effort: 30.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 1, &item, 0);
+
+        assert!(output.contains("### #1 - Score: 125.8"));
+        assert!(output.contains("**Type:** FILE - GOD OBJECT"));
+        assert!(output.contains("**God Object Metrics:**"));
+        assert!(output.contains("- Methods: 45"));
+        assert!(output.contains("- Fields: 20"));
+        assert!(output.contains("- Responsibilities: 8"));
+        assert!(output.contains("- God Object Score: 3.5"));
+        assert!(output.contains("**Recommendation:** Split into multiple focused modules"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_high_complexity() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/complex.rs"),
+                total_lines: 600,
+                function_count: 15,
+                class_count: 3,
+                avg_complexity: 12.0,
+                max_complexity: 30,
+                total_complexity: 180,
+                coverage_percent: 0.50,
+                uncovered_lines: 300,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 12,
+                    fields_count: 8,
+                    responsibilities: 4,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                },
+                function_scores: vec![],
+            },
+            score: 85.3,
+            priority_rank: 2,
+            recommendation: "Reduce complexity and improve test coverage".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 35.0,
+                maintainability_improvement: 40.0,
+                test_effort: 25.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 2, &item, 0);
+
+        assert!(output.contains("### #2 - Score: 85.3"));
+        assert!(output.contains("**Type:** FILE - HIGH COMPLEXITY"));
+        assert!(output.contains("600 lines"));
+        assert!(!output.contains("**God Object Metrics:**"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_with_verbosity() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/verbose.rs"),
+                total_lines: 350,
+                function_count: 12,
+                class_count: 2,
+                avg_complexity: 7.5,
+                max_complexity: 18,
+                total_complexity: 90,
+                coverage_percent: 0.65,
+                uncovered_lines: 122,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 10,
+                    fields_count: 5,
+                    responsibilities: 3,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                },
+                function_scores: vec![],
+            },
+            score: 55.7,
+            priority_rank: 3,
+            recommendation: "Consider refactoring".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 20.0,
+                maintainability_improvement: 25.0,
+                test_effort: 15.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 3, &item, 1);
+
+        assert!(output.contains("### #3 - Score: 55.7"));
+        assert!(output.contains("**Scoring Breakdown:**"));
+        assert!(output.contains("- File size:"));
+        assert!(output.contains("- Functions:"));
+        assert!(output.contains("- Complexity:"));
+        assert!(output.contains("- Dependencies: 12 functions may have complex interdependencies"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_zero_functions() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/empty.rs"),
+                total_lines: 100,
+                function_count: 0,
+                class_count: 0,
+                avg_complexity: 0.0,
+                max_complexity: 0,
+                total_complexity: 0,
+                coverage_percent: 1.0,
+                uncovered_lines: 0,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 0,
+                    fields_count: 0,
+                    responsibilities: 0,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                },
+                function_scores: vec![],
+            },
+            score: 5.0,
+            priority_rank: 10,
+            recommendation: "No action needed".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 0.0,
+                maintainability_improvement: 0.0,
+                test_effort: 0.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 10, &item, 1);
+
+        assert!(output.contains("0 functions"));
+        assert!(!output.contains("- Dependencies:"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_critical_severity() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/critical.rs"),
+                total_lines: 1000,
+                function_count: 60,
+                class_count: 5,
+                avg_complexity: 15.0,
+                max_complexity: 40,
+                total_complexity: 900,
+                coverage_percent: 0.30,
+                uncovered_lines: 700,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 55,
+                    fields_count: 30,
+                    responsibilities: 12,
+                    is_god_object: true,
+                    god_object_score: 5.0,
+                },
+                function_scores: vec![],
+            },
+            score: 150.0,
+            priority_rank: 1,
+            recommendation: "Urgent refactoring required".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 70.0,
+                maintainability_improvement: 80.0,
+                test_effort: 50.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 1, &item, 0);
+
+        assert!(output.contains("[CRITICAL]"));
+        assert!(output.contains("**Type:** FILE - GOD OBJECT"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_low_severity() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/simple.rs"),
+                total_lines: 150,
+                function_count: 5,
+                class_count: 1,
+                avg_complexity: 3.0,
+                max_complexity: 5,
+                total_complexity: 15,
+                coverage_percent: 0.90,
+                uncovered_lines: 15,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 4,
+                    fields_count: 2,
+                    responsibilities: 1,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                },
+                function_scores: vec![],
+            },
+            score: 18.5,
+            priority_rank: 15,
+            recommendation: "Good state, minor improvements possible".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 5.0,
+                maintainability_improvement: 8.0,
+                test_effort: 3.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 15, &item, 0);
+
+        assert!(output.contains("[CRITICAL]")); // Score 18.5 is CRITICAL (>=9.0)
+        assert!(output.contains("**Type:** FILE"));
+    }
+
+    #[test]
+    fn test_format_file_priority_item_markdown_extreme_verbosity() {
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/detailed.rs"),
+                total_lines: 750,
+                function_count: 25,
+                class_count: 4,
+                avg_complexity: 9.2,
+                max_complexity: 22,
+                total_complexity: 230,
+                coverage_percent: 0.55,
+                uncovered_lines: 337,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 20,
+                    fields_count: 12,
+                    responsibilities: 5,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                },
+                function_scores: vec![],
+            },
+            score: 72.4,
+            priority_rank: 4,
+            recommendation: "Significant refactoring recommended".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 40.0,
+                maintainability_improvement: 45.0,
+                test_effort: 28.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 4, &item, 2);
+
+        // With verbosity 2, should include all details
+        assert!(output.contains("**Scoring Breakdown:**"));
+        assert!(output.contains("- File size:"));
+        assert!(output.contains("HIGH")); // 750 lines is HIGH category
+        assert!(output.contains("- Functions:"));
+        assert!(output.contains("HIGH")); // 25 functions is HIGH category
+        assert!(output.contains("- Complexity:"));
+        assert!(output.contains("MODERATE")); // avg 9.2 is MODERATE category
+    }
 }
