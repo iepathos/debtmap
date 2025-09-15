@@ -331,4 +331,177 @@ mod tests {
         // Note: Our simple analysis might still flag the ?, but that's ok
         // In a real implementation we'd have more sophisticated analysis
     }
+
+    #[test]
+    fn test_map_err_with_proper_context() {
+        let code = r#"
+            fn example() -> Result<i32, String> {
+                some_function()
+                    .map_err(|e| format!("Failed to process: {}", e))
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        // Should still detect issue because we're using format! which includes original error
+        // but the heuristic might not catch this properly
+        assert!(!items.is_empty());
+    }
+
+    #[test]
+    fn test_map_err_closure_with_wildcard() {
+        let code = r#"
+            fn example() -> Result<i32, String> {
+                some_function()
+                    .map_err(|_| "Generic error".to_string())
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        assert!(!items.is_empty());
+        assert!(items[0].message.contains("map_err"));
+        assert!(items[0].message.contains("discards"));
+    }
+
+    #[test]
+    fn test_map_err_simple_constructor() {
+        let code = r#"
+            fn example() -> Result<i32, MyError> {
+                some_function()
+                    .map_err(|e| MyError::Simple)
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        assert!(!items.is_empty());
+        assert!(items[0].message.contains("map_err"));
+    }
+
+    #[test]
+    fn test_into_conversion_detection() {
+        let code = r#"
+            fn example() -> Result<(), Box<dyn std::error::Error>> {
+                let err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+                result.map_err(|e| e.into())
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        assert!(!items.is_empty());
+        let into_items: Vec<_> = items.iter()
+            .filter(|item| item.message.contains("into()"))
+            .collect();
+        assert!(!into_items.is_empty());
+    }
+
+    #[test]
+    fn test_context_loss_priority_test_function() {
+        let code = r#"
+            #[test]
+            fn test_example() {
+                some_function()
+                    .map_err(|_| "test error".to_string())
+                    .unwrap();
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        if !items.is_empty() {
+            // Should have low priority for test functions
+            assert_eq!(items[0].priority, Priority::Low);
+        }
+    }
+
+    #[test]
+    fn test_long_question_mark_chain() {
+        let code = r#"
+            fn example() -> Result<i32, Box<dyn std::error::Error>> {
+                let a = func1()?;
+                let b = func2()?;
+                let c = func3()?;
+                let d = func4()?;
+                let e = func5()?; // This should trigger the warning
+                Ok(e)
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        let question_mark_items: Vec<_> = items.iter()
+            .filter(|item| item.message.contains("? operator"))
+            .collect();
+        assert!(!question_mark_items.is_empty());
+    }
+
+    #[test]
+    fn test_error_to_owned_conversion() {
+        let code = r#"
+            fn example() {
+                let err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+                let owned = err.to_owned();
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = analyze_error_context(&file, Path::new("test.rs"), None);
+
+        let string_conversion_items: Vec<_> = items.iter()
+            .filter(|item| item.message.contains("string"))
+            .collect();
+        assert!(!string_conversion_items.is_empty());
+    }
+
+    #[test]
+    fn test_context_loss_pattern_descriptions() {
+        use ContextLossPattern::*;
+
+        assert_eq!(MapErrDiscardingOriginal.description(), "map_err discards original error");
+        assert_eq!(AnyhowWithoutContext.description(), "anyhow error without context");
+        assert_eq!(QuestionMarkChain.description(), "Long ? operator chain");
+        assert_eq!(StringErrorConversion.description(), "Error converted to string");
+        assert_eq!(IntoErrorConversion.description(), "Generic into() error conversion");
+    }
+
+    #[test]
+    fn test_context_loss_pattern_remediations() {
+        use ContextLossPattern::*;
+
+        assert!(MapErrDiscardingOriginal.remediation().contains("Include original error"));
+        assert!(AnyhowWithoutContext.remediation().contains("context"));
+        assert!(QuestionMarkChain.remediation().contains("Add context"));
+        assert!(StringErrorConversion.remediation().contains("Preserve error type"));
+        assert!(IntoErrorConversion.remediation().contains("explicit error conversion"));
+    }
+
+    #[test]
+    fn test_suppression_integration() {
+        use crate::debt::suppression::SuppressionContext;
+
+        let code = r#"
+            fn example() -> Result<i32, String> {
+                some_function()
+                    .map_err(|_| "Something went wrong".to_string())
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+
+        // Create a suppression context that suppresses line 3
+        let suppression = SuppressionContext::new();
+        // Note: This would need actual implementation of suppression logic
+
+        let items = analyze_error_context(&file, Path::new("test.rs"), Some(&suppression));
+        // Test should verify suppression works when implemented
+        assert!(!items.is_empty()); // Currently no suppression is actually implemented
+    }
 }

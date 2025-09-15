@@ -772,4 +772,168 @@ mod tests {
         let explanation = provider.explain(&context);
         assert_eq!(explanation, "On 3 critical path(s) with weight 8.7");
     }
+
+    #[test]
+    fn test_gather_with_complex_dependency_chain() {
+        let mut analyzer = CriticalPathAnalyzer::new();
+
+        // Create a complex dependency chain
+        // main -> init -> database_setup -> connection_pool
+        //             -> config_loader -> file_reader
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "main".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: EntryType::Main,
+            is_user_facing: true,
+        });
+
+        // Build the call graph
+        analyzer.call_graph.add_edge_by_name(
+            "main".to_string(),
+            "init".to_string(),
+            PathBuf::from("src/main.rs"),
+        );
+        analyzer.call_graph.add_edge_by_name(
+            "init".to_string(),
+            "database_setup".to_string(),
+            PathBuf::from("src/init.rs"),
+        );
+        analyzer.call_graph.add_edge_by_name(
+            "database_setup".to_string(),
+            "connection_pool".to_string(),
+            PathBuf::from("src/database.rs"),
+        );
+        analyzer.call_graph.add_edge_by_name(
+            "init".to_string(),
+            "config_loader".to_string(),
+            PathBuf::from("src/init.rs"),
+        );
+        analyzer.call_graph.add_edge_by_name(
+            "config_loader".to_string(),
+            "file_reader".to_string(),
+            PathBuf::from("src/config.rs"),
+        );
+
+        let provider = CriticalPathProvider::new(analyzer);
+
+        // Test gathering for a deeply nested function
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "connection_pool".to_string(),
+            file_path: PathBuf::from("src/database.rs"),
+            line_range: (45, 80),
+        };
+
+        let result = provider.gather(&target).unwrap();
+
+        assert_eq!(result.provider, "critical_path");
+        assert_eq!(result.contribution, 2.0); // user-facing main function
+        if let ContextDetails::CriticalPath {
+            entry_points,
+            path_weight,
+            is_user_facing,
+        } = result.details
+        {
+            assert_eq!(entry_points.len(), 1);
+            assert_eq!(path_weight, 10.0);
+            assert!(is_user_facing);
+            assert!(entry_points[0].contains("main"));
+        } else {
+            panic!("Expected CriticalPath context details");
+        }
+    }
+
+    #[test]
+    fn test_gather_with_mixed_visibility_and_orphaned_functions() {
+        let mut analyzer = CriticalPathAnalyzer::new();
+
+        // Add mix of user-facing and non-user-facing entry points
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "main".to_string(),
+            file_path: PathBuf::from("src/main.rs"),
+            entry_type: EntryType::Main,
+            is_user_facing: true,
+        });
+
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "background_worker".to_string(),
+            file_path: PathBuf::from("src/worker.rs"),
+            entry_type: EntryType::EventHandler,
+            is_user_facing: false,
+        });
+
+        analyzer.entry_points.push_back(EntryPoint {
+            function_name: "api_endpoint".to_string(),
+            file_path: PathBuf::from("src/api.rs"),
+            entry_type: EntryType::ApiEndpoint,
+            is_user_facing: true,
+        });
+
+        // Create a shared utility function called by all entry points
+        analyzer.call_graph.add_edge_by_name(
+            "main".to_string(),
+            "shared_utility".to_string(),
+            PathBuf::from("src/main.rs"),
+        );
+        analyzer.call_graph.add_edge_by_name(
+            "background_worker".to_string(),
+            "shared_utility".to_string(),
+            PathBuf::from("src/worker.rs"),
+        );
+        analyzer.call_graph.add_edge_by_name(
+            "api_endpoint".to_string(),
+            "shared_utility".to_string(),
+            PathBuf::from("src/api.rs"),
+        );
+
+        let provider = CriticalPathProvider::new(analyzer);
+
+        // Test gathering for the shared utility function
+        let target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "shared_utility".to_string(),
+            file_path: PathBuf::from("src/utils.rs"),
+            line_range: (1, 30),
+        };
+
+        let result = provider.gather(&target).unwrap();
+
+        assert_eq!(result.provider, "critical_path");
+        // Should use max weight (main = 10.0) and double it for user-facing
+        assert_eq!(result.contribution, 2.0);
+        if let ContextDetails::CriticalPath {
+            entry_points,
+            path_weight,
+            is_user_facing,
+        } = result.details
+        {
+            assert_eq!(entry_points.len(), 3);
+            assert_eq!(path_weight, 10.0); // max of main (10.0), event (5.0), api (8.0)
+            assert!(is_user_facing); // has user-facing paths
+
+            // Verify all entry points are included
+            let entry_str = entry_points.join(" ");
+            assert!(entry_str.contains("main"));
+            assert!(entry_str.contains("background_worker"));
+            assert!(entry_str.contains("api_endpoint"));
+        } else {
+            panic!("Expected CriticalPath context details");
+        }
+
+        // Test edge case: orphaned function not in any path
+        let orphaned_target = AnalysisTarget {
+            root_path: PathBuf::from("/project"),
+            function_name: "orphaned_function".to_string(),
+            file_path: PathBuf::from("src/orphaned.rs"),
+            line_range: (10, 20),
+        };
+
+        let orphaned_result = provider.gather(&orphaned_target).unwrap();
+        assert_eq!(orphaned_result.contribution, 0.0);
+        if let ContextDetails::CriticalPath { entry_points, .. } = orphaned_result.details {
+            assert!(entry_points.is_empty());
+        } else {
+            panic!("Expected CriticalPath context details");
+        }
+    }
 }

@@ -552,4 +552,139 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].priority, Priority::Low);
     }
+
+    #[test]
+    fn test_check_match_expr_comprehensive() {
+        let code = r#"
+            fn example() {
+                match complex_operation() {
+                    Ok(data) => process_data(data),
+                    Err(_) => (), // Empty error handling
+                }
+
+                match another_operation() {
+                    Ok(result) => use_result(result),
+                    Err(e) => log::error!("Failed: {}", e), // Proper error handling
+                }
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
+
+        // Should only detect one issue (the first match with empty Err handling)
+        assert_eq!(items.len(), 1);
+        assert!(items[0].message.contains("match"));
+        assert!(items[0].message.contains("ignored"));
+    }
+
+    #[test]
+    fn test_unwrap_or_default_detection() {
+        let code = r#"
+            fn example() {
+                let value1 = risky_operation().unwrap_or(42);
+                let value2 = another_operation().unwrap_or_default();
+                let value3 = safe_operation().unwrap_or_else(|e| {
+                    log::warn!("Using default due to error: {}", e);
+                    0
+                });
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
+
+        // Should detect 2 issues (unwrap_or and unwrap_or_default, but not unwrap_or_else with logging)
+        assert_eq!(items.len(), 2);
+        assert!(items.iter().any(|item| item.message.contains("unwrap_or")));
+        assert!(items.iter().any(|item| item.message.contains("unwrap_or_default")));
+    }
+
+    #[test]
+    fn test_is_result_type_heuristics() {
+        // Test that our heuristics for identifying Result types work
+        let function_call: syn::Expr = syn::parse_quote!(some_function());
+        assert!(is_result_type(&function_call));
+
+        let method_call: syn::Expr = syn::parse_quote!(obj.method());
+        assert!(is_result_type(&method_call));
+
+        let try_expr: syn::Expr = syn::parse_quote!(operation()?);
+        assert!(is_result_type(&try_expr));
+
+        let literal: syn::Expr = syn::parse_quote!(42);
+        assert!(!is_result_type(&literal));
+    }
+
+    #[test]
+    fn test_pattern_descriptions_and_remediations() {
+        use ErrorSwallowingPattern::*;
+
+        // Test descriptions
+        assert_eq!(IfLetOkNoElse.description(), "if let Ok(...) without else branch");
+        assert_eq!(IfLetOkEmptyElse.description(), "if let Ok(...) with empty else branch");
+        assert_eq!(LetUnderscoreResult.description(), "let _ = discarding Result");
+        assert_eq!(OkMethodDiscard.description(), ".ok() discarding error information");
+        assert_eq!(MatchIgnoredErr.description(), "match with ignored Err variant");
+        assert_eq!(UnwrapOrNoLog.description(), "unwrap_or without error logging");
+        assert_eq!(UnwrapOrDefaultNoLog.description(), "unwrap_or_default without error logging");
+
+        // Test remediations
+        assert!(IfLetOkNoElse.remediation().contains("? operator"));
+        assert!(LetUnderscoreResult.remediation().contains("error handling"));
+        assert!(OkMethodDiscard.remediation().contains("map_err"));
+        assert!(MatchIgnoredErr.remediation().contains("Handle or log"));
+        assert!(UnwrapOrNoLog.remediation().contains("unwrap_or_else"));
+    }
+
+    #[test]
+    fn test_priority_determination() {
+        let detector = ErrorSwallowingDetector::new(Path::new("test.rs"), None);
+
+        // Test non-test function priorities
+        assert_eq!(
+            detector.determine_priority(&ErrorSwallowingPattern::LetUnderscoreResult),
+            Priority::High
+        );
+        assert_eq!(
+            detector.determine_priority(&ErrorSwallowingPattern::IfLetOkNoElse),
+            Priority::Medium
+        );
+        assert_eq!(
+            detector.determine_priority(&ErrorSwallowingPattern::UnwrapOrNoLog),
+            Priority::Low
+        );
+    }
+
+    #[test]
+    fn test_nested_error_swallowing() {
+        let code = r#"
+            fn complex_example() {
+                if condition {
+                    if let Ok(inner) = nested_operation() {
+                        // Process inner
+                        let _ = another_operation();
+                    }
+                }
+
+                match outer_operation() {
+                    Ok(data) => {
+                        if let Ok(processed) = process(data) {
+                            // Use processed
+                        }
+                    },
+                    Err(_) => {},
+                }
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
+
+        // Should detect multiple issues: nested if-let without else, let _, and empty Err match
+        assert!(items.len() >= 3);
+        assert!(items.iter().any(|item| item.message.contains("if let Ok")));
+        assert!(items.iter().any(|item| item.message.contains("let _")));
+        assert!(items.iter().any(|item| item.message.contains("match")));
+    }
 }

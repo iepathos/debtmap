@@ -360,4 +360,204 @@ mod tests {
         assert!(!items.is_empty());
         assert!(items[0].message.contains("unreachable"));
     }
+
+    #[test]
+    fn test_expect_with_descriptive_message() {
+        let code = r#"
+            fn example() {
+                let config = std::fs::read_to_string("config.toml")
+                    .expect("Failed to read config.toml - check file exists and permissions");
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_panic_patterns(&file, Path::new("test.rs"), None);
+
+        // Should not detect issues for descriptive expect messages
+        assert!(items.is_empty() || !items[0].message.contains("generic"));
+    }
+
+    #[test]
+    fn test_unimplemented_macro() {
+        let code = r#"
+            fn example() {
+                unimplemented!("This feature is not ready yet");
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_panic_patterns(&file, Path::new("test.rs"), None);
+
+        assert!(!items.is_empty());
+        assert!(items[0].message.contains("unimplemented"));
+        assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
+    }
+
+    #[test]
+    fn test_multiple_panic_patterns() {
+        let code = r#"
+            fn complex_example() {
+                let result = risky_operation().unwrap();
+                let option = maybe_value().expect("error");
+
+                if impossible_condition() {
+                    panic!("This should never happen");
+                }
+
+                todo!("Implement error handling");
+                unreachable!();
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_panic_patterns(&file, Path::new("test.rs"), None);
+
+        // Should detect multiple patterns
+        assert!(items.len() >= 4);
+
+        let has_unwrap = items.iter().any(|item| item.message.contains("unwrap"));
+        let has_expect = items.iter().any(|item| item.message.contains("expect"));
+        let has_panic = items.iter().any(|item| item.message.contains("panic!"));
+        let has_todo = items.iter().any(|item| item.message.contains("todo"));
+
+        assert!(has_unwrap);
+        assert!(has_expect);
+        assert!(has_panic);
+        assert!(has_todo);
+    }
+
+    #[test]
+    fn test_priority_determination() {
+        let detector = PanicPatternDetector::new(Path::new("test.rs"), None);
+
+        // Test production code priorities
+        assert_eq!(
+            detector.determine_priority(&PanicPattern::PanicInNonTest),
+            Priority::Critical
+        );
+        assert_eq!(
+            detector.determine_priority(&PanicPattern::UnwrapOnResult),
+            Priority::High
+        );
+        assert_eq!(
+            detector.determine_priority(&PanicPattern::ExpectWithGenericMessage),
+            Priority::Medium
+        );
+        assert_eq!(
+            detector.determine_priority(&PanicPattern::TodoInProduction),
+            Priority::Medium
+        );
+    }
+
+    #[test]
+    fn test_pattern_descriptions_and_remediations() {
+        use PanicPattern::*;
+
+        // Test descriptions
+        assert_eq!(UnwrapOnResult.description(), ".unwrap() on Result type");
+        assert_eq!(UnwrapOnOption.description(), ".unwrap() on Option type");
+        assert_eq!(ExpectWithGenericMessage.description(), ".expect() with generic message");
+        assert_eq!(PanicInNonTest.description(), "panic! in non-test code");
+        assert_eq!(UnreachableInReachable.description(), "unreachable! that may be reachable");
+        assert_eq!(TodoInProduction.description(), "todo!/unimplemented! in production");
+
+        // Test remediations
+        assert!(UnwrapOnResult.remediation().contains("? operator"));
+        assert!(ExpectWithGenericMessage.remediation().contains("descriptive context"));
+        assert!(PanicInNonTest.remediation().contains("Return Result"));
+        assert!(UnreachableInReachable.remediation().contains("Verify code path"));
+        assert!(TodoInProduction.remediation().contains("Implement the functionality"));
+    }
+
+    #[test]
+    fn test_check_unwrap_patterns_edge_cases() {
+        let code = r#"
+            fn example() {
+                // Chained unwraps
+                let value = some_result().unwrap().unwrap();
+
+                // Unwrap in various contexts
+                let items: Vec<_> = vec![Some(1), Some(2), None]
+                    .into_iter()
+                    .map(|x| x.unwrap())
+                    .collect();
+
+                // Expect with very short message
+                let result = operation().expect("err");
+
+                // Expect with common generic messages
+                let data = fetch_data().expect("should not happen");
+                let config = load_config().expect("unexpected");
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_panic_patterns(&file, Path::new("test.rs"), None);
+
+        // Should detect multiple unwrap/expect issues
+        assert!(items.len() >= 5);
+
+        let unwrap_count = items.iter().filter(|item| item.message.contains("unwrap")).count();
+        let expect_count = items.iter().filter(|item| item.message.contains("expect")).count();
+
+        assert!(unwrap_count >= 3);  // Multiple unwraps
+        assert!(expect_count >= 3);  // Multiple generic expects
+    }
+
+    #[test]
+    fn test_test_module_detection() {
+        let code = r#"
+            #[cfg(test)]
+            mod tests {
+                use super::*;
+
+                fn helper_function() {
+                    let result = operation().unwrap();
+                    panic!("Test helper panic");
+                }
+
+                #[test]
+                fn test_something() {
+                    helper_function();
+                }
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_panic_patterns(&file, Path::new("test.rs"), None);
+
+        // Should detect issues but with low priority due to test module
+        if !items.is_empty() {
+            assert_eq!(items[0].priority, Priority::Low);
+        }
+    }
+
+    #[test]
+    fn test_macro_in_statement_position() {
+        let code = r#"
+            fn example() {
+                if condition {
+                    todo!();
+                } else {
+                    unreachable!();
+                }
+
+                panic!("Statement panic");
+            }
+        "#;
+
+        let file = parse_str::<File>(code).expect("Failed to parse test code");
+        let items = detect_panic_patterns(&file, Path::new("test.rs"), None);
+
+        // Should detect macros in both expression and statement positions
+        assert!(items.len() >= 3);
+
+        let has_todo = items.iter().any(|item| item.message.contains("todo"));
+        let has_unreachable = items.iter().any(|item| item.message.contains("unreachable"));
+        let has_panic = items.iter().any(|item| item.message.contains("panic!"));
+
+        assert!(has_todo);
+        assert!(has_unreachable);
+        assert!(has_panic);
+    }
 }

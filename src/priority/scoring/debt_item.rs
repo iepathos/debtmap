@@ -1425,65 +1425,209 @@ fn generate_recommendation_with_coverage_and_data_flow(
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> ActionableRecommendation {
-    // For Rust files with complexity debt, use Rust-specific recommendations
-    let is_rust_file = func
-        .file
+    // Create recommendation context using pure functions
+    let recommendation_context = create_recommendation_context(func, debt_type, role, _score, coverage);
+
+    // Generate recommendation using functional composition
+    let (primary_action, rationale, steps) = generate_context_aware_recommendation(
+        recommendation_context,
+        data_flow,
+    );
+
+    build_actionable_recommendation(primary_action, rationale, steps)
+}
+
+// Pure function to create recommendation context
+fn create_recommendation_context(
+    func: &FunctionMetrics,
+    debt_type: &DebtType,
+    role: FunctionRole,
+    score: &UnifiedScore,
+    coverage: &Option<TransitiveCoverage>,
+) -> RecommendationContext {
+    RecommendationContext {
+        function_info: FunctionInfo::from_metrics(func),
+        debt_type: debt_type.clone(),
+        role,
+        score: score.clone(),
+        coverage: coverage.clone(),
+        is_rust_file: is_rust_file(&func.file),
+        coverage_percent: extract_coverage_percent(coverage),
+    }
+}
+
+// Data structure to hold recommendation context
+struct RecommendationContext {
+    function_info: FunctionInfo,
+    debt_type: DebtType,
+    role: FunctionRole,
+    score: UnifiedScore,
+    coverage: Option<TransitiveCoverage>,
+    is_rust_file: bool,
+    coverage_percent: f64,
+}
+
+// Pure data structure for function information
+struct FunctionInfo {
+    file: std::path::PathBuf,
+    name: String,
+    line: usize,
+    nesting: u32,
+    length: usize,
+    cognitive: u32,
+    is_pure: bool,
+    purity_confidence: f32,
+}
+
+impl FunctionInfo {
+    fn from_metrics(func: &FunctionMetrics) -> Self {
+        Self {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            line: func.line,
+            nesting: func.nesting,
+            length: func.length,
+            cognitive: func.cognitive,
+            is_pure: func.is_pure.unwrap_or(false),
+            purity_confidence: func.purity_confidence.unwrap_or(0.0),
+        }
+    }
+}
+
+// Pure function to determine if file is Rust
+fn is_rust_file(file_path: &std::path::Path) -> bool {
+    file_path
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e == "rs")
-        .unwrap_or(false);
+        .unwrap_or(false)
+}
 
-    let (primary_action, rationale, steps) = if is_rust_file {
-        if let DebtType::ComplexityHotspot { cyclomatic, .. } = debt_type {
-            let coverage_percent = coverage.as_ref().map(|c| c.direct).unwrap_or(0.0);
+// Pure function to extract coverage percentage
+fn extract_coverage_percent(coverage: &Option<TransitiveCoverage>) -> f64 {
+    coverage.as_ref().map(|c| c.direct).unwrap_or(0.0)
+}
 
-            // Create a temporary UnifiedDebtItem for the Rust recommendation function
-            let temp_item = UnifiedDebtItem {
-                location: Location {
-                    file: func.file.clone(),
-                    function: func.name.clone(),
-                    line: func.line,
-                },
-                debt_type: debt_type.clone(),
-                unified_score: _score.clone(),
-                function_role: role,
-                recommendation: ActionableRecommendation {
-                    primary_action: String::new(),
-                    rationale: String::new(),
-                    implementation_steps: vec![],
-                    related_items: vec![],
-                },
-                expected_impact: ImpactMetrics {
-                    risk_reduction: 0.0,
-                    complexity_reduction: 0.0,
-                    coverage_improvement: 0.0,
-                    lines_reduction: 0,
-                },
-                transitive_coverage: coverage.clone(),
-                upstream_dependencies: 0,
-                downstream_dependencies: 0,
-                upstream_callers: vec![],
-                downstream_callees: vec![],
-                nesting_depth: func.nesting,
-                function_length: func.length,
-                cyclomatic_complexity: *cyclomatic,
-                cognitive_complexity: func.cognitive,
-                entropy_details: None,
-                is_pure: func.is_pure,
-                purity_confidence: func.purity_confidence,
-                god_object_indicators: None,
-            };
+// Pure function to generate context-aware recommendations
+fn generate_context_aware_recommendation(
+    context: RecommendationContext,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> (String, String, Vec<String>) {
+    match should_use_rust_specific_recommendation(&context) {
+        Some(complexity) => generate_rust_complexity_recommendation(&context, complexity),
+        None => generate_standard_recommendation_from_context(context, data_flow),
+    }
+}
 
-            generate_rust_refactoring_recommendation(&temp_item, *cyclomatic, coverage_percent)
-        } else {
-            // For non-complexity debt in Rust files, use standard recommendations
-            generate_standard_recommendation(func, debt_type, role, coverage, data_flow)
+// Pure function to determine if Rust-specific recommendation should be used
+fn should_use_rust_specific_recommendation(context: &RecommendationContext) -> Option<u32> {
+    if context.is_rust_file {
+        if let DebtType::ComplexityHotspot { cyclomatic, .. } = &context.debt_type {
+            return Some(*cyclomatic);
         }
-    } else {
-        // For non-Rust files, use standard recommendations
-        generate_standard_recommendation(func, debt_type, role, coverage, data_flow)
-    };
+    }
+    None
+}
 
+// Pure function to generate Rust complexity recommendation
+fn generate_rust_complexity_recommendation(
+    context: &RecommendationContext,
+    cyclomatic: u32,
+) -> (String, String, Vec<String>) {
+    let temp_item = create_temporary_debt_item(context);
+    generate_rust_refactoring_recommendation(&temp_item, cyclomatic, context.coverage_percent)
+}
+
+// Pure function to create temporary debt item for Rust recommendations
+fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtItem {
+    UnifiedDebtItem {
+        location: Location {
+            file: context.function_info.file.clone(),
+            function: context.function_info.name.clone(),
+            line: context.function_info.line,
+        },
+        debt_type: context.debt_type.clone(),
+        unified_score: context.score.clone(),
+        function_role: context.role,
+        recommendation: ActionableRecommendation {
+            primary_action: String::new(),
+            rationale: String::new(),
+            implementation_steps: vec![],
+            related_items: vec![],
+        },
+        expected_impact: ImpactMetrics {
+            risk_reduction: 0.0,
+            complexity_reduction: 0.0,
+            coverage_improvement: 0.0,
+            lines_reduction: 0,
+        },
+        transitive_coverage: context.coverage.clone(),
+        upstream_dependencies: 0,
+        downstream_dependencies: 0,
+        upstream_callers: vec![],
+        downstream_callees: vec![],
+        nesting_depth: context.function_info.nesting,
+        function_length: context.function_info.length,
+        cyclomatic_complexity: extract_cyclomatic_complexity(&context.debt_type),
+        cognitive_complexity: context.function_info.cognitive,
+        entropy_details: None,
+        is_pure: Some(context.function_info.is_pure),
+        purity_confidence: Some(context.function_info.purity_confidence),
+        god_object_indicators: None,
+    }
+}
+
+// Pure function to extract cyclomatic complexity from debt type
+fn extract_cyclomatic_complexity(debt_type: &DebtType) -> u32 {
+    match debt_type {
+        DebtType::ComplexityHotspot { cyclomatic, .. } => *cyclomatic,
+        _ => 0,
+    }
+}
+
+// Function to generate standard recommendation from context
+fn generate_standard_recommendation_from_context(
+    context: RecommendationContext,
+    data_flow: Option<&crate::data_flow::DataFlowGraph>,
+) -> (String, String, Vec<String>) {
+    // Convert context back to original parameters for compatibility
+    let func = reconstruct_function_metrics(&context);
+    generate_standard_recommendation(
+        &func,
+        &context.debt_type,
+        context.role,
+        &context.coverage,
+        data_flow,
+    )
+}
+
+// Helper function to reconstruct function metrics from context
+fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetrics {
+    FunctionMetrics {
+        file: context.function_info.file.clone(),
+        name: context.function_info.name.clone(),
+        line: context.function_info.line,
+        nesting: context.function_info.nesting,
+        length: context.function_info.length,
+        cognitive: context.function_info.cognitive,
+        is_pure: Some(context.function_info.is_pure),
+        purity_confidence: Some(context.function_info.purity_confidence as f32),
+        // Set reasonable defaults for other fields
+        cyclomatic: extract_cyclomatic_complexity(&context.debt_type),
+        is_test: false,
+        visibility: None,
+        is_trait_method: false,
+        in_test_module: false,
+        entropy_score: None,
+    }
+}
+
+// Pure function to build final actionable recommendation
+fn build_actionable_recommendation(
+    primary_action: String,
+    rationale: String,
+    steps: Vec<String>,
+) -> ActionableRecommendation {
     ActionableRecommendation {
         primary_action,
         rationale,

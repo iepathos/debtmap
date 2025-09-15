@@ -200,43 +200,12 @@ impl ExtractionAnalyzer for UnifiedExtractionAnalyzer {
         _file: &FileMetrics,
         data_flow: Option<&DataFlowGraph>,
     ) -> Vec<ExtractionSuggestion> {
-        let language = detect_language(&func.file);
-
-        let context = AnalysisContext {
-            function_name: func.name.clone(),
-            file_path: func.file.display().to_string(),
-            language: language.clone(),
-            complexity_before: func.cyclomatic,
-            has_side_effects: detect_side_effects(func, data_flow),
-            data_dependencies: extract_dependencies(func, data_flow),
-        };
-
-        if self.matchers.contains_key(&language) {
-            // Parse the function AST based on language
-            if let Some(ast) = parse_function_ast(func, &language) {
-                // Read source and create context-aware matcher
-                if let Ok(source) = crate::io::read_file(&func.file) {
-                    use crate::extraction_patterns::language_specific::RustPatternMatcher;
-                    let matcher = RustPatternMatcher::with_source_context(&source, func.line);
-                    let patterns = matcher.match_patterns(&ast, &context);
-                    patterns
-                        .into_iter()
-                        .map(|pattern| {
-                            let confidence = matcher.score_confidence(&pattern, &context);
-                            let mut pattern = pattern;
-                            pattern.confidence = confidence;
-                            matcher.generate_extraction(&pattern)
-                        })
-                        .collect()
-                } else {
-                    Vec::new()
-                }
-            } else {
-                Vec::new()
-            }
-        } else {
-            Vec::new()
-        }
+        create_analysis_context(func, data_flow)
+            .and_then(|context| build_analysis_pipeline(&context, func))
+            .and_then(|(context, ast, source)| {
+                execute_pattern_matching(&context, &ast, &source, func.line)
+            })
+            .unwrap_or_default()
     }
 
     fn generate_recommendation(
@@ -308,71 +277,86 @@ impl ExtractionAnalyzer for UnifiedExtractionAnalyzer {
     }
 }
 
+// Pure function for language detection
 fn detect_language(path: &std::path::Path) -> String {
-    match path.extension().and_then(|s| s.to_str()) {
-        Some("rs") => "rust".to_string(),
-        Some("py") => "python".to_string(),
-        Some("js") | Some("jsx") => "javascript".to_string(),
-        Some("ts") | Some("tsx") => "typescript".to_string(),
-        _ => "unknown".to_string(),
-    }
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(map_extension_to_language)
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
+// Pure function for extension mapping
+fn map_extension_to_language(ext: &str) -> String {
+    match ext {
+        "rs" => "rust",
+        "py" => "python",
+        "js" | "jsx" => "javascript",
+        "ts" | "tsx" => "typescript",
+        _ => "unknown",
+    }
+    .to_string()
+}
+
+// Pure function for side effect detection
 fn detect_side_effects(func: &FunctionMetrics, data_flow: Option<&DataFlowGraph>) -> bool {
-    if let Some(flow) = data_flow {
-        // Create a FunctionId from the function metrics for lookup
-        let func_id = crate::priority::call_graph::FunctionId {
-            file: func.file.clone(),
-            name: func.name.clone(),
-            line: func.line,
-        };
+    data_flow
+        .map(|flow| analyze_side_effects_from_dataflow(func, flow))
+        .unwrap_or_else(|| estimate_side_effects_from_complexity(func))
+}
 
-        // Use data flow analysis to detect side effects
-        flow.has_side_effects(&func_id)
-    } else {
-        // Conservative estimate based on function metrics
-        // Functions with high complexity are more likely to have side effects
-        func.cyclomatic > 10
+// Pure function for dataflow-based side effect analysis
+fn analyze_side_effects_from_dataflow(func: &FunctionMetrics, flow: &DataFlowGraph) -> bool {
+    let func_id = create_function_id(func);
+    flow.has_side_effects(&func_id)
+}
+
+// Pure function for complexity-based side effect estimation
+fn estimate_side_effects_from_complexity(func: &FunctionMetrics) -> bool {
+    func.cyclomatic > 10
+}
+
+// Pure function for creating FunctionId
+fn create_function_id(func: &FunctionMetrics) -> crate::priority::call_graph::FunctionId {
+    crate::priority::call_graph::FunctionId {
+        file: func.file.clone(),
+        name: func.name.clone(),
+        line: func.line,
     }
 }
 
+// Pure function for dependency extraction
 fn extract_dependencies(func: &FunctionMetrics, data_flow: Option<&DataFlowGraph>) -> Vec<String> {
-    if let Some(flow) = data_flow {
-        // Create a FunctionId from the function metrics for lookup
-        let func_id = crate::priority::call_graph::FunctionId {
-            file: func.file.clone(),
-            name: func.name.clone(),
-            line: func.line,
-        };
-
-        // Extract variable dependencies from data flow graph
-        flow.get_variable_dependencies(&func_id)
-            .map(|deps| deps.iter().cloned().collect())
-            .unwrap_or_default()
-    } else {
-        Vec::new()
-    }
+    data_flow
+        .and_then(|flow| extract_variable_dependencies(func, flow))
+        .unwrap_or_default()
 }
 
-fn parse_function_ast(func: &FunctionMetrics, language: &str) -> Option<syn::File> {
-    // Read the source file
-    let source = crate::io::read_file(&func.file).ok()?;
+// Pure function for variable dependency extraction
+fn extract_variable_dependencies(
+    func: &FunctionMetrics,
+    flow: &DataFlowGraph,
+) -> Option<Vec<String>> {
+    let func_id = create_function_id(func);
+    flow.get_variable_dependencies(&func_id)
+        .map(|deps| deps.iter().cloned().collect())
+}
 
+// Pure function for AST parsing with language dispatch
+fn parse_function_ast(func: &FunctionMetrics, language: &str) -> Option<syn::File> {
+    crate::io::read_file(&func.file)
+        .ok()
+        .and_then(|source| parse_ast_by_language(&source, func, language))
+}
+
+// Pure function for language-specific AST parsing
+fn parse_ast_by_language(
+    source: &str,
+    func: &FunctionMetrics,
+    language: &str,
+) -> Option<syn::File> {
     match language {
-        "rust" => {
-            // For Rust, extract the function and create a minimal syn::File
-            extract_rust_function_ast(&source, func)
-        }
-        "python" => {
-            // Python patterns don't use syn::File, they need different handling
-            // For now, return None as Python pattern matching uses different AST
-            None
-        }
-        "javascript" | "typescript" => {
-            // JavaScript/TypeScript patterns also don't use syn::File
-            // They would use tree-sitter AST instead
-            None
-        }
+        "rust" => extract_rust_function_ast(source, func),
+        "python" | "javascript" | "typescript" => None, // Different AST types
         _ => None,
     }
 }
@@ -423,20 +407,106 @@ fn extract_rust_function_ast(source: &str, func: &FunctionMetrics) -> Option<syn
     None
 }
 
+// Pure function for parameter formatting using functional style
 fn format_parameters(params: &[Parameter]) -> String {
-    if params.is_empty() {
-        "none".to_string()
-    } else {
-        params
+    match params.is_empty() {
+        true => "none".to_string(),
+        false => params
             .iter()
-            .map(|p| {
-                if p.is_mutable {
-                    format!("mut {}: {}", p.name, p.type_hint)
-                } else {
-                    format!("{}: {}", p.name, p.type_hint)
-                }
-            })
+            .map(format_single_parameter)
             .collect::<Vec<_>>()
-            .join(", ")
+            .join(", "),
+    }
+}
+
+// Pure function for formatting a single parameter
+fn format_single_parameter(param: &Parameter) -> String {
+    let mutability = if param.is_mutable { "mut " } else { "" };
+    format!("{}{}: {}", mutability, param.name, param.type_hint)
+}
+
+// Pure functional pipeline components for analysis
+
+// Creates analysis context from function metrics and data flow
+fn create_analysis_context(
+    func: &FunctionMetrics,
+    data_flow: Option<&DataFlowGraph>,
+) -> Result<AnalysisContext, AnalysisError> {
+    let language = detect_language(&func.file);
+
+    Ok(AnalysisContext {
+        function_name: func.name.clone(),
+        file_path: func.file.display().to_string(),
+        language,
+        complexity_before: func.cyclomatic,
+        has_side_effects: detect_side_effects(func, data_flow),
+        data_dependencies: extract_dependencies(func, data_flow),
+    })
+}
+
+// Builds the analysis pipeline by preparing AST and source
+fn build_analysis_pipeline(
+    context: &AnalysisContext,
+    func: &FunctionMetrics,
+) -> Result<(AnalysisContext, syn::File, String), AnalysisError> {
+    let ast = parse_function_ast(func, &context.language)
+        .ok_or(AnalysisError::ParseError)?;
+
+    let source = crate::io::read_file(&func.file)
+        .map_err(|_| AnalysisError::IoError)?;
+
+    Ok((context.clone(), ast, source))
+}
+
+// Executes pattern matching pipeline using Result chaining
+fn execute_pattern_matching(
+    context: &AnalysisContext,
+    ast: &syn::File,
+    source: &str,
+    function_line: usize,
+) -> Result<Vec<ExtractionSuggestion>, AnalysisError> {
+    use crate::extraction_patterns::language_specific::RustPatternMatcher;
+
+    let matcher = RustPatternMatcher::with_source_context(source, function_line);
+    let patterns = matcher.match_patterns(ast, context);
+
+    Ok(patterns
+        .into_iter()
+        .map(|pattern| apply_confidence_scoring(pattern, &matcher, context))
+        .map(|pattern| matcher.generate_extraction(&pattern))
+        .collect())
+}
+
+// Pure function for applying confidence scoring
+fn apply_confidence_scoring(
+    mut pattern: MatchedPattern,
+    matcher: &crate::extraction_patterns::language_specific::RustPatternMatcher,
+    context: &AnalysisContext,
+) -> MatchedPattern {
+    pattern.confidence = matcher.score_confidence(&pattern, context);
+    pattern
+}
+
+// Error type for analysis pipeline
+#[derive(Debug)]
+enum AnalysisError {
+    ParseError,
+    IoError,
+    MatcherNotFound,
+}
+
+// Extension trait for Result chaining in analysis pipeline
+trait AnalysisResult<T> {
+    fn and_then_analysis<U, F>(self, f: F) -> Result<U, AnalysisError>
+    where
+        F: FnOnce(T) -> Result<U, AnalysisError>;
+}
+
+impl<T> AnalysisResult<T> for Result<T, AnalysisError> {
+    fn and_then_analysis<U, F>(self, f: F) -> Result<U, AnalysisError>
+    where
+        F: FnOnce(T) -> Result<U, AnalysisError>,
+    {
+        self.and_then(f)
     }
 }

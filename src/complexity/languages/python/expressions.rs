@@ -941,49 +941,59 @@ fn collect_generator_variables(gen_exp: &ast::ExprGeneratorExp) -> HashSet<Strin
 // Pattern Collection
 // ============================================================================
 
+fn collect_binary_op_patterns(bin_op: &ast::ExprBinOp, patterns: &mut Vec<String>) {
+    patterns.push(format!("bin_op:{:?}", bin_op.op));
+    collect_expression_patterns(&bin_op.left, patterns);
+    collect_expression_patterns(&bin_op.right, patterns);
+}
+
+fn collect_unary_op_patterns(unary_op: &ast::ExprUnaryOp, patterns: &mut Vec<String>) {
+    patterns.push(format!("unary_op:{:?}", unary_op.op));
+    collect_expression_patterns(&unary_op.operand, patterns);
+}
+
+fn collect_call_patterns(call: &ast::ExprCall, patterns: &mut Vec<String>) {
+    patterns.push("call".to_string());
+    collect_expression_patterns(&call.func, patterns);
+    for arg in &call.args {
+        collect_expression_patterns(arg, patterns);
+    }
+}
+
+fn collect_simple_pattern(pattern_name: &str, patterns: &mut Vec<String>) {
+    patterns.push(pattern_name.to_string());
+}
+
 fn collect_expression_patterns(expr: &ast::Expr, patterns: &mut Vec<String>) {
     use ast::Expr::*;
     match expr {
-        BoolOp(_) => patterns.push("bool_op".to_string()),
-        BinOp(bin_op) => {
-            patterns.push(format!("bin_op:{:?}", bin_op.op));
-            collect_expression_patterns(&bin_op.left, patterns);
-            collect_expression_patterns(&bin_op.right, patterns);
-        }
-        UnaryOp(unary_op) => {
-            patterns.push(format!("unary_op:{:?}", unary_op.op));
-            collect_expression_patterns(&unary_op.operand, patterns);
-        }
-        Lambda(_) => patterns.push("lambda".to_string()),
-        IfExp(_) => patterns.push("if_exp".to_string()),
-        Dict(_) => patterns.push("dict".to_string()),
-        Set(_) => patterns.push("set".to_string()),
-        ListComp(_) => patterns.push("list_comp".to_string()),
-        SetComp(_) => patterns.push("set_comp".to_string()),
-        DictComp(_) => patterns.push("dict_comp".to_string()),
-        GeneratorExp(_) => patterns.push("generator_exp".to_string()),
-        Await(_) => patterns.push("await".to_string()),
-        Yield(_) => patterns.push("yield".to_string()),
-        YieldFrom(_) => patterns.push("yield_from".to_string()),
-        Compare(_) => patterns.push("compare".to_string()),
-        Call(call) => {
-            patterns.push("call".to_string());
-            collect_expression_patterns(&call.func, patterns);
-            for arg in &call.args {
-                collect_expression_patterns(arg, patterns);
-            }
-        }
-        FormattedValue(_) => patterns.push("f_string".to_string()),
-        JoinedStr(_) => patterns.push("joined_str".to_string()),
-        Constant(_) => patterns.push("constant".to_string()),
-        Attribute(_) => patterns.push("attribute".to_string()),
-        Subscript(_) => patterns.push("subscript".to_string()),
-        Starred(_) => patterns.push("starred".to_string()),
-        Name(_) => patterns.push("name".to_string()),
-        List(_) => patterns.push("list".to_string()),
-        Tuple(_) => patterns.push("tuple".to_string()),
-        Slice(_) => patterns.push("slice".to_string()),
-        NamedExpr(_) => patterns.push("named_expr".to_string()),
+        BoolOp(_) => collect_simple_pattern("bool_op", patterns),
+        BinOp(bin_op) => collect_binary_op_patterns(bin_op, patterns),
+        UnaryOp(unary_op) => collect_unary_op_patterns(unary_op, patterns),
+        Lambda(_) => collect_simple_pattern("lambda", patterns),
+        IfExp(_) => collect_simple_pattern("if_exp", patterns),
+        Dict(_) => collect_simple_pattern("dict", patterns),
+        Set(_) => collect_simple_pattern("set", patterns),
+        ListComp(_) => collect_simple_pattern("list_comp", patterns),
+        SetComp(_) => collect_simple_pattern("set_comp", patterns),
+        DictComp(_) => collect_simple_pattern("dict_comp", patterns),
+        GeneratorExp(_) => collect_simple_pattern("generator_exp", patterns),
+        Await(_) => collect_simple_pattern("await", patterns),
+        Yield(_) => collect_simple_pattern("yield", patterns),
+        YieldFrom(_) => collect_simple_pattern("yield_from", patterns),
+        Compare(_) => collect_simple_pattern("compare", patterns),
+        Call(call) => collect_call_patterns(call, patterns),
+        FormattedValue(_) => collect_simple_pattern("f_string", patterns),
+        JoinedStr(_) => collect_simple_pattern("joined_str", patterns),
+        Constant(_) => collect_simple_pattern("constant", patterns),
+        Attribute(_) => collect_simple_pattern("attribute", patterns),
+        Subscript(_) => collect_simple_pattern("subscript", patterns),
+        Starred(_) => collect_simple_pattern("starred", patterns),
+        Name(_) => collect_simple_pattern("name", patterns),
+        List(_) => collect_simple_pattern("list", patterns),
+        Tuple(_) => collect_simple_pattern("tuple", patterns),
+        Slice(_) => collect_simple_pattern("slice", patterns),
+        NamedExpr(_) => collect_simple_pattern("named_expr", patterns),
     }
 }
 
