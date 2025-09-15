@@ -46,35 +46,53 @@ impl Default for ScoringWeights {
 }
 
 impl ScoringWeights {
-    /// Validate that weights sum to 1.0 (with small tolerance for floating point)
-    pub fn validate(&self) -> Result<(), String> {
-        // Only validate the weights we actually use in the weighted sum model
-        let sum = self.coverage + self.complexity + self.dependency;
+    // Pure function: Check if a weight is in valid range
+    fn is_valid_weight(weight: f64) -> bool {
+        weight >= 0.0 && weight <= 1.0
+    }
+
+    // Pure function: Validate a single weight with name
+    fn validate_weight(weight: f64, name: &str) -> Result<(), String> {
+        if Self::is_valid_weight(weight) {
+            Ok(())
+        } else {
+            Err(format!("{} weight must be between 0.0 and 1.0", name))
+        }
+    }
+
+    // Pure function: Validate active weights sum to 1.0
+    fn validate_active_weights_sum(coverage: f64, complexity: f64, dependency: f64) -> Result<(), String> {
+        let sum = coverage + complexity + dependency;
         if (sum - 1.0).abs() > 0.001 {
-            return Err(format!(
+            Err(format!(
                 "Active scoring weights (coverage, complexity, dependency) must sum to 1.0, but sum to {:.3}",
                 sum
-            ));
+            ))
+        } else {
+            Ok(())
         }
+    }
 
-        // Check each weight is between 0 and 1
-        if self.coverage < 0.0 || self.coverage > 1.0 {
-            return Err("Coverage weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.complexity < 0.0 || self.complexity > 1.0 {
-            return Err("Complexity weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.semantic < 0.0 || self.semantic > 1.0 {
-            return Err("Semantic weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.dependency < 0.0 || self.dependency > 1.0 {
-            return Err("Dependency weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.security < 0.0 || self.security > 1.0 {
-            return Err("Security weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.organization < 0.0 || self.organization > 1.0 {
-            return Err("Organization weight must be between 0.0 and 1.0".to_string());
+    // Pure function: Collect all weight validations
+    fn collect_weight_validations(&self) -> Vec<Result<(), String>> {
+        vec![
+            Self::validate_weight(self.coverage, "Coverage"),
+            Self::validate_weight(self.complexity, "Complexity"),
+            Self::validate_weight(self.semantic, "Semantic"),
+            Self::validate_weight(self.dependency, "Dependency"),
+            Self::validate_weight(self.security, "Security"),
+            Self::validate_weight(self.organization, "Organization"),
+        ]
+    }
+
+    /// Validate that weights sum to 1.0 (with small tolerance for floating point)
+    pub fn validate(&self) -> Result<(), String> {
+        // Validate active weights sum
+        Self::validate_active_weights_sum(self.coverage, self.complexity, self.dependency)?;
+
+        // Validate all individual weights
+        for validation in self.collect_weight_validations() {
+            validation?;
         }
 
         Ok(())

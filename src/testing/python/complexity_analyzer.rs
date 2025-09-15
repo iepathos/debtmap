@@ -1,6 +1,17 @@
 use super::{config::ComplexityConfig, Severity, TestIssueType, TestQualityIssue};
 use rustpython_parser::ast::{self, Expr, Stmt};
 
+// Pure data structure for complexity metrics
+#[derive(Debug, Clone)]
+struct ComplexityMetrics {
+    conditionals: u32,
+    loops: u32,
+    assertions: u32,
+    mocks: u32,
+    nesting_depth: u32,
+    line_count: u32,
+}
+
 pub struct TestComplexityAnalyzer {
     config: ComplexityConfig,
 }
@@ -49,38 +60,83 @@ impl TestComplexityAnalyzer {
         }
     }
 
+    // Pure function: Calculate weighted contribution above threshold
+    fn calculate_threshold_weight(value: u32, threshold: u32, weight: u32) -> u32 {
+        if value > threshold {
+            (value - threshold) * weight
+        } else {
+            0
+        }
+    }
+
+    // Pure function: Calculate line count contribution
+    fn calculate_line_contribution(line_count: u32, threshold: u32, divisor: u32) -> u32 {
+        if line_count > threshold {
+            (line_count - threshold) / divisor
+        } else {
+            0
+        }
+    }
+
+    // Pure function: Collect all complexity metrics
+    fn collect_complexity_metrics(&self, body: &[Stmt]) -> ComplexityMetrics {
+        ComplexityMetrics {
+            conditionals: self.count_conditionals(body),
+            loops: self.count_loops(body),
+            assertions: self.count_assertions(body),
+            mocks: self.count_mocks(body),
+            nesting_depth: self.calculate_max_nesting(body, 0),
+            line_count: body.len() as u32,
+        }
+    }
+
+    // Pure function: Calculate weighted complexity from metrics
+    fn calculate_weighted_complexity(
+        metrics: &ComplexityMetrics,
+        config: &ComplexityConfig,
+    ) -> u32 {
+        let base_complexity = 1;
+
+        // Direct contributions
+        let conditional_contribution = metrics.conditionals * config.conditional_weight;
+        let loop_contribution = metrics.loops * config.loop_weight;
+        let mock_contribution = metrics.mocks * config.mock_weight;
+
+        // Threshold-based contributions
+        let assertion_contribution = Self::calculate_threshold_weight(
+            metrics.assertions,
+            config.assertion_threshold,
+            config.assertion_weight,
+        );
+
+        let nesting_contribution = Self::calculate_threshold_weight(
+            metrics.nesting_depth,
+            config.nesting_threshold,
+            config.nesting_weight,
+        );
+
+        let line_contribution = Self::calculate_line_contribution(
+            metrics.line_count,
+            config.line_threshold,
+            config.line_divisor,
+        );
+
+        // Compose final complexity
+        base_complexity
+            + conditional_contribution
+            + loop_contribution
+            + assertion_contribution
+            + mock_contribution
+            + nesting_contribution
+            + line_contribution
+    }
+
     fn calculate_complexity(&self, body: &[Stmt]) -> u32 {
-        let mut complexity = 1; // Base complexity
+        // Step 1: Collect metrics (pure)
+        let metrics = self.collect_complexity_metrics(body);
 
-        // Count various complexity factors
-        let conditional_count = self.count_conditionals(body);
-        let loop_count = self.count_loops(body);
-        let assertion_count = self.count_assertions(body);
-        let mock_count = self.count_mocks(body);
-        let nesting_depth = self.calculate_max_nesting(body, 0);
-        let line_count = body.len() as u32;
-
-        // Weight different factors using configuration
-        complexity += conditional_count * self.config.conditional_weight;
-        complexity += loop_count * self.config.loop_weight;
-        complexity += if assertion_count > self.config.assertion_threshold {
-            (assertion_count - self.config.assertion_threshold) * self.config.assertion_weight
-        } else {
-            0
-        };
-        complexity += mock_count * self.config.mock_weight;
-        complexity += if nesting_depth > self.config.nesting_threshold {
-            (nesting_depth - self.config.nesting_threshold) * self.config.nesting_weight
-        } else {
-            0
-        };
-        complexity += if line_count > self.config.line_threshold {
-            (line_count - self.config.line_threshold) / self.config.line_divisor
-        } else {
-            0
-        };
-
-        complexity
+        // Step 2: Calculate weighted complexity (pure)
+        Self::calculate_weighted_complexity(&metrics, &self.config)
     }
 
     fn count_conditionals(&self, body: &[Stmt]) -> u32 {

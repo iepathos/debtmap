@@ -300,6 +300,95 @@ fn calculate_impact_percentage(problematic: usize, total: usize) -> u32 {
     }
 }
 
+// Pure function: Generate header text
+fn generate_header(rank: usize, score: f64, severity: &str, severity_color: Color) -> String {
+    format!(
+        "#{} {} [{}]",
+        rank.to_string().bright_cyan().bold(),
+        format!("SCORE: {}", score_formatter::format_score(score)).bright_yellow(),
+        format!("{} - FILE AGGREGATE", severity)
+            .color(severity_color)
+            .bold()
+    )
+}
+
+// Pure function: Generate file path line
+fn generate_file_path_line(item: &priority::FileAggregateScore) -> String {
+    format!(
+        "├─ {} ({} functions, total score: {:.1})",
+        item.file_path.display().to_string().bright_green(),
+        item.function_count,
+        item.total_score
+    )
+}
+
+// Pure function: Generate WHY section
+fn generate_why_section(formatter: &ColoredFormatter, item: &priority::FileAggregateScore) -> String {
+    format!(
+        "├─ {}: File aggregate combines complexity scores from {} individual functions to identify files with widespread technical debt. Unlike single file-level issues (god objects, high line count), this represents accumulated complexity across multiple functions. {} functions exceed complexity thresholds.",
+        formatter.emoji("WHY", "WHY").bright_magenta(),
+        item.function_count,
+        item.problematic_functions
+    )
+}
+
+// Pure function: Generate ACTION section
+fn generate_action_section(formatter: &ColoredFormatter, msg: &str) -> String {
+    format!(
+        "├─ {}: {}",
+        formatter.emoji("ACTION", "ACTION").bright_cyan(),
+        msg
+    )
+}
+
+// Pure function: Generate IMPACT section
+fn generate_impact_section(formatter: &ColoredFormatter, percentage: u32) -> String {
+    format!(
+        "├─ {}: Reduce overall file complexity by {}%, improve test coverage, enable safer refactoring",
+        formatter.emoji("IMPACT", "IMPACT").bright_yellow(),
+        percentage
+    )
+}
+
+// Pure function: Generate METRICS section
+fn generate_metrics_section(formatter: &ColoredFormatter, item: &priority::FileAggregateScore) -> String {
+    format!(
+        "├─ {}: Functions: {}, Problematic: {}, Avg complexity: {:.1}",
+        formatter.emoji("METRICS", "METRICS").bright_blue(),
+        item.function_count,
+        item.problematic_functions,
+        item.total_score / item.function_count as f64
+    )
+}
+
+// Pure function: Generate SCORING section
+fn generate_scoring_section(
+    formatter: &ColoredFormatter,
+    item: &priority::FileAggregateScore,
+    severity: &str,
+) -> String {
+    format!(
+        "├─ {}: Aggregate: {} | Avg per function: {:.1} | Max: {:.1}",
+        formatter.emoji("SCORING", "SCORING").bright_red(),
+        severity,
+        item.aggregate_score / item.function_count as f64,
+        item.top_function_scores
+            .first()
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0)
+    )
+}
+
+// Pure function: Generate DEPENDENCIES section
+fn generate_dependencies_section(formatter: &ColoredFormatter, problematic_count: usize) -> String {
+    format!(
+        "└─ {}: {} high-complexity functions identified",
+        formatter.emoji("DEPENDENCIES", "DEPS").bright_white(),
+        problematic_count
+    )
+}
+
+// Main function using composition
 fn format_file_aggregate_item(
     output: &mut String,
     rank: usize,
@@ -310,103 +399,29 @@ fn format_file_aggregate_item(
     let severity = determine_file_aggregate_severity(item.aggregate_score);
     let severity_color = get_severity_color(item.aggregate_score);
 
-    // Header with rank and score
-    writeln!(
-        output,
-        "#{} {} [{}]",
-        rank.to_string().bright_cyan().bold(),
-        format!(
-            "SCORE: {}",
-            score_formatter::format_score(item.aggregate_score)
-        )
-        .bright_yellow(),
-        format!("{} - FILE AGGREGATE", severity)
-            .color(severity_color)
-            .bold()
-    )
-    .unwrap();
+    // Compose sections using pure functions
+    writeln!(output, "{}", generate_header(rank, item.aggregate_score, severity, severity_color)).unwrap();
+    writeln!(output, "{}", generate_file_path_line(item)).unwrap();
+    writeln!(output, "{}", generate_why_section(&formatter, item)).unwrap();
 
-    // File path and stats
-    writeln!(
-        output,
-        "├─ {} ({} functions, total score: {:.1})",
-        item.file_path.display().to_string().bright_green(),
-        item.function_count,
-        item.total_score
-    )
-    .unwrap();
-
-    // WHY section - explain what file aggregate means
-    writeln!(
-        output,
-        "├─ {}: File aggregate combines complexity scores from {} individual functions to identify files with widespread technical debt. Unlike single file-level issues (god objects, high line count), this represents accumulated complexity across multiple functions. {} functions exceed complexity thresholds.",
-        formatter.emoji("WHY", "WHY").bright_magenta(),
-        item.function_count,
-        item.problematic_functions
-    )
-    .unwrap();
-
-    // ACTION section - Be specific about what to fix
+    // ACTION section with message generation
     let top_functions = item.top_function_scores.len().min(2);
     let action_msg = generate_action_message(item.problematic_functions, top_functions);
+    writeln!(output, "{}", generate_action_section(&formatter, &action_msg)).unwrap();
 
-    writeln!(
-        output,
-        "├─ {}: {}",
-        formatter.emoji("ACTION", "ACTION").bright_cyan(),
-        action_msg
-    )
-    .unwrap();
-
-    // Specific, prescriptive actions with concrete refactoring patterns
+    // Add refactoring steps if needed
     if item.problematic_functions > 0 {
         format_refactoring_steps(output, top_functions);
     }
 
     // IMPACT section
-    let impact_percentage =
-        calculate_impact_percentage(item.problematic_functions, item.function_count);
-    writeln!(
-        output,
-        "├─ {}: Reduce overall file complexity by {}%, improve test coverage, enable safer refactoring",
-        formatter.emoji("IMPACT", "IMPACT").bright_yellow(),
-        impact_percentage
-    )
-    .unwrap();
+    let impact_percentage = calculate_impact_percentage(item.problematic_functions, item.function_count);
+    writeln!(output, "{}", generate_impact_section(&formatter, impact_percentage)).unwrap();
 
-    // METRICS section
-    writeln!(
-        output,
-        "├─ {}: Functions: {}, Problematic: {}, Avg complexity: {:.1}",
-        formatter.emoji("METRICS", "METRICS").bright_blue(),
-        item.function_count,
-        item.problematic_functions,
-        item.total_score / item.function_count as f64
-    )
-    .unwrap();
-
-    // SCORING breakdown
-    writeln!(
-        output,
-        "├─ {}: Aggregate: {} | Avg per function: {:.1} | Max: {:.1}",
-        formatter.emoji("SCORING", "SCORING").bright_red(),
-        severity,
-        item.aggregate_score / item.function_count as f64,
-        item.top_function_scores
-            .first()
-            .map(|(_, s)| *s)
-            .unwrap_or(0.0)
-    )
-    .unwrap();
-
-    // DEPENDENCIES - Top problematic functions
-    writeln!(
-        output,
-        "└─ {}: {} high-complexity functions identified",
-        formatter.emoji("DEPENDENCIES", "DEPS").bright_white(),
-        item.problematic_functions
-    )
-    .unwrap();
+    // Remaining sections
+    writeln!(output, "{}", generate_metrics_section(&formatter, item)).unwrap();
+    writeln!(output, "{}", generate_scoring_section(&formatter, item, severity)).unwrap();
+    writeln!(output, "{}", generate_dependencies_section(&formatter, item.problematic_functions)).unwrap();
 
     format_top_functions_list(output, &item.top_function_scores);
 }
