@@ -180,6 +180,8 @@ fn test_manual_pruning_trigger() {
     let temp_dir = TempDir::new().unwrap();
     let mut env_guard = EnvGuard::new();
     env_guard.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+    // Disable auto-pruning during puts to test manual trigger specifically
+    env_guard.set("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
     let pruner = AutoPruner {
         max_size_bytes: 500,
