@@ -218,10 +218,7 @@ struct DependencyMetrics {
     downstream_names: Vec<String>,
 }
 
-fn extract_dependency_metrics(
-    func_id: &FunctionId,
-    call_graph: &CallGraph,
-) -> DependencyMetrics {
+fn extract_dependency_metrics(func_id: &FunctionId, call_graph: &CallGraph) -> DependencyMetrics {
     let upstream = call_graph.get_callers(func_id);
     let downstream = call_graph.get_callees(func_id);
 

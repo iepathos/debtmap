@@ -323,7 +323,10 @@ fn generate_file_path_line(item: &priority::FileAggregateScore) -> String {
 }
 
 // Pure function: Generate WHY section
-fn generate_why_section(formatter: &ColoredFormatter, item: &priority::FileAggregateScore) -> String {
+fn generate_why_section(
+    formatter: &ColoredFormatter,
+    item: &priority::FileAggregateScore,
+) -> String {
     format!(
         "├─ {}: File aggregate combines complexity scores from {} individual functions to identify files with widespread technical debt. Unlike single file-level issues (god objects, high line count), this represents accumulated complexity across multiple functions. {} functions exceed complexity thresholds.",
         formatter.emoji("WHY", "WHY").bright_magenta(),
@@ -351,7 +354,10 @@ fn generate_impact_section(formatter: &ColoredFormatter, percentage: u32) -> Str
 }
 
 // Pure function: Generate METRICS section
-fn generate_metrics_section(formatter: &ColoredFormatter, item: &priority::FileAggregateScore) -> String {
+fn generate_metrics_section(
+    formatter: &ColoredFormatter,
+    item: &priority::FileAggregateScore,
+) -> String {
     format!(
         "├─ {}: Functions: {}, Problematic: {}, Avg complexity: {:.1}",
         formatter.emoji("METRICS", "METRICS").bright_blue(),
@@ -400,14 +406,24 @@ fn format_file_aggregate_item(
     let severity_color = get_severity_color(item.aggregate_score);
 
     // Compose sections using pure functions
-    writeln!(output, "{}", generate_header(rank, item.aggregate_score, severity, severity_color)).unwrap();
+    writeln!(
+        output,
+        "{}",
+        generate_header(rank, item.aggregate_score, severity, severity_color)
+    )
+    .unwrap();
     writeln!(output, "{}", generate_file_path_line(item)).unwrap();
     writeln!(output, "{}", generate_why_section(&formatter, item)).unwrap();
 
     // ACTION section with message generation
     let top_functions = item.top_function_scores.len().min(2);
     let action_msg = generate_action_message(item.problematic_functions, top_functions);
-    writeln!(output, "{}", generate_action_section(&formatter, &action_msg)).unwrap();
+    writeln!(
+        output,
+        "{}",
+        generate_action_section(&formatter, &action_msg)
+    )
+    .unwrap();
 
     // Add refactoring steps if needed
     if item.problematic_functions > 0 {
@@ -415,13 +431,29 @@ fn format_file_aggregate_item(
     }
 
     // IMPACT section
-    let impact_percentage = calculate_impact_percentage(item.problematic_functions, item.function_count);
-    writeln!(output, "{}", generate_impact_section(&formatter, impact_percentage)).unwrap();
+    let impact_percentage =
+        calculate_impact_percentage(item.problematic_functions, item.function_count);
+    writeln!(
+        output,
+        "{}",
+        generate_impact_section(&formatter, impact_percentage)
+    )
+    .unwrap();
 
     // Remaining sections
     writeln!(output, "{}", generate_metrics_section(&formatter, item)).unwrap();
-    writeln!(output, "{}", generate_scoring_section(&formatter, item, severity)).unwrap();
-    writeln!(output, "{}", generate_dependencies_section(&formatter, item.problematic_functions)).unwrap();
+    writeln!(
+        output,
+        "{}",
+        generate_scoring_section(&formatter, item, severity)
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "{}",
+        generate_dependencies_section(&formatter, item.problematic_functions)
+    )
+    .unwrap();
 
     format_top_functions_list(output, &item.top_function_scores);
 }

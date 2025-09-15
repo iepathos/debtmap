@@ -48,7 +48,7 @@ impl Default for ScoringWeights {
 impl ScoringWeights {
     // Pure function: Check if a weight is in valid range
     fn is_valid_weight(weight: f64) -> bool {
-        weight >= 0.0 && weight <= 1.0
+        (0.0..=1.0).contains(&weight)
     }
 
     // Pure function: Validate a single weight with name
@@ -61,7 +61,11 @@ impl ScoringWeights {
     }
 
     // Pure function: Validate active weights sum to 1.0
-    fn validate_active_weights_sum(coverage: f64, complexity: f64, dependency: f64) -> Result<(), String> {
+    fn validate_active_weights_sum(
+        coverage: f64,
+        complexity: f64,
+        dependency: f64,
+    ) -> Result<(), String> {
         let sum = coverage + complexity + dependency;
         if (sum - 1.0).abs() > 0.001 {
             Err(format!(
