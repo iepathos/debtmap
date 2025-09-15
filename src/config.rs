@@ -46,35 +46,57 @@ impl Default for ScoringWeights {
 }
 
 impl ScoringWeights {
-    /// Validate that weights sum to 1.0 (with small tolerance for floating point)
-    pub fn validate(&self) -> Result<(), String> {
-        // Only validate the weights we actually use in the weighted sum model
-        let sum = self.coverage + self.complexity + self.dependency;
+    // Pure function: Check if a weight is in valid range
+    fn is_valid_weight(weight: f64) -> bool {
+        (0.0..=1.0).contains(&weight)
+    }
+
+    // Pure function: Validate a single weight with name
+    fn validate_weight(weight: f64, name: &str) -> Result<(), String> {
+        if Self::is_valid_weight(weight) {
+            Ok(())
+        } else {
+            Err(format!("{} weight must be between 0.0 and 1.0", name))
+        }
+    }
+
+    // Pure function: Validate active weights sum to 1.0
+    fn validate_active_weights_sum(
+        coverage: f64,
+        complexity: f64,
+        dependency: f64,
+    ) -> Result<(), String> {
+        let sum = coverage + complexity + dependency;
         if (sum - 1.0).abs() > 0.001 {
-            return Err(format!(
+            Err(format!(
                 "Active scoring weights (coverage, complexity, dependency) must sum to 1.0, but sum to {:.3}",
                 sum
-            ));
+            ))
+        } else {
+            Ok(())
         }
+    }
 
-        // Check each weight is between 0 and 1
-        if self.coverage < 0.0 || self.coverage > 1.0 {
-            return Err("Coverage weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.complexity < 0.0 || self.complexity > 1.0 {
-            return Err("Complexity weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.semantic < 0.0 || self.semantic > 1.0 {
-            return Err("Semantic weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.dependency < 0.0 || self.dependency > 1.0 {
-            return Err("Dependency weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.security < 0.0 || self.security > 1.0 {
-            return Err("Security weight must be between 0.0 and 1.0".to_string());
-        }
-        if self.organization < 0.0 || self.organization > 1.0 {
-            return Err("Organization weight must be between 0.0 and 1.0".to_string());
+    // Pure function: Collect all weight validations
+    fn collect_weight_validations(&self) -> Vec<Result<(), String>> {
+        vec![
+            Self::validate_weight(self.coverage, "Coverage"),
+            Self::validate_weight(self.complexity, "Complexity"),
+            Self::validate_weight(self.semantic, "Semantic"),
+            Self::validate_weight(self.dependency, "Dependency"),
+            Self::validate_weight(self.security, "Security"),
+            Self::validate_weight(self.organization, "Organization"),
+        ]
+    }
+
+    /// Validate that weights sum to 1.0 (with small tolerance for floating point)
+    pub fn validate(&self) -> Result<(), String> {
+        // Validate active weights sum
+        Self::validate_active_weights_sum(self.coverage, self.complexity, self.dependency)?;
+
+        // Validate all individual weights
+        for validation in self.collect_weight_validations() {
+            validation?;
         }
 
         Ok(())
@@ -1359,5 +1381,418 @@ interface_weight = 0.15
 
         // This should log a warning but not panic
         handle_read_error(&path, &error);
+    }
+
+    #[test]
+    fn test_get_validation_thresholds_with_defaults() {
+        // Test that get_validation_thresholds returns expected values
+        // The config might override these, so we test flexible values
+        let thresholds = get_validation_thresholds();
+        assert_eq!(thresholds.max_average_complexity, 10.0);
+        assert_eq!(thresholds.max_high_complexity_count, 100);
+        // max_debt_items can be 2000 (default) or 2500 (from config)
+        assert!(thresholds.max_debt_items >= 2000);
+        assert_eq!(thresholds.max_total_debt_score, 1000);
+        assert_eq!(thresholds.max_codebase_risk_score, 7.0);
+        assert_eq!(thresholds.max_high_risk_functions, 50);
+        assert_eq!(thresholds.min_coverage_percentage, 0.0);
+    }
+
+    #[test]
+    fn test_default_linear_threshold() {
+        assert_eq!(default_linear_threshold(), 10.0);
+    }
+
+    #[test]
+    fn test_default_logarithmic_threshold() {
+        assert_eq!(default_logarithmic_threshold(), 100.0);
+    }
+
+    #[test]
+    fn test_default_sqrt_multiplier() {
+        assert_eq!(default_sqrt_multiplier(), 3.33);
+    }
+
+    #[test]
+    fn test_default_log_multiplier() {
+        assert_eq!(default_log_multiplier(), 10.0);
+    }
+
+    #[test]
+    fn test_default_show_raw_scores() {
+        assert!(default_show_raw_scores());
+    }
+
+    #[test]
+    fn test_god_object_thresholds_rust_defaults() {
+        let thresholds = GodObjectThresholds::rust_defaults();
+        assert_eq!(thresholds.max_methods, 20);
+        assert_eq!(thresholds.max_fields, 15);
+        assert_eq!(thresholds.max_traits, 5);
+        assert_eq!(thresholds.max_lines, 1000);
+        assert_eq!(thresholds.max_complexity, 200);
+    }
+
+    #[test]
+    fn test_god_object_thresholds_python_defaults() {
+        let thresholds = GodObjectThresholds::python_defaults();
+        assert_eq!(thresholds.max_methods, 15);
+        assert_eq!(thresholds.max_fields, 10);
+        assert_eq!(thresholds.max_traits, 3);
+        assert_eq!(thresholds.max_lines, 500);
+        assert_eq!(thresholds.max_complexity, 150);
+    }
+
+    #[test]
+    fn test_god_object_thresholds_javascript_defaults() {
+        let thresholds = GodObjectThresholds::javascript_defaults();
+        assert_eq!(thresholds.max_methods, 15);
+        assert_eq!(thresholds.max_fields, 20);
+        assert_eq!(thresholds.max_traits, 3);
+        assert_eq!(thresholds.max_lines, 500);
+        assert_eq!(thresholds.max_complexity, 150);
+    }
+
+    #[test]
+    fn test_normalization_config_default() {
+        let config = NormalizationConfig::default();
+        assert_eq!(config.linear_threshold, 10.0);
+        assert_eq!(config.logarithmic_threshold, 100.0);
+        assert_eq!(config.sqrt_multiplier, 3.33);
+        assert_eq!(config.log_multiplier, 10.0);
+        assert!(config.show_raw_scores);
+    }
+
+    #[test]
+    fn test_role_multipliers_default() {
+        let multipliers = RoleMultipliers::default();
+        assert_eq!(multipliers.pure_logic, 1.2);
+        assert_eq!(multipliers.orchestrator, 0.8);
+        assert_eq!(multipliers.io_wrapper, 0.7);
+        assert_eq!(multipliers.entry_point, 0.9);
+        assert_eq!(multipliers.pattern_match, 0.6);
+        assert_eq!(multipliers.unknown, 1.0);
+    }
+
+    #[test]
+    fn test_scoring_weights_default() {
+        let weights = ScoringWeights::default();
+        assert_eq!(weights.coverage, 0.50);
+        assert_eq!(weights.complexity, 0.35);
+        assert_eq!(weights.semantic, 0.00);
+        assert_eq!(weights.dependency, 0.15);
+        assert_eq!(weights.security, 0.00);
+        assert_eq!(weights.organization, 0.00);
+    }
+
+    #[test]
+    fn test_scoring_weights_validate_success() {
+        let weights = ScoringWeights {
+            coverage: 0.50,
+            complexity: 0.35,
+            semantic: 0.0,
+            dependency: 0.15,
+            security: 0.0,
+            organization: 0.0,
+        };
+        assert!(weights.validate().is_ok());
+    }
+
+    #[test]
+    fn test_scoring_weights_validate_invalid_sum() {
+        let weights = ScoringWeights {
+            coverage: 0.60,
+            complexity: 0.60,
+            semantic: 0.0,
+            dependency: 0.0,
+            security: 0.0,
+            organization: 0.0,
+        };
+        assert!(weights.validate().is_err());
+    }
+
+    #[test]
+    fn test_scoring_weights_normalize() {
+        let mut weights = ScoringWeights {
+            coverage: 0.40,
+            complexity: 0.30,
+            semantic: 0.0,
+            dependency: 0.10,
+            security: 0.0,
+            organization: 0.0,
+        };
+        weights.normalize();
+        // After normalization, active weights should sum to 1.0
+        let sum = weights.coverage + weights.complexity + weights.dependency;
+        assert!((sum - 1.0).abs() < 0.001);
+        // Check proportions are maintained
+        assert!((weights.coverage - 0.50).abs() < 0.001);
+        assert!((weights.complexity - 0.375).abs() < 0.001);
+        assert!((weights.dependency - 0.125).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_entropy_config_default() {
+        let config = EntropyConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.weight, 1.0);
+        assert_eq!(config.min_tokens, 20);
+        assert_eq!(config.pattern_threshold, 0.7);
+        assert_eq!(config.entropy_threshold, 0.4);
+        assert_eq!(config.branch_threshold, 0.8);
+        assert_eq!(config.max_repetition_reduction, 0.20);
+        assert_eq!(config.max_entropy_reduction, 0.15);
+        assert_eq!(config.max_branch_reduction, 0.25);
+        assert_eq!(config.max_combined_reduction, 0.30);
+    }
+
+    #[test]
+    fn test_error_handling_config_default() {
+        let config = ErrorHandlingConfig::default();
+        assert!(config.detect_async_errors);
+        assert!(config.detect_context_loss);
+        assert!(config.detect_propagation);
+        assert!(config.detect_panic_patterns);
+        assert!(config.detect_swallowing);
+        assert_eq!(config.custom_patterns.len(), 0);
+        assert_eq!(config.severity_overrides.len(), 0);
+    }
+
+    #[test]
+    fn test_god_object_config_default() {
+        let config = GodObjectConfig::default();
+        assert!(config.enabled);
+        // Test Rust defaults
+        assert_eq!(config.rust.max_methods, 20);
+        assert_eq!(config.rust.max_fields, 15);
+        // Test Python defaults
+        assert_eq!(config.python.max_methods, 15);
+        assert_eq!(config.python.max_fields, 10);
+        // Test JavaScript defaults
+        assert_eq!(config.javascript.max_methods, 15);
+        assert_eq!(config.javascript.max_fields, 20);
+    }
+
+    #[test]
+    fn test_context_config_default() {
+        let config = ContextConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.rules.len(), 0);
+        assert!(config.function_patterns.is_none());
+    }
+
+    #[test]
+    fn test_language_features_default() {
+        let features = LanguageFeatures::default();
+        assert!(features.detect_dead_code);
+        assert!(features.detect_complexity);
+        assert!(features.detect_duplication);
+    }
+
+    #[test]
+    fn test_get_minimum_debt_score() {
+        // This test will use the config from .debtmap.toml if present, or defaults otherwise
+        let score = get_minimum_debt_score();
+        // The default is 1.0 but config might override it to 2.0
+        assert!(score >= 1.0);
+    }
+
+    #[test]
+    fn test_get_minimum_cyclomatic_complexity() {
+        // This test will use the config from .debtmap.toml if present, or defaults otherwise
+        let complexity = get_minimum_cyclomatic_complexity();
+        // The default is 2 but config might override it to 3
+        assert!(complexity >= 2);
+    }
+
+    #[test]
+    fn test_get_minimum_cognitive_complexity() {
+        // This test will use the config from .debtmap.toml if present, or defaults otherwise
+        let complexity = get_minimum_cognitive_complexity();
+        // The default is 3 but config might override it to 5
+        assert!(complexity >= 3);
+    }
+
+    #[test]
+    fn test_get_minimum_risk_score() {
+        // This test will use the config from .debtmap.toml if present, or defaults otherwise
+        let score = get_minimum_risk_score();
+        // The default is 1.0 but config might override it to 2.0
+        assert!(score >= 1.0);
+    }
+
+    #[test]
+    fn test_default_god_object_thresholds() {
+        let thresholds = GodObjectThresholds::default();
+        assert_eq!(thresholds.max_methods, 20);
+        assert_eq!(thresholds.max_fields, 15);
+        assert_eq!(thresholds.max_traits, 5);
+        assert_eq!(thresholds.max_lines, 1000);
+        assert_eq!(thresholds.max_complexity, 200);
+    }
+
+    #[test]
+    fn test_validation_thresholds_default() {
+        let thresholds = ValidationThresholds::default();
+        assert_eq!(thresholds.max_average_complexity, 10.0);
+        assert_eq!(thresholds.max_high_complexity_count, 100);
+        assert_eq!(thresholds.max_debt_items, 2000);
+        assert_eq!(thresholds.max_total_debt_score, 1000);
+        assert_eq!(thresholds.max_codebase_risk_score, 7.0);
+        assert_eq!(thresholds.max_high_risk_functions, 50);
+        assert_eq!(thresholds.min_coverage_percentage, 0.0);
+    }
+
+    #[test]
+    fn test_get_language_features_rust() {
+        use crate::core::Language;
+        let features = get_language_features(&Language::Rust);
+        assert!(!features.detect_dead_code); // Rust has dead code detection disabled
+        assert!(features.detect_complexity);
+        assert!(features.detect_duplication);
+    }
+
+    #[test]
+    fn test_get_language_features_python() {
+        use crate::core::Language;
+        let features = get_language_features(&Language::Python);
+        assert!(features.detect_dead_code);
+        assert!(features.detect_complexity);
+        assert!(features.detect_duplication);
+    }
+
+    #[test]
+    fn test_get_language_features_javascript() {
+        use crate::core::Language;
+        let features = get_language_features(&Language::JavaScript);
+        assert!(features.detect_dead_code);
+        assert!(features.detect_complexity);
+        assert!(features.detect_duplication);
+    }
+
+    #[test]
+    fn test_get_language_features_typescript() {
+        use crate::core::Language;
+        let features = get_language_features(&Language::TypeScript);
+        assert!(features.detect_dead_code);
+        assert!(features.detect_complexity);
+        assert!(features.detect_duplication);
+    }
+
+    #[test]
+    fn test_get_language_features_unknown() {
+        use crate::core::Language;
+        let features = get_language_features(&Language::Unknown);
+        assert!(features.detect_dead_code);
+        assert!(features.detect_complexity);
+        assert!(features.detect_duplication);
+    }
+
+    #[test]
+    fn test_get_entropy_config() {
+        let config = get_entropy_config();
+        // Config might override these values
+        assert!(config.enabled);
+        // Weight might be configured to 0.5 in .debtmap.toml
+        assert!(config.weight > 0.0);
+    }
+
+    #[test]
+    fn test_get_role_multipliers() {
+        let multipliers = get_role_multipliers();
+        assert_eq!(multipliers.pure_logic, 1.2);
+        assert_eq!(multipliers.orchestrator, 0.8);
+    }
+
+    #[test]
+    fn test_get_error_handling_config() {
+        let config = get_error_handling_config();
+        assert!(config.detect_async_errors);
+        assert!(config.detect_context_loss);
+    }
+
+    #[test]
+    fn test_get_scoring_weights() {
+        let weights = get_scoring_weights();
+        assert_eq!(weights.coverage, 0.50);
+        assert_eq!(weights.complexity, 0.35);
+        assert_eq!(weights.dependency, 0.15);
+    }
+
+    #[test]
+    fn test_default_weight_functions() {
+        assert_eq!(default_coverage_weight(), 0.50);
+        assert_eq!(default_complexity_weight(), 0.35);
+        assert_eq!(default_semantic_weight(), 0.00);
+        assert_eq!(default_dependency_weight(), 0.15);
+        assert_eq!(default_security_weight(), 0.00);
+        assert_eq!(default_organization_weight(), 0.00);
+    }
+
+    #[test]
+    fn test_default_multiplier_functions() {
+        assert_eq!(default_pure_logic_multiplier(), 1.2);
+        assert_eq!(default_orchestrator_multiplier(), 0.8);
+        assert_eq!(default_io_wrapper_multiplier(), 0.7);
+        assert_eq!(default_entry_point_multiplier(), 0.9);
+        assert_eq!(default_pattern_match_multiplier(), 0.6);
+        assert_eq!(default_unknown_multiplier(), 1.0);
+    }
+
+    #[test]
+    fn test_default_threshold_functions() {
+        assert_eq!(default_max_methods(), 20);
+        assert_eq!(default_max_fields(), 15);
+        assert_eq!(default_max_traits(), 5);
+        assert_eq!(default_max_lines(), 1000);
+        assert_eq!(default_max_complexity(), 200);
+        assert!(default_god_object_enabled());
+    }
+
+    #[test]
+    fn test_default_validation_threshold_functions() {
+        assert_eq!(default_max_avg_complexity(), 10.0);
+        assert_eq!(default_max_high_complexity_count(), 100);
+        assert_eq!(default_max_debt_items(), 2000);
+        assert_eq!(default_max_total_debt_score(), 1000);
+        assert_eq!(default_max_codebase_risk(), 7.0);
+        assert_eq!(default_max_high_risk_count(), 50);
+        assert_eq!(default_min_coverage(), 0.0);
+    }
+
+    #[test]
+    fn test_default_language_feature_functions() {
+        assert!(default_detect_dead_code());
+        assert!(default_detect_complexity());
+        assert!(default_detect_duplication());
+    }
+
+    #[test]
+    fn test_default_entropy_functions() {
+        assert!(default_entropy_enabled());
+        assert_eq!(default_entropy_weight(), 1.0);
+        assert_eq!(default_entropy_min_tokens(), 20);
+        assert_eq!(default_entropy_pattern_threshold(), 0.7);
+        assert_eq!(default_entropy_threshold(), 0.4);
+        assert_eq!(default_branch_threshold(), 0.8);
+        assert_eq!(default_max_repetition_reduction(), 0.20);
+        assert_eq!(default_max_entropy_reduction(), 0.15);
+        assert_eq!(default_max_branch_reduction(), 0.25);
+        assert_eq!(default_max_combined_reduction(), 0.30);
+    }
+
+    #[test]
+    fn test_default_error_handling_functions() {
+        assert!(default_detect_async_errors());
+        assert!(default_detect_context_loss());
+        assert!(default_detect_propagation());
+        assert!(default_detect_panic_patterns());
+        assert!(default_detect_swallowing());
+    }
+
+    #[test]
+    fn test_default_context_functions() {
+        assert!(!default_context_enabled());
+        assert_eq!(default_rule_priority(), 50);
     }
 }
