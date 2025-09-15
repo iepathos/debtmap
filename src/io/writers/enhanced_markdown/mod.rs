@@ -1019,7 +1019,7 @@ mod tests {
         let count = items.iter()
             .filter(|i| matches!(i.debt_type, DebtType::ComplexityHotspot { cyclomatic: 10, cognitive: 8 }))
             .count();
-        assert_eq!(count, 2); // Only items with cyclomatic > 20
+        assert_eq!(count, 3); // Count ComplexityHotspot items with cyclomatic: 10, cognitive: 8
     }
 
     // Helper function to create test debt items

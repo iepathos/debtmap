@@ -74,13 +74,16 @@ impl MatchExpressionRecognizer {
         variant_count as f32 / match_expr.arms.len() as f32 > 0.5
     }
 
-    /// Detect if this is string matching pattern  
+    /// Detect if this is string matching pattern
     fn detect_string_matching(&self, match_expr: &ExprMatch) -> bool {
-        // Check if matching against string literals
-        match_expr
-            .arms
-            .iter()
-            .any(|arm| matches!(&arm.pat, Pat::Lit(_)))
+        // Check if matching against string literals specifically
+        match_expr.arms.iter().any(|arm| {
+            if let Pat::Lit(pat_lit) = &arm.pat {
+                matches!(pat_lit.lit, syn::Lit::Str(_))
+            } else {
+                false
+            }
+        })
     }
 }
 

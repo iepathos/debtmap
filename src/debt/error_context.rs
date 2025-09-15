@@ -96,6 +96,14 @@ impl<'a> ContextLossAnalyzer<'a> {
                                     // Check if it's a simple constructor without using the error
                                     !format!("{}", quote::quote!(#call)).contains("e")
                                 }
+                                Expr::Path(_) => true, // Simple enum variant like MyError::Simple
+                                Expr::Macro(mac) => {
+                                    // For macros like format!, check if error param is used
+                                    let tokens = format!("{}", quote::quote!(#mac));
+                                    // format! macro with error parameter is considered context loss
+                                    // because it converts to string
+                                    tokens.contains("format") || !tokens.contains("e")
+                                }
                                 _ => false,
                             }
                         }

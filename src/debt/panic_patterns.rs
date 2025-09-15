@@ -170,19 +170,16 @@ impl<'a> Visit<'_> for PanicPatternDetector<'a> {
     fn visit_item_mod(&mut self, node: &syn::ItemMod) {
         let was_in_test = self.in_test_module;
 
-        // Check for #[cfg(test)] attribute
+        // Check for #[cfg(test)] attribute or test module name
         self.in_test_module = node.attrs.iter().any(|attr| {
             if attr.path().get_ident().map(|i| i.to_string()).as_deref() == Some("cfg") {
-                // Parse the attribute to check if it's cfg(test)
-                if let Ok(syn::Meta::List(list)) = attr.parse_args::<syn::Meta>() {
-                    list.tokens.to_string().contains("test")
-                } else {
-                    false
-                }
+                // Check if it's cfg(test) by converting to string
+                let attr_str = format!("{}", quote::quote!(#attr));
+                attr_str.contains("test")
             } else {
                 false
             }
-        });
+        }) || node.ident == "tests";
 
         syn::visit::visit_item_mod(self, node);
         self.in_test_module = was_in_test;
