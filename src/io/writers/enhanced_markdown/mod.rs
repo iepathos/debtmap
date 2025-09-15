@@ -1220,7 +1220,10 @@ mod tests {
     #[test]
     fn test_write_health_status_section_collapsible_enabled() {
         let results = create_test_results(3, 6.0);
-        let config = MarkdownConfig { collapsible_sections: true, ..Default::default() };
+        let config = MarkdownConfig {
+            collapsible_sections: true,
+            ..Default::default()
+        };
         let mut buffer = Cursor::new(Vec::new());
         let mut writer = EnhancedMarkdownWriter::with_config(&mut buffer, config);
 
@@ -1236,7 +1239,10 @@ mod tests {
     #[test]
     fn test_write_health_status_section_collapsible_disabled() {
         let results = create_test_results(7, 9.0);
-        let config = MarkdownConfig { collapsible_sections: false, ..Default::default() };
+        let config = MarkdownConfig {
+            collapsible_sections: false,
+            ..Default::default()
+        };
         let mut buffer = Cursor::new(Vec::new());
         let mut writer = EnhancedMarkdownWriter::with_config(&mut buffer, config);
 

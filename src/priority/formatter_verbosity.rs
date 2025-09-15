@@ -41,44 +41,25 @@ fn format_coverage_status(coverage_pct: f64) -> String {
 // Pure function to format coverage factor description
 fn format_coverage_factor_description(
     item: &UnifiedDebtItem,
-    weights: &crate::config::ScoringWeights,
+    _weights: &crate::config::ScoringWeights,
 ) -> Option<String> {
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
         match coverage_pct {
-            0.0 => Some(format!(
-                "🔴 UNTESTED (0% coverage, weight: {:.0}%)",
-                weights.coverage * 100.0
-            )),
-            c if c < 20.0 => Some(format!(
-                "🟠 LOW COVERAGE ({:.1}%, weight: {:.0}%)",
-                c,
-                weights.coverage * 100.0
-            )),
-            c if c < 50.0 => Some(format!(
-                "🟡 PARTIAL COVERAGE ({:.1}%, weight: {:.0}%)",
-                c,
-                weights.coverage * 100.0
-            )),
+            0.0 => Some("🔴 UNTESTED (0% coverage, weight: 50%)".to_string()),
+            c if c < 20.0 => Some(format!("🟠 LOW COVERAGE ({:.1}%, weight: 50%)", c)),
+            c if c < 50.0 => Some(format!("🟡 PARTIAL COVERAGE ({:.1}%, weight: 50%)", c)),
             c if c >= 95.0 => Some(format!("Excellent coverage {:.1}%", c)),
             c if c >= 80.0 => Some(format!("Good coverage {:.1}%", c)),
-            _ if item.unified_score.coverage_factor > 3.0 => Some(format!(
-                "Line coverage {:.1}% (weight: {:.0}%)",
-                coverage_pct,
-                weights.coverage * 100.0
-            )),
+            _ if item.unified_score.coverage_factor > 3.0 => {
+                Some(format!("Line coverage {:.1}% (weight: 50%)", coverage_pct))
+            }
             _ => None,
         }
     } else if item.unified_score.coverage_factor >= 10.0 {
-        Some(format!(
-            "🔴 UNTESTED (no coverage data, weight: {:.0}%)",
-            weights.coverage * 100.0
-        ))
+        Some("🔴 UNTESTED (no coverage data, weight: 50%)".to_string())
     } else if item.unified_score.coverage_factor > 3.0 {
-        Some(format!(
-            "No coverage data (weight: {:.0}%)",
-            weights.coverage * 100.0
-        ))
+        Some("No coverage data (weight: 50%)".to_string())
     } else {
         None
     }
@@ -191,27 +172,21 @@ fn collect_scoring_factors(
 ) -> Vec<String> {
     let mut factors = vec![];
 
-    // Coverage factor
+    // Coverage factor (50% weight in weighted sum model)
     if let Some(desc) = format_coverage_factor_description(item, weights) {
         factors.push(desc);
     }
 
-    // Complexity factor
+    // Complexity factor (35% weight in weighted sum model)
     if item.unified_score.complexity_factor > 5.0 {
-        factors.push(format!(
-            "Complexity (weight: {:.0}%)",
-            weights.complexity * 100.0
-        ));
+        factors.push("Complexity (weight: 35%)".to_string());
     } else if item.unified_score.complexity_factor > 3.0 {
         factors.push("Moderate complexity".to_string());
     }
 
-    // Dependency factor
+    // Dependency factor (15% weight in weighted sum model)
     if item.unified_score.dependency_factor > 5.0 {
-        factors.push(format!(
-            "Critical path (weight: {:.0}%)",
-            weights.dependency * 100.0
-        ));
+        factors.push("Critical path (weight: 15%)".to_string());
     }
 
     // Performance specific factors
@@ -397,10 +372,7 @@ fn format_score_calculation_section(
         tree_branch,
         "SCORE CALCULATION:".bright_blue()
     ));
-    lines.push(format!(
-        "{} Multiplicative Components (Spec 68):",
-        tree_sub_branch
-    ));
+    lines.push(format!("{} Weighted Sum Model:", tree_sub_branch));
 
     // Calculate multiplicative factors for display
     let factors = calculate_score_factors(item);
@@ -411,46 +383,48 @@ fn format_score_calculation_section(
     );
 
     lines.push(format!(
-        "{}  {} Coverage Gap: ({:.3}^1.5 + 0.1) = {:.3}{}",
+        "{}  {} Coverage Score: {:.1} × 50% = {:.2}{}",
         tree_pipe,
         formatter.emoji("├─", "-"),
-        factors.coverage_gap,
-        factors.coverage_factor,
+        factors.coverage_factor * 10.0, // Convert to 0-100 scale
+        factors.coverage_factor * 10.0 * 0.5,
         coverage_detail
     ));
 
-    // Show complexity with entropy adjustment if present
+    // Show complexity score
     let complexity_detail = format_complexity_detail(&item.entropy_details);
     lines.push(format!(
-        "{}  {} Complexity:   {:.1}^0.8 = {:.3}{}",
+        "{}  {} Complexity Score: {:.1} × 35% = {:.2}{}",
         tree_pipe,
         formatter.emoji("├─", "-"),
-        item.unified_score.complexity_factor,
-        factors.complexity_factor,
+        factors.complexity_factor * 10.0, // Convert to 0-100 scale
+        factors.complexity_factor * 10.0 * 0.35,
         complexity_detail
     ));
 
-    // Show dependency factor with sqrt scaling
+    // Show dependency score
     lines.push(format!(
-        "{}  {} Dependencies: {} callers → {:.3}",
+        "{}  {} Dependency Score: {:.1} × 15% = {:.2} ({} callers)",
         tree_pipe,
         formatter.emoji("├─", "-"),
-        item.unified_score.dependency_factor as u32,
-        factors.dependency_factor
+        factors.dependency_factor * 10.0, // Convert to 0-100 scale
+        factors.dependency_factor * 10.0 * 0.15,
+        item.unified_score.dependency_factor as u32
     ));
 
-    // Calculate multiplicative base score (spec 68)
-    let complexity_component = (factors.complexity_factor + 0.1).max(0.1);
-    let dependency_component = (factors.dependency_factor + 0.1).max(0.1);
-    let base_score = factors.coverage_factor * complexity_component * dependency_component;
+    // Calculate weighted sum base score
+    let coverage_contribution = factors.coverage_factor * 10.0 * 0.5;
+    let complexity_contribution = factors.complexity_factor * 10.0 * 0.35;
+    let dependency_contribution = factors.dependency_factor * 10.0 * 0.15;
+    let base_score = coverage_contribution + complexity_contribution + dependency_contribution;
 
     lines.push(format!(
-        "{}  {} Base Score: {:.3} × {:.3} × {:.3} = {:.4}",
+        "{}  {} Base Score: {:.2} + {:.2} + {:.2} = {:.2}",
         tree_pipe,
         formatter.emoji("├─", "-"),
-        factors.coverage_factor,
-        complexity_component,
-        dependency_component,
+        coverage_contribution,
+        complexity_contribution,
+        dependency_contribution,
         base_score
     ));
 
@@ -1211,14 +1185,11 @@ mod tests {
 
         // Check for expected sections
         assert!(lines.iter().any(|l| l.contains("SCORE CALCULATION:")));
-        assert!(lines
-            .iter()
-            .any(|l| l.contains("Multiplicative Components")));
-        assert!(lines.iter().any(|l| l.contains("Coverage Gap:")));
-        assert!(lines.iter().any(|l| l.contains("Complexity:")));
-        assert!(lines.iter().any(|l| l.contains("Dependencies:")));
+        assert!(lines.iter().any(|l| l.contains("Weighted Sum Model:")));
+        assert!(lines.iter().any(|l| l.contains("Coverage Score:")));
+        assert!(lines.iter().any(|l| l.contains("Complexity Score:")));
+        assert!(lines.iter().any(|l| l.contains("Dependency Score:")));
         assert!(lines.iter().any(|l| l.contains("Base Score:")));
-        assert!(lines.iter().any(|l| l.contains("Role Adjustment:")));
         assert!(lines.iter().any(|l| l.contains("Final Score:")));
     }
 

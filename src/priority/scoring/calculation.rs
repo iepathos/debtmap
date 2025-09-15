@@ -33,45 +33,39 @@ pub fn calculate_coverage_factor_with_test_flag(coverage_pct: f64, is_test_code:
 
 /// Calculate complexity factor from raw complexity
 pub fn calculate_complexity_factor(raw_complexity: f64) -> f64 {
-    if raw_complexity <= 1.0 {
-        raw_complexity * 0.5 // Low complexity gets lower factor
-    } else if raw_complexity <= 3.0 {
-        0.5 + (raw_complexity - 1.0) * 0.3 // Medium-low complexity
-    } else {
-        raw_complexity.powf(0.8) // Higher complexity uses power scaling
-    }
+    // Linear scaling to 0-10 range for predictable scoring
+    // Complexity of 20+ maps to 10.0
+    (raw_complexity / 2.0).clamp(0.0, 10.0)
 }
 
 /// Calculate dependency factor from upstream count
 pub fn calculate_dependency_factor(upstream_count: usize) -> f64 {
-    if upstream_count == 0 {
-        0.1 // No dependencies = low factor
-    } else if upstream_count <= 2 {
-        0.3 + upstream_count as f64 * 0.2 // Small dependency boost
-    } else {
-        ((upstream_count as f64 + 1.0).sqrt() / 2.0).min(2.0) // Sqrt scaling for many dependencies
-    }
+    // Linear scaling with cap at 10.0 for 20+ dependencies
+    // This makes dependency impact predictable
+    ((upstream_count as f64) / 2.0).min(10.0)
 }
 
-/// Calculate multiplicative base score
+/// Calculate weighted sum base score
+/// Uses additive model for clear, predictable scoring
 pub fn calculate_base_score(
     coverage_factor: f64,
     complexity_factor: f64,
     dependency_factor: f64,
 ) -> f64 {
-    // Apply small constants to avoid zero multiplication
-    let complexity_component = (complexity_factor + 0.1).max(0.1);
-    let dependency_component = (dependency_factor + 0.1).max(0.1);
-    coverage_factor * complexity_component * dependency_component
-}
+    // Default weights (can be overridden by config)
+    let coverage_weight = 0.50; // 50% weight on coverage gaps
+    let complexity_weight = 0.35; // 35% weight on complexity
+    let dependency_weight = 0.15; // 15% weight on dependencies
 
-/// Apply complexity-coverage interaction bonus
-pub fn apply_interaction_bonus(base_score: f64, coverage_pct: f64, raw_complexity: f64) -> f64 {
-    if coverage_pct < 0.5 && raw_complexity > 5.0 {
-        base_score * 1.5 // 50% bonus for complex untested code
-    } else {
-        base_score
-    }
+    // Convert factors to 0-100 scale for clarity
+    let coverage_score = coverage_factor * 10.0; // Already 0-10 scale
+    let complexity_score = complexity_factor * 10.0; // Already 0-10 scale
+    let dependency_score = dependency_factor * 10.0; // Already 0-10 scale
+
+    // Weighted sum
+    (coverage_score * coverage_weight)
+        + (complexity_score * complexity_weight)
+        + (dependency_score * dependency_weight)
 }
 
 /// Structure to hold normalized score with metadata
@@ -154,7 +148,9 @@ pub fn normalize_final_score_with_metadata(raw_score: f64) -> NormalizedScore {
 
 /// Normalize final score to a simple f64 (backwards compatibility)
 pub fn normalize_final_score(raw_score: f64) -> f64 {
-    normalize_final_score_with_metadata(raw_score).normalized
+    // Simple linear scaling to 0-100 range for clarity
+    // No complex transformations that distort relative differences
+    raw_score.clamp(0.0, 100.0)
 }
 
 /// Inverse normalization function for interpretation
@@ -259,88 +255,84 @@ mod tests {
 
     #[test]
     fn test_calculate_complexity_factor() {
-        // Test different complexity ranges
-        assert_eq!(calculate_complexity_factor(0.5), 0.25); // Low * 0.5
-        assert_eq!(calculate_complexity_factor(1.0), 0.5); // Low boundary
-        assert!((calculate_complexity_factor(2.0) - 0.8).abs() < 0.01); // Medium
-        assert!((calculate_complexity_factor(5.0) - 3.62).abs() < 0.1); // High, power scaling - 5.0^0.8 = ~3.62
+        // Test linear scaling
+        assert_eq!(calculate_complexity_factor(0.0), 0.0);
+        assert_eq!(calculate_complexity_factor(10.0), 5.0);
+        assert_eq!(calculate_complexity_factor(20.0), 10.0);
+        assert_eq!(calculate_complexity_factor(30.0), 10.0); // Capped at 10
     }
 
     #[test]
     fn test_calculate_dependency_factor() {
-        assert_eq!(calculate_dependency_factor(0), 0.1); // No deps
-        assert_eq!(calculate_dependency_factor(1), 0.5); // 1 dep
-        assert_eq!(calculate_dependency_factor(2), 0.7); // 2 deps
-        assert!((calculate_dependency_factor(10) - 1.65).abs() < 0.1); // Many deps
+        // Test linear scaling
+        assert_eq!(calculate_dependency_factor(0), 0.0);
+        assert_eq!(calculate_dependency_factor(10), 5.0);
+        assert_eq!(calculate_dependency_factor(20), 10.0);
+        assert_eq!(calculate_dependency_factor(30), 10.0); // Capped at 10
     }
 
     #[test]
     fn test_calculate_base_score() {
-        // Test multiplicative scoring
+        // Test weighted sum scoring
         let score = calculate_base_score(1.0, 0.5, 0.1);
-        // (1.0) * (0.5 + 0.1) * (0.1 + 0.1) = 1.0 * 0.6 * 0.2 = 0.12
-        assert!((score - 0.12).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_apply_interaction_bonus() {
-        // No bonus case
-        assert_eq!(apply_interaction_bonus(1.0, 0.8, 3.0), 1.0);
-
-        // Bonus case: low coverage + high complexity
-        assert_eq!(apply_interaction_bonus(1.0, 0.3, 7.0), 1.5);
+        // coverage: 1.0*10*0.5 + complexity: 0.5*10*0.35 + deps: 0.1*10*0.15 = 5.0 + 1.75 + 0.15 = 6.9
+        assert!((score - 6.9).abs() < 0.01);
     }
 
     #[test]
     fn test_normalization_continuity() {
-        // Test continuity at transition points
-        // Note: Some small discontinuity is expected at transition boundaries
+        // Linear scaling is continuous everywhere
         let eps = 0.001;
 
-        // At 10.0 transition
-        let below_10 = normalize_final_score(10.0 - eps);
-        let at_10 = normalize_final_score(10.0);
-        let above_10 = normalize_final_score(10.0 + eps);
-        assert!((at_10 - below_10).abs() < 0.01);
-        // Small jump expected here due to sqrt function starting
-        assert!((above_10 - at_10).abs() < 0.11);
+        let below_50 = normalize_final_score(50.0 - eps);
+        let at_50 = normalize_final_score(50.0);
+        let above_50 = normalize_final_score(50.0 + eps);
+        assert!((at_50 - below_50).abs() < 0.01);
+        assert!((above_50 - at_50).abs() < 0.01);
 
-        // At 100.0 transition
-        let below_100 = normalize_final_score(100.0 - eps);
+        // At cap
         let at_100 = normalize_final_score(100.0);
-        let above_100 = normalize_final_score(100.0 + eps);
-        assert!((at_100 - below_100).abs() < 0.01);
-        assert!((above_100 - at_100).abs() < 0.01);
+        let above_100 = normalize_final_score(101.0);
+        assert_eq!(at_100, 100.0);
+        assert_eq!(above_100, 100.0);
     }
 
     #[test]
     fn test_normalization_monotonic() {
-        // Verify ordering is preserved
-        let scores = [1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0];
+        // Verify ordering is preserved (up to cap)
+        let scores = [1.0, 5.0, 10.0, 50.0, 99.0];
         let normalized: Vec<_> = scores.iter().map(|&s| normalize_final_score(s)).collect();
 
         for i in 1..normalized.len() {
             assert!(normalized[i] > normalized[i - 1]);
         }
+
+        // Values above 100 are capped
+        assert_eq!(normalize_final_score(100.0), 100.0);
+        assert_eq!(normalize_final_score(500.0), 100.0);
     }
 
     #[test]
     fn test_inverse_function() {
-        let test_scores = vec![5.0, 15.0, 50.0, 150.0, 500.0];
+        // With linear scaling, inverse should work for values up to 100
+        let test_scores = vec![5.0, 15.0, 50.0, 90.0];
 
         for score in test_scores {
             let normalized = normalize_final_score(score);
-            let denormalized = denormalize_score(normalized);
-            assert!((denormalized - score).abs() < 0.1);
+            assert_eq!(normalized, score); // Linear = identity up to 100
         }
+
+        // Above 100 is capped
+        assert_eq!(normalize_final_score(150.0), 100.0);
     }
 
     #[test]
     fn test_normalization_ranges() {
-        // Test that normalized scores fall within expected ranges
-        assert!(normalize_final_score(5.0) <= 10.0); // Linear range
-        assert!(normalize_final_score(50.0) > 10.0 && normalize_final_score(50.0) <= 40.0); // Square root range
-        assert!(normalize_final_score(200.0) > 40.0); // Logarithmic range
+        // Linear scaling preserves values up to 100
+        assert_eq!(normalize_final_score(5.0), 5.0);
+        assert_eq!(normalize_final_score(50.0), 50.0);
+        assert_eq!(normalize_final_score(100.0), 100.0);
+        assert_eq!(normalize_final_score(200.0), 100.0); // Capped
     }
 
     #[test]

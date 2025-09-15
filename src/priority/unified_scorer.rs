@@ -5,8 +5,8 @@ use crate::priority::{
     coverage_propagation::TransitiveCoverage,
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
     scoring::calculation::{
-        apply_interaction_bonus, calculate_base_score, calculate_complexity_factor,
-        calculate_coverage_factor, calculate_dependency_factor, normalize_final_score,
+        calculate_base_score, calculate_complexity_factor, calculate_coverage_factor,
+        calculate_dependency_factor, normalize_final_score,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
     semantic_classifier::{classify_function_role, FunctionRole},
@@ -191,7 +191,7 @@ pub fn calculate_unified_priority_with_debt(
     let dependency_factor = calculate_dependency_factor(upstream_count);
 
     // Get role multiplier - adjusted for better differentiation
-    let role_multiplier = match role {
+    let role_multiplier: f64 = match role {
         FunctionRole::EntryPoint => 1.5,
         FunctionRole::PureLogic if raw_complexity > 5.0 => 1.3, // Complex core logic
         FunctionRole::PureLogic => 1.0,
@@ -201,27 +201,15 @@ pub fn calculate_unified_priority_with_debt(
         _ => 1.0,
     };
 
-    // Calculate multiplicative base score using pure function
-    let mut base_score =
-        calculate_base_score(coverage_factor, complexity_factor, dependency_factor);
+    // Calculate weighted sum base score
+    let base_score = calculate_base_score(coverage_factor, complexity_factor, dependency_factor);
 
-    // Apply interaction bonus using pure function
-    base_score = apply_interaction_bonus(base_score, coverage_pct, raw_complexity);
+    // Apply minimal role adjustment (capped to avoid distortion)
+    let clamped_role_multiplier = role_multiplier.clamp(0.8, 1.2);
+    let role_adjusted_score = base_score * clamped_role_multiplier;
 
-    // Apply zero-coverage boost directly to base score (spec 98)
-    // This ensures minimum score of 50 for zero coverage when combined with 10x coverage factor
-    let zero_coverage_boost = if coverage_pct == 0.0 && !func.is_test {
-        5.0 // Significant boost for untested code
-    } else {
-        1.0
-    };
-    base_score *= zero_coverage_boost;
-
-    // Apply role multiplier
-    let role_adjusted_score = base_score * role_multiplier;
-
-    // Calculate debt-based modifiers if aggregator is available
-    let debt_modifier = if let Some(aggregator) = debt_aggregator {
+    // Add debt-based adjustments additively (not multiplicatively)
+    let debt_adjustment = if let Some(aggregator) = debt_aggregator {
         let agg_func_id = AggregatorFunctionId {
             file: func.file.clone(),
             name: func.name.clone(),
@@ -230,30 +218,19 @@ pub fn calculate_unified_priority_with_debt(
         };
         let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
 
-        // Add small multiplicative factors for other debt types
-        let testing_modifier = 1.0 + (debt_scores.testing / 100.0);
-        let resource_modifier = 1.0 + (debt_scores.resource / 100.0);
-        let duplication_modifier = 1.0 + (debt_scores.duplication / 100.0);
-
-        testing_modifier * resource_modifier * duplication_modifier
+        // Add small additive adjustments for other debt types
+        (debt_scores.testing / 50.0)
+            + (debt_scores.resource / 50.0)
+            + (debt_scores.duplication / 50.0)
     } else {
-        1.0
+        0.0
     };
 
-    let debt_adjusted_score = role_adjusted_score * debt_modifier;
+    let debt_adjusted_score = role_adjusted_score + debt_adjustment;
 
-    // Apply entropy dampening (spec 68: max 50% reduction)
-    let final_score = if let Some(entropy_score) = func.entropy_score.as_ref() {
-        // Apply dampening as a multiplier to the score
-        // Use the new framework's dampening calculation
-        let calculator = crate::complexity::entropy_core::UniversalEntropyCalculator::new(
-            crate::complexity::entropy_core::EntropyConfig::default(),
-        );
-        let dampening_factor = calculator.apply_dampening(entropy_score) / 100.0;
-        debt_adjusted_score * dampening_factor.clamp(0.5, 1.0) // Ensure max 50% reduction
-    } else {
-        debt_adjusted_score
-    };
+    // Remove entropy dampening from scoring - it should not affect prioritization
+    // Entropy is already factored into complexity metrics
+    let final_score = debt_adjusted_score;
 
     // Normalize to 0-10 scale with better distribution
     let normalized_score = normalize_final_score(final_score);

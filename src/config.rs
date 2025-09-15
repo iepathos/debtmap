@@ -48,15 +48,11 @@ impl Default for ScoringWeights {
 impl ScoringWeights {
     /// Validate that weights sum to 1.0 (with small tolerance for floating point)
     pub fn validate(&self) -> Result<(), String> {
-        let sum = self.coverage
-            + self.complexity
-            + self.semantic
-            + self.dependency
-            + self.security
-            + self.organization;
+        // Only validate the weights we actually use in the weighted sum model
+        let sum = self.coverage + self.complexity + self.dependency;
         if (sum - 1.0).abs() > 0.001 {
             return Err(format!(
-                "Scoring weights must sum to 1.0, but sum to {:.3}",
+                "Active scoring weights (coverage, complexity, dependency) must sum to 1.0, but sum to {:.3}",
                 sum
             ));
         }
@@ -86,41 +82,38 @@ impl ScoringWeights {
 
     /// Normalize weights to ensure they sum to 1.0
     pub fn normalize(&mut self) {
-        let sum = self.coverage
-            + self.complexity
-            + self.semantic
-            + self.dependency
-            + self.security
-            + self.organization;
-        if sum > 0.0 {
+        // Only normalize the weights we actually use
+        let sum = self.coverage + self.complexity + self.dependency;
+        if sum > 0.0 && (sum - 1.0).abs() > 0.001 {
             self.coverage /= sum;
             self.complexity /= sum;
-            self.semantic /= sum;
             self.dependency /= sum;
-            self.security /= sum;
-            self.organization /= sum;
+            // Set unused weights to 0
+            self.semantic = 0.0;
+            self.security = 0.0;
+            self.organization = 0.0;
         }
     }
 }
 
-// Default weights after spec 58 - removed double penalties and redundant factors
+// Default weights for weighted sum model - prioritizing coverage gaps
 fn default_coverage_weight() -> f64 {
-    0.40 // Increased from 0.30 to prioritize coverage after removing ROI and semantic factors
+    0.50 // 50% weight to prioritize untested code
 }
 fn default_complexity_weight() -> f64 {
-    0.35 // Increased from 0.20, absorbing organization factor's 5% (redundant with complexity)
+    0.35 // 35% weight for complexity within coverage tiers
 }
 fn default_semantic_weight() -> f64 {
-    0.00 // Removed from scoring per spec 58 to avoid double penalty with role multipliers
+    0.00 // Not used in weighted sum model
 }
 fn default_dependency_weight() -> f64 {
-    0.20 // Increased from 0.10, absorbing semantic factor's 5%
+    0.15 // 15% weight for impact radius
 }
 fn default_security_weight() -> f64 {
-    0.05 // Unchanged
+    0.00 // Not used in weighted sum model
 }
 fn default_organization_weight() -> f64 {
-    0.00 // Removed from scoring per spec 58 (redundant with complexity factor)
+    0.00 // Not used in weighted sum model
 }
 
 /// Role multipliers configuration for semantic classification
@@ -1193,33 +1186,26 @@ mod tests {
 critical_paths = ["/src/main.rs"]
 
 [scoring]
-coverage = 0.20
-complexity = 0.20
-semantic = 0.20
+coverage = 0.50
+complexity = 0.35
 dependency = 0.15
-security = 0.15
-organization = 0.10
 "#;
         let result = super::parse_and_validate_config(toml_content);
         assert!(result.is_ok());
         let config = result.unwrap();
         assert!(config.scoring.is_some());
         let scoring = config.scoring.unwrap();
-        // All weights should sum to 1.0
-        let sum = scoring.coverage
-            + scoring.complexity
-            + scoring.semantic
-            + scoring.dependency
-            + scoring.security
-            + scoring.organization;
-        assert!((sum - 1.0).abs() < 0.001);
+        // Active weights should sum to 1.0
+        let active_sum = scoring.coverage + scoring.complexity + scoring.dependency;
+        assert!((active_sum - 1.0).abs() < 0.001);
         // Check the values with floating point tolerance
-        assert!((scoring.coverage - 0.20).abs() < 0.001);
-        assert!((scoring.complexity - 0.20).abs() < 0.001);
-        assert!((scoring.semantic - 0.20).abs() < 0.001);
+        assert!((scoring.coverage - 0.50).abs() < 0.001);
+        assert!((scoring.complexity - 0.35).abs() < 0.001);
         assert!((scoring.dependency - 0.15).abs() < 0.001);
-        assert!((scoring.security - 0.15).abs() < 0.001);
-        assert!((scoring.organization - 0.10).abs() < 0.001);
+        // Unused weights should be 0
+        assert!((scoring.semantic - 0.0).abs() < 0.001);
+        assert!((scoring.security - 0.0).abs() < 0.001);
+        assert!((scoring.organization - 0.0).abs() < 0.001);
     }
 
     #[test]
@@ -1246,19 +1232,14 @@ organization = 0.5
         let config = result.unwrap();
         let scoring = config.scoring.unwrap();
         // Invalid weights (sum > 1.0) should be replaced with defaults
-        assert_eq!(scoring.coverage, 0.40);
+        assert_eq!(scoring.coverage, 0.50);
         assert_eq!(scoring.complexity, 0.35);
         assert_eq!(scoring.semantic, 0.00);
-        assert_eq!(scoring.dependency, 0.20);
-        assert_eq!(scoring.security, 0.05);
+        assert_eq!(scoring.dependency, 0.15);
+        assert_eq!(scoring.security, 0.00);
         assert_eq!(scoring.organization, 0.00);
-        let sum = scoring.coverage
-            + scoring.complexity
-            + scoring.semantic
-            + scoring.dependency
-            + scoring.security
-            + scoring.organization;
-        assert!((sum - 1.0).abs() < 0.001);
+        let active_sum = scoring.coverage + scoring.complexity + scoring.dependency;
+        assert!((active_sum - 1.0).abs() < 0.001);
     }
 
     #[test]

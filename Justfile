@@ -137,12 +137,12 @@ coverage-open: coverage
 # Analyze the current repository with debtmap using coverage data
 analyze-self:
     #!/usr/bin/env bash
-    echo "Building debtmap in release mode..."
-    cargo build --release --bin debtmap
+    echo "Building debtmap..."
+    cargo build --bin debtmap
     echo "Generating code coverage (lcov format)..."
     cargo tarpaulin --config .tarpaulin.toml --out Lcov
     echo "Analyzing current repository with debtmap..."
-    ./target/release/debtmap analyze . --lcov target/coverage/lcov.info -vv
+    ./target/debug/debtmap analyze . --lcov target/coverage/lcov.info -vv
     echo "Analysis complete!"
 
 # Run property-based tests only (if using proptest)

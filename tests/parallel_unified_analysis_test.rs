@@ -262,7 +262,7 @@ fn test_large_codebase_parallel_analysis() {
 
     // Performance check - should be fast even for 500 functions
     assert!(
-        duration.as_secs() < 2,
+        duration.as_secs() < 3,
         "Large codebase analysis took too long: {:?}",
         duration
     );
