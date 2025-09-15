@@ -34,14 +34,22 @@ def load_json_file(filepath: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def extract_location_components(location_dict: Dict[str, Any]) -> Tuple[str, str, int]:
+    """Extract location components from dictionary."""
+    return (
+        location_dict.get('file', 'unknown'),
+        location_dict.get('function', 'unknown'),
+        location_dict.get('line', 0)
+    )
+
+
 def format_location_string(location_obj: Any) -> str:
     """Format location object into a standardized string."""
-    if isinstance(location_obj, dict):
-        file_name = location_obj.get('file', 'unknown')
-        function_name = location_obj.get('function', 'unknown')
-        line_number = location_obj.get('line', 0)
-        return f"{file_name}:{function_name}:{line_number}"
-    return str(location_obj)
+    if not isinstance(location_obj, dict):
+        return str(location_obj)
+
+    file_name, function_name, line_number = extract_location_components(location_obj)
+    return f"{file_name}:{function_name}:{line_number}"
 
 
 def calculate_score_from_item(item: Dict[str, Any]) -> float:

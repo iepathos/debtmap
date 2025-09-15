@@ -1,0 +1,46 @@
+{
+  "items": [
+    {
+      "unified_score": {
+        "final_score": 9.2
+      },
+      "location": {
+        "file": "src/auth.rs",
+        "line": 45
+      },
+      "message": "High complexity authentication function"
+    },
+    {
+      "unified_score": {
+        "final_score": 8.5
+      },
+      "location": {
+        "file": "src/parser.rs",
+        "line": 123
+      },
+      "message": "Complex parsing logic"
+    },
+    {
+      "unified_score": {
+        "final_score": 6.3
+      },
+      "location": {
+        "file": "src/utils.rs",
+        "line": 78
+      },
+      "message": "Moderate complexity in utility function"
+    }
+  ],
+  "complexity": {
+    "metrics": [
+      {
+        "name": "authenticate_user",
+        "cyclomatic": 15
+      },
+      {
+        "name": "parse_config",
+        "cyclomatic": 12
+      }
+    ]
+  }
+}

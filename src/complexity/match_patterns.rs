@@ -86,36 +86,9 @@ impl MatchExpressionRecognizer {
 
 impl PatternRecognizer for MatchExpressionRecognizer {
     fn detect(&self, block: &syn::Block) -> Option<PatternMatchInfo> {
-        // Look for match expressions in the block
-        for stmt in &block.stmts {
-            if let Stmt::Expr(Expr::Match(match_expr), _) = stmt {
-                // Check if all arms are simple
-                let simple_arms = match_expr
-                    .arms
-                    .iter()
-                    .all(|arm| self.is_simple_arm(&arm.body));
-
-                if simple_arms && match_expr.arms.len() >= 3 {
-                    // Determine pattern type
-                    let pattern_type = if self.detect_enum_matching(match_expr) {
-                        PatternType::EnumMatching
-                    } else if self.detect_string_matching(match_expr) {
-                        PatternType::StringMatching
-                    } else {
-                        PatternType::SimpleComparison
-                    };
-
-                    return Some(PatternMatchInfo {
-                        variable_name: "match_expr".to_string(),
-                        condition_count: match_expr.arms.len(),
-                        has_default: self.has_wildcard_arm(match_expr),
-                        pattern_type,
-                    });
-                }
-            }
-        }
-
-        None
+        block.stmts
+            .iter()
+            .find_map(|stmt| self.analyze_statement(stmt))
     }
 
     fn adjust_complexity(&self, info: &PatternMatchInfo, _base: u32) -> u32 {
@@ -126,6 +99,53 @@ impl PatternRecognizer for MatchExpressionRecognizer {
         let default_penalty = if !info.has_default { 1 } else { 0 };
 
         adjusted + default_penalty
+    }
+}
+
+impl MatchExpressionRecognizer {
+    /// Analyze a single statement for match expression patterns
+    fn analyze_statement(&self, stmt: &Stmt) -> Option<PatternMatchInfo> {
+        match stmt {
+            Stmt::Expr(Expr::Match(match_expr), _) => self.analyze_match_expression(match_expr),
+            _ => None,
+        }
+    }
+
+    /// Analyze a match expression and extract pattern information
+    fn analyze_match_expression(&self, match_expr: &ExprMatch) -> Option<PatternMatchInfo> {
+        // Check if match qualifies for pattern extraction
+        if !self.is_pattern_extractable(match_expr) {
+            return None;
+        }
+
+        let pattern_type = self.determine_pattern_type(match_expr);
+
+        Some(PatternMatchInfo {
+            variable_name: "match_expr".to_string(),
+            condition_count: match_expr.arms.len(),
+            has_default: self.has_wildcard_arm(match_expr),
+            pattern_type,
+        })
+    }
+
+    /// Check if match expression is suitable for pattern extraction
+    fn is_pattern_extractable(&self, match_expr: &ExprMatch) -> bool {
+        match_expr.arms.len() >= 3
+            && match_expr
+                .arms
+                .iter()
+                .all(|arm| self.is_simple_arm(&arm.body))
+    }
+
+    /// Determine the type of pattern matching being used
+    fn determine_pattern_type(&self, match_expr: &ExprMatch) -> PatternType {
+        if self.detect_enum_matching(match_expr) {
+            PatternType::EnumMatching
+        } else if self.detect_string_matching(match_expr) {
+            PatternType::StringMatching
+        } else {
+            PatternType::SimpleComparison
+        }
     }
 }
 

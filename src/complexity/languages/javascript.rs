@@ -264,21 +264,29 @@ impl<'a> JavaScriptEntropyAnalyzer<'a> {
         variables.len()
     }
 
+    /// Check if node is a variable declaration context
+    fn is_variable_declaration_context(parent_kind: &str) -> bool {
+        matches!(parent_kind, "variable_declarator" | "parameter" | "pattern")
+    }
+
+    /// Extract variable name from identifier node if it's in a declaration context
+    fn extract_variable_if_declaration(&self, node: Node) -> Option<String> {
+        if node.kind() != "identifier" {
+            return None;
+        }
+
+        node.parent()
+            .filter(|parent| Self::is_variable_declaration_context(parent.kind()))
+            .map(|_| self.source[node.byte_range()].to_string())
+    }
+
     /// Collect variable names
     fn collect_variables(&self, cursor: &mut TreeCursor, variables: &mut HashSet<String>) {
         let node = cursor.node();
 
-        if node.kind() == "identifier" {
-            if let Some(parent) = node.parent() {
-                // Only count identifiers in variable declarations
-                if parent.kind() == "variable_declarator"
-                    || parent.kind() == "parameter"
-                    || parent.kind() == "pattern"
-                {
-                    let text = &self.source[node.byte_range()];
-                    variables.insert(text.to_string());
-                }
-            }
+        // Extract variable if applicable
+        if let Some(var_name) = self.extract_variable_if_declaration(node) {
+            variables.insert(var_name);
         }
 
         // Visit children

@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "unified_score": {
+        "final_score": 9.2
+      },
+      "location": {
+        "file": "src/auth.rs",
+        "line": 45
+      },
+      "message": "High complexity authentication function"
+    },
+    {
+      "unified_score": {
+        "final_score": 5.8
+      },
+      "location": {
+        "file": "src/parser.rs",
+        "line": 123
+      },
+      "message": "Reduced complexity in parsing logic"
+    }
+  ],
+  "complexity": {
+    "metrics": [
+      {
+        "name": "authenticate_user",
+        "cyclomatic": 15
+      },
+      {
+        "name": "parse_config",
+        "cyclomatic": 8
+      }
+    ]
+  }
+}

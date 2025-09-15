@@ -964,36 +964,53 @@ fn collect_simple_pattern(pattern_name: &str, patterns: &mut Vec<String>) {
     patterns.push(pattern_name.to_string());
 }
 
-fn collect_expression_patterns(expr: &ast::Expr, patterns: &mut Vec<String>) {
+/// Get the pattern name for simple expression types
+fn get_simple_pattern_name(expr: &ast::Expr) -> Option<&'static str> {
     use ast::Expr::*;
     match expr {
-        BoolOp(_) => collect_simple_pattern("bool_op", patterns),
+        BoolOp(_) => Some("bool_op"),
+        Lambda(_) => Some("lambda"),
+        IfExp(_) => Some("if_exp"),
+        Dict(_) => Some("dict"),
+        Set(_) => Some("set"),
+        ListComp(_) => Some("list_comp"),
+        SetComp(_) => Some("set_comp"),
+        DictComp(_) => Some("dict_comp"),
+        GeneratorExp(_) => Some("generator_exp"),
+        Await(_) => Some("await"),
+        Yield(_) => Some("yield"),
+        YieldFrom(_) => Some("yield_from"),
+        Compare(_) => Some("compare"),
+        FormattedValue(_) => Some("f_string"),
+        JoinedStr(_) => Some("joined_str"),
+        Constant(_) => Some("constant"),
+        Attribute(_) => Some("attribute"),
+        Subscript(_) => Some("subscript"),
+        Starred(_) => Some("starred"),
+        Name(_) => Some("name"),
+        List(_) => Some("list"),
+        Tuple(_) => Some("tuple"),
+        Slice(_) => Some("slice"),
+        NamedExpr(_) => Some("named_expr"),
+        _ => None,
+    }
+}
+
+fn collect_expression_patterns(expr: &ast::Expr, patterns: &mut Vec<String>) {
+    use ast::Expr::*;
+
+    // Handle simple patterns
+    if let Some(pattern_name) = get_simple_pattern_name(expr) {
+        collect_simple_pattern(pattern_name, patterns);
+        return;
+    }
+
+    // Handle complex patterns
+    match expr {
         BinOp(bin_op) => collect_binary_op_patterns(bin_op, patterns),
         UnaryOp(unary_op) => collect_unary_op_patterns(unary_op, patterns),
-        Lambda(_) => collect_simple_pattern("lambda", patterns),
-        IfExp(_) => collect_simple_pattern("if_exp", patterns),
-        Dict(_) => collect_simple_pattern("dict", patterns),
-        Set(_) => collect_simple_pattern("set", patterns),
-        ListComp(_) => collect_simple_pattern("list_comp", patterns),
-        SetComp(_) => collect_simple_pattern("set_comp", patterns),
-        DictComp(_) => collect_simple_pattern("dict_comp", patterns),
-        GeneratorExp(_) => collect_simple_pattern("generator_exp", patterns),
-        Await(_) => collect_simple_pattern("await", patterns),
-        Yield(_) => collect_simple_pattern("yield", patterns),
-        YieldFrom(_) => collect_simple_pattern("yield_from", patterns),
-        Compare(_) => collect_simple_pattern("compare", patterns),
         Call(call) => collect_call_patterns(call, patterns),
-        FormattedValue(_) => collect_simple_pattern("f_string", patterns),
-        JoinedStr(_) => collect_simple_pattern("joined_str", patterns),
-        Constant(_) => collect_simple_pattern("constant", patterns),
-        Attribute(_) => collect_simple_pattern("attribute", patterns),
-        Subscript(_) => collect_simple_pattern("subscript", patterns),
-        Starred(_) => collect_simple_pattern("starred", patterns),
-        Name(_) => collect_simple_pattern("name", patterns),
-        List(_) => collect_simple_pattern("list", patterns),
-        Tuple(_) => collect_simple_pattern("tuple", patterns),
-        Slice(_) => collect_simple_pattern("slice", patterns),
-        NamedExpr(_) => collect_simple_pattern("named_expr", patterns),
+        _ => {} // Unknown pattern type
     }
 }
 
