@@ -19,7 +19,6 @@ use crate::{
         UnifiedDebtItem, UnifiedScore,
     },
     risk,
-    scoring::{EnhancedScorer, ScoringContext},
 };
 use anyhow::{Context, Result};
 use std::collections::HashSet;
@@ -941,19 +940,8 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> UnifiedDebtItem {
-    let mut scoring_context = ScoringContext::new(call_graph.clone());
-
-    if let Some(lcov) = coverage_data {
-        scoring_context = scoring_context.with_coverage(lcov.clone());
-    }
-
-    let test_files: HashSet<PathBuf> = HashSet::new();
-    scoring_context = scoring_context.with_test_files(test_files);
-
-    let scorer = EnhancedScorer::new(&scoring_context);
-    let score_breakdown = scorer.score_function_with_aggregator(metric, debt_aggregator);
-
-    let mut item = debt_item::create_unified_debt_item_with_aggregator_and_data_flow(
+    // Use the unified debt item creation which already calculates the score correctly
+    debt_item::create_unified_debt_item_with_aggregator_and_data_flow(
         metric,
         call_graph,
         coverage_data,
@@ -961,10 +949,7 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         function_pointer_used_functions,
         debt_aggregator,
         data_flow,
-    );
-
-    item.unified_score.final_score = score_breakdown.total;
-    item
+    )
 }
 
 fn convert_error_swallowing_to_unified(
