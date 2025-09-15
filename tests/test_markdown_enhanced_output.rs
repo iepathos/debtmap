@@ -174,7 +174,9 @@ fn test_enhanced_markdown_with_verbosity() {
     }
 
     // Add file aggregate
-    analysis.file_aggregates.push_back(create_sample_file_aggregate());
+    analysis
+        .file_aggregates
+        .push_back(create_sample_file_aggregate());
 
     analysis.sort_by_priority();
 
@@ -222,7 +224,9 @@ fn test_enhanced_markdown_full_report() {
     analysis.add_item(item3);
 
     // Add file aggregate
-    analysis.file_aggregates.push_back(create_sample_file_aggregate());
+    analysis
+        .file_aggregates
+        .push_back(create_sample_file_aggregate());
 
     analysis.sort_by_priority();
 

@@ -597,7 +597,9 @@ mod tests {
         // Should detect 2 issues (unwrap_or and unwrap_or_default, but not unwrap_or_else with logging)
         assert_eq!(items.len(), 2);
         assert!(items.iter().any(|item| item.message.contains("unwrap_or")));
-        assert!(items.iter().any(|item| item.message.contains("unwrap_or_default")));
+        assert!(items
+            .iter()
+            .any(|item| item.message.contains("unwrap_or_default")));
     }
 
     #[test]
@@ -621,13 +623,34 @@ mod tests {
         use ErrorSwallowingPattern::*;
 
         // Test descriptions
-        assert_eq!(IfLetOkNoElse.description(), "if let Ok(...) without else branch");
-        assert_eq!(IfLetOkEmptyElse.description(), "if let Ok(...) with empty else branch");
-        assert_eq!(LetUnderscoreResult.description(), "let _ = discarding Result");
-        assert_eq!(OkMethodDiscard.description(), ".ok() discarding error information");
-        assert_eq!(MatchIgnoredErr.description(), "match with ignored Err variant");
-        assert_eq!(UnwrapOrNoLog.description(), "unwrap_or without error logging");
-        assert_eq!(UnwrapOrDefaultNoLog.description(), "unwrap_or_default without error logging");
+        assert_eq!(
+            IfLetOkNoElse.description(),
+            "if let Ok(...) without else branch"
+        );
+        assert_eq!(
+            IfLetOkEmptyElse.description(),
+            "if let Ok(...) with empty else branch"
+        );
+        assert_eq!(
+            LetUnderscoreResult.description(),
+            "let _ = discarding Result"
+        );
+        assert_eq!(
+            OkMethodDiscard.description(),
+            ".ok() discarding error information"
+        );
+        assert_eq!(
+            MatchIgnoredErr.description(),
+            "match with ignored Err variant"
+        );
+        assert_eq!(
+            UnwrapOrNoLog.description(),
+            "unwrap_or without error logging"
+        );
+        assert_eq!(
+            UnwrapOrDefaultNoLog.description(),
+            "unwrap_or_default without error logging"
+        );
 
         // Test remediations
         assert!(IfLetOkNoElse.remediation().contains("? operator"));

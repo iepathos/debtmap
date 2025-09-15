@@ -449,11 +449,9 @@ fn build_analysis_pipeline(
     context: &AnalysisContext,
     func: &FunctionMetrics,
 ) -> Result<(AnalysisContext, syn::File, String), AnalysisError> {
-    let ast = parse_function_ast(func, &context.language)
-        .ok_or(AnalysisError::ParseError)?;
+    let ast = parse_function_ast(func, &context.language).ok_or(AnalysisError::ParseError)?;
 
-    let source = crate::io::read_file(&func.file)
-        .map_err(|_| AnalysisError::IoError)?;
+    let source = crate::io::read_file(&func.file).map_err(|_| AnalysisError::IoError)?;
 
     Ok((context.clone(), ast, source))
 }

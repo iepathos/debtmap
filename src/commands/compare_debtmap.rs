@@ -122,17 +122,25 @@ fn perform_validation(
         remaining_issues.push(format!(
             "{} critical debt item{} still present",
             unchanged_critical.count,
-            if unchanged_critical.count == 1 { "" } else { "s" }
+            if unchanged_critical.count == 1 {
+                ""
+            } else {
+                "s"
+            }
         ));
 
         for (idx, item) in unchanged_critical.items.iter().take(2).enumerate() {
             gaps.insert(
                 format!("critical_debt_remaining_{}", idx),
                 GapDetail {
-                    description: format!("High-priority debt item still present in {}", item.function),
+                    description: format!(
+                        "High-priority debt item still present in {}",
+                        item.function
+                    ),
                     location: format!("{}:{}:{}", item.file.display(), item.function, item.line),
                     severity: "high".to_string(),
-                    suggested_fix: "Apply functional programming patterns to reduce complexity".to_string(),
+                    suggested_fix: "Apply functional programming patterns to reduce complexity"
+                        .to_string(),
                     original_score: Some(item.score),
                     current_score: Some(item.score),
                     original_complexity: None,
@@ -208,7 +216,11 @@ fn create_summary(analysis: &UnifiedAnalysis) -> AnalysisSummary {
     let average_score = if analysis.items.is_empty() {
         0.0
     } else {
-        analysis.items.iter().map(|i| i.unified_score.final_score).sum::<f64>()
+        analysis
+            .items
+            .iter()
+            .map(|i| i.unified_score.final_score)
+            .sum::<f64>()
             / analysis.items.len() as f64
     };
 
@@ -234,7 +246,9 @@ fn identify_resolved_items(before: &UnifiedAnalysis, after: &UnifiedAnalysis) ->
     let resolved: Vec<_> = before
         .items
         .iter()
-        .filter(|item| !after_keys.contains(&(item.location.file.clone(), item.location.function.clone())))
+        .filter(|item| {
+            !after_keys.contains(&(item.location.file.clone(), item.location.function.clone()))
+        })
         .collect();
 
     let high_priority_count = resolved
@@ -266,22 +280,32 @@ fn identify_improved_items(before: &UnifiedAnalysis, after: &UnifiedAnalysis) ->
     let mut improved_count = 0;
 
     for after_item in &after.items {
-        let key = (after_item.location.file.clone(), after_item.location.function.clone());
+        let key = (
+            after_item.location.file.clone(),
+            after_item.location.function.clone(),
+        );
         if let Some(before_item) = before_map.get(&key) {
-            let score_improvement = before_item.unified_score.final_score - after_item.unified_score.final_score;
+            let score_improvement =
+                before_item.unified_score.final_score - after_item.unified_score.final_score;
             if score_improvement > 0.5 {
                 improved_count += 1;
 
                 if after_item.cyclomatic_complexity < before_item.cyclomatic_complexity {
-                    let reduction = (before_item.cyclomatic_complexity - after_item.cyclomatic_complexity) as f64
+                    let reduction = (before_item.cyclomatic_complexity
+                        - after_item.cyclomatic_complexity)
+                        as f64
                         / before_item.cyclomatic_complexity as f64;
                     total_complexity_reduction += reduction;
                 }
 
-                let after_coverage = after_item.transitive_coverage.as_ref()
+                let after_coverage = after_item
+                    .transitive_coverage
+                    .as_ref()
                     .map(|tc| tc.direct.max(tc.transitive))
                     .unwrap_or(0.0);
-                let before_coverage = before_item.transitive_coverage.as_ref()
+                let before_coverage = before_item
+                    .transitive_coverage
+                    .as_ref()
                     .map(|tc| tc.direct.max(tc.transitive))
                     .unwrap_or(0.0);
 
@@ -325,7 +349,9 @@ fn identify_new_items(before: &UnifiedAnalysis, after: &UnifiedAnalysis) -> NewI
     let new_items: Vec<_> = after
         .items
         .iter()
-        .filter(|item| !before_keys.contains(&(item.location.file.clone(), item.location.function.clone())))
+        .filter(|item| {
+            !before_keys.contains(&(item.location.file.clone(), item.location.function.clone()))
+        })
         .filter(|item| item.unified_score.final_score >= 8.0)
         .map(|item| ItemInfo {
             file: item.location.file.clone(),
@@ -346,7 +372,10 @@ struct UnchangedCritical {
     items: Vec<ItemInfo>,
 }
 
-fn identify_unchanged_critical(before: &UnifiedAnalysis, after: &UnifiedAnalysis) -> UnchangedCritical {
+fn identify_unchanged_critical(
+    before: &UnifiedAnalysis,
+    after: &UnifiedAnalysis,
+) -> UnchangedCritical {
     let mut unchanged_critical = Vec::new();
 
     let after_map: HashMap<_, _> = after
@@ -357,9 +386,14 @@ fn identify_unchanged_critical(before: &UnifiedAnalysis, after: &UnifiedAnalysis
 
     for before_item in &before.items {
         if before_item.unified_score.final_score >= 8.0 {
-            let key = (before_item.location.file.clone(), before_item.location.function.clone());
+            let key = (
+                before_item.location.file.clone(),
+                before_item.location.function.clone(),
+            );
             if let Some(after_item) = after_map.get(&key) {
-                let score_change = (before_item.unified_score.final_score - after_item.unified_score.final_score).abs();
+                let score_change = (before_item.unified_score.final_score
+                    - after_item.unified_score.final_score)
+                    .abs();
                 if score_change < 0.5 && after_item.unified_score.final_score >= 8.0 {
                     unchanged_critical.push(ItemInfo {
                         file: before_item.location.file.clone(),
@@ -393,7 +427,9 @@ fn calculate_improvement_score(
     };
 
     let overall_score_improvement = if before_summary.average_score > 0.0 {
-        ((before_summary.average_score - after_summary.average_score) / before_summary.average_score) * 100.0
+        ((before_summary.average_score - after_summary.average_score)
+            / before_summary.average_score)
+            * 100.0
     } else {
         0.0
     };
@@ -406,15 +442,14 @@ fn calculate_improvement_score(
         0.0
     };
 
-    let weighted_score =
-        resolved_high_priority_score * 0.4 +
-        overall_score_improvement.max(0.0) * 0.3 +
-        complexity_reduction_score * 0.2 +
-        no_new_critical_score * 0.1;
+    let weighted_score = resolved_high_priority_score * 0.4
+        + overall_score_improvement.max(0.0) * 0.3
+        + complexity_reduction_score * 0.2
+        + no_new_critical_score * 0.1;
 
     let penalty = unchanged_critical.count as f64 * 5.0;
 
-    (weighted_score - penalty).max(0.0).min(100.0)
+    (weighted_score - penalty).clamp(0.0, 100.0)
 }
 
 fn write_validation_result(path: &Path, result: &ValidationResult) -> Result<()> {
@@ -449,12 +484,12 @@ fn print_summary(result: &ValidationResult) {
         }
     }
 
-    println!("\nBefore: {} items (avg score: {:.1})",
-        result.before_summary.total_items,
-        result.before_summary.average_score
+    println!(
+        "\nBefore: {} items (avg score: {:.1})",
+        result.before_summary.total_items, result.before_summary.average_score
     );
-    println!("After: {} items (avg score: {:.1})",
-        result.after_summary.total_items,
-        result.after_summary.average_score
+    println!(
+        "After: {} items (avg score: {:.1})",
+        result.after_summary.total_items, result.after_summary.average_score
     );
 }

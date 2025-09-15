@@ -1426,13 +1426,12 @@ fn generate_recommendation_with_coverage_and_data_flow(
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> ActionableRecommendation {
     // Create recommendation context using pure functions
-    let recommendation_context = create_recommendation_context(func, debt_type, role, _score, coverage);
+    let recommendation_context =
+        create_recommendation_context(func, debt_type, role, _score, coverage);
 
     // Generate recommendation using functional composition
-    let (primary_action, rationale, steps) = generate_context_aware_recommendation(
-        recommendation_context,
-        data_flow,
-    );
+    let (primary_action, rationale, steps) =
+        generate_context_aware_recommendation(recommendation_context, data_flow);
 
     build_actionable_recommendation(primary_action, rationale, steps)
 }
@@ -1611,7 +1610,7 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         length: context.function_info.length,
         cognitive: context.function_info.cognitive,
         is_pure: Some(context.function_info.is_pure),
-        purity_confidence: Some(context.function_info.purity_confidence as f32),
+        purity_confidence: Some(context.function_info.purity_confidence),
         // Set reasonable defaults for other fields
         cyclomatic: extract_cyclomatic_complexity(&context.debt_type),
         is_test: false,

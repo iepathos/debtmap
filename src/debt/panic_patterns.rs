@@ -453,17 +453,32 @@ mod tests {
         // Test descriptions
         assert_eq!(UnwrapOnResult.description(), ".unwrap() on Result type");
         assert_eq!(UnwrapOnOption.description(), ".unwrap() on Option type");
-        assert_eq!(ExpectWithGenericMessage.description(), ".expect() with generic message");
+        assert_eq!(
+            ExpectWithGenericMessage.description(),
+            ".expect() with generic message"
+        );
         assert_eq!(PanicInNonTest.description(), "panic! in non-test code");
-        assert_eq!(UnreachableInReachable.description(), "unreachable! that may be reachable");
-        assert_eq!(TodoInProduction.description(), "todo!/unimplemented! in production");
+        assert_eq!(
+            UnreachableInReachable.description(),
+            "unreachable! that may be reachable"
+        );
+        assert_eq!(
+            TodoInProduction.description(),
+            "todo!/unimplemented! in production"
+        );
 
         // Test remediations
         assert!(UnwrapOnResult.remediation().contains("? operator"));
-        assert!(ExpectWithGenericMessage.remediation().contains("descriptive context"));
+        assert!(ExpectWithGenericMessage
+            .remediation()
+            .contains("descriptive context"));
         assert!(PanicInNonTest.remediation().contains("Return Result"));
-        assert!(UnreachableInReachable.remediation().contains("Verify code path"));
-        assert!(TodoInProduction.remediation().contains("Implement the functionality"));
+        assert!(UnreachableInReachable
+            .remediation()
+            .contains("Verify code path"));
+        assert!(TodoInProduction
+            .remediation()
+            .contains("Implement the functionality"));
     }
 
     #[test]
@@ -494,11 +509,17 @@ mod tests {
         // Should detect multiple unwrap/expect issues
         assert!(items.len() >= 5);
 
-        let unwrap_count = items.iter().filter(|item| item.message.contains("unwrap")).count();
-        let expect_count = items.iter().filter(|item| item.message.contains("expect")).count();
+        let unwrap_count = items
+            .iter()
+            .filter(|item| item.message.contains("unwrap"))
+            .count();
+        let expect_count = items
+            .iter()
+            .filter(|item| item.message.contains("expect"))
+            .count();
 
-        assert!(unwrap_count >= 3);  // Multiple unwraps
-        assert!(expect_count >= 3);  // Multiple generic expects
+        assert!(unwrap_count >= 3); // Multiple unwraps
+        assert!(expect_count >= 3); // Multiple generic expects
     }
 
     #[test]
@@ -550,7 +571,9 @@ mod tests {
         assert!(items.len() >= 3);
 
         let has_todo = items.iter().any(|item| item.message.contains("todo"));
-        let has_unreachable = items.iter().any(|item| item.message.contains("unreachable"));
+        let has_unreachable = items
+            .iter()
+            .any(|item| item.message.contains("unreachable"));
         let has_panic = items.iter().any(|item| item.message.contains("panic!"));
 
         assert!(has_todo);

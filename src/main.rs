@@ -93,7 +93,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
     } = command
     {
         // Apply side effects first
-        let cache_location_path = cache_location.as_ref().map(|s| std::path::PathBuf::from(s));
+        let cache_location_path = cache_location.as_ref().map(std::path::PathBuf::from);
         apply_environment_setup(&cache_location_path, no_context_aware)?;
 
         // Handle early returns for cache operations
@@ -104,15 +104,42 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         // Build configuration from pure data transformation
         let formatting_config = create_formatting_config(plain);
         let config = build_analyze_config(
-            path, format, output, threshold_complexity, threshold_duplication,
-            languages, coverage_file, enable_context, context_providers,
-            disable_context, top, tail, semantic_off, verbosity,
-            verbose_macro_warnings, show_macro_stats, group_by_category,
-            min_priority, filter_categories, no_context_aware, threshold_preset,
-            formatting_config, no_parallel, jobs, use_cache, no_cache,
-            clear_cache, cache_location, multi_pass, show_attribution,
-            detail_level, aggregate_only, no_aggregation, aggregation_method,
-            min_problematic, no_god_object,
+            path,
+            format,
+            output,
+            threshold_complexity,
+            threshold_duplication,
+            languages,
+            coverage_file,
+            enable_context,
+            context_providers,
+            disable_context,
+            top,
+            tail,
+            semantic_off,
+            verbosity,
+            verbose_macro_warnings,
+            show_macro_stats,
+            group_by_category,
+            min_priority,
+            filter_categories,
+            no_context_aware,
+            threshold_preset,
+            formatting_config,
+            no_parallel,
+            jobs,
+            use_cache,
+            no_cache,
+            clear_cache,
+            cache_location,
+            multi_pass,
+            show_attribution,
+            detail_level,
+            aggregate_only,
+            no_aggregation,
+            aggregation_method,
+            min_problematic,
+            no_god_object,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -137,7 +164,7 @@ fn handle_cache_operations(
 }
 
 // Side effect handler for cache stats
-fn handle_cache_stats(path: &std::path::PathBuf) -> Result<()> {
+fn handle_cache_stats(path: &std::path::Path) -> Result<()> {
     let cache = debtmap::cache::SharedCache::new(Some(path))?;
     let stats = cache.get_stats();
     println!("Cache Statistics:");
@@ -147,16 +174,14 @@ fn handle_cache_stats(path: &std::path::PathBuf) -> Result<()> {
 }
 
 // Side effect handler for cache migration
-fn handle_cache_migration(path: &std::path::PathBuf) -> Result<Result<()>> {
+fn handle_cache_migration(path: &std::path::Path) -> Result<Result<()>> {
     use debtmap::cache::CacheStrategy;
 
     println!("Migrating cache to shared location");
 
     // Get the shared cache location
-    let dst_location = debtmap::cache::CacheLocation::resolve_with_strategy(
-        Some(path),
-        CacheStrategy::Shared,
-    )?;
+    let dst_location =
+        debtmap::cache::CacheLocation::resolve_with_strategy(Some(path), CacheStrategy::Shared)?;
 
     // Create a new cache at the shared location
     let _dst_cache = debtmap::cache::SharedCache::new_with_cache_dir(
@@ -165,7 +190,10 @@ fn handle_cache_migration(path: &std::path::PathBuf) -> Result<Result<()>> {
     )?;
 
     // For now, just report that we've set up the cache in the shared location
-    println!("Cache now configured at shared location: {:?}", dst_location.get_cache_path());
+    println!(
+        "Cache now configured at shared location: {:?}",
+        dst_location.get_cache_path()
+    );
     Ok(Ok(()))
 }
 
@@ -231,7 +259,9 @@ fn convert_cache_location(location: &Option<String>) -> Option<String> {
     location.clone()
 }
 
-fn convert_threshold_preset(preset: Option<debtmap::cli::ThresholdPreset>) -> Option<debtmap::cli::ThresholdPreset> {
+fn convert_threshold_preset(
+    preset: Option<debtmap::cli::ThresholdPreset>,
+) -> Option<debtmap::cli::ThresholdPreset> {
     preset
 }
 

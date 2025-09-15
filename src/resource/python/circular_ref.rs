@@ -504,8 +504,14 @@ class SimpleClass:
         let issues = detector.detect_issues(&module, Path::new("test.py"));
 
         // Should not detect any circular references
-        let circular_issues: Vec<_> = issues.into_iter()
-            .filter(|issue| matches!(issue.issue_type, PythonResourceIssueType::CircularReference { .. }))
+        let circular_issues: Vec<_> = issues
+            .into_iter()
+            .filter(|issue| {
+                matches!(
+                    issue.issue_type,
+                    PythonResourceIssueType::CircularReference { .. }
+                )
+            })
             .collect();
         assert!(circular_issues.is_empty());
     }
@@ -556,7 +562,11 @@ class SimpleClass:
         let long_chain_issue = ResourceIssue {
             issue_type: PythonResourceIssueType::CircularReference {
                 pattern: CircularPattern::ChainReference(5),
-                classes_involved: vec!["ClassA".to_string(), "ClassB".to_string(), "ClassC".to_string()],
+                classes_involved: vec![
+                    "ClassA".to_string(),
+                    "ClassB".to_string(),
+                    "ClassC".to_string(),
+                ],
             },
             location: ResourceLocation {
                 line: 5,

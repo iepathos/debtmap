@@ -403,7 +403,8 @@ mod tests {
         let items = analyze_error_context(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        let into_items: Vec<_> = items.iter()
+        let into_items: Vec<_> = items
+            .iter()
             .filter(|item| item.message.contains("into()"))
             .collect();
         assert!(!into_items.is_empty());
@@ -445,7 +446,8 @@ mod tests {
         let file = parse_str::<File>(code).expect("Failed to parse test code");
         let items = analyze_error_context(&file, Path::new("test.rs"), None);
 
-        let question_mark_items: Vec<_> = items.iter()
+        let question_mark_items: Vec<_> = items
+            .iter()
             .filter(|item| item.message.contains("? operator"))
             .collect();
         assert!(!question_mark_items.is_empty());
@@ -463,7 +465,8 @@ mod tests {
         let file = parse_str::<File>(code).expect("Failed to parse test code");
         let items = analyze_error_context(&file, Path::new("test.rs"), None);
 
-        let string_conversion_items: Vec<_> = items.iter()
+        let string_conversion_items: Vec<_> = items
+            .iter()
             .filter(|item| item.message.contains("string"))
             .collect();
         assert!(!string_conversion_items.is_empty());
@@ -473,22 +476,40 @@ mod tests {
     fn test_context_loss_pattern_descriptions() {
         use ContextLossPattern::*;
 
-        assert_eq!(MapErrDiscardingOriginal.description(), "map_err discards original error");
-        assert_eq!(AnyhowWithoutContext.description(), "anyhow error without context");
+        assert_eq!(
+            MapErrDiscardingOriginal.description(),
+            "map_err discards original error"
+        );
+        assert_eq!(
+            AnyhowWithoutContext.description(),
+            "anyhow error without context"
+        );
         assert_eq!(QuestionMarkChain.description(), "Long ? operator chain");
-        assert_eq!(StringErrorConversion.description(), "Error converted to string");
-        assert_eq!(IntoErrorConversion.description(), "Generic into() error conversion");
+        assert_eq!(
+            StringErrorConversion.description(),
+            "Error converted to string"
+        );
+        assert_eq!(
+            IntoErrorConversion.description(),
+            "Generic into() error conversion"
+        );
     }
 
     #[test]
     fn test_context_loss_pattern_remediations() {
         use ContextLossPattern::*;
 
-        assert!(MapErrDiscardingOriginal.remediation().contains("Include original error"));
+        assert!(MapErrDiscardingOriginal
+            .remediation()
+            .contains("Include original error"));
         assert!(AnyhowWithoutContext.remediation().contains("context"));
         assert!(QuestionMarkChain.remediation().contains("Add context"));
-        assert!(StringErrorConversion.remediation().contains("Preserve error type"));
-        assert!(IntoErrorConversion.remediation().contains("explicit error conversion"));
+        assert!(StringErrorConversion
+            .remediation()
+            .contains("Preserve error type"));
+        assert!(IntoErrorConversion
+            .remediation()
+            .contains("explicit error conversion"));
     }
 
     #[test]

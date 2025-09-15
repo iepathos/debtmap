@@ -932,19 +932,24 @@ impl DependencyInfo {
 }
 
 enum DebtSpecificInfo {
-    DeadCode { visibility: String, usage_hints: Vec<String> },
+    DeadCode {
+        visibility: String,
+        usage_hints: Vec<String>,
+    },
     Other,
 }
 
 impl DebtSpecificInfo {
     fn from_item(item: &UnifiedDebtItem) -> Self {
         match &item.debt_type {
-            DebtType::DeadCode { visibility, usage_hints, .. } => {
-                Self::DeadCode {
-                    visibility: format_visibility(visibility).to_string(),
-                    usage_hints: usage_hints.clone(),
-                }
-            }
+            DebtType::DeadCode {
+                visibility,
+                usage_hints,
+                ..
+            } => Self::DeadCode {
+                visibility: format_visibility(visibility).to_string(),
+                usage_hints: usage_hints.clone(),
+            },
             _ => Self::Other,
         }
     }
@@ -981,7 +986,11 @@ fn format_header_section(context: &FormatContext) -> String {
         "#{} {} [{}]",
         context.rank.to_string().bright_cyan().bold(),
         format!("SCORE: {}", score_formatter::format_score(context.score)).bright_yellow(),
-        context.severity_info.label.color(context.severity_info.color).bold()
+        context
+            .severity_info
+            .label
+            .color(context.severity_info.color)
+            .bold()
     )
 }
 
@@ -1052,7 +1061,10 @@ fn format_dependencies_section(context: &FormatContext) -> Option<String> {
     // Add callees information
     if !context.dependency_info.downstream_callees.is_empty() {
         let callees_display = format_truncated_list(&context.dependency_info.downstream_callees, 3);
-        section.push_str(&format!("\n│  └─ CALLS: {}", callees_display.bright_magenta()));
+        section.push_str(&format!(
+            "\n│  └─ CALLS: {}",
+            callees_display.bright_magenta()
+        ));
     }
 
     Some(section)
@@ -1061,7 +1073,10 @@ fn format_dependencies_section(context: &FormatContext) -> Option<String> {
 // Pure function to format debt-specific section
 fn format_debt_specific_section(context: &FormatContext) -> Option<String> {
     match &context.debt_specific_info {
-        DebtSpecificInfo::DeadCode { visibility, usage_hints } => {
+        DebtSpecificInfo::DeadCode {
+            visibility,
+            usage_hints,
+        } => {
             let mut section = format!(
                 "├─ VISIBILITY: {} function with no callers",
                 visibility.yellow()

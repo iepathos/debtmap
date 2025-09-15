@@ -505,9 +505,7 @@ mod tests {
 
     #[test]
     fn test_branch_similarity_no_branches() {
-        let group = BranchGroup {
-            branches: vec![],
-        };
+        let group = BranchGroup { branches: vec![] };
 
         let similarity = group.similarity();
         assert_eq!(similarity, 0.0); // No branches should return 0
@@ -534,8 +532,16 @@ mod tests {
 
     #[test]
     fn test_sequence_similarity_partial_match() {
-        let seq1 = vec!["call".to_string(), "assign".to_string(), "return".to_string()];
-        let seq2 = vec!["call".to_string(), "binary".to_string(), "return".to_string()];
+        let seq1 = vec![
+            "call".to_string(),
+            "assign".to_string(),
+            "return".to_string(),
+        ];
+        let seq2 = vec![
+            "call".to_string(),
+            "binary".to_string(),
+            "return".to_string(),
+        ];
 
         let group = BranchGroup { branches: vec![] };
         let similarity = group.sequence_similarity(&seq1, &seq2);

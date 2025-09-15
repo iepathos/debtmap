@@ -97,10 +97,21 @@ pub fn perform_unified_analysis_with_options(
 
     // Extract files and create computation parameters in pure functional style
     let analysis_params = create_analysis_parameters(
-        results, coverage_file, semantic_off, project_path,
-        verbose_macro_warnings, show_macro_stats, parallel, jobs,
-        use_cache, multi_pass, show_attribution, no_aggregation,
-        aggregation_method, min_problematic, no_god_object,
+        results,
+        coverage_file,
+        semantic_off,
+        project_path,
+        verbose_macro_warnings,
+        show_macro_stats,
+        parallel,
+        jobs,
+        use_cache,
+        multi_pass,
+        show_attribution,
+        no_aggregation,
+        aggregation_method,
+        min_problematic,
+        no_god_object,
     );
 
     // Apply caching strategy using function composition
@@ -187,7 +198,8 @@ struct CacheConfiguration {
 impl CacheConfiguration {
     fn new(use_cache: bool, file_count: usize, has_coverage: bool) -> Self {
         Self {
-            should_cache: use_cache && UnifiedAnalysisCache::should_use_cache(file_count, has_coverage),
+            should_cache: use_cache
+                && UnifiedAnalysisCache::should_use_cache(file_count, has_coverage),
         }
     }
 }
@@ -198,8 +210,7 @@ fn apply_caching_strategy(params: &AnalysisParameters) -> Option<Result<UnifiedA
         return None;
     }
 
-    attempt_cached_analysis(&params)
-        .or_else(|| None)
+    attempt_cached_analysis(params).or_else(|| None)
 }
 
 // Pure function for cache attempt
@@ -220,7 +231,7 @@ fn attempt_computation_with_caching(params: AnalysisParameters) -> Option<Result
 
     Some(
         perform_computation(&params)
-            .and_then(|result| cache_result(&mut unified_cache, cache_key, result, params.files))
+            .and_then(|result| cache_result(&mut unified_cache, cache_key, result, params.files)),
     )
 }
 
@@ -1143,7 +1154,9 @@ fn analyze_files_for_debt(
 }
 
 // Pure function to group functions by file
-fn group_functions_by_file(metrics: &[FunctionMetrics]) -> std::collections::HashMap<PathBuf, Vec<FunctionMetrics>> {
+fn group_functions_by_file(
+    metrics: &[FunctionMetrics],
+) -> std::collections::HashMap<PathBuf, Vec<FunctionMetrics>> {
     let mut files_map = std::collections::HashMap::new();
     for metric in metrics {
         files_map
@@ -1176,7 +1189,13 @@ fn process_single_file(
 
     // Apply file content analysis
     let file_content = std::fs::read_to_string(&file_path)?;
-    let enhanced_metrics = enhance_metrics_with_content(file_metrics, &file_content, file_analyzer, &file_path, no_god_object)?;
+    let enhanced_metrics = enhance_metrics_with_content(
+        file_metrics,
+        &file_content,
+        file_analyzer,
+        &file_path,
+        no_god_object,
+    )?;
 
     // Calculate function scores and update metrics
     let function_scores = calculate_function_scores(&functions, unified);
@@ -1204,14 +1223,15 @@ fn enhance_metrics_with_content(
     mut file_metrics: FileDebtMetrics,
     content: &str,
     file_analyzer: &crate::analyzers::file_analyzer::UnifiedFileAnalyzer,
-    file_path: &PathBuf,
+    file_path: &Path,
     no_god_object: bool,
 ) -> Result<FileDebtMetrics, Box<dyn std::error::Error>> {
     let actual_line_count = content.lines().count();
     file_metrics.total_lines = actual_line_count;
 
     // Recalculate uncovered lines based on actual line count
-    file_metrics.uncovered_lines = calculate_uncovered_lines(file_metrics.coverage_percent, actual_line_count);
+    file_metrics.uncovered_lines =
+        calculate_uncovered_lines(file_metrics.coverage_percent, actual_line_count);
 
     // Apply god object detection if enabled
     if !no_god_object {
@@ -1237,7 +1257,7 @@ fn calculate_uncovered_lines(coverage_percent: f64, line_count: usize) -> usize 
 // Pure function to detect god object indicators
 fn detect_god_object_indicators(
     file_analyzer: &crate::analyzers::file_analyzer::UnifiedFileAnalyzer,
-    file_path: &PathBuf,
+    file_path: &Path,
     content: &str,
     file_metrics: &FileDebtMetrics,
     actual_line_count: usize,
@@ -1286,7 +1306,9 @@ fn calculate_function_scores(functions: &[FunctionMetrics], unified: &UnifiedAna
 }
 
 // Pure function to create god object analysis
-fn create_god_object_analysis(file_metrics: &FileDebtMetrics) -> Option<crate::organization::GodObjectAnalysis> {
+fn create_god_object_analysis(
+    file_metrics: &FileDebtMetrics,
+) -> Option<crate::organization::GodObjectAnalysis> {
     if !file_metrics.god_object_indicators.is_god_object {
         return None;
     }
@@ -1306,8 +1328,10 @@ fn create_god_object_analysis(file_metrics: &FileDebtMetrics) -> Option<crate::o
 }
 
 // I/O function to apply results to unified analysis
-fn apply_file_analysis_results(unified: &mut UnifiedAnalysis, processed_files: Vec<ProcessedFileData>) {
-
+fn apply_file_analysis_results(
+    unified: &mut UnifiedAnalysis,
+    processed_files: Vec<ProcessedFileData>,
+) {
     for file_data in processed_files {
         // Update god object indicators for functions in this file
         if let Some(god_analysis) = &file_data.god_analysis {
@@ -1323,7 +1347,7 @@ fn apply_file_analysis_results(unified: &mut UnifiedAnalysis, processed_files: V
 // Pure function to update function god indicators
 fn update_function_god_indicators(
     unified: &mut UnifiedAnalysis,
-    file_path: &PathBuf,
+    file_path: &Path,
     god_analysis: &crate::organization::GodObjectAnalysis,
 ) {
     for item in unified.items.iter_mut() {
@@ -1335,7 +1359,6 @@ fn update_function_god_indicators(
 
 // Pure function to create file debt item
 fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
-
     FileDebtItem {
         metrics: file_data.file_metrics.clone(),
         score: file_data.score,

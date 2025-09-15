@@ -280,7 +280,12 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         results: &AnalysisResults,
     ) -> Result<()> {
         self.write_health_section_header()?;
-        self.write_health_metrics_table(health_score, avg_complexity, coverage_percentage, results)?;
+        self.write_health_metrics_table(
+            health_score,
+            avg_complexity,
+            coverage_percentage,
+            results,
+        )?;
         self.write_health_section_footer()
     }
 
@@ -312,8 +317,18 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
 
         // Critical complexity items
         if let Some(analysis) = unified_analysis {
-            let critical_count = analysis.items.iter()
-                .filter(|i| matches!(i.debt_type, DebtType::ComplexityHotspot { cyclomatic: 10, cognitive: 8 }))
+            let critical_count = analysis
+                .items
+                .iter()
+                .filter(|i| {
+                    matches!(
+                        i.debt_type,
+                        DebtType::ComplexityHotspot {
+                            cyclomatic: 10,
+                            cognitive: 8
+                        }
+                    )
+                })
                 .count();
             if critical_count > 0 {
                 insights.push(format_critical_complexity_insight(critical_count));
@@ -1006,9 +1021,18 @@ mod tests {
     #[test]
     fn test_count_critical_complexity_items() {
         let items = vec![
-            create_test_debt_item(DebtType::ComplexityHotspot { cyclomatic: 10, cognitive: 8 }),
-            create_test_debt_item(DebtType::ComplexityHotspot { cyclomatic: 10, cognitive: 8 }),
-            create_test_debt_item(DebtType::ComplexityHotspot { cyclomatic: 10, cognitive: 8 }),
+            create_test_debt_item(DebtType::ComplexityHotspot {
+                cyclomatic: 10,
+                cognitive: 8,
+            }),
+            create_test_debt_item(DebtType::ComplexityHotspot {
+                cyclomatic: 10,
+                cognitive: 8,
+            }),
+            create_test_debt_item(DebtType::ComplexityHotspot {
+                cyclomatic: 10,
+                cognitive: 8,
+            }),
             create_test_debt_item(DebtType::TestingGap {
                 coverage: 0.3,
                 cyclomatic: 10,
@@ -1016,8 +1040,17 @@ mod tests {
             }),
         ];
 
-        let count = items.iter()
-            .filter(|i| matches!(i.debt_type, DebtType::ComplexityHotspot { cyclomatic: 10, cognitive: 8 }))
+        let count = items
+            .iter()
+            .filter(|i| {
+                matches!(
+                    i.debt_type,
+                    DebtType::ComplexityHotspot {
+                        cyclomatic: 10,
+                        cognitive: 8
+                    }
+                )
+            })
             .count();
         assert_eq!(count, 3); // Count ComplexityHotspot items with cyclomatic: 10, cognitive: 8
     }
@@ -1068,10 +1101,14 @@ mod tests {
     }
 
     // Comprehensive tests for write_health_status_section
-    use crate::core::{AnalysisResults, ComplexityReport, ComplexitySummary, FunctionMetrics, TechnicalDebtReport};
-    use crate::core::{DebtItem as CoreDebtItem, DebtType as CoreDebtType, Priority as CorePriority};
-    use std::io::Cursor;
+    use crate::core::{
+        AnalysisResults, ComplexityReport, ComplexitySummary, FunctionMetrics, TechnicalDebtReport,
+    };
+    use crate::core::{
+        DebtItem as CoreDebtItem, DebtType as CoreDebtType, Priority as CorePriority,
+    };
     use chrono::Utc;
+    use std::io::Cursor;
 
     fn create_test_results(debt_count: usize, avg_complexity: f64) -> AnalysisResults {
         let metrics: Vec<FunctionMetrics> = (0..5)
@@ -1327,11 +1364,18 @@ mod tests {
         let output = String::from_utf8(buffer.into_inner()).unwrap();
 
         // Should contain health emoji in the output
-        let health_emoji_present = output.contains("🟢") || output.contains("🟡") ||
-                                  output.contains("🟠") || output.contains("🔴") ||
-                                  output.contains("✅") || output.contains("⚠️") ||
-                                  output.contains("❌");
-        assert!(health_emoji_present, "Expected health emoji in output: {}", output);
+        let health_emoji_present = output.contains("🟢")
+            || output.contains("🟡")
+            || output.contains("🟠")
+            || output.contains("🔴")
+            || output.contains("✅")
+            || output.contains("⚠️")
+            || output.contains("❌");
+        assert!(
+            health_emoji_present,
+            "Expected health emoji in output: {}",
+            output
+        );
     }
 
     #[test]

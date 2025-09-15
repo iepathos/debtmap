@@ -89,7 +89,8 @@ impl MatchExpressionRecognizer {
 
 impl PatternRecognizer for MatchExpressionRecognizer {
     fn detect(&self, block: &syn::Block) -> Option<PatternMatchInfo> {
-        block.stmts
+        block
+            .stmts
             .iter()
             .find_map(|stmt| self.analyze_statement(stmt))
     }
@@ -347,9 +348,7 @@ mod tests {
         let recognizer = MatchExpressionRecognizer::new();
 
         // Simple block with single expression
-        let expr: Expr = parse_quote!({
-            42
-        });
+        let expr: Expr = parse_quote!({ 42 });
         assert!(recognizer.is_simple_arm(&expr));
 
         // Block with single return statement

@@ -486,10 +486,7 @@ fn write_table_rows<W: Write>(
 }
 
 // 11. Pure function for formatting detailed breakdown
-fn format_file_details(
-    idx: usize,
-    aggregate: &crate::priority::FileAggregateScore,
-) -> String {
+fn format_file_details(idx: usize, aggregate: &crate::priority::FileAggregateScore) -> String {
     let mut result = format!(
         "#### {}. {}\n\n- **Total Score**: {:.2}\n- **Aggregate Score**: {:.2}\n- **Aggregation Method**: {:?}\n- **Function Count**: {}\n- **Problematic Functions**: {}\n",
         idx + 1,

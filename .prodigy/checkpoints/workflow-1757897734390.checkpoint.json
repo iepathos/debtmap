@@ -1,11 +1,11 @@
 {
   "workflow_id": "workflow-1757897734390",
   "execution_state": {
-    "current_step_index": 4,
+    "current_step_index": 5,
     "total_steps": 6,
     "status": "Running",
-    "start_time": "2025-09-15T04:05:43.659667Z",
-    "last_checkpoint": "2025-09-15T04:05:43.659667Z",
+    "start_time": "2025-09-15T04:17:33.349477Z",
+    "last_checkpoint": "2025-09-15T04:17:33.349477Z",
     "current_iteration": null,
     "total_iterations": null
   },
@@ -57,13 +57,28 @@
         "nanos": 33549625
       },
       "completed_at": "2025-09-15T04:05:43.659619Z"
+    },
+    {
+      "step_index": 4,
+      "command": "test: just test",
+      "success": true,
+      "output": null,
+      "captured_variables": {},
+      "duration": {
+        "secs": 709,
+        "nanos": 437894333
+      },
+      "completed_at": "2025-09-15T04:17:33.349404Z"
     }
   ],
   "variable_state": {
-    "PROJECT_ROOT": "/Users/glen/.prodigy/worktrees/debtmap/session-915ae016-1bca-47c2-bc4b-6b7c98f96d06"
+    "test.output": "/var/folders/fc/plw0013j1yj8dj00s3gbpdfw0000gn/T/.tmpGob4KQ",
+    "PROJECT_ROOT": "/Users/glen/.prodigy/worktrees/debtmap/session-915ae016-1bca-47c2-bc4b-6b7c98f96d06",
+    "test.exit_code": "100",
+    "test.attempt": "1"
   },
   "mapreduce_state": null,
-  "timestamp": "2025-09-15T04:05:43.659667Z",
+  "timestamp": "2025-09-15T04:17:33.349477Z",
   "version": 1,
   "workflow_hash": "6",
   "total_steps": 6,

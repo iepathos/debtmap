@@ -73,12 +73,10 @@ fn parse_arguments(args: &str) -> Result<CompareConfig> {
         }
     }
 
-    let before_path = before_path
-        .context("Missing required --before argument")?;
-    let after_path = after_path
-        .context("Missing required --after argument")?;
-    let output_path = output_path
-        .unwrap_or_else(|| PathBuf::from(".prodigy/debtmap-validation.json"));
+    let before_path = before_path.context("Missing required --before argument")?;
+    let after_path = after_path.context("Missing required --after argument")?;
+    let output_path =
+        output_path.unwrap_or_else(|| PathBuf::from(".prodigy/debtmap-validation.json"));
 
     if !before_path.exists() {
         anyhow::bail!("Before file does not exist: {}", before_path.display());
