@@ -25,7 +25,6 @@ pub mod priority;
 pub mod refactoring;
 pub mod resource;
 pub mod risk;
-pub mod scoring;
 pub mod testing;
 pub mod transformers;
 pub mod utils;
