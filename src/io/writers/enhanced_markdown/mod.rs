@@ -69,7 +69,107 @@ fn format_low_coverage_insight(coverage: f64) -> String {
     )
 }
 
+// Pure functions for health metrics formatting
+fn format_overall_health_metric(health_score: u32) -> String {
+    format_health_metric(
+        "**Overall Health**",
+        format!("{}% {}", health_score, get_health_emoji(health_score)),
+        classify_health_status(health_score),
+    )
+}
+
+fn format_complexity_metric(avg_complexity: f64) -> String {
+    format_health_metric(
+        "**Average Complexity**",
+        format!("{:.2}", avg_complexity),
+        get_complexity_status(avg_complexity),
+    )
+}
+
+fn format_coverage_metric(coverage: f64) -> String {
+    format_health_metric(
+        "**Code Coverage**",
+        format!("{:.1}%", coverage * 100.0),
+        get_coverage_status(coverage * 100.0),
+    )
+}
+
+fn format_debt_metric(debt_count: usize) -> String {
+    format_health_metric(
+        "**Technical Debt**",
+        format!("{} items", debt_count),
+        get_debt_status(debt_count),
+    )
+}
+
+// Pure function for building all metrics
+fn build_health_metrics(
+    health_score: u32,
+    avg_complexity: f64,
+    coverage_percentage: Option<f64>,
+    debt_count: usize,
+) -> Vec<String> {
+    let mut metrics = vec![
+        format_overall_health_metric(health_score),
+        format_complexity_metric(avg_complexity),
+    ];
+
+    if let Some(coverage) = coverage_percentage {
+        metrics.push(format_coverage_metric(coverage));
+    }
+
+    metrics.push(format_debt_metric(debt_count));
+    metrics
+}
+
 impl<W: Write> EnhancedMarkdownWriter<W> {
+    // Helper functions for health status section
+    fn write_health_section_header(&mut self) -> Result<()> {
+        if self.config.collapsible_sections {
+            writeln!(self.writer, "<details open>")?;
+            writeln!(
+                self.writer,
+                "<summary><strong>📊 Health Status</strong></summary>\n"
+            )?;
+        } else {
+            writeln!(self.writer, "### 📊 Health Status\n")?;
+        }
+        Ok(())
+    }
+
+    fn write_health_metrics_table(
+        &mut self,
+        health_score: u32,
+        avg_complexity: f64,
+        coverage_percentage: Option<f64>,
+        results: &AnalysisResults,
+    ) -> Result<()> {
+        // Write table headers
+        writeln!(self.writer, "| Metric | Value | Status |")?;
+        writeln!(self.writer, "|--------|-------|--------|")?;
+
+        // Generate and write all metrics
+        let metrics = build_health_metrics(
+            health_score,
+            avg_complexity,
+            coverage_percentage,
+            results.technical_debt.items.len(),
+        );
+
+        for metric in metrics {
+            writeln!(self.writer, "{}", metric)?;
+        }
+
+        Ok(())
+    }
+
+    fn write_health_section_footer(&mut self) -> Result<()> {
+        if self.config.collapsible_sections {
+            writeln!(self.writer, "\n</details>\n")?;
+        }
+        Ok(())
+    }
+
     pub fn new(writer: W) -> Self {
         Self::with_config(writer, MarkdownConfig::default())
     }
@@ -179,70 +279,9 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         coverage_percentage: Option<f64>,
         results: &AnalysisResults,
     ) -> Result<()> {
-        // Write section header
-        if self.config.collapsible_sections {
-            writeln!(self.writer, "<details open>")?;
-            writeln!(
-                self.writer,
-                "<summary><strong>📊 Health Status</strong></summary>\n"
-            )?;
-        } else {
-            writeln!(self.writer, "### 📊 Health Status\n")?;
-        }
-
-        // Write metrics table
-        writeln!(self.writer, "| Metric | Value | Status |")?;
-        writeln!(self.writer, "|--------|-------|--------|")?;
-
-        // Write individual metrics
-        writeln!(
-            self.writer,
-            "{}",
-            format_health_metric(
-                "**Overall Health**",
-                format!("{}% {}", health_score, get_health_emoji(health_score)),
-                classify_health_status(health_score)
-            )
-        )?;
-
-        writeln!(
-            self.writer,
-            "{}",
-            format_health_metric(
-                "**Average Complexity**",
-                format!("{:.2}", avg_complexity),
-                get_complexity_status(avg_complexity)
-            )
-        )?;
-
-        if let Some(coverage) = coverage_percentage {
-            writeln!(
-                self.writer,
-                "{}",
-                format_health_metric(
-                    "**Code Coverage**",
-                    format!("{:.1}%", coverage * 100.0),
-                    get_coverage_status(coverage * 100.0)
-                )
-            )?;
-        }
-
-        writeln!(
-            self.writer,
-            "{}",
-            format_health_metric(
-                "**Technical Debt**",
-                format!("{} items", results.technical_debt.items.len()),
-                get_debt_status(results.technical_debt.items.len())
-            )
-        )?;
-
-        // Close collapsible section if needed
-        if self.config.collapsible_sections {
-            writeln!(self.writer, "\n</details>\n")?;
-        }
-
-        Ok(())
+        self.write_health_section_header()?;
+        self.write_health_metrics_table(health_score, avg_complexity, coverage_percentage, results)?;
+        self.write_health_section_footer()
     }
 
     fn write_key_insights_section(

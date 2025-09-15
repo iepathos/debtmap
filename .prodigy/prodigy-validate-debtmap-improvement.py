@@ -325,75 +325,94 @@ def identify_gaps(improvements: Dict, after_items: List[Dict],
     return gaps
 
 
-def generate_validation_result(before_data: Dict, after_data: Dict) -> Dict[str, Any]:
-    """Generate complete validation result comparing before and after states."""
-    # Extract debt items
-    before_items = extract_debt_items(before_data)
-    after_items = extract_debt_items(after_data)
+def count_critical_items(items: List[Dict[str, Any]]) -> int:
+    """Count items with critical score (>= 8)."""
+    return len([item for item in items if item.get('score', 0) >= 8])
 
-    # Calculate metrics
-    before_metrics = calculate_metrics(before_items)
-    after_metrics = calculate_metrics(after_items)
 
-    # Identify improvements
-    improvements = identify_improvements(before_items, after_items)
+def build_improvement_descriptions(improvements: Dict[str, Any], before_metrics: Dict, after_metrics: Dict) -> List[str]:
+    """Build list of improvement descriptions using pure functions."""
+    descriptions = []
 
-    # Calculate improvement score
-    improvement_score = calculate_improvement_score(before_metrics, after_metrics, improvements)
+    # Critical items resolved
+    resolved_critical = count_critical_items(improvements['resolved_items'])
+    if resolved_critical > 0:
+        descriptions.append(f"Resolved {resolved_critical} critical debt items")
 
-    # Determine status
-    status = 'complete' if improvement_score >= 75 else 'incomplete' if improvement_score >= 40 else 'failed'
-
-    # Build improvement descriptions
-    improvement_descriptions = []
-    if improvements['resolved_items']:
-        resolved_critical = len([item for item in improvements['resolved_items']
-                               if item.get('score', 0) >= 8])
-        if resolved_critical > 0:
-            improvement_descriptions.append(f"Resolved {resolved_critical} critical debt items")
-
+    # Functions improved
     if improvements['improved_items']:
-        improvement_descriptions.append(f"Improved {len(improvements['improved_items'])} functions")
+        descriptions.append(f"Improved {len(improvements['improved_items'])} functions")
 
+    # Complexity reduction
     if after_metrics['average_complexity'] < before_metrics['average_complexity']:
         reduction_pct = ((before_metrics['average_complexity'] - after_metrics['average_complexity']) /
                         before_metrics['average_complexity'] * 100)
-        improvement_descriptions.append(f"Reduced average complexity by {reduction_pct:.1f}%")
+        descriptions.append(f"Reduced average complexity by {reduction_pct:.1f}%")
 
+    # Score reduction
     if after_metrics['total_score'] < before_metrics['total_score']:
         score_reduction = before_metrics['total_score'] - after_metrics['total_score']
-        improvement_descriptions.append(f"Reduced total debt score by {score_reduction:.1f} points")
+        descriptions.append(f"Reduced total debt score by {score_reduction:.1f} points")
 
-    # Build remaining issues
-    remaining_issues = []
+    return descriptions
+
+
+def build_remaining_issues(improvements: Dict[str, Any]) -> List[str]:
+    """Build list of remaining issues using pure functions."""
+    issues = []
+
+    # Unchanged critical items
     if improvements['unchanged_critical']:
-        remaining_issues.append(f"{len(improvements['unchanged_critical'])} critical debt items still present")
+        issues.append(f"{len(improvements['unchanged_critical'])} critical debt items still present")
 
-    if improvements['new_items']:
-        new_critical = len([item for item in improvements['new_items']
-                          if item.get('score', 0) >= 8])
-        if new_critical > 0:
-            remaining_issues.append(f"{new_critical} new critical issues introduced")
+    # New critical items
+    new_critical = count_critical_items(improvements['new_items'])
+    if new_critical > 0:
+        issues.append(f"{new_critical} new critical issues introduced")
 
-    # Identify gaps if improvement is insufficient
-    gaps = identify_gaps(improvements, after_items, improvement_score) if improvement_score < 75 else {}
+    return issues
 
+
+def determine_status(improvement_score: float) -> str:
+    """Determine status based on improvement score."""
+    if improvement_score >= 75:
+        return 'complete'
+    elif improvement_score >= 40:
+        return 'incomplete'
+    else:
+        return 'failed'
+
+
+def build_summary(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    """Build summary section from metrics."""
+    return {
+        'total_items': metrics['total_items'],
+        'high_priority_items': metrics['high_priority_items'],
+        'average_score': round(metrics['average_score'], 2)
+    }
+
+
+def generate_validation_result(before_data: Dict, after_data: Dict) -> Dict[str, Any]:
+    """Generate complete validation result comparing before and after states."""
+    # Extract debt items and calculate metrics
+    before_items = extract_debt_items(before_data)
+    after_items = extract_debt_items(after_data)
+    before_metrics = calculate_metrics(before_items)
+    after_metrics = calculate_metrics(after_items)
+
+    # Analyze improvements and calculate score
+    improvements = identify_improvements(before_items, after_items)
+    improvement_score = calculate_improvement_score(before_metrics, after_metrics, improvements)
+
+    # Build result components using pure functions
     return {
         'completion_percentage': round(improvement_score, 1),
-        'status': status,
-        'improvements': improvement_descriptions,
-        'remaining_issues': remaining_issues,
-        'gaps': gaps,
-        'before_summary': {
-            'total_items': before_metrics['total_items'],
-            'high_priority_items': before_metrics['high_priority_items'],
-            'average_score': round(before_metrics['average_score'], 2)
-        },
-        'after_summary': {
-            'total_items': after_metrics['total_items'],
-            'high_priority_items': after_metrics['high_priority_items'],
-            'average_score': round(after_metrics['average_score'], 2)
-        }
+        'status': determine_status(improvement_score),
+        'improvements': build_improvement_descriptions(improvements, before_metrics, after_metrics),
+        'remaining_issues': build_remaining_issues(improvements),
+        'gaps': identify_gaps(improvements, after_items, improvement_score) if improvement_score < 75 else {},
+        'before_summary': build_summary(before_metrics),
+        'after_summary': build_summary(after_metrics)
     }
 
 

@@ -97,56 +97,108 @@ impl<'a> CriticalityAnalyzer<'a> {
     }
 
     pub fn explain_criticality(&self, function_id: &FunctionId) -> String {
-        let mut factors = Vec::new();
+        let factors = self.collect_criticality_factors(function_id);
 
-        // Distance from entry
-        if let Some(distance) = self.context.distance_from_entry(function_id) {
-            let factor = 2.0 / (1.0 + distance as f64 * 0.3);
-            factors.push(format!("Entry distance {}: {:.1}x", distance, factor));
+        match factors.is_empty() {
+            true => "Base criticality: 1.0x".to_string(),
+            false => factors.join(", "),
         }
+    }
 
-        // Caller count
-        if let Some(caller_count) = self.context.call_frequencies.get(function_id) {
-            if *caller_count > 0 {
-                let factor = 1.0 + (*caller_count as f64).ln() * 0.2;
-                factors.push(format!("{} callers: {:.1}x", caller_count, factor.min(1.8)));
-            }
-        }
+    fn collect_criticality_factors(&self, function_id: &FunctionId) -> Vec<String> {
+        let mut factors = vec![
+            self.calculate_distance_factor_explanation(function_id),
+            self.calculate_caller_factor_explanation(function_id),
+            self.calculate_hot_path_factor_explanation(function_id),
+            self.calculate_downstream_factor_explanation(function_id),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
 
-        // Hot path
-        if self.context.hot_paths.contains(function_id) {
-            factors.push("Hot path: 1.5x".to_string());
-        }
+        factors.extend(self.calculate_git_history_factors_explanation(function_id));
+        factors
+    }
 
-        // Downstream impact
+    fn calculate_distance_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
+        self.context
+            .distance_from_entry(function_id)
+            .map(|distance| {
+                let factor = 2.0 / (1.0 + distance as f64 * 0.3);
+                format!("Entry distance {}: {:.1}x", distance, factor)
+            })
+    }
+
+    fn calculate_caller_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
+        self.context
+            .call_frequencies
+            .get(function_id)
+            .filter(|&&count| count > 0)
+            .map(|&caller_count| {
+                let factor = 1.0 + (caller_count as f64).ln() * 0.2;
+                format!("{} callers: {:.1}x", caller_count, factor.min(1.8))
+            })
+    }
+
+    fn calculate_hot_path_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
+        self.context
+            .hot_paths
+            .contains(function_id)
+            .then(|| "Hot path: 1.5x".to_string())
+    }
+
+    fn calculate_downstream_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
         let callee_count = self.context.call_graph.get_callees(function_id).len();
-        if callee_count > 5 {
+        (callee_count > 5).then(|| {
             let factor = 1.0 + (callee_count as f64 / 10.0);
-            factors.push(format!("{} callees: {:.1}x", callee_count, factor.min(1.3)));
-        }
+            format!("{} callees: {:.1}x", callee_count, factor.min(1.3))
+        })
+    }
 
-        // Git history
-        if let Some(git_history) = &self.context.git_history {
-            if let Some(change_count) = git_history.change_counts.get(&function_id.file) {
-                if *change_count > 10 {
-                    let factor = 1.0 + (*change_count as f64 / 50.0);
-                    factors.push(format!("{} changes: {:.1}x", change_count, factor.min(1.4)));
-                }
-            }
+    fn calculate_git_history_factors_explanation(&self, function_id: &FunctionId) -> Vec<String> {
+        self.context
+            .git_history
+            .as_ref()
+            .map(|git_history| {
+                [
+                    self.calculate_change_count_factor(git_history, &function_id.file),
+                    self.calculate_bug_fix_factor(git_history, &function_id.file),
+                ]
+                .into_iter()
+                .flatten()
+                .collect()
+            })
+            .unwrap_or_default()
+    }
 
-            if let Some(bug_count) = git_history.bug_fix_counts.get(&function_id.file) {
-                if *bug_count > 5 {
-                    let factor = 1.0 + (*bug_count as f64 / 20.0);
-                    factors.push(format!("{} bug fixes: {:.1}x", bug_count, factor.min(1.5)));
-                }
-            }
-        }
+    fn calculate_change_count_factor(
+        &self,
+        git_history: &crate::scoring::scoring_context::GitHistory,
+        file_path: &std::path::Path,
+    ) -> Option<String> {
+        git_history
+            .change_counts
+            .get(file_path)
+            .filter(|&&count| count > 10)
+            .map(|&change_count| {
+                let factor = 1.0 + (change_count as f64 / 50.0);
+                format!("{} changes: {:.1}x", change_count, factor.min(1.4))
+            })
+    }
 
-        if factors.is_empty() {
-            "Base criticality: 1.0x".to_string()
-        } else {
-            factors.join(", ")
-        }
+    fn calculate_bug_fix_factor(
+        &self,
+        git_history: &crate::scoring::scoring_context::GitHistory,
+        file_path: &std::path::Path,
+    ) -> Option<String> {
+        git_history
+            .bug_fix_counts
+            .get(file_path)
+            .filter(|&&count| count > 5)
+            .map(|&bug_count| {
+                let factor = 1.0 + (bug_count as f64 / 20.0);
+                format!("{} bug fixes: {:.1}x", bug_count, factor.min(1.5))
+            })
     }
 }
 
