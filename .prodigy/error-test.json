@@ -1,0 +1,10 @@
+{
+  "completion_percentage": 0.0,
+  "status": "failed",
+  "improvements": [],
+  "remaining_issues": [
+    "Unable to load debtmap JSON files"
+  ],
+  "gaps": {},
+  "raw_output": "Failed to load: before=nonexistent.json, after=.prodigy/debtmap-after.json"
+}

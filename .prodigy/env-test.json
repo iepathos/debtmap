@@ -1,0 +1,876 @@
+{
+  "completion_percentage": 22.9,
+  "status": "failed",
+  "improvements": [
+    "Resolved 56 critical debt items",
+    "Improved 220 functions",
+    "Reduced total debt score by 1686.1 points"
+  ],
+  "remaining_issues": [
+    "11 critical debt items still present",
+    "2 new critical issues introduced"
+  ],
+  "gaps": {
+    "critical_debt_._src_io_writers_markdown_enhanced.rs_MarkdownWriter__write_file_aggregates_section_78": {
+      "description": "High-priority debt item still present in Decompose into 11 smaller functions using Result chaining",
+      "location": "./src/io/writers/markdown/enhanced.rs:MarkdownWriter::write_file_aggregates_section:78",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 16.54936966447475,
+      "current_score": 16.54936966447475
+    },
+    "critical_debt_._src_extraction_patterns_mod.rs_UnifiedExtractionAnalyzer__analyze_function_197": {
+      "description": "High-priority debt item still present in Refactor using nom or pest parser combinators",
+      "location": "./src/extraction_patterns/mod.rs:UnifiedExtractionAnalyzer::analyze_function:197",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 14.55574719315105,
+      "current_score": 14.55574719315105
+    },
+    "critical_debt_._src_debt_error_context.rs_ContextLossAnalyzer__check_map_err_patterns_75": {
+      "description": "High-priority debt item still present in Add 9 tests for 100% coverage gap. NO refactoring needed (complexity 9 is acceptable)",
+      "location": "./src/debt/error_context.rs:ContextLossAnalyzer::check_map_err_patterns:75",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 14.538944979263158,
+      "current_score": 14.538944979263158
+    },
+    "critical_debt_._src_io_writers_enhanced_markdown_mod.rs_EnhancedMarkdownWriter__write_health_status_section_175": {
+      "description": "High-priority debt item still present in Add 15 tests for 100% coverage gap. NO refactoring needed (complexity 15 is acceptable)",
+      "location": "./src/io/writers/enhanced_markdown/mod.rs:EnhancedMarkdownWriter::write_health_status_section:175",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 11.190655315199516,
+      "current_score": 11.190655315199516
+    },
+    "critical_debt_._src_debt_panic_patterns.rs_PanicPatternDetector__check_unwrap_patterns_73": {
+      "description": "High-priority debt item still present in Add 9 tests for 100% coverage gap. NO refactoring needed (complexity 9 is acceptable)",
+      "location": "./src/debt/panic_patterns.rs:PanicPatternDetector::check_unwrap_patterns:73",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 9.784608695652175,
+      "current_score": 9.784608695652175
+    },
+    "critical_debt_._src_debt_error_swallowing.rs_ErrorSwallowingDetector__check_match_expr_173": {
+      "description": "High-priority debt item still present in Add 6 tests for 100% coverage gap. NO refactoring needed (complexity 6 is acceptable)",
+      "location": "./src/debt/error_swallowing.rs:ErrorSwallowingDetector::check_match_expr:173",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 9.738988443752769,
+      "current_score": 9.738988443752769
+    },
+    "critical_debt_._src_complexity_match_patterns.rs_MatchExpressionRecognizer__detect_88": {
+      "description": "High-priority debt item still present in Add 8 tests for 100% coverage gap. NO refactoring needed (complexity 8 is acceptable)",
+      "location": "./src/complexity/match_patterns.rs:MatchExpressionRecognizer::detect:88",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 28.593989570942387,
+      "current_score": 28.593989570942387
+    },
+    "critical_debt_._src_complexity_languages_javascript.rs_JavaScriptEntropyAnalyzer__collect_variables_268": {
+      "description": "High-priority debt item still present in Add 7 tests for 100% coverage gap. NO refactoring needed (complexity 7 is acceptable)",
+      "location": "./src/complexity/languages/javascript.rs:JavaScriptEntropyAnalyzer::collect_variables:268",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 9.102273669085223,
+      "current_score": 9.102273669085223
+    },
+    "critical_debt_._src_scoring_criticality_analyzer.rs_CriticalityAnalyzer__explain_criticality_99": {
+      "description": "High-priority debt item still present in Add 13 tests for 100% coverage gap. NO refactoring needed (complexity 13 is acceptable)",
+      "location": "./src/scoring/criticality_analyzer.rs:CriticalityAnalyzer::explain_criticality:99",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 9.096577776848616,
+      "current_score": 9.096577776848616
+    },
+    "critical_debt_._src_resource_python_circular_ref.rs_PythonCircularRefDetector__detect_issues_368": {
+      "description": "High-priority debt item still present in Add 8 tests for 100% coverage gap. NO refactoring needed (complexity 8 is acceptable)",
+      "location": "./src/resource/python/circular_ref.rs:PythonCircularRefDetector::detect_issues:368",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 9.096227449860677,
+      "current_score": 9.096227449860677
+    },
+    "critical_debt_._src_risk_context_critical_path.rs_CriticalPathProvider__gather_248": {
+      "description": "High-priority debt item still present in Add 2 tests for 100% coverage gap. NO refactoring needed (complexity 2 is acceptable)",
+      "location": "./src/risk/context/critical_path.rs:CriticalPathProvider::gather:248",
+      "severity": "critical",
+      "suggested_fix": "Apply functional programming patterns to reduce complexity",
+      "original_score": 21.69808695652174,
+      "current_score": 21.69808695652174
+    },
+    "insufficient_._src_priority_formatter_markdown.rs_format_priority_item_markdown_271": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter_markdown.rs:format_priority_item_markdown:271",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 75.40360892578087,
+      "current_score": 64.63737907924076,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_formatter_markdown.rs_format_file_priority_item_markdown_62": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter_markdown.rs:format_file_priority_item_markdown:62",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 70.9644088833606,
+      "current_score": 60.83277904288052,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_languages_python_expressions.rs_extract_literal_tokens_110": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/languages/python/expressions.rs:extract_literal_tokens:110",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 69.82804347826088,
+      "current_score": 59.857608695652175,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_formatter.rs_format_priority_item_821": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter.rs:format_priority_item:821",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 65.7723924844707,
+      "current_score": 56.37547927240346,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analysis_diagnostics_reporter.rs_DiagnosticReporter__generate_report_23": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analysis/diagnostics/reporter.rs:DiagnosticReporter::generate_report:23",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 40.01130822930989,
+      "current_score": 34.299407053694196,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_external_api_detector.rs_classify_api_patterns_167": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/external_api_detector.rs:classify_api_patterns:167",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 31.76722100858701,
+      "current_score": 27.23247515021744,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_formatter_verbosity.rs_format_priority_item_with_config_930": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter_verbosity.rs:format_priority_item_with_config:930",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 27.801139143776926,
+      "current_score": 23.823833551808793,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_formatter.rs_format_impact_1058": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter.rs:format_impact:1058",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 27.732389602692166,
+      "current_score": 9.001302175521861,
+      "target_score": 6.0
+    },
+    "insufficient_._src_refactoring_mod.rs_PatternRecognitionEngine__generate_recommendations_362": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/refactoring/mod.rs:PatternRecognitionEngine::generate_recommendations:362",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 27.31780021920982,
+      "current_score": 23.420685902179844,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_languages_python_expressions.rs_extract_list_comp_tokens_346": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/languages/python/expressions.rs:extract_list_comp_tokens:346",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 26.19232917584885,
+      "current_score": 22.451853579299016,
+      "target_score": 6.0
+    },
+    "insufficient_._src_risk_priority_module_detection.rs_add_path_specific_dependencies_80": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/risk/priority/module_detection.rs:add_path_specific_dependencies:80",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 25.166924659513953,
+      "current_score": 21.566792565297675,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_pattern_adjustments.rs_PatternMatchRecognizer__analyze_if_chain_204": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/pattern_adjustments.rs:PatternMatchRecognizer::analyze_if_chain:204",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 24.6,
+      "current_score": 21.09,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_circular_ref.rs_PythonCircularRefDetector__detect_circular_references_197": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/circular_ref.rs:PythonCircularRefDetector::detect_circular_references:197",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 24.447795081106726,
+      "current_score": 20.96211006952005,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_languages_python_statements.rs_StatementProcessor__process_try_stmt_163": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/languages/python/statements.rs:StatementProcessor::process_try_stmt:163",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 24.094056073186387,
+      "current_score": 20.653619491302614,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_formatter_markdown.rs_format_file_aggregate_item_markdown_161": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter_markdown.rs:format_file_aggregate_item_markdown:161",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 24.08437433343769,
+      "current_score": 16.060249555625127,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_scoring_rust_recommendations.rs_generate_simple_extraction_recommendation_204": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/scoring/rust_recommendations.rs:generate_simple_extraction_recommendation:204",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 23.321264218772015,
+      "current_score": 19.9940836160903,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_threshold_manager.rs_ComplexityThresholds__validate_191": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/threshold_manager.rs:ComplexityThresholds::validate:191",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 23.13103246919304,
+      "current_score": 15.416021646128693,
+      "target_score": 6.0
+    },
+    "insufficient_._src_builders_unified_analysis.rs_perform_unified_analysis_with_options_75": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/builders/unified_analysis.rs:perform_unified_analysis_with_options:75",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 22.646312153229513,
+      "current_score": 19.40569613133958,
+      "target_score": 6.0
+    },
+    "insufficient_._src_main.rs_main_8": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/main.rs:main:8",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 21.935181897470876,
+      "current_score": 14.611454598313918,
+      "target_score": 6.0
+    },
+    "insufficient_._src_risk_lcov.rs_find_functions_by_path_440": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/risk/lcov.rs:find_functions_by_path:440",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 21.68083926674417,
+      "current_score": 18.584005085780714,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_resource_tracker.rs_PythonResourceTracker__detect_resource_type_121": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/resource_tracker.rs:PythonResourceTracker::detect_resource_type:121",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 21.63893849036885,
+      "current_score": 18.540518706030443,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_external_api_detector.rs_is_likely_external_api_with_config_90": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/external_api_detector.rs:is_likely_external_api_with_config:90",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 21.246260869565212,
+      "current_score": 18.20765217391304,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_resource_tracker.rs_PythonResourceTracker__check_statement_for_resources_221": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/resource_tracker.rs:PythonResourceTracker::check_statement_for_resources:221",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 21.186629530904916,
+      "current_score": 18.160682455061355,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_javascript_detectors_resource.rs_detect_event_listener_leaks_124": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/javascript/detectors/resource.rs:detect_event_listener_leaks:124",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 20.737451585757345,
+      "current_score": 17.76824421636344,
+      "target_score": 6.0
+    },
+    "insufficient_._src_organization_god_object_analysis.rs_infer_responsibility_from_method_177": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/organization/god_object_analysis.rs:infer_responsibility_from_method:177",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 20.199794440087658,
+      "current_score": 17.311109520075135,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_unbounded_collection.rs_PythonUnboundedCollectionDetector__get_collection_type_175": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/unbounded_collection.rs:PythonUnboundedCollectionDetector::get_collection_type:175",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 20.0860136002859,
+      "current_score": 17.212868800245055,
+      "target_score": 6.0
+    },
+    "insufficient_._src_cache_unified_analysis_cache.rs_UnifiedAnalysisCache__get_126": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/cache/unified_analysis_cache.rs:UnifiedAnalysisCache::get:126",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 19.99668773130676,
+      "current_score": 13.338458487537842,
+      "target_score": 6.0
+    },
+    "insufficient_._src_builders_parallel_unified_analysis.rs_ParallelUnifiedAnalysisBuilder__analyze_file_parallel_716": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/builders/parallel_unified_analysis.rs:ParallelUnifiedAnalysisBuilder::analyze_file_parallel:716",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 19.90971309849108,
+      "current_score": 17.064182655849496,
+      "target_score": 6.0
+    },
+    "insufficient_._src_organization_python_simplified_implementation.rs_SimplifiedPythonOrganizationDetector__collect_constants_in_expr_428": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/organization/python/simplified_implementation.rs:SimplifiedPythonOrganizationDetector::collect_constants_in_expr:428",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 19.846268768149525,
+      "current_score": 17.010801801271022,
+      "target_score": 6.0
+    },
+    "insufficient_._src_risk_roi_cascade.rs_CascadeCalculator__propagate_impact_88": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/risk/roi/cascade.rs:CascadeCalculator::propagate_impact:88",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 19.342428129488273,
+      "current_score": 16.57350982527566,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_languages_python_statements.rs_StatementProcessor__process_class_def_318": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/languages/python/statements.rs:StatementProcessor::process_class_def:318",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 18.691283791058495,
+      "current_score": 16.02467182090728,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_languages_python_statements.rs_StatementProcessor__process_function_parameters_357": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/languages/python/statements.rs:StatementProcessor::process_function_parameters:357",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 18.103898727986767,
+      "current_score": 15.516484623988658,
+      "target_score": 6.0
+    },
+    "insufficient_._src_risk_priority_scoring.rs_CriticalityScorer__classify_file_score_56": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/risk/priority/scoring.rs:CriticalityScorer::classify_file_score:56",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 17.42142445457174,
+      "current_score": 14.93022096106149,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_javascript_detectors_resource.rs_detect_worker_leaks_427": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/javascript/detectors/resource.rs:detect_worker_leaks:427",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 16.618656119928545,
+      "current_score": 14.245990959938752,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_unbounded_collection.rs_PythonUnboundedCollectionDetector__detect_unbounded_collections_233": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/unbounded_collection.rs:PythonUnboundedCollectionDetector::detect_unbounded_collections:233",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 16.10191146781727,
+      "current_score": 13.807352686700517,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_python_purity.rs_PythonPurityDetector__analyze_expr_275": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/python_purity.rs:PythonPurityDetector::analyze_expr:275",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 15.951753988761388,
+      "current_score": 13.677074847509761,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_scoring_debt_item.rs_identify_risk_factors_531": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/scoring/debt_item.rs:identify_risk_factors:531",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 15.68804998486366,
+      "current_score": 10.460699989909108,
+      "target_score": 6.0
+    },
+    "insufficient_._src_builders_unified_analysis.rs_perform_multi_pass_analysis_916": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/builders/unified_analysis.rs:perform_multi_pass_analysis:916",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 15.445896101714132,
+      "current_score": 10.295930734476087,
+      "target_score": 6.0
+    },
+    "insufficient_._src_organization_primitive_obsession_detector.rs_PrimitiveObsessionDetector__suggest_domain_type_84": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/organization/primitive_obsession_detector.rs:PrimitiveObsessionDetector::suggest_domain_type:84",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 15.146999999999997,
+      "current_score": 12.986999999999998,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_languages_python_expressions.rs_extract_bool_op_tokens_186": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/languages/python/expressions.rs:extract_bool_op_tokens:186",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 15.08925067138081,
+      "current_score": 12.92692914689784,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_resource_tracker.rs_PythonResourceTracker__analyze_class_resources_58": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/resource_tracker.rs:PythonResourceTracker::analyze_class_resources:58",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 15.00658398179221,
+      "current_score": 12.863214841536179,
+      "target_score": 6.0
+    },
+    "insufficient_._src_risk_lcov.rs_find_function_by_name_366": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/risk/lcov.rs:find_function_by_name:366",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 14.50911561101991,
+      "current_score": 12.439956238017066,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analysis_attribution_pattern_tracker.rs_PatternTracker__analyze_patterns_32": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analysis/attribution/pattern_tracker.rs:PatternTracker::analyze_patterns:32",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 14.43722809003999,
+      "current_score": 12.369338362891423,
+      "target_score": 6.0
+    },
+    "insufficient_._src_config.rs_ScoringWeights__validate_50": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/config.rs:ScoringWeights::validate:50",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 14.278078908735367,
+      "current_score": 12.23292477891603,
+      "target_score": 6.0
+    },
+    "insufficient_._src_io_writers_terminal.rs_print_complexity_hotspots_218": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/io/writers/terminal.rs:print_complexity_hotspots:218",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 14.252230058072474,
+      "current_score": 9.507153372048315,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_circular_ref.rs_PythonCircularRefDetector__check_for_circular_pattern_162": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/circular_ref.rs:PythonCircularRefDetector::check_for_circular_pattern:162",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 13.872959882580297,
+      "current_score": 11.895822756497397,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analysis_diagnostics_reporter.rs_DiagnosticReporter__format_markdown_103": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analysis/diagnostics/reporter.rs:DiagnosticReporter::format_markdown:103",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 13.707769939560078,
+      "current_score": 11.743231376765783,
+      "target_score": 6.0
+    },
+    "insufficient_._src_extraction_patterns_language_specific_python_patterns.rs_PythonPatternMatcher__infer_return_type_134": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/extraction_patterns/language_specific/python_patterns.rs:PythonPatternMatcher::infer_return_type:134",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 13.576589114646671,
+      "current_score": 9.059059409764446,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_javascript_detectors_resource.rs_process_timer_match_237": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/javascript/detectors/resource.rs:process_timer_match:237",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 13.409300206203802,
+      "current_score": 11.495971605317546,
+      "target_score": 6.0
+    },
+    "insufficient_._src_debt_patterns.rs_find_todos_and_fixmes_with_suppression_11": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/debt/patterns.rs:find_todos_and_fixmes_with_suppression:11",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 13.12851933551983,
+      "current_score": 11.252873716159854,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_call_graph_macro_expansion.rs_MacroExpander__parse_braced_exprs_311": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/call_graph/macro_expansion.rs:MacroExpander::parse_braced_exprs:311",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 12.739387307260643,
+      "current_score": 10.921617691937696,
+      "target_score": 6.0
+    },
+    "insufficient_._src_extraction_patterns_confidence.rs_ConfidenceScorer__calculate_base_score_25": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/extraction_patterns/confidence.rs:ConfidenceScorer::calculate_base_score:25",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 12.422633416338634,
+      "current_score": 10.647685785433115,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_type_tracker.rs_TypeTracker__track_self_param_443": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/type_tracker.rs:TypeTracker::track_self_param:443",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 12.349778301478011,
+      "current_score": 8.236185534318674,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analysis_multi_pass.rs_generate_comparative_analysis_553": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analysis/multi_pass.rs:generate_comparative_analysis:553",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 12.212604844465043,
+      "current_score": 10.473518438112894,
+      "target_score": 6.0
+    },
+    "insufficient_._src_io_writers_enhanced_markdown_complexity_analyzer.rs_extract_module_dependencies_99": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/io/writers/enhanced_markdown/complexity_analyzer.rs:extract_module_dependencies:99",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 12.011196733227003,
+      "current_score": 8.023797822151336,
+      "target_score": 6.0
+    },
+    "insufficient_._src_formatting_mod.rs_FormattingConfig__from_env_77": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/formatting/mod.rs:FormattingConfig::from_env:77",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 11.886393923934,
+      "current_score": 10.189337649086285,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_formatter_verbosity.rs_format_line_ranges_308": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter_verbosity.rs:format_line_ranges:308",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 11.845393923934,
+      "current_score": 10.148337649086285,
+      "target_score": 6.0
+    },
+    "insufficient_._src_context_rules.rs_ContextMatcher__matches_85": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/context/rules.rs:ContextMatcher::matches:85",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 11.20902725811763,
+      "current_score": 9.60530907838654,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_javascript_detectors_resource.rs_extract_observer_locations_498": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/javascript/detectors/resource.rs:extract_observer_locations:498",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 11.205814859584391,
+      "current_score": 9.606412736786622,
+      "target_score": 6.0
+    },
+    "insufficient_._src_organization_god_object_detector.rs_GodObjectDetector__analyze_comprehensive_43": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/organization/god_object_detector.rs:GodObjectDetector::analyze_comprehensive:43",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.941323476418647,
+      "current_score": 9.373705836930268,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_rust_normalizer.rs_RustSemanticNormalizer__normalize_string_literal_136": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/rust_normalizer.rs:RustSemanticNormalizer::normalize_string_literal:136",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.867698014097307,
+      "current_score": 9.317169726369121,
+      "target_score": 6.0
+    },
+    "insufficient_._src_builders_unified_analysis.rs_analyze_files_for_debt_1013": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/builders/unified_analysis.rs:analyze_files_for_debt:1013",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.812265654400479,
+      "current_score": 9.26922770377184,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_scoring_debt_item.rs_generate_recommendation_with_coverage_and_data_flow_1420": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/scoring/debt_item.rs:generate_recommendation_with_coverage_and_data_flow:1420",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.768612122614297,
+      "current_score": 9.22795324795511,
+      "target_score": 6.0
+    },
+    "insufficient_._src_risk_insights.rs_wrap_text_69": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/risk/insights.rs:wrap_text:69",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.664454531540601,
+      "current_score": 9.137103884177659,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_circular_ref.rs_PythonCircularRefDetector__analyze_init_statement_107": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/circular_ref.rs:PythonCircularRefDetector::analyze_init_statement:107",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.64509569029736,
+      "current_score": 9.11951059168345,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_circular_ref.rs_PythonCircularRefDetector__analyze_classes_49": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/circular_ref.rs:PythonCircularRefDetector::analyze_classes:49",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.540890509244063,
+      "current_score": 9.039477579352054,
+      "target_score": 6.0
+    },
+    "insufficient_._src_extraction_patterns_language_specific_rust_patterns.rs_RustPatternMatcher__infer_return_type_170": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/extraction_patterns/language_specific/rust_patterns.rs:RustPatternMatcher::infer_return_type:170",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.501902644725188,
+      "current_score": 8.996059409764447,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_signature_extractor.rs_SignatureExtractor__detect_builder_patterns_122": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/signature_extractor.rs:SignatureExtractor::detect_builder_patterns:122",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.492368089619507,
+      "current_score": 8.999886933959578,
+      "target_score": 6.0
+    },
+    "insufficient_._src_cache_shared_cache.rs_SharedCache__clear_component_files_976": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/cache/shared_cache.rs:SharedCache::clear_component_files:976",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.37234005420742,
+      "current_score": 8.886005760749217,
+      "target_score": 6.0
+    },
+    "insufficient_._src_cache_unified_analysis_cache.rs_UnifiedAnalysisCache__generate_key_58": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/cache/unified_analysis_cache.rs:UnifiedAnalysisCache::generate_key:58",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.058420111297638,
+      "current_score": 8.622502952540833,
+      "target_score": 6.0
+    },
+    "insufficient_._src_organization_python_simplified_implementation.rs_SimplifiedPythonOrganizationDetector__detect_feature_envy_in_function_505": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/organization/python/simplified_implementation.rs:SimplifiedPythonOrganizationDetector::detect_feature_envy_in_function:505",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 10.05788859487745,
+      "current_score": 8.6187616527521,
+      "target_score": 6.0
+    },
+    "insufficient_._src_organization_python_simplified_implementation.rs_SimplifiedPythonOrganizationDetector__count_calls_in_expr_587": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/organization/python/simplified_implementation.rs:SimplifiedPythonOrganizationDetector::count_calls_in_expr:587",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.952706733070908,
+      "current_score": 8.532748628346493,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_formatter_markdown.rs_format_file_impact_248": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/formatter_markdown.rs:format_file_impact:248",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.879494936611668,
+      "current_score": 8.465281374238572,
+      "target_score": 6.0
+    },
+    "insufficient_._src_cache_cache_location.rs_CacheLocation__get_git_info_112": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/cache/cache_location.rs:CacheLocation::get_git_info:112",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.803728078915535,
+      "current_score": 8.400766924784746,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_javascript_detectors_resource.rs_extract_cleared_variables_294": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/javascript/detectors/resource.rs:extract_cleared_variables:294",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.792498018674129,
+      "current_score": 8.391284016006397,
+      "target_score": 6.0
+    },
+    "insufficient_._src_resource_python_circular_ref.rs_PythonCircularRefDetector__find_reference_chain_292": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/resource/python/circular_ref.rs:PythonCircularRefDetector::find_reference_chain:292",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.758064892602157,
+      "current_score": 8.357198479373277,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_javascript_detectors_resource.rs_detect_memory_retention_593": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/javascript/detectors/resource.rs:detect_memory_retention:593",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.730517605598111,
+      "current_score": 8.340300804798382,
+      "target_score": 6.0
+    },
+    "insufficient_._src_cache_shared_cache.rs_SharedCache__trigger_pruning_if_needed_with_new_entry_1188": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/cache/shared_cache.rs:SharedCache::trigger_pruning_if_needed_with_new_entry:1188",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.602158973724409,
+      "current_score": 8.23713626319235,
+      "target_score": 6.0
+    },
+    "insufficient_._src_builders_call_graph.rs_process_python_files_for_call_graph_107": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/builders/call_graph.rs:process_python_files_for_call_graph:107",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.567838822353712,
+      "current_score": 8.204004704874611,
+      "target_score": 6.0
+    },
+    "insufficient_._src_priority_scoring_rust_recommendations.rs_generate_rust_refactoring_recommendation_4": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/priority/scoring/rust_recommendations.rs:generate_rust_refactoring_recommendation:4",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.556767451738743,
+      "current_score": 8.198229244347496,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_match_patterns.rs_detect_match_expression_133": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/match_patterns.rs:detect_match_expression:133",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.500652173913045,
+      "current_score": 8.14413043478261,
+      "target_score": 6.0
+    },
+    "insufficient_._src_complexity_message_generator.rs_analyze_match_complexity_156": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/complexity/message_generator.rs:analyze_match_complexity:156",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 9.485626163203415,
+      "current_score": 8.130108139888643,
+      "target_score": 6.0
+    },
+    "insufficient_._src_analyzers_javascript_detectors_organization.rs_OrganizationAntiPattern__to_debt_item_39": {
+      "description": "Function complexity reduced but still above critical threshold",
+      "location": "./src/analyzers/javascript/detectors/organization.rs:OrganizationAntiPattern::to_debt_item:39",
+      "severity": "high",
+      "suggested_fix": "Extract helper functions using pure functional patterns",
+      "original_score": 8.87765527102398,
+      "current_score": 8.456766924784745,
+      "target_score": 6.0
+    },
+    "regression_._src_complexity_languages_python_expressions.rs_collect_expression_patterns_944": {
+      "description": "New complexity introduced during refactoring",
+      "location": "./src/complexity/languages/python/expressions.rs:collect_expression_patterns:944",
+      "severity": "critical",
+      "suggested_fix": "Simplify the newly added code or split into smaller functions",
+      "original_score": null,
+      "current_score": 100.77
+    },
+    "regression_._.prodigy_prodigy-validate-debtmap-improvement.py_extract_debt_items_37": {
+      "description": "New complexity introduced during refactoring",
+      "location": "./.prodigy/prodigy-validate-debtmap-improvement.py:extract_debt_items:37",
+      "severity": "critical",
+      "suggested_fix": "Simplify the newly added code or split into smaller functions",
+      "original_score": null,
+      "current_score": 9.244655182729876
+    }
+  },
+  "before_summary": {
+    "total_items": 457,
+    "high_priority_items": 247,
+    "average_score": 9.01
+  },
+  "after_summary": {
+    "total_items": 282,
+    "high_priority_items": 145,
+    "average_score": 8.62
+  }
+}

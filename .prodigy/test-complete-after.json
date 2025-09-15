@@ -1,0 +1,15 @@
+{
+  "items": [],
+  "complexity": {
+    "metrics": [
+      {
+        "name": "authenticate_user",
+        "cyclomatic": 5
+      },
+      {
+        "name": "parse_config",
+        "cyclomatic": 4
+      }
+    ]
+  }
+}

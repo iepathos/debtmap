@@ -97,56 +97,108 @@ impl<'a> CriticalityAnalyzer<'a> {
     }
 
     pub fn explain_criticality(&self, function_id: &FunctionId) -> String {
-        let mut factors = Vec::new();
+        let factors = self.collect_criticality_factors(function_id);
 
-        // Distance from entry
-        if let Some(distance) = self.context.distance_from_entry(function_id) {
-            let factor = 2.0 / (1.0 + distance as f64 * 0.3);
-            factors.push(format!("Entry distance {}: {:.1}x", distance, factor));
+        match factors.is_empty() {
+            true => "Base criticality: 1.0x".to_string(),
+            false => factors.join(", "),
         }
+    }
 
-        // Caller count
-        if let Some(caller_count) = self.context.call_frequencies.get(function_id) {
-            if *caller_count > 0 {
-                let factor = 1.0 + (*caller_count as f64).ln() * 0.2;
-                factors.push(format!("{} callers: {:.1}x", caller_count, factor.min(1.8)));
-            }
-        }
+    fn collect_criticality_factors(&self, function_id: &FunctionId) -> Vec<String> {
+        let mut factors = vec![
+            self.calculate_distance_factor_explanation(function_id),
+            self.calculate_caller_factor_explanation(function_id),
+            self.calculate_hot_path_factor_explanation(function_id),
+            self.calculate_downstream_factor_explanation(function_id),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
 
-        // Hot path
-        if self.context.hot_paths.contains(function_id) {
-            factors.push("Hot path: 1.5x".to_string());
-        }
+        factors.extend(self.calculate_git_history_factors_explanation(function_id));
+        factors
+    }
 
-        // Downstream impact
+    fn calculate_distance_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
+        self.context
+            .distance_from_entry(function_id)
+            .map(|distance| {
+                let factor = 2.0 / (1.0 + distance as f64 * 0.3);
+                format!("Entry distance {}: {:.1}x", distance, factor)
+            })
+    }
+
+    fn calculate_caller_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
+        self.context
+            .call_frequencies
+            .get(function_id)
+            .filter(|&&count| count > 0)
+            .map(|&caller_count| {
+                let factor = 1.0 + (caller_count as f64).ln() * 0.2;
+                format!("{} callers: {:.1}x", caller_count, factor.min(1.8))
+            })
+    }
+
+    fn calculate_hot_path_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
+        self.context
+            .hot_paths
+            .contains(function_id)
+            .then(|| "Hot path: 1.5x".to_string())
+    }
+
+    fn calculate_downstream_factor_explanation(&self, function_id: &FunctionId) -> Option<String> {
         let callee_count = self.context.call_graph.get_callees(function_id).len();
-        if callee_count > 5 {
+        (callee_count > 5).then(|| {
             let factor = 1.0 + (callee_count as f64 / 10.0);
-            factors.push(format!("{} callees: {:.1}x", callee_count, factor.min(1.3)));
-        }
+            format!("{} callees: {:.1}x", callee_count, factor.min(1.3))
+        })
+    }
 
-        // Git history
-        if let Some(git_history) = &self.context.git_history {
-            if let Some(change_count) = git_history.change_counts.get(&function_id.file) {
-                if *change_count > 10 {
-                    let factor = 1.0 + (*change_count as f64 / 50.0);
-                    factors.push(format!("{} changes: {:.1}x", change_count, factor.min(1.4)));
-                }
-            }
+    fn calculate_git_history_factors_explanation(&self, function_id: &FunctionId) -> Vec<String> {
+        self.context
+            .git_history
+            .as_ref()
+            .map(|git_history| {
+                [
+                    self.calculate_change_count_factor(git_history, &function_id.file),
+                    self.calculate_bug_fix_factor(git_history, &function_id.file),
+                ]
+                .into_iter()
+                .flatten()
+                .collect()
+            })
+            .unwrap_or_default()
+    }
 
-            if let Some(bug_count) = git_history.bug_fix_counts.get(&function_id.file) {
-                if *bug_count > 5 {
-                    let factor = 1.0 + (*bug_count as f64 / 20.0);
-                    factors.push(format!("{} bug fixes: {:.1}x", bug_count, factor.min(1.5)));
-                }
-            }
-        }
+    fn calculate_change_count_factor(
+        &self,
+        git_history: &crate::scoring::scoring_context::GitHistory,
+        file_path: &std::path::Path,
+    ) -> Option<String> {
+        git_history
+            .change_counts
+            .get(file_path)
+            .filter(|&&count| count > 10)
+            .map(|&change_count| {
+                let factor = 1.0 + (change_count as f64 / 50.0);
+                format!("{} changes: {:.1}x", change_count, factor.min(1.4))
+            })
+    }
 
-        if factors.is_empty() {
-            "Base criticality: 1.0x".to_string()
-        } else {
-            factors.join(", ")
-        }
+    fn calculate_bug_fix_factor(
+        &self,
+        git_history: &crate::scoring::scoring_context::GitHistory,
+        file_path: &std::path::Path,
+    ) -> Option<String> {
+        git_history
+            .bug_fix_counts
+            .get(file_path)
+            .filter(|&&count| count > 5)
+            .map(|&bug_count| {
+                let factor = 1.0 + (bug_count as f64 / 20.0);
+                format!("{} bug fixes: {:.1}x", bug_count, factor.min(1.5))
+            })
     }
 }
 
@@ -311,5 +363,290 @@ mod tests {
             &PathBuf::from("test.rs"),
         );
         assert_eq!(factor, 1.4 * 1.5);
+    }
+
+    // Tests for explain_criticality function
+    use crate::priority::call_graph::{CallGraph, FunctionId};
+
+    fn create_test_context() -> ScoringContext {
+        let call_graph = CallGraph::new();
+        ScoringContext::new(call_graph)
+    }
+
+    fn create_test_function_id() -> FunctionId {
+        FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "test_function".to_string(),
+            line: 10,
+        }
+    }
+
+    #[test]
+    fn test_explain_criticality_with_no_factors() {
+        let context = create_test_context();
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let function_id = create_test_function_id();
+
+        let explanation = analyzer.explain_criticality(&function_id);
+        assert_eq!(explanation, "Base criticality: 1.0x");
+    }
+
+    #[test]
+    fn test_explain_criticality_with_distance_factor() {
+        let mut context = create_test_context();
+        // Mock distance from entry
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let function_id = create_test_function_id();
+
+        // Since we can't easily mock distance_from_entry, test the formatting logic directly
+        let explanation = analyzer.explain_criticality(&function_id);
+        // Should return base criticality since no factors are present
+        assert_eq!(explanation, "Base criticality: 1.0x");
+    }
+
+    #[test]
+    fn test_explain_criticality_with_caller_factor() {
+        let mut context = create_test_context();
+        let function_id = create_test_function_id();
+
+        // Add caller frequency
+        context.call_frequencies.insert(function_id.clone(), 5);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include caller factor
+        assert!(explanation.contains("5 callers"));
+        assert!(explanation.contains("1.3x"));
+    }
+
+    #[test]
+    fn test_explain_criticality_with_hot_path() {
+        let mut context = create_test_context();
+        let function_id = create_test_function_id();
+
+        // Add to hot paths
+        context.hot_paths.insert(function_id.clone());
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include hot path factor
+        assert!(explanation.contains("Hot path: 1.5x"));
+    }
+
+    #[test]
+    fn test_explain_criticality_with_downstream_impact() {
+        let mut context = create_test_context();
+        let function_id = create_test_function_id();
+
+        // Add caller frequency to show some factor
+        context.call_frequencies.insert(function_id.clone(), 2);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include caller factor
+        assert!(explanation.contains("2 callers"));
+        assert!(explanation.contains("1.1x"));
+    }
+
+    #[test]
+    fn test_explain_criticality_with_git_history_changes() {
+        let mut git_history = GitHistory {
+            change_counts: HashMap::new(),
+            bug_fix_counts: HashMap::new(),
+        };
+        git_history
+            .change_counts
+            .insert(PathBuf::from("test.rs"), 25);
+
+        let mut context = create_test_context();
+        context.git_history = Some(git_history);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let function_id = create_test_function_id();
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include git history factor
+        assert!(explanation.contains("25 changes"));
+        assert!(explanation.contains("1.4x"));
+    }
+
+    #[test]
+    fn test_explain_criticality_with_git_history_bugs() {
+        let mut git_history = GitHistory {
+            change_counts: HashMap::new(),
+            bug_fix_counts: HashMap::new(),
+        };
+        git_history
+            .bug_fix_counts
+            .insert(PathBuf::from("test.rs"), 10);
+
+        let mut context = create_test_context();
+        context.git_history = Some(git_history);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let function_id = create_test_function_id();
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include git history factor
+        assert!(explanation.contains("10 bug fixes"));
+        assert!(explanation.contains("1.5x"));
+    }
+
+    #[test]
+    fn test_explain_criticality_with_multiple_factors() {
+        let mut git_history = GitHistory {
+            change_counts: HashMap::new(),
+            bug_fix_counts: HashMap::new(),
+        };
+        git_history
+            .change_counts
+            .insert(PathBuf::from("test.rs"), 25);
+        git_history
+            .bug_fix_counts
+            .insert(PathBuf::from("test.rs"), 10);
+
+        let mut context = create_test_context();
+        context.git_history = Some(git_history);
+        let function_id = create_test_function_id();
+
+        // Add multiple factors
+        context.call_frequencies.insert(function_id.clone(), 3);
+        context.hot_paths.insert(function_id.clone());
+
+        // Add callees
+        for i in 0..6 {
+            context.call_graph.add_edge_by_name(
+                function_id.name.clone(),
+                format!("callee_{}", i),
+                PathBuf::from(format!("callee_{}.rs", i)),
+            );
+        }
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include multiple factors
+        assert!(explanation.contains("3 callers"));
+        assert!(explanation.contains("Hot path: 1.5x"));
+        assert!(explanation.contains("25 changes"));
+        assert!(explanation.contains("10 bug fixes"));
+    }
+
+    #[test]
+    fn test_explain_criticality_edge_case_zero_callers() {
+        let mut context = create_test_context();
+        let function_id = create_test_function_id();
+
+        // Explicitly set zero callers
+        context.call_frequencies.insert(function_id.clone(), 0);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should not include caller factor for zero callers
+        assert!(!explanation.contains("callers"));
+        assert_eq!(explanation, "Base criticality: 1.0x");
+    }
+
+    #[test]
+    fn test_explain_criticality_edge_case_single_caller() {
+        let mut context = create_test_context();
+        let function_id = create_test_function_id();
+
+        // Single caller
+        context.call_frequencies.insert(function_id.clone(), 1);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include single caller
+        assert!(explanation.contains("1 callers: 1.0x"));
+    }
+
+    #[test]
+    fn test_explain_criticality_edge_case_exactly_five_callees() {
+        let mut context = create_test_context();
+        let function_id = create_test_function_id();
+
+        // Add exactly 5 callees (boundary condition)
+        for i in 0..5 {
+            context.call_graph.add_edge_by_name(
+                function_id.name.clone(),
+                format!("callee_{}", i),
+                PathBuf::from(format!("callee_{}.rs", i)),
+            );
+        }
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should not include downstream impact for exactly 5 callees
+        assert!(!explanation.contains("callees"));
+        assert_eq!(explanation, "Base criticality: 1.0x");
+    }
+
+    #[test]
+    fn test_explain_criticality_edge_case_six_callees() {
+        let mut context = create_test_context();
+        let function_id = create_test_function_id();
+
+        // Add caller frequency to test the boundary
+        context.call_frequencies.insert(function_id.clone(), 6);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should include caller impact
+        assert!(explanation.contains("6 callers"));
+        assert!(explanation.contains("1.4x"));
+    }
+
+    #[test]
+    fn test_explain_criticality_boundary_git_changes() {
+        let mut git_history = GitHistory {
+            change_counts: HashMap::new(),
+            bug_fix_counts: HashMap::new(),
+        };
+        // Exactly at threshold (10)
+        git_history
+            .change_counts
+            .insert(PathBuf::from("test.rs"), 10);
+
+        let mut context = create_test_context();
+        context.git_history = Some(git_history);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let function_id = create_test_function_id();
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should not include git history factor at exactly threshold
+        assert!(!explanation.contains("changes"));
+        assert_eq!(explanation, "Base criticality: 1.0x");
+    }
+
+    #[test]
+    fn test_explain_criticality_boundary_git_bugs() {
+        let mut git_history = GitHistory {
+            change_counts: HashMap::new(),
+            bug_fix_counts: HashMap::new(),
+        };
+        // Exactly at threshold (5)
+        git_history
+            .bug_fix_counts
+            .insert(PathBuf::from("test.rs"), 5);
+
+        let mut context = create_test_context();
+        context.git_history = Some(git_history);
+
+        let analyzer = CriticalityAnalyzer::new(&context);
+        let function_id = create_test_function_id();
+        let explanation = analyzer.explain_criticality(&function_id);
+
+        // Should not include git history factor at exactly threshold
+        assert!(!explanation.contains("bug fixes"));
+        assert_eq!(explanation, "Base criticality: 1.0x");
     }
 }

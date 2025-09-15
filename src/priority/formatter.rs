@@ -819,115 +819,309 @@ fn format_truncated_list(items: &[String], max_display: usize) -> String {
 }
 
 pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
-    let severity = get_severity_label(item.unified_score.final_score);
-    let severity_color = get_severity_color(item.unified_score.final_score);
+    // Use functional composition to format different sections
+    let format_context = create_format_context(rank, item);
 
-    writeln!(
-        output,
+    // Format each section using pure functions composed together
+    let formatted_sections = generate_formatted_sections(&format_context);
+
+    // Apply formatting to output (I/O at edges)
+    apply_formatted_sections(output, formatted_sections);
+}
+
+// Pure function to create formatting context
+fn create_format_context(rank: usize, item: &UnifiedDebtItem) -> FormatContext {
+    FormatContext {
+        rank,
+        score: item.unified_score.final_score,
+        severity_info: SeverityInfo::from_score(item.unified_score.final_score),
+        location_info: LocationInfo::from_item(item),
+        action: item.recommendation.primary_action.clone(),
+        impact: item.expected_impact.clone(),
+        complexity_info: ComplexityInfo::from_item(item),
+        dependency_info: DependencyInfo::from_item(item),
+        debt_specific_info: DebtSpecificInfo::from_item(item),
+        rationale: item.recommendation.rationale.clone(),
+    }
+}
+
+// Data structures for formatted content
+struct FormatContext {
+    rank: usize,
+    score: f64,
+    severity_info: SeverityInfo,
+    location_info: LocationInfo,
+    action: String,
+    impact: crate::priority::ImpactMetrics,
+    complexity_info: ComplexityInfo,
+    dependency_info: DependencyInfo,
+    debt_specific_info: DebtSpecificInfo,
+    rationale: String,
+}
+
+struct SeverityInfo {
+    label: String,
+    color: colored::Color,
+}
+
+impl SeverityInfo {
+    fn from_score(score: f64) -> Self {
+        Self {
+            label: get_severity_label(score).to_string(),
+            color: get_severity_color(score),
+        }
+    }
+}
+
+struct LocationInfo {
+    file: std::path::PathBuf,
+    line: u32,
+    function: String,
+}
+
+impl LocationInfo {
+    fn from_item(item: &UnifiedDebtItem) -> Self {
+        Self {
+            file: item.location.file.clone(),
+            line: item.location.line as u32,
+            function: item.location.function.clone(),
+        }
+    }
+}
+
+struct ComplexityInfo {
+    cyclomatic: u32,
+    cognitive: u32,
+    branch_count: u32,
+    nesting: u32,
+    has_complexity: bool,
+}
+
+impl ComplexityInfo {
+    fn from_item(item: &UnifiedDebtItem) -> Self {
+        let (cyclomatic, cognitive, branch_count, nesting, _length) = extract_complexity_info(item);
+        Self {
+            cyclomatic,
+            cognitive,
+            branch_count,
+            nesting,
+            has_complexity: cyclomatic > 0 || cognitive > 0,
+        }
+    }
+}
+
+struct DependencyInfo {
+    upstream: usize,
+    downstream: usize,
+    upstream_callers: Vec<String>,
+    downstream_callees: Vec<String>,
+    has_dependencies: bool,
+}
+
+impl DependencyInfo {
+    fn from_item(item: &UnifiedDebtItem) -> Self {
+        let (upstream, downstream) = extract_dependency_info(item);
+        Self {
+            upstream,
+            downstream,
+            upstream_callers: item.upstream_callers.clone(),
+            downstream_callees: item.downstream_callees.clone(),
+            has_dependencies: upstream > 0 || downstream > 0,
+        }
+    }
+}
+
+enum DebtSpecificInfo {
+    DeadCode {
+        visibility: String,
+        usage_hints: Vec<String>,
+    },
+    Other,
+}
+
+impl DebtSpecificInfo {
+    fn from_item(item: &UnifiedDebtItem) -> Self {
+        match &item.debt_type {
+            DebtType::DeadCode {
+                visibility,
+                usage_hints,
+                ..
+            } => Self::DeadCode {
+                visibility: format_visibility(visibility).to_string(),
+                usage_hints: usage_hints.clone(),
+            },
+            _ => Self::Other,
+        }
+    }
+}
+
+struct FormattedSections {
+    header: String,
+    location: String,
+    action: String,
+    impact: String,
+    complexity: Option<String>,
+    dependencies: Option<String>,
+    debt_specific: Option<String>,
+    rationale: String,
+}
+
+// Pure function to generate all formatted sections
+fn generate_formatted_sections(context: &FormatContext) -> FormattedSections {
+    FormattedSections {
+        header: format_header_section(context),
+        location: format_location_section(context),
+        action: format_action_section(context),
+        impact: format_impact_section(context),
+        complexity: format_complexity_section(context),
+        dependencies: format_dependencies_section(context),
+        debt_specific: format_debt_specific_section(context),
+        rationale: format_rationale_section(context),
+    }
+}
+
+// Pure function to format header section
+fn format_header_section(context: &FormatContext) -> String {
+    format!(
         "#{} {} [{}]",
-        rank.to_string().bright_cyan().bold(),
-        format!(
-            "SCORE: {}",
-            score_formatter::format_score(item.unified_score.final_score)
-        )
-        .bright_yellow(),
-        severity.color(severity_color).bold()
+        context.rank.to_string().bright_cyan().bold(),
+        format!("SCORE: {}", score_formatter::format_score(context.score)).bright_yellow(),
+        context
+            .severity_info
+            .label
+            .color(context.severity_info.color)
+            .bold()
     )
-    .unwrap();
+}
 
-    writeln!(
-        output,
+// Pure function to format location section
+fn format_location_section(context: &FormatContext) -> String {
+    format!(
         "{} {}:{} {}()",
         "├─ LOCATION:".bright_blue(),
-        item.location.file.display(),
-        item.location.line,
-        item.location.function.bright_green()
+        context.location_info.file.display(),
+        context.location_info.line,
+        context.location_info.function.bright_green()
     )
-    .unwrap();
+}
 
-    writeln!(
-        output,
+// Pure function to format action section
+fn format_action_section(context: &FormatContext) -> String {
+    format!(
         "{} {}",
         "├─ ACTION:".bright_blue(),
-        item.recommendation.primary_action.bright_green().bold()
+        context.action.bright_green().bold()
     )
-    .unwrap();
+}
 
-    writeln!(
-        output,
+// Pure function to format impact section
+fn format_impact_section(context: &FormatContext) -> String {
+    format!(
         "{} {}",
         "├─ IMPACT:".bright_blue(),
-        format_impact(&item.expected_impact).bright_cyan()
+        format_impact(&context.impact).bright_cyan()
     )
-    .unwrap();
+}
 
-    // Add complexity details with branch information
-    let (cyclomatic, cognitive, branch_count, nesting, _length) = extract_complexity_info(item);
-    if cyclomatic > 0 || cognitive > 0 {
-        writeln!(
-            output,
-            "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
-            "├─ COMPLEXITY:".bright_blue(),
-            cyclomatic.to_string().yellow(),
-            branch_count.to_string().yellow(),
-            cognitive.to_string().yellow(),
-            nesting.to_string().yellow()
-        )
-        .unwrap();
+// Pure function to format complexity section
+fn format_complexity_section(context: &FormatContext) -> Option<String> {
+    if !context.complexity_info.has_complexity {
+        return None;
     }
 
-    // Add dependency information with caller/callee names
-    let (upstream, downstream) = extract_dependency_info(item);
-    if upstream > 0 || downstream > 0 {
-        writeln!(
-            output,
-            "{} {} upstream, {} downstream",
-            "├─ DEPENDENCIES:".bright_blue(),
-            upstream.to_string().cyan(),
-            downstream.to_string().cyan()
-        )
-        .unwrap();
+    Some(format!(
+        "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
+        "├─ COMPLEXITY:".bright_blue(),
+        context.complexity_info.cyclomatic.to_string().yellow(),
+        context.complexity_info.branch_count.to_string().yellow(),
+        context.complexity_info.cognitive.to_string().yellow(),
+        context.complexity_info.nesting.to_string().yellow()
+    ))
+}
 
-        // Add upstream callers if present
-        if !item.upstream_callers.is_empty() {
-            let callers_display = format_truncated_list(&item.upstream_callers, 3);
-            writeln!(output, "│  ├─ CALLERS: {}", callers_display.cyan()).unwrap();
-        }
-
-        // Add downstream callees if present
-        if !item.downstream_callees.is_empty() {
-            let callees_display = format_truncated_list(&item.downstream_callees, 3);
-            writeln!(output, "│  └─ CALLS: {}", callees_display.bright_magenta()).unwrap();
-        }
+// Pure function to format dependencies section
+fn format_dependencies_section(context: &FormatContext) -> Option<String> {
+    if !context.dependency_info.has_dependencies {
+        return None;
     }
 
-    // Add dead code specific information
-    if let DebtType::DeadCode {
-        visibility,
-        usage_hints,
-        ..
-    } = &item.debt_type
-    {
-        writeln!(
-            output,
-            "├─ VISIBILITY: {} function with no callers",
-            format_visibility(visibility).yellow()
-        )
-        .unwrap();
+    let mut section = format!(
+        "{} {} upstream, {} downstream",
+        "├─ DEPENDENCIES:".bright_blue(),
+        context.dependency_info.upstream.to_string().cyan(),
+        context.dependency_info.downstream.to_string().cyan()
+    );
 
-        for hint in usage_hints {
-            writeln!(output, "│  • {}", hint.bright_white()).unwrap();
-        }
+    // Add callers information
+    if !context.dependency_info.upstream_callers.is_empty() {
+        let callers_display = format_truncated_list(&context.dependency_info.upstream_callers, 3);
+        section.push_str(&format!("\n│  ├─ CALLERS: {}", callers_display.cyan()));
     }
 
+    // Add callees information
+    if !context.dependency_info.downstream_callees.is_empty() {
+        let callees_display = format_truncated_list(&context.dependency_info.downstream_callees, 3);
+        section.push_str(&format!(
+            "\n│  └─ CALLS: {}",
+            callees_display.bright_magenta()
+        ));
+    }
+
+    Some(section)
+}
+
+// Pure function to format debt-specific section
+fn format_debt_specific_section(context: &FormatContext) -> Option<String> {
+    match &context.debt_specific_info {
+        DebtSpecificInfo::DeadCode {
+            visibility,
+            usage_hints,
+        } => {
+            let mut section = format!(
+                "├─ VISIBILITY: {} function with no callers",
+                visibility.yellow()
+            );
+
+            for hint in usage_hints {
+                section.push_str(&format!("\n│  • {}", hint.bright_white()));
+            }
+
+            Some(section)
+        }
+        DebtSpecificInfo::Other => None,
+    }
+}
+
+// Pure function to format rationale section
+fn format_rationale_section(context: &FormatContext) -> String {
     let formatter = ColoredFormatter::new(FormattingConfig::default());
-    writeln!(
-        output,
+    format!(
         "{} {}",
         formatter.emoji("└─ WHY:", "- WHY:").bright_blue(),
-        item.recommendation.rationale
+        context.rationale
     )
-    .unwrap();
+}
+
+// I/O function to apply formatted sections to output
+fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
+    writeln!(output, "{}", sections.header).unwrap();
+    writeln!(output, "{}", sections.location).unwrap();
+    writeln!(output, "{}", sections.action).unwrap();
+    writeln!(output, "{}", sections.impact).unwrap();
+
+    if let Some(complexity) = sections.complexity {
+        writeln!(output, "{}", complexity).unwrap();
+    }
+
+    if let Some(dependencies) = sections.dependencies {
+        writeln!(output, "{}", dependencies).unwrap();
+    }
+
+    if let Some(debt_specific) = sections.debt_specific {
+        writeln!(output, "{}", debt_specific).unwrap();
+    }
+
+    writeln!(output, "{}", sections.rationale).unwrap();
 }
 
 #[allow(dead_code)]

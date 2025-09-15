@@ -3,7 +3,7 @@ use crate::{
     analysis::diagnostics::{DetailLevel, DiagnosticReporter, OutputFormat},
     analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
     analyzers::FileAnalyzer,
-    cache::{CacheKey, CallGraphCache, UnifiedAnalysisCache},
+    cache::{CacheKey, CallGraphCache, UnifiedAnalysisCache, UnifiedAnalysisCacheKey},
     config,
     core::{self, AnalysisResults, DebtItem, FunctionMetrics, Language},
     io,
@@ -12,6 +12,7 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::DebtAggregator,
         debt_aggregator::FunctionId as AggregatorFunctionId,
+        file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact},
         scoring::debt_item,
         unified_scorer::Location,
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, UnifiedAnalysis,
@@ -94,72 +95,8 @@ pub fn perform_unified_analysis_with_options(
         no_god_object,
     } = options;
 
-    // Check if we should use unified analysis caching
-    let files: Vec<PathBuf> = results
-        .complexity
-        .metrics
-        .iter()
-        .map(|m| m.file.clone())
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
-
-    let should_cache =
-        use_cache && UnifiedAnalysisCache::should_use_cache(files.len(), coverage_file.is_some());
-
-    // Try to get cached unified analysis result
-    if should_cache {
-        if let Ok(mut unified_cache) = UnifiedAnalysisCache::new(Some(project_path)) {
-            // Generate cache key
-            if let Ok(cache_key) = UnifiedAnalysisCache::generate_key(
-                project_path,
-                &files,
-                results.complexity.summary.max_complexity, // Use max complexity as threshold proxy
-                50,                                        // Default duplication threshold
-                coverage_file.as_ref().map(|p| p.as_path()),
-                semantic_off,
-                parallel,
-            ) {
-                // Try to get cached result
-                if let Some(cached_analysis) = unified_cache.get(&cache_key) {
-                    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-                    if !quiet_mode {
-                        eprintln!("🎯 Using cached unified analysis ✓");
-                    }
-                    return Ok(cached_analysis);
-                }
-
-                // Cache miss - proceed with analysis and cache the result
-                let analysis_result = perform_unified_analysis_computation(
-                    results,
-                    coverage_file,
-                    semantic_off,
-                    project_path,
-                    verbose_macro_warnings,
-                    show_macro_stats,
-                    parallel,
-                    jobs,
-                    use_cache,
-                    multi_pass,
-                    show_attribution,
-                    no_aggregation,
-                    aggregation_method,
-                    min_problematic,
-                    no_god_object,
-                )?;
-
-                // Cache the computed result
-                if let Err(e) = unified_cache.put(cache_key, analysis_result.clone(), files) {
-                    log::warn!("Failed to cache unified analysis: {}", e);
-                }
-
-                return Ok(analysis_result);
-            }
-        }
-    }
-
-    // No caching - proceed with direct computation
-    perform_unified_analysis_computation(
+    // Extract files and create computation parameters in pure functional style
+    let analysis_params = create_analysis_parameters(
         results,
         coverage_file,
         semantic_off,
@@ -175,6 +112,186 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
+    );
+
+    // Apply caching strategy using function composition
+    apply_caching_strategy(&analysis_params)
+        .unwrap_or_else(|| perform_direct_computation(analysis_params))
+}
+
+// Pure function to create analysis parameters
+fn create_analysis_parameters<'a>(
+    results: &'a AnalysisResults,
+    coverage_file: Option<&'a PathBuf>,
+    semantic_off: bool,
+    project_path: &'a Path,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+    parallel: bool,
+    jobs: usize,
+    use_cache: bool,
+    multi_pass: bool,
+    show_attribution: bool,
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
+    min_problematic: Option<usize>,
+    no_god_object: bool,
+) -> AnalysisParameters<'a> {
+    let files = extract_unique_files(&results.complexity.metrics);
+    let cache_config = CacheConfiguration::new(use_cache, files.len(), coverage_file.is_some());
+
+    AnalysisParameters {
+        results,
+        coverage_file,
+        semantic_off,
+        project_path,
+        verbose_macro_warnings,
+        show_macro_stats,
+        parallel,
+        jobs,
+        multi_pass,
+        show_attribution,
+        no_aggregation,
+        aggregation_method,
+        min_problematic,
+        no_god_object,
+        files,
+        cache_config,
+    }
+}
+
+// Pure function to extract unique files from metrics
+fn extract_unique_files(metrics: &[FunctionMetrics]) -> Vec<PathBuf> {
+    metrics
+        .iter()
+        .map(|m| m.file.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+// Data structure to hold analysis parameters
+struct AnalysisParameters<'a> {
+    results: &'a AnalysisResults,
+    coverage_file: Option<&'a PathBuf>,
+    semantic_off: bool,
+    project_path: &'a Path,
+    verbose_macro_warnings: bool,
+    show_macro_stats: bool,
+    parallel: bool,
+    jobs: usize,
+    multi_pass: bool,
+    show_attribution: bool,
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
+    min_problematic: Option<usize>,
+    no_god_object: bool,
+    files: Vec<PathBuf>,
+    cache_config: CacheConfiguration,
+}
+
+// Pure function for cache configuration
+struct CacheConfiguration {
+    should_cache: bool,
+}
+
+impl CacheConfiguration {
+    fn new(use_cache: bool, file_count: usize, has_coverage: bool) -> Self {
+        Self {
+            should_cache: use_cache
+                && UnifiedAnalysisCache::should_use_cache(file_count, has_coverage),
+        }
+    }
+}
+
+// Functional approach to caching strategy
+fn apply_caching_strategy(params: &AnalysisParameters) -> Option<Result<UnifiedAnalysis>> {
+    if !params.cache_config.should_cache {
+        return None;
+    }
+
+    attempt_cached_analysis(params).or_else(|| None)
+}
+
+// Pure function for cache attempt
+fn attempt_cached_analysis(params: &AnalysisParameters) -> Option<Result<UnifiedAnalysis>> {
+    let mut unified_cache = UnifiedAnalysisCache::new(Some(params.project_path)).ok()?;
+    let cache_key = create_cache_key(params).ok()?;
+
+    unified_cache.get(&cache_key).map(|cached_analysis| {
+        log_cache_hit();
+        Ok(cached_analysis)
+    })
+}
+
+// Function composition for computation with caching
+fn attempt_computation_with_caching(params: AnalysisParameters) -> Option<Result<UnifiedAnalysis>> {
+    let mut unified_cache = UnifiedAnalysisCache::new(Some(params.project_path)).ok()?;
+    let cache_key = create_cache_key(&params).ok()?;
+
+    Some(
+        perform_computation(&params)
+            .and_then(|result| cache_result(&mut unified_cache, cache_key, result, params.files)),
+    )
+}
+
+// Pure function to create cache key
+fn create_cache_key(params: &AnalysisParameters) -> Result<UnifiedAnalysisCacheKey> {
+    UnifiedAnalysisCache::generate_key(
+        params.project_path,
+        &params.files,
+        params.results.complexity.summary.max_complexity,
+        50, // Default duplication threshold
+        params.coverage_file.map(|p| p.as_path()),
+        params.semantic_off,
+        params.parallel,
+    )
+}
+
+// I/O function for logging cache hit
+fn log_cache_hit() {
+    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+    if !quiet_mode {
+        eprintln!("🎯 Using cached unified analysis ✓");
+    }
+}
+
+// Function to cache computation result
+fn cache_result(
+    cache: &mut UnifiedAnalysisCache,
+    cache_key: UnifiedAnalysisCacheKey,
+    result: UnifiedAnalysis,
+    files: Vec<PathBuf>,
+) -> Result<UnifiedAnalysis> {
+    if let Err(e) = cache.put(cache_key, result.clone(), files) {
+        log::warn!("Failed to cache unified analysis: {}", e);
+    }
+    Ok(result)
+}
+
+// Direct computation without caching
+fn perform_direct_computation(params: AnalysisParameters) -> Result<UnifiedAnalysis> {
+    perform_computation(&params)
+}
+
+// Core computation function (extracted for reuse)
+fn perform_computation(params: &AnalysisParameters) -> Result<UnifiedAnalysis> {
+    perform_unified_analysis_computation(
+        params.results,
+        params.coverage_file,
+        params.semantic_off,
+        params.project_path,
+        params.verbose_macro_warnings,
+        params.show_macro_stats,
+        params.parallel,
+        params.jobs,
+        params.cache_config.should_cache,
+        params.multi_pass,
+        params.show_attribution,
+        params.no_aggregation,
+        params.aggregation_method.clone(),
+        params.min_problematic,
+        params.no_god_object,
     )
 }
 
@@ -1017,128 +1134,242 @@ fn analyze_files_for_debt(
     no_god_object: bool,
 ) {
     use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
-    use crate::priority::file_metrics::{FileDebtItem, FileImpact};
-    use std::collections::HashMap;
 
-    // Group functions by file
-    let mut files_map: HashMap<PathBuf, Vec<&FunctionMetrics>> = HashMap::new();
+    // Pure functional pipeline for file analysis
+    let file_groups = group_functions_by_file(metrics);
+    let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
+
+    // Process each file using functional composition
+    let processed_files: Vec<ProcessedFileData> = file_groups
+        .into_iter()
+        .map(|(file_path, functions)| {
+            process_single_file(file_path, functions, &file_analyzer, no_god_object, unified)
+        })
+        .filter_map(|result| result.ok())
+        .filter(|data| data.score > 50.0) // Filter significant files
+        .collect();
+
+    // Apply results to unified analysis (I/O at edges)
+    apply_file_analysis_results(unified, processed_files);
+}
+
+// Pure function to group functions by file
+fn group_functions_by_file(
+    metrics: &[FunctionMetrics],
+) -> std::collections::HashMap<PathBuf, Vec<FunctionMetrics>> {
+    let mut files_map = std::collections::HashMap::new();
     for metric in metrics {
         files_map
             .entry(metric.file.clone())
-            .or_default()
-            .push(metric);
+            .or_insert_with(Vec::new)
+            .push(metric.clone());
+    }
+    files_map
+}
+
+// Data structure for processed file information
+struct ProcessedFileData {
+    file_path: PathBuf,
+    file_metrics: FileDebtMetrics,
+    score: f64,
+    recommendation: String,
+    god_analysis: Option<crate::organization::GodObjectAnalysis>,
+}
+
+// Pure function to process a single file
+fn process_single_file(
+    file_path: PathBuf,
+    functions: Vec<FunctionMetrics>,
+    file_analyzer: &crate::analyzers::file_analyzer::UnifiedFileAnalyzer,
+    no_god_object: bool,
+    unified: &UnifiedAnalysis,
+) -> Result<ProcessedFileData, Box<dyn std::error::Error>> {
+    // Get base file metrics
+    let file_metrics = file_analyzer.aggregate_functions(&functions);
+
+    // Apply file content analysis
+    let file_content = std::fs::read_to_string(&file_path)?;
+    let enhanced_metrics = enhance_metrics_with_content(
+        file_metrics,
+        &file_content,
+        file_analyzer,
+        &file_path,
+        no_god_object,
+    )?;
+
+    // Calculate function scores and update metrics
+    let function_scores = calculate_function_scores(&functions, unified);
+    let mut final_metrics = enhanced_metrics;
+    final_metrics.function_scores = function_scores;
+
+    // Calculate overall file score
+    let score = final_metrics.calculate_score();
+
+    // Generate recommendation and god object analysis
+    let recommendation = final_metrics.generate_recommendation();
+    let god_analysis = create_god_object_analysis(&final_metrics);
+
+    Ok(ProcessedFileData {
+        file_path,
+        file_metrics: final_metrics,
+        score,
+        recommendation,
+        god_analysis,
+    })
+}
+
+// Pure function to enhance metrics with file content
+fn enhance_metrics_with_content(
+    mut file_metrics: FileDebtMetrics,
+    content: &str,
+    file_analyzer: &crate::analyzers::file_analyzer::UnifiedFileAnalyzer,
+    file_path: &Path,
+    no_god_object: bool,
+) -> Result<FileDebtMetrics, Box<dyn std::error::Error>> {
+    let actual_line_count = content.lines().count();
+    file_metrics.total_lines = actual_line_count;
+
+    // Recalculate uncovered lines based on actual line count
+    file_metrics.uncovered_lines =
+        calculate_uncovered_lines(file_metrics.coverage_percent, actual_line_count);
+
+    // Apply god object detection if enabled
+    if !no_god_object {
+        file_metrics.god_object_indicators = detect_god_object_indicators(
+            file_analyzer,
+            file_path,
+            content,
+            &file_metrics,
+            actual_line_count,
+        );
+    } else {
+        file_metrics.god_object_indicators = create_empty_god_object_indicators();
     }
 
-    let file_analyzer = UnifiedFileAnalyzer::new(coverage_data.cloned());
+    Ok(file_metrics)
+}
 
-    // Analyze each file
-    for (file_path, functions) in files_map {
-        // Convert references to owned values for aggregate_functions
-        let functions_owned: Vec<FunctionMetrics> = functions.iter().map(|&f| f.clone()).collect();
+// Pure function to calculate uncovered lines
+fn calculate_uncovered_lines(coverage_percent: f64, line_count: usize) -> usize {
+    ((1.0 - coverage_percent) * line_count as f64) as usize
+}
 
-        // Get file-level metrics
-        let mut file_metrics = file_analyzer.aggregate_functions(&functions_owned);
+// Pure function to detect god object indicators
+fn detect_god_object_indicators(
+    file_analyzer: &crate::analyzers::file_analyzer::UnifiedFileAnalyzer,
+    file_path: &Path,
+    content: &str,
+    file_metrics: &FileDebtMetrics,
+    actual_line_count: usize,
+) -> crate::priority::file_metrics::GodObjectIndicators {
+    let mut god_indicators = file_analyzer
+        .analyze_file(file_path, content)
+        .ok()
+        .map(|m| m.god_object_indicators)
+        .unwrap_or_else(|| file_metrics.god_object_indicators.clone());
 
-        // Read file content to get accurate line count and god object analysis
-        if let Ok(content) = std::fs::read_to_string(&file_path) {
-            // Get accurate line count
-            let actual_line_count = content.lines().count();
-            file_metrics.total_lines = actual_line_count;
-
-            // Recalculate uncovered lines based on actual line count
-            file_metrics.uncovered_lines =
-                ((1.0 - file_metrics.coverage_percent) * actual_line_count as f64) as usize;
-
-            // Run god object detection if enabled
-            if !no_god_object {
-                let god_indicators = file_analyzer
-                    .analyze_file(&file_path, &content)
-                    .ok()
-                    .map(|m| m.god_object_indicators)
-                    .unwrap_or_else(|| file_metrics.god_object_indicators.clone());
-                file_metrics.god_object_indicators = god_indicators;
-
-                // Update god object detection based on actual line count
-                if actual_line_count > 2000 || file_metrics.function_count > 50 {
-                    file_metrics.god_object_indicators.is_god_object = true;
-                    if file_metrics.god_object_indicators.god_object_score == 0.0 {
-                        file_metrics.god_object_indicators.god_object_score =
-                            (file_metrics.function_count as f64 / 50.0).min(2.0);
-                    }
-                }
-            }
-        } else if !no_god_object {
-            // Disable god object detection
-            file_metrics.god_object_indicators =
-                crate::priority::file_metrics::GodObjectIndicators {
-                    methods_count: 0,
-                    fields_count: 0,
-                    responsibilities: 0,
-                    is_god_object: false,
-                    god_object_score: 0.0,
-                };
+    // Apply size-based god object detection
+    if actual_line_count > 2000 || file_metrics.function_count > 50 {
+        god_indicators.is_god_object = true;
+        if god_indicators.god_object_score == 0.0 {
+            god_indicators.god_object_score = (file_metrics.function_count as f64 / 50.0).min(2.0);
         }
+    }
 
-        // Calculate function scores for this file
-        let mut function_scores = Vec::new();
-        for func in &functions_owned {
-            // Get the score from unified items if it exists
-            let score = unified
+    god_indicators
+}
+
+// Pure function to create empty god object indicators
+fn create_empty_god_object_indicators() -> crate::priority::file_metrics::GodObjectIndicators {
+    crate::priority::file_metrics::GodObjectIndicators {
+        methods_count: 0,
+        fields_count: 0,
+        responsibilities: 0,
+        is_god_object: false,
+        god_object_score: 0.0,
+    }
+}
+
+// Pure function to calculate function scores
+fn calculate_function_scores(functions: &[FunctionMetrics], unified: &UnifiedAnalysis) -> Vec<f64> {
+    functions
+        .iter()
+        .map(|func| {
+            unified
                 .items
                 .iter()
                 .find(|item| item.location.file == func.file && item.location.function == func.name)
                 .map(|item| item.unified_score.final_score)
-                .unwrap_or(0.0);
-            function_scores.push(score);
-        }
-        file_metrics.function_scores = function_scores;
+                .unwrap_or(0.0)
+        })
+        .collect()
+}
 
-        // Calculate file score
-        let score = file_metrics.calculate_score();
+// Pure function to create god object analysis
+fn create_god_object_analysis(
+    file_metrics: &FileDebtMetrics,
+) -> Option<crate::organization::GodObjectAnalysis> {
+    if !file_metrics.god_object_indicators.is_god_object {
+        return None;
+    }
 
+    Some(crate::organization::GodObjectAnalysis {
+        is_god_object: file_metrics.god_object_indicators.is_god_object,
+        method_count: file_metrics.god_object_indicators.methods_count,
+        field_count: file_metrics.god_object_indicators.fields_count,
+        responsibility_count: file_metrics.god_object_indicators.responsibilities,
+        lines_of_code: file_metrics.total_lines,
+        complexity_sum: file_metrics.total_complexity,
+        god_object_score: file_metrics.god_object_indicators.god_object_score * 100.0,
+        recommended_splits: Vec::new(),
+        confidence: crate::organization::GodObjectConfidence::Definite,
+        responsibilities: Vec::new(),
+    })
+}
+
+// I/O function to apply results to unified analysis
+fn apply_file_analysis_results(
+    unified: &mut UnifiedAnalysis,
+    processed_files: Vec<ProcessedFileData>,
+) {
+    for file_data in processed_files {
         // Update god object indicators for functions in this file
-        if file_metrics.god_object_indicators.is_god_object {
-            // Convert GodObjectIndicators to GodObjectAnalysis for UnifiedDebtItem
-            let god_analysis = crate::organization::GodObjectAnalysis {
-                is_god_object: file_metrics.god_object_indicators.is_god_object,
-                method_count: file_metrics.god_object_indicators.methods_count,
-                field_count: file_metrics.god_object_indicators.fields_count,
-                responsibility_count: file_metrics.god_object_indicators.responsibilities,
-                lines_of_code: file_metrics.total_lines,
-                complexity_sum: file_metrics.total_complexity,
-                god_object_score: file_metrics.god_object_indicators.god_object_score * 100.0, // Convert to percentage
-                recommended_splits: Vec::new(),
-                confidence: crate::organization::GodObjectConfidence::Definite,
-                responsibilities: Vec::new(),
-            };
-
-            for item in unified.items.iter_mut() {
-                if item.location.file == file_path {
-                    item.god_object_indicators = Some(god_analysis.clone());
-                }
-            }
+        if let Some(god_analysis) = &file_data.god_analysis {
+            update_function_god_indicators(unified, &file_data.file_path, god_analysis);
         }
 
-        // Only add file items with significant scores
-        if score > 50.0 {
-            // Threshold for file-level items
-            let recommendation = file_metrics.generate_recommendation();
+        // Create and add file debt item
+        let file_item = create_file_debt_item(file_data);
+        unified.add_file_item(file_item);
+    }
+}
 
-            let file_item = FileDebtItem {
-                metrics: file_metrics.clone(),
-                score,
-                priority_rank: 0, // Will be set during sorting
-                recommendation,
-                impact: FileImpact {
-                    complexity_reduction: file_metrics.avg_complexity
-                        * file_metrics.function_count as f64
-                        * 0.2,
-                    maintainability_improvement: score / 10.0,
-                    test_effort: file_metrics.uncovered_lines as f64 * 0.1,
-                },
-            };
-
-            unified.add_file_item(file_item);
+// Pure function to update function god indicators
+fn update_function_god_indicators(
+    unified: &mut UnifiedAnalysis,
+    file_path: &Path,
+    god_analysis: &crate::organization::GodObjectAnalysis,
+) {
+    for item in unified.items.iter_mut() {
+        if item.location.file == *file_path {
+            item.god_object_indicators = Some(god_analysis.clone());
         }
+    }
+}
+
+// Pure function to create file debt item
+fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
+    FileDebtItem {
+        metrics: file_data.file_metrics.clone(),
+        score: file_data.score,
+        priority_rank: 0, // Will be set during sorting
+        recommendation: file_data.recommendation,
+        impact: FileImpact {
+            complexity_reduction: file_data.file_metrics.avg_complexity
+                * file_data.file_metrics.function_count as f64
+                * 0.2,
+            maintainability_improvement: file_data.score / 10.0,
+            test_effort: file_data.file_metrics.uncovered_lines as f64 * 0.1,
+        },
     }
 }

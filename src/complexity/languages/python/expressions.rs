@@ -941,6 +941,79 @@ fn collect_generator_variables(gen_exp: &ast::ExprGeneratorExp) -> HashSet<Strin
 // Pattern Collection
 // ============================================================================
 
+fn collect_binary_op_patterns(bin_op: &ast::ExprBinOp, patterns: &mut Vec<String>) {
+    patterns.push(format!("bin_op:{:?}", bin_op.op));
+    collect_expression_patterns(&bin_op.left, patterns);
+    collect_expression_patterns(&bin_op.right, patterns);
+}
+
+fn collect_unary_op_patterns(unary_op: &ast::ExprUnaryOp, patterns: &mut Vec<String>) {
+    patterns.push(format!("unary_op:{:?}", unary_op.op));
+    collect_expression_patterns(&unary_op.operand, patterns);
+}
+
+fn collect_call_patterns(call: &ast::ExprCall, patterns: &mut Vec<String>) {
+    patterns.push("call".to_string());
+    collect_expression_patterns(&call.func, patterns);
+    for arg in &call.args {
+        collect_expression_patterns(arg, patterns);
+    }
+}
+
+fn collect_simple_pattern(pattern_name: &str, patterns: &mut Vec<String>) {
+    patterns.push(pattern_name.to_string());
+}
+
+/// Get the pattern name for simple expression types
+fn get_simple_pattern_name(expr: &ast::Expr) -> Option<&'static str> {
+    use ast::Expr::*;
+    match expr {
+        BoolOp(_) => Some("bool_op"),
+        Lambda(_) => Some("lambda"),
+        IfExp(_) => Some("if_exp"),
+        Dict(_) => Some("dict"),
+        Set(_) => Some("set"),
+        ListComp(_) => Some("list_comp"),
+        SetComp(_) => Some("set_comp"),
+        DictComp(_) => Some("dict_comp"),
+        GeneratorExp(_) => Some("generator_exp"),
+        Await(_) => Some("await"),
+        Yield(_) => Some("yield"),
+        YieldFrom(_) => Some("yield_from"),
+        Compare(_) => Some("compare"),
+        FormattedValue(_) => Some("f_string"),
+        JoinedStr(_) => Some("joined_str"),
+        Constant(_) => Some("constant"),
+        Attribute(_) => Some("attribute"),
+        Subscript(_) => Some("subscript"),
+        Starred(_) => Some("starred"),
+        Name(_) => Some("name"),
+        List(_) => Some("list"),
+        Tuple(_) => Some("tuple"),
+        Slice(_) => Some("slice"),
+        NamedExpr(_) => Some("named_expr"),
+        _ => None,
+    }
+}
+
+fn collect_expression_patterns(expr: &ast::Expr, patterns: &mut Vec<String>) {
+    use ast::Expr::*;
+
+    // Handle simple patterns
+    if let Some(pattern_name) = get_simple_pattern_name(expr) {
+        collect_simple_pattern(pattern_name, patterns);
+        return;
+    }
+
+    // Handle complex patterns
+    match expr {
+        BinOp(bin_op) => collect_binary_op_patterns(bin_op, patterns),
+        UnaryOp(unary_op) => collect_unary_op_patterns(unary_op, patterns),
+        Call(call) => collect_call_patterns(call, patterns),
+        _ => {} // Unknown pattern type
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1066,30 +1139,88 @@ mod tests {
 
     #[test]
     fn test_collect_expression_patterns_await() {
-        // Note: await requires async context, parsing may not work perfectly
-        // but we can still test with manual AST construction if needed
-        // For now, skip this test as it's complex to set up correctly
+        // Test await expression pattern detection
+        // We need to construct the AST manually since await requires async context
+        use rustpython_parser::ast;
+
+        let await_expr = ast::Expr::Await(ast::ExprAwait {
+            value: Box::new(ast::Expr::Name(ast::ExprName {
+                id: "x".to_string().into(),
+                ctx: ast::ExprContext::Load,
+                range: Default::default(),
+            })),
+            range: Default::default(),
+        });
+
+        let mut patterns = Vec::new();
+        collect_expression_patterns(&await_expr, &mut patterns);
+        assert!(patterns.contains(&"await".to_string()));
     }
 
     #[test]
     fn test_collect_expression_patterns_yield() {
-        // Yield is a statement-level construct, test it indirectly
-        // The yield pattern is already tested through generator expressions
+        // Test yield expression pattern detection
+        use rustpython_parser::ast;
+
+        let yield_expr = ast::Expr::Yield(ast::ExprYield {
+            value: Some(Box::new(ast::Expr::Name(ast::ExprName {
+                id: "x".to_string().into(),
+                ctx: ast::ExprContext::Load,
+                range: Default::default(),
+            }))),
+            range: Default::default(),
+        });
+
+        let mut patterns = Vec::new();
+        collect_expression_patterns(&yield_expr, &mut patterns);
+        assert!(patterns.contains(&"yield".to_string()));
     }
 
     #[test]
     fn test_collect_expression_patterns_yield_from() {
-        // YieldFrom is also complex to test directly
-        // The pattern is already covered through other tests
+        // Test yield from expression pattern detection
+        use rustpython_parser::ast;
+
+        let yield_from_expr = ast::Expr::YieldFrom(ast::ExprYieldFrom {
+            value: Box::new(ast::Expr::Name(ast::ExprName {
+                id: "x".to_string().into(),
+                ctx: ast::ExprContext::Load,
+                range: Default::default(),
+            })),
+            range: Default::default(),
+        });
+
+        let mut patterns = Vec::new();
+        collect_expression_patterns(&yield_from_expr, &mut patterns);
+        assert!(patterns.contains(&"yield_from".to_string()));
     }
 
     #[test]
     fn test_collect_expression_patterns_formatted_value() {
-        // F-strings parse as JoinedStr, not FormattedValue directly
-        let expr = parse_expr("f'{x}'");
+        // Test FormattedValue pattern detection (part of f-strings)
+        use rustpython_parser::ast;
+
+        // Create a FormattedValue directly
+        let formatted_value_expr = ast::Expr::FormattedValue(ast::ExprFormattedValue {
+            value: Box::new(ast::Expr::Name(ast::ExprName {
+                id: "x".to_string().into(),
+                ctx: ast::ExprContext::Load,
+                range: Default::default(),
+            })),
+            conversion: ast::ConversionFlag::None,
+            format_spec: None,
+            range: Default::default(),
+        });
+
         let mut patterns = Vec::new();
-        collect_expression_patterns(&expr, &mut patterns);
-        assert!(patterns.contains(&"joined_str".to_string()));
+        collect_expression_patterns(&formatted_value_expr, &mut patterns);
+        assert!(patterns.contains(&"f_string".to_string()));
+
+        // Also test JoinedStr which contains FormattedValues
+        let expr = parse_expr("f'{x}'");
+        let mut patterns2 = Vec::new();
+        collect_expression_patterns(&expr, &mut patterns2);
+        assert!(patterns2.contains(&"joined_str".to_string()));
     }
 
     #[test]
@@ -1126,12 +1257,34 @@ mod tests {
 
     #[test]
     fn test_collect_expression_patterns_slice() {
-        // Slices are typically part of subscript operations
-        let expr = parse_expr("arr[1:5]");
+        // Test slice expression pattern detection
+        use rustpython_parser::ast;
+
+        // Create a Slice directly
+        let slice_expr = ast::Expr::Slice(ast::ExprSlice {
+            lower: Some(Box::new(ast::Expr::Constant(ast::ExprConstant {
+                value: ast::Constant::Int(1.into()),
+                kind: None,
+                range: Default::default(),
+            }))),
+            upper: Some(Box::new(ast::Expr::Constant(ast::ExprConstant {
+                value: ast::Constant::Int(5.into()),
+                kind: None,
+                range: Default::default(),
+            }))),
+            step: None,
+            range: Default::default(),
+        });
+
         let mut patterns = Vec::new();
-        collect_expression_patterns(&expr, &mut patterns);
-        // The subscript contains a slice internally
-        assert!(patterns.contains(&"subscript".to_string()));
+        collect_expression_patterns(&slice_expr, &mut patterns);
+        assert!(patterns.contains(&"slice".to_string()));
+
+        // Also test slice as part of subscript
+        let expr = parse_expr("arr[1:5]");
+        let mut patterns2 = Vec::new();
+        collect_expression_patterns(&expr, &mut patterns2);
+        assert!(patterns2.contains(&"subscript".to_string()));
     }
 
     #[test]
@@ -1240,51 +1393,5 @@ mod tests {
         let expr = parse_expr("[1, 2, 3]");
         let tokens = extract_literal_tokens(&expr);
         assert!(tokens.is_empty());
-    }
-}
-
-fn collect_expression_patterns(expr: &ast::Expr, patterns: &mut Vec<String>) {
-    use ast::Expr::*;
-    match expr {
-        BoolOp(_) => patterns.push("bool_op".to_string()),
-        BinOp(bin_op) => {
-            patterns.push(format!("bin_op:{:?}", bin_op.op));
-            collect_expression_patterns(&bin_op.left, patterns);
-            collect_expression_patterns(&bin_op.right, patterns);
-        }
-        UnaryOp(unary_op) => {
-            patterns.push(format!("unary_op:{:?}", unary_op.op));
-            collect_expression_patterns(&unary_op.operand, patterns);
-        }
-        Lambda(_) => patterns.push("lambda".to_string()),
-        IfExp(_) => patterns.push("if_exp".to_string()),
-        Dict(_) => patterns.push("dict".to_string()),
-        Set(_) => patterns.push("set".to_string()),
-        ListComp(_) => patterns.push("list_comp".to_string()),
-        SetComp(_) => patterns.push("set_comp".to_string()),
-        DictComp(_) => patterns.push("dict_comp".to_string()),
-        GeneratorExp(_) => patterns.push("generator_exp".to_string()),
-        Await(_) => patterns.push("await".to_string()),
-        Yield(_) => patterns.push("yield".to_string()),
-        YieldFrom(_) => patterns.push("yield_from".to_string()),
-        Compare(_) => patterns.push("compare".to_string()),
-        Call(call) => {
-            patterns.push("call".to_string());
-            collect_expression_patterns(&call.func, patterns);
-            for arg in &call.args {
-                collect_expression_patterns(arg, patterns);
-            }
-        }
-        FormattedValue(_) => patterns.push("f_string".to_string()),
-        JoinedStr(_) => patterns.push("joined_str".to_string()),
-        Constant(_) => patterns.push("constant".to_string()),
-        Attribute(_) => patterns.push("attribute".to_string()),
-        Subscript(_) => patterns.push("subscript".to_string()),
-        Starred(_) => patterns.push("starred".to_string()),
-        Name(_) => patterns.push("name".to_string()),
-        List(_) => patterns.push("list".to_string()),
-        Tuple(_) => patterns.push("tuple".to_string()),
-        Slice(_) => patterns.push("slice".to_string()),
-        NamedExpr(_) => patterns.push("named_expr".to_string()),
     }
 }

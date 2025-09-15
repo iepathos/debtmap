@@ -76,120 +76,10 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
     }
 
     fn write_file_aggregates_section(&mut self, analysis: &UnifiedAnalysis) -> anyhow::Result<()> {
-        if analysis.file_aggregates.is_empty() {
-            return Ok(());
-        }
-
-        writeln!(self.writer(), "## File-Level Technical Debt")?;
-        writeln!(self.writer())?;
-
-        // Sort file aggregates by aggregate score descending
-        let mut file_aggregates: Vec<_> = analysis.file_aggregates.iter().cloned().collect();
-        file_aggregates.sort_by(|a, b| {
-            b.aggregate_score
-                .partial_cmp(&a.aggregate_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        // Take top 10 files
-        let top_files = file_aggregates.iter().take(10).collect::<Vec<_>>();
-
-        writeln!(self.writer(), "### Most Problematic Files")?;
-        writeln!(self.writer())?;
-        writeln!(
-            self.writer(),
-            "| Rank | File | Aggregate Score | Functions | Problematic | Top Function |"
-        )?;
-        writeln!(
-            self.writer(),
-            "|------|------|-----------------|-----------|-------------|--------------|"
-        )?;
-
-        for (idx, aggregate) in top_files.iter().enumerate() {
-            let rank = idx + 1;
-            let file_name = aggregate
-                .file_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown");
-            let aggregate_score = format!("{:.1}", aggregate.aggregate_score);
-            let top_function = aggregate
-                .top_function_scores
-                .first()
-                .map(|(name, score)| format!("{} ({:.1})", name, score))
-                .unwrap_or_else(|| "N/A".to_string());
-
-            writeln!(
-                self.writer(),
-                "| {} | {} | {} | {} | {} | {} |",
-                rank,
-                file_name,
-                aggregate_score,
-                aggregate.function_count,
-                aggregate.problematic_functions,
-                top_function
-            )?;
-        }
-        writeln!(self.writer())?;
-
-        // Add detailed breakdown for top 3 files if verbosity is enabled
-        if self.verbosity() > 0 && !top_files.is_empty() {
-            writeln!(self.writer(), "<details>")?;
-            writeln!(
-                self.writer(),
-                "<summary>File Details (click to expand)</summary>"
-            )?;
-            writeln!(self.writer())?;
-
-            for (idx, aggregate) in top_files.iter().take(3).enumerate() {
-                writeln!(
-                    self.writer(),
-                    "#### {}. {}",
-                    idx + 1,
-                    aggregate.file_path.display()
-                )?;
-                writeln!(self.writer())?;
-                writeln!(
-                    self.writer(),
-                    "- **Total Score**: {:.2}",
-                    aggregate.total_score
-                )?;
-                writeln!(
-                    self.writer(),
-                    "- **Aggregate Score**: {:.2}",
-                    aggregate.aggregate_score
-                )?;
-                writeln!(
-                    self.writer(),
-                    "- **Aggregation Method**: {:?}",
-                    aggregate.aggregation_method
-                )?;
-                writeln!(
-                    self.writer(),
-                    "- **Function Count**: {}",
-                    aggregate.function_count
-                )?;
-                writeln!(
-                    self.writer(),
-                    "- **Problematic Functions**: {}",
-                    aggregate.problematic_functions
-                )?;
-
-                if !aggregate.top_function_scores.is_empty() {
-                    writeln!(self.writer())?;
-                    writeln!(self.writer(), "**Top Functions:**")?;
-                    for (func_name, score) in &aggregate.top_function_scores {
-                        writeln!(self.writer(), "  - `{}`: {:.2}", func_name, score)?;
-                    }
-                }
-                writeln!(self.writer())?;
-            }
-
-            writeln!(self.writer(), "</details>")?;
-            writeln!(self.writer())?;
-        }
-
-        Ok(())
+        validate_file_aggregates(analysis)
+            .and_then(|_| write_section_header(self.writer()))
+            .and_then(|_| process_and_write_file_table(self, analysis))
+            .and_then(|_| conditionally_write_file_details(self, analysis))
     }
 
     fn write_dead_code_section(&mut self, analysis: &UnifiedAnalysis) -> anyhow::Result<()> {
@@ -477,4 +367,190 @@ mod tests {
         // The function name should be included as-is in markdown
         assert!(result.contains("test_function_with_<special>&_chars"));
     }
+}
+
+// Pure functional components for file aggregates section
+
+// 1. Pure validation function
+fn validate_file_aggregates(analysis: &UnifiedAnalysis) -> anyhow::Result<()> {
+    if analysis.file_aggregates.is_empty() {
+        return Err(anyhow::anyhow!("No file aggregates to display"));
+    }
+    Ok(())
+}
+
+// 2. Pure function for writing section header
+fn write_section_header<W: Write>(writer: &mut W) -> anyhow::Result<()> {
+    writeln!(writer, "## File-Level Technical Debt")?;
+    writeln!(writer)?;
+    Ok(())
+}
+
+// 3. Pure function for sorting file aggregates
+fn sort_file_aggregates_by_score(
+    analysis: &UnifiedAnalysis,
+) -> Vec<crate::priority::FileAggregateScore> {
+    let mut file_aggregates: Vec<_> = analysis.file_aggregates.iter().cloned().collect();
+    file_aggregates.sort_by(|a, b| {
+        b.aggregate_score
+            .partial_cmp(&a.aggregate_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    file_aggregates
+}
+
+// 4. Pure function for selecting top files
+fn select_top_files(
+    file_aggregates: &[crate::priority::FileAggregateScore],
+) -> Vec<&crate::priority::FileAggregateScore> {
+    file_aggregates.iter().take(10).collect()
+}
+
+// 5. Pure function for writing table headers
+fn write_table_headers<W: Write>(writer: &mut W) -> anyhow::Result<()> {
+    writeln!(writer, "### Most Problematic Files")?;
+    writeln!(writer)?;
+    writeln!(
+        writer,
+        "| Rank | File | Aggregate Score | Functions | Problematic | Top Function |"
+    )?;
+    writeln!(
+        writer,
+        "|------|------|-----------------|-----------|-------------|--------------|"
+    )?;
+    Ok(())
+}
+
+// 6. Pure function for extracting file name
+fn extract_file_name(aggregate: &crate::priority::FileAggregateScore) -> String {
+    aggregate
+        .file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+// 7. Pure function for formatting aggregate score
+fn format_aggregate_score(aggregate: &crate::priority::FileAggregateScore) -> String {
+    format!("{:.1}", aggregate.aggregate_score)
+}
+
+// 8. Pure function for formatting top function
+fn format_top_function(aggregate: &crate::priority::FileAggregateScore) -> String {
+    aggregate
+        .top_function_scores
+        .first()
+        .map(|(name, score)| format!("{} ({:.1})", name, score))
+        .unwrap_or_else(|| "N/A".to_string())
+}
+
+// 9. Pure function for formatting table row
+fn format_table_row(
+    rank: usize,
+    file_name: &str,
+    aggregate_score: &str,
+    function_count: usize,
+    problematic_functions: usize,
+    top_function: &str,
+) -> String {
+    format!(
+        "| {} | {} | {} | {} | {} | {} |",
+        rank, file_name, aggregate_score, function_count, problematic_functions, top_function
+    )
+}
+
+// 10. Pure function for writing table rows
+fn write_table_rows<W: Write>(
+    writer: &mut W,
+    top_files: &[&crate::priority::FileAggregateScore],
+) -> anyhow::Result<()> {
+    for (idx, aggregate) in top_files.iter().enumerate() {
+        let rank = idx + 1;
+        let file_name = extract_file_name(aggregate);
+        let aggregate_score = format_aggregate_score(aggregate);
+        let top_function = format_top_function(aggregate);
+
+        let row = format_table_row(
+            rank,
+            &file_name,
+            &aggregate_score,
+            aggregate.function_count,
+            aggregate.problematic_functions,
+            &top_function,
+        );
+        writeln!(writer, "{}", row)?;
+    }
+    writeln!(writer)?;
+    Ok(())
+}
+
+// 11. Pure function for formatting detailed breakdown
+fn format_file_details(idx: usize, aggregate: &crate::priority::FileAggregateScore) -> String {
+    let mut result = format!(
+        "#### {}. {}\n\n- **Total Score**: {:.2}\n- **Aggregate Score**: {:.2}\n- **Aggregation Method**: {:?}\n- **Function Count**: {}\n- **Problematic Functions**: {}\n",
+        idx + 1,
+        aggregate.file_path.display(),
+        aggregate.total_score,
+        aggregate.aggregate_score,
+        aggregate.aggregation_method,
+        aggregate.function_count,
+        aggregate.problematic_functions
+    );
+
+    if !aggregate.top_function_scores.is_empty() {
+        result.push_str("\n**Top Functions:**\n");
+        for (func_name, score) in &aggregate.top_function_scores {
+            result.push_str(&format!("  - `{}`: {:.2}\n", func_name, score));
+        }
+    }
+    result.push('\n');
+    result
+}
+
+// Helper functions for composing the pipeline
+
+fn process_and_write_file_table<W: Write>(
+    writer: &mut MarkdownWriter<W>,
+    analysis: &UnifiedAnalysis,
+) -> anyhow::Result<()> {
+    let sorted_aggregates = sort_file_aggregates_by_score(analysis);
+    let top_files = select_top_files(&sorted_aggregates);
+
+    write_table_headers(writer.writer())?;
+    write_table_rows(writer.writer(), &top_files)?;
+    Ok(())
+}
+
+fn conditionally_write_file_details<W: Write>(
+    writer: &mut MarkdownWriter<W>,
+    analysis: &UnifiedAnalysis,
+) -> anyhow::Result<()> {
+    if writer.verbosity() > 0 {
+        let sorted_aggregates = sort_file_aggregates_by_score(analysis);
+        let top_files = select_top_files(&sorted_aggregates);
+
+        if !top_files.is_empty() {
+            write_details_section(writer.writer(), &top_files)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_details_section<W: Write>(
+    writer: &mut W,
+    top_files: &[&crate::priority::FileAggregateScore],
+) -> anyhow::Result<()> {
+    writeln!(writer, "<details>")?;
+    writeln!(writer, "<summary>File Details (click to expand)</summary>")?;
+    writeln!(writer)?;
+
+    for (idx, aggregate) in top_files.iter().take(3).enumerate() {
+        let details = format_file_details(idx, aggregate);
+        write!(writer, "{}", details)?;
+    }
+
+    writeln!(writer, "</details>")?;
+    writeln!(writer)?;
+    Ok(())
 }

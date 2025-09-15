@@ -416,3 +416,212 @@ impl PythonResourceDetector for PythonCircularRefDetector {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustpython_parser::{parse, Mode};
+
+    fn parse_python_code(code: &str) -> ast::Mod {
+        parse(code, Mode::Module, "test.py").unwrap()
+    }
+
+    #[test]
+    fn test_detect_self_reference() {
+        let code = r#"
+class Node:
+    def __init__(self, value):
+        self.value = value
+        self.child = self  # Self-reference
+        "#;
+
+        let module = parse_python_code(code);
+        let detector = PythonCircularRefDetector::new();
+        let issues = detector.detect_issues(&module, Path::new("test.py"));
+
+        assert!(!issues.is_empty());
+        if let PythonResourceIssueType::CircularReference { pattern, .. } = &issues[0].issue_type {
+            assert_eq!(*pattern, CircularPattern::SelfReference);
+        } else {
+            panic!("Expected circular reference issue");
+        }
+    }
+
+    #[test]
+    fn test_detect_mutual_reference() {
+        let code = r#"
+class Parent:
+    def __init__(self):
+        self.child = Child(self)
+
+class Child:
+    def __init__(self, parent):
+        self.parent = parent
+        "#;
+
+        let module = parse_python_code(code);
+        let detector = PythonCircularRefDetector::new();
+        let issues = detector.detect_issues(&module, Path::new("test.py"));
+
+        // Should detect circular reference pattern
+        assert!(!issues.is_empty());
+    }
+
+    #[test]
+    fn test_analyze_classes() {
+        let code = r#"
+class TestClass:
+    def __init__(self):
+        self.attr1 = "value"
+        self.attr2 = 42
+
+    def method1(self):
+        self.attr3 = "another"
+        "#;
+
+        let module = parse_python_code(code);
+        let detector = PythonCircularRefDetector::new();
+        let classes = detector.analyze_classes(&module);
+
+        assert_eq!(classes.len(), 1);
+        assert!(classes.contains_key("TestClass"));
+
+        let test_class = &classes["TestClass"];
+        assert!(!test_class.attributes.is_empty());
+    }
+
+    #[test]
+    fn test_no_circular_reference() {
+        let code = r#"
+class SimpleClass:
+    def __init__(self, value):
+        self.value = value
+        self.data = []
+        "#;
+
+        let module = parse_python_code(code);
+        let detector = PythonCircularRefDetector::new();
+        let issues = detector.detect_issues(&module, Path::new("test.py"));
+
+        // Should not detect any circular references
+        let circular_issues: Vec<_> = issues
+            .into_iter()
+            .filter(|issue| {
+                matches!(
+                    issue.issue_type,
+                    PythonResourceIssueType::CircularReference { .. }
+                )
+            })
+            .collect();
+        assert!(circular_issues.is_empty());
+    }
+
+    #[test]
+    fn test_assess_resource_impact() {
+        let detector = PythonCircularRefDetector::new();
+
+        let issue = ResourceIssue {
+            issue_type: PythonResourceIssueType::CircularReference {
+                pattern: CircularPattern::SelfReference,
+                classes_involved: vec!["Node".to_string()],
+            },
+            location: ResourceLocation {
+                line: 5,
+                column: 10,
+                end_line: None,
+                end_column: None,
+            },
+            severity: ResourceSeverity::High,
+            suggestion: "Avoid self-reference to prevent potential memory issues".to_string(),
+        };
+
+        let impact = detector.assess_resource_impact(&issue);
+        assert_eq!(impact.impact_level, ImpactLevel::High);
+        assert_eq!(impact.estimated_severity, 0.8);
+    }
+
+    #[test]
+    fn test_chain_reference_impact() {
+        let detector = PythonCircularRefDetector::new();
+
+        let short_chain_issue = ResourceIssue {
+            issue_type: PythonResourceIssueType::CircularReference {
+                pattern: CircularPattern::ChainReference(2),
+                classes_involved: vec!["ClassA".to_string(), "ClassB".to_string()],
+            },
+            location: ResourceLocation {
+                line: 5,
+                column: 10,
+                end_line: None,
+                end_column: None,
+            },
+            severity: ResourceSeverity::Medium,
+            suggestion: "Short chain reference found".to_string(),
+        };
+
+        let long_chain_issue = ResourceIssue {
+            issue_type: PythonResourceIssueType::CircularReference {
+                pattern: CircularPattern::ChainReference(5),
+                classes_involved: vec![
+                    "ClassA".to_string(),
+                    "ClassB".to_string(),
+                    "ClassC".to_string(),
+                ],
+            },
+            location: ResourceLocation {
+                line: 5,
+                column: 10,
+                end_line: None,
+                end_column: None,
+            },
+            severity: ResourceSeverity::High,
+            suggestion: "Long chain reference found".to_string(),
+        };
+
+        let short_impact = detector.assess_resource_impact(&short_chain_issue);
+        let long_impact = detector.assess_resource_impact(&long_chain_issue);
+
+        assert_eq!(short_impact.impact_level, ImpactLevel::Medium);
+        assert_eq!(long_impact.impact_level, ImpactLevel::High);
+    }
+
+    #[test]
+    fn test_callback_loop_pattern() {
+        let code = r#"
+class EventHandler:
+    def __init__(self):
+        self.callback = self.handle_event
+
+    def handle_event(self, event):
+        self.callback(event)  # Potential infinite loop
+        "#;
+
+        let module = parse_python_code(code);
+        let detector = PythonCircularRefDetector::new();
+        let issues = detector.detect_issues(&module, Path::new("test.py"));
+
+        // Should detect potential callback loop
+        assert!(!issues.is_empty());
+    }
+
+    #[test]
+    fn test_complex_inheritance_scenario() {
+        let code = r#"
+class Base:
+    def __init__(self):
+        self.derived_ref = None
+
+class Derived(Base):
+    def __init__(self):
+        super().__init__()
+        self.derived_ref = self  # Self-reference through inheritance
+        "#;
+
+        let module = parse_python_code(code);
+        let detector = PythonCircularRefDetector::new();
+        let issues = detector.detect_issues(&module, Path::new("test.py"));
+
+        // Should detect issues in inheritance scenarios
+        assert!(!issues.is_empty());
+    }
+}

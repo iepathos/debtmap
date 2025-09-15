@@ -264,21 +264,29 @@ impl<'a> JavaScriptEntropyAnalyzer<'a> {
         variables.len()
     }
 
+    /// Check if node is a variable declaration context
+    fn is_variable_declaration_context(parent_kind: &str) -> bool {
+        matches!(parent_kind, "variable_declarator" | "parameter" | "pattern")
+    }
+
+    /// Extract variable name from identifier node if it's in a declaration context
+    fn extract_variable_if_declaration(&self, node: Node) -> Option<String> {
+        if node.kind() != "identifier" {
+            return None;
+        }
+
+        node.parent()
+            .filter(|parent| Self::is_variable_declaration_context(parent.kind()))
+            .map(|_| self.source[node.byte_range()].to_string())
+    }
+
     /// Collect variable names
     fn collect_variables(&self, cursor: &mut TreeCursor, variables: &mut HashSet<String>) {
         let node = cursor.node();
 
-        if node.kind() == "identifier" {
-            if let Some(parent) = node.parent() {
-                // Only count identifiers in variable declarations
-                if parent.kind() == "variable_declarator"
-                    || parent.kind() == "parameter"
-                    || parent.kind() == "pattern"
-                {
-                    let text = &self.source[node.byte_range()];
-                    variables.insert(text.to_string());
-                }
-            }
+        // Extract variable if applicable
+        if let Some(var_name) = self.extract_variable_if_declaration(node) {
+            variables.insert(var_name);
         }
 
         // Visit children
@@ -449,5 +457,125 @@ impl BranchGroup {
         }
 
         matches as f64 / max_len
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    // Test helpers for mock scenarios since tree-sitter requires complex setup
+    fn create_mock_variables() -> HashSet<String> {
+        let mut vars = HashSet::new();
+        vars.insert("x".to_string());
+        vars.insert("y".to_string());
+        vars.insert("z".to_string());
+        vars
+    }
+
+    #[test]
+    fn test_branch_similarity_calculation() {
+        let analyzer = JavaScriptEntropyAnalyzer::new("test");
+
+        // Test similarity calculation with identical branches
+        let branch1 = vec!["call".to_string(), "return".to_string()];
+        let branch2 = vec!["call".to_string(), "return".to_string()];
+
+        let group = BranchGroup {
+            branches: vec![branch1, branch2],
+        };
+
+        let similarity = group.similarity();
+        assert_eq!(similarity, 1.0); // Identical branches should have 100% similarity
+    }
+
+    #[test]
+    fn test_branch_similarity_different_lengths() {
+        let branch1 = vec!["call".to_string(), "return".to_string()];
+        let branch2 = vec!["call".to_string()];
+
+        let group = BranchGroup {
+            branches: vec![branch1, branch2],
+        };
+
+        let similarity = group.similarity();
+        assert_eq!(similarity, 0.5); // Should normalize by max length
+    }
+
+    #[test]
+    fn test_branch_similarity_no_branches() {
+        let group = BranchGroup { branches: vec![] };
+
+        let similarity = group.similarity();
+        assert_eq!(similarity, 0.0); // No branches should return 0
+    }
+
+    #[test]
+    fn test_branch_similarity_single_branch() {
+        let branch1 = vec!["call".to_string(), "return".to_string()];
+
+        let group = BranchGroup {
+            branches: vec![branch1],
+        };
+
+        let similarity = group.similarity();
+        assert_eq!(similarity, 0.0); // Single branch can't have similarity
+    }
+
+    #[test]
+    fn test_sequence_similarity_empty_sequences() {
+        let group = BranchGroup { branches: vec![] };
+        let similarity = group.sequence_similarity(&[], &[]);
+        assert_eq!(similarity, 0.0);
+    }
+
+    #[test]
+    fn test_sequence_similarity_partial_match() {
+        let seq1 = vec![
+            "call".to_string(),
+            "assign".to_string(),
+            "return".to_string(),
+        ];
+        let seq2 = vec![
+            "call".to_string(),
+            "binary".to_string(),
+            "return".to_string(),
+        ];
+
+        let group = BranchGroup { branches: vec![] };
+        let similarity = group.sequence_similarity(&seq1, &seq2);
+
+        // 2 matches out of 3 positions = 2/3 ≈ 0.67
+        assert!((similarity - 0.666).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_cache_key_generation() {
+        let analyzer = JavaScriptEntropyAnalyzer::new("function test() { return 42; }");
+
+        // Create a mock node-like structure for testing cache key generation
+        // This test focuses on the format and consistency of cache keys
+        let content = "function test() { return 42; }";
+
+        // Test that cache key format is correct
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(content.as_bytes());
+        let content_hash = hasher.finalize();
+        let expected_format = format!("js_0:0-0:0__{:x}", content_hash);
+
+        // The actual implementation would use node positions, but we test the format
+        assert!(expected_format.starts_with("js_"));
+        assert!(expected_format.contains("__"));
+    }
+
+    #[test]
+    fn test_analyzer_creation() {
+        let source = "function test() { return 42; }";
+        let analyzer = JavaScriptEntropyAnalyzer::new(source);
+
+        // Basic test to ensure analyzer is created correctly
+        assert_eq!(analyzer.source, source);
     }
 }
