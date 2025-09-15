@@ -20,35 +20,66 @@ ls -la target/coverage/lcov.info
 - The baseline coverage will be recorded from debtmap's output in Step 2
 
 ### Step 2: Initial Analysis
-Run debtmap to analyze the current tech debt and get the top recommendation:
+The workflow has already generated the debtmap analysis. Extract the baseline data:
+```bash
+# Verify the workflow-generated file exists
+ls -la .prodigy/debtmap-before.json
 ```
-target/release/debtmap analyze . --lcov target/coverage/lcov.info --top 1
-```
-- **CRITICAL**: Record the BASELINE values shown at the bottom:
-  - TOTAL DEBT SCORE (e.g., "TOTAL DEBT SCORE: 3735")
-  - OVERALL COVERAGE (e.g., "OVERALL COVERAGE: 48.32%")
+- **CRITICAL**: Extract and record the BASELINE values from the workflow-generated JSON:
+  ```bash
+  # Extract key metrics
+  TOTAL_DEBT_SCORE=$(jq '.total_debt_score' .prodigy/debtmap-before.json)
+  OVERALL_COVERAGE=$(jq '.overall_coverage' .prodigy/debtmap-before.json)
+  echo "BASELINE - Total Debt Score: $TOTAL_DEBT_SCORE"
+  echo "BASELINE - Overall Coverage: $OVERALL_COVERAGE%"
+  ```
 - Store these as your BASELINE values for comparison later
-- Note the top recommendation details:
-  - Priority SCORE value
-  - TEST GAP location (file:line and function)
-  - ACTION required
-  - IMPACT predictions
+- Extract the top recommendation details from JSON:
+  ```bash
+  # Get top priority item details
+  jq '.items[0] | {
+    score: .unified_score.final_score,
+    location: .location,
+    action: .recommendation.primary_action,
+    rationale: .recommendation.rationale,
+    expected_impact: .expected_impact
+  }' .prodigy/debtmap-before.json
+  ```
 
 ### Step 3: Identify Priority
-The debtmap output now shows the #1 TOP RECOMMENDATION with a unified priority score:
+The debtmap JSON output provides the #1 TOP RECOMMENDATION with structured data:
 
-The recommendation will include:
-- **SCORE**: Unified priority score (higher = more critical)
-- **TEST GAP**: The specific function/file needing attention
-- **ACTION**: What needs to be done (refactor, add tests, etc.)
-- **IMPACT**: Expected improvements (coverage %, complexity reduction, risk reduction)
-- **WHY**: Explanation of why this is the top priority
+Extract the key information from the JSON:
+```bash
+# Get detailed top priority information
+jq '.items[0] | {
+  unified_score: .unified_score.final_score,
+  location: {
+    file: .location.file,
+    function: .location.function,
+    line: .location.line
+  },
+  debt_type: .debt_type,
+  action: .recommendation.primary_action,
+  rationale: .recommendation.rationale,
+  implementation_steps: .recommendation.implementation_steps,
+  expected_impact: {
+    coverage_improvement: .expected_impact.coverage_improvement,
+    complexity_reduction: .expected_impact.complexity_reduction,
+    risk_reduction: .expected_impact.risk_reduction
+  },
+  coverage_info: {
+    current_coverage: .transitive_coverage.direct,
+    uncovered_lines: .transitive_coverage.uncovered_lines
+  }
+}' .prodigy/debtmap-before.json
+```
 
-Priority categories:
-1. **CRITICAL (Score 10.0)**: Functions with high complexity and zero coverage
-2. **HIGH (Score 7-9)**: Important business logic with test gaps
-3. **MEDIUM (Score 4-6)**: Moderate complexity or coverage issues
-4. **LOW (Score 1-3)**: Minor improvements
+Priority categories (based on unified_score):
+1. **CRITICAL (Score >100)**: High complexity with poor coverage
+2. **HIGH (Score 50-100)**: Important business logic with test gaps
+3. **MEDIUM (Score 20-50)**: Moderate complexity or coverage issues
+4. **LOW (Score <20)**: Minor improvements
 
 ### Step 3.5: Evaluate Refactoring Approach (for Complexity Issues)
 
@@ -217,16 +248,29 @@ cargo tarpaulin --config .tarpaulin.toml --out Lcov --output-dir target/coverage
 ### Step 8: Final Analysis
 Run debtmap again to verify improvement:
 ```
-target/release/debtmap analyze . --lcov target/coverage/lcov.info --top 1
+target/release/debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-final.json --format json
 ```
-- **CRITICAL**: Record the NEW values:
-  - TOTAL DEBT SCORE
-  - OVERALL COVERAGE percentage
-- Calculate the changes:
-  - Coverage change: NEW% - BASELINE%
-  - Debt score change: BASELINE - NEW
-- Verify the original issue is resolved (should no longer be #1 priority)
-- Note what the new top priority is
+- **CRITICAL**: Extract and record the NEW values from JSON:
+  ```bash
+  # Extract final metrics
+  NEW_DEBT_SCORE=$(jq '.total_debt_score' .prodigy/debtmap-final.json)
+  NEW_COVERAGE=$(jq '.overall_coverage' .prodigy/debtmap-final.json)
+  echo "FINAL - Total Debt Score: $NEW_DEBT_SCORE"
+  echo "FINAL - Overall Coverage: $NEW_COVERAGE%"
+
+  # Calculate changes
+  echo "Coverage change: $(echo "$NEW_COVERAGE - $OVERALL_COVERAGE" | bc -l)%"
+  echo "Debt score change: $(echo "$TOTAL_DEBT_SCORE - $NEW_DEBT_SCORE" | bc -l)"
+  ```
+- Verify the original issue is resolved:
+  ```bash
+  # Check if the original issue is still #1 priority
+  jq '.items[0] | {
+    score: .unified_score.final_score,
+    location: .location,
+    action: .recommendation.primary_action
+  }' .prodigy/debtmap-final.json
+  ```
 
 ### Step 8.5: Understanding Metrics Changes
 
@@ -254,30 +298,39 @@ target/release/debtmap analyze . --lcov target/coverage/lcov.info --top 1
 - Consider long-term maintainability over short-term metrics
 
 ### Step 9: Commit Changes
-Create a descriptive commit message using the values recorded from debtmap:
+Create a descriptive commit message using the values extracted from debtmap JSON:
 
 **For test additions:**
-```
-test: add comprehensive tests for [module/function name]
+```bash
+# Extract values for commit message
+ORIGINAL_FUNCTION=$(jq -r '.items[0].location.function' .prodigy/debtmap-before.json)
+ORIGINAL_SCORE=$(jq -r '.items[0].unified_score.final_score' .prodigy/debtmap-before.json)
+ORIGINAL_COVERAGE=$(jq -r '.items[0].transitive_coverage.direct' .prodigy/debtmap-before.json)
+
+# Create commit with extracted values
+git commit -m "test: add comprehensive tests for $ORIGINAL_FUNCTION
 
 - Added [number] test cases covering [specific scenarios]
-- Coverage: +X.XX% (from BASELINE% to NEW%)
-- Debt score: [+/-]XX (from BASELINE to NEW)
-- Resolved: Priority [SCORE] - [function] with [coverage]% coverage
+- Coverage: $(printf "%.2f" $(echo "$NEW_COVERAGE - $OVERALL_COVERAGE" | bc -l))% (from $(printf "%.2f" $OVERALL_COVERAGE)% to $(printf "%.2f" $NEW_COVERAGE)%)
+- Debt score: $(printf "%.0f" $(echo "$TOTAL_DEBT_SCORE - $NEW_DEBT_SCORE" | bc -l)) (from $(printf "%.0f" $TOTAL_DEBT_SCORE) to $(printf "%.0f" $NEW_DEBT_SCORE))
+- Resolved: Priority $(printf "%.1f" $ORIGINAL_SCORE) - $ORIGINAL_FUNCTION with $(printf "%.0f%%" $(echo "$ORIGINAL_COVERAGE * 100" | bc -l)) coverage"
 ```
 
 **For complexity reduction:**
-```
-refactor: reduce complexity in [module/function name]
+```bash
+# Extract complexity information
+ORIGINAL_COMPLEXITY=$(jq -r '.items[0].cyclomatic_complexity' .prodigy/debtmap-before.json)
 
-- [Specific refactoring applied, e.g., "Replaced nested loops with iterator chain"]
-- Complexity reduced from [X] to [Y]
-- Coverage: +X.XX% (from BASELINE% to NEW%) [if coverage changed]
-- Debt score: [+/-]XX (from BASELINE to NEW)
-- Resolved: Priority [SCORE] - [function] complexity [X]
+git commit -m "refactor: reduce complexity in $ORIGINAL_FUNCTION
+
+- [Specific refactoring applied, e.g., \"Replaced nested loops with iterator chain\"]
+- Complexity reduced from $ORIGINAL_COMPLEXITY to [new_complexity]
+- Coverage: $(printf "%.2f" $(echo "$NEW_COVERAGE - $OVERALL_COVERAGE" | bc -l))% (from $(printf "%.2f" $OVERALL_COVERAGE)% to $(printf "%.2f" $NEW_COVERAGE)%)
+- Debt score: $(printf "%.0f" $(echo "$TOTAL_DEBT_SCORE - $NEW_DEBT_SCORE" | bc -l)) (from $(printf "%.0f" $TOTAL_DEBT_SCORE) to $(printf "%.0f" $NEW_DEBT_SCORE))
+- Resolved: Priority $(printf "%.1f" $ORIGINAL_SCORE) - $ORIGINAL_FUNCTION complexity $ORIGINAL_COMPLEXITY"
 ```
 
-**Important**: Use the exact coverage percentages and debt scores from debtmap's output, not from tarpaulin directly.
+**Important**: Use the exact coverage percentages and debt scores extracted from debtmap JSON output.
 
 ## Important Instructions
 
@@ -286,11 +339,11 @@ refactor: reduce complexity in [module/function name]
 **COMMIT MESSAGE REQUIREMENTS**:
 Every commit MUST include:
 1. What was changed (refactoring or tests added)
-2. **Coverage change with actual percentages from debtmap** (e.g., "+3.15% (from 48.32% to 51.47%)")
-3. **Debt score change with actual values from debtmap** (e.g., "-150 (from 3735 to 3585)")
-4. The priority score and description of resolved issue
+2. **Coverage change with actual percentages from debtmap JSON** (extracted using `jq '.overall_coverage'`)
+3. **Debt score change with actual values from debtmap JSON** (extracted using `jq '.total_debt_score'`)
+4. The priority score and description of resolved issue (extracted from `.items[0]`)
 
-**Note**: Always use the OVERALL COVERAGE percentage shown by debtmap, not the line coverage from tarpaulin.
+**Note**: Always use the JSON output values from debtmap, not the line coverage from tarpaulin directly. The workflow generates `.prodigy/debtmap-before.json` (baseline) and `.prodigy/debtmap-after.json` (final state for validation). You can also create `.prodigy/debtmap-final.json` for manual comparison if needed.
 
 ## Success Criteria
 
