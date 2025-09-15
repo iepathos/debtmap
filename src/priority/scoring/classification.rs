@@ -49,7 +49,7 @@ fn check_testing_gap(
 }
 
 fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
-    (func.cyclomatic > 10 || func.cognitive > 15).then(|| DebtType::ComplexityHotspot {
+    (func.cyclomatic > 10 || func.cognitive > 15).then_some(DebtType::ComplexityHotspot {
         cyclomatic: func.cyclomatic,
         cognitive: func.cognitive,
     })

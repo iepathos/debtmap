@@ -1,0 +1,60 @@
+{
+  "workflow_id": "workflow-1757897734390",
+  "execution_state": {
+    "current_step_index": 3,
+    "total_steps": 6,
+    "status": "Running",
+    "start_time": "2025-09-15T01:07:13.390598Z",
+    "last_checkpoint": "2025-09-15T01:07:13.390598Z",
+    "current_iteration": null,
+    "total_iterations": null
+  },
+  "completed_steps": [
+    {
+      "step_index": 0,
+      "command": "shell: just build-release",
+      "success": true,
+      "output": null,
+      "captured_variables": {},
+      "duration": {
+        "secs": 127,
+        "nanos": 801360833
+      },
+      "completed_at": "2025-09-15T00:57:42.219368Z"
+    },
+    {
+      "step_index": 1,
+      "command": "shell: just coverage-lcov",
+      "success": true,
+      "output": null,
+      "captured_variables": {},
+      "duration": {
+        "secs": 314,
+        "nanos": 867597584
+      },
+      "completed_at": "2025-09-15T01:02:57.090500Z"
+    },
+    {
+      "step_index": 2,
+      "command": "shell: target/debug/debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json -vv",
+      "success": true,
+      "output": null,
+      "captured_variables": {},
+      "duration": {
+        "secs": 256,
+        "nanos": 297223000
+      },
+      "completed_at": "2025-09-15T01:07:13.390589Z"
+    }
+  ],
+  "variable_state": {
+    "PROJECT_ROOT": "/Users/glen/.prodigy/worktrees/debtmap/session-915ae016-1bca-47c2-bc4b-6b7c98f96d06"
+  },
+  "mapreduce_state": null,
+  "timestamp": "2025-09-15T01:07:13.390598Z",
+  "version": 1,
+  "workflow_hash": "6",
+  "total_steps": 6,
+  "workflow_name": "default",
+  "workflow_path": null
+}

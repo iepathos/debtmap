@@ -388,6 +388,6 @@ mod tests {
 
         // Window size 2 should find "a,b" pattern
         let patterns = detect_repetitive_sequences(&tokens, 2);
-        assert!(patterns.len() > 0, "Should detect overlapping patterns");
+        assert!(!patterns.is_empty(), "Should detect overlapping patterns");
     }
 }
