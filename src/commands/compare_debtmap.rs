@@ -233,6 +233,7 @@ fn create_summary(analysis: &UnifiedAnalysis) -> AnalysisSummary {
 
 struct ResolvedItems {
     high_priority_count: usize,
+    #[allow(dead_code)]
     total_count: usize,
 }
 

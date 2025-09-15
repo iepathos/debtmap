@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_explain_criticality_with_distance_factor() {
-        let mut context = create_test_context();
+        let context = create_test_context();
         // Mock distance from entry
         let analyzer = CriticalityAnalyzer::new(&context);
         let function_id = create_test_function_id();

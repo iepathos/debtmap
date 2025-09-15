@@ -120,6 +120,7 @@ pub fn perform_unified_analysis_with_options(
 }
 
 // Pure function to create analysis parameters
+#[allow(clippy::too_many_arguments)]
 fn create_analysis_parameters<'a>(
     results: &'a AnalysisResults,
     coverage_file: Option<&'a PathBuf>,
@@ -225,6 +226,7 @@ fn attempt_cached_analysis(params: &AnalysisParameters) -> Option<Result<Unified
 }
 
 // Function composition for computation with caching
+#[allow(dead_code)]
 fn attempt_computation_with_caching(params: AnalysisParameters) -> Option<Result<UnifiedAnalysis>> {
     let mut unified_cache = UnifiedAnalysisCache::new(Some(params.project_path)).ok()?;
     let cache_key = create_cache_key(&params).ok()?;
@@ -257,6 +259,7 @@ fn log_cache_hit() {
 }
 
 // Function to cache computation result
+#[allow(dead_code)]
 fn cache_result(
     cache: &mut UnifiedAnalysisCache,
     cache_key: UnifiedAnalysisCacheKey,

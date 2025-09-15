@@ -162,6 +162,7 @@ pub enum VerbosityLevel {
 }
 
 pub struct UnifiedExtractionAnalyzer {
+    #[allow(dead_code)]
     matchers: HashMap<String, Box<dyn PatternMatcher>>,
 }
 
@@ -487,6 +488,7 @@ fn apply_confidence_scoring(
 
 // Error type for analysis pipeline
 #[derive(Debug)]
+#[allow(dead_code)]
 enum AnalysisError {
     ParseError,
     IoError,
@@ -494,6 +496,7 @@ enum AnalysisError {
 }
 
 // Extension trait for Result chaining in analysis pipeline
+#[allow(dead_code)]
 trait AnalysisResult<T> {
     fn and_then_analysis<U, F>(self, f: F) -> Result<U, AnalysisError>
     where

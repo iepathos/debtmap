@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{Cli, Commands};
 use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
+use std::path::Path;
 
 // Main orchestrator function
 fn main() -> Result<()> {
@@ -152,7 +153,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
 fn handle_cache_operations(
     cache_stats: bool,
     migrate_cache: bool,
-    path: &std::path::PathBuf,
+    path: &Path,
 ) -> Result<Option<Result<()>>> {
     if cache_stats {
         return Ok(Some(handle_cache_stats(path)));

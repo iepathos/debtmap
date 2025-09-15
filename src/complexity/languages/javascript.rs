@@ -466,6 +466,7 @@ mod tests {
     use std::collections::HashSet;
 
     // Test helpers for mock scenarios since tree-sitter requires complex setup
+    #[allow(dead_code)]
     fn create_mock_variables() -> HashSet<String> {
         let mut vars = HashSet::new();
         vars.insert("x".to_string());
@@ -476,7 +477,7 @@ mod tests {
 
     #[test]
     fn test_branch_similarity_calculation() {
-        let analyzer = JavaScriptEntropyAnalyzer::new("test");
+        let _analyzer = JavaScriptEntropyAnalyzer::new("test");
 
         // Test similarity calculation with identical branches
         let branch1 = vec!["call".to_string(), "return".to_string()];
@@ -552,7 +553,7 @@ mod tests {
 
     #[test]
     fn test_cache_key_generation() {
-        let analyzer = JavaScriptEntropyAnalyzer::new("function test() { return 42; }");
+        let _analyzer = JavaScriptEntropyAnalyzer::new("function test() { return 42; }");
 
         // Create a mock node-like structure for testing cache key generation
         // This test focuses on the format and consistency of cache keys
