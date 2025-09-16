@@ -42,6 +42,7 @@ pub struct AnalyzeConfig {
     pub use_cache: bool,
     pub no_cache: bool,
     pub clear_cache: bool,
+    pub force_cache_rebuild: bool,
     pub cache_stats: bool,
     pub migrate_cache: bool,
     pub cache_location: Option<String>,
@@ -65,7 +66,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     }
 
     // Handle cache flags
-    if config.clear_cache {
+    if config.clear_cache || config.force_cache_rebuild {
         // Clear cache using the shared cache system
         if let Ok(mut cache) = core::cache::AnalysisCache::new(Some(&config.path)) {
             cache.clear()?;
@@ -77,6 +78,10 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         if let Ok(mut unified_cache) = UnifiedAnalysisCache::new(Some(&config.path)) {
             unified_cache.clear()?;
             log::info!("Unified analysis cache cleared");
+        }
+
+        if config.force_cache_rebuild {
+            log::info!("Force cache rebuild requested - all caches cleared");
         }
     }
 

@@ -722,6 +722,7 @@ mod tests {
             last_accessed: old_time,
             access_count: 1,
             size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
         };
 
         let recent_metadata = CacheMetadata {
@@ -730,6 +731,7 @@ mod tests {
             last_accessed: recent_time,
             access_count: 1,
             size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
         };
 
         // Entry older than 1 day should be considered old
@@ -771,6 +773,7 @@ mod tests {
                 last_accessed: now,
                 access_count: 1,
                 size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             };
 
             index.entries.insert(key.clone(), metadata.clone());
@@ -840,6 +843,7 @@ mod tests {
                 last_accessed: SystemTime::now(),
                 access_count: 1,
                 size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             },
         );
 
@@ -853,6 +857,7 @@ mod tests {
                 last_accessed: SystemTime::now(),
                 access_count: 1,
                 size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             },
         );
         index.entries.insert(
@@ -863,6 +868,7 @@ mod tests {
                 last_accessed: SystemTime::now(),
                 access_count: 1,
                 size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             },
         );
 
@@ -914,6 +920,7 @@ mod tests {
             last_accessed: now - Duration::from_secs(3600), // 1 hour ago
             access_count: 1,
             size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
         };
         entries.insert("recent".to_string(), recent_metadata);
         assert!(!AutoPruner::has_old_entries(&entries, 1, now));
@@ -925,6 +932,7 @@ mod tests {
             last_accessed: now - Duration::from_secs(2 * 86400), // 2 days ago
             access_count: 1,
             size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
         };
         entries.insert("old".to_string(), old_metadata);
         assert!(AutoPruner::has_old_entries(&entries, 1, now));
@@ -949,6 +957,7 @@ mod tests {
             last_accessed: now - Duration::from_secs(2 * 86400), // 2 days ago
             access_count: 1,
             size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
         };
         index.entries.insert("old_key".to_string(), old_metadata);
         index.total_size = 100;

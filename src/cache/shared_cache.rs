@@ -19,6 +19,14 @@ pub struct CacheMetadata {
     pub last_accessed: SystemTime,
     pub access_count: u64,
     pub size_bytes: u64,
+    #[serde(default = "default_debtmap_version")]
+    pub debtmap_version: String,
+}
+
+/// Default function for debtmap_version field when deserializing old cache entries
+fn default_debtmap_version() -> String {
+    // Return empty string for old entries that don't have version info
+    String::new()
 }
 
 /// Index for tracking cache entries
@@ -187,14 +195,18 @@ impl SharedCache {
     /// Create a new shared cache instance
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
         let location = CacheLocation::resolve(repo_path)?;
-        Self::new_with_location(location)
+        let cache = Self::new_with_location(location)?;
+        cache.validate_version()?;
+        Ok(cache)
     }
 
     /// Create a new shared cache instance with explicit cache directory (for testing)
     pub fn new_with_cache_dir(repo_path: Option<&Path>, cache_dir: PathBuf) -> Result<Self> {
         let strategy = CacheStrategy::Custom(cache_dir);
         let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
-        Self::new_with_location(location)
+        let cache = Self::new_with_location(location)?;
+        cache.validate_version()?;
+        Ok(cache)
     }
 
     /// Create a new shared cache instance with explicit location
@@ -558,6 +570,7 @@ impl SharedCache {
             last_accessed: SystemTime::now(),
             access_count: 1,
             size_bytes: data_len as u64,
+            debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
         }
     }
 
@@ -755,6 +768,22 @@ impl SharedCache {
         Ok(())
     }
 
+    /// Compute cache key including file hash
+    pub fn compute_cache_key(&self, file_path: &Path) -> Result<String> {
+        if file_path.exists() && file_path.is_file() {
+            let content = fs::read_to_string(file_path)
+                .with_context(|| format!("Failed to read file: {:?}", file_path))?;
+            use sha2::{Digest, Sha256};
+            let mut hasher = Sha256::new();
+            hasher.update(content.as_bytes());
+            let hash = format!("{:x}", hasher.finalize());
+            Ok(format!("{}:{}", file_path.display(), hash))
+        } else {
+            // For non-file paths, just use the path as key
+            Ok(file_path.display().to_string())
+        }
+    }
+
     /// Store a cache entry
     pub fn put(&self, key: &str, component: &str, data: &[u8]) -> Result<()> {
         let config = Self::determine_pruning_config();
@@ -942,6 +971,76 @@ impl SharedCache {
     }
 
     /// Get cache statistics
+    /// Validate cache version and clear if mismatched
+    pub fn validate_version(&self) -> Result<bool> {
+        let current_version = env!("CARGO_PKG_VERSION");
+
+        // Check if we need to validate version by looking at any existing entry
+        let needs_clear = {
+            let index = self
+                .index
+                .read()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+
+            // If cache is empty, no need to clear
+            if index.entries.is_empty() {
+                false
+            } else {
+                // Check if any entry has a different version
+                index.entries.values().any(|metadata| {
+                    !metadata.debtmap_version.is_empty()
+                        && metadata.debtmap_version != current_version
+                })
+            }
+        };
+
+        if needs_clear {
+            log::info!(
+                "Cache version mismatch detected. Clearing cache for version upgrade to {}",
+                current_version
+            );
+            self.clear()?;
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
+
+    /// Clear entire cache (all entries across all components)
+    pub fn clear(&self) -> Result<()> {
+        // Get all cache components from the cache directory
+        let cache_path = self.location.get_cache_path();
+
+        // Clear all component directories
+        if cache_path.exists() {
+            for entry in fs::read_dir(cache_path)? {
+                let entry = entry?;
+                let path = entry.path();
+
+                // Skip non-directories and special files
+                if path.is_dir() && entry.file_name() != "." && entry.file_name() != ".." {
+                    let component_name = entry.file_name().to_string_lossy().to_string();
+                    self.clear_component_files(&component_name)?;
+                }
+            }
+        }
+
+        // Clear index
+        {
+            let mut index = self
+                .index
+                .write()
+                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            index.entries.clear();
+            index.total_size = 0;
+            index.last_cleanup = Some(SystemTime::now());
+        }
+
+        self.save_index()?;
+        log::info!("Cache cleared successfully");
+        Ok(())
+    }
+
     /// Clear all cache entries for this project
     pub fn clear_project(&self) -> Result<()> {
         // Clear all files in all components
@@ -1702,6 +1801,7 @@ mod tests {
                 last_accessed: now,
                 access_count: 1,
                 size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             },
         );
         entries.insert(
@@ -1712,6 +1812,7 @@ mod tests {
                 last_accessed: old_time,
                 access_count: 1,
                 size_bytes: 100,
+                debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
             },
         );
 
@@ -1919,6 +2020,104 @@ mod tests {
         // Verify index still shows only one entry
         let stats = cache.get_stats();
         assert_eq!(stats.entry_count, 1);
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cache_version_validation() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        // Create a cache and add an entry
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        cache
+            .put("test_key", "test_component", b"test data")
+            .unwrap();
+
+        // Verify the entry exists
+        assert!(cache.exists("test_key", "test_component"));
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 1);
+
+        // Create another cache instance - should validate version (same version, no clear)
+        let cache2 = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        assert!(cache2.exists("test_key", "test_component"));
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cache_clear() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        // Add multiple entries
+        cache.put("key1", "component1", b"data1").unwrap();
+        cache.put("key2", "component2", b"data2").unwrap();
+        cache.put("key3", "component3", b"data3").unwrap();
+
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 3);
+
+        // Clear the entire cache
+        cache.clear().unwrap();
+
+        // Verify all entries are gone
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 0);
+        assert!(!cache.exists("key1", "component1"));
+        assert!(!cache.exists("key2", "component2"));
+        assert!(!cache.exists("key3", "component3"));
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_compute_cache_key_with_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.rs");
+        fs::write(&test_file, "fn main() {}").unwrap();
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let key = cache.compute_cache_key(&test_file).unwrap();
+        assert!(key.contains("test.rs"));
+        assert!(key.contains(":")); // Should have hash separator
+
+        // Cleanup
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_compute_cache_key_without_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let non_existent_path = temp_dir.path().join("non_existent.rs");
+
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        let key = cache.compute_cache_key(&non_existent_path).unwrap();
+        assert!(key.contains("non_existent.rs"));
+        assert!(!key.contains(":")); // Should not have hash separator
 
         // Cleanup
         std::env::remove_var("DEBTMAP_CACHE_DIR");
