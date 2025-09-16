@@ -1,6 +1,4 @@
-use crate::priority::{
-    DebtItem, DebtType, FileAggregateScore, FileDebtItem, UnifiedAnalysis, UnifiedDebtItem,
-};
+use crate::priority::{DebtItem, DebtType, FileDebtItem, UnifiedAnalysis, UnifiedDebtItem};
 use std::fmt::Write;
 
 /// Format priorities for markdown output without ANSI color codes
@@ -52,9 +50,6 @@ fn format_mixed_priority_item_markdown(
         }
         DebtItem::File(file_item) => {
             format_file_priority_item_markdown(output, rank, file_item, verbosity);
-        }
-        DebtItem::FileAggregate(agg_item) => {
-            format_file_aggregate_item_markdown(output, rank, agg_item, verbosity);
         }
     }
 }
@@ -155,66 +150,6 @@ fn format_file_priority_item_markdown(
             )
             .unwrap();
         }
-    }
-}
-
-fn format_file_aggregate_item_markdown(
-    output: &mut String,
-    rank: usize,
-    item: &FileAggregateScore,
-    verbosity: u8,
-) {
-    let severity = if item.aggregate_score >= 300.0 {
-        "CRITICAL"
-    } else if item.aggregate_score >= 200.0 {
-        "HIGH"
-    } else if item.aggregate_score >= 100.0 {
-        "MEDIUM"
-    } else {
-        "LOW"
-    };
-
-    // Header with rank and score
-    writeln!(
-        output,
-        "### #{} - Score: {:.1} [{}]",
-        rank, item.aggregate_score, severity
-    )
-    .unwrap();
-
-    writeln!(output, "**Type:** FILE AGGREGATE").unwrap();
-    writeln!(
-        output,
-        "**File:** `{}` ({} functions, total score: {:.1})",
-        item.file_path.display(),
-        item.function_count,
-        item.total_score
-    )
-    .unwrap();
-
-    if item.problematic_functions > 0 {
-        writeln!(
-            output,
-            "**Warning:** {} problematic functions (score > 5.0)",
-            item.problematic_functions
-        )
-        .unwrap();
-    }
-
-    writeln!(output, "\n**Top Issues:**").unwrap();
-    for (func_name, score) in &item.top_function_scores {
-        writeln!(output, "- `{}`: {:.1}", func_name, score).unwrap();
-    }
-
-    writeln!(output, "\n**Action:** Comprehensive refactoring needed").unwrap();
-
-    if verbosity >= 1 {
-        writeln!(
-            output,
-            "\n**Aggregation Method:** {:?}",
-            item.aggregation_method
-        )
-        .unwrap();
     }
 }
 

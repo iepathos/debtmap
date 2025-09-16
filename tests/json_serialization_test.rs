@@ -8,7 +8,6 @@ fn test_unified_analysis_json_serialization() {
     let analysis = UnifiedAnalysis {
         items: Vector::new(),
         file_items: Vector::new(),
-        file_aggregates: Vector::new(),
         total_impact: ImpactMetrics {
             coverage_improvement: 0.0,
             lines_reduction: 0,

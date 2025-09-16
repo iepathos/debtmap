@@ -709,73 +709,7 @@ pub fn create_unified_analysis_with_exclusions(
         eprintln!("  ⏱️  File-level analysis: {:?}", step_start.elapsed());
     }
 
-    // Step 8: File aggregation analysis
-    let step_start = Instant::now();
-    let mut aggregation_config = crate::config::get_aggregation_config();
-
-    // Override with CLI flags
-    if no_aggregation {
-        aggregation_config.enabled = false;
-    }
-
-    if let Some(method_str) = aggregation_method {
-        aggregation_config.method = match method_str.as_str() {
-            "sum" => priority::aggregation::AggregationMethod::Sum,
-            "weighted_sum" => priority::aggregation::AggregationMethod::WeightedSum,
-            "logarithmic_sum" => priority::aggregation::AggregationMethod::LogarithmicSum,
-            "max_plus_average" => priority::aggregation::AggregationMethod::MaxPlusAverage,
-            _ => aggregation_config.method, // Keep default if invalid
-        };
-    }
-
-    // Apply min_problematic if specified
-    if let Some(min_prob) = min_problematic {
-        aggregation_config.min_functions_for_aggregation = min_prob;
-    }
-
-    if aggregation_config.enabled {
-        // Try to aggregate from UnifiedDebtItems first (for scored items)
-        let items_vec: Vec<UnifiedDebtItem> = unified.items.iter().cloned().collect();
-        let mut file_aggregates = if !items_vec.is_empty() {
-            priority::aggregation::AggregationPipeline::aggregate_from_debt_items(
-                &items_vec,
-                &aggregation_config,
-            )
-        } else {
-            // If no debt items passed the threshold, aggregate from all metrics
-            // This ensures aggregation works even for files with many small issues
-            priority::aggregation::AggregationPipeline::aggregate_from_metrics(
-                metrics,
-                &aggregation_config,
-            )
-        };
-
-        // If we have items but not all files are represented, also aggregate from metrics
-        // to ensure all files with functions are included
-        if items_vec.is_empty()
-            || file_aggregates.len()
-                < metrics
-                    .iter()
-                    .map(|m| &m.file)
-                    .collect::<std::collections::HashSet<_>>()
-                    .len()
-                    / 2
-        {
-            file_aggregates = priority::aggregation::AggregationPipeline::aggregate_from_metrics(
-                metrics,
-                &aggregation_config,
-            );
-        }
-
-        unified.file_aggregates = im::Vector::from(file_aggregates);
-    }
-    if !quiet_mode {
-        eprintln!(
-            "  ⏱️  File aggregation (enabled={}): {:?}",
-            aggregation_config.enabled,
-            step_start.elapsed()
-        );
-    }
+    // Step 8: File aggregation has been removed - skip to step 9
 
     // Step 9: Final sorting and impact calculation
     let step_start = Instant::now();
@@ -804,9 +738,9 @@ fn create_unified_analysis_parallel(
     framework_exclusions: &HashSet<priority::call_graph::FunctionId>,
     function_pointer_used_functions: Option<&HashSet<priority::call_graph::FunctionId>>,
     debt_items: Option<&[DebtItem]>,
-    no_aggregation: bool,
-    aggregation_method: Option<String>,
-    min_problematic: Option<usize>,
+    _no_aggregation: bool,
+    _aggregation_method: Option<String>,
+    _min_problematic: Option<usize>,
     no_god_object: bool,
     jobs: Option<usize>,
 ) -> UnifiedAnalysis {
@@ -849,7 +783,7 @@ fn create_unified_analysis_parallel(
     let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
 
     // Build final unified analysis
-    let (mut unified, _timings) = builder.build(
+    let (unified, _timings) = builder.build(
         data_flow_graph,
         _purity,
         all_items,
@@ -857,43 +791,7 @@ fn create_unified_analysis_parallel(
         coverage_data,
     );
 
-    // Handle aggregation
-    let mut aggregation_config = crate::config::get_aggregation_config();
-
-    if no_aggregation {
-        aggregation_config.enabled = false;
-    }
-
-    if let Some(method_str) = aggregation_method {
-        aggregation_config.method = match method_str.as_str() {
-            "sum" => priority::aggregation::AggregationMethod::Sum,
-            "weighted_sum" => priority::aggregation::AggregationMethod::WeightedSum,
-            "logarithmic_sum" => priority::aggregation::AggregationMethod::LogarithmicSum,
-            "max_plus_average" => priority::aggregation::AggregationMethod::MaxPlusAverage,
-            _ => aggregation_config.method,
-        };
-    }
-
-    if let Some(min_prob) = min_problematic {
-        aggregation_config.min_functions_for_aggregation = min_prob;
-    }
-
-    if aggregation_config.enabled {
-        let items_vec: Vec<UnifiedDebtItem> = unified.items.iter().cloned().collect();
-        let file_aggregates = if !items_vec.is_empty() {
-            priority::aggregation::AggregationPipeline::aggregate_from_debt_items(
-                &items_vec,
-                &aggregation_config,
-            )
-        } else {
-            priority::aggregation::AggregationPipeline::aggregate_from_metrics(
-                metrics,
-                &aggregation_config,
-            )
-        };
-
-        unified.file_aggregates = im::Vector::from(file_aggregates);
-    }
+    // Aggregation has been removed - no longer needed
 
     unified
 }

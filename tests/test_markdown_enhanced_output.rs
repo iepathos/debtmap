@@ -1,27 +1,11 @@
 use debtmap::io::writers::markdown::EnhancedMarkdownWriter;
 use debtmap::io::writers::MarkdownWriter;
 use debtmap::priority::{
-    aggregation::{AggregationMethod, FileAggregateScore},
     unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
     CallGraph, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, UnifiedAnalysis,
 };
 use std::io::Cursor;
 use std::path::PathBuf;
-
-fn create_sample_file_aggregate() -> FileAggregateScore {
-    FileAggregateScore {
-        file_path: PathBuf::from("src/main.rs"),
-        total_score: 25.0,
-        function_count: 5,
-        problematic_functions: 2,
-        top_function_scores: vec![
-            ("process_data".to_string(), 7.8),
-            ("validate_input".to_string(), 5.2),
-        ],
-        aggregate_score: 12.5,
-        aggregation_method: AggregationMethod::WeightedSum,
-    }
-}
 
 fn create_sample_unified_item() -> UnifiedDebtItem {
     UnifiedDebtItem {
@@ -173,11 +157,6 @@ fn test_enhanced_markdown_with_verbosity() {
         analysis.add_item(item);
     }
 
-    // Add file aggregate
-    analysis
-        .file_aggregates
-        .push_back(create_sample_file_aggregate());
-
     analysis.sort_by_priority();
 
     let mut output = Vec::new();
@@ -222,11 +201,6 @@ fn test_enhanced_markdown_full_report() {
         cognitive: 30,
     };
     analysis.add_item(item3);
-
-    // Add file aggregate
-    analysis
-        .file_aggregates
-        .push_back(create_sample_file_aggregate());
 
     analysis.sort_by_priority();
 
