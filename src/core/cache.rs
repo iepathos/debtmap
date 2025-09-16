@@ -33,10 +33,15 @@ pub struct AnalysisCache {
 }
 
 impl AnalysisCache {
-    /// Create a new cache instance using shared cache backend
+    /// Create a new cache instance using shared cache backend with version checking
     pub fn new(project_path: Option<&Path>) -> Result<Self> {
         let shared_cache = SharedCache::new(project_path)?;
         Self::new_with_shared_cache(shared_cache)
+    }
+
+    /// Create a new cache instance with version checking
+    pub fn new_with_version_check(project_path: Option<&Path>) -> Result<Self> {
+        Self::new(project_path)
     }
 
     /// Create a new cache instance with explicit cache directory (for testing)
@@ -605,6 +610,20 @@ mod tests {
         assert_eq!(cache.memory_index.len(), 1);
         assert!(cache.memory_index.contains_key("recent_hash"));
         assert!(!cache.memory_index.contains_key("old_hash"));
+    }
+
+    #[test]
+    fn test_new_with_version_check() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create cache with version checking
+        let cache = AnalysisCache::new_with_version_check(Some(temp_dir.path())).unwrap();
+
+        // Cache should be created successfully
+        let stats = cache.stats();
+        assert_eq!(stats.entries, 0);
+        assert_eq!(stats.hits, 0);
+        assert_eq!(stats.misses, 0);
     }
 
     #[test]

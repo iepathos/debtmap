@@ -138,6 +138,10 @@ pub enum Commands {
         #[arg(long = "clear-cache")]
         clear_cache: bool,
 
+        /// Force cache rebuild (same as --clear-cache)
+        #[arg(long = "force-cache-rebuild", conflicts_with = "clear_cache")]
+        force_cache_rebuild: bool,
+
         /// Show cache statistics and location
         #[arg(long = "cache-stats")]
         cache_stats: bool,
