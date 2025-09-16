@@ -1,33 +1,40 @@
 {
-  "completion_percentage": 41.9,
-  "status": "incomplete",
+  "completion_percentage": 31.8,
+  "status": "insufficient",
   "improvements": [
-    "Resolved 1 debt items",
-    "Resolved 1 high-priority debt items",
-    "Reduced average debt score by 6%",
-    "Reduced complexity in 1 functions"
+    "Improved critical item: parse_config (8.1 \u2192 5.5)"
   ],
   "remaining_issues": [
-    "1 critical debt items still present"
+    "1 critical debt items still present",
+    "1 new debt items introduced",
+    "Average complexity still high (10.8)"
   ],
   "gaps": {
-    "critical_debt_1": {
-      "description": "High complexity authentication function",
-      "location": "src/auth.rs:45",
+    "critical_authenticate_user": {
+      "description": "Critical debt item still present: High cyclomatic complexity and poor test coverage",
+      "location": "src/auth.rs:authenticate_user",
       "severity": "critical",
       "suggested_fix": "Apply functional programming patterns to reduce complexity",
       "original_score": 9.2,
       "current_score": 9.2
+    },
+    "new_new_helper": {
+      "description": "New debt introduced: New helper function introduced during refactoring",
+      "location": "src/util.rs:new_helper",
+      "severity": "medium",
+      "suggested_fix": "Review recent changes and apply proper refactoring",
+      "original_score": null,
+      "current_score": 6.8
     }
   },
   "before_summary": {
-    "total_items": 3,
-    "high_priority_items": 2,
-    "average_score": 8.0
+    "total_items": 5,
+    "high_priority_items": 4,
+    "average_score": 7.3
   },
   "after_summary": {
-    "total_items": 2,
-    "high_priority_items": 1,
-    "average_score": 7.5
+    "total_items": 5,
+    "high_priority_items": 2,
+    "average_score": 6.3
   }
 }
