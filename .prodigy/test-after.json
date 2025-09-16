@@ -1,36 +1,61 @@
 {
-  "items": [
-    {
-      "unified_score": {
-        "final_score": 9.2
-      },
-      "location": {
-        "file": "src/auth.rs",
-        "line": 45
-      },
-      "message": "High complexity authentication function"
+  "files": {
+    "src/auth.rs": {
+      "debt_items": [
+        {
+          "location": "src/auth.rs",
+          "function": "authenticate_user",
+          "score": 9.2,
+          "complexity": 18,
+          "coverage": 20,
+          "description": "High cyclomatic complexity and poor test coverage",
+          "type": "complexity"
+        },
+        {
+          "location": "src/auth.rs",
+          "function": "validate_token",
+          "score": 5.8,
+          "complexity": 8,
+          "coverage": 75,
+          "description": "Improved with functional patterns and test coverage",
+          "type": "complexity"
+        }
+      ]
     },
-    {
-      "unified_score": {
-        "final_score": 5.8
-      },
-      "location": {
-        "file": "src/parser.rs",
-        "line": 123
-      },
-      "message": "Reduced complexity in parsing logic"
+    "src/parser.rs": {
+      "debt_items": [
+        {
+          "location": "src/parser.rs",
+          "function": "parse_config",
+          "score": 5.5,
+          "complexity": 10,
+          "coverage": 85,
+          "description": "Added comprehensive test coverage",
+          "type": "complexity"
+        }
+      ]
+    },
+    "src/util.rs": {
+      "debt_items": [
+        {
+          "location": "src/util.rs",
+          "function": "process_batch",
+          "score": 4.2,
+          "complexity": 7,
+          "coverage": 80,
+          "description": "Improved error handling and test coverage",
+          "type": "error_handling"
+        },
+        {
+          "location": "src/util.rs",
+          "function": "new_helper",
+          "score": 6.8,
+          "complexity": 11,
+          "coverage": 0,
+          "description": "New helper function introduced during refactoring",
+          "type": "complexity"
+        }
+      ]
     }
-  ],
-  "complexity": {
-    "metrics": [
-      {
-        "name": "authenticate_user",
-        "cyclomatic": 15
-      },
-      {
-        "name": "parse_config",
-        "cyclomatic": 8
-      }
-    ]
   }
 }
