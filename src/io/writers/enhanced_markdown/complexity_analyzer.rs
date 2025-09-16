@@ -88,9 +88,7 @@ fn calculate_base_effort(debt_type: &crate::priority::DebtType) -> u32 {
         crate::priority::DebtType::ComplexityHotspot { cyclomatic, .. } => {
             effort_from_complexity(cyclomatic)
         }
-        crate::priority::DebtType::TestingGap { coverage, .. } => {
-            effort_from_coverage(coverage)
-        }
+        crate::priority::DebtType::TestingGap { coverage, .. } => effort_from_coverage(coverage),
         crate::priority::DebtType::Risk { risk_score, .. } => effort_from_risk(risk_score),
         crate::priority::DebtType::DeadCode { .. } => 2,
         crate::priority::DebtType::Duplication { instances, .. } => {
@@ -176,13 +174,16 @@ pub fn get_top_complex_functions(results: &AnalysisResults, limit: usize) -> Vec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ComplexityReport as ComplexityResults, DebtItem, DebtType, FunctionMetrics, TechnicalDebtReport, DependencyReport, Priority};
-    use std::collections::HashMap;
+    use crate::core::{
+        ComplexityReport as ComplexityResults, DebtItem, DebtType, DependencyReport,
+        FunctionMetrics, Priority, TechnicalDebtReport,
+    };
     use crate::priority::{
         ActionableRecommendation, DebtType as PriorityDebtType, FunctionRole, FunctionVisibility,
         ImpactMetrics, Location as PriorityLocation, TransitiveCoverage, UnifiedDebtItem,
         UnifiedScore,
     };
+    use std::collections::HashMap;
     use std::path::PathBuf;
 
     #[test]
