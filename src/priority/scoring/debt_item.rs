@@ -151,6 +151,7 @@ struct DebtAnalysisContext {
 }
 
 // Pure function: Perform debt analysis
+#[allow(clippy::too_many_arguments)]
 fn analyze_debt(
     func: &FunctionMetrics,
     func_id: &FunctionId,

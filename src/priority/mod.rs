@@ -1,4 +1,3 @@
-pub mod aggregation;
 pub mod call_graph;
 pub mod coverage_propagation;
 pub mod debt_aggregator;
@@ -14,9 +13,6 @@ pub mod unified_scorer;
 
 use serde::{Deserialize, Serialize};
 
-pub use aggregation::{
-    AggregationConfig, AggregationMethod, AggregationPipeline, FileAggregateScore,
-};
 pub use call_graph::{CallGraph, FunctionCall};
 pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage};
 pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
@@ -33,7 +29,6 @@ use std::path::PathBuf;
 pub struct UnifiedAnalysis {
     pub items: Vector<UnifiedDebtItem>,
     pub file_items: Vector<FileDebtItem>,
-    pub file_aggregates: Vector<FileAggregateScore>,
     pub total_impact: ImpactMetrics,
     pub total_debt_score: f64,
     pub call_graph: CallGraph,
@@ -190,7 +185,6 @@ pub enum FunctionVisibility {
 pub enum DebtItem {
     Function(Box<UnifiedDebtItem>),
     File(Box<FileDebtItem>),
-    FileAggregate(Box<FileAggregateScore>),
 }
 
 impl DebtItem {
@@ -198,7 +192,6 @@ impl DebtItem {
         match self {
             DebtItem::Function(item) => item.unified_score.final_score,
             DebtItem::File(item) => item.score,
-            DebtItem::FileAggregate(item) => item.aggregate_score,
         }
     }
 
@@ -206,7 +199,6 @@ impl DebtItem {
         match self {
             DebtItem::Function(_) => "FUNCTION",
             DebtItem::File(_) => "FILE",
-            DebtItem::FileAggregate(_) => "FILE AGGREGATE",
         }
     }
 }
@@ -219,7 +211,6 @@ impl UnifiedAnalysis {
         Self {
             items: Vector::new(),
             file_items: Vector::new(),
-            file_aggregates: Vector::new(),
             total_impact: ImpactMetrics {
                 coverage_improvement: 0.0,
                 lines_reduction: 0,
@@ -383,37 +374,17 @@ impl UnifiedAnalysis {
     }
 
     pub fn get_top_mixed_priorities(&self, n: usize) -> Vector<DebtItem> {
-        // Combine function, file, and file aggregate items, sorted by score
+        // Combine function and file items, sorted by score
         let mut all_items: Vec<DebtItem> = Vec::new();
-        let mut seen_file_paths = std::collections::HashSet::new();
 
-        // Add file aggregate items (if enabled)
-        let aggregation_config = crate::config::get_aggregation_config();
-        if aggregation_config.enabled {
-            for item in &self.file_aggregates {
-                seen_file_paths.insert(item.file_path.clone());
-                all_items.push(DebtItem::FileAggregate(Box::new(item.clone())));
-            }
-        }
-
-        // Add function items not already included in aggregates
+        // Add function items
         for item in &self.items {
-            // Skip function items that are in aggregated files if aggregate score is higher
-            let in_aggregate = self.file_aggregates.iter().any(|agg| {
-                agg.file_path == item.location.file
-                    && agg.aggregate_score > item.unified_score.final_score
-            });
-            if !in_aggregate {
-                all_items.push(DebtItem::Function(Box::new(item.clone())));
-            }
+            all_items.push(DebtItem::Function(Box::new(item.clone())));
         }
 
-        // Add file items that aren't already represented by aggregates
+        // Add file items
         for item in &self.file_items {
-            // Skip if this file has an aggregate (avoid duplication)
-            if !seen_file_paths.contains(&item.metrics.path) {
-                all_items.push(DebtItem::File(Box::new(item.clone())));
-            }
+            all_items.push(DebtItem::File(Box::new(item.clone())));
         }
 
         // Sort by score descending
