@@ -94,13 +94,11 @@
 //!
 //! // Parse the Python code
 //! let parsed = rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
-//! if let ast::Mod::Module(module) = parsed {
-//!     let mut analyzer = PythonTestAnalyzer::new();
-//!     let issues = analyzer.analyze_module(&module, &PathBuf::from("test.py"));
+//! let mut analyzer = PythonTestAnalyzer::new();
+//! let issues = analyzer.analyze_module(&parsed, &PathBuf::from("test.py"));
 //!
-//!     for issue in issues {
-//!         println!("Found issue: {:?}", issue);
-//!     }
+//! for issue in issues {
+//!     println!("Found issue: {:?}", issue);
 //! }
 //! ```
 
