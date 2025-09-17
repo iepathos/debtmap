@@ -3,6 +3,99 @@ use crate::organization::{GodObjectAnalysis, GodObjectDetector};
 use anyhow::Result;
 use std::path::Path;
 
+/// Represents the type of file for analysis
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum FileType {
+    Rust,
+    Other,
+}
+
+/// Pure function to determine file type from path
+fn determine_file_type(path: &Path) -> FileType {
+    match path.extension().and_then(|s| s.to_str()) {
+        Some("rs") => FileType::Rust,
+        _ => FileType::Other,
+    }
+}
+
+/// Pure function to check if analysis indicates a god object
+fn is_god_object_analysis(analysis: &GodObjectAnalysis) -> bool {
+    analysis.is_god_object
+}
+
+/// Pure function to extract metrics from functions
+fn extract_function_metrics(functions: &[FunctionMetrics]) -> (usize, u32) {
+    let function_count = functions.len();
+    let total_complexity = functions.iter().map(|f| f.cyclomatic).sum();
+    (function_count, total_complexity)
+}
+
+/// Pure function to calculate god object score
+fn calculate_god_object_score(function_count: usize, lines: usize) -> f64 {
+    ((function_count as f64 / 50.0) + (lines as f64 / 2000.0)) * 50.0
+}
+
+/// Pure predicate to check if metrics exceed god object thresholds
+fn exceeds_god_object_thresholds(function_count: usize, lines: usize, complexity: u32) -> bool {
+    function_count > 50 || lines > 2000 || complexity > 300
+}
+
+/// Pure function to create god object analysis from metrics
+fn create_god_object_analysis(
+    function_count: usize,
+    lines: usize,
+    total_complexity: u32,
+) -> GodObjectAnalysis {
+    GodObjectAnalysis {
+        is_god_object: true,
+        method_count: function_count,
+        field_count: 0,
+        responsibility_count: 5,
+        lines_of_code: lines,
+        complexity_sum: total_complexity,
+        god_object_score: calculate_god_object_score(function_count, lines),
+        recommended_splits: Vec::new(),
+        confidence: crate::organization::GodObjectConfidence::Probable,
+        responsibilities: Vec::new(),
+    }
+}
+
+/// I/O function to detect god object in Rust files
+fn detect_rust_god_object(path: &Path, content: &str) -> Result<Option<GodObjectAnalysis>> {
+    syn::parse_file(content)
+        .map(|ast| {
+            let detector = GodObjectDetector::with_source_content(content);
+            detector.analyze_comprehensive(path, &ast)
+        })
+        .map(|analysis| {
+            if is_god_object_analysis(&analysis) {
+                Some(analysis)
+            } else {
+                None
+            }
+        })
+        .or(Ok(None))
+}
+
+/// Pure function to detect god object using generic metrics
+fn detect_generic_god_object(
+    content: &str,
+    functions: &[FunctionMetrics],
+) -> Result<Option<GodObjectAnalysis>> {
+    let lines = content.lines().count();
+    let (function_count, total_complexity) = extract_function_metrics(functions);
+
+    if exceeds_god_object_thresholds(function_count, lines, total_complexity) {
+        Ok(Some(create_god_object_analysis(
+            function_count,
+            lines,
+            total_complexity,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisResult {
     pub functions: Vec<FunctionMetrics>,
@@ -38,45 +131,9 @@ pub trait EnhancedAnalyzer {
         content: &str,
         functions: &[FunctionMetrics],
     ) -> Result<Option<GodObjectAnalysis>> {
-        // Parse content as Rust AST for now (can be extended for other languages)
-        if path.extension().and_then(|s| s.to_str()) == Some("rs") {
-            if let Ok(ast) = syn::parse_file(content) {
-                let detector = GodObjectDetector::with_source_content(content);
-                let analysis = detector.analyze_comprehensive(path, &ast);
-
-                // Only return Some if it's actually a god object
-                if analysis.is_god_object {
-                    Ok(Some(analysis))
-                } else {
-                    Ok(None)
-                }
-            } else {
-                Ok(None)
-            }
-        } else {
-            // For non-Rust files, use simpler heuristics
-            let lines = content.lines().count();
-            let function_count = functions.len();
-            let total_complexity: u32 = functions.iter().map(|f| f.cyclomatic).sum();
-
-            // Check if it meets god object thresholds
-            if function_count > 50 || lines > 2000 || total_complexity > 300 {
-                Ok(Some(GodObjectAnalysis {
-                    is_god_object: true,
-                    method_count: function_count,
-                    field_count: 0,          // Would need language-specific parsing
-                    responsibility_count: 5, // Estimated
-                    lines_of_code: lines,
-                    complexity_sum: total_complexity,
-                    god_object_score: ((function_count as f64 / 50.0) + (lines as f64 / 2000.0))
-                        * 50.0,
-                    recommended_splits: Vec::new(),
-                    confidence: crate::organization::GodObjectConfidence::Probable,
-                    responsibilities: Vec::new(),
-                }))
-            } else {
-                Ok(None)
-            }
+        match determine_file_type(path) {
+            FileType::Rust => detect_rust_god_object(path, content),
+            FileType::Other => detect_generic_god_object(content, functions),
         }
     }
 

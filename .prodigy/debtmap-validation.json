@@ -1,20 +1,21 @@
 {
-  "completion_percentage": 78.0,
+  "completion_percentage": 100.0,
   "status": "complete",
-  "improvements": [
-    "Improved critical item: authenticate_user (9.2 \u2192 4.5)",
-    "Improved critical item: parse_config (8.1 \u2192 4.0)"
-  ],
+  "improvements": [],
   "remaining_issues": [],
   "gaps": {},
   "before_summary": {
-    "total_items": 5,
-    "high_priority_items": 4,
-    "average_score": 7.3
+    "total_items": 0,
+    "high_priority_items": 0,
+    "critical_items": 0,
+    "average_score": 0.0,
+    "average_complexity": 0.0
   },
   "after_summary": {
-    "total_items": 9,
+    "total_items": 0,
     "high_priority_items": 0,
-    "average_score": 3.6
+    "critical_items": 0,
+    "average_score": 0.0,
+    "average_complexity": 0.0
   }
 }

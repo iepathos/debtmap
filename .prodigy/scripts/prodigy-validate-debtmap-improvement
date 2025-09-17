@@ -1,0 +1,368 @@
+#!/usr/bin/env python3
+"""
+Validates technical debt improvements by comparing debtmap JSON outputs.
+
+Compares before and after states to determine improvement percentage and gaps.
+"""
+
+import json
+import sys
+import os
+from typing import Dict, List, Tuple, Optional, Any
+from pathlib import Path
+
+
+def parse_arguments(args_str: str) -> Dict[str, str]:
+    """Parse command arguments from space-separated string."""
+    args = {}
+    parts = args_str.split()
+    i = 0
+    while i < len(parts):
+        if parts[i] == '--before' and i + 1 < len(parts):
+            args['before'] = parts[i + 1]
+            i += 2
+        elif parts[i] == '--after' and i + 1 < len(parts):
+            args['after'] = parts[i + 1]
+            i += 2
+        elif parts[i] == '--output' and i + 1 < len(parts):
+            args['output'] = parts[i + 1]
+            i += 2
+        else:
+            i += 1
+    return args
+
+
+def load_json_file(filepath: str) -> Optional[Dict]:
+    """Load and parse JSON file."""
+    try:
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error loading {filepath}: {e}")
+        return None
+
+
+def extract_debt_items(data: Dict) -> List[Dict]:
+    """Extract debt items from debtmap JSON."""
+    # Handle both old and new debtmap formats
+    if 'technical_debt' in data and 'items' in data['technical_debt']:
+        return data['technical_debt']['items']
+    elif 'debt_items' in data:
+        return data['debt_items']
+    elif 'items' in data:
+        return data['items']
+    return []
+
+
+def calculate_metrics(data: Dict) -> Dict[str, Any]:
+    """Calculate summary metrics from debtmap data."""
+    debt_items = extract_debt_items(data)
+
+    metrics = {
+        'total_items': len(debt_items),
+        'high_priority_items': 0,
+        'critical_items': 0,
+        'average_score': 0.0,
+        'total_score': 0.0,
+        'complexity_sum': 0,
+        'coverage_gaps': 0
+    }
+
+    if not debt_items:
+        return metrics
+
+    scores = []
+    for item in debt_items:
+        score = item.get('score', 0)
+        scores.append(score)
+        metrics['total_score'] += score
+
+        if score >= 8:
+            metrics['critical_items'] += 1
+        if score >= 6:
+            metrics['high_priority_items'] += 1
+
+        # Check for complexity issues
+        if 'complexity' in item.get('description', '').lower():
+            metrics['complexity_sum'] += 1
+
+        # Check for coverage gaps
+        if 'coverage' in item.get('description', '').lower() or 'untested' in item.get('description', '').lower():
+            metrics['coverage_gaps'] += 1
+
+    if scores:
+        metrics['average_score'] = sum(scores) / len(scores)
+
+    return metrics
+
+
+def identify_improvements(before_items: List[Dict], after_items: List[Dict]) -> Dict[str, List]:
+    """Identify improvements between before and after states."""
+    # Create lookups by location/description
+    before_map = {}
+    for item in before_items:
+        key = f"{item.get('location', '')}:{item.get('description', '')}"
+        before_map[key] = item
+
+    after_map = {}
+    for item in after_items:
+        key = f"{item.get('location', '')}:{item.get('description', '')}"
+        after_map[key] = item
+
+    improvements = {
+        'resolved': [],
+        'improved': [],
+        'new': [],
+        'unchanged_critical': []
+    }
+
+    # Find resolved and improved items
+    for key, before_item in before_map.items():
+        if key not in after_map:
+            improvements['resolved'].append(before_item)
+        else:
+            after_item = after_map[key]
+            before_score = before_item.get('score', 0)
+            after_score = after_item.get('score', 0)
+
+            if after_score < before_score:
+                improvements['improved'].append({
+                    'item': before_item,
+                    'before_score': before_score,
+                    'after_score': after_score
+                })
+            elif before_score >= 8 and after_score >= 8:
+                improvements['unchanged_critical'].append(after_item)
+
+    # Find new items
+    for key, after_item in after_map.items():
+        if key not in before_map:
+            improvements['new'].append(after_item)
+
+    return improvements
+
+
+def calculate_improvement_score(before_metrics: Dict, after_metrics: Dict, improvements: Dict) -> float:
+    """Calculate overall improvement score based on weighted factors."""
+    score = 0.0
+
+    # Factor 1: Resolved high-priority items (40%)
+    if before_metrics['critical_items'] > 0:
+        resolved_critical = len([i for i in improvements['resolved'] if i.get('score', 0) >= 8])
+        critical_resolution_rate = resolved_critical / before_metrics['critical_items']
+        score += critical_resolution_rate * 40
+    else:
+        # No critical items to resolve, full points
+        score += 40
+
+    # Factor 2: Overall debt score improvement (30%)
+    if before_metrics['average_score'] > 0:
+        improvement_rate = max(0, (before_metrics['average_score'] - after_metrics['average_score']) / before_metrics['average_score'])
+        score += min(improvement_rate * 100, 30)  # Cap at 30
+
+    # Factor 3: Complexity reduction (20%)
+    complexity_before = before_metrics['complexity_sum']
+    complexity_after = after_metrics['complexity_sum']
+    if complexity_before > 0:
+        complexity_reduction = max(0, (complexity_before - complexity_after) / complexity_before)
+        score += complexity_reduction * 20
+    else:
+        score += 20  # No complexity issues to fix
+
+    # Factor 4: No new critical debt (10%)
+    new_critical = len([i for i in improvements['new'] if i.get('score', 0) >= 8])
+    if new_critical == 0:
+        score += 10
+
+    return min(100.0, max(0.0, score))
+
+
+def identify_gaps(improvements: Dict, score: float) -> Dict[str, Dict]:
+    """Identify specific gaps when improvement is insufficient."""
+    gaps = {}
+
+    # Check for unresolved critical items
+    for i, item in enumerate(improvements['unchanged_critical'][:3]):  # Top 3 critical
+        gaps[f'critical_debt_remaining_{i}'] = {
+            'description': item.get('description', 'Critical debt item still present'),
+            'location': item.get('location', 'Unknown'),
+            'severity': 'critical',
+            'suggested_fix': 'Apply functional programming patterns to reduce complexity',
+            'original_score': item.get('score', 0),
+            'current_score': item.get('score', 0)
+        }
+
+    # Check for new critical items (regression)
+    new_critical = [i for i in improvements['new'] if i.get('score', 0) >= 8]
+    for i, item in enumerate(new_critical[:2]):  # Top 2 new critical
+        gaps[f'regression_detected_{i}'] = {
+            'description': f"New complexity introduced: {item.get('description', 'Unknown')}",
+            'location': item.get('location', 'Unknown'),
+            'severity': 'high',
+            'suggested_fix': 'Review changes and simplify implementation',
+            'original_score': None,
+            'current_score': item.get('score', 0)
+        }
+
+    return gaps
+
+
+def main():
+    """Main validation logic."""
+    # Check environment for automation mode
+    is_automation = os.environ.get('PRODIGY_AUTOMATION') == 'true' or \
+                    os.environ.get('PRODIGY_VALIDATION') == 'true'
+
+    # Parse arguments
+    args_str = os.environ.get('ARGUMENTS', '')
+    if not is_automation:
+        print(f"Parsing arguments: {args_str}")
+
+    args = parse_arguments(args_str)
+
+    # Validate required arguments
+    if 'before' not in args or 'after' not in args:
+        error_result = {
+            'completion_percentage': 0.0,
+            'status': 'failed',
+            'improvements': [],
+            'remaining_issues': ['Missing required arguments: --before and --after'],
+            'gaps': {},
+            'raw_output': f"Arguments received: {args}"
+        }
+        output_path = args.get('output', '.prodigy/debtmap-validation.json')
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w') as f:
+            json.dump(error_result, f, indent=2)
+        sys.exit(1)
+
+    # Get output path
+    output_path = args.get('output', '.prodigy/debtmap-validation.json')
+
+    if not is_automation:
+        print(f"Loading before state from: {args['before']}")
+        print(f"Loading after state from: {args['after']}")
+        print(f"Will write results to: {output_path}")
+
+    # Load JSON files
+    before_data = load_json_file(args['before'])
+    after_data = load_json_file(args['after'])
+
+    if not before_data or not after_data:
+        error_result = {
+            'completion_percentage': 0.0,
+            'status': 'failed',
+            'improvements': [],
+            'remaining_issues': ['Failed to load debtmap JSON files'],
+            'gaps': {},
+            'raw_output': 'Check that both JSON files exist and are valid'
+        }
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w') as f:
+            json.dump(error_result, f, indent=2)
+        sys.exit(1)
+
+    # Extract debt items
+    before_items = extract_debt_items(before_data)
+    after_items = extract_debt_items(after_data)
+
+    if not is_automation:
+        print(f"Found {len(before_items)} debt items before")
+        print(f"Found {len(after_items)} debt items after")
+
+    # Calculate metrics
+    before_metrics = calculate_metrics(before_data)
+    after_metrics = calculate_metrics(after_data)
+
+    # Identify improvements
+    improvements = identify_improvements(before_items, after_items)
+
+    if not is_automation:
+        print(f"Resolved: {len(improvements['resolved'])} items")
+        print(f"Improved: {len(improvements['improved'])} items")
+        print(f"New: {len(improvements['new'])} items")
+        print(f"Unchanged critical: {len(improvements['unchanged_critical'])} items")
+
+    # Calculate improvement score
+    score = calculate_improvement_score(before_metrics, after_metrics, improvements)
+
+    # Determine status
+    if score >= 75:
+        status = 'complete'
+    elif score >= 40:
+        status = 'incomplete'
+    else:
+        status = 'insufficient'
+
+    # Build improvement messages
+    improvement_messages = []
+    if improvements['resolved']:
+        resolved_critical = len([i for i in improvements['resolved'] if i.get('score', 0) >= 8])
+        if resolved_critical > 0:
+            improvement_messages.append(f"Resolved {resolved_critical} critical debt items")
+        improvement_messages.append(f"Resolved {len(improvements['resolved'])} total debt items")
+
+    if improvements['improved']:
+        improvement_messages.append(f"Improved {len(improvements['improved'])} debt items")
+
+    if before_metrics['average_score'] > after_metrics['average_score']:
+        reduction = ((before_metrics['average_score'] - after_metrics['average_score']) / before_metrics['average_score']) * 100
+        improvement_messages.append(f"Reduced average debt score by {reduction:.1f}%")
+
+    if before_metrics['complexity_sum'] > after_metrics['complexity_sum']:
+        improvement_messages.append(f"Reduced complexity issues from {before_metrics['complexity_sum']} to {after_metrics['complexity_sum']}")
+
+    # Build remaining issues messages
+    remaining_issues = []
+    if improvements['unchanged_critical']:
+        remaining_issues.append(f"{len(improvements['unchanged_critical'])} critical debt items still present")
+
+    if improvements['new']:
+        new_critical = len([i for i in improvements['new'] if i.get('score', 0) >= 8])
+        if new_critical > 0:
+            remaining_issues.append(f"{new_critical} new critical debt items introduced")
+        else:
+            remaining_issues.append(f"{len(improvements['new'])} new debt items introduced")
+
+    # Identify gaps if needed
+    gaps = {}
+    if score < 75:
+        gaps = identify_gaps(improvements, score)
+
+    # Build validation result
+    validation_result = {
+        'completion_percentage': round(score, 1),
+        'status': status,
+        'improvements': improvement_messages,
+        'remaining_issues': remaining_issues,
+        'gaps': gaps,
+        'before_summary': {
+            'total_items': before_metrics['total_items'],
+            'high_priority_items': before_metrics['high_priority_items'],
+            'critical_items': before_metrics['critical_items'],
+            'average_score': round(before_metrics['average_score'], 2)
+        },
+        'after_summary': {
+            'total_items': after_metrics['total_items'],
+            'high_priority_items': after_metrics['high_priority_items'],
+            'critical_items': after_metrics['critical_items'],
+            'average_score': round(after_metrics['average_score'], 2)
+        }
+    }
+
+    # Write result to file
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w') as f:
+        json.dump(validation_result, f, indent=2)
+
+    if not is_automation:
+        print(f"\nValidation complete!")
+        print(f"Improvement score: {score:.1f}%")
+        print(f"Status: {status}")
+        print(f"Results written to: {output_path}")
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()

@@ -6,6 +6,24 @@ use crate::risk::lcov::LcovData;
 use anyhow::Result;
 use std::path::Path;
 
+/// Helper struct for complexity calculation results
+struct ComplexityMetrics {
+    total_complexity: u32,
+    max_complexity: u32,
+    avg_complexity: f64,
+}
+
+/// Helper struct for coverage calculation results
+struct CoverageMetrics {
+    coverage_percent: f64,
+}
+
+/// Helper struct for line calculation results
+struct LineMetrics {
+    total_lines: usize,
+    uncovered_lines: usize,
+}
+
 pub struct UnifiedFileAnalyzer {
     coverage_data: Option<LcovData>,
 }
@@ -69,6 +87,101 @@ impl UnifiedFileAnalyzer {
     }
 }
 
+impl UnifiedFileAnalyzer {
+    /// Calculate complexity-related metrics for functions
+    fn calculate_complexity_metrics(functions: &[FunctionMetrics]) -> ComplexityMetrics {
+        let total_complexity: u32 = functions.iter().map(|f| f.cyclomatic).sum();
+        let max_complexity = functions.iter().map(|f| f.cyclomatic).max().unwrap_or(0);
+        let function_count = functions.len();
+        let avg_complexity = if function_count > 0 {
+            total_complexity as f64 / function_count as f64
+        } else {
+            0.0
+        };
+
+        ComplexityMetrics {
+            total_complexity,
+            max_complexity,
+            avg_complexity,
+        }
+    }
+
+    /// Estimate class count using simple heuristics
+    fn estimate_class_count(functions: &[FunctionMetrics]) -> usize {
+        functions
+            .iter()
+            .filter(|f| f.name.contains("::new") || f.name.contains("__init__"))
+            .count()
+    }
+
+    /// Calculate coverage-related metrics
+    fn calculate_coverage_metrics(
+        &self,
+        functions: &[FunctionMetrics],
+        function_count: usize,
+    ) -> CoverageMetrics {
+        let coverage_percent = match &self.coverage_data {
+            Some(coverage) => {
+                let covered_functions = functions
+                    .iter()
+                    .filter(|f| {
+                        coverage
+                            .get_function_coverage(&f.file, &f.name)
+                            .map(|c| c > 0.0)
+                            .unwrap_or(false)
+                    })
+                    .count();
+                covered_functions as f64 / function_count as f64
+            }
+            None => 0.0,
+        };
+
+        CoverageMetrics { coverage_percent }
+    }
+
+    /// Calculate line-related metrics including uncovered lines
+    fn calculate_line_metrics(
+        functions: &[FunctionMetrics],
+        function_count: usize,
+        coverage_percent: f64,
+    ) -> LineMetrics {
+        const OVERHEAD_LINES_PER_FUNCTION: usize = 5;
+
+        let total_lines: usize = functions.iter().map(|f| f.length).sum::<usize>()
+            + function_count * OVERHEAD_LINES_PER_FUNCTION;
+        let uncovered_lines = ((1.0 - coverage_percent) * total_lines as f64) as usize;
+
+        LineMetrics {
+            total_lines,
+            uncovered_lines,
+        }
+    }
+
+    /// Detect god object patterns and calculate indicators
+    fn detect_god_object(function_count: usize, total_lines: usize) -> GodObjectIndicators {
+        const MAX_FUNCTIONS_THRESHOLD: usize = 50;
+        const MAX_LINES_THRESHOLD: usize = 2000;
+        const ESTIMATED_FIELDS_PER_CLASS: usize = 5;
+
+        let is_god_object =
+            function_count > MAX_FUNCTIONS_THRESHOLD || total_lines > MAX_LINES_THRESHOLD;
+        let god_object_score = if is_god_object {
+            (function_count as f64 / MAX_FUNCTIONS_THRESHOLD as f64).min(2.0)
+        } else {
+            0.0
+        };
+
+        GodObjectIndicators {
+            methods_count: function_count,
+            fields_count: function_count * ESTIMATED_FIELDS_PER_CLASS
+                / MAX_FUNCTIONS_THRESHOLD.max(1), // Rough estimate
+            responsibilities: if is_god_object { 5 } else { 2 },
+            is_god_object,
+            god_object_score,
+        }
+    }
+}
+
 impl FileAnalyzer for UnifiedFileAnalyzer {
     fn analyze_file(&self, path: &Path, content: &str) -> Result<FileDebtMetrics> {
         let total_lines = Self::count_lines(content);
@@ -98,72 +211,29 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
 
         let path = functions[0].file.clone();
         let function_count = functions.len();
-
-        // Calculate complexity metrics
-        let total_complexity: u32 = functions.iter().map(|f| f.cyclomatic).sum();
-        let max_complexity = functions.iter().map(|f| f.cyclomatic).max().unwrap_or(0);
-        let avg_complexity = if function_count > 0 {
-            total_complexity as f64 / function_count as f64
-        } else {
-            0.0
-        };
-
-        // Extract function scores (would be calculated by unified scorer)
-        let function_scores: Vec<f64> = functions.iter().map(|_| 0.0).collect();
-
-        // Count classes (simple heuristic for now)
-        let class_count = functions
-            .iter()
-            .filter(|f| f.name.contains("::new") || f.name.contains("__init__"))
-            .count();
-
-        // Get coverage
-        let coverage_percent = if let Some(ref coverage) = self.coverage_data {
-            let covered_functions = functions
-                .iter()
-                .filter(|f| {
-                    coverage
-                        .get_function_coverage(&f.file, &f.name)
-                        .map(|c| c > 0.0)
-                        .unwrap_or(false)
-                })
-                .count();
-            covered_functions as f64 / function_count as f64
-        } else {
-            0.0
-        };
-
-        // Estimate total lines (sum of function lengths plus overhead)
-        let total_lines: usize =
-            functions.iter().map(|f| f.length).sum::<usize>() + function_count * 5;
-        let uncovered_lines = ((1.0 - coverage_percent) * total_lines as f64) as usize;
-
-        // Detect god object based on aggregated metrics
-        let is_god_object = function_count > 50 || total_lines > 2000;
-        let god_object_score = if is_god_object {
-            (function_count as f64 / 50.0).min(2.0)
-        } else {
-            0.0
-        };
+        let complexity_metrics = Self::calculate_complexity_metrics(functions);
+        let class_count = Self::estimate_class_count(functions);
+        let coverage_metrics = self.calculate_coverage_metrics(functions, function_count);
+        let line_metrics = Self::calculate_line_metrics(
+            functions,
+            function_count,
+            coverage_metrics.coverage_percent,
+        );
+        let god_object_indicators =
+            Self::detect_god_object(function_count, line_metrics.total_lines);
 
         FileDebtMetrics {
             path,
-            total_lines,
+            total_lines: line_metrics.total_lines,
             function_count,
             class_count,
-            avg_complexity,
-            max_complexity,
-            total_complexity,
-            coverage_percent,
-            uncovered_lines,
-            god_object_indicators: GodObjectIndicators {
-                methods_count: function_count,
-                fields_count: class_count * 5, // Rough estimate
-                responsibilities: if is_god_object { 5 } else { 2 },
-                is_god_object,
-                god_object_score,
-            },
-            function_scores,
+            avg_complexity: complexity_metrics.avg_complexity,
+            max_complexity: complexity_metrics.max_complexity,
+            total_complexity: complexity_metrics.total_complexity,
+            coverage_percent: coverage_metrics.coverage_percent,
+            uncovered_lines: line_metrics.uncovered_lines,
+            god_object_indicators,
+            function_scores: vec![0.0; function_count], // Placeholder scores
         }
     }
 }
@@ -196,4 +266,184 @@ pub fn analyze_file_with_metrics(
     }
 
     Ok(file_metrics)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::FunctionMetrics;
+    use std::path::PathBuf;
+
+    fn create_test_function_metrics(name: &str, cyclomatic: u32, length: usize) -> FunctionMetrics {
+        FunctionMetrics {
+            name: name.to_string(),
+            file: PathBuf::from("test.rs"),
+            line: 1,
+            cyclomatic,
+            cognitive: cyclomatic, // Approximate cognitive complexity
+            nesting: 1,
+            length,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+        }
+    }
+
+    #[test]
+    fn test_calculate_complexity_metrics() {
+        let functions = vec![
+            create_test_function_metrics("func1", 5, 20),
+            create_test_function_metrics("func2", 10, 30),
+            create_test_function_metrics("func3", 3, 15),
+        ];
+
+        let metrics = UnifiedFileAnalyzer::calculate_complexity_metrics(&functions);
+
+        assert_eq!(metrics.total_complexity, 18);
+        assert_eq!(metrics.max_complexity, 10);
+        assert_eq!(metrics.avg_complexity, 6.0);
+    }
+
+    #[test]
+    fn test_estimate_class_count() {
+        let functions = vec![
+            create_test_function_metrics("MyClass::new", 1, 10),
+            create_test_function_metrics("AnotherClass::new", 1, 10),
+            create_test_function_metrics("__init__", 1, 10),
+            create_test_function_metrics("regular_function", 1, 10),
+            create_test_function_metrics("another_regular", 1, 10),
+        ];
+
+        let class_count = UnifiedFileAnalyzer::estimate_class_count(&functions);
+        assert_eq!(class_count, 3); // Two ::new and one __init__
+    }
+
+    #[test]
+    fn test_calculate_coverage_metrics_with_data() {
+        use crate::risk::lcov::LcovData;
+        use std::collections::HashMap;
+
+        use crate::risk::lcov::FunctionCoverage;
+
+        let mut functions = HashMap::new();
+        let function_coverages = vec![
+            FunctionCoverage {
+                name: "func1".to_string(),
+                start_line: 1,
+                execution_count: 10,
+                coverage_percentage: 80.0,
+                uncovered_lines: vec![2, 3],
+            },
+            FunctionCoverage {
+                name: "func2".to_string(),
+                start_line: 10,
+                execution_count: 0,
+                coverage_percentage: 0.0,
+                uncovered_lines: vec![10, 11, 12, 13, 14],
+            },
+            FunctionCoverage {
+                name: "func3".to_string(),
+                start_line: 20,
+                execution_count: 5,
+                coverage_percentage: 50.0,
+                uncovered_lines: vec![21, 22],
+            },
+        ];
+        functions.insert(PathBuf::from("test.rs"), function_coverages);
+
+        let coverage_data = LcovData {
+            functions,
+            total_lines: 100,
+            lines_hit: 50,
+        };
+
+        let analyzer = UnifiedFileAnalyzer::new(Some(coverage_data));
+        let functions = vec![
+            create_test_function_metrics("func1", 1, 10),
+            create_test_function_metrics("func2", 1, 10),
+            create_test_function_metrics("func3", 1, 10),
+        ];
+
+        let metrics = analyzer.calculate_coverage_metrics(&functions, 3);
+        assert_eq!(metrics.coverage_percent, 2.0 / 3.0); // 2 out of 3 have coverage > 0
+    }
+
+    #[test]
+    fn test_calculate_coverage_metrics_without_data() {
+        let analyzer = UnifiedFileAnalyzer::new(None);
+        let functions = vec![
+            create_test_function_metrics("func1", 1, 10),
+            create_test_function_metrics("func2", 1, 10),
+        ];
+
+        let metrics = analyzer.calculate_coverage_metrics(&functions, 2);
+        assert_eq!(metrics.coverage_percent, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_line_metrics() {
+        let functions = vec![
+            create_test_function_metrics("func1", 1, 20),
+            create_test_function_metrics("func2", 1, 30),
+            create_test_function_metrics("func3", 1, 10),
+        ];
+
+        let metrics = UnifiedFileAnalyzer::calculate_line_metrics(&functions, 3, 0.6);
+
+        // Total lines = 20 + 30 + 10 + 3*5 (overhead) = 75
+        assert_eq!(metrics.total_lines, 75);
+        // Uncovered lines = (1.0 - 0.6) * 75 = 30
+        assert_eq!(metrics.uncovered_lines, 30);
+    }
+
+    #[test]
+    fn test_detect_god_object() {
+        // Test non-god object
+        let normal_indicators = UnifiedFileAnalyzer::detect_god_object(20, 500);
+        assert!(!normal_indicators.is_god_object);
+        assert_eq!(normal_indicators.god_object_score, 0.0);
+        assert_eq!(normal_indicators.methods_count, 20);
+
+        // Test god object by function count
+        let function_god = UnifiedFileAnalyzer::detect_god_object(60, 500);
+        assert!(function_god.is_god_object);
+        assert_eq!(function_god.god_object_score, 1.2); // 60/50 = 1.2
+
+        // Test god object by line count
+        let line_god = UnifiedFileAnalyzer::detect_god_object(30, 2500);
+        assert!(line_god.is_god_object);
+        assert_eq!(line_god.methods_count, 30);
+
+        // Test capped god object score
+        let extreme_god = UnifiedFileAnalyzer::detect_god_object(150, 5000);
+        assert!(extreme_god.is_god_object);
+        assert_eq!(extreme_god.god_object_score, 2.0); // Capped at 2.0
+    }
+
+    #[test]
+    fn test_aggregate_functions_integration() {
+        let analyzer = UnifiedFileAnalyzer::new(None);
+        let functions = vec![
+            create_test_function_metrics("MyClass::new", 3, 15),
+            create_test_function_metrics("regular_func", 8, 25),
+            create_test_function_metrics("another_func", 4, 20),
+        ];
+
+        let result = analyzer.aggregate_functions(&functions);
+
+        assert_eq!(result.function_count, 3);
+        assert_eq!(result.class_count, 1); // One ::new function
+        assert_eq!(result.total_complexity, 15); // 3 + 8 + 4
+        assert_eq!(result.max_complexity, 8);
+        assert_eq!(result.avg_complexity, 5.0); // 15/3
+        assert_eq!(result.total_lines, 75); // 15+25+20 + 3*5 overhead
+        assert_eq!(result.coverage_percent, 0.0);
+        assert_eq!(result.uncovered_lines, 75); // All uncovered
+        assert!(!result.god_object_indicators.is_god_object);
+        assert_eq!(result.function_scores.len(), 3);
+    }
 }
