@@ -310,45 +310,85 @@ impl MacroExpander {
     /// Parse braced expressions {expr1, expr2, ...}
     pub fn parse_braced_exprs(&self, tokens: &proc_macro2::TokenStream) -> syn::Result<Vec<Expr>> {
         let content = tokens.to_string();
+        Self::validate_braced_format(&content)?;
+        self.parse_validated_braced_content(&content)
+    }
 
+    /// Validate that content has proper braced format
+    fn validate_braced_format(content: &str) -> syn::Result<()> {
         if content.starts_with('{') && content.ends_with('}') {
-            let inner = &content[1..content.len() - 1];
-
-            if inner.trim().is_empty() {
-                return Ok(Vec::new());
-            }
-
-            // Check if it's a braced content that needs extraction
-            if Self::is_braced_content(&content) {
-                let inner_content = Self::extract_braced_inner(&content);
-                if let Some(expr) = Self::parse_expression_from_str(inner_content) {
-                    return Ok(vec![expr]);
-                }
-            }
-
-            let parser = Punctuated::<Expr, Comma>::parse_separated_nonempty;
-            let token_stream: proc_macro2::TokenStream = inner.parse().unwrap_or_default();
-
-            match parser.parse2(token_stream) {
-                Ok(punctuated) => Ok(punctuated.into_iter().collect()),
-                Err(_) => {
-                    // Try parsing as single expression
-                    if let Ok(expr) = syn::parse_str::<Expr>(inner) {
-                        Ok(vec![expr])
-                    } else {
-                        Err(syn::Error::new(
-                            proc_macro2::Span::call_site(),
-                            "Failed to parse braced expressions",
-                        ))
-                    }
-                }
-            }
+            Ok(())
         } else {
             Err(syn::Error::new(
                 proc_macro2::Span::call_site(),
                 "Not a braced expression",
             ))
         }
+    }
+
+    /// Parse the content inside validated braces
+    fn parse_validated_braced_content(&self, content: &str) -> syn::Result<Vec<Expr>> {
+        let inner = Self::extract_inner_content(content);
+
+        if inner.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.try_parse_braced_expressions(content, inner)
+    }
+
+    /// Extract content between braces
+    fn extract_inner_content(content: &str) -> &str {
+        &content[1..content.len() - 1]
+    }
+
+    /// Try different parsing strategies for braced expressions
+    fn try_parse_braced_expressions(&self, full_content: &str, inner: &str) -> syn::Result<Vec<Expr>> {
+        // Strategy 1: Try special braced content extraction
+        if let Ok(expr) = self.try_braced_content_extraction(full_content) {
+            return Ok(vec![expr]);
+        }
+
+        // Strategy 2: Try comma-separated parsing
+        if let Ok(exprs) = Self::try_comma_separated_parsing(inner) {
+            return Ok(exprs);
+        }
+
+        // Strategy 3: Try single expression parsing
+        Self::try_single_expression_parsing(inner)
+    }
+
+    /// Try parsing using braced content extraction
+    fn try_braced_content_extraction(&self, content: &str) -> syn::Result<Expr> {
+        if Self::is_braced_content(content) {
+            let inner_content = Self::extract_braced_inner(content);
+            if let Some(expr) = Self::parse_expression_from_str(inner_content) {
+                return Ok(expr);
+            }
+        }
+        Err(syn::Error::new(
+            proc_macro2::Span::call_site(),
+            "Braced content extraction failed",
+        ))
+    }
+
+    /// Try parsing as comma-separated expressions
+    fn try_comma_separated_parsing(inner: &str) -> syn::Result<Vec<Expr>> {
+        let parser = Punctuated::<Expr, Comma>::parse_separated_nonempty;
+        let token_stream: proc_macro2::TokenStream = inner.parse().unwrap_or_default();
+        parser.parse2(token_stream).map(|punctuated| punctuated.into_iter().collect())
+    }
+
+    /// Try parsing as a single expression
+    fn try_single_expression_parsing(inner: &str) -> syn::Result<Vec<Expr>> {
+        syn::parse_str::<Expr>(inner)
+            .map(|expr| vec![expr])
+            .map_err(|_| {
+                syn::Error::new(
+                    proc_macro2::Span::call_site(),
+                    "Failed to parse braced expressions",
+                )
+            })
     }
 
     /// Parse comma-separated expressions

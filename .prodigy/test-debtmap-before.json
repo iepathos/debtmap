@@ -1,0 +1,107 @@
+{
+  "items": [
+    {
+      "location": {
+        "file": "./src/auth.rs",
+        "function": "authenticate_user",
+        "line": 45
+      },
+      "debt_type": {
+        "ComplexFunction": {
+          "cyclomatic": 15,
+          "cognitive": 35
+        }
+      },
+      "unified_score": {
+        "final_score": 9.2
+      },
+      "recommendation": {
+        "primary_action": "Extract validation logic into pure functions",
+        "rationale": "Function too complex with multiple responsibilities"
+      }
+    },
+    {
+      "location": {
+        "file": "./src/parser.rs",
+        "function": "parse_config",
+        "line": 123
+      },
+      "debt_type": {
+        "ComplexFunction": {
+          "cyclomatic": 12,
+          "cognitive": 28
+        }
+      },
+      "unified_score": {
+        "final_score": 8.5
+      },
+      "recommendation": {
+        "primary_action": "Split parsing logic into smaller functions",
+        "rationale": "High cyclomatic complexity"
+      }
+    },
+    {
+      "location": {
+        "file": "./src/utils.rs",
+        "function": "process_data",
+        "line": 78
+      },
+      "debt_type": {
+        "TestingGap": {
+          "coverage": 0.0,
+          "cyclomatic": 8,
+          "cognitive": 20
+        }
+      },
+      "unified_score": {
+        "final_score": 7.8
+      },
+      "recommendation": {
+        "primary_action": "Add test coverage for critical paths",
+        "rationale": "No test coverage for complex function"
+      }
+    },
+    {
+      "location": {
+        "file": "./src/cache.rs",
+        "function": "cleanup",
+        "line": 200
+      },
+      "debt_type": {
+        "ComplexFunction": {
+          "cyclomatic": 10,
+          "cognitive": 25
+        }
+      },
+      "unified_score": {
+        "final_score": 6.5
+      },
+      "recommendation": {
+        "primary_action": "Refactor using functional patterns",
+        "rationale": "Mixed I/O and business logic"
+      }
+    },
+    {
+      "location": {
+        "file": "./src/logger.rs",
+        "function": "format_output",
+        "line": 50
+      },
+      "debt_type": {
+        "ComplexFunction": {
+          "cyclomatic": 8,
+          "cognitive": 18
+        }
+      },
+      "unified_score": {
+        "final_score": 5.2
+      },
+      "recommendation": {
+        "primary_action": "Simplify formatting logic",
+        "rationale": "Nested conditionals"
+      }
+    }
+  ],
+  "total_debt_score": 37.2,
+  "overall_coverage": 45.0
+}

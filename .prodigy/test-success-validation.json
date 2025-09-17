@@ -1,0 +1,21 @@
+{
+  "completion_percentage": 75.5,
+  "status": "complete",
+  "improvements": [
+    "Resolved 1 critical debt items",
+    "Reduced average debt score from 7.4 to 3.5",
+    "Reduced total complexity by 77%"
+  ],
+  "remaining_issues": [],
+  "gaps": {},
+  "before_summary": {
+    "total_items": 5,
+    "high_priority_items": 2,
+    "average_score": 7.44
+  },
+  "after_summary": {
+    "total_items": 3,
+    "high_priority_items": 0,
+    "average_score": 3.5
+  }
+}

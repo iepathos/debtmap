@@ -157,21 +157,24 @@ impl PurityDetector {
     }
 
     fn is_io_call(&self, path_str: &str) -> bool {
-        // Common I/O operations
-        path_str.contains("print")
-            || path_str.contains("write")
-            || path_str.contains("read")
-            || path_str.contains("File")
-            || path_str.contains("stdin")
-            || path_str.contains("stdout")
-            || path_str.contains("stderr")
-            || path_str.contains("fs::")
-            || path_str.contains("io::")
-            || path_str.contains("net::")
-            || path_str.contains("TcpStream")
-            || path_str.contains("UdpSocket")
-            || path_str.contains("reqwest")
-            || path_str.contains("tokio")
+        const IO_PATTERNS: &[&str] = &[
+            "print",
+            "write",
+            "read",
+            "File",
+            "stdin",
+            "stdout",
+            "stderr",
+            "fs::",
+            "io::",
+            "net::",
+            "TcpStream",
+            "UdpSocket",
+            "reqwest",
+            "tokio",
+        ];
+
+        IO_PATTERNS.iter().any(|pattern| path_str.contains(pattern))
     }
 
     fn is_mutation_method(&self, method_name: &str) -> bool {

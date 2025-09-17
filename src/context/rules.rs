@@ -83,46 +83,63 @@ impl ContextMatcher {
 
     /// Check if this matcher matches the given context
     pub fn matches(&self, context: &FunctionContext) -> bool {
-        // Check role
-        if let Some(role) = self.role {
-            if context.role != role {
-                return false;
-            }
-        }
+        self.matches_role(context)
+            && self.matches_file_type(context)
+            && self.matches_async_status(context)
+            && self.matches_framework_and_name(context)
+    }
 
-        // Check file type
-        if let Some(file_type) = self.file_type {
-            if context.file_type != file_type {
-                return false;
-            }
+    /// Check if the context matches the role requirement
+    fn matches_role(&self, context: &FunctionContext) -> bool {
+        match self.role {
+            Some(role) => context.role == role,
+            None => true,
         }
+    }
 
-        // Check async status
-        if let Some(is_async) = self.is_async {
-            if context.is_async != is_async {
-                return false;
-            }
+    /// Check if the context matches the file type requirement
+    fn matches_file_type(&self, context: &FunctionContext) -> bool {
+        match self.file_type {
+            Some(file_type) => context.file_type == file_type,
+            None => true,
         }
+    }
 
-        // Check framework pattern
-        if let Some(pattern) = self.framework_pattern {
-            if context.framework_pattern != Some(pattern) {
-                return false;
-            }
+    /// Check if the context matches the async status requirement
+    fn matches_async_status(&self, context: &FunctionContext) -> bool {
+        match self.is_async {
+            Some(is_async) => context.is_async == is_async,
+            None => true,
         }
+    }
 
-        // Check name pattern
-        if let Some(ref pattern) = self.name_pattern {
-            if let Some(ref name) = context.function_name {
-                if !name.contains(pattern) {
-                    return false;
-                }
-            } else {
-                return false;
-            }
+    /// Check if the context matches both framework pattern and name pattern requirements
+    fn matches_framework_and_name(&self, context: &FunctionContext) -> bool {
+        Self::matches_framework_pattern_pure(self.framework_pattern, context.framework_pattern)
+            && Self::matches_name_pattern_pure(&self.name_pattern, &context.function_name)
+    }
+
+    /// Pure function to check framework pattern matching
+    fn matches_framework_pattern_pure(
+        required: Option<FrameworkPattern>,
+        actual: Option<FrameworkPattern>,
+    ) -> bool {
+        match required {
+            Some(pattern) => actual == Some(pattern),
+            None => true,
         }
+    }
 
-        true
+    /// Pure function to check name pattern matching
+    fn matches_name_pattern_pure(
+        required_pattern: &Option<String>,
+        actual_name: &Option<String>,
+    ) -> bool {
+        match (required_pattern, actual_name) {
+            (Some(pattern), Some(name)) => name.contains(pattern),
+            (Some(_), None) => false, // Pattern required but name is None
+            (None, _) => true,        // No pattern requirement
+        }
     }
 }
 
@@ -479,5 +496,98 @@ mod tests {
             FunctionContext::new().with_function_name("run_benchmark".to_string());
         let action = engine.evaluate(&DebtPattern::InputValidation, &benchmark_context);
         assert_eq!(action, RuleAction::Skip);
+    }
+
+    #[test]
+    fn test_context_matcher_pure_functions() {
+        use super::ContextMatcher;
+
+        // Test matches_framework_pattern_pure
+        assert!(ContextMatcher::matches_framework_pattern_pure(None, None));
+        assert!(ContextMatcher::matches_framework_pattern_pure(None, Some(FrameworkPattern::WebHandler)));
+        assert!(ContextMatcher::matches_framework_pattern_pure(
+            Some(FrameworkPattern::WebHandler),
+            Some(FrameworkPattern::WebHandler)
+        ));
+        assert!(!ContextMatcher::matches_framework_pattern_pure(
+            Some(FrameworkPattern::WebHandler),
+            Some(FrameworkPattern::ConfigInit)
+        ));
+        assert!(!ContextMatcher::matches_framework_pattern_pure(
+            Some(FrameworkPattern::WebHandler),
+            None
+        ));
+
+        // Test matches_name_pattern_pure
+        assert!(ContextMatcher::matches_name_pattern_pure(&None, &None));
+        assert!(ContextMatcher::matches_name_pattern_pure(&None, &Some("any_name".to_string())));
+        assert!(ContextMatcher::matches_name_pattern_pure(
+            &Some("test".to_string()),
+            &Some("test_function".to_string())
+        ));
+        assert!(!ContextMatcher::matches_name_pattern_pure(
+            &Some("test".to_string()),
+            &Some("production_function".to_string())
+        ));
+        assert!(!ContextMatcher::matches_name_pattern_pure(
+            &Some("test".to_string()),
+            &None
+        ));
+    }
+
+    #[test]
+    fn test_context_matcher_comprehensive_matching() {
+        // Test complex matching scenarios with multiple criteria
+        let complex_matcher = ContextMatcher {
+            role: Some(FunctionRole::TestFunction),
+            file_type: Some(FileType::Test),
+            is_async: Some(true),
+            framework_pattern: Some(FrameworkPattern::WebHandler),
+            name_pattern: Some("api_test".to_string()),
+        };
+
+        // Should match all criteria
+        let matching_context = FunctionContext {
+            role: FunctionRole::TestFunction,
+            file_type: FileType::Test,
+            is_async: true,
+            framework_pattern: Some(FrameworkPattern::WebHandler),
+            function_name: Some("test_api_test_endpoint".to_string()),
+            module_path: Vec::new(),
+        };
+        assert!(complex_matcher.matches(&matching_context));
+
+        // Should fail on role mismatch
+        let role_mismatch = FunctionContext {
+            role: FunctionRole::Main,
+            file_type: FileType::Test,
+            is_async: true,
+            framework_pattern: Some(FrameworkPattern::WebHandler),
+            function_name: Some("test_api_test_endpoint".to_string()),
+            module_path: Vec::new(),
+        };
+        assert!(!complex_matcher.matches(&role_mismatch));
+
+        // Should fail on name pattern mismatch
+        let name_mismatch = FunctionContext {
+            role: FunctionRole::TestFunction,
+            file_type: FileType::Test,
+            is_async: true,
+            framework_pattern: Some(FrameworkPattern::WebHandler),
+            function_name: Some("test_database_function".to_string()),
+            module_path: Vec::new(),
+        };
+        assert!(!complex_matcher.matches(&name_mismatch));
+
+        // Should fail on missing function name when pattern required
+        let missing_name = FunctionContext {
+            role: FunctionRole::TestFunction,
+            file_type: FileType::Test,
+            is_async: true,
+            framework_pattern: Some(FrameworkPattern::WebHandler),
+            function_name: None,
+            module_path: Vec::new(),
+        };
+        assert!(!complex_matcher.matches(&missing_name));
     }
 }

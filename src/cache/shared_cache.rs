@@ -850,67 +850,87 @@ impl SharedCache {
 
     /// Clean up old cache entries
     pub fn cleanup(&self) -> Result<()> {
-        let removed_keys = {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-            // Sort entries by last access time
-            let mut entries: Vec<_> = index
-                .entries
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-            entries.sort_by_key(|(_, metadata)| metadata.last_accessed);
-
-            // Remove oldest entries until we're under 50% of max size
-            let target_size = self.max_cache_size / 2;
-            let mut removed_keys = Vec::new();
-            let mut current_size = index.total_size;
-
-            for (key, metadata) in entries {
-                if current_size <= target_size {
-                    break;
-                }
-                removed_keys.push(key);
-                current_size -= metadata.size_bytes;
-            }
-
-            // Remove from index
-            for key in &removed_keys {
-                if let Some(metadata) = index.entries.remove(key) {
-                    index.total_size -= metadata.size_bytes;
-                }
-            }
-
-            index.last_cleanup = Some(SystemTime::now());
-
-            removed_keys
-        };
-
-        // Delete files with better error handling
-        for key in removed_keys {
-            // Try to delete from all components
-            for component in &[
-                "call_graphs",
-                "analysis",
-                "metadata",
-                "temp",
-                "file_metrics",
-                "test",
-            ] {
-                let cache_path = self.get_cache_file_path(&key, component);
-                if cache_path.exists() {
-                    if let Err(e) = fs::remove_file(&cache_path) {
-                        log::debug!("Failed to delete cache file {:?}: {}. This may be due to concurrent access.", cache_path, e);
-                    }
-                }
-            }
-        }
-
+        let removed_keys = self.determine_keys_to_remove()?;
+        self.delete_cache_files(&removed_keys)?;
         self.save_index()?;
         Ok(())
+    }
+
+    /// Determine which cache keys should be removed based on size and age
+    fn determine_keys_to_remove(&self) -> Result<Vec<String>> {
+        let mut index = self
+            .index
+            .write()
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+
+        let sorted_entries = Self::sort_entries_by_access_time(&index.entries);
+        let target_size = self.max_cache_size / 2;
+        let keys_to_remove = Self::select_keys_for_removal(sorted_entries, target_size, index.total_size);
+
+        Self::update_index_after_removal(&mut index, &keys_to_remove);
+        Ok(keys_to_remove)
+    }
+
+    /// Sort cache entries by last access time (oldest first)
+    fn sort_entries_by_access_time(entries: &HashMap<String, CacheMetadata>) -> Vec<(String, CacheMetadata)> {
+        let mut sorted_entries: Vec<_> = entries
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        sorted_entries.sort_by_key(|(_, metadata)| metadata.last_accessed);
+        sorted_entries
+    }
+
+    /// Select keys for removal until target size is reached
+    fn select_keys_for_removal(
+        entries: Vec<(String, CacheMetadata)>,
+        target_size: u64,
+        current_size: u64,
+    ) -> Vec<String> {
+        let mut removed_keys = Vec::new();
+        let mut remaining_size = current_size;
+
+        for (key, metadata) in entries {
+            if remaining_size <= target_size {
+                break;
+            }
+            removed_keys.push(key);
+            remaining_size -= metadata.size_bytes;
+        }
+        removed_keys
+    }
+
+
+    /// Delete cache files for the given keys
+    fn delete_cache_files(&self, removed_keys: &[String]) -> Result<()> {
+        const CACHE_COMPONENTS: &[&str] = &[
+            "call_graphs",
+            "analysis",
+            "metadata",
+            "temp",
+            "file_metrics",
+            "test",
+        ];
+
+        for key in removed_keys {
+            for component in CACHE_COMPONENTS {
+                self.delete_component_file(key, component);
+            }
+        }
+        Ok(())
+    }
+
+    /// Delete a single cache component file with error handling
+    fn delete_component_file(&self, key: &str, component: &str) {
+        let cache_path = self.get_cache_file_path(key, component);
+        if cache_path.exists() {
+            if let Err(e) = fs::remove_file(&cache_path) {
+                log::debug!(
+                    "Failed to delete cache file {:?}: {}. This may be due to concurrent access.",
+                    cache_path, e
+                );
+            }
+        }
     }
 
     /// Migrate cache from local to shared location
@@ -2433,5 +2453,74 @@ mod tests {
 
         std::env::remove_var("DEBTMAP_CACHE_DIR");
         std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cleanup_pure_functions_behavior() {
+        use std::collections::HashMap;
+        use std::time::{Duration, SystemTime};
+
+        // Test sort_entries_by_access_time
+        let now = SystemTime::now();
+        let old_time = now - Duration::from_secs(3600); // 1 hour ago
+        let very_old_time = now - Duration::from_secs(7200); // 2 hours ago
+
+        let mut entries = HashMap::new();
+        entries.insert(
+            "newest".to_string(),
+            CacheMetadata {
+                version: "1.0".to_string(),
+                created_at: now,
+                last_accessed: now,
+                access_count: 1,
+                size_bytes: 10,
+                debtmap_version: "0.2.0".to_string(),
+            },
+        );
+        entries.insert(
+            "oldest".to_string(),
+            CacheMetadata {
+                version: "1.0".to_string(),
+                created_at: very_old_time,
+                last_accessed: very_old_time,
+                access_count: 1,
+                size_bytes: 20,
+                debtmap_version: "0.2.0".to_string(),
+            },
+        );
+        entries.insert(
+            "middle".to_string(),
+            CacheMetadata {
+                version: "1.0".to_string(),
+                created_at: old_time,
+                last_accessed: old_time,
+                access_count: 1,
+                size_bytes: 15,
+                debtmap_version: "0.2.0".to_string(),
+            },
+        );
+
+        let sorted = SharedCache::sort_entries_by_access_time(&entries);
+
+        // Should be sorted with oldest first
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[0].0, "oldest");
+        assert_eq!(sorted[1].0, "middle");
+        assert_eq!(sorted[2].0, "newest");
+
+        // Test select_keys_for_removal
+        let keys_to_remove = SharedCache::select_keys_for_removal(sorted.clone(), 25, 45);
+
+        // With total size 45 and target 25, should remove oldest (20 bytes) to get to 25
+        assert_eq!(keys_to_remove.len(), 1);
+        assert_eq!(keys_to_remove[0], "oldest");
+
+        // Test with smaller target - should remove multiple entries
+        let keys_to_remove_multiple = SharedCache::select_keys_for_removal(sorted, 10, 45);
+
+        // Should remove oldest (20) + middle (15) = 35, leaving 10 which is under target
+        assert_eq!(keys_to_remove_multiple.len(), 2);
+        assert_eq!(keys_to_remove_multiple[0], "oldest");
+        assert_eq!(keys_to_remove_multiple[1], "middle");
     }
 }
