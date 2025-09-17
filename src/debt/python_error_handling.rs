@@ -24,13 +24,10 @@ impl<'a> PythonErrorHandlingAnalyzer<'a> {
     pub fn analyze(&mut self, module: &ast::Mod) -> Vec<DebtItem> {
         let mut items = Vec::new();
 
-        match module {
-            ast::Mod::Module(m) => {
-                for stmt in &m.body {
-                    items.extend(self.analyze_statement(stmt));
-                }
+        if let ast::Mod::Module(m) = module {
+            for stmt in &m.body {
+                items.extend(self.analyze_statement(stmt));
             }
-            _ => {}
         }
 
         items
@@ -148,15 +145,14 @@ impl<'a> PythonErrorHandlingAnalyzer<'a> {
         let mut items = Vec::new();
 
         // Check if it's contextlib.suppress usage (which can swallow errors)
-        if self.is_contextlib_suppress(&with_stmt.items) {
-            if !self.is_suppressed(self.current_line, &DebtType::ErrorSwallowing) {
+        if self.is_contextlib_suppress(&with_stmt.items)
+            && !self.is_suppressed(self.current_line, &DebtType::ErrorSwallowing) {
                 items.push(self.create_debt_item(
                     self.current_line,
                     ErrorPattern::ContextlibSuppress,
                     "contextlib.suppress usage detected",
                 ));
             }
-        }
 
         // Check body for nested error handling
         for stmt in &with_stmt.body {
