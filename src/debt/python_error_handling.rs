@@ -146,13 +146,14 @@ impl<'a> PythonErrorHandlingAnalyzer<'a> {
 
         // Check if it's contextlib.suppress usage (which can swallow errors)
         if self.is_contextlib_suppress(&with_stmt.items)
-            && !self.is_suppressed(self.current_line, &DebtType::ErrorSwallowing) {
-                items.push(self.create_debt_item(
-                    self.current_line,
-                    ErrorPattern::ContextlibSuppress,
-                    "contextlib.suppress usage detected",
-                ));
-            }
+            && !self.is_suppressed(self.current_line, &DebtType::ErrorSwallowing)
+        {
+            items.push(self.create_debt_item(
+                self.current_line,
+                ErrorPattern::ContextlibSuppress,
+                "contextlib.suppress usage detected",
+            ));
+        }
 
         // Check body for nested error handling
         for stmt in &with_stmt.body {
