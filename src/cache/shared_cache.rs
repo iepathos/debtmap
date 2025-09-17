@@ -2162,4 +2162,250 @@ mod tests {
         std::env::remove_var("DEBTMAP_CACHE_DIR");
         std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
     }
+
+    #[test]
+    fn test_cleanup_removes_oldest_entries() {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        cache.max_cache_size = 100; // Set small size to trigger cleanup
+
+        // Create large entries to ensure we exceed max_cache_size
+        let large_data = vec![0u8; 40]; // Each entry is 40 bytes
+
+        // Add old entries
+        cache.put("old_key1", "component1", &large_data).unwrap();
+        cache.put("old_key2", "component1", &large_data).unwrap();
+
+        // Sleep briefly to ensure time difference
+        std::thread::sleep(Duration::from_millis(10));
+
+        // Add recent entries
+        cache.put("recent_key1", "component1", &large_data).unwrap();
+        cache.put("recent_key2", "component1", &large_data).unwrap();
+
+        // Access recent entries to update their access time
+        cache.get("recent_key1", "component1").unwrap();
+        cache.get("recent_key2", "component1").unwrap();
+
+        // Debug: Check actual size before cleanup
+        let stats_before = cache.get_stats();
+        eprintln!("Before cleanup - entries: {}, size: {}", stats_before.entry_count, stats_before.total_size);
+
+        // Total size should be ~160 bytes, max is 100, target after cleanup is 50
+        // Manually trigger cleanup
+        cache.cleanup().unwrap();
+
+        // Debug: Check actual size after cleanup
+        let stats_after = cache.get_stats();
+        eprintln!("After cleanup - entries: {}, size: {}", stats_after.entry_count, stats_after.total_size);
+
+        // The cleanup should have removed some entries to get under target (50 bytes)
+        assert!(stats_after.entry_count < stats_before.entry_count,
+                "Cleanup should have removed entries: {} -> {}", stats_before.entry_count, stats_after.entry_count);
+        assert!(stats_after.total_size <= cache.max_cache_size / 2,
+                "Size should be under target: {} <= {}", stats_after.total_size, cache.max_cache_size / 2);
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cleanup_target_size_calculation() {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        // Create cache with specific max size
+        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        cache.max_cache_size = 1000; // Set a small size for testing
+
+        // Add entries that exceed half the max size
+        let data = vec![0u8; 300]; // Each entry is 300 bytes
+        cache.put("key1", "component", &data).unwrap();
+        cache.put("key2", "component", &data).unwrap();
+        cache.put("key3", "component", &data).unwrap();
+
+        // Total size should be ~900 bytes, target after cleanup is 500
+
+        // Run cleanup
+        cache.cleanup().unwrap();
+
+        // Verify total size is now under target (500 bytes)
+        let stats = cache.get_stats();
+        assert!(stats.total_size <= 500);
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cleanup_handles_empty_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        // Cleanup on empty cache should not error
+        let result = cache.cleanup();
+        assert!(result.is_ok());
+
+        // Cache should still be empty
+        let stats = cache.get_stats();
+        assert_eq!(stats.entry_count, 0);
+        assert_eq!(stats.total_size, 0);
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cleanup_removes_files_from_all_components() {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        // Add entries to different components
+        let components = vec![
+            "call_graphs",
+            "analysis",
+            "metadata",
+            "temp",
+            "file_metrics",
+            "test",
+        ];
+
+        let key = "test_key";
+        let data = b"test_data";
+
+        // Add to each component
+        for component in &components {
+            cache.put(key, component, data).unwrap();
+            assert!(cache.exists(key, component));
+        }
+
+        // Force cache size to be large enough to trigger cleanup
+        {
+            let mut index = cache.index.write().unwrap();
+            index.total_size = cache.max_cache_size + 1;
+        }
+
+        // Run cleanup
+        cache.cleanup().unwrap();
+
+        // Verify all component files are removed
+        for component in &components {
+            assert!(!cache.exists(key, component));
+        }
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cleanup_updates_index_correctly() {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        cache.max_cache_size = 200; // Increase size to allow all entries to be added first
+
+        // Add multiple entries
+        let entries: Vec<(&str, Vec<u8>)> = vec![
+            ("key1", vec![0u8; 20]),
+            ("key2", vec![0u8; 20]),
+            ("key3", vec![0u8; 20]),
+            ("key4", vec![0u8; 20]),
+        ];
+
+        for (key, data) in &entries {
+            cache.put(key, "component", data).unwrap();
+        }
+
+        let initial_stats = cache.get_stats();
+        assert!(initial_stats.entry_count > 0, "Should have entries");
+
+        // Now reduce max_cache_size to force cleanup
+        cache.max_cache_size = 50;
+
+        // Run cleanup - should remove entries to get under 25 bytes (50% of max)
+        cache.cleanup().unwrap();
+
+        // Verify index is updated
+        let final_stats = cache.get_stats();
+        assert!(final_stats.entry_count < initial_stats.entry_count,
+                "Entry count should decrease: {} -> {}", initial_stats.entry_count, final_stats.entry_count);
+        assert!(final_stats.total_size <= cache.max_cache_size / 2,
+                "Total size should be under target: {} <= {}", final_stats.total_size, cache.max_cache_size / 2);
+
+        // Verify last_cleanup is set
+        {
+            let index = cache.index.read().unwrap();
+            assert!(index.last_cleanup.is_some());
+        }
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cleanup_handles_concurrent_file_access() {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+
+        // Add an entry
+        let key = "concurrent_key";
+        let component = "component";
+        cache.put(key, component, b"data").unwrap();
+
+        // Manually remove the file to simulate concurrent deletion
+        let cache_path = cache.get_cache_file_path(key, component);
+        if cache_path.exists() {
+            fs::remove_file(&cache_path).ok();
+        }
+
+        // Cleanup should handle the missing file gracefully
+        let result = cache.cleanup();
+        assert!(result.is_ok());
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_cleanup_preserves_entries_under_target_size() {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        cache.max_cache_size = 1000;
+
+        // Add entries that total less than half the max size (target = 500)
+        cache.put("keep1", "component", b"small").unwrap();
+        cache.put("keep2", "component", b"data").unwrap();
+
+        let initial_count = cache.get_stats().entry_count;
+
+        // Run cleanup
+        cache.cleanup().unwrap();
+
+        // All entries should be preserved since we're under target
+        let final_count = cache.get_stats().entry_count;
+        assert_eq!(initial_count, final_count);
+        assert!(cache.exists("keep1", "component"));
+        assert!(cache.exists("keep2", "component"));
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
 }
