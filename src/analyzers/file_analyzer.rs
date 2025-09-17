@@ -115,7 +115,11 @@ impl UnifiedFileAnalyzer {
     }
 
     /// Calculate coverage-related metrics
-    fn calculate_coverage_metrics(&self, functions: &[FunctionMetrics], function_count: usize) -> CoverageMetrics {
+    fn calculate_coverage_metrics(
+        &self,
+        functions: &[FunctionMetrics],
+        function_count: usize,
+    ) -> CoverageMetrics {
         let coverage_percent = match &self.coverage_data {
             Some(coverage) => {
                 let covered_functions = functions
@@ -132,9 +136,7 @@ impl UnifiedFileAnalyzer {
             None => 0.0,
         };
 
-        CoverageMetrics {
-            coverage_percent,
-        }
+        CoverageMetrics { coverage_percent }
     }
 
     /// Calculate line-related metrics including uncovered lines
@@ -145,8 +147,8 @@ impl UnifiedFileAnalyzer {
     ) -> LineMetrics {
         const OVERHEAD_LINES_PER_FUNCTION: usize = 5;
 
-        let total_lines: usize =
-            functions.iter().map(|f| f.length).sum::<usize>() + function_count * OVERHEAD_LINES_PER_FUNCTION;
+        let total_lines: usize = functions.iter().map(|f| f.length).sum::<usize>()
+            + function_count * OVERHEAD_LINES_PER_FUNCTION;
         let uncovered_lines = ((1.0 - coverage_percent) * total_lines as f64) as usize;
 
         LineMetrics {
@@ -161,7 +163,8 @@ impl UnifiedFileAnalyzer {
         const MAX_LINES_THRESHOLD: usize = 2000;
         const ESTIMATED_FIELDS_PER_CLASS: usize = 5;
 
-        let is_god_object = function_count > MAX_FUNCTIONS_THRESHOLD || total_lines > MAX_LINES_THRESHOLD;
+        let is_god_object =
+            function_count > MAX_FUNCTIONS_THRESHOLD || total_lines > MAX_LINES_THRESHOLD;
         let god_object_score = if is_god_object {
             (function_count as f64 / MAX_FUNCTIONS_THRESHOLD as f64).min(2.0)
         } else {
@@ -170,7 +173,8 @@ impl UnifiedFileAnalyzer {
 
         GodObjectIndicators {
             methods_count: function_count,
-            fields_count: function_count * ESTIMATED_FIELDS_PER_CLASS / MAX_FUNCTIONS_THRESHOLD.max(1), // Rough estimate
+            fields_count: function_count * ESTIMATED_FIELDS_PER_CLASS
+                / MAX_FUNCTIONS_THRESHOLD.max(1), // Rough estimate
             responsibilities: if is_god_object { 5 } else { 2 },
             is_god_object,
             god_object_score,
@@ -210,8 +214,13 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
         let complexity_metrics = Self::calculate_complexity_metrics(functions);
         let class_count = Self::estimate_class_count(functions);
         let coverage_metrics = self.calculate_coverage_metrics(functions, function_count);
-        let line_metrics = Self::calculate_line_metrics(functions, function_count, coverage_metrics.coverage_percent);
-        let god_object_indicators = Self::detect_god_object(function_count, line_metrics.total_lines);
+        let line_metrics = Self::calculate_line_metrics(
+            functions,
+            function_count,
+            coverage_metrics.coverage_percent,
+        );
+        let god_object_indicators =
+            Self::detect_god_object(function_count, line_metrics.total_lines);
 
         FileDebtMetrics {
             path,

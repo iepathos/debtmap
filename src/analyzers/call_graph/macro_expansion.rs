@@ -343,7 +343,11 @@ impl MacroExpander {
     }
 
     /// Try different parsing strategies for braced expressions
-    fn try_parse_braced_expressions(&self, full_content: &str, inner: &str) -> syn::Result<Vec<Expr>> {
+    fn try_parse_braced_expressions(
+        &self,
+        full_content: &str,
+        inner: &str,
+    ) -> syn::Result<Vec<Expr>> {
         // Strategy 1: Try special braced content extraction
         if let Ok(expr) = self.try_braced_content_extraction(full_content) {
             return Ok(vec![expr]);
@@ -376,7 +380,9 @@ impl MacroExpander {
     fn try_comma_separated_parsing(inner: &str) -> syn::Result<Vec<Expr>> {
         let parser = Punctuated::<Expr, Comma>::parse_separated_nonempty;
         let token_stream: proc_macro2::TokenStream = inner.parse().unwrap_or_default();
-        parser.parse2(token_stream).map(|punctuated| punctuated.into_iter().collect())
+        parser
+            .parse2(token_stream)
+            .map(|punctuated| punctuated.into_iter().collect())
     }
 
     /// Try parsing as a single expression

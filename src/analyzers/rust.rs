@@ -177,11 +177,9 @@ fn create_configured_visitor(
 
 /// Pure function to calculate total complexity metrics
 fn calculate_total_complexity(functions: &[FunctionMetrics]) -> (u32, u32) {
-    functions
-        .iter()
-        .fold((0, 0), |(cyc, cog), f| {
-            (cyc + f.cyclomatic, cog + f.cognitive)
-        })
+    functions.iter().fold((0, 0), |(cyc, cog), f| {
+        (cyc + f.cyclomatic, cog + f.cognitive)
+    })
 }
 
 /// Pure function to build file metrics
@@ -849,15 +847,9 @@ fn apply_cognitive_pattern_scaling(
     let base_cognitive = calculate_cognitive_syn(block);
 
     match pattern_info.pattern_type {
-        PatternType::Visitor => {
-            ((base_cognitive as f32).log2().ceil()).max(1.0) as u32
-        }
-        PatternType::ExhaustiveMatch => {
-            ((base_cognitive as f32).sqrt().ceil()).max(2.0) as u32
-        }
-        PatternType::SimpleMapping => {
-            ((base_cognitive as f32) * 0.2).max(1.0) as u32
-        }
+        PatternType::Visitor => ((base_cognitive as f32).log2().ceil()).max(1.0) as u32,
+        PatternType::ExhaustiveMatch => ((base_cognitive as f32).sqrt().ceil()).max(2.0) as u32,
+        PatternType::SimpleMapping => ((base_cognitive as f32) * 0.2).max(1.0) as u32,
         _ => base_cognitive,
     }
 }

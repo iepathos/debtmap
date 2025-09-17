@@ -504,7 +504,10 @@ mod tests {
 
         // Test matches_framework_pattern_pure
         assert!(ContextMatcher::matches_framework_pattern_pure(None, None));
-        assert!(ContextMatcher::matches_framework_pattern_pure(None, Some(FrameworkPattern::WebHandler)));
+        assert!(ContextMatcher::matches_framework_pattern_pure(
+            None,
+            Some(FrameworkPattern::WebHandler)
+        ));
         assert!(ContextMatcher::matches_framework_pattern_pure(
             Some(FrameworkPattern::WebHandler),
             Some(FrameworkPattern::WebHandler)
@@ -520,7 +523,10 @@ mod tests {
 
         // Test matches_name_pattern_pure
         assert!(ContextMatcher::matches_name_pattern_pure(&None, &None));
-        assert!(ContextMatcher::matches_name_pattern_pure(&None, &Some("any_name".to_string())));
+        assert!(ContextMatcher::matches_name_pattern_pure(
+            &None,
+            &Some("any_name".to_string())
+        ));
         assert!(ContextMatcher::matches_name_pattern_pure(
             &Some("test".to_string()),
             &Some("test_function".to_string())

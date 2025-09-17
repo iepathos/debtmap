@@ -56,10 +56,19 @@ if [ ! -f "$AFTER_FILE" ]; then
     exit 1
 fi
 
-echo "Validating debtmap improvement..."
-echo "  Before: $BEFORE_FILE"
-echo "  After: $AFTER_FILE"
-echo "  Output: $OUTPUT_FILE"
+# Check for automation mode
+IS_AUTOMATION=false
+if [ "$PRODIGY_AUTOMATION" = "true" ] || [ "$PRODIGY_VALIDATION" = "true" ]; then
+    IS_AUTOMATION=true
+fi
+
+# Only show progress in non-automation mode
+if [ "$IS_AUTOMATION" = "false" ]; then
+    echo "Validating debtmap improvement..."
+    echo "  Before: $BEFORE_FILE"
+    echo "  After: $AFTER_FILE"
+    echo "  Output: $OUTPUT_FILE"
+fi
 
 # Ensure output directory exists
 mkdir -p "$(dirname "$OUTPUT_FILE")"
@@ -83,7 +92,11 @@ def load_json(filepath: str) -> Optional[Dict]:
 
 def get_debt_items(data: Dict) -> List[Dict]:
     """Extract debt items from debtmap output."""
-    if 'debt_items' in data:
+    # Handle the standard debtmap output structure
+    if 'technical_debt' in data and 'debt_items' in data['technical_debt']:
+        return data['technical_debt']['debt_items']
+    # Alternative structures
+    elif 'debt_items' in data:
         return data['debt_items']
     elif 'technical_debt' in data and 'items' in data['technical_debt']:
         return data['technical_debt']['items']
@@ -148,9 +161,11 @@ def compare_debt_items(before_items: List[Dict], after_items: List[Dict]) -> Dic
 
     def item_key(item: Dict) -> str:
         """Generate a unique key for a debt item."""
-        location = item.get('location', item.get('file', ''))
-        function = item.get('function', item.get('function_name', ''))
-        return f"{location}:{function}"
+        # Handle standard debtmap output structure
+        location = item.get('file_path', item.get('location', item.get('file', '')))
+        function = item.get('function_name', item.get('function', ''))
+        issue_type = item.get('issue_type', '')
+        return f"{location}:{function}:{issue_type}"
 
     before_map = {item_key(item): item for item in before_items}
     after_map = {item_key(item): item for item in after_items}
@@ -279,14 +294,17 @@ def calculate_improvement_score(before_metrics: Dict, after_metrics: Dict, compa
 
     # Document remaining issues and gaps
     for item in comparison['unchanged_critical']:
-        location = item.get('location', item.get('file', 'unknown'))
-        function = item.get('function', item.get('function_name', 'unknown'))
+        # Handle standard debtmap output structure
+        location = item.get('file_path', item.get('location', item.get('file', 'unknown')))
+        function = item.get('function_name', item.get('function', 'unknown'))
+        line_number = item.get('line_number', item.get('line', ''))
         score = item.get('score', item.get('severity_score', 0))
+        issue_type = item.get('issue_type', 'Unknown issue')
 
         gap_key = f"critical_debt_{location.replace('/', '_').replace('.', '_')}_{function}"
         gaps[gap_key] = {
-            'description': item.get('reason', 'Critical debt item remains unresolved'),
-            'location': f"{location}:{function}",
+            'description': f"Critical debt item: {issue_type}",
+            'location': f"{location}:{function}:{line_number}" if line_number else f"{location}:{function}",
             'severity': 'critical',
             'suggested_fix': item.get('recommendation', 'Apply functional programming patterns to reduce complexity'),
             'original_score': score,
@@ -379,18 +397,22 @@ def main():
     with open(output_file, 'w') as f:
         json.dump(result, f, indent=2)
 
-    # Print summary (not JSON)
-    print(f"\nValidation complete: {improvement_score:.1f}% improvement")
-    print(f"Status: {status}")
-    if improvements:
-        print("\nImprovements made:")
-        for imp in improvements[:3]:
-            print(f"  ✓ {imp}")
-    if remaining_issues and improvement_score < 75:
-        print("\nRemaining issues:")
-        for issue in remaining_issues[:3]:
-            print(f"  ✗ {issue}")
-    print(f"\nValidation result written to: {output_file}")
+    # Print summary (not JSON) only in non-automation mode
+    is_automation = os.environ.get('PRODIGY_AUTOMATION') == 'true' or \
+                    os.environ.get('PRODIGY_VALIDATION') == 'true'
+
+    if not is_automation:
+        print(f"\nValidation complete: {improvement_score:.1f}% improvement")
+        print(f"Status: {status}")
+        if improvements:
+            print("\nImprovements made:")
+            for imp in improvements[:3]:
+                print(f"  ✓ {imp}")
+        if remaining_issues and improvement_score < 75:
+            print("\nRemaining issues:")
+            for issue in remaining_issues[:3]:
+                print(f"  ✗ {issue}")
+        print(f"\nValidation result written to: {output_file}")
 
 if __name__ == '__main__':
     main()

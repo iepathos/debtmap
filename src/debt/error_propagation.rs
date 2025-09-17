@@ -49,8 +49,7 @@ fn is_box_dyn_error_pattern(type_str: &str) -> bool {
 
 /// Pure predicate for Result with String error
 fn is_result_with_string_error(type_str: &str) -> bool {
-    type_str.contains("Result")
-        && (type_str.contains(", String") || type_str.contains(",String"))
+    type_str.contains("Result") && (type_str.contains(", String") || type_str.contains(",String"))
 }
 
 /// Pure predicate for anyhow error types
@@ -177,6 +176,7 @@ pub enum PropagationQuality {
 
 impl PropagationQuality {
     /// Pure method to get base priority for this quality type
+    #[allow(dead_code)]
     fn base_priority(self) -> Priority {
         match self {
             Self::BoxDynError => Priority::Medium,

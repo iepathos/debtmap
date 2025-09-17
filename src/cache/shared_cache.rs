@@ -865,14 +865,17 @@ impl SharedCache {
 
         let sorted_entries = Self::sort_entries_by_access_time(&index.entries);
         let target_size = self.max_cache_size / 2;
-        let keys_to_remove = Self::select_keys_for_removal(sorted_entries, target_size, index.total_size);
+        let keys_to_remove =
+            Self::select_keys_for_removal(sorted_entries, target_size, index.total_size);
 
         Self::update_index_after_removal(&mut index, &keys_to_remove);
         Ok(keys_to_remove)
     }
 
     /// Sort cache entries by last access time (oldest first)
-    fn sort_entries_by_access_time(entries: &HashMap<String, CacheMetadata>) -> Vec<(String, CacheMetadata)> {
+    fn sort_entries_by_access_time(
+        entries: &HashMap<String, CacheMetadata>,
+    ) -> Vec<(String, CacheMetadata)> {
         let mut sorted_entries: Vec<_> = entries
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -900,7 +903,6 @@ impl SharedCache {
         removed_keys
     }
 
-
     /// Delete cache files for the given keys
     fn delete_cache_files(&self, removed_keys: &[String]) -> Result<()> {
         const CACHE_COMPONENTS: &[&str] = &[
@@ -927,7 +929,8 @@ impl SharedCache {
             if let Err(e) = fs::remove_file(&cache_path) {
                 log::debug!(
                     "Failed to delete cache file {:?}: {}. This may be due to concurrent access.",
-                    cache_path, e
+                    cache_path,
+                    e
                 );
             }
         }
