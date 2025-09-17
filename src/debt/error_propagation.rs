@@ -4,6 +4,70 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{File, ItemFn, ReturnType, Type};
 
+/// Pure function to check for Box<dyn Error> pattern
+fn detect_box_dyn_error(type_str: &str) -> Option<(PropagationQuality, &'static str)> {
+    if is_box_dyn_error_pattern(type_str) {
+        Some((
+            PropagationQuality::BoxDynError,
+            "Using Box<dyn Error> loses type information",
+        ))
+    } else {
+        None
+    }
+}
+
+/// Pure function to check for String error type
+fn detect_string_error_type(type_str: &str) -> Option<(PropagationQuality, &'static str)> {
+    if is_result_with_string_error(type_str) {
+        Some((
+            PropagationQuality::TypeErasure,
+            "Using String as error type loses structure",
+        ))
+    } else {
+        None
+    }
+}
+
+/// Pure function to check for anyhow without context
+fn detect_anyhow_no_context(type_str: &str) -> Option<(PropagationQuality, &'static str)> {
+    if is_anyhow_error_type(type_str) {
+        Some((
+            PropagationQuality::PassthroughNoContext,
+            "Consider adding context to anyhow errors",
+        ))
+    } else {
+        None
+    }
+}
+
+/// Pure predicate for Box<dyn Error> pattern
+fn is_box_dyn_error_pattern(type_str: &str) -> bool {
+    type_str.contains("Box")
+        && type_str.contains("dyn")
+        && (type_str.contains("Error") || type_str.contains("std::error::Error"))
+}
+
+/// Pure predicate for Result with String error
+fn is_result_with_string_error(type_str: &str) -> bool {
+    type_str.contains("Result")
+        && (type_str.contains(", String") || type_str.contains(",String"))
+}
+
+/// Pure predicate for anyhow error types
+fn is_anyhow_error_type(type_str: &str) -> bool {
+    type_str.contains("anyhow::Error") || type_str.contains("anyhow :: Error")
+}
+
+/// Error type check definition
+type ErrorTypeCheck = fn(&str) -> Option<(PropagationQuality, &'static str)>;
+
+/// Array of error type checks using functional composition
+const ERROR_TYPE_CHECKS: &[ErrorTypeCheck] = &[
+    detect_box_dyn_error,
+    detect_string_error_type,
+    detect_anyhow_no_context,
+];
+
 pub struct ErrorPropagationAnalyzer<'a> {
     items: Vec<DebtItem>,
     current_file: &'a Path,
@@ -76,38 +140,13 @@ impl<'a> ErrorPropagationAnalyzer<'a> {
     fn check_error_type(&mut self, ty: &Type, line: usize) {
         let type_str = quote::quote!(#ty).to_string();
 
-        // Check for Box<dyn Error>
-        if type_str.contains("Box")
-            && type_str.contains("dyn")
-            && (type_str.contains("Error") || type_str.contains("std::error::Error"))
-        {
-            self.add_debt_item(
-                line,
-                PropagationQuality::BoxDynError,
-                "Using Box<dyn Error> loses type information",
-            );
-        }
-
-        // Check for overly broad Result types
-        if type_str.contains("Result") {
-            // Check specifically for Result<_, String> pattern
-            if type_str.contains(", String") || type_str.contains(",String") {
-                self.add_debt_item(
-                    line,
-                    PropagationQuality::TypeErasure,
-                    "Using String as error type loses structure",
-                );
-            }
-        }
-
-        // Check for anyhow::Error without context
-        if type_str.contains("anyhow::Error") || type_str.contains("anyhow :: Error") {
-            self.add_debt_item(
-                line,
-                PropagationQuality::PassthroughNoContext,
-                "Consider adding context to anyhow errors",
-            );
-        }
+        // Apply all error type checks using functional style
+        ERROR_TYPE_CHECKS
+            .iter()
+            .filter_map(|check| check(&type_str))
+            .for_each(|(quality, context)| {
+                self.add_debt_item(line, quality, context);
+            });
     }
 }
 
@@ -137,6 +176,16 @@ pub enum PropagationQuality {
 }
 
 impl PropagationQuality {
+    /// Pure method to get base priority for this quality type
+    fn base_priority(self) -> Priority {
+        match self {
+            Self::BoxDynError => Priority::Medium,
+            Self::OverlyBroadConversion => Priority::Low,
+            Self::TypeErasure => Priority::Medium,
+            Self::PassthroughNoContext => Priority::Low,
+        }
+    }
+
     fn description(&self) -> &'static str {
         match self {
             Self::BoxDynError => "Box<dyn Error> type erasure",

@@ -1,64 +1,9 @@
 {
-  "completion_percentage": 0.2,
+  "completion_percentage": 0.0,
   "status": "failed",
-  "improvements": [
-    "Resolved 5 critical debt items",
-    "Reduced average debt score from 52.2 to 52.2"
-  ],
+  "improvements": [],
   "remaining_issues": [
-    "23 new critical debt items introduced",
-    "1121 critical debt items still present"
+    "Failed to load debtmap JSON files"
   ],
-  "gaps": {
-    "critical_debt_remaining_1": {
-      "description": "High-priority debt item still present: Add 7 tests for 100% coverage gap, then refactor complexity 11 into 5 functions",
-      "location": "./src/cache/shared_cache.rs:SharedCache::cleanup:852",
-      "severity": "critical",
-      "suggested_fix": "Add 7 tests for 100% coverage gap, then refactor complexity 11 into 5 functions",
-      "original_score": 84.99535533905932,
-      "current_score": 84.99535533905932
-    },
-    "critical_debt_remaining_2": {
-      "description": "High-priority debt item still present: Add 2 tests for 29% coverage gap, then refactor complexity 13 into 4 functions",
-      "location": "./src/context/rules.rs:ContextMatcher::matches:85",
-      "severity": "critical",
-      "suggested_fix": "Add 2 tests for 29% coverage gap, then refactor complexity 13 into 4 functions",
-      "original_score": 78.68142857142858,
-      "current_score": 78.68142857142858
-    },
-    "critical_debt_remaining_3": {
-      "description": "High-priority debt item still present: Add 6 tests for 76% coverage gap, then refactor complexity 12 into 6 functions",
-      "location": "./src/analyzers/file_analyzer.rs:UnifiedFileAnalyzer::aggregate_functions:94",
-      "severity": "critical",
-      "suggested_fix": "Add 6 tests for 76% coverage gap, then refactor complexity 12 into 6 functions",
-      "original_score": 78.36535533905932,
-      "current_score": 78.36535533905932
-    },
-    "regression_detected_1": {
-      "description": "New complexity introduced during refactoring",
-      "location": "./src/analyzers/purity_detector.rs:PurityDetector::is_io_call:159",
-      "severity": "high",
-      "suggested_fix": "Simplify the newly added code using functional patterns",
-      "original_score": null,
-      "current_score": 60.059999999999995
-    },
-    "regression_detected_2": {
-      "description": "New complexity introduced during refactoring",
-      "location": "./src/analyzers/call_graph/macro_expansion.rs:MacroExpander::parse_braced_exprs:311",
-      "severity": "high",
-      "suggested_fix": "Simplify the newly added code using functional patterns",
-      "original_score": null,
-      "current_score": 59.63485893588361
-    }
-  },
-  "before_summary": {
-    "total_items": 1149,
-    "high_priority_items": 1149,
-    "average_score": 52.18
-  },
-  "after_summary": {
-    "total_items": 1167,
-    "high_priority_items": 1167,
-    "average_score": 52.17
-  }
+  "gaps": {}
 }

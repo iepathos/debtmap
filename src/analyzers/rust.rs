@@ -108,29 +108,92 @@ fn analyze_rust_file(
     enhanced_thresholds: &ComplexityThresholds,
     _use_enhanced: bool,
 ) -> FileMetrics {
-    let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
-    let mut visitor = FunctionVisitor::new(ast.path.clone(), source_content.clone());
-    visitor.file_ast = Some(ast.file.clone());
-    visitor.enhanced_thresholds = enhanced_thresholds.clone();
-    visitor.visit_file(&ast.file);
+    let source_content = read_source_content(&ast.path);
+    let analysis_result = analyze_ast_with_content(ast, &source_content, enhanced_thresholds);
 
     let debt_items = create_debt_items(
         &ast.file,
         &ast.path,
         threshold,
-        &visitor.functions,
+        &analysis_result.functions,
         &source_content,
-        &visitor.enhanced_analysis,
+        &analysis_result.enhanced_analysis,
     );
     let dependencies = extract_dependencies(&ast.file);
+    let complexity_metrics = calculate_total_complexity(&analysis_result.functions);
 
-    let functions = visitor.functions;
-    let (cyclomatic, cognitive) = functions.iter().fold((0, 0), |(cyc, cog), f| {
-        (cyc + f.cyclomatic, cog + f.cognitive)
-    });
+    build_file_metrics(
+        ast.path.clone(),
+        analysis_result.functions,
+        complexity_metrics,
+        debt_items,
+        dependencies,
+    )
+}
 
+/// Pure I/O function to read source content
+fn read_source_content(path: &std::path::Path) -> String {
+    std::fs::read_to_string(path).unwrap_or_default()
+}
+
+/// Structure to hold analysis results
+struct AnalysisResult {
+    functions: Vec<FunctionMetrics>,
+    enhanced_analysis: Vec<EnhancedFunctionAnalysis>,
+}
+
+/// Pure function to analyze AST with content
+fn analyze_ast_with_content(
+    ast: &RustAst,
+    source_content: &str,
+    enhanced_thresholds: &ComplexityThresholds,
+) -> AnalysisResult {
+    let mut visitor = create_configured_visitor(
+        ast.path.clone(),
+        source_content.to_string(),
+        enhanced_thresholds.clone(),
+        Some(ast.file.clone()),
+    );
+    visitor.visit_file(&ast.file);
+
+    AnalysisResult {
+        functions: visitor.functions,
+        enhanced_analysis: visitor.enhanced_analysis,
+    }
+}
+
+/// Pure function to create and configure visitor
+fn create_configured_visitor(
+    path: std::path::PathBuf,
+    source_content: String,
+    enhanced_thresholds: ComplexityThresholds,
+    file_ast: Option<syn::File>,
+) -> FunctionVisitor {
+    let mut visitor = FunctionVisitor::new(path, source_content);
+    visitor.file_ast = file_ast;
+    visitor.enhanced_thresholds = enhanced_thresholds;
+    visitor
+}
+
+/// Pure function to calculate total complexity metrics
+fn calculate_total_complexity(functions: &[FunctionMetrics]) -> (u32, u32) {
+    functions
+        .iter()
+        .fold((0, 0), |(cyc, cog), f| {
+            (cyc + f.cyclomatic, cog + f.cognitive)
+        })
+}
+
+/// Pure function to build file metrics
+fn build_file_metrics(
+    path: std::path::PathBuf,
+    functions: Vec<FunctionMetrics>,
+    (cyclomatic, cognitive): (u32, u32),
+    debt_items: Vec<DebtItem>,
+    dependencies: Vec<Dependency>,
+) -> FileMetrics {
     FileMetrics {
-        path: ast.path.clone(),
+        path,
         language: Language::Rust,
         complexity: ComplexityMetrics {
             functions,
@@ -570,47 +633,27 @@ impl FunctionVisitor {
     }
 
     fn calculate_cyclomatic_with_visitor(&self, block: &syn::Block, func: &syn::ItemFn) -> u32 {
-        use crate::complexity::visitor_detector::detect_visitor_pattern;
-
-        // Check if we have the file AST and can detect visitor patterns
-        if let Some(ref file_ast) = self.file_ast {
-            if let Some(pattern_info) = detect_visitor_pattern(file_ast, func) {
-                // Return the adjusted complexity if a visitor pattern was detected
-                return pattern_info.adjusted_complexity;
-            }
-        }
-
-        // Fall back to standard calculation
-        calculate_cyclomatic_adjusted(block)
+        self.try_detect_visitor_pattern(func)
+            .map(|pattern_info| pattern_info.adjusted_complexity)
+            .unwrap_or_else(|| calculate_cyclomatic_adjusted(block))
     }
 
     fn calculate_cognitive_with_visitor(&self, block: &syn::Block, func: &syn::ItemFn) -> u32 {
+        self.try_detect_visitor_pattern(func)
+            .map(|pattern_info| apply_cognitive_pattern_scaling(block, &pattern_info))
+            .unwrap_or_else(|| calculate_cognitive_syn(block))
+    }
+
+    /// Pure helper to try detecting visitor patterns
+    fn try_detect_visitor_pattern(
+        &self,
+        func: &syn::ItemFn,
+    ) -> Option<crate::complexity::visitor_detector::PatternInfo> {
         use crate::complexity::visitor_detector::detect_visitor_pattern;
 
-        // Check if we have the file AST and can detect visitor patterns
-        if let Some(ref file_ast) = self.file_ast {
-            if let Some(pattern_info) = detect_visitor_pattern(file_ast, func) {
-                // For cognitive complexity, we also apply the reduction
-                let base_cognitive = calculate_cognitive_syn(block);
-                // Apply similar scaling for cognitive complexity
-                match pattern_info.pattern_type {
-                    crate::complexity::visitor_detector::PatternType::Visitor => {
-                        ((base_cognitive as f32).log2().ceil()).max(1.0) as u32
-                    }
-                    crate::complexity::visitor_detector::PatternType::ExhaustiveMatch => {
-                        ((base_cognitive as f32).sqrt().ceil()).max(2.0) as u32
-                    }
-                    crate::complexity::visitor_detector::PatternType::SimpleMapping => {
-                        ((base_cognitive as f32) * 0.2).max(1.0) as u32
-                    }
-                    _ => base_cognitive,
-                }
-            } else {
-                calculate_cognitive_syn(block)
-            }
-        } else {
-            calculate_cognitive_syn(block)
-        }
+        self.file_ast
+            .as_ref()
+            .and_then(|file_ast| detect_visitor_pattern(file_ast, func))
     }
 }
 
@@ -793,6 +836,29 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 
         // Continue visiting
         syn::visit::visit_expr(self, expr);
+    }
+}
+
+/// Pure function to apply cognitive complexity scaling based on pattern type
+fn apply_cognitive_pattern_scaling(
+    block: &syn::Block,
+    pattern_info: &crate::complexity::visitor_detector::PatternInfo,
+) -> u32 {
+    use crate::complexity::visitor_detector::PatternType;
+
+    let base_cognitive = calculate_cognitive_syn(block);
+
+    match pattern_info.pattern_type {
+        PatternType::Visitor => {
+            ((base_cognitive as f32).log2().ceil()).max(1.0) as u32
+        }
+        PatternType::ExhaustiveMatch => {
+            ((base_cognitive as f32).sqrt().ceil()).max(2.0) as u32
+        }
+        PatternType::SimpleMapping => {
+            ((base_cognitive as f32) * 0.2).max(1.0) as u32
+        }
+        _ => base_cognitive,
     }
 }
 
