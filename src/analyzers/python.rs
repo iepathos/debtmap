@@ -275,6 +275,11 @@ fn collect_all_debt_items(
         find_code_smells_with_suppression(source_content, path, Some(suppression_context)),
         extract_module_smell_items(path, source_content, suppression_context),
         extract_function_smell_items(module, functions, suppression_context),
+        crate::debt::python_error_handling::detect_error_swallowing(
+            module,
+            path,
+            Some(suppression_context),
+        ),
     ]
     .into_iter()
     .flatten()
