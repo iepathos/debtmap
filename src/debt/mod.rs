@@ -7,6 +7,7 @@ pub mod error_propagation;
 pub mod error_swallowing;
 pub mod panic_patterns;
 pub mod patterns;
+pub mod python_error_handling;
 pub mod smells;
 pub mod suppression;
 
