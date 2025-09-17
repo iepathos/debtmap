@@ -2169,7 +2169,8 @@ mod tests {
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
         std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
-        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        let mut cache =
+            SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
         cache.max_cache_size = 100; // Set small size to trigger cleanup
 
         // Create large entries to ensure we exceed max_cache_size
@@ -2192,7 +2193,10 @@ mod tests {
 
         // Debug: Check actual size before cleanup
         let stats_before = cache.get_stats();
-        eprintln!("Before cleanup - entries: {}, size: {}", stats_before.entry_count, stats_before.total_size);
+        eprintln!(
+            "Before cleanup - entries: {}, size: {}",
+            stats_before.entry_count, stats_before.total_size
+        );
 
         // Total size should be ~160 bytes, max is 100, target after cleanup is 50
         // Manually trigger cleanup
@@ -2200,13 +2204,24 @@ mod tests {
 
         // Debug: Check actual size after cleanup
         let stats_after = cache.get_stats();
-        eprintln!("After cleanup - entries: {}, size: {}", stats_after.entry_count, stats_after.total_size);
+        eprintln!(
+            "After cleanup - entries: {}, size: {}",
+            stats_after.entry_count, stats_after.total_size
+        );
 
         // The cleanup should have removed some entries to get under target (50 bytes)
-        assert!(stats_after.entry_count < stats_before.entry_count,
-                "Cleanup should have removed entries: {} -> {}", stats_before.entry_count, stats_after.entry_count);
-        assert!(stats_after.total_size <= cache.max_cache_size / 2,
-                "Size should be under target: {} <= {}", stats_after.total_size, cache.max_cache_size / 2);
+        assert!(
+            stats_after.entry_count < stats_before.entry_count,
+            "Cleanup should have removed entries: {} -> {}",
+            stats_before.entry_count,
+            stats_after.entry_count
+        );
+        assert!(
+            stats_after.total_size <= cache.max_cache_size / 2,
+            "Size should be under target: {} <= {}",
+            stats_after.total_size,
+            cache.max_cache_size / 2
+        );
 
         std::env::remove_var("DEBTMAP_CACHE_DIR");
         std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
@@ -2219,7 +2234,8 @@ mod tests {
         std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
         // Create cache with specific max size
-        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        let mut cache =
+            SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
         cache.max_cache_size = 1000; // Set a small size for testing
 
         // Add entries that exceed half the max size
@@ -2313,7 +2329,8 @@ mod tests {
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
         std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
-        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        let mut cache =
+            SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
         cache.max_cache_size = 200; // Increase size to allow all entries to be added first
 
         // Add multiple entries
@@ -2339,10 +2356,18 @@ mod tests {
 
         // Verify index is updated
         let final_stats = cache.get_stats();
-        assert!(final_stats.entry_count < initial_stats.entry_count,
-                "Entry count should decrease: {} -> {}", initial_stats.entry_count, final_stats.entry_count);
-        assert!(final_stats.total_size <= cache.max_cache_size / 2,
-                "Total size should be under target: {} <= {}", final_stats.total_size, cache.max_cache_size / 2);
+        assert!(
+            final_stats.entry_count < initial_stats.entry_count,
+            "Entry count should decrease: {} -> {}",
+            initial_stats.entry_count,
+            final_stats.entry_count
+        );
+        assert!(
+            final_stats.total_size <= cache.max_cache_size / 2,
+            "Total size should be under target: {} <= {}",
+            final_stats.total_size,
+            cache.max_cache_size / 2
+        );
 
         // Verify last_cleanup is set
         {
@@ -2387,7 +2412,8 @@ mod tests {
         std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
         std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
-        let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        let mut cache =
+            SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
         cache.max_cache_size = 1000;
 
         // Add entries that total less than half the max size (target = 500)
