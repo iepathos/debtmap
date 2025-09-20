@@ -106,23 +106,28 @@ pub fn extract_comprehension_expr_tokens(
     }
 }
 
+/// Classifies a Python constant into its type name - pure function
+fn classify_constant(constant: &ast::Constant) -> String {
+    use ast::Constant;
+    match constant {
+        Constant::None => "None".to_string(),
+        Constant::Bool(_) => "bool".to_string(),
+        Constant::Str(_) => "string".to_string(),
+        Constant::Int(_) => "int".to_string(),
+        Constant::Float(_) => "float".to_string(),
+        Constant::Complex { .. } => "complex".to_string(),
+        Constant::Bytes(_) => "bytes".to_string(),
+        Constant::Tuple(_) => "tuple".to_string(),
+        Constant::Ellipsis => "...".to_string(),
+    }
+}
+
 /// Extracts literal tokens - pure function
 pub fn extract_literal_tokens(expr: &ast::Expr) -> Vec<GenericToken> {
     use ast::Expr::*;
     match expr {
         Constant(constant) => {
-            use ast::Constant;
-            let value = match &constant.value {
-                Constant::None => "None".to_string(),
-                Constant::Bool(_) => "bool".to_string(),
-                Constant::Str(_) => "string".to_string(),
-                Constant::Int(_) => "int".to_string(),
-                Constant::Float(_) => "float".to_string(),
-                Constant::Complex { .. } => "complex".to_string(),
-                Constant::Bytes(_) => "bytes".to_string(),
-                Constant::Tuple(_) => "tuple".to_string(),
-                Constant::Ellipsis => "...".to_string(),
-            };
+            let value = classify_constant(&constant.value);
             vec![GenericToken::literal(value)]
         }
         JoinedStr(joined_str) => extract_join_str_tokens(joined_str),
