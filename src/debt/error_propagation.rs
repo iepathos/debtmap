@@ -4,7 +4,7 @@ use std::path::Path;
 use syn::visit::Visit;
 use syn::{File, ItemFn, ReturnType, Type};
 
-/// Pure function to check for Box<dyn Error> pattern
+/// Pure function to check for `Box<dyn Error>` pattern
 fn detect_box_dyn_error(type_str: &str) -> Option<(PropagationQuality, &'static str)> {
     if is_box_dyn_error_pattern(type_str) {
         Some((
@@ -40,7 +40,7 @@ fn detect_anyhow_no_context(type_str: &str) -> Option<(PropagationQuality, &'sta
     }
 }
 
-/// Pure predicate for Box<dyn Error> pattern
+/// Pure predicate for `Box<dyn Error>` pattern
 fn is_box_dyn_error_pattern(type_str: &str) -> bool {
     type_str.contains("Box")
         && type_str.contains("dyn")
@@ -188,7 +188,7 @@ impl PropagationQuality {
 
     fn description(&self) -> &'static str {
         match self {
-            Self::BoxDynError => "Box<dyn Error> type erasure",
+            Self::BoxDynError => "`Box<dyn Error>` type erasure",
             Self::OverlyBroadConversion => "Overly broad error conversion",
             Self::TypeErasure => "Error type erasure",
             Self::PassthroughNoContext => "Error passthrough without context",
@@ -231,7 +231,7 @@ mod tests {
         let items = analyze_error_propagation(&file, Path::new("test.rs"), None);
 
         assert!(!items.is_empty());
-        assert!(items[0].message.contains("Box<dyn Error>"));
+        assert!(items[0].message.contains("`Box<dyn Error>`"));
     }
 
     #[test]
