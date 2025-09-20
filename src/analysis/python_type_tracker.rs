@@ -238,7 +238,7 @@ impl PythonTypeTracker {
                 }
             }
             ast::Expr::Attribute(attr) => {
-                let base_type = self.infer_type(&attr.value);
+                let _base_type = self.infer_type(&attr.value);
                 // Method call return type would need more sophisticated tracking
                 return PythonType::Unknown;
             }
@@ -772,8 +772,7 @@ impl TwoPassExtractor {
     }
 }
 
-// TODO: Re-enable tests once the AST API stabilizes
-#[cfg(test_disabled)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -834,16 +833,14 @@ mod tests {
         // Create a class with a method
         let method_func = ast::StmtFunctionDef {
             name: "test_method".to_string().into(),
-            args: ast::Arguments {
+            args: Box::new(ast::Arguments {
                 posonlyargs: vec![],
                 args: vec![],
                 kwonlyargs: vec![],
-                kw_defaults: vec![],
                 kwarg: None,
                 vararg: None,
-                defaults: vec![],
                 range: Default::default(),
-            },
+            }),
             body: vec![],
             decorator_list: vec![],
             returns: None,

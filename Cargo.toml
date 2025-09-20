@@ -128,3 +128,7 @@ harness = false
 name = "parallel_performance"
 harness = false
 
+[[bench]]
+name = "python_type_inference_bench"
+harness = false
+
