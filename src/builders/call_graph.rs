@@ -1,8 +1,11 @@
 use crate::{
     analysis::call_graph::RustCallGraphBuilder,
-    analysis::python_call_graph::PythonCallGraphAnalyzer,
-    analyzers::rust_call_graph::extract_call_graph_multi_file, config, core::FunctionMetrics,
-    core::Language, io, priority,
+    analysis::python_call_graph::{PythonCallGraphAnalyzer, TwoPassExtractor},
+    analyzers::rust_call_graph::extract_call_graph_multi_file,
+    config,
+    core::FunctionMetrics,
+    core::Language,
+    io, priority,
 };
 use anyhow::{Context, Result};
 use std::collections::HashSet;
@@ -108,35 +111,72 @@ pub fn process_python_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
 ) -> Result<()> {
+    process_python_files_for_call_graph_with_types(project_path, call_graph, true)
+}
+
+/// Process Python files with optional two-pass type-aware extraction
+pub fn process_python_files_for_call_graph_with_types(
+    project_path: &Path,
+    call_graph: &mut priority::CallGraph,
+    use_type_tracking: bool,
+) -> Result<()> {
     let config = config::get_config();
     let python_files =
         io::walker::find_project_files_with_config(project_path, vec![Language::Python], config)
             .context("Failed to find Python files for call graph")?;
 
-    let mut analyzer = PythonCallGraphAnalyzer::new();
-
-    for file_path in &python_files {
-        match io::read_file(file_path) {
-            Ok(content) => {
-                match rustpython_parser::parse(
-                    &content,
-                    rustpython_parser::Mode::Module,
-                    "<module>",
-                ) {
-                    Ok(module) => {
-                        if let Err(e) = analyzer
-                            .analyze_module_with_source(&module, file_path, &content, call_graph)
-                        {
-                            log::warn!("Failed to analyze Python file {:?}: {}", file_path, e);
+    if use_type_tracking {
+        // Use two-pass type-aware extraction for better accuracy
+        for file_path in &python_files {
+            match io::read_file(file_path) {
+                Ok(content) => {
+                    match rustpython_parser::parse(
+                        &content,
+                        rustpython_parser::Mode::Module,
+                        "<module>",
+                    ) {
+                        Ok(module) => {
+                            let mut extractor = TwoPassExtractor::new(file_path.to_path_buf());
+                            let file_call_graph = extractor.extract(&module);
+                            call_graph.merge(file_call_graph);
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
                         }
                     }
-                    Err(e) => {
-                        log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
-                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to read Python file {:?}: {}", file_path, e);
                 }
             }
-            Err(e) => {
-                log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+        }
+    } else {
+        // Fall back to original implementation
+        let mut analyzer = PythonCallGraphAnalyzer::new();
+
+        for file_path in &python_files {
+            match io::read_file(file_path) {
+                Ok(content) => {
+                    match rustpython_parser::parse(
+                        &content,
+                        rustpython_parser::Mode::Module,
+                        "<module>",
+                    ) {
+                        Ok(module) => {
+                            if let Err(e) = analyzer.analyze_module_with_source(
+                                &module, file_path, &content, call_graph,
+                            ) {
+                                log::warn!("Failed to analyze Python file {:?}: {}", file_path, e);
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+                }
             }
         }
     }

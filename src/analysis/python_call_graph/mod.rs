@@ -2,13 +2,14 @@
 //!
 //! This module provides Python-specific call graph analysis that addresses false positives
 //! in dead code detection by tracking:
-//! - Instance method calls (self.method())  
+//! - Instance method calls (self.method())
 //! - Class method calls (cls.method())
 //! - Static method calls
 //! - Context manager usage (with statements)
 //! - Property access (@property decorators)
 //! - Nested function definitions and callback patterns
 //! - Functions passed as arguments to callback-accepting functions
+//! - Type-aware method resolution using two-pass analysis
 
 mod call_analysis;
 mod callback_patterns;
@@ -25,6 +26,9 @@ use std::path::Path;
 use call_analysis::{CallAnalyzer, StatementAnalyzer};
 use callback_patterns::{find_callback_position, get_callback_patterns};
 use function_detection::FunctionLineCollector;
+
+// Re-export two-pass extractor for convenience
+pub use crate::analysis::python_type_tracker::TwoPassExtractor;
 
 /// Python-specific call graph analyzer
 #[derive(Default)]
@@ -99,6 +103,12 @@ impl PythonCallGraphAnalyzer {
             }
         }
         Ok(())
+    }
+
+    /// Analyze module using two-pass type-aware extraction
+    pub fn analyze_module_with_types(module: &ast::Mod, file_path: &Path) -> Result<CallGraph> {
+        let mut extractor = TwoPassExtractor::new(file_path.to_path_buf());
+        Ok(extractor.extract(module))
     }
 
     fn analyze_stmt(
