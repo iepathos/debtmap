@@ -5,7 +5,9 @@
 [![Security](https://github.com/iepathos/debtmap/actions/workflows/security.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/security.yml)
 [![Release](https://github.com/iepathos/debtmap/actions/workflows/release.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/release.yml)
 [![Debtmap](https://github.com/iepathos/debtmap/actions/workflows/debtmap.yml/badge.svg)](https://github.com/iepathos/debtmap/actions/workflows/debtmap.yml)
-
+[![Crates.io](https://img.shields.io/crates/v/debtmap)](https://crates.io/crates/debtmap)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](LICENSE)
+[![Downloads](https://img.shields.io/crates/d/debtmap)](https://crates.io/crates/debtmap)
 
 > 🚧 **Early Prototype** - This project is under active development and APIs may change
 
