@@ -1,5 +1,4 @@
 use debtmap::analysis::TwoPassExtractor;
-use rustpython_parser;
 use std::path::PathBuf;
 
 #[test]
@@ -54,15 +53,31 @@ def helper_function(calc: Calculator):
 
     // Check that the call graph has tracked calls
     // The type tracker should have collected phase-one calls
-    assert!(!extractor.phase_one_calls.is_empty(), "Should have collected calls in phase one");
+    assert!(
+        !extractor.phase_one_calls.is_empty(),
+        "Should have collected calls in phase one"
+    );
 
     // Check that type information was tracked
-    assert!(!extractor.type_tracker.class_hierarchy.is_empty(), "Should have tracked class hierarchy");
-    assert!(extractor.type_tracker.class_hierarchy.contains_key("Calculator"));
-    assert!(extractor.type_tracker.class_hierarchy.contains_key("ScientificCalculator"));
+    assert!(
+        !extractor.type_tracker.class_hierarchy.is_empty(),
+        "Should have tracked class hierarchy"
+    );
+    assert!(extractor
+        .type_tracker
+        .class_hierarchy
+        .contains_key("Calculator"));
+    assert!(extractor
+        .type_tracker
+        .class_hierarchy
+        .contains_key("ScientificCalculator"));
 
     // Verify inheritance is tracked
-    let sci_calc_info = extractor.type_tracker.class_hierarchy.get("ScientificCalculator").unwrap();
+    let sci_calc_info = extractor
+        .type_tracker
+        .class_hierarchy
+        .get("ScientificCalculator")
+        .unwrap();
     assert!(sci_calc_info.bases.contains(&"Calculator".to_string()));
 }
 
@@ -174,18 +189,25 @@ def numeric_operations():
     let _call_graph = extractor.extract(&module);
 
     // Check that phase one calls were collected
-    let method_calls: Vec<_> = extractor.phase_one_calls
+    let method_calls: Vec<_> = extractor
+        .phase_one_calls
         .iter()
         .filter(|call| {
             if let Some(ref method_name) = call.method_name {
-                matches!(method_name.as_str(), "upper" | "lower" | "append" | "extend" | "get" | "update")
+                matches!(
+                    method_name.as_str(),
+                    "upper" | "lower" | "append" | "extend" | "get" | "update"
+                )
             } else {
                 false
             }
         })
         .collect();
 
-    assert!(!method_calls.is_empty(), "Should have collected built-in type method calls");
+    assert!(
+        !method_calls.is_empty(),
+        "Should have collected built-in type method calls"
+    );
 }
 
 #[test]
@@ -244,23 +266,41 @@ def complex_flow():
     let _call_graph = two_pass_extractor.extract(&module);
 
     // Count unresolved calls in phase one
-    let close_calls: Vec<_> = two_pass_extractor.phase_one_calls
+    let close_calls: Vec<_> = two_pass_extractor
+        .phase_one_calls
         .iter()
-        .filter(|call| call.method_name.as_ref().map(|s| s.as_str()) == Some("close"))
+        .filter(|call| call.method_name.as_deref() == Some("close"))
         .collect();
 
     // At least some close calls should have been collected
-    assert!(!close_calls.is_empty(), "Should have collected close() method calls");
+    assert!(
+        !close_calls.is_empty(),
+        "Should have collected close() method calls"
+    );
 
     // The type tracker should have information about both classes
-    assert!(two_pass_extractor.type_tracker.class_hierarchy.contains_key("DatabaseConnection"));
-    assert!(two_pass_extractor.type_tracker.class_hierarchy.contains_key("FileHandler"));
+    assert!(two_pass_extractor
+        .type_tracker
+        .class_hierarchy
+        .contains_key("DatabaseConnection"));
+    assert!(two_pass_extractor
+        .type_tracker
+        .class_hierarchy
+        .contains_key("FileHandler"));
 
     // Both classes should have the close method
-    let db_class = two_pass_extractor.type_tracker.class_hierarchy.get("DatabaseConnection").unwrap();
+    let db_class = two_pass_extractor
+        .type_tracker
+        .class_hierarchy
+        .get("DatabaseConnection")
+        .unwrap();
     assert!(db_class.methods.contains_key("close"));
 
-    let file_class = two_pass_extractor.type_tracker.class_hierarchy.get("FileHandler").unwrap();
+    let file_class = two_pass_extractor
+        .type_tracker
+        .class_hierarchy
+        .get("FileHandler")
+        .unwrap();
     assert!(file_class.methods.contains_key("close"));
 }
 
@@ -310,13 +350,18 @@ def main():
     let _call_graph = extractor.extract(&module);
 
     // Check that type hints are utilized
-    let processor_class = extractor.type_tracker.class_hierarchy.get("DataProcessor").unwrap();
+    let processor_class = extractor
+        .type_tracker
+        .class_hierarchy
+        .get("DataProcessor")
+        .unwrap();
     assert!(processor_class.methods.contains_key("__init__"));
     assert!(processor_class.methods.contains_key("add_item"));
     assert!(processor_class.methods.contains_key("get_average"));
 
     // Check that calls were collected
-    let method_calls: Vec<_> = extractor.phase_one_calls
+    let method_calls: Vec<_> = extractor
+        .phase_one_calls
         .iter()
         .filter(|call| {
             if let Some(ref name) = call.method_name {
@@ -327,7 +372,10 @@ def main():
         })
         .collect();
 
-    assert!(!method_calls.is_empty(), "Should have collected DataProcessor method calls");
+    assert!(
+        !method_calls.is_empty(),
+        "Should have collected DataProcessor method calls"
+    );
 }
 
 #[test]
@@ -396,12 +444,13 @@ def mixed_processing():
     let user_service_methods = ["get_user", "update_user", "delete_user"];
     let product_service_methods = ["get_product", "update_product", "delete_product"];
 
-    let resolvable_calls: Vec<_> = extractor.phase_one_calls
+    let resolvable_calls: Vec<_> = extractor
+        .phase_one_calls
         .iter()
         .filter(|call| {
             if let Some(ref name) = call.method_name {
-                user_service_methods.contains(&name.as_str()) ||
-                product_service_methods.contains(&name.as_str())
+                user_service_methods.contains(&name.as_str())
+                    || product_service_methods.contains(&name.as_str())
             } else {
                 false
             }
@@ -424,16 +473,30 @@ def mixed_processing():
     );
 
     // Verify both service classes are tracked
-    assert!(extractor.type_tracker.class_hierarchy.contains_key("UserService"));
-    assert!(extractor.type_tracker.class_hierarchy.contains_key("ProductService"));
+    assert!(extractor
+        .type_tracker
+        .class_hierarchy
+        .contains_key("UserService"));
+    assert!(extractor
+        .type_tracker
+        .class_hierarchy
+        .contains_key("ProductService"));
 
     // Verify methods are tracked for both classes
-    let user_service = extractor.type_tracker.class_hierarchy.get("UserService").unwrap();
+    let user_service = extractor
+        .type_tracker
+        .class_hierarchy
+        .get("UserService")
+        .unwrap();
     assert!(user_service.methods.contains_key("get_user"));
     assert!(user_service.methods.contains_key("update_user"));
     assert!(user_service.methods.contains_key("delete_user"));
 
-    let product_service = extractor.type_tracker.class_hierarchy.get("ProductService").unwrap();
+    let product_service = extractor
+        .type_tracker
+        .class_hierarchy
+        .get("ProductService")
+        .unwrap();
     assert!(product_service.methods.contains_key("get_product"));
     assert!(product_service.methods.contains_key("update_product"));
     assert!(product_service.methods.contains_key("delete_product"));
@@ -441,5 +504,8 @@ def mixed_processing():
     // This demonstrates the >30% improvement in false positive reduction
     // as we can now distinguish between UserService and ProductService methods
     println!("Resolution rate: {:.1}%", resolution_rate * 100.0);
-    assert!(resolution_rate > 0.3, "Improvement should be greater than 30%");
+    assert!(
+        resolution_rate > 0.3,
+        "Improvement should be greater than 30%"
+    );
 }

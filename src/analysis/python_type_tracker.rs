@@ -535,9 +535,9 @@ impl TwoPassExtractor {
         // Register function with default metrics
         self.call_graph.add_function(
             func_id.clone(),
-            false, // is_entry_point - could check for main() or __main__
-            false, // is_test - could check for test_ prefix
-            10,    // default complexity
+            false,               // is_entry_point - could check for main() or __main__
+            false,               // is_test - could check for test_ prefix
+            10,                  // default complexity
             func_def.body.len(), // line count approximation
         );
 
@@ -590,13 +590,8 @@ impl TwoPassExtractor {
             line: 0,
         };
 
-        self.call_graph.add_function(
-            func_id.clone(),
-            false,
-            false,
-            10,
-            func_def.body.len(),
-        );
+        self.call_graph
+            .add_function(func_id.clone(), false, false, 10, func_def.body.len());
 
         let prev_function = self.current_function.clone();
         self.current_function = Some(func_id.clone());

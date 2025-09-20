@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::analysis::{PythonTypeTracker, TwoPassExtractor};
-use rustpython_parser;
 use std::hint::black_box;
 use std::path::PathBuf;
 
@@ -37,9 +36,12 @@ fn benchmark_type_inference(c: &mut Criterion) {
     let medium_code = generate_large_python_module(20, 5);
     let large_code = generate_large_python_module(50, 10);
 
-    let small_module = rustpython_parser::parse(&small_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
-    let medium_module = rustpython_parser::parse(&medium_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
-    let large_module = rustpython_parser::parse(&large_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
+    let small_module =
+        rustpython_parser::parse(&small_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
+    let medium_module =
+        rustpython_parser::parse(&medium_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
+    let large_module =
+        rustpython_parser::parse(&large_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
 
     c.bench_function("type_inference_small", |b| {
         b.iter(|| {
@@ -139,7 +141,9 @@ def zoo_operations():
     parrot.mimic()
 "#;
 
-    let module = rustpython_parser::parse(inheritance_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
+    let module =
+        rustpython_parser::parse(inheritance_code, rustpython_parser::Mode::Module, "<bench>")
+            .unwrap();
 
     c.bench_function("type_tracking_inheritance", |b| {
         b.iter(|| {
@@ -202,7 +206,8 @@ def complex_workflow():
             print(f"Cached: {cached}")
 "#;
 
-    let module = rustpython_parser::parse(complex_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
+    let module =
+        rustpython_parser::parse(complex_code, rustpython_parser::Mode::Module, "<bench>").unwrap();
 
     c.bench_function("complex_type_resolution", |b| {
         b.iter(|| {
