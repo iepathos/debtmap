@@ -24,6 +24,7 @@ fn test_output_json_format() {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
+                detected_patterns: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

@@ -222,6 +222,7 @@ mod tests {
                         entropy_score: None,
                         is_pure: None,
                         purity_confidence: None,
+                        detected_patterns: None,
                     },
                     FunctionMetrics {
                         name: "high_complexity".to_string(),
@@ -238,6 +239,7 @@ mod tests {
                         entropy_score: None,
                         is_pure: None,
                         purity_confidence: None,
+                        detected_patterns: None,
                     },
                 ],
                 cyclomatic_complexity: 17,
@@ -408,6 +410,7 @@ mod tests {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
+                detected_patterns: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -424,6 +427,7 @@ mod tests {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
+                detected_patterns: None,
             },
         ];
 

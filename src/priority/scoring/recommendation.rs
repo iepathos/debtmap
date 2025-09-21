@@ -553,6 +553,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
+            detected_patterns: None,
         }
     }
 

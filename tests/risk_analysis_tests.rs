@@ -51,6 +51,7 @@ end_of_record
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
+                detected_patterns: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -111,6 +112,7 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
+                detected_patterns: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -172,6 +174,7 @@ fn test_analyze_risk_without_coverage() {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
+                detected_patterns: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

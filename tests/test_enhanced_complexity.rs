@@ -72,6 +72,7 @@ fn test_threshold_filtering() {
         entropy_score: None,
         is_pure: Some(true),
         purity_confidence: Some(0.9),
+        detected_patterns: None,
     };
 
     let complex_func = FunctionMetrics {
@@ -89,6 +90,7 @@ fn test_threshold_filtering() {
         entropy_score: None,
         is_pure: Some(false),
         purity_confidence: Some(0.8),
+        detected_patterns: None,
     };
 
     // Simple function should not be flagged
@@ -113,6 +115,7 @@ fn test_threshold_filtering() {
         entropy_score: None,
         is_pure: Some(false),
         purity_confidence: Some(0.5),
+        detected_patterns: None,
     };
 
     // Test function with moderate complexity should not be flagged due to multiplier
@@ -173,6 +176,7 @@ fn test_enhanced_message_generation() {
         entropy_score: None,
         is_pure: Some(false),
         purity_confidence: Some(0.7),
+        detected_patterns: None,
     };
 
     let thresholds = ComplexityThresholds::from_preset(ThresholdPreset::Balanced);
@@ -292,6 +296,7 @@ fn test_false_positive_reduction() {
             entropy_score: None,
             is_pure: Some(true),
             purity_confidence: Some(0.9),
+            detected_patterns: None,
         };
 
         assert!(

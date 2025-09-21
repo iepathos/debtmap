@@ -367,6 +367,7 @@ mod tests {
                     entropy_score: None,
                     is_pure: None,
                     purity_confidence: None,
+                    detected_patterns: None,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -756,6 +757,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
+            detected_patterns: None,
         });
 
         assert!(!metrics_equal(&metrics1, &metrics2));
@@ -841,6 +843,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
+            detected_patterns: None,
         });
 
         inc.previous_state = inc

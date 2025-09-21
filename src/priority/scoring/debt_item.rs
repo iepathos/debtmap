@@ -1710,6 +1710,7 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         is_trait_method: false,
         in_test_module: false,
         entropy_score: None,
+        detected_patterns: None,
     }
 }
 
@@ -2089,6 +2090,7 @@ mod tests {
             entropy_score: None,
             is_pure: Some(true),
             purity_confidence: Some(1.0),
+            detected_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2124,6 +2126,7 @@ mod tests {
             entropy_score: None,
             is_pure: Some(true),
             purity_confidence: Some(1.0),
+            detected_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2163,6 +2166,7 @@ mod tests {
             entropy_score: None,
             is_pure: Some(false),
             purity_confidence: Some(0.8),
+            detected_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2200,6 +2204,7 @@ mod tests {
             entropy_score: None,
             is_pure: Some(false),
             purity_confidence: Some(0.9),
+            detected_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2238,6 +2243,7 @@ mod tests {
             entropy_score: None,
             is_pure: Some(false),
             purity_confidence: Some(0.95),
+            detected_patterns: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2276,6 +2282,7 @@ mod tests {
             entropy_score: None,
             is_pure: Some(true),
             purity_confidence: Some(1.0),
+            detected_patterns: None,
         };
 
         let transitive_cov = TransitiveCoverage {
@@ -2318,6 +2325,7 @@ mod tests {
             entropy_score: None,
             is_pure: Some(true),
             purity_confidence: Some(0.85),
+            detected_patterns: None,
         };
 
         // Test at cyclomatic=10 (not complex)

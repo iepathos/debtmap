@@ -1127,6 +1127,7 @@ mod tests {
                 is_trait_method: false,
                 in_test_module: false,
                 entropy_score: None,
+                detected_patterns: None,
             })
             .collect();
 

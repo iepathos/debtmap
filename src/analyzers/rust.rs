@@ -499,6 +499,7 @@ impl FunctionVisitor {
             entropy_score: metadata.entropy_score,
             is_pure: metadata.purity_info.0,
             purity_confidence: metadata.purity_info.1,
+            detected_patterns: None, // TODO: Add pattern detection for Rust
         }
     }
 
@@ -826,6 +827,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
                     entropy_score,
                     is_pure: None, // TODO: Add purity detection for closures
                     purity_confidence: None,
+                    detected_patterns: None, // TODO: Add pattern detection for closures
                 };
 
                 self.functions.push(metrics);
