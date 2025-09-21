@@ -2444,4 +2444,309 @@ mod tests {
         assert!(action2.contains("70% coverage gap"));
         assert!(action2.contains("refactor complexity"));
     }
+
+    // Tests for extracted pure functions (spec 93)
+
+    #[test]
+    fn test_create_function_id() {
+        let func = FunctionMetrics {
+            name: "test_func".to_string(),
+            file: "/path/to/file.rs".into(),
+            line: 42,
+            cyclomatic: 5,
+            cognitive: 8,
+            nesting: 2,
+            length: 20,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(true),
+            purity_confidence: Some(0.9),
+            detected_patterns: None,
+        };
+
+        let func_id = create_function_id(&func);
+        assert_eq!(func_id.name, "test_func");
+        assert_eq!(func_id.file.to_str().unwrap(), "/path/to/file.rs");
+        assert_eq!(func_id.line, 42);
+    }
+
+    #[test]
+    fn test_calculate_functions_to_extract() {
+        // Test various complexity levels
+        assert_eq!(calculate_functions_to_extract(5, 5), 2);
+        assert_eq!(calculate_functions_to_extract(10, 10), 2);
+        assert_eq!(calculate_functions_to_extract(15, 15), 3);
+        assert_eq!(calculate_functions_to_extract(20, 20), 4);
+        assert_eq!(calculate_functions_to_extract(25, 25), 5);
+        assert_eq!(calculate_functions_to_extract(30, 30), 6);
+        assert_eq!(calculate_functions_to_extract(50, 50), 10);
+
+        // Test with different cyclomatic and cognitive values
+        assert_eq!(calculate_functions_to_extract(10, 20), 4);
+        assert_eq!(calculate_functions_to_extract(30, 15), 6);
+    }
+
+    #[test]
+    fn test_format_complexity_display() {
+        assert_eq!(format_complexity_display(&5, &8), "cyclo=5, cog=8");
+        assert_eq!(format_complexity_display(&10, &15), "cyclo=10, cog=15");
+        assert_eq!(format_complexity_display(&0, &0), "cyclo=0, cog=0");
+    }
+
+    #[test]
+    fn test_format_role_description() {
+        assert_eq!(format_role_description(FunctionRole::PureLogic), "business logic");
+        assert_eq!(format_role_description(FunctionRole::Orchestrator), "orchestration");
+        assert_eq!(format_role_description(FunctionRole::IOWrapper), "I/O wrapper");
+        assert_eq!(format_role_description(FunctionRole::EntryPoint), "entry point");
+        assert_eq!(format_role_description(FunctionRole::PatternMatch), "pattern matching");
+        assert_eq!(format_role_description(FunctionRole::Unknown), "function");
+    }
+
+    #[test]
+    fn test_is_function_complex() {
+        // Test not complex
+        assert!(!is_function_complex(5, 10));
+        assert!(!is_function_complex(10, 15));
+
+        // Test complex based on cyclomatic
+        assert!(is_function_complex(11, 10));
+        assert!(is_function_complex(20, 5));
+
+        // Test complex based on cognitive
+        assert!(is_function_complex(5, 16));
+        assert!(is_function_complex(10, 20));
+
+        // Test complex based on both
+        assert!(is_function_complex(15, 20));
+    }
+
+    #[test]
+    fn test_calculate_risk_factor() {
+        // Test various debt types
+        assert_eq!(calculate_risk_factor(&DebtType::TestingGap {
+            coverage: 0.5,
+            cyclomatic: 10,
+            cognitive: 15
+        }), 0.42);
+
+        assert_eq!(calculate_risk_factor(&DebtType::ComplexityHotspot {
+            cyclomatic: 20,
+            cognitive: 25
+        }), 0.35);
+
+        assert_eq!(calculate_risk_factor(&DebtType::ErrorSwallowing {
+            pattern: "unwrap_or_default".to_string(),
+            context: None
+        }), 0.35);
+
+        assert_eq!(calculate_risk_factor(&DebtType::DeadCode {
+            visibility: FunctionVisibility::Private,
+            cyclomatic: 5,
+            cognitive: 8,
+            usage_hints: vec![]
+        }), 0.3);
+    }
+
+    #[test]
+    fn test_calculate_coverage_improvement() {
+        // Test simple function
+        assert_eq!(calculate_coverage_improvement(0.0, false), 100.0);
+        assert_eq!(calculate_coverage_improvement(0.5, false), 50.0);
+        assert_eq!(calculate_coverage_improvement(0.8, false), 20.0);
+        assert_eq!(calculate_coverage_improvement(1.0, false), 0.0);
+
+        // Test complex function (50% reduction)
+        assert_eq!(calculate_coverage_improvement(0.0, true), 50.0);
+        assert_eq!(calculate_coverage_improvement(0.5, true), 25.0);
+        assert_eq!(calculate_coverage_improvement(0.8, true), 10.0);
+        assert_eq!(calculate_coverage_improvement(1.0, true), 0.0);
+    }
+
+    #[test]
+    fn test_calculate_lines_reduction() {
+        // Test dead code
+        let dead_code = DebtType::DeadCode {
+            visibility: FunctionVisibility::Private,
+            cyclomatic: 10,
+            cognitive: 15,
+            usage_hints: vec![],
+        };
+        assert_eq!(calculate_lines_reduction(&dead_code), 25);
+
+        // Test duplication
+        let duplication = DebtType::Duplication {
+            instances: 4,
+            total_lines: 100,
+        };
+        assert_eq!(calculate_lines_reduction(&duplication), 75);
+
+        // Test other types
+        let complexity = DebtType::ComplexityHotspot {
+            cyclomatic: 20,
+            cognitive: 25,
+        };
+        assert_eq!(calculate_lines_reduction(&complexity), 0);
+    }
+
+    #[test]
+    fn test_is_rust_file() {
+        use std::path::Path;
+        assert!(is_rust_file(Path::new("test.rs")));
+        assert!(is_rust_file(Path::new("/path/to/file.rs")));
+        assert!(!is_rust_file(Path::new("test.py")));
+        assert!(!is_rust_file(Path::new("test.js")));
+        assert!(!is_rust_file(Path::new("test")));
+    }
+
+    #[test]
+    fn test_extract_coverage_percent() {
+        // Test with coverage
+        let coverage = TransitiveCoverage {
+            direct: 0.75,
+            transitive: 0.85,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        };
+        assert_eq!(extract_coverage_percent(&Some(coverage)), 0.75);
+
+        // Test without coverage
+        assert_eq!(extract_coverage_percent(&None), 0.0);
+    }
+
+    #[test]
+    fn test_extract_cyclomatic_complexity() {
+        assert_eq!(
+            extract_cyclomatic_complexity(&DebtType::ComplexityHotspot {
+                cyclomatic: 15,
+                cognitive: 20,
+            }),
+            15
+        );
+
+        assert_eq!(
+            extract_cyclomatic_complexity(&DebtType::TestingGap {
+                coverage: 0.5,
+                cyclomatic: 10,
+                cognitive: 12,
+            }),
+            0
+        );
+
+        assert_eq!(
+            extract_cyclomatic_complexity(&DebtType::DeadCode {
+                visibility: FunctionVisibility::Public,
+                cyclomatic: 5,
+                cognitive: 8,
+                usage_hints: vec![],
+            }),
+            0
+        );
+    }
+
+    #[test]
+    fn test_build_actionable_recommendation() {
+        let recommendation = build_actionable_recommendation(
+            "Fix the issue".to_string(),
+            "This is why it matters".to_string(),
+            vec!["Step 1".to_string(), "Step 2".to_string()],
+        );
+
+        assert_eq!(recommendation.primary_action, "Fix the issue");
+        assert_eq!(recommendation.rationale, "This is why it matters");
+        assert_eq!(recommendation.implementation_steps.len(), 2);
+        assert_eq!(recommendation.implementation_steps[0], "Step 1");
+        assert_eq!(recommendation.implementation_steps[1], "Step 2");
+        assert!(recommendation.related_items.is_empty());
+    }
+
+    #[test]
+    fn test_create_recommendation_context() {
+        let func = FunctionMetrics {
+            name: "test_func".to_string(),
+            file: "/test.rs".into(),
+            line: 10,
+            cyclomatic: 15,
+            cognitive: 20,
+            nesting: 3,
+            length: 50,
+            is_test: false,
+            visibility: Some("pub".to_string()),
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(true),
+            purity_confidence: Some(0.95),
+            detected_patterns: None,
+        };
+
+        let debt_type = DebtType::ComplexityHotspot {
+            cyclomatic: 15,
+            cognitive: 20,
+        };
+
+        let score = UnifiedScore {
+            complexity_factor: 7.5,
+            coverage_factor: 6.0,
+            dependency_factor: 2.0,
+            role_multiplier: 1.2,
+            final_score: 8.5,
+        };
+
+        let coverage = TransitiveCoverage {
+            direct: 0.6,
+            transitive: 0.7,
+            propagated_from: vec![],
+            uncovered_lines: vec![15, 16, 20],
+        };
+
+        let context = create_recommendation_context(
+            &func,
+            &debt_type,
+            FunctionRole::PureLogic,
+            &score,
+            &Some(coverage.clone()),
+        );
+
+        assert_eq!(context.function_info.name, "test_func");
+        assert_eq!(context.function_info.line, 10);
+        assert!(context.is_rust_file);
+        assert_eq!(context.coverage_percent, 0.6);
+        assert_eq!(context.role, FunctionRole::PureLogic);
+    }
+
+    #[test]
+    fn test_function_info_from_metrics() {
+        let func = FunctionMetrics {
+            name: "my_function".to_string(),
+            file: "/src/lib.rs".into(),
+            line: 100,
+            cyclomatic: 8,
+            cognitive: 12,
+            nesting: 2,
+            length: 35,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(true),
+            purity_confidence: Some(0.85),
+            detected_patterns: None,
+        };
+
+        let info = FunctionInfo::from_metrics(&func);
+
+        assert_eq!(info.name, "my_function");
+        assert_eq!(info.file.to_str().unwrap(), "/src/lib.rs");
+        assert_eq!(info.line, 100);
+        assert_eq!(info.nesting, 2);
+        assert_eq!(info.length, 35);
+        assert_eq!(info.cognitive, 12);
+        assert!(info.is_pure);
+        assert_eq!(info.purity_confidence, 0.85);
+    }
 }

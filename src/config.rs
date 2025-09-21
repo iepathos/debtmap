@@ -1786,4 +1786,190 @@ interface_weight = 0.15
         assert!(!default_context_enabled());
         assert_eq!(default_rule_priority(), 50);
     }
+
+    // Tests for extracted pure functions (spec 93)
+
+    #[test]
+    fn test_is_valid_weight() {
+        // Test valid weights
+        assert!(ScoringWeights::is_valid_weight(0.0));
+        assert!(ScoringWeights::is_valid_weight(0.5));
+        assert!(ScoringWeights::is_valid_weight(1.0));
+
+        // Test invalid weights
+        assert!(!ScoringWeights::is_valid_weight(-0.1));
+        assert!(!ScoringWeights::is_valid_weight(1.1));
+        assert!(!ScoringWeights::is_valid_weight(2.0));
+        assert!(!ScoringWeights::is_valid_weight(-10.0));
+    }
+
+    #[test]
+    fn test_validate_weight() {
+        // Test valid weight
+        assert!(ScoringWeights::validate_weight(0.5, "Test").is_ok());
+        assert!(ScoringWeights::validate_weight(0.0, "Min").is_ok());
+        assert!(ScoringWeights::validate_weight(1.0, "Max").is_ok());
+
+        // Test invalid weight
+        let result = ScoringWeights::validate_weight(1.5, "Invalid");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Invalid weight must be between 0.0 and 1.0");
+    }
+
+    #[test]
+    fn test_validate_active_weights_sum() {
+        // Test valid sum (exactly 1.0)
+        assert!(ScoringWeights::validate_active_weights_sum(0.5, 0.3, 0.2).is_ok());
+
+        // Test valid sum (within tolerance)
+        assert!(ScoringWeights::validate_active_weights_sum(0.5, 0.3, 0.2001).is_ok());
+        assert!(ScoringWeights::validate_active_weights_sum(0.5, 0.3, 0.1999).is_ok());
+
+        // Test invalid sum (too high)
+        let result = ScoringWeights::validate_active_weights_sum(0.6, 0.5, 0.3);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must sum to 1.0, but sum to 1.400"));
+
+        // Test invalid sum (too low)
+        let result = ScoringWeights::validate_active_weights_sum(0.2, 0.2, 0.2);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must sum to 1.0, but sum to 0.600"));
+    }
+
+    #[test]
+    fn test_collect_weight_validations() {
+        // Test with all valid weights
+        let weights = ScoringWeights {
+            coverage: 0.5,
+            complexity: 0.3,
+            semantic: 0.0,
+            dependency: 0.2,
+            security: 0.0,
+            organization: 0.0,
+        };
+        let validations = weights.collect_weight_validations();
+        assert_eq!(validations.len(), 6);
+        for validation in validations {
+            assert!(validation.is_ok());
+        }
+
+        // Test with invalid weights
+        let weights = ScoringWeights {
+            coverage: 1.5,  // Invalid
+            complexity: -0.1, // Invalid
+            semantic: 0.0,
+            dependency: 0.2,
+            security: 2.0,  // Invalid
+            organization: 0.0,
+        };
+        let validations = weights.collect_weight_validations();
+        assert_eq!(validations.len(), 6);
+        assert!(validations[0].is_err()); // coverage
+        assert!(validations[1].is_err()); // complexity
+        assert!(validations[2].is_ok());  // semantic
+        assert!(validations[3].is_ok());  // dependency
+        assert!(validations[4].is_err()); // security
+        assert!(validations[5].is_ok());  // organization
+    }
+
+    #[test]
+    fn test_read_config_file() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("test_config.toml");
+
+        // Write test config
+        fs::write(&config_path, "[thresholds]\ncomplexity = 15\n").unwrap();
+
+        // Test reading existing file
+        let contents = read_config_file(&config_path).unwrap();
+        assert_eq!(contents, "[thresholds]\ncomplexity = 15\n");
+
+        // Test reading non-existent file
+        let non_existent = temp_dir.path().join("non_existent.toml");
+        assert!(read_config_file(&non_existent).is_err());
+    }
+
+    #[test]
+    fn test_parse_and_validate_config_impl() {
+        // Test valid config
+        let valid_toml = r#"
+[scoring]
+coverage = 0.50
+complexity = 0.35
+dependency = 0.15
+"#;
+        let config = parse_and_validate_config_impl(valid_toml).unwrap();
+        let scoring = config.scoring.unwrap();
+        assert_eq!(scoring.coverage, 0.50);
+        assert_eq!(scoring.complexity, 0.35);
+        assert_eq!(scoring.dependency, 0.15);
+
+        // Test invalid TOML
+        let invalid_toml = "invalid [[ toml";
+        assert!(parse_and_validate_config_impl(invalid_toml).is_err());
+
+        // Test config with invalid weights (should be normalized)
+        let invalid_weights = r#"
+[scoring]
+coverage = 0.6
+complexity = 0.6
+dependency = 0.6
+"#;
+        let config = parse_and_validate_config_impl(invalid_weights).unwrap();
+        // Should use defaults due to invalid sum
+        let scoring = config.scoring.unwrap();
+        assert_eq!(scoring.coverage, 0.50);
+        assert_eq!(scoring.complexity, 0.35);
+        assert_eq!(scoring.dependency, 0.15);
+    }
+
+    #[test]
+    fn test_directory_ancestors_impl() {
+        use std::path::PathBuf;
+
+        // Test normal path traversal
+        let start = PathBuf::from("/a/b/c/d");
+        let ancestors: Vec<PathBuf> = directory_ancestors_impl(start.clone(), 3).collect();
+        assert_eq!(ancestors.len(), 3);
+        assert_eq!(ancestors[0], PathBuf::from("/a/b/c/d"));
+        assert_eq!(ancestors[1], PathBuf::from("/a/b/c"));
+        assert_eq!(ancestors[2], PathBuf::from("/a/b"));
+
+        // Test with depth limit
+        let ancestors: Vec<PathBuf> = directory_ancestors_impl(start.clone(), 2).collect();
+        assert_eq!(ancestors.len(), 2);
+
+        // Test with root path
+        let root = PathBuf::from("/");
+        let ancestors: Vec<PathBuf> = directory_ancestors_impl(root, 5).collect();
+        assert_eq!(ancestors.len(), 1);
+        assert_eq!(ancestors[0], PathBuf::from("/"));
+
+        // Test with zero depth
+        let ancestors: Vec<PathBuf> = directory_ancestors_impl(start, 0).collect();
+        assert_eq!(ancestors.len(), 0);
+    }
+
+    #[test]
+    fn test_handle_read_error() {
+        use std::io;
+        use std::path::PathBuf;
+
+        let path = PathBuf::from("/test/path.toml");
+
+        // Test NotFound error (should not log warning)
+        let not_found = io::Error::new(io::ErrorKind::NotFound, "File not found");
+        handle_read_error(&path, &not_found); // Should not panic
+
+        // Test PermissionDenied error (should log warning)
+        let permission = io::Error::new(io::ErrorKind::PermissionDenied, "Access denied");
+        handle_read_error(&path, &permission); // Should not panic
+
+        // Test other errors
+        let other = io::Error::new(io::ErrorKind::Other, "Unknown error");
+        handle_read_error(&path, &other); // Should not panic
+    }
 }
