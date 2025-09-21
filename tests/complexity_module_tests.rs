@@ -23,6 +23,7 @@ fn test_complexity_calculator_new() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(!calc.is_complex(&metrics));
 }
@@ -45,6 +46,7 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -70,6 +72,7 @@ fn test_complexity_calculator_is_complex_cognitive() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -95,6 +98,7 @@ fn test_complexity_calculator_is_complex_both() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -120,6 +124,7 @@ fn test_complexity_calculator_is_not_complex() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(
         !calc.is_complex(&metrics),
@@ -145,6 +150,7 @@ fn test_complexity_calculator_calculate_score_low() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -171,6 +177,7 @@ fn test_complexity_calculator_calculate_score_medium() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -197,6 +204,7 @@ fn test_complexity_calculator_calculate_score_high() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -223,6 +231,7 @@ fn test_complexity_calculator_calculate_score_zero() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(score, 0, "Score should be 0 when metrics are 0");
@@ -328,6 +337,7 @@ fn test_complexity_calculator_boundary_values() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(!calc.is_complex(&metrics_zero));
 
@@ -346,6 +356,7 @@ fn test_complexity_calculator_boundary_values() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(!calc.is_complex(&metrics_one));
 
@@ -364,6 +375,7 @@ fn test_complexity_calculator_boundary_values() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     assert!(calc.is_complex(&metrics_two));
 }
@@ -387,6 +399,7 @@ fn test_complexity_score_proportions() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
     assert_eq!(
@@ -409,6 +422,7 @@ fn test_complexity_score_proportions() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
     assert_eq!(

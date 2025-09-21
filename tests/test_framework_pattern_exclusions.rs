@@ -24,6 +24,7 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
 
     let func_id = FunctionId {
@@ -84,6 +85,7 @@ fn test_visit_trait_pattern_exclusion() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
 
     let func_id = FunctionId {

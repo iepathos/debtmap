@@ -18,6 +18,7 @@ fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> Function
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+    detected_patterns: None,
     }
 }
 

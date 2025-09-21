@@ -23,6 +23,7 @@ fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
             entropy_score: None,
             is_pure: Some(i % 3 == 0),
             purity_confidence: if i % 3 == 0 { Some(0.9) } else { Some(0.1) },
+            detected_patterns: None,
         })
         .collect()
 }

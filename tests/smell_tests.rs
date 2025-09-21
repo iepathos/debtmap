@@ -18,6 +18,7 @@ fn test_code_smell_long_parameter_list() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
 
     // Test with 7 parameters (over threshold of 5)
@@ -53,6 +54,7 @@ fn test_code_smell_long_method() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
 
     let smell = detect_long_method(&func);
@@ -88,6 +90,7 @@ fn test_code_smell_deep_nesting() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
 
     let smell = detect_deep_nesting(&func);
@@ -123,6 +126,7 @@ fn test_code_smell_detection_multiple() {
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     };
 
     let smells = analyze_function_smells(&func, 7);

@@ -246,6 +246,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
+        detected_patterns: None,
         }];
         let report = build_complexity_report(&functions, 10);
 
@@ -285,6 +286,7 @@ mod tests {
                         entropy_score: None,
                         is_pure: None,
                         purity_confidence: None,
+        detected_patterns: None,
                     }],
                     cyclomatic_complexity: 2,
                     cognitive_complexity: 3,
@@ -313,6 +315,7 @@ mod tests {
                             entropy_score: None,
                             is_pure: None,
                             purity_confidence: None,
+        detected_patterns: None,
                         },
                         FunctionMetrics {
                             name: "func_c".to_string(),
@@ -329,6 +332,7 @@ mod tests {
                             entropy_score: None,
                             is_pure: None,
                             purity_confidence: None,
+        detected_patterns: None,
                         },
                     ],
                     cyclomatic_complexity: 10,

@@ -49,6 +49,7 @@ pub struct FunctionMetrics {
     pub entropy_score: Option<crate::complexity::entropy_core::EntropyScore>, // Optional entropy-based complexity score
     pub is_pure: Option<bool>, // Whether the function is pure (no side effects)
     pub purity_confidence: Option<f32>, // Confidence level of purity detection (0.0 to 1.0)
+    pub detected_patterns: Option<Vec<String>>, // Patterns detected for complexity adjustment
 }
 
 /// Entropy details for explainable output
@@ -80,6 +81,7 @@ impl FunctionMetrics {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
+            detected_patterns: None,
         }
     }
 

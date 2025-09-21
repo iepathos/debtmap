@@ -398,6 +398,13 @@ fn extract_functions_from_stmts(
                 let adjusted_cyclomatic = apply_adjustments(base_cyclomatic, &patterns);
                 let adjusted_cognitive = apply_adjustments(base_cognitive, &patterns);
 
+                // Extract pattern descriptions for reporting
+                let detected_patterns = if !patterns.is_empty() {
+                    Some(patterns.iter().map(|p| p.description.clone()).collect())
+                } else {
+                    None
+                };
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -413,6 +420,7 @@ fn extract_functions_from_stmts(
                     entropy_score,
                     is_pure: Some(purity_analysis.is_pure),
                     purity_confidence: Some(purity_analysis.confidence),
+                    detected_patterns,
                 });
 
                 // Recursively look for nested functions
@@ -454,6 +462,13 @@ fn extract_functions_from_stmts(
                 let adjusted_cyclomatic = apply_adjustments(base_cyclomatic, &patterns);
                 let adjusted_cognitive = apply_adjustments(base_cognitive, &patterns);
 
+                // Extract pattern descriptions for reporting
+                let detected_patterns = if !patterns.is_empty() {
+                    Some(patterns.iter().map(|p| p.description.clone()).collect())
+                } else {
+                    None
+                };
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -469,6 +484,7 @@ fn extract_functions_from_stmts(
                     entropy_score,
                     is_pure: Some(purity_analysis.is_pure),
                     purity_confidence: Some(purity_analysis.confidence),
+                    detected_patterns,
                 });
 
                 // Recursively look for nested functions

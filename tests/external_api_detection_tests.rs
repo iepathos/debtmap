@@ -22,6 +22,7 @@ fn create_function(name: &str, path: &str, visibility: Option<String>) -> Functi
         entropy_score: None,
         is_pure: None,
         purity_confidence: None,
+        detected_patterns: None,
     }
 }
 
