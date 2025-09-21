@@ -555,7 +555,7 @@ mod tests {
                         entropy_score: None,
                         is_pure: None,
                         purity_confidence: None,
-        detected_patterns: None,
+                        detected_patterns: None,
                     },
                     FunctionMetrics {
                         name: "func2".to_string(),
@@ -572,7 +572,7 @@ mod tests {
                         entropy_score: None,
                         is_pure: None,
                         purity_confidence: None,
-        detected_patterns: None,
+                        detected_patterns: None,
                     },
                     FunctionMetrics {
                         name: "func3".to_string(),
@@ -589,7 +589,7 @@ mod tests {
                         entropy_score: None,
                         is_pure: None,
                         purity_confidence: None,
-        detected_patterns: None,
+                        detected_patterns: None,
                     },
                 ],
                 summary: ComplexitySummary {

@@ -162,7 +162,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         }];
 
         AnalysisResults {
@@ -335,7 +335,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -357,7 +357,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -379,7 +379,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -401,7 +401,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -427,7 +427,7 @@ mod tests {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
-        detected_patterns: None,
+                detected_patterns: None,
             });
         }
 
@@ -465,7 +465,7 @@ mod tests {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
-        detected_patterns: None,
+                detected_patterns: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -482,7 +482,7 @@ mod tests {
                 entropy_score: None,
                 is_pure: None,
                 purity_confidence: None,
-        detected_patterns: None,
+                detected_patterns: None,
             },
         ];
 

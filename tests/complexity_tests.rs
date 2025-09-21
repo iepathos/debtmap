@@ -19,7 +19,7 @@ fn test_complexity_metrics() {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         },
         FunctionMetrics {
             name: "complex".to_string(),
@@ -36,7 +36,7 @@ fn test_complexity_metrics() {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         },
         FunctionMetrics {
             name: "medium".to_string(),
@@ -53,7 +53,7 @@ fn test_complexity_metrics() {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         },
     ];
 

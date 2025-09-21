@@ -296,7 +296,7 @@ fn test_false_positive_reduction() {
             entropy_score: None,
             is_pure: Some(true),
             purity_confidence: Some(0.9),
-        detected_patterns: None,
+            detected_patterns: None,
         };
 
         assert!(

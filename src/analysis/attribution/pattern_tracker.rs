@@ -292,7 +292,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         };
 
         let pattern = detector.detect(&func);
@@ -322,7 +322,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         };
 
         let pattern = detector.detect(&func);
@@ -351,7 +351,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         };
 
         let pattern = detector.detect(&func);
@@ -386,7 +386,7 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
-        detected_patterns: None,
+            detected_patterns: None,
         }];
 
         let result = tracker.analyze_patterns(&functions);

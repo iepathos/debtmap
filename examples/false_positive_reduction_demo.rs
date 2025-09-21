@@ -137,7 +137,7 @@ fn create_getter() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(true),
         purity_confidence: Some(1.0),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -157,7 +157,7 @@ fn create_setter() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(false),
         purity_confidence: Some(0.9),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -177,7 +177,7 @@ fn create_simple_validator() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(true),
         purity_confidence: Some(0.95),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -197,7 +197,7 @@ fn create_small_util() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(true),
         purity_confidence: Some(0.85),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -217,7 +217,7 @@ fn create_test_helper() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(false),
         purity_confidence: Some(0.5),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -237,7 +237,7 @@ fn create_complex_handler() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(false),
         purity_confidence: Some(0.3),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -257,7 +257,7 @@ fn create_nested_logic() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(false),
         purity_confidence: Some(0.4),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -277,7 +277,7 @@ fn create_long_switch() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(true),
         purity_confidence: Some(0.8),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }
 
@@ -297,6 +297,6 @@ fn create_moderate_complexity() -> FunctionMetrics {
         entropy_score: None,
         is_pure: Some(true),
         purity_confidence: Some(0.9),
-    detected_patterns: None,
+        detected_patterns: None,
     }
 }

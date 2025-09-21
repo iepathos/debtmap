@@ -141,7 +141,8 @@ impl DictionaryDispatchPattern {
             ast::Stmt::Assign(assign) => {
                 if let ast::Expr::Dict(dict) = &*assign.value {
                     // Check if values are functions/lambdas
-                    let is_dispatch = dict.values
+                    let is_dispatch = dict
+                        .values
                         .iter()
                         .any(|v| matches!(v, ast::Expr::Lambda(_) | ast::Expr::Name(_)));
                     if is_dispatch {
@@ -160,10 +161,7 @@ impl DictionaryDispatchPattern {
     fn has_dictionary_get_and_call(&self, stmt: &ast::Stmt) -> bool {
         match stmt {
             ast::Stmt::Expr(expr_stmt) => self.is_dict_get_call(&expr_stmt.value),
-            ast::Stmt::Return(ret) => ret
-                .value
-                .as_ref()
-                .is_some_and(|v| self.is_dict_get_call(v)),
+            ast::Stmt::Return(ret) => ret.value.as_ref().is_some_and(|v| self.is_dict_get_call(v)),
             _ => false,
         }
     }
