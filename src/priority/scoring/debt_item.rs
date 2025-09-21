@@ -2160,7 +2160,11 @@ mod tests {
 
         let debt = classify_test_debt(&test_func);
         match debt {
-            DebtType::TestingGap { coverage, cyclomatic, cognitive } => {
+            DebtType::TestingGap {
+                coverage,
+                cyclomatic,
+                cognitive,
+            } => {
                 assert_float_eq(coverage, 0.0, 0.01);
                 assert_eq!(cyclomatic, 4);
                 assert_eq!(cognitive, 6);
@@ -2193,7 +2197,10 @@ mod tests {
         assert!(debt.is_some());
 
         match debt.unwrap() {
-            DebtType::ComplexityHotspot { cyclomatic, cognitive } => {
+            DebtType::ComplexityHotspot {
+                cyclomatic,
+                cognitive,
+            } => {
                 assert_eq!(cyclomatic, 10);
                 assert_eq!(cognitive, 12);
             }
@@ -2622,11 +2629,26 @@ mod tests {
 
     #[test]
     fn test_format_role_description() {
-        assert_eq!(format_role_description(FunctionRole::PureLogic), "business logic");
-        assert_eq!(format_role_description(FunctionRole::Orchestrator), "orchestration");
-        assert_eq!(format_role_description(FunctionRole::IOWrapper), "I/O wrapper");
-        assert_eq!(format_role_description(FunctionRole::EntryPoint), "entry point");
-        assert_eq!(format_role_description(FunctionRole::PatternMatch), "pattern matching");
+        assert_eq!(
+            format_role_description(FunctionRole::PureLogic),
+            "business logic"
+        );
+        assert_eq!(
+            format_role_description(FunctionRole::Orchestrator),
+            "orchestration"
+        );
+        assert_eq!(
+            format_role_description(FunctionRole::IOWrapper),
+            "I/O wrapper"
+        );
+        assert_eq!(
+            format_role_description(FunctionRole::EntryPoint),
+            "entry point"
+        );
+        assert_eq!(
+            format_role_description(FunctionRole::PatternMatch),
+            "pattern matching"
+        );
         assert_eq!(format_role_description(FunctionRole::Unknown), "function");
     }
 
@@ -2651,28 +2673,40 @@ mod tests {
     #[test]
     fn test_calculate_risk_factor() {
         // Test various debt types
-        assert_eq!(calculate_risk_factor(&DebtType::TestingGap {
-            coverage: 0.5,
-            cyclomatic: 10,
-            cognitive: 15
-        }), 0.42);
+        assert_eq!(
+            calculate_risk_factor(&DebtType::TestingGap {
+                coverage: 0.5,
+                cyclomatic: 10,
+                cognitive: 15
+            }),
+            0.42
+        );
 
-        assert_eq!(calculate_risk_factor(&DebtType::ComplexityHotspot {
-            cyclomatic: 20,
-            cognitive: 25
-        }), 0.35);
+        assert_eq!(
+            calculate_risk_factor(&DebtType::ComplexityHotspot {
+                cyclomatic: 20,
+                cognitive: 25
+            }),
+            0.35
+        );
 
-        assert_eq!(calculate_risk_factor(&DebtType::ErrorSwallowing {
-            pattern: "unwrap_or_default".to_string(),
-            context: None
-        }), 0.35);
+        assert_eq!(
+            calculate_risk_factor(&DebtType::ErrorSwallowing {
+                pattern: "unwrap_or_default".to_string(),
+                context: None
+            }),
+            0.35
+        );
 
-        assert_eq!(calculate_risk_factor(&DebtType::DeadCode {
-            visibility: FunctionVisibility::Private,
-            cyclomatic: 5,
-            cognitive: 8,
-            usage_hints: vec![]
-        }), 0.3);
+        assert_eq!(
+            calculate_risk_factor(&DebtType::DeadCode {
+                visibility: FunctionVisibility::Private,
+                cyclomatic: 5,
+                cognitive: 8,
+                usage_hints: vec![]
+            }),
+            0.3
+        );
     }
 
     #[test]

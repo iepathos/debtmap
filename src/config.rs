@@ -1813,7 +1813,10 @@ interface_weight = 0.15
         // Test invalid weight
         let result = ScoringWeights::validate_weight(1.5, "Invalid");
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid weight must be between 0.0 and 1.0");
+        assert_eq!(
+            result.unwrap_err(),
+            "Invalid weight must be between 0.0 and 1.0"
+        );
     }
 
     #[test]
@@ -1828,12 +1831,16 @@ interface_weight = 0.15
         // Test invalid sum (too high)
         let result = ScoringWeights::validate_active_weights_sum(0.6, 0.5, 0.3);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("must sum to 1.0, but sum to 1.400"));
+        assert!(result
+            .unwrap_err()
+            .contains("must sum to 1.0, but sum to 1.400"));
 
         // Test invalid sum (too low)
         let result = ScoringWeights::validate_active_weights_sum(0.2, 0.2, 0.2);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("must sum to 1.0, but sum to 0.600"));
+        assert!(result
+            .unwrap_err()
+            .contains("must sum to 1.0, but sum to 0.600"));
     }
 
     #[test]
@@ -1855,21 +1862,21 @@ interface_weight = 0.15
 
         // Test with invalid weights
         let weights = ScoringWeights {
-            coverage: 1.5,  // Invalid
+            coverage: 1.5,    // Invalid
             complexity: -0.1, // Invalid
             semantic: 0.0,
             dependency: 0.2,
-            security: 2.0,  // Invalid
+            security: 2.0, // Invalid
             organization: 0.0,
         };
         let validations = weights.collect_weight_validations();
         assert_eq!(validations.len(), 6);
         assert!(validations[0].is_err()); // coverage
         assert!(validations[1].is_err()); // complexity
-        assert!(validations[2].is_ok());  // semantic
-        assert!(validations[3].is_ok());  // dependency
+        assert!(validations[2].is_ok()); // semantic
+        assert!(validations[3].is_ok()); // dependency
         assert!(validations[4].is_err()); // security
-        assert!(validations[5].is_ok());  // organization
+        assert!(validations[5].is_ok()); // organization
     }
 
     #[test]

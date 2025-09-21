@@ -414,11 +414,13 @@ impl EntropyAnalyzer {
     }
 
     /// Adjust complexity based on entropy and pattern analysis
+    #[allow(dead_code)]
     fn adjust_complexity(&self, entropy: f64, repetition: f64, similarity: f64) -> f64 {
         Self::compute_effective_complexity(entropy, repetition, similarity)
     }
 
     /// Calculate the dampening factor that will be applied
+    #[cfg_attr(not(test), allow(dead_code))]
     fn calculate_dampening_factor(&self, entropy: f64, repetition: f64, similarity: f64) -> f64 {
         Self::compute_dampening_factor(entropy, repetition, similarity)
     }
@@ -516,6 +518,7 @@ enum LiteralType {
 
 impl TokenType {
     /// Convert from classified token to simple token type for compatibility
+    #[allow(dead_code)]
     fn from_classified(classified: ClassifiedToken) -> Self {
         match classified.class {
             TokenClass::Keyword(s) => TokenType::Keyword(s),
@@ -674,7 +677,6 @@ fn classify_literal(lit: &syn::Lit) -> LiteralType {
         syn::Lit::Char(_) => LiteralType::Char,
         _ => LiteralType::String,
     }
-
 }
 
 impl<'ast> Visit<'ast> for ClassifiedTokenExtractor<'ast> {
@@ -689,8 +691,14 @@ impl<'ast> Visit<'ast> for ClassifiedTokenExtractor<'ast> {
 impl<'ast> ClassifiedTokenExtractor<'ast> {
     fn handle_classified_expression(&mut self, expr: &'ast Expr) -> bool {
         match expr {
-            Expr::If(_) | Expr::While(_) | Expr::ForLoop(_) | Expr::Loop(_)
-            | Expr::Match(_) | Expr::Return(_) | Expr::Break(_) | Expr::Continue(_)
+            Expr::If(_)
+            | Expr::While(_)
+            | Expr::ForLoop(_)
+            | Expr::Loop(_)
+            | Expr::Match(_)
+            | Expr::Return(_)
+            | Expr::Break(_)
+            | Expr::Continue(_)
             | Expr::Try(_) => {
                 self.handle_control_flow_keyword(expr);
                 false
@@ -729,7 +737,7 @@ impl<'ast> ClassifiedTokenExtractor<'ast> {
                 self.handle_block_scope(expr);
                 true
             }
-            _ => false
+            _ => false,
         }
     }
 
@@ -810,7 +818,6 @@ fn format_literal_token(lit: &syn::Lit) -> String {
         syn::Lit::Char(_) => "'c'".to_string(),
         _ => "literal".to_string(),
     }
-
 }
 
 /// Detector for repetitive patterns
@@ -1008,10 +1015,10 @@ fn extract_expr_tokens(expr: &Expr) -> Vec<String> {
 }
 
 fn extract_stmt_tokens(stmts: &[syn::Stmt]) -> Vec<String> {
-    stmts.iter()
+    stmts
+        .iter()
         .map(|stmt| format!("{:?}", std::mem::discriminant(stmt)))
         .collect()
-
 }
 
 /// Apply entropy-based dampening to complexity scores (spec 68: max 50% reduction)
@@ -1111,11 +1118,11 @@ mod tests {
     fn test_build_entropy_score() {
         // Test the pure function for building entropy scores
         let score = EntropyAnalyzer::build_entropy_score(
-            0.7,  // entropy
-            0.3,  // patterns
-            0.4,  // similarity
-            10,   // unique_vars
-            3,    // max_nesting
+            0.7, // entropy
+            0.3, // patterns
+            0.4, // similarity
+            10,  // unique_vars
+            3,   // max_nesting
         );
 
         assert_float_eq(score.token_entropy, 0.7, 1e-10);
