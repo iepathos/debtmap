@@ -1,12 +1,16 @@
 //! Integration tests for the dependency injection system
 
 use anyhow::Result;
-use debtmap::core::injection::{AppContainer, AppContainerBuilder, AnalyzerFactory, ServiceLocator};
+use debtmap::core::injection::{
+    AnalyzerFactory, AppContainer, AppContainerBuilder, ServiceLocator,
+};
 use debtmap::core::traits::{
-    Analyzer, Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
+    Analyzer, Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor,
+    Scorer,
 };
 use debtmap::core::types::{
-    AnalysisResult, DebtCategory, DebtItem, Language, ModuleInfo, Severity, SourceLocation, FunctionInfo, ProjectMetrics,
+    AnalysisResult, DebtCategory, DebtItem, FunctionInfo, Language, ModuleInfo, ProjectMetrics,
+    Severity, SourceLocation,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -27,24 +31,22 @@ impl Analyzer for TestAnalyzer {
             name: format!("test_module_{}", self.name),
             language: self.language,
             path: PathBuf::from(format!("test.{}", self.name)),
-            functions: vec![
-                FunctionInfo {
-                    name: "test_function".to_string(),
-                    location: SourceLocation {
-                        file: PathBuf::from("test.rs"),
-                        line: 1,
-                        column: 0,
-                        end_line: Some(10),
-                        end_column: Some(0),
-                    },
-                    parameters: vec!["arg1".to_string(), "arg2".to_string()],
-                    return_type: Some("Result<()>".to_string()),
-                    is_public: true,
-                    is_async: false,
-                    is_generic: false,
-                    doc_comment: Some("Test function".to_string()),
+            functions: vec![FunctionInfo {
+                name: "test_function".to_string(),
+                location: SourceLocation {
+                    file: PathBuf::from("test.rs"),
+                    line: 1,
+                    column: 0,
+                    end_line: Some(10),
+                    end_column: Some(0),
                 },
-            ],
+                parameters: vec!["arg1".to_string(), "arg2".to_string()],
+                return_type: Some("Result<()>".to_string()),
+                is_public: true,
+                is_async: false,
+                is_generic: false,
+                doc_comment: Some("Test function".to_string()),
+            }],
             exports: vec!["export1".to_string()],
             imports: vec!["import1".to_string(), "import2".to_string()],
         })
@@ -108,10 +110,12 @@ impl Cache for TestCache {
     fn get(&self, key: &Self::Key) -> Option<Self::Value> {
         let storage = self.storage.lock().unwrap();
         if let Some(value) = storage.get(key) {
-            self.hit_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.hit_count
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Some(value.clone())
         } else {
-            self.miss_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.miss_count
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             None
         }
     }
@@ -124,8 +128,10 @@ impl Cache for TestCache {
     fn clear(&mut self) {
         let mut storage = self.storage.lock().unwrap();
         storage.clear();
-        self.hit_count.store(0, std::sync::atomic::Ordering::Relaxed);
-        self.miss_count.store(0, std::sync::atomic::Ordering::Relaxed);
+        self.hit_count
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+        self.miss_count
+            .store(0, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn stats(&self) -> CacheStats {
@@ -236,9 +242,18 @@ impl Formatter for TestFormatter {
 
     fn format(&self, report: &Self::Report) -> Result<String> {
         match self.format_type.as_str() {
-            "json" => Ok(format!("{{\"total_files\": {}, \"format\": \"json\"}}", report.metrics.total_files)),
-            "markdown" => Ok(format!("# Analysis Report\nTotal files: {}", report.metrics.total_files)),
-            "terminal" => Ok(format!("Analysis complete: {} files processed", report.metrics.total_files)),
+            "json" => Ok(format!(
+                "{{\"total_files\": {}, \"format\": \"json\"}}",
+                report.metrics.total_files
+            )),
+            "markdown" => Ok(format!(
+                "# Analysis Report\nTotal files: {}",
+                report.metrics.total_files
+            )),
+            "terminal" => Ok(format!(
+                "Analysis complete: {} files processed",
+                report.metrics.total_files
+            )),
             _ => Ok(format!("Report: {} files", report.metrics.total_files)),
         }
     }
@@ -375,7 +390,12 @@ fn test_analyzer_factory_integration() {
 
         // Verify the analyzer can be used
         let result = analyzer.analyze(test_code.to_string());
-        assert!(result.is_ok(), "Failed to analyze for {:?}: {:?}", language, result);
+        assert!(
+            result.is_ok(),
+            "Failed to analyze for {:?}: {:?}",
+            language,
+            result
+        );
 
         let module_info = result.unwrap();
         assert_eq!(module_info.language, language);
@@ -486,8 +506,17 @@ fn test_trait_boundaries_and_contracts() {
     let scorer = TestScorer { base_score: 1.0 };
 
     // Test with different severity/category combinations
-    for category in &[DebtCategory::Complexity, DebtCategory::Testing, DebtCategory::Documentation] {
-        for severity in &[Severity::Info, Severity::Warning, Severity::Major, Severity::Critical] {
+    for category in &[
+        DebtCategory::Complexity,
+        DebtCategory::Testing,
+        DebtCategory::Documentation,
+    ] {
+        for severity in &[
+            Severity::Info,
+            Severity::Warning,
+            Severity::Major,
+            Severity::Critical,
+        ] {
             let item = DebtItem {
                 id: format!("test_{:?}_{:?}", category, severity),
                 category: *category,
@@ -547,14 +576,20 @@ fn test_trait_boundaries_and_contracts() {
     };
 
     let priority = calculator.calculate_priority(&item);
-    assert!(priority >= 0.0 && priority <= 1.0, "Priority should be normalized");
+    assert!(
+        priority >= 0.0 && priority <= 1.0,
+        "Priority should be normalized"
+    );
 
     let factors = calculator.get_factors(&item);
     assert!(!factors.is_empty(), "Should return priority factors");
 
     // Verify factors sum to reasonable weight
     let total_weight: f64 = factors.iter().map(|f| f.weight).sum();
-    assert!((total_weight - 1.0).abs() < 0.01, "Factor weights should sum to ~1.0");
+    assert!(
+        (total_weight - 1.0).abs() < 0.01,
+        "Factor weights should sum to ~1.0"
+    );
 }
 
 #[test]

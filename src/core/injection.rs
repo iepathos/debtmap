@@ -1,8 +1,7 @@
 //! Dependency injection container and builder patterns
 
 use crate::core::traits::{
-    Analyzer, Cache, CacheStats, ConfigProvider, Formatter,
-    PriorityCalculator, Scorer,
+    Analyzer, Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, Scorer,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -46,6 +45,12 @@ pub struct AppContainerBuilder {
     json_formatter: Option<Arc<dyn Formatter<Report = crate::core::types::AnalysisResult>>>,
     markdown_formatter: Option<Arc<dyn Formatter<Report = crate::core::types::AnalysisResult>>>,
     terminal_formatter: Option<Arc<dyn Formatter<Report = crate::core::types::AnalysisResult>>>,
+}
+
+impl Default for AppContainerBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AppContainerBuilder {
@@ -215,6 +220,12 @@ pub struct RustAnalyzerAdapter {
     inner: crate::analyzers::rust::RustAnalyzer,
 }
 
+impl Default for RustAnalyzerAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RustAnalyzerAdapter {
     pub fn new() -> Self {
         Self {
@@ -236,7 +247,8 @@ impl Analyzer for RustAnalyzerAdapter {
 
         // Convert FileMetrics to ModuleInfo
         Ok(crate::core::types::ModuleInfo {
-            name: path.file_stem()
+            name: path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("module")
                 .to_string(),
@@ -264,7 +276,9 @@ impl Analyzer for RustAnalyzerAdapter {
                 })
                 .collect(),
             exports: vec![],
-            imports: file_metrics.dependencies.iter()
+            imports: file_metrics
+                .dependencies
+                .iter()
                 .map(|d| d.name.clone())
                 .collect(),
         })
@@ -278,6 +292,12 @@ impl Analyzer for RustAnalyzerAdapter {
 /// Adapter for Python analyzer to implement Analyzer trait
 pub struct PythonAnalyzerAdapter {
     inner: crate::analyzers::python::PythonAnalyzer,
+}
+
+impl Default for PythonAnalyzerAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PythonAnalyzerAdapter {
@@ -301,7 +321,8 @@ impl Analyzer for PythonAnalyzerAdapter {
 
         // Convert FileMetrics to ModuleInfo
         Ok(crate::core::types::ModuleInfo {
-            name: path.file_stem()
+            name: path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("module")
                 .to_string(),
@@ -329,7 +350,9 @@ impl Analyzer for PythonAnalyzerAdapter {
                 })
                 .collect(),
             exports: vec![],
-            imports: file_metrics.dependencies.iter()
+            imports: file_metrics
+                .dependencies
+                .iter()
                 .map(|d| d.name.clone())
                 .collect(),
         })
@@ -343,6 +366,12 @@ impl Analyzer for PythonAnalyzerAdapter {
 /// Adapter for JavaScript analyzer to implement Analyzer trait
 pub struct JavaScriptAnalyzerAdapter;
 
+impl Default for JavaScriptAnalyzerAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JavaScriptAnalyzerAdapter {
     pub fn new() -> Self {
         Self
@@ -353,7 +382,7 @@ impl Analyzer for JavaScriptAnalyzerAdapter {
     type Input = String;
     type Output = crate::core::types::ModuleInfo;
 
-    fn analyze(&self, input: Self::Input) -> anyhow::Result<Self::Output> {
+    fn analyze(&self, _input: Self::Input) -> anyhow::Result<Self::Output> {
         // JavaScript analysis implementation
         // For now, use a basic implementation
         let path = std::path::PathBuf::from("temp.js");
@@ -375,6 +404,12 @@ impl Analyzer for JavaScriptAnalyzerAdapter {
 
 /// Adapter for TypeScript analyzer to implement Analyzer trait
 pub struct TypeScriptAnalyzerAdapter;
+
+impl Default for TypeScriptAnalyzerAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl TypeScriptAnalyzerAdapter {
     pub fn new() -> Self {
@@ -411,6 +446,12 @@ pub struct ServiceLocator {
     services: std::collections::HashMap<std::any::TypeId, Box<dyn std::any::Any + Send + Sync>>,
 }
 
+impl Default for ServiceLocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServiceLocator {
     /// Create a new service locator
     pub fn new() -> Self {
@@ -438,7 +479,9 @@ impl ServiceLocator {
 mod tests {
     use super::*;
     use crate::core::traits::PriorityFactor;
-    use crate::core::types::{DebtCategory, DebtItem, Language, ModuleInfo, Severity, SourceLocation};
+    use crate::core::types::{
+        DebtCategory, DebtItem, Language, ModuleInfo,
+    };
 
     // Mock implementations for testing
     struct MockAnalyzer {
@@ -449,7 +492,7 @@ mod tests {
         type Input = String;
         type Output = ModuleInfo;
 
-        fn analyze(&self, _input: Self::Input) -> anyhow::Result<Self::Output> {
+        fn analyze(&self, input: Self::Input) -> anyhow::Result<Self::Output> {
             Ok(ModuleInfo {
                 name: "test_module".to_string(),
                 language: self.language,
@@ -547,14 +590,12 @@ mod tests {
         }
 
         fn get_factors(&self, _item: &Self::Item) -> Vec<PriorityFactor> {
-            vec![
-                PriorityFactor {
-                    name: "debt_type".to_string(),
-                    weight: 1.0,
-                    value: 0.5,
-                    description: "Mock factor".to_string(),
-                },
-            ]
+            vec![PriorityFactor {
+                name: "debt_type".to_string(),
+                weight: 1.0,
+                value: 0.5,
+                description: "Mock factor".to_string(),
+            }]
         }
     }
 
@@ -662,5 +703,4 @@ mod tests {
         let ts_analyzer = factory.create_analyzer(Language::TypeScript);
         assert_eq!(ts_analyzer.name(), "TypeScriptAnalyzer");
     }
-
 }

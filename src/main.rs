@@ -1,19 +1,19 @@
 use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{Cli, Commands};
-use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
 use debtmap::core::injection::{AppContainer, AppContainerBuilder};
+use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
 use std::path::Path;
 use std::sync::Arc;
 
 // Default implementations for DI container components
 mod default_implementations {
+    use anyhow::Result;
     use debtmap::core::traits::{
         Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
     };
     use debtmap::core::types::{AnalysisResult, DebtCategory, DebtItem, Severity};
     use std::collections::HashMap;
-    use anyhow::Result;
 
     pub struct DefaultDebtScorer;
 
@@ -79,7 +79,8 @@ mod default_implementations {
                 self.hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 Some(value.clone())
             } else {
-                self.misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.misses
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 None
             }
         }
@@ -177,7 +178,10 @@ mod default_implementations {
 
             let effort_factor = 1.0 / (1.0 + item.effort);
 
-            f64::min(severity_weight * 0.5 + category_weight * 0.3 + effort_factor * 0.2, 1.0)
+            f64::min(
+                severity_weight * 0.5 + category_weight * 0.3 + effort_factor * 0.2,
+                1.0,
+            )
         }
 
         fn get_factors(&self, item: &Self::Item) -> Vec<PriorityFactor> {
@@ -225,7 +229,8 @@ mod default_implementations {
         type Report = AnalysisResult;
 
         fn format(&self, report: &Self::Report) -> Result<String> {
-            serde_json::to_string_pretty(report).map_err(|e| anyhow::anyhow!("JSON formatting error: {}", e))
+            serde_json::to_string_pretty(report)
+                .map_err(|e| anyhow::anyhow!("JSON formatting error: {}", e))
         }
 
         fn format_name(&self) -> &str {
@@ -246,19 +251,27 @@ mod default_implementations {
 
         fn format(&self, report: &Self::Report) -> Result<String> {
             let mut output = String::new();
-            output.push_str(&format!("# Code Analysis Report\n\n"));
-            output.push_str(&format!("## Summary\n\n"));
+            output.push_str("# Code Analysis Report\n\n");
+            output.push_str("## Summary\n\n");
             output.push_str(&format!("- Total Files: {}\n", report.metrics.total_files));
-            output.push_str(&format!("- Total Functions: {}\n", report.metrics.total_functions));
+            output.push_str(&format!(
+                "- Total Functions: {}\n",
+                report.metrics.total_functions
+            ));
             output.push_str(&format!("- Total Lines: {}\n", report.metrics.total_lines));
-            output.push_str(&format!("- Average Complexity: {:.2}\n", report.metrics.average_complexity));
+            output.push_str(&format!(
+                "- Average Complexity: {:.2}\n",
+                report.metrics.average_complexity
+            ));
             output.push_str(&format!("- Debt Score: {:.2}\n\n", report.total_score));
 
             if !report.debt_items.is_empty() {
                 output.push_str("## Technical Debt Items\n\n");
                 for item in &report.debt_items {
-                    output.push_str(&format!("- **{:?}** ({:?}): {}\n",
-                        item.category, item.severity, item.description));
+                    output.push_str(&format!(
+                        "- **{:?}** ({:?}): {}\n",
+                        item.category, item.severity, item.description
+                    ));
                 }
             }
 
@@ -287,10 +300,22 @@ mod default_implementations {
             output.push_str("         Code Analysis Report          \n");
             output.push_str("═══════════════════════════════════════\n\n");
 
-            output.push_str(&format!("Total Files:      {}\n", report.metrics.total_files));
-            output.push_str(&format!("Total Functions:  {}\n", report.metrics.total_functions));
-            output.push_str(&format!("Total Lines:      {}\n", report.metrics.total_lines));
-            output.push_str(&format!("Avg Complexity:   {:.2}\n", report.metrics.average_complexity));
+            output.push_str(&format!(
+                "Total Files:      {}\n",
+                report.metrics.total_files
+            ));
+            output.push_str(&format!(
+                "Total Functions:  {}\n",
+                report.metrics.total_functions
+            ));
+            output.push_str(&format!(
+                "Total Lines:      {}\n",
+                report.metrics.total_lines
+            ));
+            output.push_str(&format!(
+                "Avg Complexity:   {:.2}\n",
+                report.metrics.average_complexity
+            ));
             output.push_str(&format!("Debt Score:       {:.2}\n", report.total_score));
 
             if !report.debt_items.is_empty() {
@@ -343,7 +368,10 @@ fn create_app_container() -> Result<AppContainer> {
     // Build the container with all required dependencies
     // We need to create instances directly since the factory returns Box<dyn Analyzer>
     // But our AppContainerBuilder expects concrete types implementing the new trait
-    use debtmap::core::injection::{RustAnalyzerAdapter, PythonAnalyzerAdapter, JavaScriptAnalyzerAdapter, TypeScriptAnalyzerAdapter};
+    use debtmap::core::injection::{
+        JavaScriptAnalyzerAdapter, PythonAnalyzerAdapter, RustAnalyzerAdapter,
+        TypeScriptAnalyzerAdapter,
+    };
 
     let container = AppContainerBuilder::new()
         .with_rust_analyzer(RustAnalyzerAdapter::new())

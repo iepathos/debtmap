@@ -148,6 +148,12 @@ pub struct AnalyzerFactory {
     // Dependencies can be stored here or created on demand
 }
 
+impl Default for AnalyzerFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnalyzerFactory {
     /// Create a new factory
     pub fn new() -> Self {
@@ -173,8 +179,12 @@ impl AnalyzerFactory {
         match language {
             crate::core::Language::Rust => self.create_rust_analyzer(),
             crate::core::Language::Python => self.create_python_analyzer(),
-            crate::core::Language::JavaScript => Box::new(JavaScriptAnalyzerAdapter::new_javascript().unwrap()),
-            crate::core::Language::TypeScript => Box::new(JavaScriptAnalyzerAdapter::new_typescript().unwrap()),
+            crate::core::Language::JavaScript => {
+                Box::new(JavaScriptAnalyzerAdapter::new_javascript().unwrap())
+            }
+            crate::core::Language::TypeScript => {
+                Box::new(JavaScriptAnalyzerAdapter::new_typescript().unwrap())
+            }
             crate::core::Language::Unknown => panic!("Cannot create analyzer for unknown language"),
         }
     }
