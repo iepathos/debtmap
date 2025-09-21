@@ -8,6 +8,7 @@ pub mod context_aware;
 pub mod enhanced_analyzer;
 pub mod file_analyzer;
 pub mod function_registry;
+pub mod implementations;
 pub mod javascript;
 pub mod purity_detector;
 pub mod python;
@@ -19,6 +20,7 @@ pub mod signature_extractor;
 pub mod test_detector;
 pub mod trait_implementation_tracker;
 pub mod trait_resolver;
+pub mod traits;
 pub mod type_registry;
 pub mod type_tracker;
 

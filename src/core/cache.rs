@@ -175,6 +175,26 @@ impl AnalysisCache {
         Ok(())
     }
 
+    /// Get read access to memory index
+    pub fn memory_index(&self) -> &HashMap<String, CacheEntry> {
+        &self.memory_index
+    }
+
+    /// Get mutable access to memory index
+    pub fn memory_index_mut(&mut self) -> &mut HashMap<String, CacheEntry> {
+        &mut self.memory_index
+    }
+
+    /// Get read access to shared cache
+    pub fn shared_cache(&self) -> &SharedCache {
+        &self.shared_cache
+    }
+
+    /// Get mutable access to shared cache
+    pub fn shared_cache_mut(&mut self) -> &mut SharedCache {
+        &mut self.shared_cache
+    }
+
     /// Get cache statistics
     pub fn stats(&self) -> CacheStats {
         let shared_stats = self.shared_cache.get_stats();

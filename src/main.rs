@@ -1,12 +1,402 @@
 use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{Cli, Commands};
+use debtmap::core::injection::{AppContainer, AppContainerBuilder};
 use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
 use std::path::Path;
+use std::sync::Arc;
+
+// Default implementations for DI container components
+mod default_implementations {
+    use anyhow::Result;
+    use debtmap::core::traits::{
+        Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
+    };
+    use debtmap::core::types::{AnalysisResult, DebtCategory, DebtItem, Severity};
+    use std::collections::HashMap;
+
+    pub struct DefaultDebtScorer;
+
+    impl DefaultDebtScorer {
+        pub fn new() -> Self {
+            Self
+        }
+    }
+
+    impl Scorer for DefaultDebtScorer {
+        type Item = DebtItem;
+
+        fn score(&self, item: &Self::Item) -> f64 {
+            let base_score = match item.category {
+                DebtCategory::Complexity => 10.0,
+                DebtCategory::Testing => 8.0,
+                DebtCategory::Documentation => 6.0,
+                DebtCategory::Organization => 7.0,
+                DebtCategory::Performance => 9.0,
+                DebtCategory::Security => 10.0,
+                DebtCategory::Maintainability => 7.0,
+                _ => 5.0,
+            };
+
+            let severity_multiplier = match item.severity {
+                Severity::Critical => 3.0,
+                Severity::Major => 2.0,
+                Severity::Warning => 1.5,
+                Severity::Info => 1.0,
+            };
+
+            base_score * severity_multiplier * item.effort.max(0.1)
+        }
+
+        fn methodology(&self) -> &str {
+            "Default scoring based on category, severity, and estimated hours"
+        }
+    }
+
+    pub struct DefaultCache {
+        storage: std::sync::Mutex<HashMap<String, Vec<u8>>>,
+        hits: std::sync::atomic::AtomicUsize,
+        misses: std::sync::atomic::AtomicUsize,
+    }
+
+    impl DefaultCache {
+        pub fn new() -> Result<Self> {
+            Ok(Self {
+                storage: std::sync::Mutex::new(HashMap::new()),
+                hits: std::sync::atomic::AtomicUsize::new(0),
+                misses: std::sync::atomic::AtomicUsize::new(0),
+            })
+        }
+    }
+
+    impl Cache for DefaultCache {
+        type Key = String;
+        type Value = Vec<u8>;
+
+        fn get(&self, key: &Self::Key) -> Option<Self::Value> {
+            let storage = self.storage.lock().unwrap();
+            if let Some(value) = storage.get(key) {
+                self.hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                Some(value.clone())
+            } else {
+                self.misses
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                None
+            }
+        }
+
+        fn set(&mut self, key: Self::Key, value: Self::Value) {
+            let mut storage = self.storage.lock().unwrap();
+            storage.insert(key, value);
+        }
+
+        fn clear(&mut self) {
+            let mut storage = self.storage.lock().unwrap();
+            storage.clear();
+            self.hits.store(0, std::sync::atomic::Ordering::Relaxed);
+            self.misses.store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        fn stats(&self) -> CacheStats {
+            let storage = self.storage.lock().unwrap();
+            let memory_usage: usize = storage.values().map(|v| v.len()).sum();
+
+            CacheStats {
+                hits: self.hits.load(std::sync::atomic::Ordering::Relaxed),
+                misses: self.misses.load(std::sync::atomic::Ordering::Relaxed),
+                entries: storage.len(),
+                memory_usage,
+            }
+        }
+    }
+
+    pub struct DefaultConfigProvider {
+        config: std::sync::RwLock<HashMap<String, String>>,
+    }
+
+    impl DefaultConfigProvider {
+        pub fn new() -> Self {
+            let mut config = HashMap::new();
+            // Load default configuration values
+            config.insert("complexity_threshold".to_string(), "10".to_string());
+            config.insert("max_file_size".to_string(), "1000000".to_string());
+            config.insert("enable_caching".to_string(), "true".to_string());
+            config.insert("parallel_processing".to_string(), "true".to_string());
+
+            Self {
+                config: std::sync::RwLock::new(config),
+            }
+        }
+    }
+
+    impl ConfigProvider for DefaultConfigProvider {
+        fn get(&self, key: &str) -> Option<String> {
+            let config = self.config.read().unwrap();
+            config.get(key).cloned()
+        }
+
+        fn set(&mut self, key: String, value: String) {
+            let mut config = self.config.write().unwrap();
+            config.insert(key, value);
+        }
+
+        fn load_from_file(&self, _path: &std::path::Path) -> Result<()> {
+            // In production, would read from actual config file
+            // For now, just return Ok to satisfy the trait
+            Ok(())
+        }
+    }
+
+    pub struct DefaultPriorityCalculator;
+
+    impl DefaultPriorityCalculator {
+        pub fn new() -> Self {
+            Self
+        }
+    }
+
+    impl PriorityCalculator for DefaultPriorityCalculator {
+        type Item = DebtItem;
+
+        fn calculate_priority(&self, item: &Self::Item) -> f64 {
+            let severity_weight = match item.severity {
+                Severity::Critical => 1.0,
+                Severity::Major => 0.75,
+                Severity::Warning => 0.5,
+                Severity::Info => 0.25,
+            };
+
+            let category_weight = match item.category {
+                DebtCategory::Complexity => 0.9,
+                DebtCategory::Testing => 0.85,
+                DebtCategory::Performance => 0.8,
+                DebtCategory::Organization => 0.7,
+                DebtCategory::Documentation => 0.6,
+                DebtCategory::Security => 0.95,
+                _ => 0.5,
+            };
+
+            let effort_factor = 1.0 / (1.0 + item.effort);
+
+            f64::min(
+                severity_weight * 0.5 + category_weight * 0.3 + effort_factor * 0.2,
+                1.0,
+            )
+        }
+
+        fn get_factors(&self, item: &Self::Item) -> Vec<PriorityFactor> {
+            vec![
+                PriorityFactor {
+                    name: "severity".to_string(),
+                    weight: 0.5,
+                    value: match item.severity {
+                        Severity::Critical => 1.0,
+                        Severity::Major => 0.75,
+                        Severity::Warning => 0.5,
+                        Severity::Info => 0.25,
+                    },
+                    description: format!("Severity: {:?}", item.severity),
+                },
+                PriorityFactor {
+                    name: "category".to_string(),
+                    weight: 0.3,
+                    value: match item.category {
+                        DebtCategory::Complexity => 0.9,
+                        DebtCategory::Testing => 0.85,
+                        _ => 0.5,
+                    },
+                    description: format!("Category: {:?}", item.category),
+                },
+                PriorityFactor {
+                    name: "effort".to_string(),
+                    weight: 0.2,
+                    value: 1.0 / (1.0 + item.effort),
+                    description: format!("Estimated effort: {} hours", item.effort),
+                },
+            ]
+        }
+    }
+
+    pub struct JsonFormatter;
+
+    impl JsonFormatter {
+        pub fn new() -> Self {
+            Self
+        }
+    }
+
+    impl Formatter for JsonFormatter {
+        type Report = AnalysisResult;
+
+        fn format(&self, report: &Self::Report) -> Result<String> {
+            serde_json::to_string_pretty(report)
+                .map_err(|e| anyhow::anyhow!("JSON formatting error: {}", e))
+        }
+
+        fn format_name(&self) -> &str {
+            "json"
+        }
+    }
+
+    pub struct MarkdownFormatter;
+
+    impl MarkdownFormatter {
+        pub fn new() -> Self {
+            Self
+        }
+    }
+
+    impl Formatter for MarkdownFormatter {
+        type Report = AnalysisResult;
+
+        fn format(&self, report: &Self::Report) -> Result<String> {
+            let mut output = String::new();
+            output.push_str("# Code Analysis Report\n\n");
+            output.push_str("## Summary\n\n");
+            output.push_str(&format!("- Total Files: {}\n", report.metrics.total_files));
+            output.push_str(&format!(
+                "- Total Functions: {}\n",
+                report.metrics.total_functions
+            ));
+            output.push_str(&format!("- Total Lines: {}\n", report.metrics.total_lines));
+            output.push_str(&format!(
+                "- Average Complexity: {:.2}\n",
+                report.metrics.average_complexity
+            ));
+            output.push_str(&format!("- Debt Score: {:.2}\n\n", report.total_score));
+
+            if !report.debt_items.is_empty() {
+                output.push_str("## Technical Debt Items\n\n");
+                for item in &report.debt_items {
+                    output.push_str(&format!(
+                        "- **{:?}** ({:?}): {}\n",
+                        item.category, item.severity, item.description
+                    ));
+                }
+            }
+
+            Ok(output)
+        }
+
+        fn format_name(&self) -> &str {
+            "markdown"
+        }
+    }
+
+    pub struct TerminalFormatter;
+
+    impl TerminalFormatter {
+        pub fn new() -> Self {
+            Self
+        }
+    }
+
+    impl Formatter for TerminalFormatter {
+        type Report = AnalysisResult;
+
+        fn format(&self, report: &Self::Report) -> Result<String> {
+            let mut output = String::new();
+            output.push_str("═══════════════════════════════════════\n");
+            output.push_str("         Code Analysis Report          \n");
+            output.push_str("═══════════════════════════════════════\n\n");
+
+            output.push_str(&format!(
+                "Total Files:      {}\n",
+                report.metrics.total_files
+            ));
+            output.push_str(&format!(
+                "Total Functions:  {}\n",
+                report.metrics.total_functions
+            ));
+            output.push_str(&format!(
+                "Total Lines:      {}\n",
+                report.metrics.total_lines
+            ));
+            output.push_str(&format!(
+                "Avg Complexity:   {:.2}\n",
+                report.metrics.average_complexity
+            ));
+            output.push_str(&format!("Debt Score:       {:.2}\n", report.total_score));
+
+            if !report.debt_items.is_empty() {
+                output.push_str("\n───────────────────────────────────────\n");
+                output.push_str("Technical Debt Summary:\n");
+                output.push_str(&format!("  {} items found\n", report.debt_items.len()));
+
+                // Create severity counts
+                let mut critical_count = 0;
+                let mut major_count = 0;
+                let mut warning_count = 0;
+                let mut info_count = 0;
+
+                for item in &report.debt_items {
+                    match item.severity {
+                        Severity::Critical => critical_count += 1,
+                        Severity::Major => major_count += 1,
+                        Severity::Warning => warning_count += 1,
+                        Severity::Info => info_count += 1,
+                    }
+                }
+
+                if critical_count > 0 {
+                    output.push_str(&format!("  Critical: {}\n", critical_count));
+                }
+                if major_count > 0 {
+                    output.push_str(&format!("  Major: {}\n", major_count));
+                }
+                if warning_count > 0 {
+                    output.push_str(&format!("  Warning: {}\n", warning_count));
+                }
+                if info_count > 0 {
+                    output.push_str(&format!("  Info: {}\n", info_count));
+                }
+            }
+
+            Ok(output)
+        }
+
+        fn format_name(&self) -> &str {
+            "terminal"
+        }
+    }
+}
+
+// Create and configure the dependency injection container
+fn create_app_container() -> Result<AppContainer> {
+    use default_implementations::*;
+
+    // Build the container with all required dependencies
+    // We need to create instances directly since the factory returns Box<dyn Analyzer>
+    // But our AppContainerBuilder expects concrete types implementing the new trait
+    use debtmap::core::injection::{
+        JavaScriptAnalyzerAdapter, PythonAnalyzerAdapter, RustAnalyzerAdapter,
+        TypeScriptAnalyzerAdapter,
+    };
+
+    let container = AppContainerBuilder::new()
+        .with_rust_analyzer(RustAnalyzerAdapter::new())
+        .with_python_analyzer(PythonAnalyzerAdapter::new())
+        .with_js_analyzer(JavaScriptAnalyzerAdapter::new())
+        .with_ts_analyzer(TypeScriptAnalyzerAdapter::new())
+        .with_debt_scorer(DefaultDebtScorer::new())
+        .with_cache(DefaultCache::new()?)
+        .with_config(DefaultConfigProvider::new())
+        .with_priority_calculator(DefaultPriorityCalculator::new())
+        .with_json_formatter(JsonFormatter::new())
+        .with_markdown_formatter(MarkdownFormatter::new())
+        .with_terminal_formatter(TerminalFormatter::new())
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to build container: {}", e))?;
+
+    Ok(container)
+}
 
 // Main orchestrator function
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // Create the dependency injection container once at startup
+    let _container = Arc::new(create_app_container()?);
 
     match cli.command {
         command @ Commands::Analyze { .. } => handle_analyze_command(command)?,

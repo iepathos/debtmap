@@ -87,6 +87,8 @@ env_logger = "0.11"
 petgraph = "0.8"
 
 [dev-dependencies]
+# Dependency analysis tools
+cargo-modules = "0.17"
 # Testing
 proptest = "1.4"
 pretty_assertions = "1.4"
