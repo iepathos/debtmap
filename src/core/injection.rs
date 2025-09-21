@@ -211,12 +211,12 @@ impl AnalyzerFactory {
 }
 
 /// Adapter for Rust analyzer to implement Analyzer trait
-struct RustAnalyzerAdapter {
+pub struct RustAnalyzerAdapter {
     inner: crate::analyzers::rust::RustAnalyzer,
 }
 
 impl RustAnalyzerAdapter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: crate::analyzers::rust::RustAnalyzer::new(),
         }
@@ -276,12 +276,12 @@ impl Analyzer for RustAnalyzerAdapter {
 }
 
 /// Adapter for Python analyzer to implement Analyzer trait
-struct PythonAnalyzerAdapter {
+pub struct PythonAnalyzerAdapter {
     inner: crate::analyzers::python::PythonAnalyzer,
 }
 
 impl PythonAnalyzerAdapter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: crate::analyzers::python::PythonAnalyzer::new(),
         }
@@ -341,10 +341,10 @@ impl Analyzer for PythonAnalyzerAdapter {
 }
 
 /// Adapter for JavaScript analyzer to implement Analyzer trait
-struct JavaScriptAnalyzerAdapter;
+pub struct JavaScriptAnalyzerAdapter;
 
 impl JavaScriptAnalyzerAdapter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 }
@@ -374,10 +374,10 @@ impl Analyzer for JavaScriptAnalyzerAdapter {
 }
 
 /// Adapter for TypeScript analyzer to implement Analyzer trait
-struct TypeScriptAnalyzerAdapter;
+pub struct TypeScriptAnalyzerAdapter;
 
 impl TypeScriptAnalyzerAdapter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 }
