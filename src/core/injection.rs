@@ -479,9 +479,7 @@ impl ServiceLocator {
 mod tests {
     use super::*;
     use crate::core::traits::PriorityFactor;
-    use crate::core::types::{
-        DebtCategory, DebtItem, Language, ModuleInfo,
-    };
+    use crate::core::types::{DebtCategory, DebtItem, Language, ModuleInfo};
 
     // Mock implementations for testing
     struct MockAnalyzer {
@@ -492,7 +490,7 @@ mod tests {
         type Input = String;
         type Output = ModuleInfo;
 
-        fn analyze(&self, input: Self::Input) -> anyhow::Result<Self::Output> {
+        fn analyze(&self, _input: Self::Input) -> anyhow::Result<Self::Output> {
             Ok(ModuleInfo {
                 name: "test_module".to_string(),
                 language: self.language,
