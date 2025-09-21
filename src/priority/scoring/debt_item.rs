@@ -2108,6 +2108,124 @@ mod tests {
     }
 
     #[test]
+    fn test_has_testing_gap() {
+        // Coverage below 20% and not a test = testing gap
+        assert!(has_testing_gap(0.1, false));
+        assert!(has_testing_gap(0.19, false));
+
+        // Coverage at or above 20% = no testing gap
+        assert!(!has_testing_gap(0.2, false));
+        assert!(!has_testing_gap(0.5, false));
+
+        // Test functions never have testing gaps
+        assert!(!has_testing_gap(0.0, true));
+        assert!(!has_testing_gap(0.1, true));
+    }
+
+    #[test]
+    fn test_is_complexity_hotspot_by_metrics() {
+        // High cyclomatic complexity
+        assert!(is_complexity_hotspot_by_metrics(6, 3));
+        assert!(is_complexity_hotspot_by_metrics(10, 5));
+
+        // High cognitive complexity
+        assert!(is_complexity_hotspot_by_metrics(3, 9));
+        assert!(is_complexity_hotspot_by_metrics(4, 15));
+
+        // Both low = not a hotspot
+        assert!(!is_complexity_hotspot_by_metrics(5, 8));
+        assert!(!is_complexity_hotspot_by_metrics(3, 5));
+        assert!(!is_complexity_hotspot_by_metrics(0, 0));
+    }
+
+    #[test]
+    fn test_classify_test_debt() {
+        let test_func = FunctionMetrics {
+            name: "test_something".to_string(),
+            file: std::path::PathBuf::from("tests/test.rs"),
+            line: 10,
+            length: 20,
+            cyclomatic: 4,
+            cognitive: 6,
+            nesting: 1,
+            visibility: Some("pub".to_string()),
+            is_test: true,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.3),
+            detected_patterns: None,
+        };
+
+        let debt = classify_test_debt(&test_func);
+        match debt {
+            DebtType::TestingGap { coverage, cyclomatic, cognitive } => {
+                assert_float_eq(coverage, 0.0, 0.01);
+                assert_eq!(cyclomatic, 4);
+                assert_eq!(cognitive, 6);
+            }
+            _ => panic!("Expected TestingGap debt type for test function"),
+        }
+    }
+
+    #[test]
+    fn test_check_enhanced_complexity_hotspot() {
+        let complex_func = FunctionMetrics {
+            name: "complex_func".to_string(),
+            file: std::path::PathBuf::from("src/complex.rs"),
+            line: 1,
+            length: 50,
+            cyclomatic: 10,
+            cognitive: 12,
+            nesting: 3,
+            visibility: Some("pub".to_string()),
+            is_test: false,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.5),
+            detected_patterns: None,
+        };
+
+        let debt = check_enhanced_complexity_hotspot(&complex_func);
+        assert!(debt.is_some());
+
+        match debt.unwrap() {
+            DebtType::ComplexityHotspot { cyclomatic, cognitive } => {
+                assert_eq!(cyclomatic, 10);
+                assert_eq!(cognitive, 12);
+            }
+            _ => panic!("Expected ComplexityHotspot debt type"),
+        }
+    }
+
+    #[test]
+    fn test_check_enhanced_complexity_hotspot_simple() {
+        let simple_func = FunctionMetrics {
+            name: "simple_func".to_string(),
+            file: std::path::PathBuf::from("src/simple.rs"),
+            line: 1,
+            length: 10,
+            cyclomatic: 2,
+            cognitive: 3,
+            nesting: 1,
+            visibility: Some("pub".to_string()),
+            is_test: false,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(true),
+            purity_confidence: Some(0.9),
+            detected_patterns: None,
+        };
+
+        let debt = check_enhanced_complexity_hotspot(&simple_func);
+        assert!(debt.is_none());
+    }
+
+    #[test]
     fn test_calculate_needed_test_cases_partial_coverage() {
         // When 50% covered, ideal is 7, current is 3.5 ≈ 4, needed is 3
         assert_eq!(calculate_needed_test_cases(10, 0.5), 3);

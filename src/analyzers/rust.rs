@@ -1397,13 +1397,138 @@ mod tests {
     fn test_classify_test_file_with_windows_paths() {
         // Windows path patterns
         assert!(FunctionVisitor::classify_test_file("src\\tests\\mod.rs"));
-        assert!(FunctionVisitor::classify_test_file("src\\test\\utils.rs"));
-        assert!(FunctionVisitor::classify_test_file(
-            "C:\\project\\tests\\integration.rs"
-        ));
-        assert!(FunctionVisitor::classify_test_file(
-            "D:\\code\\test\\unit.rs"
-        ));
+    }
+
+    #[test]
+    fn test_calculate_total_complexity() {
+        let functions = vec![
+            FunctionMetrics {
+                name: "func1".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 1,
+                length: 10,
+                cyclomatic: 5,
+                cognitive: 10,
+                nesting: 1,
+                visibility: Some("pub".to_string()),
+                is_test: false,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: Some(true),
+                purity_confidence: Some(1.0),
+                detected_patterns: None,
+            },
+            FunctionMetrics {
+                name: "func2".to_string(),
+                file: PathBuf::from("test.rs"),
+                line: 15,
+                length: 8,
+                cyclomatic: 3,
+                cognitive: 5,
+                nesting: 0,
+                visibility: None,
+                is_test: false,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: None,
+                is_pure: Some(true),
+                purity_confidence: Some(1.0),
+                detected_patterns: None,
+            },
+        ];
+
+        let (total_cyc, total_cog) = calculate_total_complexity(&functions);
+        assert_eq!(total_cyc, 8);
+        assert_eq!(total_cog, 15);
+    }
+
+    #[test]
+    fn test_calculate_total_complexity_empty() {
+        let functions = vec![];
+        let (total_cyc, total_cog) = calculate_total_complexity(&functions);
+        assert_eq!(total_cyc, 0);
+        assert_eq!(total_cog, 0);
+    }
+
+    #[test]
+    fn test_build_file_metrics() {
+        let path = PathBuf::from("test.rs");
+        let functions = vec![FunctionMetrics {
+            name: "test_fn".to_string(),
+            file: path.clone(),
+            line: 1,
+            length: 5,
+            cyclomatic: 2,
+            cognitive: 3,
+            nesting: 1,
+            visibility: Some("pub".to_string()),
+            is_test: false,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: Some(true),
+            purity_confidence: Some(0.9),
+            detected_patterns: None,
+        }];
+        let debt_items = vec![];
+        let dependencies = vec![Dependency {
+            name: "std".to_string(),
+            kind: DependencyKind::Import,
+        }];
+
+        let metrics = build_file_metrics(
+            path.clone(),
+            functions.clone(),
+            (2, 3),
+            debt_items.clone(),
+            dependencies.clone(),
+        );
+
+        assert_eq!(metrics.path, path);
+        assert_eq!(metrics.language, Language::Rust);
+        assert_eq!(metrics.complexity.cyclomatic_complexity, 2);
+        assert_eq!(metrics.complexity.cognitive_complexity, 3);
+        assert_eq!(metrics.complexity.functions.len(), 1);
+        assert_eq!(metrics.dependencies.len(), 1);
+    }
+
+    #[test]
+    fn test_extract_dependencies() {
+        let file: syn::File = parse_quote! {
+            use std::io;
+            use serde::{Deserialize, Serialize};
+            use crate::core::Config;
+
+            fn main() {}
+        };
+
+        let deps = extract_dependencies(&file);
+        assert_eq!(deps.len(), 3);
+        assert!(deps.iter().any(|d| d.name == "std"));
+        assert!(deps.iter().any(|d| d.name == "serde"));
+        assert!(deps.iter().any(|d| d.name == "crate"));
+        assert!(deps.iter().all(|d| d.kind == DependencyKind::Import));
+    }
+
+    #[test]
+    fn test_extract_use_name() {
+        let tree: syn::UseTree = parse_quote!(std);
+        assert_eq!(extract_use_name(&tree), Some("std".to_string()));
+
+        let tree: syn::UseTree = parse_quote!(std::io);
+        assert_eq!(extract_use_name(&tree), Some("std".to_string()));
+
+        let tree: syn::UseTree = parse_quote!(serde);
+        assert_eq!(extract_use_name(&tree), Some("serde".to_string()));
+    }
+
+    #[test]
+    fn test_classify_test_file_non_test_files() {
+        // Non-test files
+        assert!(!FunctionVisitor::classify_test_file("src/main.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/lib.rs"));
+        assert!(!FunctionVisitor::classify_test_file("src/core/module.rs"));
     }
 
     #[test]

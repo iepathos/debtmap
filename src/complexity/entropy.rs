@@ -1108,6 +1108,45 @@ mod tests {
     }
 
     #[test]
+    fn test_build_entropy_score() {
+        // Test the pure function for building entropy scores
+        let score = EntropyAnalyzer::build_entropy_score(
+            0.7,  // entropy
+            0.3,  // patterns
+            0.4,  // similarity
+            10,   // unique_vars
+            3,    // max_nesting
+        );
+
+        assert_float_eq(score.token_entropy, 0.7, 1e-10);
+        assert_float_eq(score.pattern_repetition, 0.3, 1e-10);
+        assert_float_eq(score.branch_similarity, 0.4, 1e-10);
+        assert_eq!(score.unique_variables, 10);
+        assert_eq!(score.max_nesting, 3);
+
+        // Check effective complexity calculation using the actual formula
+        // base_simplicity = (1.0 - entropy) * repetition = (1.0 - 0.7) * 0.3 = 0.09
+        // simplicity_factor = base_simplicity * (0.5 + similarity * 0.5) = 0.09 * (0.5 + 0.4 * 0.5) = 0.09 * 0.7 = 0.063
+        // effective = 1.0 - (simplicity_factor * 0.9) = 1.0 - (0.063 * 0.9) = 1.0 - 0.0567 = 0.9433
+        let expected_effective = 0.9433;
+        assert_float_eq(score.effective_complexity, expected_effective, 0.01);
+    }
+
+    #[test]
+    fn test_build_entropy_score_edge_cases() {
+        // Test with all zeros
+        let score = EntropyAnalyzer::build_entropy_score(0.0, 0.0, 0.0, 0, 0);
+        assert_float_eq(score.token_entropy, 0.0, 1e-10);
+        assert_float_eq(score.effective_complexity, 1.0, 0.01);
+
+        // Test with all max values
+        let score = EntropyAnalyzer::build_entropy_score(1.0, 1.0, 1.0, 100, 10);
+        assert_float_eq(score.token_entropy, 1.0, 1e-10);
+        assert_float_eq(score.pattern_repetition, 1.0, 1e-10);
+        assert_float_eq(score.branch_similarity, 1.0, 1e-10);
+    }
+
+    #[test]
     fn test_entropy_dampening() {
         // Test with low entropy that triggers dampening per spec 68
         let entropy_score = EntropyScore {
