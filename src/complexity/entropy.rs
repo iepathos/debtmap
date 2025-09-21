@@ -114,30 +114,44 @@ impl EntropyAnalyzer {
     /// Calculate entropy score for a function block
     pub fn calculate_entropy(&mut self, block: &Block) -> EntropyScore {
         let entropy_config = crate::config::get_entropy_config();
-        let use_classification =
-            entropy_config.enabled && entropy_config.use_classification.unwrap_or(false);
 
-        let (_tokens, entropy) = if use_classification {
-            let classified = self.extract_classified_tokens(block);
-            let weighted_entropy = self.weighted_shannon_entropy(&classified);
-            (
-                classified
-                    .into_iter()
-                    .map(TokenType::from_classified)
-                    .collect(),
-                weighted_entropy,
-            )
-        } else {
-            let tokens = self.extract_tokens(block);
-            let entropy = self.shannon_entropy(&tokens);
-            (tokens, entropy)
-        };
-
+        // Extract pure computation steps
+        let entropy = self.compute_token_entropy(block, &entropy_config);
         let patterns = self.detect_pattern_repetition(block);
         let similarity = self.calculate_branch_similarity(block);
         let (unique_vars, max_nesting) = self.analyze_code_structure(block);
-        let effective = self.adjust_complexity(entropy, patterns, similarity);
-        let dampening = self.calculate_dampening_factor(entropy, patterns, similarity);
+
+        // Compose final score using pure functions
+        Self::build_entropy_score(entropy, patterns, similarity, unique_vars, max_nesting)
+    }
+
+    /// Pure function to compute token entropy based on configuration
+    fn compute_token_entropy(
+        &mut self,
+        block: &Block,
+        config: &crate::config::EntropyConfig,
+    ) -> f64 {
+        let use_classification = config.enabled && config.use_classification.unwrap_or(false);
+
+        if use_classification {
+            let classified = self.extract_classified_tokens(block);
+            self.weighted_shannon_entropy(&classified)
+        } else {
+            let tokens = self.extract_tokens(block);
+            self.shannon_entropy(&tokens)
+        }
+    }
+
+    /// Pure function to build entropy score from components
+    fn build_entropy_score(
+        entropy: f64,
+        patterns: f64,
+        similarity: f64,
+        unique_vars: usize,
+        max_nesting: u32,
+    ) -> EntropyScore {
+        let effective = Self::compute_effective_complexity(entropy, patterns, similarity);
+        let dampening = Self::compute_dampening_factor(entropy, patterns, similarity);
 
         EntropyScore {
             token_entropy: entropy,
@@ -148,6 +162,37 @@ impl EntropyAnalyzer {
             max_nesting,
             dampening_applied: dampening,
         }
+    }
+
+    /// Pure function to compute effective complexity
+    fn compute_effective_complexity(entropy: f64, repetition: f64, similarity: f64) -> f64 {
+        let base_simplicity = (1.0 - entropy) * repetition;
+        let simplicity_factor = if similarity > 0.0 {
+            base_simplicity * (0.5 + similarity * 0.5)
+        } else {
+            base_simplicity * 0.7
+        };
+        1.0 - (simplicity_factor * 0.9)
+    }
+
+    /// Pure function to compute dampening factor
+    fn compute_dampening_factor(entropy: f64, repetition: f64, similarity: f64) -> f64 {
+        let config = crate::config::get_entropy_config();
+        if !config.enabled {
+            return 1.0;
+        }
+
+        let repetition_factor = Self::calculate_graduated_dampening(
+            repetition,
+            config.pattern_threshold,
+            1.0,
+            0.20,
+            true,
+        );
+        let entropy_factor = Self::calculate_graduated_dampening(entropy, 0.4, 0.4, 0.15, false);
+        let branch_factor = Self::calculate_graduated_dampening(similarity, 0.8, 0.2, 0.25, true);
+
+        (repetition_factor * entropy_factor * branch_factor).max(0.7)
     }
 
     /// Calculate entropy score with caching support
@@ -369,52 +414,15 @@ impl EntropyAnalyzer {
     }
 
     /// Adjust complexity based on entropy and pattern analysis
+    #[allow(dead_code)]
     fn adjust_complexity(&self, entropy: f64, repetition: f64, similarity: f64) -> f64 {
-        // High repetition and high similarity = low effective complexity
-        // Low entropy = simple patterns
-
-        // Weight the factors - repetition and entropy are always relevant
-        // Branch similarity is optional (0 when no branches)
-        let base_simplicity = (1.0 - entropy) * repetition;
-
-        // If we have branch similarity, it reinforces the pattern
-        // Otherwise, use base simplicity alone
-        let simplicity_factor = if similarity > 0.0 {
-            base_simplicity * (0.5 + similarity * 0.5)
-        } else {
-            base_simplicity * 0.7 // Reduce impact when no branches
-        };
-
-        // Return effective complexity multiplier (0.1 = very simple, 1.0 = genuinely complex)
-        1.0 - (simplicity_factor * 0.9)
+        Self::compute_effective_complexity(entropy, repetition, similarity)
     }
 
     /// Calculate the dampening factor that will be applied
+    #[cfg_attr(not(test), allow(dead_code))]
     fn calculate_dampening_factor(&self, entropy: f64, repetition: f64, similarity: f64) -> f64 {
-        let config = crate::config::get_entropy_config();
-        if !config.enabled {
-            return 1.0;
-        }
-
-        // Extract pure calculation functions
-        let repetition_factor = Self::calculate_graduated_dampening(
-            repetition,
-            config.pattern_threshold,
-            1.0,
-            0.20,
-            true, // excess when above threshold
-        );
-
-        let entropy_factor = Self::calculate_graduated_dampening(
-            entropy, 0.4, 0.4, 0.15, false, // deficit when below threshold
-        );
-
-        let branch_factor = Self::calculate_graduated_dampening(
-            similarity, 0.8, 0.2, 0.25, true, // excess when above threshold
-        );
-
-        // Combine factors with cap at 30% total reduction
-        (repetition_factor * entropy_factor * branch_factor).max(0.7)
+        Self::compute_dampening_factor(entropy, repetition, similarity)
     }
 
     /// Pure function to calculate graduated dampening factor
@@ -510,6 +518,7 @@ enum LiteralType {
 
 impl TokenType {
     /// Convert from classified token to simple token type for compatibility
+    #[allow(dead_code)]
     fn from_classified(classified: ClassifiedToken) -> Self {
         match classified.class {
             TokenClass::Keyword(s) => TokenType::Keyword(s),
@@ -597,6 +606,13 @@ impl TokenExtractor {
 
 impl<'ast> Visit<'ast> for TokenExtractor {
     fn visit_expr(&mut self, expr: &'ast Expr) {
+        self.handle_expression(expr);
+        syn::visit::visit_expr(self, expr);
+    }
+}
+
+impl TokenExtractor {
+    fn handle_expression(&mut self, expr: &Expr) {
         match expr {
             Expr::If(_) => self.add_keyword("if"),
             Expr::While(_) => self.add_keyword("while"),
@@ -610,146 +626,197 @@ impl<'ast> Visit<'ast> for TokenExtractor {
             Expr::Async(_) => self.add_keyword("async"),
             Expr::Await(_) => self.add_keyword("await"),
             Expr::Unsafe(_) => self.add_keyword("unsafe"),
-
-            Expr::Binary(binary) => {
-                let op_str = match &binary.op {
-                    syn::BinOp::Add(_) => "+",
-                    syn::BinOp::Sub(_) => "-",
-                    syn::BinOp::Mul(_) => "*",
-                    syn::BinOp::Div(_) => "/",
-                    syn::BinOp::Rem(_) => "%",
-                    syn::BinOp::And(_) => "&&",
-                    syn::BinOp::Or(_) => "||",
-                    syn::BinOp::Eq(_) => "==",
-                    syn::BinOp::Ne(_) => "!=",
-                    syn::BinOp::Lt(_) => "<",
-                    syn::BinOp::Le(_) => "<=",
-                    syn::BinOp::Gt(_) => ">",
-                    syn::BinOp::Ge(_) => ">=",
-                    _ => "op",
-                };
-                self.add_operator(op_str);
-            }
-
-            Expr::Path(path) => {
-                if let Some(segment) = path.path.segments.last() {
-                    self.add_identifier(&segment.ident.to_string());
-                }
-            }
-
-            Expr::Lit(lit) => {
-                let lit_type = match &lit.lit {
-                    syn::Lit::Str(_) => LiteralType::String,
-                    syn::Lit::Int(_) | syn::Lit::Float(_) => LiteralType::Number,
-                    syn::Lit::Bool(_) => LiteralType::Bool,
-                    syn::Lit::Char(_) => LiteralType::Char,
-                    _ => LiteralType::String,
-                };
-                self.tokens.push(TokenType::Literal(lit_type));
-            }
-
+            Expr::Binary(binary) => self.handle_binary_expr(binary),
+            Expr::Path(path) => self.handle_path_expr(path),
+            Expr::Lit(lit) => self.handle_literal(lit),
             _ => {}
         }
+    }
 
-        syn::visit::visit_expr(self, expr);
+    fn handle_binary_expr(&mut self, binary: &syn::ExprBinary) {
+        let op_str = binary_op_to_str(&binary.op);
+        self.add_operator(op_str);
+    }
+
+    fn handle_path_expr(&mut self, path: &syn::ExprPath) {
+        if let Some(segment) = path.path.segments.last() {
+            self.add_identifier(&segment.ident.to_string());
+        }
+    }
+
+    fn handle_literal(&mut self, lit: &syn::ExprLit) {
+        let lit_type = classify_literal(&lit.lit);
+        self.tokens.push(TokenType::Literal(lit_type));
+    }
+}
+
+fn binary_op_to_str(op: &syn::BinOp) -> &'static str {
+    match op {
+        syn::BinOp::Add(_) => "+",
+        syn::BinOp::Sub(_) => "-",
+        syn::BinOp::Mul(_) => "*",
+        syn::BinOp::Div(_) => "/",
+        syn::BinOp::Rem(_) => "%",
+        syn::BinOp::And(_) => "&&",
+        syn::BinOp::Or(_) => "||",
+        syn::BinOp::Eq(_) => "==",
+        syn::BinOp::Ne(_) => "!=",
+        syn::BinOp::Lt(_) => "<",
+        syn::BinOp::Le(_) => "<=",
+        syn::BinOp::Gt(_) => ">",
+        syn::BinOp::Ge(_) => ">=",
+        _ => "op",
+    }
+}
+
+fn classify_literal(lit: &syn::Lit) -> LiteralType {
+    match lit {
+        syn::Lit::Str(_) => LiteralType::String,
+        syn::Lit::Int(_) | syn::Lit::Float(_) => LiteralType::Number,
+        syn::Lit::Bool(_) => LiteralType::Bool,
+        syn::Lit::Char(_) => LiteralType::Char,
+        _ => LiteralType::String,
     }
 }
 
 impl<'ast> Visit<'ast> for ClassifiedTokenExtractor<'ast> {
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        match expr {
-            Expr::If(_) => self.add_token("if", false, false, NodeType::Statement),
-            Expr::While(_) => self.add_token("while", false, false, NodeType::Statement),
-            Expr::ForLoop(_) => self.add_token("for", false, false, NodeType::Statement),
-            Expr::Loop(_) => self.add_token("loop", false, false, NodeType::Statement),
-            Expr::Match(_) => self.add_token("match", false, false, NodeType::Statement),
-            Expr::Return(_) => self.add_token("return", false, false, NodeType::Statement),
-            Expr::Break(_) => self.add_token("break", false, false, NodeType::Statement),
-            Expr::Continue(_) => self.add_token("continue", false, false, NodeType::Statement),
-            Expr::Try(_) => self.add_token("try", false, false, NodeType::Statement),
-            Expr::Async(_) => self.add_token("async", false, false, NodeType::Expression),
-            Expr::Await(_) => self.add_token("await", false, false, NodeType::Expression),
-            Expr::Unsafe(_) => self.add_token("unsafe", false, false, NodeType::Block),
-
-            Expr::MethodCall(method) => {
-                self.add_token(
-                    &method.method.to_string(),
-                    true,
-                    false,
-                    NodeType::Expression,
-                );
-                syn::visit::visit_expr(self, expr);
-                return;
-            }
-
-            Expr::Field(field) => {
-                if let syn::Member::Named(ident) = &field.member {
-                    self.add_token(&ident.to_string(), false, true, NodeType::Expression);
-                }
-                syn::visit::visit_expr(self, expr);
-                return;
-            }
-
-            Expr::Path(path) => {
-                if let Some(segment) = path.path.segments.last() {
-                    self.add_token(
-                        &segment.ident.to_string(),
-                        false,
-                        false,
-                        NodeType::Expression,
-                    );
-                }
-            }
-
-            Expr::Binary(binary) => {
-                let op_str = match &binary.op {
-                    syn::BinOp::Add(_) => "+",
-                    syn::BinOp::Sub(_) => "-",
-                    syn::BinOp::Mul(_) => "*",
-                    syn::BinOp::Div(_) => "/",
-                    syn::BinOp::Rem(_) => "%",
-                    syn::BinOp::And(_) => "&&",
-                    syn::BinOp::Or(_) => "||",
-                    syn::BinOp::Eq(_) => "==",
-                    syn::BinOp::Ne(_) => "!=",
-                    syn::BinOp::Lt(_) => "<",
-                    syn::BinOp::Le(_) => "<=",
-                    syn::BinOp::Gt(_) => ">",
-                    syn::BinOp::Ge(_) => ">=",
-                    _ => "op",
-                };
-                self.add_token(op_str, false, false, NodeType::Expression);
-            }
-
-            Expr::Lit(lit) => {
-                let lit_str = match &lit.lit {
-                    syn::Lit::Str(_) => "\"string\"",
-                    syn::Lit::Int(i) => &i.to_string(),
-                    syn::Lit::Float(f) => &f.to_string(),
-                    syn::Lit::Bool(b) => {
-                        if b.value() {
-                            "true"
-                        } else {
-                            "false"
-                        }
-                    }
-                    syn::Lit::Char(_) => "'c'",
-                    _ => "literal",
-                };
-                self.add_token(lit_str, false, false, NodeType::Expression);
-            }
-
-            Expr::Block(_) => {
-                self.scope_depth += 1;
-                syn::visit::visit_expr(self, expr);
-                self.scope_depth -= 1;
-                return;
-            }
-
-            _ => {}
+        if self.handle_classified_expression(expr) {
+            return;
         }
-
         syn::visit::visit_expr(self, expr);
+    }
+}
+
+impl<'ast> ClassifiedTokenExtractor<'ast> {
+    fn handle_classified_expression(&mut self, expr: &'ast Expr) -> bool {
+        match expr {
+            Expr::If(_)
+            | Expr::While(_)
+            | Expr::ForLoop(_)
+            | Expr::Loop(_)
+            | Expr::Match(_)
+            | Expr::Return(_)
+            | Expr::Break(_)
+            | Expr::Continue(_)
+            | Expr::Try(_) => {
+                self.handle_control_flow_keyword(expr);
+                false
+            }
+            Expr::Async(_) | Expr::Await(_) => {
+                self.handle_async_keyword(expr);
+                false
+            }
+            Expr::Unsafe(_) => {
+                self.add_token("unsafe", false, false, NodeType::Block);
+                false
+            }
+            Expr::MethodCall(method) => {
+                self.handle_method_call(method);
+                syn::visit::visit_expr(self, expr);
+                true
+            }
+            Expr::Field(field) => {
+                self.handle_field_access(field);
+                syn::visit::visit_expr(self, expr);
+                true
+            }
+            Expr::Path(path) => {
+                self.handle_path(path);
+                false
+            }
+            Expr::Binary(binary) => {
+                self.handle_binary_operator(binary);
+                false
+            }
+            Expr::Lit(lit) => {
+                self.handle_literal_token(lit);
+                false
+            }
+            Expr::Block(_) => {
+                self.handle_block_scope(expr);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn handle_control_flow_keyword(&mut self, expr: &Expr) {
+        let keyword = match expr {
+            Expr::If(_) => "if",
+            Expr::While(_) => "while",
+            Expr::ForLoop(_) => "for",
+            Expr::Loop(_) => "loop",
+            Expr::Match(_) => "match",
+            Expr::Return(_) => "return",
+            Expr::Break(_) => "break",
+            Expr::Continue(_) => "continue",
+            Expr::Try(_) => "try",
+            _ => return,
+        };
+        self.add_token(keyword, false, false, NodeType::Statement);
+    }
+
+    fn handle_async_keyword(&mut self, expr: &Expr) {
+        let keyword = match expr {
+            Expr::Async(_) => "async",
+            Expr::Await(_) => "await",
+            _ => return,
+        };
+        self.add_token(keyword, false, false, NodeType::Expression);
+    }
+
+    fn handle_method_call(&mut self, method: &syn::ExprMethodCall) {
+        self.add_token(
+            &method.method.to_string(),
+            true,
+            false,
+            NodeType::Expression,
+        );
+    }
+
+    fn handle_field_access(&mut self, field: &syn::ExprField) {
+        if let syn::Member::Named(ident) = &field.member {
+            self.add_token(&ident.to_string(), false, true, NodeType::Expression);
+        }
+    }
+
+    fn handle_path(&mut self, path: &syn::ExprPath) {
+        if let Some(segment) = path.path.segments.last() {
+            self.add_token(
+                &segment.ident.to_string(),
+                false,
+                false,
+                NodeType::Expression,
+            );
+        }
+    }
+
+    fn handle_binary_operator(&mut self, binary: &syn::ExprBinary) {
+        let op_str = binary_op_to_str(&binary.op);
+        self.add_token(op_str, false, false, NodeType::Expression);
+    }
+
+    fn handle_literal_token(&mut self, lit: &syn::ExprLit) {
+        let lit_str = format_literal_token(&lit.lit);
+        self.add_token(&lit_str, false, false, NodeType::Expression);
+    }
+
+    fn handle_block_scope(&mut self, expr: &'ast Expr) {
+        self.scope_depth += 1;
+        syn::visit::visit_expr(self, expr);
+        self.scope_depth -= 1;
+    }
+}
+
+fn format_literal_token(lit: &syn::Lit) -> String {
+    match lit {
+        syn::Lit::Str(_) => "\"string\"".to_string(),
+        syn::Lit::Int(i) => i.to_string(),
+        syn::Lit::Float(f) => f.to_string(),
+        syn::Lit::Bool(b) => if b.value() { "true" } else { "false" }.to_string(),
+        syn::Lit::Char(_) => "'c'".to_string(),
+        _ => "literal".to_string(),
     }
 }
 
@@ -889,70 +956,69 @@ impl BranchGroup {
 impl<'ast> Visit<'ast> for BranchSimilarityAnalyzer {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         match expr {
-            Expr::Match(match_expr) => {
-                let mut group = BranchGroup::new();
-
-                for arm in &match_expr.arms {
-                    // Extract simplified token sequence from arm body
-                    struct SimpleTokenizer {
-                        tokens: Vec<String>,
-                    }
-
-                    impl<'a> Visit<'a> for SimpleTokenizer {
-                        fn visit_expr(&mut self, e: &'a Expr) {
-                            self.tokens.push(format!("{:?}", std::mem::discriminant(e)));
-                            syn::visit::visit_expr(self, e);
-                        }
-                    }
-
-                    let mut tokenizer = SimpleTokenizer { tokens: Vec::new() };
-                    tokenizer.visit_expr(&arm.body);
-                    group.add_branch(tokenizer.tokens);
-                }
-
-                if group.branches.len() > 1 {
-                    self.branch_groups.push(group);
-                }
-            }
-
-            Expr::If(if_expr) => {
-                let mut group = BranchGroup::new();
-
-                // Then branch
-                let mut then_tokens = Vec::new();
-                for stmt in &if_expr.then_branch.stmts {
-                    then_tokens.push(format!("{:?}", std::mem::discriminant(stmt)));
-                }
-                group.add_branch(then_tokens);
-
-                // Else branch (if exists)
-                if let Some((_, else_expr)) = &if_expr.else_branch {
-                    struct ElseTokenizer {
-                        tokens: Vec<String>,
-                    }
-
-                    impl<'a> Visit<'a> for ElseTokenizer {
-                        fn visit_expr(&mut self, e: &'a Expr) {
-                            self.tokens.push(format!("{:?}", std::mem::discriminant(e)));
-                            syn::visit::visit_expr(self, e);
-                        }
-                    }
-
-                    let mut tokenizer = ElseTokenizer { tokens: Vec::new() };
-                    tokenizer.visit_expr(else_expr);
-                    group.add_branch(tokenizer.tokens);
-                }
-
-                if group.branches.len() > 1 {
-                    self.branch_groups.push(group);
-                }
-            }
-
+            Expr::Match(match_expr) => self.analyze_match_branches(match_expr),
+            Expr::If(if_expr) => self.analyze_if_branches(if_expr),
             _ => {}
         }
-
         syn::visit::visit_expr(self, expr);
     }
+}
+
+impl BranchSimilarityAnalyzer {
+    fn analyze_match_branches(&mut self, match_expr: &syn::ExprMatch) {
+        let mut group = BranchGroup::new();
+
+        for arm in &match_expr.arms {
+            let tokens = extract_expr_tokens(&arm.body);
+            group.add_branch(tokens);
+        }
+
+        if group.branches.len() > 1 {
+            self.branch_groups.push(group);
+        }
+    }
+
+    fn analyze_if_branches(&mut self, if_expr: &syn::ExprIf) {
+        let mut group = BranchGroup::new();
+
+        // Then branch
+        let then_tokens = extract_stmt_tokens(&if_expr.then_branch.stmts);
+        group.add_branch(then_tokens);
+
+        // Else branch (if exists)
+        if let Some((_, else_expr)) = &if_expr.else_branch {
+            let else_tokens = extract_expr_tokens(else_expr);
+            group.add_branch(else_tokens);
+        }
+
+        if group.branches.len() > 1 {
+            self.branch_groups.push(group);
+        }
+    }
+}
+
+fn extract_expr_tokens(expr: &Expr) -> Vec<String> {
+    struct SimpleTokenizer {
+        tokens: Vec<String>,
+    }
+
+    impl<'a> Visit<'a> for SimpleTokenizer {
+        fn visit_expr(&mut self, e: &'a Expr) {
+            self.tokens.push(format!("{:?}", std::mem::discriminant(e)));
+            syn::visit::visit_expr(self, e);
+        }
+    }
+
+    let mut tokenizer = SimpleTokenizer { tokens: Vec::new() };
+    tokenizer.visit_expr(expr);
+    tokenizer.tokens
+}
+
+fn extract_stmt_tokens(stmts: &[syn::Stmt]) -> Vec<String> {
+    stmts
+        .iter()
+        .map(|stmt| format!("{:?}", std::mem::discriminant(stmt)))
+        .collect()
 }
 
 /// Apply entropy-based dampening to complexity scores (spec 68: max 50% reduction)
@@ -989,13 +1055,19 @@ mod tests {
     };
     use syn::parse_quote;
 
+    fn assert_float_eq(left: f64, right: f64, epsilon: f64) {
+        if (left - right).abs() > epsilon {
+            panic!("assertion failed: `(left == right)`\n  left: `{}`,\n right: `{}`\n  diff: `{}`\nepsilon: `{}`", left, right, (left - right).abs(), epsilon);
+        }
+    }
+
     #[test]
     fn test_shannon_entropy_calculation() {
         let analyzer = EntropyAnalyzer::new();
 
         // All same tokens = 0 entropy
         let uniform_tokens = vec![TokenType::Keyword("if".to_string()); 10];
-        assert_eq!(analyzer.shannon_entropy(&uniform_tokens), 0.0);
+        assert_float_eq(analyzer.shannon_entropy(&uniform_tokens), 0.0, 1e-10);
 
         // Mixed tokens = higher entropy
         let mixed_tokens = vec![
@@ -1040,6 +1112,45 @@ mod tests {
 
         let similarity = analyzer.calculate_branch_similarity(&block);
         assert!(similarity > 0.0); // Should detect some similarity
+    }
+
+    #[test]
+    fn test_build_entropy_score() {
+        // Test the pure function for building entropy scores
+        let score = EntropyAnalyzer::build_entropy_score(
+            0.7, // entropy
+            0.3, // patterns
+            0.4, // similarity
+            10,  // unique_vars
+            3,   // max_nesting
+        );
+
+        assert_float_eq(score.token_entropy, 0.7, 1e-10);
+        assert_float_eq(score.pattern_repetition, 0.3, 1e-10);
+        assert_float_eq(score.branch_similarity, 0.4, 1e-10);
+        assert_eq!(score.unique_variables, 10);
+        assert_eq!(score.max_nesting, 3);
+
+        // Check effective complexity calculation using the actual formula
+        // base_simplicity = (1.0 - entropy) * repetition = (1.0 - 0.7) * 0.3 = 0.09
+        // simplicity_factor = base_simplicity * (0.5 + similarity * 0.5) = 0.09 * (0.5 + 0.4 * 0.5) = 0.09 * 0.7 = 0.063
+        // effective = 1.0 - (simplicity_factor * 0.9) = 1.0 - (0.063 * 0.9) = 1.0 - 0.0567 = 0.9433
+        let expected_effective = 0.9433;
+        assert_float_eq(score.effective_complexity, expected_effective, 0.01);
+    }
+
+    #[test]
+    fn test_build_entropy_score_edge_cases() {
+        // Test with all zeros
+        let score = EntropyAnalyzer::build_entropy_score(0.0, 0.0, 0.0, 0, 0);
+        assert_float_eq(score.token_entropy, 0.0, 1e-10);
+        assert_float_eq(score.effective_complexity, 1.0, 0.01);
+
+        // Test with all max values
+        let score = EntropyAnalyzer::build_entropy_score(1.0, 1.0, 1.0, 100, 10);
+        assert_float_eq(score.token_entropy, 1.0, 1e-10);
+        assert_float_eq(score.pattern_repetition, 1.0, 1e-10);
+        assert_float_eq(score.branch_similarity, 1.0, 1e-10);
     }
 
     #[test]
@@ -1134,7 +1245,7 @@ mod tests {
         // Cache should now have 2 entries
         let stats = analyzer.get_cache_stats();
         assert_eq!(stats.entries, 2);
-        assert_eq!(stats.hit_rate, 1.0 / 3.0);
+        assert_float_eq(stats.hit_rate, 1.0 / 3.0, 1e-10);
 
         // Add third function - should trigger eviction
         let block3: syn::Block = parse_quote! {{
@@ -1250,7 +1361,7 @@ mod tests {
         let analyzer = EntropyAnalyzer::new();
         let tokens = vec![];
         let entropy = analyzer.weighted_shannon_entropy(&tokens);
-        assert_eq!(entropy, 0.0);
+        assert_float_eq(entropy, 0.0, 1e-10);
     }
 
     #[test]
@@ -1269,7 +1380,7 @@ mod tests {
             1.0,
         )];
         let entropy = analyzer.weighted_shannon_entropy(&tokens);
-        assert_eq!(entropy, 0.0);
+        assert_float_eq(entropy, 0.0, 1e-10);
     }
 
     #[test]
@@ -1388,7 +1499,7 @@ mod tests {
         ];
 
         let entropy = analyzer.weighted_shannon_entropy(&tokens);
-        assert_eq!(entropy, 0.0);
+        assert_float_eq(entropy, 0.0, 1e-10);
     }
 
     #[test]
@@ -1555,7 +1666,7 @@ mod tests {
             0.25, // max_reduction
             true, // excess_mode
         );
-        assert_eq!(factor, 1.0);
+        assert_float_eq(factor, 1.0, 1e-10);
 
         // Value at threshold - no dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
@@ -1565,7 +1676,7 @@ mod tests {
             0.25, // max_reduction
             true, // excess_mode
         );
-        assert_eq!(factor, 1.0);
+        assert_float_eq(factor, 1.0, 1e-10);
 
         // Value above threshold - graduated dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
@@ -1585,7 +1696,7 @@ mod tests {
             0.25, // max_reduction
             true, // excess_mode
         );
-        assert_eq!(factor, 0.75); // 1.0 - 0.25
+        assert_float_eq(factor, 0.75, 1e-10); // 1.0 - 0.25
     }
 
     #[test]
@@ -1600,7 +1711,7 @@ mod tests {
             0.15,  // max_reduction
             false, // deficit_mode
         );
-        assert_eq!(factor, 1.0);
+        assert_float_eq(factor, 1.0, 1e-10);
 
         // Value at threshold - no dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
@@ -1610,7 +1721,7 @@ mod tests {
             0.15,  // max_reduction
             false, // deficit_mode
         );
-        assert_eq!(factor, 1.0);
+        assert_float_eq(factor, 1.0, 1e-10);
 
         // Value below threshold - graduated dampening
         let factor = EntropyAnalyzer::calculate_graduated_dampening(
@@ -1630,7 +1741,7 @@ mod tests {
             0.15,  // max_reduction
             false, // deficit_mode
         );
-        assert_eq!(factor, 0.85); // 1.0 - 0.15
+        assert_float_eq(factor, 0.85, 1e-10); // 1.0 - 0.15
     }
 
     #[test]
@@ -1639,7 +1750,7 @@ mod tests {
 
         // Test with all factors at neutral values
         let factor = analyzer.calculate_dampening_factor(0.5, 0.5, 0.5);
-        assert_eq!(factor, 1.0); // No dampening when all values are in neutral range
+        assert_float_eq(factor, 1.0, 1e-10); // No dampening when all values are in neutral range
 
         // Test with high repetition (should dampen)
         let factor = analyzer.calculate_dampening_factor(0.5, 0.9, 0.5);
