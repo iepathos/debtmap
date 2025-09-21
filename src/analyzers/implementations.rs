@@ -173,9 +173,97 @@ impl AnalyzerFactory {
         match language {
             crate::core::Language::Rust => self.create_rust_analyzer(),
             crate::core::Language::Python => self.create_python_analyzer(),
-            crate::core::Language::JavaScript => unimplemented!("JavaScript analyzer"),
-            crate::core::Language::TypeScript => unimplemented!("TypeScript analyzer"),
+            crate::core::Language::JavaScript => Box::new(JavaScriptAnalyzerAdapter::new_javascript().unwrap()),
+            crate::core::Language::TypeScript => Box::new(JavaScriptAnalyzerAdapter::new_typescript().unwrap()),
             crate::core::Language::Unknown => panic!("Cannot create analyzer for unknown language"),
         }
+    }
+}
+
+// ========= Adapter Implementations =========
+// These adapters wrap the existing analyzer implementations
+// to implement the LanguageAnalyzer trait
+
+/// Adapter for RustAnalyzer to implement LanguageAnalyzer
+struct RustAnalyzerAdapter {
+    inner: crate::analyzers::rust::RustAnalyzer,
+}
+
+impl RustAnalyzerAdapter {
+    fn new() -> Self {
+        Self {
+            inner: crate::analyzers::rust::RustAnalyzer::new(),
+        }
+    }
+}
+
+impl LanguageAnalyzer for RustAnalyzerAdapter {
+    fn analyze_file(&self, path: &Path, content: &str) -> Result<crate::core::FileMetrics> {
+        use crate::analyzers::Analyzer;
+        let ast = self.inner.parse(content, path.to_path_buf())?;
+        Ok(self.inner.analyze(&ast))
+    }
+
+    fn language(&self) -> crate::core::Language {
+        crate::core::Language::Rust
+    }
+}
+
+/// Adapter for PythonAnalyzer to implement LanguageAnalyzer
+struct PythonAnalyzerAdapter {
+    inner: crate::analyzers::python::PythonAnalyzer,
+}
+
+impl PythonAnalyzerAdapter {
+    fn new() -> Self {
+        Self {
+            inner: crate::analyzers::python::PythonAnalyzer::new(),
+        }
+    }
+}
+
+impl LanguageAnalyzer for PythonAnalyzerAdapter {
+    fn analyze_file(&self, path: &Path, content: &str) -> Result<crate::core::FileMetrics> {
+        use crate::analyzers::Analyzer;
+        let ast = self.inner.parse(content, path.to_path_buf())?;
+        Ok(self.inner.analyze(&ast))
+    }
+
+    fn language(&self) -> crate::core::Language {
+        crate::core::Language::Python
+    }
+}
+
+/// Adapter for JavaScriptAnalyzer to implement LanguageAnalyzer
+struct JavaScriptAnalyzerAdapter {
+    inner: crate::analyzers::javascript::JavaScriptAnalyzer,
+    language: crate::core::Language,
+}
+
+impl JavaScriptAnalyzerAdapter {
+    fn new_javascript() -> Result<Self> {
+        Ok(Self {
+            inner: crate::analyzers::javascript::JavaScriptAnalyzer::new_javascript()?,
+            language: crate::core::Language::JavaScript,
+        })
+    }
+
+    fn new_typescript() -> Result<Self> {
+        Ok(Self {
+            inner: crate::analyzers::javascript::JavaScriptAnalyzer::new_typescript()?,
+            language: crate::core::Language::TypeScript,
+        })
+    }
+}
+
+impl LanguageAnalyzer for JavaScriptAnalyzerAdapter {
+    fn analyze_file(&self, path: &Path, content: &str) -> Result<crate::core::FileMetrics> {
+        use crate::analyzers::Analyzer;
+        let ast = self.inner.parse(content, path.to_path_buf())?;
+        Ok(self.inner.analyze(&ast))
+    }
+
+    fn language(&self) -> crate::core::Language {
+        self.language
     }
 }

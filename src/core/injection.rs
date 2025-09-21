@@ -1,9 +1,10 @@
 //! Dependency injection container and builder patterns
 
 use crate::core::traits::{
-    Analyzer, Cache, ComplexityCalculator, ConfigProvider, Detector, Formatter, Parser,
-    PriorityCalculator, RefactoringDetector, Repository, Scorer, TestAnalyzer,
+    Analyzer, Cache, ConfigProvider, Formatter, Parser,
+    PriorityCalculator, Scorer,
 };
+use anyhow::Result;
 use std::sync::Arc;
 
 /// Main application container using dependency injection
@@ -207,21 +208,58 @@ impl AnalyzerFactory {
     ) -> Box<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>> {
         match language {
             crate::core::types::Language::Rust => {
-                // Implementation would create actual Rust analyzer
-                unimplemented!("Rust analyzer creation")
+                // Create a simple no-op analyzer for demonstration
+                Box::new(NoOpAnalyzer::new(crate::core::types::Language::Rust))
             }
             crate::core::types::Language::Python => {
-                // Implementation would create actual Python analyzer
-                unimplemented!("Python analyzer creation")
+                // Create a simple no-op analyzer for demonstration
+                Box::new(NoOpAnalyzer::new(crate::core::types::Language::Python))
             }
             crate::core::types::Language::JavaScript => {
-                // Implementation would create actual JS analyzer
-                unimplemented!("JavaScript analyzer creation")
+                // Create a simple no-op analyzer for demonstration
+                Box::new(NoOpAnalyzer::new(crate::core::types::Language::JavaScript))
             }
             crate::core::types::Language::TypeScript => {
-                // Implementation would create actual TS analyzer
-                unimplemented!("TypeScript analyzer creation")
+                // Create a simple no-op analyzer for demonstration
+                Box::new(NoOpAnalyzer::new(crate::core::types::Language::TypeScript))
             }
+        }
+    }
+}
+
+/// Simple no-op analyzer for demonstration purposes
+struct NoOpAnalyzer {
+    language: crate::core::types::Language,
+}
+
+impl NoOpAnalyzer {
+    fn new(language: crate::core::types::Language) -> Self {
+        Self { language }
+    }
+}
+
+impl Analyzer for NoOpAnalyzer {
+    type Input = String;
+    type Output = crate::core::types::ModuleInfo;
+
+    fn analyze(&self, _input: Self::Input) -> anyhow::Result<Self::Output> {
+        // Return a simple module info with minimal data
+        Ok(crate::core::types::ModuleInfo {
+            name: "module".to_string(),
+            language: self.language,
+            path: std::path::PathBuf::from("unknown"),
+            functions: vec![],
+            exports: vec![],
+            imports: vec![],
+        })
+    }
+
+    fn name(&self) -> &str {
+        match self.language {
+            crate::core::types::Language::Rust => "NoOpRustAnalyzer",
+            crate::core::types::Language::Python => "NoOpPythonAnalyzer",
+            crate::core::types::Language::JavaScript => "NoOpJavaScriptAnalyzer",
+            crate::core::types::Language::TypeScript => "NoOpTypeScriptAnalyzer",
         }
     }
 }
