@@ -2061,6 +2061,12 @@ fn calculate_expected_impact(
 mod tests {
     use super::*;
 
+    fn assert_float_eq(left: f64, right: f64, epsilon: f64) {
+        if (left - right).abs() > epsilon {
+            panic!("assertion failed: `(left == right)`\n  left: `{}`,\n right: `{}`\n  diff: `{}`\nepsilon: `{}`", left, right, (left - right).abs(), epsilon);
+        }
+    }
+
     #[test]
     fn test_get_role_display_name() {
         assert_eq!(
@@ -2554,16 +2560,16 @@ mod tests {
     #[test]
     fn test_calculate_coverage_improvement() {
         // Test simple function
-        assert_eq!(calculate_coverage_improvement(0.0, false), 100.0);
-        assert_eq!(calculate_coverage_improvement(0.5, false), 50.0);
-        assert_eq!(calculate_coverage_improvement(0.8, false), 20.0);
-        assert_eq!(calculate_coverage_improvement(1.0, false), 0.0);
+        assert_float_eq(calculate_coverage_improvement(0.0, false), 100.0, 1e-10);
+        assert_float_eq(calculate_coverage_improvement(0.5, false), 50.0, 1e-10);
+        assert_float_eq(calculate_coverage_improvement(0.8, false), 20.0, 1e-10);
+        assert_float_eq(calculate_coverage_improvement(1.0, false), 0.0, 1e-10);
 
         // Test complex function (50% reduction)
-        assert_eq!(calculate_coverage_improvement(0.0, true), 50.0);
-        assert_eq!(calculate_coverage_improvement(0.5, true), 25.0);
-        assert_eq!(calculate_coverage_improvement(0.8, true), 10.0);
-        assert_eq!(calculate_coverage_improvement(1.0, true), 0.0);
+        assert_float_eq(calculate_coverage_improvement(0.0, true), 50.0, 1e-10);
+        assert_float_eq(calculate_coverage_improvement(0.5, true), 25.0, 1e-10);
+        assert_float_eq(calculate_coverage_improvement(0.8, true), 10.0, 1e-10);
+        assert_float_eq(calculate_coverage_improvement(1.0, true), 0.0, 1e-10);
     }
 
     #[test]
