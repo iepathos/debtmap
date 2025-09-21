@@ -318,12 +318,26 @@ struct ComplexityMetricsData {
     cognitive: u32,
 }
 
+/// Complexity metrics for closures
+struct ClosureComplexityMetrics {
+    cyclomatic: u32,
+    cognitive: u32,
+    nesting: u32,
+    length: usize,
+}
+
 struct FunctionContext {
     name: String,
     file: PathBuf,
     line: usize,
     is_trait_method: bool,
     in_test_module: bool,
+}
+
+/// Data structure to hold complete function analysis results
+struct FunctionAnalysisData {
+    metrics: FunctionMetrics,
+    enhanced_analysis: EnhancedFunctionAnalysis,
 }
 
 struct FunctionVisitor {
@@ -407,23 +421,29 @@ impl FunctionVisitor {
         line: usize,
         is_trait_method: bool,
     ) {
-        // Extract basic function metadata
-        let metadata = Self::extract_function_metadata(&name, item_fn);
+        // Create function analysis data using pure functions
+        let analysis_data =
+            self.create_function_analysis_data(&name, item_fn, line, is_trait_method);
 
-        // Calculate complexity metrics
+        // Store results
+        self.enhanced_analysis.push(analysis_data.enhanced_analysis);
+        self.functions.push(analysis_data.metrics);
+    }
+
+    /// Pure function to create complete function analysis data
+    fn create_function_analysis_data(
+        &mut self,
+        name: &str,
+        item_fn: &syn::ItemFn,
+        line: usize,
+        is_trait_method: bool,
+    ) -> FunctionAnalysisData {
+        let metadata = Self::extract_function_metadata(name, item_fn);
         let complexity_metrics = self.calculate_complexity_metrics(&item_fn.block, item_fn);
-
-        // Perform enhanced complexity analysis
         let enhanced_analysis = Self::perform_enhanced_analysis(&item_fn.block);
+        let context = self.create_function_context(name.to_string(), line, is_trait_method);
+        let role = Self::classify_function_role(name, metadata.is_test);
 
-        // Build complete metrics
-        let context = FunctionContext {
-            name: name.clone(),
-            file: self.current_file.clone(),
-            line,
-            is_trait_method,
-            in_test_module: self.in_test_module,
-        };
         let metrics = Self::build_function_metrics(
             context,
             metadata.clone(),
@@ -432,15 +452,29 @@ impl FunctionVisitor {
             item_fn,
         );
 
-        // Determine function role and check if it should be flagged
-        let role = Self::classify_function_role(&name, metadata.is_test);
-
-        // Create and store analysis results
         let analysis_result =
-            self.create_analysis_result(name.clone(), &metrics, role, enhanced_analysis);
+            self.create_analysis_result(name.to_string(), &metrics, role, enhanced_analysis);
 
-        self.enhanced_analysis.push(analysis_result);
-        self.functions.push(metrics);
+        FunctionAnalysisData {
+            metrics,
+            enhanced_analysis: analysis_result,
+        }
+    }
+
+    /// Pure function to create function context
+    fn create_function_context(
+        &self,
+        name: String,
+        line: usize,
+        is_trait_method: bool,
+    ) -> FunctionContext {
+        FunctionContext {
+            name,
+            file: self.current_file.clone(),
+            line,
+            is_trait_method,
+            in_test_module: self.in_test_module,
+        }
     }
 
     // Pure function to extract metadata
@@ -761,81 +795,111 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
     }
 
     fn visit_expr(&mut self, expr: &'ast syn::Expr) {
-        // Also count closures as functions, but only if they're non-trivial
         if let syn::Expr::Closure(closure) = expr {
-            // Convert closure body to a block for analysis
-            let block = match &*closure.body {
-                syn::Expr::Block(expr_block) => expr_block.block.clone(),
-                _ => {
-                    // Wrap single expression in a block
-                    syn::Block {
-                        brace_token: Default::default(),
-                        stmts: vec![syn::Stmt::Expr(*closure.body.clone(), None)],
-                    }
-                }
-            };
-
-            // Calculate metrics first to determine if closure is trivial
-            let cyclomatic = calculate_cyclomatic(&block);
-            let cognitive = calculate_cognitive_syn(&block);
-            let nesting = calculate_nesting(&block);
-            let length = count_lines(&block);
-
-            // Only track substantial closures:
-            // - Cognitive complexity > 1 (has some logic)
-            // - OR length > 1 (multi-line)
-            // - OR cyclomatic > 1 (has branches)
-            if cognitive > 1 || length > 1 || cyclomatic > 1 {
-                let name = if let Some(ref parent) = self.current_function {
-                    format!("{}::<closure@{}>", parent, self.functions.len())
-                } else {
-                    format!("<closure@{}>", self.functions.len())
-                };
-                let line = self.get_line_number(closure.body.span());
-
-                // Calculate entropy score if enabled
-                let entropy_score = if crate::config::get_entropy_config().enabled {
-                    let mut old_analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
-                    let old_score = old_analyzer.calculate_entropy(&block);
-
-                    // Convert old score to new score format
-                    Some(crate::complexity::entropy_core::EntropyScore {
-                        token_entropy: old_score.token_entropy,
-                        pattern_repetition: old_score.pattern_repetition,
-                        branch_similarity: old_score.branch_similarity,
-                        effective_complexity: old_score.effective_complexity,
-                        unique_variables: old_score.unique_variables,
-                        max_nesting: old_score.max_nesting,
-                        dampening_applied: old_score.dampening_applied,
-                    })
-                } else {
-                    None
-                };
-
-                let metrics = FunctionMetrics {
-                    name,
-                    file: self.current_file.clone(),
-                    line,
-                    cyclomatic,
-                    cognitive,
-                    nesting,
-                    length,
-                    is_test: self.in_test_module, // Closures in test modules are test-related
-                    visibility: None,             // Closures are always private
-                    is_trait_method: false,       // Closures are not trait methods
-                    in_test_module: self.in_test_module,
-                    entropy_score,
-                    is_pure: None, // TODO: Add purity detection for closures
-                    purity_confidence: None,
-                    detected_patterns: None, // TODO: Add pattern detection for closures
-                };
-
-                self.functions.push(metrics);
-            }
+            self.analyze_closure(closure);
         }
-
-        // Continue visiting
         syn::visit::visit_expr(self, expr);
+    }
+}
+
+impl FunctionVisitor {
+    /// Analyze closure and add to functions if substantial
+    fn analyze_closure(&mut self, closure: &syn::ExprClosure) {
+        let block = self.convert_closure_to_block(closure);
+        let complexity_metrics = self.calculate_closure_complexity(&block);
+
+        if self.is_substantial_closure(&complexity_metrics) {
+            let metrics = self.build_closure_metrics(closure, &block, &complexity_metrics);
+            self.functions.push(metrics);
+        }
+    }
+
+    /// Convert closure body to a block for analysis
+    fn convert_closure_to_block(&self, closure: &syn::ExprClosure) -> syn::Block {
+        match &*closure.body {
+            syn::Expr::Block(expr_block) => expr_block.block.clone(),
+            _ => syn::Block {
+                brace_token: Default::default(),
+                stmts: vec![syn::Stmt::Expr(*closure.body.clone(), None)],
+            },
+        }
+    }
+
+    /// Calculate complexity metrics for closure
+    fn calculate_closure_complexity(&self, block: &syn::Block) -> ClosureComplexityMetrics {
+        ClosureComplexityMetrics {
+            cyclomatic: calculate_cyclomatic(block),
+            cognitive: calculate_cognitive_syn(block),
+            nesting: calculate_nesting(block),
+            length: count_lines(block),
+        }
+    }
+
+    /// Check if closure is substantial enough to track
+    fn is_substantial_closure(&self, metrics: &ClosureComplexityMetrics) -> bool {
+        metrics.cognitive > 1 || metrics.length > 1 || metrics.cyclomatic > 1
+    }
+
+    /// Build function metrics for closure
+    fn build_closure_metrics(
+        &mut self,
+        closure: &syn::ExprClosure,
+        block: &syn::Block,
+        complexity: &ClosureComplexityMetrics,
+    ) -> FunctionMetrics {
+        let name = self.generate_closure_name();
+        let line = self.get_line_number(closure.body.span());
+        let entropy_score = self.calculate_closure_entropy(block);
+
+        FunctionMetrics {
+            name,
+            file: self.current_file.clone(),
+            line,
+            cyclomatic: complexity.cyclomatic,
+            cognitive: complexity.cognitive,
+            nesting: complexity.nesting,
+            length: complexity.length,
+            is_test: self.in_test_module,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: self.in_test_module,
+            entropy_score,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+        }
+    }
+
+    /// Generate name for closure
+    fn generate_closure_name(&self) -> String {
+        if let Some(ref parent) = self.current_function {
+            format!("{}::<closure@{}>", parent, self.functions.len())
+        } else {
+            format!("<closure@{}>", self.functions.len())
+        }
+    }
+
+    /// Calculate entropy score for closure if enabled
+    fn calculate_closure_entropy(
+        &mut self,
+        block: &syn::Block,
+    ) -> Option<crate::complexity::entropy_core::EntropyScore> {
+        if crate::config::get_entropy_config().enabled {
+            let mut old_analyzer = crate::complexity::entropy::EntropyAnalyzer::new();
+            let old_score = old_analyzer.calculate_entropy(block);
+
+            Some(crate::complexity::entropy_core::EntropyScore {
+                token_entropy: old_score.token_entropy,
+                pattern_repetition: old_score.pattern_repetition,
+                branch_similarity: old_score.branch_similarity,
+                effective_complexity: old_score.effective_complexity,
+                unique_variables: old_score.unique_variables,
+                max_nesting: old_score.max_nesting,
+                dampening_applied: old_score.dampening_applied,
+            })
+        } else {
+            None
+        }
     }
 }
 

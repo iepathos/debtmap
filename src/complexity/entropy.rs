@@ -114,30 +114,44 @@ impl EntropyAnalyzer {
     /// Calculate entropy score for a function block
     pub fn calculate_entropy(&mut self, block: &Block) -> EntropyScore {
         let entropy_config = crate::config::get_entropy_config();
-        let use_classification =
-            entropy_config.enabled && entropy_config.use_classification.unwrap_or(false);
 
-        let (_tokens, entropy) = if use_classification {
-            let classified = self.extract_classified_tokens(block);
-            let weighted_entropy = self.weighted_shannon_entropy(&classified);
-            (
-                classified
-                    .into_iter()
-                    .map(TokenType::from_classified)
-                    .collect(),
-                weighted_entropy,
-            )
-        } else {
-            let tokens = self.extract_tokens(block);
-            let entropy = self.shannon_entropy(&tokens);
-            (tokens, entropy)
-        };
-
+        // Extract pure computation steps
+        let entropy = self.compute_token_entropy(block, &entropy_config);
         let patterns = self.detect_pattern_repetition(block);
         let similarity = self.calculate_branch_similarity(block);
         let (unique_vars, max_nesting) = self.analyze_code_structure(block);
-        let effective = self.adjust_complexity(entropy, patterns, similarity);
-        let dampening = self.calculate_dampening_factor(entropy, patterns, similarity);
+
+        // Compose final score using pure functions
+        Self::build_entropy_score(entropy, patterns, similarity, unique_vars, max_nesting)
+    }
+
+    /// Pure function to compute token entropy based on configuration
+    fn compute_token_entropy(
+        &mut self,
+        block: &Block,
+        config: &crate::config::EntropyConfig,
+    ) -> f64 {
+        let use_classification = config.enabled && config.use_classification.unwrap_or(false);
+
+        if use_classification {
+            let classified = self.extract_classified_tokens(block);
+            self.weighted_shannon_entropy(&classified)
+        } else {
+            let tokens = self.extract_tokens(block);
+            self.shannon_entropy(&tokens)
+        }
+    }
+
+    /// Pure function to build entropy score from components
+    fn build_entropy_score(
+        entropy: f64,
+        patterns: f64,
+        similarity: f64,
+        unique_vars: usize,
+        max_nesting: u32,
+    ) -> EntropyScore {
+        let effective = Self::compute_effective_complexity(entropy, patterns, similarity);
+        let dampening = Self::compute_dampening_factor(entropy, patterns, similarity);
 
         EntropyScore {
             token_entropy: entropy,
@@ -148,6 +162,37 @@ impl EntropyAnalyzer {
             max_nesting,
             dampening_applied: dampening,
         }
+    }
+
+    /// Pure function to compute effective complexity
+    fn compute_effective_complexity(entropy: f64, repetition: f64, similarity: f64) -> f64 {
+        let base_simplicity = (1.0 - entropy) * repetition;
+        let simplicity_factor = if similarity > 0.0 {
+            base_simplicity * (0.5 + similarity * 0.5)
+        } else {
+            base_simplicity * 0.7
+        };
+        1.0 - (simplicity_factor * 0.9)
+    }
+
+    /// Pure function to compute dampening factor
+    fn compute_dampening_factor(entropy: f64, repetition: f64, similarity: f64) -> f64 {
+        let config = crate::config::get_entropy_config();
+        if !config.enabled {
+            return 1.0;
+        }
+
+        let repetition_factor = Self::calculate_graduated_dampening(
+            repetition,
+            config.pattern_threshold,
+            1.0,
+            0.20,
+            true,
+        );
+        let entropy_factor = Self::calculate_graduated_dampening(entropy, 0.4, 0.4, 0.15, false);
+        let branch_factor = Self::calculate_graduated_dampening(similarity, 0.8, 0.2, 0.25, true);
+
+        (repetition_factor * entropy_factor * branch_factor).max(0.7)
     }
 
     /// Calculate entropy score with caching support
@@ -370,51 +415,12 @@ impl EntropyAnalyzer {
 
     /// Adjust complexity based on entropy and pattern analysis
     fn adjust_complexity(&self, entropy: f64, repetition: f64, similarity: f64) -> f64 {
-        // High repetition and high similarity = low effective complexity
-        // Low entropy = simple patterns
-
-        // Weight the factors - repetition and entropy are always relevant
-        // Branch similarity is optional (0 when no branches)
-        let base_simplicity = (1.0 - entropy) * repetition;
-
-        // If we have branch similarity, it reinforces the pattern
-        // Otherwise, use base simplicity alone
-        let simplicity_factor = if similarity > 0.0 {
-            base_simplicity * (0.5 + similarity * 0.5)
-        } else {
-            base_simplicity * 0.7 // Reduce impact when no branches
-        };
-
-        // Return effective complexity multiplier (0.1 = very simple, 1.0 = genuinely complex)
-        1.0 - (simplicity_factor * 0.9)
+        Self::compute_effective_complexity(entropy, repetition, similarity)
     }
 
     /// Calculate the dampening factor that will be applied
     fn calculate_dampening_factor(&self, entropy: f64, repetition: f64, similarity: f64) -> f64 {
-        let config = crate::config::get_entropy_config();
-        if !config.enabled {
-            return 1.0;
-        }
-
-        // Extract pure calculation functions
-        let repetition_factor = Self::calculate_graduated_dampening(
-            repetition,
-            config.pattern_threshold,
-            1.0,
-            0.20,
-            true, // excess when above threshold
-        );
-
-        let entropy_factor = Self::calculate_graduated_dampening(
-            entropy, 0.4, 0.4, 0.15, false, // deficit when below threshold
-        );
-
-        let branch_factor = Self::calculate_graduated_dampening(
-            similarity, 0.8, 0.2, 0.25, true, // excess when above threshold
-        );
-
-        // Combine factors with cap at 30% total reduction
-        (repetition_factor * entropy_factor * branch_factor).max(0.7)
+        Self::compute_dampening_factor(entropy, repetition, similarity)
     }
 
     /// Pure function to calculate graduated dampening factor
