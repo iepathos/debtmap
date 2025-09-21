@@ -3,6 +3,9 @@ use crate::analyzers::python_purity::PythonPurityDetector;
 use crate::analyzers::Analyzer;
 use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
 use crate::complexity::languages::python::PythonEntropyAnalyzer;
+use crate::complexity::python_pattern_adjustments::{
+    apply_adjustments, detect_patterns, detect_patterns_async,
+};
 use crate::complexity::python_patterns::analyze_python_patterns;
 use crate::core::{
     ast::{Ast, PythonAst},
@@ -386,12 +389,21 @@ fn extract_functions_from_stmts(
                 let mut purity_detector = PythonPurityDetector::new();
                 let purity_analysis = purity_detector.analyze_function(func_def);
 
+                // Calculate base complexity metrics
+                let base_cyclomatic = calculate_cyclomatic_python(&func_def.body);
+                let base_cognitive = calculate_cognitive_python(&func_def.body);
+
+                // Detect patterns and apply adjustments
+                let patterns = detect_patterns(func_def);
+                let adjusted_cyclomatic = apply_adjustments(base_cyclomatic, &patterns);
+                let adjusted_cognitive = apply_adjustments(base_cognitive, &patterns);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
                     line: line_number,
-                    cyclomatic: calculate_cyclomatic_python(&func_def.body),
-                    cognitive: calculate_cognitive_python(&func_def.body),
+                    cyclomatic: adjusted_cyclomatic,
+                    cognitive: adjusted_cognitive,
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
                     is_test: func_def.name.starts_with("test_"),
@@ -433,12 +445,21 @@ fn extract_functions_from_stmts(
                 let mut purity_detector = PythonPurityDetector::new();
                 let purity_analysis = purity_detector.analyze_async_function(func_def);
 
+                // Calculate base complexity metrics
+                let base_cyclomatic = calculate_cyclomatic_python(&func_def.body);
+                let base_cognitive = calculate_cognitive_python(&func_def.body);
+
+                // Detect patterns and apply adjustments
+                let patterns = detect_patterns_async(func_def);
+                let adjusted_cyclomatic = apply_adjustments(base_cyclomatic, &patterns);
+                let adjusted_cognitive = apply_adjustments(base_cognitive, &patterns);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
                     line: line_number,
-                    cyclomatic: calculate_cyclomatic_python(&func_def.body),
-                    cognitive: calculate_cognitive_python(&func_def.body),
+                    cyclomatic: adjusted_cyclomatic,
+                    cognitive: adjusted_cognitive,
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
                     is_test: func_def.name.starts_with("test_"),
