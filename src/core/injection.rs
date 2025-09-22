@@ -1,8 +1,6 @@
 //! Dependency injection container and builder patterns
 
-use crate::core::traits::{
-    Analyzer, Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, Scorer,
-};
+use crate::core::traits::{Analyzer, Cache, ConfigProvider, Formatter, PriorityCalculator, Scorer};
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -478,7 +476,7 @@ impl ServiceLocator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::traits::PriorityFactor;
+    use crate::core::traits::{CacheStats, PriorityFactor};
     use crate::core::types::{DebtCategory, DebtItem, Language, ModuleInfo};
 
     // Mock implementations for testing

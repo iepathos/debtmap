@@ -12,8 +12,11 @@ where
     S: Scorer,
     D: Detector,
 {
+    #[allow(dead_code)]
     complexity_calculator: C,
+    #[allow(dead_code)]
     scorer: S,
+    #[allow(dead_code)]
     detector: D,
 }
 
@@ -42,6 +45,7 @@ where
 {
     call_graph: CG,
     test_detector: TD,
+    #[allow(dead_code)]
     purity_analyzer: PA,
 }
 
@@ -97,6 +101,7 @@ where
 {
     call_graph: CG,
     test_detector: TD,
+    #[allow(dead_code)]
     purity_analyzer: PA,
 }
 
@@ -195,10 +200,12 @@ impl AnalyzerFactory {
 // to implement the LanguageAnalyzer trait
 
 /// Adapter for RustAnalyzer to implement LanguageAnalyzer
+#[allow(dead_code)]
 struct RustAnalyzerAdapter {
     inner: crate::analyzers::rust::RustAnalyzer,
 }
 
+#[allow(dead_code)]
 impl RustAnalyzerAdapter {
     fn new() -> Self {
         Self {
@@ -220,10 +227,12 @@ impl LanguageAnalyzer for RustAnalyzerAdapter {
 }
 
 /// Adapter for PythonAnalyzer to implement LanguageAnalyzer
+#[allow(dead_code)]
 struct PythonAnalyzerAdapter {
     inner: crate::analyzers::python::PythonAnalyzer,
 }
 
+#[allow(dead_code)]
 impl PythonAnalyzerAdapter {
     fn new() -> Self {
         Self {

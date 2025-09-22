@@ -1,9 +1,7 @@
 //! Integration tests for the dependency injection system
 
 use anyhow::Result;
-use debtmap::core::injection::{
-    AnalyzerFactory, AppContainer, AppContainerBuilder, ServiceLocator,
-};
+use debtmap::core::injection::{AnalyzerFactory, AppContainerBuilder, ServiceLocator};
 use debtmap::core::traits::{
     Analyzer, Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor,
     Scorer,
@@ -577,7 +575,7 @@ fn test_trait_boundaries_and_contracts() {
 
     let priority = calculator.calculate_priority(&item);
     assert!(
-        priority >= 0.0 && priority <= 1.0,
+        (0.0..=1.0).contains(&priority),
         "Priority should be normalized"
     );
 

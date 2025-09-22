@@ -1976,7 +1976,7 @@ dependency = 0.6
         handle_read_error(&path, &permission); // Should not panic
 
         // Test other errors
-        let other = io::Error::new(io::ErrorKind::Other, "Unknown error");
+        let other = io::Error::other("Unknown error");
         handle_read_error(&path, &other); // Should not panic
     }
 }
