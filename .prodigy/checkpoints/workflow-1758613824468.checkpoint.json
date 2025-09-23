@@ -1,0 +1,122 @@
+{
+  "workflow_id": "workflow-1758613824468",
+  "execution_state": {
+    "current_step_index": 1,
+    "total_steps": 3,
+    "status": "Running",
+    "start_time": "2025-09-23T08:05:22.508828Z",
+    "last_checkpoint": "2025-09-23T08:05:22.508828Z",
+    "current_iteration": null,
+    "total_iterations": null
+  },
+  "completed_steps": [
+    {
+      "step_index": 0,
+      "command": "claude: /prodigy-implement-spec $ARG",
+      "success": true,
+      "output": null,
+      "captured_variables": {},
+      "duration": {
+        "secs": 898,
+        "nanos": 2722583
+      },
+      "completed_at": "2025-09-23T08:05:22.508704Z"
+    }
+  ],
+  "variable_state": {
+    "step.files_changed": "7",
+    "step.insertions": "845",
+    "step.deletions": "207",
+    "step.commits": "[{\"hash\":\"2728e32742349c083f966bf5df5a1a9b30378c6b\",\"message\":\"feat: implement spec 104 - Python-aware dead code detection\",\"author\":\"Glen Baker\",\"timestamp\":\"2025-09-23T08:02:58Z\",\"files_changed\":[\"Cargo.toml\",\"specs/104-python-aware-dead-code-detection.md\",\"src/analysis/mod.rs\",\"src/analysis/python_dead_code.rs\",\"src/priority/scoring/classification.rs\",\"src/priority/scoring/debt_item.rs\",\"tests/python_dead_code_test.rs\"],\"insertions\":845,\"deletions\":207,\"step_name\":\"claude: /prodigy-implement-spec $ARG\",\"agent_id\":null}]",
+    "ARG": "104",
+    "PROJECT_ROOT": "/Users/glen/.prodigy/worktrees/debtmap/session-f5e2bb15-d509-43bb-a8f3-fd5dfb5b2e7b"
+  },
+  "mapreduce_state": null,
+  "timestamp": "2025-09-23T08:05:22.508828Z",
+  "version": 1,
+  "workflow_hash": "3",
+  "total_steps": 3,
+  "workflow_name": "args-workflow",
+  "workflow_path": "/Users/glen/memento-mori/debtmap/workflows/implement.yml",
+  "retry_checkpoint_state": null,
+  "variable_checkpoint_state": {
+    "global_variables": {
+      "step.insertions": "845",
+      "PROJECT_ROOT": "/Users/glen/.prodigy/worktrees/debtmap/session-f5e2bb15-d509-43bb-a8f3-fd5dfb5b2e7b",
+      "step.files_changed": "7",
+      "step.commits": "[{\"hash\":\"2728e32742349c083f966bf5df5a1a9b30378c6b\",\"message\":\"feat: implement spec 104 - Python-aware dead code detection\",\"author\":\"Glen Baker\",\"timestamp\":\"2025-09-23T08:02:58Z\",\"files_changed\":[\"Cargo.toml\",\"specs/104-python-aware-dead-code-detection.md\",\"src/analysis/mod.rs\",\"src/analysis/python_dead_code.rs\",\"src/priority/scoring/classification.rs\",\"src/priority/scoring/debt_item.rs\",\"tests/python_dead_code_test.rs\"],\"insertions\":845,\"deletions\":207,\"step_name\":\"claude: /prodigy-implement-spec $ARG\",\"agent_id\":null}]",
+      "ARG": "104",
+      "step.deletions": "207"
+    },
+    "phase_variables": {},
+    "computed_cache": {},
+    "environment_snapshot": {
+      "variables": {
+        "HOMEBREW_REPOSITORY": "/opt/homebrew",
+        "XPC_SERVICE_NAME": "0",
+        "SHELL": "/bin/zsh",
+        "INFOPATH": "/opt/homebrew/share/info:",
+        "ZSH": "/Users/glen/.oh-my-zsh",
+        "OLDPWD": "/Users/glen/memento-mori/debtmap",
+        "LESS": "-R",
+        "GHOSTTY_RESOURCES_DIR": "/Applications/Ghostty.app/Contents/Resources/ghostty",
+        "PYENV_ROOT": "/Users/glen/.pyenv",
+        "HOMEBREW_PREFIX": "/opt/homebrew",
+        "HOME": "/Users/glen",
+        "NVM_INC": "/Users/glen/.nvm/versions/node/v22.18.0/include/node",
+        "BUN_INSTALL": "/Users/glen/.bun",
+        "VISUAL": "hx",
+        "TMPDIR": "/var/folders/fc/plw0013j1yj8dj00s3gbpdfw0000gn/T/",
+        "XDG_DATA_DIRS": "/usr/local/share:/usr/share:/Applications/Ghostty.app/Contents/Resources/ghostty/..",
+        "PAGER": "less",
+        "PWD": "/Users/glen/memento-mori/debtmap",
+        "NVM_DIR": "/Users/glen/.nvm",
+        "XPC_FLAGS": "0x0",
+        "HEADSPIN_HOME": "/Users/glen/headspinio",
+        "TERMINFO": "/Applications/Ghostty.app/Contents/Resources/terminfo",
+        "HOMEBREW_CELLAR": "/opt/homebrew/Cellar",
+        "COLORTERM": "truecolor",
+        "PYTHONPATH": ":/Users/glen/headspinio/devtools:/Users/glen/headspinio/platform:/Users/glen/headspinio/common:/Users/glen/headspinio/mar:/Users/glen/headspinio/reports:/Users/glen/headspinio/ops:/Users/glen/headspinio/pbox:/Users/glen/headspinio/loadtests:/Users/glen/headspinio/pushserver:/Users/glen/headspinio/product-error-codes:/Users/glen/headspinio/onpremadmin",
+        "PRODIGY_ARG": "104",
+        "TERM_PROGRAM_VERSION": "1.2.0",
+        "LOGNAME": "glen",
+        "PYENV_SHELL": "zsh",
+        "GHOSTTY_SHELL_FEATURES": "cursor,title",
+        "LANG": "en_US.UTF-8",
+        "NVM_BIN": "/Users/glen/.nvm/versions/node/v22.18.0/bin",
+        "NVM_CD_FLAGS": "-q",
+        "_": "/usr/local/bin/prodigy",
+        "LS_COLORS": "di=1;36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43",
+        "EDITOR": "hx",
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.ye4Ol1VMB1/Listeners",
+        "DIRHISTORY_SIZE": "30",
+        "MANPATH": "/Users/glen/.nvm/versions/node/v22.18.0/share/man::/usr/share/man:/usr/local/share/man:/Applications/Ghostty.app/Contents/Resources/ghostty/../man:",
+        "TERM_PROGRAM": "ghostty",
+        "__CF_USER_TEXT_ENCODING": "0x1F5:0x0:0x0",
+        "LSCOLORS": "Gxfxcxdxbxegedabagacad",
+        "SHLVL": "1",
+        "PATH": "/Users/glen/.bun/bin:/Users/glen/.nvm/versions/node/v22.18.0/bin:/Users/glen/.pyenv/plugins/pyenv-virtualenv/shims:/Users/glen/.pyenv/shims:/Users/glen/.pyenv/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Users/glen/.cargo/bin:/Applications/Ghostty.app/Contents/MacOS:/Users/glen/.foundry/bin:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/lib:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/git:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/command-not-found:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/docker:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/sudo:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/dirhistory:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/history:/Users/glen/.antigen/bundles/robbyrussell/oh-my-zsh/plugins/macos:/Users/glen/.antigen/bundles/zsh-users/zsh-completions:/Users/glen/.antigen/bundles/zsh-users/zsh-autosuggestions:/Users/glen/.antigen/bundles/zsh-users/zsh-syntax-highlighting:/opt/homebrew/bin:/Users/glen/headspinio/devtools/bin:/Users/glen/headspinio/ops/bin:/usr/local/opt/mysql@5.7/bin:/Users/glen/go/bin:/Users/glen/devl/oracli/bin",
+        "PYENV_VIRTUALENV_INIT": "1",
+        "COMMAND_MODE": "unix2003",
+        "TERM": "xterm-ghostty",
+        "USER": "glen",
+        "__CFBundleIdentifier": "com.mitchellh.ghostty",
+        "GHOSTTY_BIN_DIR": "/Applications/Ghostty.app/Contents/MacOS"
+      },
+      "captured_at": "2025-09-23T08:05:22.508808Z",
+      "hostname": "harley",
+      "working_directory": "/Users/glen/memento-mori/debtmap"
+    },
+    "interpolation_history": [],
+    "variable_metadata": {
+      "total_variables": 6,
+      "computed_variables": 0,
+      "total_interpolations": 0,
+      "checkpoint_version": "1.0.0"
+    },
+    "captured_outputs": {},
+    "iteration_vars": {
+      "ITERATION": "1"
+    }
+  }
+}

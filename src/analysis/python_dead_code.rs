@@ -350,7 +350,7 @@ impl FrameworkPattern {
 pub struct PythonDeadCodeDetector {
     magic_methods: &'static HashSet<&'static str>,
     framework_patterns: HashMap<String, FrameworkPattern>,
-    decorator_handlers: Vec<String>,
+    _decorator_handlers: Vec<String>,
     active_frameworks: HashSet<String>,
 }
 
@@ -380,7 +380,7 @@ impl PythonDeadCodeDetector {
         Self {
             magic_methods: &MAGIC_METHODS,
             framework_patterns,
-            decorator_handlers,
+            _decorator_handlers: decorator_handlers,
             active_frameworks: HashSet::new(),
         }
     }
@@ -641,15 +641,15 @@ mod tests {
 
     #[test]
     fn test_framework_method_detection() {
-        let mut detector = PythonDeadCodeDetector::new()
+        let detector = PythonDeadCodeDetector::new()
             .with_frameworks(vec!["django".to_string(), "wxpython".to_string()]);
 
-        let func = FunctionMetrics {
-            name: "MyClass.OnInit".to_string(),
-            file: Path::new("app.py").to_path_buf(),
-            visibility: Some("pub".to_string()),
-            ..Default::default()
-        };
+        let mut func = FunctionMetrics::new(
+            "MyClass.OnInit".to_string(),
+            Path::new("app.py").to_path_buf(),
+            0,
+        );
+        func.visibility = Some("pub".to_string());
 
         assert!(detector.is_framework_method("OnInit", &func));
         assert!(detector.is_framework_method("save", &func));
@@ -661,41 +661,41 @@ mod tests {
         let detector = PythonDeadCodeDetector::new();
 
         // Magic method
-        let magic_func = FunctionMetrics {
-            name: "MyClass.__init__".to_string(),
-            file: Path::new("test.py").to_path_buf(),
-            ..Default::default()
-        };
+        let magic_func = FunctionMetrics::new(
+            "MyClass.__init__".to_string(),
+            Path::new("test.py").to_path_buf(),
+            0,
+        );
         assert_eq!(detector.get_removal_confidence(&magic_func), RemovalConfidence::Magic);
 
         // Event handler
-        let event_func = FunctionMetrics {
-            name: "Panel.on_click".to_string(),
-            file: Path::new("ui.py").to_path_buf(),
-            ..Default::default()
-        };
+        let event_func = FunctionMetrics::new(
+            "Panel.on_click".to_string(),
+            Path::new("ui.py").to_path_buf(),
+            0,
+        );
         assert_eq!(detector.get_removal_confidence(&event_func), RemovalConfidence::Unsafe);
 
         // Private method
-        let private_func = FunctionMetrics {
-            name: "MyClass._helper".to_string(),
-            file: Path::new("core.py").to_path_buf(),
-            visibility: None,
-            ..Default::default()
-        };
+        let mut private_func = FunctionMetrics::new(
+            "MyClass._helper".to_string(),
+            Path::new("core.py").to_path_buf(),
+            0,
+        );
+        private_func.visibility = None;
         assert_eq!(detector.get_removal_confidence(&private_func), RemovalConfidence::Safe);
     }
 
     #[test]
     fn test_usage_hints_generation() {
-        let mut detector = PythonDeadCodeDetector::new()
+        let detector = PythonDeadCodeDetector::new()
             .with_frameworks(vec!["wxpython".to_string()]);
 
-        let func = FunctionMetrics {
-            name: "App.OnInit".to_string(),
-            file: Path::new("app.py").to_path_buf(),
-            ..Default::default()
-        };
+        let func = FunctionMetrics::new(
+            "App.OnInit".to_string(),
+            Path::new("app.py").to_path_buf(),
+            0,
+        );
 
         let hints = detector.generate_usage_hints(&func);
         assert!(!hints.is_empty());

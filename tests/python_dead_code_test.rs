@@ -413,54 +413,49 @@ fn test_python_magic_methods_not_flagged() {
     let detector = PythonDeadCodeDetector::new();
 
     // Test __init__ method
-    let init_func = FunctionMetrics {
-        name: "MyClass.__init__".to_string(),
-        file: Path::new("test.py").to_path_buf(),
-        line: 10,
-        ..Default::default()
-    };
+    let init_func = FunctionMetrics::new(
+        "MyClass.__init__".to_string(),
+        Path::new("test.py").to_path_buf(),
+        10,
+    );
     assert!(detector.is_implicitly_called(&init_func));
 
     // Test __str__ method
-    let str_func = FunctionMetrics {
-        name: "MyClass.__str__".to_string(),
-        file: Path::new("test.py").to_path_buf(),
-        line: 20,
-        ..Default::default()
-    };
+    let str_func = FunctionMetrics::new(
+        "MyClass.__str__".to_string(),
+        Path::new("test.py").to_path_buf(),
+        20,
+    );
     assert!(detector.is_implicitly_called(&str_func));
 
     // Test __getitem__ method
-    let getitem_func = FunctionMetrics {
-        name: "Container.__getitem__".to_string(),
-        file: Path::new("container.py").to_path_buf(),
-        line: 15,
-        ..Default::default()
-    };
+    let getitem_func = FunctionMetrics::new(
+        "Container.__getitem__".to_string(),
+        Path::new("container.py").to_path_buf(),
+        15,
+    );
     assert!(detector.is_implicitly_called(&getitem_func));
 }
 
 #[test]
 fn test_python_framework_methods_not_flagged() {
-    let mut detector = PythonDeadCodeDetector::new()
+    let detector = PythonDeadCodeDetector::new()
         .with_frameworks(vec!["wxpython".to_string(), "django".to_string()]);
 
     // Test OnInit method (wxPython)
-    let on_init = FunctionMetrics {
-        name: "MyApp.OnInit".to_string(),
-        file: Path::new("app.py").to_path_buf(),
-        line: 10,
-        ..Default::default()
-    };
+    let on_init = FunctionMetrics::new(
+        "MyApp.OnInit".to_string(),
+        Path::new("app.py").to_path_buf(),
+        10,
+    );
     assert!(detector.is_implicitly_called(&on_init));
 
     // Test save method (Django)
-    let save_method = FunctionMetrics {
-        name: "Model.save".to_string(),
-        file: Path::new("models.py").to_path_buf(),
-        line: 30,
-        ..Default::default()
-    };
+    let save_method = FunctionMetrics::new(
+        "Model.save".to_string(),
+        Path::new("models.py").to_path_buf(),
+        30,
+    );
     assert!(detector.is_implicitly_called(&save_method));
 }
 
@@ -469,27 +464,27 @@ fn test_python_confidence_levels() {
     let detector = PythonDeadCodeDetector::new();
 
     // Magic method should have Magic confidence
-    let magic_func = FunctionMetrics {
-        name: "Cls.__init__".to_string(),
-        file: Path::new("test.py").to_path_buf(),
-        ..Default::default()
-    };
+    let magic_func = FunctionMetrics::new(
+        "Cls.__init__".to_string(),
+        Path::new("test.py").to_path_buf(),
+        0,
+    );
     assert_eq!(detector.get_removal_confidence(&magic_func), RemovalConfidence::Magic);
 
     // Event handler should have Unsafe confidence
-    let event_func = FunctionMetrics {
-        name: "Panel.on_click".to_string(),
-        file: Path::new("panel.py").to_path_buf(),
-        ..Default::default()
-    };
+    let event_func = FunctionMetrics::new(
+        "Panel.on_click".to_string(),
+        Path::new("panel.py").to_path_buf(),
+        0,
+    );
     assert_eq!(detector.get_removal_confidence(&event_func), RemovalConfidence::Unsafe);
 
     // Private method should have Safe confidence
-    let private_func = FunctionMetrics {
-        name: "Cls._helper".to_string(),
-        file: Path::new("module.py").to_path_buf(),
-        visibility: None,
-        ..Default::default()
-    };
+    let mut private_func = FunctionMetrics::new(
+        "Cls._helper".to_string(),
+        Path::new("module.py").to_path_buf(),
+        0,
+    );
+    private_func.visibility = None;
     assert_eq!(detector.get_removal_confidence(&private_func), RemovalConfidence::Safe);
 }
