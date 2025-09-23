@@ -7,6 +7,7 @@ use crate::complexity::python_pattern_adjustments::{
     apply_adjustments, detect_patterns, detect_patterns_async,
 };
 use crate::complexity::python_patterns::analyze_python_patterns;
+use crate::complexity::python_specific_patterns::PythonSpecificPatternDetector;
 use crate::core::{
     ast::{Ast, PythonAst},
     ComplexityMetrics, DebtItem, DebtType, Dependency, DependencyKind, FileMetrics,
@@ -91,6 +92,14 @@ impl Analyzer for PythonAnalyzer {
                         ),
                     );
                 }
+
+                // Add Python-specific pattern complexity detection
+                let mut specific_detector = PythonSpecificPatternDetector::new();
+                specific_detector.detect_patterns(&python_ast.module);
+                let pattern_complexity = specific_detector.calculate_pattern_complexity();
+
+                // Add pattern complexity to overall complexity metrics
+                metrics.complexity.cognitive_complexity += pattern_complexity as u32;
 
                 metrics
             }
