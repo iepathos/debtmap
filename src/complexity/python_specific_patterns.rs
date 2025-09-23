@@ -161,7 +161,6 @@ pub struct PythonSpecificPatternDetector {
     current_class: Option<String>,
     context_depth: u32,
     comprehension_depth: u32,
-    decorator_stack: Vec<String>,
     known_mixins: HashSet<String>,
     framework_indicators: HashMap<String, FrameworkType>,
 }
@@ -197,7 +196,6 @@ impl PythonSpecificPatternDetector {
             current_class: None,
             context_depth: 0,
             comprehension_depth: 0,
-            decorator_stack: Vec::new(),
             known_mixins,
             framework_indicators,
         }
@@ -594,7 +592,11 @@ impl PythonSpecificPatternDetector {
         self.comprehension_depth -= 1;
     }
 
-    fn analyze_comprehension_gen(&mut self, comp_type: ComprehensionType, comp: &ast::ExprGeneratorExp) {
+    fn analyze_comprehension_gen(
+        &mut self,
+        comp_type: ComprehensionType,
+        comp: &ast::ExprGeneratorExp,
+    ) {
         self.comprehension_depth += 1;
 
         let has_conditions = comp.generators.iter().any(|gen| !gen.ifs.is_empty());

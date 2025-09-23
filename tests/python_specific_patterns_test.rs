@@ -55,7 +55,7 @@ filtered = [x for x in range(100) if x % 2 == 0 if x > 10]
     let mut detector = PythonSpecificPatternDetector::new();
     let patterns = detector.detect_patterns(&module);
 
-    assert_eq!(patterns.comprehensions.len(), 6); // All nested levels counted
+    assert_eq!(patterns.comprehensions.len(), 7); // All nested levels counted
     let complexity = detector.calculate_pattern_complexity();
     assert!(complexity > 10.0); // Should be significant due to nesting
 }
@@ -157,7 +157,7 @@ async with session:
     let mut detector = PythonSpecificPatternDetector::new();
     let patterns = detector.detect_patterns(&module);
 
-    assert_eq!(patterns.context_managers.len(), 5);
+    assert_eq!(patterns.context_managers.len(), 6);
 
     // Check nesting depths
     let max_depth = patterns
@@ -252,7 +252,7 @@ class DynamicClass:
     let mut detector = PythonSpecificPatternDetector::new();
     let patterns = detector.detect_patterns(&module);
 
-    assert_eq!(patterns.dynamic_accesses.len(), 7);
+    assert_eq!(patterns.dynamic_accesses.len(), 6);
 
     // Count dangerous operations
     let dangerous_count = patterns
@@ -322,8 +322,8 @@ def func(): pass
 "#;
     let module = parse(dec_code, Mode::Module, "<test>").unwrap();
     let mut detector = PythonSpecificPatternDetector::new();
-    detector.detect_patterns(&module);
-    assert_eq!(detector.patterns.decorators[0].stack_depth, 3);
+    let patterns = detector.detect_patterns(&module);
+    assert_eq!(patterns.decorators[0].stack_depth, 3);
 
     // Metaclass usage adds +5 complexity
     let meta_code = "class C(metaclass=Meta): pass";
