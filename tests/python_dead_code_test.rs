@@ -1,13 +1,15 @@
 use debtmap::analysis::python_call_graph::PythonCallGraphAnalyzer;
+use debtmap::analysis::{PythonDeadCodeDetector, RemovalConfidence};
 use debtmap::analyzers::python::PythonAnalyzer;
 use debtmap::analyzers::Analyzer;
+use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, FunctionId};
 use debtmap::priority::scoring::classification::{
     classify_debt_type_with_exclusions, is_dead_code_with_exclusions,
 };
 use debtmap::priority::DebtType;
 use im::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn test_python_instance_method_not_dead_code() {
@@ -404,4 +406,94 @@ class ConversationPanel:
             // Good - it's not dead code
         }
     }
+}
+
+#[test]
+fn test_python_magic_methods_not_flagged() {
+    let detector = PythonDeadCodeDetector::new();
+
+    // Test __init__ method
+    let init_func = FunctionMetrics::new(
+        "MyClass.__init__".to_string(),
+        Path::new("test.py").to_path_buf(),
+        10,
+    );
+    assert!(detector.is_implicitly_called(&init_func));
+
+    // Test __str__ method
+    let str_func = FunctionMetrics::new(
+        "MyClass.__str__".to_string(),
+        Path::new("test.py").to_path_buf(),
+        20,
+    );
+    assert!(detector.is_implicitly_called(&str_func));
+
+    // Test __getitem__ method
+    let getitem_func = FunctionMetrics::new(
+        "Container.__getitem__".to_string(),
+        Path::new("container.py").to_path_buf(),
+        15,
+    );
+    assert!(detector.is_implicitly_called(&getitem_func));
+}
+
+#[test]
+fn test_python_framework_methods_not_flagged() {
+    let detector = PythonDeadCodeDetector::new()
+        .with_frameworks(vec!["wxpython".to_string(), "django".to_string()]);
+
+    // Test OnInit method (wxPython)
+    let on_init = FunctionMetrics::new(
+        "MyApp.OnInit".to_string(),
+        Path::new("app.py").to_path_buf(),
+        10,
+    );
+    assert!(detector.is_implicitly_called(&on_init));
+
+    // Test save method (Django)
+    let save_method = FunctionMetrics::new(
+        "Model.save".to_string(),
+        Path::new("models.py").to_path_buf(),
+        30,
+    );
+    assert!(detector.is_implicitly_called(&save_method));
+}
+
+#[test]
+fn test_python_confidence_levels() {
+    let detector = PythonDeadCodeDetector::new();
+
+    // Magic method should have Magic confidence
+    let magic_func = FunctionMetrics::new(
+        "Cls.__init__".to_string(),
+        Path::new("test.py").to_path_buf(),
+        0,
+    );
+    assert_eq!(
+        detector.get_removal_confidence(&magic_func),
+        RemovalConfidence::Magic
+    );
+
+    // Event handler should have Unsafe confidence
+    let event_func = FunctionMetrics::new(
+        "Panel.on_click".to_string(),
+        Path::new("panel.py").to_path_buf(),
+        0,
+    );
+    assert_eq!(
+        detector.get_removal_confidence(&event_func),
+        RemovalConfidence::Unsafe
+    );
+
+    // Private method should have Safe confidence
+    let mut private_func = FunctionMetrics::new(
+        "Cls._helper".to_string(),
+        Path::new("module.py").to_path_buf(),
+        0,
+    );
+    private_func.visibility = None;
+    assert_eq!(
+        detector.get_removal_confidence(&private_func),
+        RemovalConfidence::Safe
+    );
 }

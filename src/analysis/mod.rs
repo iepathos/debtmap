@@ -4,6 +4,7 @@
 //! - Rust-specific call graph analysis with trait dispatch and function pointers
 //! - Python-specific call graph analysis with instance method tracking
 //! - Python type tracking and inference for improved method resolution
+//! - Python-aware dead code detection with magic methods and framework patterns
 //! - Framework pattern detection
 //! - Cross-module dependency tracking
 //! - Multi-pass complexity analysis with attribution
@@ -15,12 +16,14 @@ pub mod diagnostics;
 pub mod function_visitor;
 pub mod multi_pass;
 pub mod python_call_graph;
+pub mod python_dead_code;
 pub mod python_type_tracker;
 
 pub use call_graph::{
     AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
     FunctionPointerTracker, RustCallGraph, RustCallGraphBuilder, TraitRegistry,
 };
+pub use python_dead_code::{FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence};
 pub use python_type_tracker::{
     ClassInfo, FunctionSignature, PythonType, PythonTypeTracker, TwoPassExtractor,
 };
