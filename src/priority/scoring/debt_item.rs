@@ -1,6 +1,7 @@
 // Functions for creating UnifiedDebtItem instances
 
-use crate::core::FunctionMetrics;
+use crate::analysis::PythonDeadCodeDetector;
+use crate::core::{FunctionMetrics, Language};
 use crate::priority::unified_scorer::{
     calculate_unified_priority, calculate_unified_priority_with_debt, EntropyDetails,
 };
@@ -993,6 +994,17 @@ pub fn classify_debt_type_enhanced(
 }
 
 fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
+    // Check language-specific exclusions
+    let language = Language::from_path(&func.file);
+
+    if language == Language::Python {
+        // Use Python-specific dead code detector
+        let detector = PythonDeadCodeDetector::new();
+        if detector.is_implicitly_called(func) {
+            return true;
+        }
+    }
+
     // Entry points
     if func.name == "main" || func.name.starts_with("_start") {
         return true;
@@ -1018,8 +1030,8 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
         return true;
     }
 
-    // Common framework patterns
-    if is_framework_callback(func) {
+    // Common framework patterns (for non-Python languages)
+    if language != Language::Python && is_framework_callback(func) {
         return true;
     }
 
@@ -1029,8 +1041,8 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
         return true;
     }
 
-    // Also check for common trait method patterns as fallback
-    if is_likely_trait_method(func) {
+    // Also check for common trait method patterns as fallback (for Rust)
+    if language != Language::Python && is_likely_trait_method(func) {
         return true;
     }
 

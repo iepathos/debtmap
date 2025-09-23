@@ -1,6 +1,7 @@
 // Debt classification functions
 
-use crate::core::FunctionMetrics;
+use crate::analysis::PythonDeadCodeDetector;
+use crate::core::{FunctionMetrics, Language};
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::semantic_classifier::{classify_function_role, FunctionRole};
 use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
@@ -407,6 +408,17 @@ fn coverage_factor(coverage: &Option<TransitiveCoverage>) -> Option<String> {
 }
 
 fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
+    // Check language-specific exclusions
+    let language = Language::from_path(&func.file);
+
+    if language == Language::Python {
+        // Use Python-specific dead code detector
+        let detector = PythonDeadCodeDetector::new();
+        if detector.is_implicitly_called(func) {
+            return true;
+        }
+    }
+
     // Entry points
     if func.name == "main" || func.name.starts_with("_start") {
         return true;
@@ -417,13 +429,13 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
         return true;
     }
 
-    // Build script functions
+    // Build script functions (Rust-specific)
     if func.file.to_string_lossy().contains("build.rs") && func.name == "main" {
         return true;
     }
 
-    // Common framework patterns
-    if is_likely_trait_method(func) || is_framework_callback(func) {
+    // Common framework patterns (for non-Python languages)
+    if language != Language::Python && (is_likely_trait_method(func) || is_framework_callback(func)) {
         return true;
     }
 
@@ -514,6 +526,19 @@ fn generate_usage_hints(
 ) -> Vec<String> {
     let mut hints = Vec::new();
 
+    // Check language for specialized hints
+    let language = Language::from_path(&func.file);
+
+    if language == Language::Python {
+        // Use Python-specific detector for usage hints
+        let detector = PythonDeadCodeDetector::new();
+        let python_hints = detector.generate_usage_hints(func);
+        if !python_hints.is_empty() {
+            return python_hints;
+        }
+    }
+
+    // Generic hints for non-Python or when Python detector has no specific hints
     if func.visibility.as_ref().is_some_and(|v| v == "pub") {
         hints.push("Public function with no internal callers".to_string());
     } else {
