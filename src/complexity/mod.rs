@@ -12,6 +12,7 @@ pub mod pattern_adjustments;
 pub mod patterns;
 pub mod python_pattern_adjustments;
 pub mod python_patterns;
+pub mod python_specific_patterns;
 pub mod recursive_detector;
 pub mod rust_normalizer;
 pub mod semantic_normalizer;
