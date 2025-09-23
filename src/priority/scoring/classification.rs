@@ -435,7 +435,8 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
     }
 
     // Common framework patterns (for non-Python languages)
-    if language != Language::Python && (is_likely_trait_method(func) || is_framework_callback(func)) {
+    if language != Language::Python && (is_likely_trait_method(func) || is_framework_callback(func))
+    {
         return true;
     }
 

@@ -290,9 +290,7 @@ impl FrameworkPattern {
                 "setUpModule".to_string(),
                 "tearDownModule".to_string(),
             ],
-            event_patterns: vec![
-                Regex::new(r"^test.*").unwrap(),
-            ],
+            event_patterns: vec![Regex::new(r"^test.*").unwrap()],
             decorator_patterns: vec![
                 "@unittest.skip".to_string(),
                 "@unittest.skipIf".to_string(),
@@ -305,10 +303,7 @@ impl FrameworkPattern {
     pub fn fastapi() -> Self {
         Self {
             name: "FastAPI".to_string(),
-            lifecycle_methods: vec![
-                "startup".to_string(),
-                "shutdown".to_string(),
-            ],
+            lifecycle_methods: vec!["startup".to_string(), "shutdown".to_string()],
             event_patterns: vec![],
             decorator_patterns: vec![
                 "@app.get".to_string(),
@@ -447,7 +442,11 @@ impl PythonDeadCodeDetector {
                 }
 
                 // Check event patterns
-                if pattern.event_patterns.iter().any(|re| re.is_match(method_name)) {
+                if pattern
+                    .event_patterns
+                    .iter()
+                    .any(|re| re.is_match(method_name))
+                {
                     return true;
                 }
 
@@ -483,8 +482,10 @@ impl PythonDeadCodeDetector {
         }
 
         // Test methods (additional patterns)
-        if method_name.starts_with("test") || method_name.starts_with("setup") ||
-           method_name.starts_with("teardown") {
+        if method_name.starts_with("test")
+            || method_name.starts_with("setup")
+            || method_name.starts_with("teardown")
+        {
             return true;
         }
 
@@ -520,7 +521,7 @@ impl PythonDeadCodeDetector {
         }
 
         // Public API (no underscore prefix) - likely safe but needs review
-        if !method_name.starts_with('_') && func.visibility.as_ref().map_or(false, |v| v == "pub") {
+        if !method_name.starts_with('_') && func.visibility.as_ref().is_some_and(|v| v == "pub") {
             return RemovalConfidence::Likely;
         }
 
@@ -538,7 +539,10 @@ impl PythonDeadCodeDetector {
         };
 
         if self.is_magic_method(method_name) {
-            hints.push(format!("Magic method '{}' is called by Python runtime", method_name));
+            hints.push(format!(
+                "Magic method '{}' is called by Python runtime",
+                method_name
+            ));
         }
 
         for framework_name in &self.active_frameworks {
@@ -546,7 +550,11 @@ impl PythonDeadCodeDetector {
                 if pattern.lifecycle_methods.contains(&method_name.to_string()) {
                     hints.push(format!("{} framework lifecycle method", pattern.name));
                 }
-                if pattern.event_patterns.iter().any(|re| re.is_match(method_name)) {
+                if pattern
+                    .event_patterns
+                    .iter()
+                    .any(|re| re.is_match(method_name))
+                {
                     hints.push(format!("Matches {} event pattern", pattern.name));
                 }
             }
@@ -666,7 +674,10 @@ mod tests {
             Path::new("test.py").to_path_buf(),
             0,
         );
-        assert_eq!(detector.get_removal_confidence(&magic_func), RemovalConfidence::Magic);
+        assert_eq!(
+            detector.get_removal_confidence(&magic_func),
+            RemovalConfidence::Magic
+        );
 
         // Event handler
         let event_func = FunctionMetrics::new(
@@ -674,7 +685,10 @@ mod tests {
             Path::new("ui.py").to_path_buf(),
             0,
         );
-        assert_eq!(detector.get_removal_confidence(&event_func), RemovalConfidence::Unsafe);
+        assert_eq!(
+            detector.get_removal_confidence(&event_func),
+            RemovalConfidence::Unsafe
+        );
 
         // Private method
         let mut private_func = FunctionMetrics::new(
@@ -683,13 +697,15 @@ mod tests {
             0,
         );
         private_func.visibility = None;
-        assert_eq!(detector.get_removal_confidence(&private_func), RemovalConfidence::Safe);
+        assert_eq!(
+            detector.get_removal_confidence(&private_func),
+            RemovalConfidence::Safe
+        );
     }
 
     #[test]
     fn test_usage_hints_generation() {
-        let detector = PythonDeadCodeDetector::new()
-            .with_frameworks(vec!["wxpython".to_string()]);
+        let detector = PythonDeadCodeDetector::new().with_frameworks(vec!["wxpython".to_string()]);
 
         let func = FunctionMetrics::new(
             "App.OnInit".to_string(),

@@ -23,9 +23,7 @@ pub use call_graph::{
     AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
     FunctionPointerTracker, RustCallGraph, RustCallGraphBuilder, TraitRegistry,
 };
-pub use python_dead_code::{
-    FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence,
-};
+pub use python_dead_code::{FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence};
 pub use python_type_tracker::{
     ClassInfo, FunctionSignature, PythonType, PythonTypeTracker, TwoPassExtractor,
 };

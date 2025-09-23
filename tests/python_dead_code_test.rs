@@ -469,7 +469,10 @@ fn test_python_confidence_levels() {
         Path::new("test.py").to_path_buf(),
         0,
     );
-    assert_eq!(detector.get_removal_confidence(&magic_func), RemovalConfidence::Magic);
+    assert_eq!(
+        detector.get_removal_confidence(&magic_func),
+        RemovalConfidence::Magic
+    );
 
     // Event handler should have Unsafe confidence
     let event_func = FunctionMetrics::new(
@@ -477,7 +480,10 @@ fn test_python_confidence_levels() {
         Path::new("panel.py").to_path_buf(),
         0,
     );
-    assert_eq!(detector.get_removal_confidence(&event_func), RemovalConfidence::Unsafe);
+    assert_eq!(
+        detector.get_removal_confidence(&event_func),
+        RemovalConfidence::Unsafe
+    );
 
     // Private method should have Safe confidence
     let mut private_func = FunctionMetrics::new(
@@ -486,5 +492,8 @@ fn test_python_confidence_levels() {
         0,
     );
     private_func.visibility = None;
-    assert_eq!(detector.get_removal_confidence(&private_func), RemovalConfidence::Safe);
+    assert_eq!(
+        detector.get_removal_confidence(&private_func),
+        RemovalConfidence::Safe
+    );
 }
