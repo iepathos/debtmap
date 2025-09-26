@@ -324,7 +324,7 @@ impl PythonTypeTracker {
                     let func_id = FunctionId {
                         name: format!("{}.{}", class_def.name, method_name),
                         file: self.file_path.clone(),
-                        line: 0, // Would need source mapping for accurate line
+                        line: 0, // Line numbers handled by TwoPassExtractor
                     };
 
                     // Check decorators for static/class methods/properties
@@ -449,6 +449,8 @@ pub struct TwoPassExtractor {
     current_function: Option<FunctionId>,
     /// Current class context
     current_class: Option<String>,
+    /// Source code lines for line number extraction
+    source_lines: Vec<String>,
 }
 
 impl TwoPassExtractor {
@@ -461,7 +463,42 @@ impl TwoPassExtractor {
             function_name_map: HashMap::new(),
             current_function: None,
             current_class: None,
+            source_lines: Vec::new(),
         }
+    }
+
+    /// Create a new extractor with source content for line number extraction
+    pub fn new_with_source(file_path: PathBuf, source: &str) -> Self {
+        let source_lines: Vec<String> = source.lines().map(|s| s.to_string()).collect();
+        Self {
+            phase_one_calls: Vec::new(),
+            type_tracker: PythonTypeTracker::new(file_path.clone()),
+            call_graph: CallGraph::new(),
+            known_functions: HashSet::new(),
+            function_name_map: HashMap::new(),
+            current_function: None,
+            current_class: None,
+            source_lines,
+        }
+    }
+
+    /// Estimate line number for a function by searching for def patterns
+    fn estimate_line_number(&self, func_name: &str) -> usize {
+        if self.source_lines.is_empty() {
+            return 0;
+        }
+
+        let def_pattern = format!("def {}", func_name);
+        let async_def_pattern = format!("async def {}", func_name);
+
+        for (idx, line) in self.source_lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(&def_pattern) || trimmed.starts_with(&async_def_pattern) {
+                return idx + 1; // Line numbers are 1-based
+            }
+        }
+
+        0 // Return 0 if not found (backward compatibility)
     }
 
     /// Extract call graph in two passes
@@ -537,10 +574,13 @@ impl TwoPassExtractor {
             func_def.name.to_string()
         };
 
+        // Extract line number from source if available
+        let line = self.estimate_line_number(&func_def.name.to_string());
+
         let func_id = FunctionId {
             name: func_name.clone(),
             file: self.type_tracker.file_path.clone(),
-            line: 0, // Would need source mapping
+            line,
         };
 
         // Register function with default metrics
@@ -600,10 +640,13 @@ impl TwoPassExtractor {
             func_def.name.to_string()
         };
 
+        // Extract line number from source if available
+        let line = self.estimate_line_number(&func_def.name.to_string());
+
         let func_id = FunctionId {
             name: func_name.clone(),
             file: self.type_tracker.file_path.clone(),
-            line: 0,
+            line,
         };
 
         self.call_graph

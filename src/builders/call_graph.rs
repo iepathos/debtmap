@@ -136,7 +136,10 @@ pub fn process_python_files_for_call_graph_with_types(
                         "<module>",
                     ) {
                         Ok(module) => {
-                            let mut extractor = TwoPassExtractor::new(file_path.to_path_buf());
+                            let mut extractor = TwoPassExtractor::new_with_source(
+                                file_path.to_path_buf(),
+                                &content,
+                            );
                             let file_call_graph = extractor.extract(&module);
                             call_graph.merge(file_call_graph);
                         }
