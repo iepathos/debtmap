@@ -24,8 +24,8 @@ fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
             is_pure: Some(i % 3 == 0),
             purity_confidence: if i % 3 == 0 { Some(0.9) } else { Some(0.1) },
             detected_patterns: None,
-        upstream_callers: None,
-        downstream_callees: None,
+            upstream_callers: None,
+            downstream_callees: None,
         })
         .collect()
 }

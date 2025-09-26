@@ -52,8 +52,8 @@ end_of_record
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
-        upstream_callers: None,
-        downstream_callees: None,
+                upstream_callers: None,
+                downstream_callees: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -115,8 +115,8 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
-        upstream_callers: None,
-        downstream_callees: None,
+                upstream_callers: None,
+                downstream_callees: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -179,8 +179,8 @@ fn test_analyze_risk_without_coverage() {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
-        upstream_callers: None,
-        downstream_callees: None,
+                upstream_callers: None,
+                downstream_callees: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

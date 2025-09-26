@@ -305,8 +305,8 @@ fn test_false_positive_reduction() {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             detected_patterns: None,
-        upstream_callers: None,
-        downstream_callees: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         assert!(

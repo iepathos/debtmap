@@ -554,7 +554,8 @@ impl TwoPassExtractor {
 
         // Track function for phase two resolution
         self.known_functions.insert(func_id.clone());
-        self.function_name_map.insert(func_name.clone(), func_id.clone());
+        self.function_name_map
+            .insert(func_name.clone(), func_id.clone());
 
         let prev_function = self.current_function.clone();
         self.current_function = Some(func_id.clone());
@@ -610,7 +611,8 @@ impl TwoPassExtractor {
 
         // Track function for phase two resolution
         self.known_functions.insert(func_id.clone());
-        self.function_name_map.insert(func_name.clone(), func_id.clone());
+        self.function_name_map
+            .insert(func_name.clone(), func_id.clone());
 
         let prev_function = self.current_function.clone();
         self.current_function = Some(func_id.clone());
@@ -770,7 +772,7 @@ impl TwoPassExtractor {
             if let ast::Expr::Call(call) = &unresolved.call_expr {
                 if let ast::Expr::Name(name) = &*call.func {
                     // Look up function by name
-                    if let Some(func_id) = self.function_name_map.get(&name.id.to_string()) {
+                    if let Some(func_id) = self.function_name_map.get(name.id.as_str()) {
                         return Some(func_id.clone());
                     }
                 }

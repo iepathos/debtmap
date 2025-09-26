@@ -110,7 +110,9 @@ pub fn filter_python_call_graph(call_graph: &CallGraph) -> CallGraph {
     let python_functions: Vec<FunctionId> = call_graph
         .get_all_functions()
         .filter(|func_id| {
-            func_id.file.extension()
+            func_id
+                .file
+                .extension()
                 .and_then(|ext| ext.to_str())
                 .map(|ext| ext == "py")
                 .unwrap_or(false)
@@ -120,7 +122,9 @@ pub fn filter_python_call_graph(call_graph: &CallGraph) -> CallGraph {
 
     // Add Python functions to the filtered graph
     for func_id in &python_functions {
-        if let Some((is_entry_point, is_test, complexity, length)) = call_graph.get_function_info(func_id) {
+        if let Some((is_entry_point, is_test, complexity, length)) =
+            call_graph.get_function_info(func_id)
+        {
             filtered_graph.add_function(
                 func_id.clone(),
                 is_entry_point,
@@ -137,7 +141,11 @@ pub fn filter_python_call_graph(call_graph: &CallGraph) -> CallGraph {
         for callee in callees {
             // Only add the call if the callee is also a Python function
             if python_functions.contains(&callee) {
-                filtered_graph.add_call_parts(func_id.clone(), callee, crate::priority::call_graph::CallType::Direct);
+                filtered_graph.add_call_parts(
+                    func_id.clone(),
+                    callee,
+                    crate::priority::call_graph::CallType::Direct,
+                );
             }
         }
     }
@@ -183,9 +191,7 @@ mod tests {
 
     #[test]
     fn test_populate_call_graph_data_single_function() {
-        let mut metrics = vec![
-            create_test_function_metric("test_func", "test.py", 10)
-        ];
+        let mut metrics = vec![create_test_function_metric("test_func", "test.py", 10)];
         let mut call_graph = CallGraph::new();
 
         let func_id = FunctionId {
@@ -240,12 +246,18 @@ mod tests {
         let caller_metric = &result[0];
         assert_eq!(caller_metric.name, "caller");
         assert_eq!(caller_metric.upstream_callers, None);
-        assert_eq!(caller_metric.downstream_callees, Some(vec!["test.py:callee".to_string()]));
+        assert_eq!(
+            caller_metric.downstream_callees,
+            Some(vec!["test.py:callee".to_string()])
+        );
 
         // Check callee function
         let callee_metric = &result[1];
         assert_eq!(callee_metric.name, "callee");
-        assert_eq!(callee_metric.upstream_callers, Some(vec!["test.py:caller".to_string()]));
+        assert_eq!(
+            callee_metric.upstream_callers,
+            Some(vec!["test.py:caller".to_string()])
+        );
         assert_eq!(callee_metric.downstream_callees, None);
     }
 

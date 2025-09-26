@@ -223,8 +223,8 @@ mod tests {
                         is_pure: None,
                         purity_confidence: None,
                         detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
+                        upstream_callers: None,
+                        downstream_callees: None,
                     },
                     FunctionMetrics {
                         name: "high_complexity".to_string(),
@@ -242,8 +242,8 @@ mod tests {
                         is_pure: None,
                         purity_confidence: None,
                         detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
+                        upstream_callers: None,
+                        downstream_callees: None,
                     },
                 ],
                 cyclomatic_complexity: 17,
@@ -415,8 +415,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -434,8 +434,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
         ];
 

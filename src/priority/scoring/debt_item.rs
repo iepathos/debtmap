@@ -718,7 +718,9 @@ pub fn is_dead_code(
     if language == crate::core::Language::Python {
         let detector = PythonDeadCodeDetector::new();
         // Use the enhanced detection that considers both call graph and implicit calls
-        if let Some((is_dead, _confidence)) = detector.is_dead_code_with_confidence(func, call_graph, func_id) {
+        if let Some((is_dead, _confidence)) =
+            detector.is_dead_code_with_confidence(func, call_graph, func_id)
+        {
             return is_dead;
         }
     }

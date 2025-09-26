@@ -1422,8 +1422,8 @@ mod tests {
                 is_pure: Some(true),
                 purity_confidence: Some(1.0),
                 detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1441,8 +1441,8 @@ mod tests {
                 is_pure: Some(true),
                 purity_confidence: Some(1.0),
                 detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
         ];
 
