@@ -1,5 +1,6 @@
 use crate::priority::{
-    DebtItem, DebtType, DisplayGroup, FileDebtItem, Tier, UnifiedAnalysis, UnifiedDebtItem,
+    CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
+    DisplayGroup, FileDebtItem, ImpactLevel, Tier, UnifiedAnalysis, UnifiedDebtItem,
 };
 use std::fmt::Write;
 
@@ -38,6 +39,229 @@ pub fn format_priorities_markdown(
     }
 
     output
+}
+
+/// Format priorities for markdown output with categorical grouping
+pub fn format_priorities_categorical_markdown(
+    analysis: &UnifiedAnalysis,
+    limit: usize,
+    verbosity: u8,
+) -> String {
+    let mut output = String::new();
+
+    let version = env!("CARGO_PKG_VERSION");
+    writeln!(output, "# Debtmap v{}\n", version).unwrap();
+
+    let categorized = analysis.get_categorized_debt(limit);
+
+    writeln!(output, "## Technical Debt Analysis - By Category\n").unwrap();
+
+    // Sort categories by total score (highest first)
+    let mut sorted_categories: Vec<(&DebtCategory, &CategorySummary)> =
+        categorized.categories.iter().collect();
+    sorted_categories.sort_by(|a, b| {
+        b.1.total_score.partial_cmp(&a.1.total_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Format each category
+    for (category, summary) in sorted_categories {
+        format_category_section(&mut output, category, summary, verbosity);
+    }
+
+    // Add cross-category dependencies if any
+    if !categorized.cross_category_dependencies.is_empty() {
+        format_cross_category_dependencies(&mut output, &categorized.cross_category_dependencies);
+    }
+
+    // Add summary
+    format_categorical_summary(&mut output, &categorized);
+
+    writeln!(output).unwrap();
+    writeln!(
+        output,
+        "**Total Debt Score:** {:.0}",
+        analysis.total_debt_score
+    )
+    .unwrap();
+
+    if let Some(coverage) = analysis.overall_coverage {
+        writeln!(output, "**Overall Coverage:** {:.2}%", coverage).unwrap();
+    }
+
+    output
+}
+
+fn format_category_section(
+    output: &mut String,
+    category: &DebtCategory,
+    summary: &CategorySummary,
+    verbosity: u8,
+) {
+    writeln!(
+        output,
+        "### {} {} ({} items)",
+        category.icon(),
+        category.name(),
+        summary.item_count
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "**Total Score:** {:.1} | **Average Severity:** {:.1}",
+        summary.total_score, summary.average_severity
+    )
+    .unwrap();
+
+    writeln!(output).unwrap();
+    writeln!(
+        output,
+        "{}",
+        category.strategic_guidance(summary.item_count, summary.estimated_effort_hours)
+    )
+    .unwrap();
+    writeln!(output).unwrap();
+
+    // Show top items in this category
+    if !summary.top_items.is_empty() {
+        writeln!(output, "#### Top Priority Items").unwrap();
+        writeln!(output).unwrap();
+
+        for (idx, item) in summary.top_items.iter().take(3).enumerate() {
+            format_categorized_debt_item(output, idx + 1, item, verbosity);
+        }
+
+        if summary.item_count > summary.top_items.len() {
+            writeln!(
+                output,
+                "\n_... and {} more items in this category_",
+                summary.item_count - summary.top_items.len()
+            )
+            .unwrap();
+        }
+    }
+
+    writeln!(output).unwrap();
+}
+
+fn format_categorized_debt_item(output: &mut String, rank: usize, item: &DebtItem, verbosity: u8) {
+    match item {
+        DebtItem::Function(func) => {
+            writeln!(
+                output,
+                "{}. **{}** - Score: {:.1}",
+                rank, func.location.function, func.unified_score.final_score
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "   - Location: `{}:{}`",
+                func.location.file.display(),
+                func.location.line
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "   - Type: {}",
+                format_debt_type(&func.debt_type)
+            )
+            .unwrap();
+            if verbosity >= 1 {
+                writeln!(
+                    output,
+                    "   - Action: {}",
+                    func.recommendation.primary_action
+                )
+                .unwrap();
+            }
+        }
+        DebtItem::File(file) => {
+            let file_name = file
+                .metrics
+                .path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+            writeln!(
+                output,
+                "{}. **{}** - Score: {:.1}",
+                rank, file_name, file.score
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "   - Path: `{}`",
+                file.metrics.path.display()
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "   - Metrics: {} lines, {} functions",
+                file.metrics.total_lines, file.metrics.function_count
+            )
+            .unwrap();
+            if verbosity >= 1 {
+                writeln!(output, "   - Action: {}", file.recommendation).unwrap();
+            }
+        }
+    }
+}
+
+fn format_cross_category_dependencies(
+    output: &mut String,
+    dependencies: &[CrossCategoryDependency],
+) {
+    writeln!(output, "### ⚡ Cross-Category Dependencies\n").unwrap();
+    writeln!(output, "These relationships affect how you should prioritize improvements:\n").unwrap();
+
+    for dep in dependencies {
+        let impact_symbol = match dep.impact_level {
+            ImpactLevel::Critical => "🔴",
+            ImpactLevel::High => "🟠",
+            ImpactLevel::Medium => "🟡",
+            ImpactLevel::Low => "🟢",
+        };
+
+        writeln!(
+            output,
+            "{} **{} → {}**: {}",
+            impact_symbol,
+            dep.source_category.name(),
+            dep.target_category.name(),
+            dep.description
+        )
+        .unwrap();
+    }
+    writeln!(output).unwrap();
+}
+
+fn format_categorical_summary(output: &mut String, categorized: &CategorizedDebt) {
+    writeln!(output, "---\n").unwrap();
+    writeln!(output, "## Summary by Category\n").unwrap();
+
+    let total_items: usize = categorized.categories.values().map(|c| c.item_count).sum();
+    let total_effort: u32 = categorized.categories.values().map(|c| c.estimated_effort_hours).sum();
+
+    writeln!(output, "**Total Debt Items:** {}", total_items).unwrap();
+    writeln!(output, "**Total Estimated Effort:** {} hours", total_effort).unwrap();
+    writeln!(output).unwrap();
+
+    writeln!(output, "| Category | Items | Total Score | Effort (hours) |").unwrap();
+    writeln!(output, "|----------|-------|------------|----------------|").unwrap();
+
+    for (category, summary) in &categorized.categories {
+        writeln!(
+            output,
+            "| {} {} | {} | {:.1} | {} |",
+            category.icon(),
+            category.name(),
+            summary.item_count,
+            summary.total_score,
+            summary.estimated_effort_hours
+        )
+        .unwrap();
+    }
 }
 
 /// Format priorities for markdown output with tiered display
