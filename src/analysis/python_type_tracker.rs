@@ -575,7 +575,7 @@ impl TwoPassExtractor {
         };
 
         // Extract line number from source if available
-        let line = self.estimate_line_number(&func_def.name.to_string());
+        let line = self.estimate_line_number(func_def.name.as_ref());
 
         let func_id = FunctionId {
             name: func_name.clone(),
@@ -641,7 +641,7 @@ impl TwoPassExtractor {
         };
 
         // Extract line number from source if available
-        let line = self.estimate_line_number(&func_def.name.to_string());
+        let line = self.estimate_line_number(func_def.name.as_ref());
 
         let func_id = FunctionId {
             name: func_name.clone(),
@@ -812,7 +812,9 @@ impl TwoPassExtractor {
                     .resolve_method_call(receiver_type, method_name)
                 {
                     // Then look up the actual FunctionId with correct line number from our map
-                    if let Some(func_id_with_line) = self.function_name_map.get(&resolved_func_id.name) {
+                    if let Some(func_id_with_line) =
+                        self.function_name_map.get(&resolved_func_id.name)
+                    {
                         return Some(func_id_with_line.clone());
                     }
                     // Fallback to the resolved one if not found in map
@@ -1289,7 +1291,8 @@ def another_helper():
     pass
 "#;
 
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let module =
+            rustpython_parser::parse(source, rustpython_parser::Mode::Module, "test.py").unwrap();
         let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
         let call_graph = extractor.extract(&module);
 
@@ -1297,17 +1300,17 @@ def another_helper():
         let main_id = FunctionId {
             name: "main".to_string(),
             file: PathBuf::from("test.py"),
-            line: 5,  // main is on line 5
+            line: 5, // main is on line 5
         };
         let helper_id = FunctionId {
             name: "helper".to_string(),
             file: PathBuf::from("test.py"),
-            line: 2,  // helper is on line 2
+            line: 2, // helper is on line 2
         };
         let another_helper_id = FunctionId {
             name: "another_helper".to_string(),
             file: PathBuf::from("test.py"),
-            line: 9,  // another_helper is on line 9
+            line: 9, // another_helper is on line 9
         };
 
         // Verify functions exist with expected line numbers
@@ -1346,7 +1349,8 @@ class Calculator:
         print(msg)
 "#;
 
-        let module = rustpython_parser::parse(source, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let module =
+            rustpython_parser::parse(source, rustpython_parser::Mode::Module, "test.py").unwrap();
         let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
         let call_graph = extractor.extract(&module);
 
@@ -1354,25 +1358,25 @@ class Calculator:
         let init_id = FunctionId {
             name: "Calculator.__init__".to_string(),
             file: PathBuf::from("test.py"),
-            line: 3,  // __init__ is on line 3
+            line: 3, // __init__ is on line 3
         };
 
         let reset_id = FunctionId {
             name: "Calculator.reset".to_string(),
             file: PathBuf::from("test.py"),
-            line: 7,  // reset is on line 7
+            line: 7, // reset is on line 7
         };
 
         let add_id = FunctionId {
             name: "Calculator.add".to_string(),
             file: PathBuf::from("test.py"),
-            line: 10,  // add is on line 10
+            line: 10, // add is on line 10
         };
 
         let log_id = FunctionId {
             name: "Calculator.log".to_string(),
             file: PathBuf::from("test.py"),
-            line: 14,  // log is on line 14
+            line: 14, // log is on line 14
         };
 
         // Verify all methods are tracked with correct line numbers
@@ -1383,11 +1387,17 @@ class Calculator:
 
         // Verify method calls have correct line numbers
         let init_callees = call_graph.get_callees(&init_id);
-        let reset_callee = init_callees.iter().find(|f| f.name == "Calculator.reset").unwrap();
+        let reset_callee = init_callees
+            .iter()
+            .find(|f| f.name == "Calculator.reset")
+            .unwrap();
         assert_eq!(reset_callee.line, 7);
 
         let add_callees = call_graph.get_callees(&add_id);
-        let log_callee = add_callees.iter().find(|f| f.name == "Calculator.log").unwrap();
+        let log_callee = add_callees
+            .iter()
+            .find(|f| f.name == "Calculator.log")
+            .unwrap();
         assert_eq!(log_callee.line, 14);
     }
 }
