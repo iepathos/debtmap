@@ -33,19 +33,39 @@ pub fn populate_call_graph_data(
     // Populate call graph data for each function metric
     for (idx, metric) in function_metrics.iter_mut().enumerate() {
         if let Some(func_id) = metric_to_id_map.get(&idx) {
-            // Get callers (upstream dependencies)
-            let upstream_callers: Vec<String> = call_graph
+            // For Python functions, also try with line 0 since the call graph might use that
+            let mut upstream_callers: Vec<String> = call_graph
                 .get_callers(func_id)
                 .into_iter()
                 .map(|caller_id| format_function_name(&caller_id))
                 .collect();
 
-            // Get callees (downstream dependencies)
-            let downstream_callees: Vec<String> = call_graph
+            let mut downstream_callees: Vec<String> = call_graph
                 .get_callees(func_id)
                 .into_iter()
                 .map(|callee_id| format_function_name(&callee_id))
                 .collect();
+
+            // If no results and this is a Python file, try with line 0
+            if upstream_callers.is_empty() && downstream_callees.is_empty() {
+                let func_id_zero_line = FunctionId {
+                    file: func_id.file.clone(),
+                    name: func_id.name.clone(),
+                    line: 0,
+                };
+
+                upstream_callers = call_graph
+                    .get_callers(&func_id_zero_line)
+                    .into_iter()
+                    .map(|caller_id| format_function_name(&caller_id))
+                    .collect();
+
+                downstream_callees = call_graph
+                    .get_callees(&func_id_zero_line)
+                    .into_iter()
+                    .map(|callee_id| format_function_name(&callee_id))
+                    .collect();
+            }
 
             // Update the function metrics with call graph data
             metric.upstream_callers = if upstream_callers.is_empty() {
@@ -206,7 +226,11 @@ mod tests {
 
         call_graph.add_function(caller_id.clone(), false, false, 1, 10);
         call_graph.add_function(callee_id.clone(), false, false, 1, 10);
-        call_graph.add_call(&caller_id, &callee_id);
+        call_graph.add_call(crate::priority::call_graph::FunctionCall {
+            caller: caller_id.clone(),
+            callee: callee_id.clone(),
+            call_type: crate::priority::call_graph::CallType::Direct,
+        });
 
         let result = populate_call_graph_data(metrics, &call_graph);
 

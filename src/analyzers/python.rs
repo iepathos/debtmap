@@ -219,12 +219,29 @@ fn convert_org_pattern_to_debt_item(
 fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
     let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
     let mut entropy_calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
-    let functions = extract_function_metrics(
+
+    // Use TwoPassExtractor for two-pass analysis
+    use crate::analysis::python_type_tracker::TwoPassExtractor;
+    let mut extractor = TwoPassExtractor::new(ast.path.clone());
+
+    // Phase 1: Register all functions and extract call relationships
+    extractor.extract(&ast.module);
+
+    // Get the extracted call graph
+    let call_graph = extractor.get_call_graph();
+
+    // Extract basic function metrics as before
+    let mut functions = extract_function_metrics(
         &ast.module,
         &ast.path,
         &source_content,
         &mut entropy_calculator,
     );
+
+    // Populate call graph data into function metrics
+    use crate::analyzers::call_graph_integration::populate_call_graph_data;
+    functions = populate_call_graph_data(functions, &call_graph);
+
     let debt_items = create_python_debt_items(
         &ast.module,
         &ast.path,

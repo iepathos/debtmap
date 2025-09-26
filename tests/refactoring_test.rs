@@ -19,6 +19,8 @@ fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> Function
         is_pure: None,
         purity_confidence: None,
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 

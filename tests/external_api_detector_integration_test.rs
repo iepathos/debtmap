@@ -26,6 +26,8 @@ fn create_test_function(name: &str, path: &str, visibility: Option<String>) -> F
         is_pure: None,
         purity_confidence: None,
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 

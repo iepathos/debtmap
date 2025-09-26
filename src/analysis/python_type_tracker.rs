@@ -443,6 +443,8 @@ pub struct TwoPassExtractor {
     pub call_graph: CallGraph,
     /// Set of known function IDs discovered in phase one
     known_functions: HashSet<FunctionId>,
+    /// Map function names to their FunctionIds for easier lookup (without line numbers)
+    function_name_map: HashMap<String, FunctionId>,
     /// Current function context
     current_function: Option<FunctionId>,
     /// Current class context
@@ -456,6 +458,7 @@ impl TwoPassExtractor {
             type_tracker: PythonTypeTracker::new(file_path.clone()),
             call_graph: CallGraph::new(),
             known_functions: HashSet::new(),
+            function_name_map: HashMap::new(),
             current_function: None,
             current_class: None,
         }
@@ -469,6 +472,11 @@ impl TwoPassExtractor {
         // Phase 2: Resolve calls using type information
         self.phase_two();
 
+        self.call_graph.clone()
+    }
+
+    /// Get the extracted call graph
+    pub fn get_call_graph(&self) -> CallGraph {
         self.call_graph.clone()
     }
 
@@ -546,6 +554,7 @@ impl TwoPassExtractor {
 
         // Track function for phase two resolution
         self.known_functions.insert(func_id.clone());
+        self.function_name_map.insert(func_name.clone(), func_id.clone());
 
         let prev_function = self.current_function.clone();
         self.current_function = Some(func_id.clone());
@@ -601,6 +610,7 @@ impl TwoPassExtractor {
 
         // Track function for phase two resolution
         self.known_functions.insert(func_id.clone());
+        self.function_name_map.insert(func_name.clone(), func_id.clone());
 
         let prev_function = self.current_function.clone();
         self.current_function = Some(func_id.clone());
@@ -759,15 +769,9 @@ impl TwoPassExtractor {
             // Function call resolution
             if let ast::Expr::Call(call) = &unresolved.call_expr {
                 if let ast::Expr::Name(name) = &*call.func {
-                    // Check if it's a known function
-                    let func_id = FunctionId {
-                        name: name.id.to_string(),
-                        file: self.type_tracker.file_path.clone(),
-                        line: 0,
-                    };
-                    // Check if function exists in known_functions set
-                    if self.known_functions.contains(&func_id) {
-                        return Some(func_id);
+                    // Look up function by name
+                    if let Some(func_id) = self.function_name_map.get(&name.id.to_string()) {
+                        return Some(func_id.clone());
                     }
                 }
             }

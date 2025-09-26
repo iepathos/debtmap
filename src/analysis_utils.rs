@@ -247,6 +247,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }];
         let report = build_complexity_report(&functions, 10);
 
@@ -287,6 +289,8 @@ mod tests {
                         is_pure: None,
                         purity_confidence: None,
                         detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
                     }],
                     cyclomatic_complexity: 2,
                     cognitive_complexity: 3,
@@ -316,6 +320,8 @@ mod tests {
                             is_pure: None,
                             purity_confidence: None,
                             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
                         },
                         FunctionMetrics {
                             name: "func_c".to_string(),
@@ -333,6 +339,8 @@ mod tests {
                             is_pure: None,
                             purity_confidence: None,
                             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
                         },
                     ],
                     cyclomatic_complexity: 10,

@@ -31,6 +31,8 @@ fn create_test_metrics_simple() -> FileMetrics {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
             }],
             cyclomatic_complexity: 2,
             cognitive_complexity: 3,
@@ -63,6 +65,8 @@ fn create_test_metrics_complex() -> FileMetrics {
                     is_pure: None,
                     purity_confidence: None,
                     detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
                 },
                 FunctionMetrics {
                     name: "complex_func2".to_string(),
@@ -80,6 +84,8 @@ fn create_test_metrics_complex() -> FileMetrics {
                     is_pure: None,
                     purity_confidence: None,
                     detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
                 },
             ],
             cyclomatic_complexity: 8,
@@ -264,6 +270,8 @@ mod test_combine_metrics {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
         };
 
         let func2 = FunctionMetrics {
@@ -282,6 +290,8 @@ mod test_combine_metrics {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
         };
 
         let metrics1 = ComplexityMetrics {
@@ -333,6 +343,8 @@ mod test_combine_metrics {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
         };
 
         let metrics1 = ComplexityMetrics {

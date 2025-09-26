@@ -44,6 +44,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert!(is_trivial_delegation(&trivial));
 
@@ -63,6 +65,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert!(is_trivial_delegation(&simple));
 
@@ -82,6 +86,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert!(!is_trivial_delegation(&complex));
     }
@@ -104,6 +110,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert_eq!(calculate_complexity_weight(&trivial), 0.1);
 
@@ -123,6 +131,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert_eq!(calculate_complexity_weight(&simple), 0.5);
 
@@ -142,6 +152,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert_eq!(calculate_complexity_weight(&complex), 1.0);
     }

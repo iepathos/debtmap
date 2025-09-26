@@ -20,6 +20,8 @@ fn test_complexity_metrics() {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
         },
         FunctionMetrics {
             name: "complex".to_string(),
@@ -37,6 +39,8 @@ fn test_complexity_metrics() {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
         },
         FunctionMetrics {
             name: "medium".to_string(),
@@ -54,6 +58,8 @@ fn test_complexity_metrics() {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
         },
     ];
 
@@ -91,6 +97,8 @@ fn test_function_is_complex() {
         is_pure: None,
         purity_confidence: None,
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     };
 
     assert!(

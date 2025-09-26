@@ -2181,6 +2181,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.3),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt = classify_test_debt(&test_func);
@@ -2216,6 +2218,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.5),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt = check_enhanced_complexity_hotspot(&complex_func);
@@ -2251,6 +2255,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt = check_enhanced_complexity_hotspot(&simple_func);
@@ -2335,6 +2341,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2371,6 +2379,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2411,6 +2421,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2449,6 +2461,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.9),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2488,6 +2502,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.95),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2527,6 +2543,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let transitive_cov = TransitiveCoverage {
@@ -2570,6 +2588,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.85),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         // Test at cyclomatic=10 (not complex)
@@ -2621,6 +2641,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let func_id = create_function_id(&func);
@@ -2864,6 +2886,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.95),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt_type = DebtType::ComplexityHotspot {
@@ -2919,6 +2943,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.85),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let info = FunctionInfo::from_metrics(&func);

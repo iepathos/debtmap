@@ -295,6 +295,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }];
         let smells = detect_data_clumps(&functions);
         assert_eq!(
@@ -323,6 +325,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
             FunctionMetrics {
                 name: "function_b".to_string(),
@@ -340,6 +344,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -369,6 +375,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
             FunctionMetrics {
                 name: "validate_user_data".to_string(),
@@ -386,6 +394,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -423,6 +433,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
             FunctionMetrics {
                 name: "func_b".to_string(),
@@ -440,6 +452,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
             FunctionMetrics {
                 name: "func_c".to_string(),
@@ -457,6 +471,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
             FunctionMetrics {
                 name: "small_func".to_string(),
@@ -474,6 +490,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -511,6 +529,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         // Test with parameter count below threshold
@@ -581,6 +601,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         // Test with length below threshold
@@ -623,6 +645,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         // Test with nesting below threshold
@@ -673,6 +697,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         // Test function with multiple smells
@@ -702,6 +728,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let smells = analyze_function_smells(&clean_func, 3);

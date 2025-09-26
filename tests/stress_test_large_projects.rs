@@ -51,6 +51,8 @@ mod stress_tests {
                     is_pure: Some(func_idx % 3 != 0),
                     purity_confidence: Some(if func_idx % 3 != 0 { 0.8 } else { 0.2 }),
                     detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
                 });
             }
         }
