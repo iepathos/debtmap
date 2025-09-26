@@ -289,9 +289,11 @@ exec('dangerous_code')
     let complexity1 = detector1.calculate_pattern_complexity();
 
     // Test with custom weights
-    let mut custom_weights = PythonComplexityWeights::default();
-    custom_weights.generator_weight = 10.0;
-    custom_weights.exec_eval_weight = 20.0;
+    let custom_weights = PythonComplexityWeights {
+        generator_weight: 10.0,
+        exec_eval_weight: 20.0,
+        ..Default::default()
+    };
 
     let mut detector2 = PythonSpecificPatternDetector::new().with_weights(custom_weights);
     detector2.detect_patterns(&module);

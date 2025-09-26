@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_populate_call_graph_data_single_function() {
-        let mut metrics = vec![create_test_function_metric("test_func", "test.py", 10)];
+        let metrics = vec![create_test_function_metric("test_func", "test.py", 10)];
         let mut call_graph = CallGraph::new();
 
         let func_id = FunctionId {
