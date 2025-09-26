@@ -25,6 +25,8 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         is_pure: None,
         purity_confidence: None,
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     };
 
     let func_id = FunctionId {
@@ -86,6 +88,8 @@ fn test_visit_trait_pattern_exclusion() {
         is_pure: None,
         purity_confidence: None,
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     };
 
     let func_id = FunctionId {

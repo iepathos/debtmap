@@ -388,6 +388,8 @@ mod tests {
                     is_pure: None,
                     purity_confidence: None,
                     detected_patterns: None,
+                    upstream_callers: None,
+                    downstream_callees: None,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -778,6 +780,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         });
 
         assert!(!metrics_equal(&metrics1, &metrics2));
@@ -864,6 +868,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         });
 
         inc.previous_state = inc

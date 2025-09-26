@@ -1332,6 +1332,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }
     }
 

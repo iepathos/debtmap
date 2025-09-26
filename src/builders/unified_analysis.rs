@@ -2,7 +2,7 @@ use super::{call_graph, parallel_call_graph, parallel_unified_analysis};
 use crate::{
     analysis::diagnostics::{DetailLevel, DiagnosticReporter, OutputFormat},
     analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
-    analyzers::FileAnalyzer,
+    analyzers::{call_graph_integration, FileAnalyzer},
     cache::{CacheKey, CallGraphCache, UnifiedAnalysisCache, UnifiedAnalysisCacheKey},
     config,
     core::{self, AnalysisResults, DebtItem, FunctionMetrics, Language},
@@ -365,8 +365,14 @@ fn perform_unified_analysis_computation(
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
+    // Populate call graph data into function metrics for better analysis
+    let enriched_metrics = call_graph_integration::populate_call_graph_data(
+        results.complexity.metrics.clone(),
+        &call_graph,
+    );
+
     let result = create_unified_analysis_with_exclusions(
-        &results.complexity.metrics,
+        &enriched_metrics,
         &call_graph,
         coverage_data.as_ref(),
         &framework_exclusions,

@@ -163,6 +163,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }];
 
         AnalysisResults {
@@ -336,6 +338,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -358,6 +362,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -380,6 +386,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -402,6 +410,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -428,6 +438,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
             });
         }
 
@@ -466,6 +478,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -483,6 +497,8 @@ mod tests {
                 is_pure: None,
                 purity_confidence: None,
                 detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
         ];
 

@@ -138,6 +138,8 @@ fn create_getter() -> FunctionMetrics {
         is_pure: Some(true),
         purity_confidence: Some(1.0),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -158,6 +160,8 @@ fn create_setter() -> FunctionMetrics {
         is_pure: Some(false),
         purity_confidence: Some(0.9),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -178,6 +182,8 @@ fn create_simple_validator() -> FunctionMetrics {
         is_pure: Some(true),
         purity_confidence: Some(0.95),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -198,6 +204,8 @@ fn create_small_util() -> FunctionMetrics {
         is_pure: Some(true),
         purity_confidence: Some(0.85),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -218,6 +226,8 @@ fn create_test_helper() -> FunctionMetrics {
         is_pure: Some(false),
         purity_confidence: Some(0.5),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -238,6 +248,8 @@ fn create_complex_handler() -> FunctionMetrics {
         is_pure: Some(false),
         purity_confidence: Some(0.3),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -258,6 +270,8 @@ fn create_nested_logic() -> FunctionMetrics {
         is_pure: Some(false),
         purity_confidence: Some(0.4),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -278,6 +292,8 @@ fn create_long_switch() -> FunctionMetrics {
         is_pure: Some(true),
         purity_confidence: Some(0.8),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -298,5 +314,7 @@ fn create_moderate_complexity() -> FunctionMetrics {
         is_pure: Some(true),
         purity_confidence: Some(0.9),
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }

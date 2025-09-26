@@ -1128,6 +1128,8 @@ mod tests {
                 in_test_module: false,
                 entropy_score: None,
                 detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
             })
             .collect();
 

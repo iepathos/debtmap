@@ -293,6 +293,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let pattern = detector.detect(&func);
@@ -323,6 +325,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let pattern = detector.detect(&func);
@@ -352,6 +356,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let pattern = detector.detect(&func);
@@ -387,6 +393,8 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }];
 
         let result = tracker.analyze_patterns(&functions);

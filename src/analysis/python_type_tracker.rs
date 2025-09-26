@@ -441,6 +441,10 @@ pub struct TwoPassExtractor {
     pub type_tracker: PythonTypeTracker,
     /// Call graph being built
     pub call_graph: CallGraph,
+    /// Set of known function IDs discovered in phase one
+    known_functions: HashSet<FunctionId>,
+    /// Map function names to their FunctionIds for easier lookup (without line numbers)
+    function_name_map: HashMap<String, FunctionId>,
     /// Current function context
     current_function: Option<FunctionId>,
     /// Current class context
@@ -453,6 +457,8 @@ impl TwoPassExtractor {
             phase_one_calls: Vec::new(),
             type_tracker: PythonTypeTracker::new(file_path.clone()),
             call_graph: CallGraph::new(),
+            known_functions: HashSet::new(),
+            function_name_map: HashMap::new(),
             current_function: None,
             current_class: None,
         }
@@ -466,6 +472,11 @@ impl TwoPassExtractor {
         // Phase 2: Resolve calls using type information
         self.phase_two();
 
+        self.call_graph.clone()
+    }
+
+    /// Get the extracted call graph
+    pub fn get_call_graph(&self) -> CallGraph {
         self.call_graph.clone()
     }
 
@@ -541,6 +552,11 @@ impl TwoPassExtractor {
             func_def.body.len(), // line count approximation
         );
 
+        // Track function for phase two resolution
+        self.known_functions.insert(func_id.clone());
+        self.function_name_map
+            .insert(func_name.clone(), func_id.clone());
+
         let prev_function = self.current_function.clone();
         self.current_function = Some(func_id.clone());
 
@@ -592,6 +608,11 @@ impl TwoPassExtractor {
 
         self.call_graph
             .add_function(func_id.clone(), false, false, 10, func_def.body.len());
+
+        // Track function for phase two resolution
+        self.known_functions.insert(func_id.clone());
+        self.function_name_map
+            .insert(func_name.clone(), func_id.clone());
 
         let prev_function = self.current_function.clone();
         self.current_function = Some(func_id.clone());
@@ -750,15 +771,9 @@ impl TwoPassExtractor {
             // Function call resolution
             if let ast::Expr::Call(call) = &unresolved.call_expr {
                 if let ast::Expr::Name(name) = &*call.func {
-                    // Check if it's a known function
-                    let func_id = FunctionId {
-                        name: name.id.to_string(),
-                        file: self.type_tracker.file_path.clone(),
-                        line: 0,
-                    };
-                    // Check if function exists in call graph
-                    if self.call_graph.get_function_info(&func_id).is_some() {
-                        return Some(func_id);
+                    // Look up function by name
+                    if let Some(func_id) = self.function_name_map.get(name.id.as_str()) {
+                        return Some(func_id.clone());
                     }
                 }
             }
@@ -900,5 +915,134 @@ mod tests {
             tracker.infer_type(&name_expr),
             PythonType::BuiltIn("int".to_string())
         );
+    }
+
+    #[test]
+    fn test_simple_function_call_extraction() {
+        let code = r#"
+def helper():
+    print("Helper")
+
+def main():
+    helper()
+"#;
+
+        let module =
+            rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new(PathBuf::from("test.py"));
+        let call_graph = extractor.extract(&module);
+
+        // Check that functions are registered
+        let main_id = FunctionId {
+            name: "main".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 0,
+        };
+        let helper_id = FunctionId {
+            name: "helper".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 0,
+        };
+
+        assert!(call_graph.get_function_info(&main_id).is_some());
+        assert!(call_graph.get_function_info(&helper_id).is_some());
+
+        // Check that the call from main to helper is tracked
+        let callees = call_graph.get_callees(&main_id);
+        assert_eq!(callees.len(), 1);
+        assert_eq!(callees[0].name, "helper");
+    }
+
+    #[test]
+    fn test_method_call_extraction() {
+        let code = r#"
+class Calculator:
+    def __init__(self):
+        self.value = 0
+        self.reset()
+
+    def reset(self):
+        self.value = 0
+
+    def add(self, x):
+        self.value += x
+        self.log("add")
+
+    def log(self, msg):
+        print(msg)
+"#;
+
+        let module =
+            rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new(PathBuf::from("test.py"));
+        let call_graph = extractor.extract(&module);
+
+        // Check that __init__ calls reset
+        let init_id = FunctionId {
+            name: "Calculator.__init__".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 0,
+        };
+
+        let init_callees = call_graph.get_callees(&init_id);
+        assert!(init_callees.iter().any(|f| f.name == "Calculator.reset"));
+
+        // Check that add calls log
+        let add_id = FunctionId {
+            name: "Calculator.add".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 0,
+        };
+        let add_callees = call_graph.get_callees(&add_id);
+        assert!(add_callees.iter().any(|f| f.name == "Calculator.log"));
+    }
+
+    #[test]
+    fn test_known_functions_tracking() {
+        let code = r#"
+def func_a():
+    pass
+
+def func_b():
+    func_a()
+
+def func_c():
+    func_b()
+    func_a()
+"#;
+
+        let module =
+            rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new(PathBuf::from("test.py"));
+
+        // After phase one, known_functions should contain all three functions
+        if let ast::Mod::Module(module) = &module {
+            for stmt in &module.body {
+                extractor.analyze_stmt_phase_one(stmt);
+            }
+        }
+
+        assert_eq!(extractor.known_functions.len(), 3);
+
+        // Verify all functions are tracked
+        let func_a = FunctionId {
+            name: "func_a".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 0,
+        };
+        let func_b = FunctionId {
+            name: "func_b".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 0,
+        };
+        let func_c = FunctionId {
+            name: "func_c".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 0,
+        };
+
+        assert!(extractor.known_functions.contains(&func_a));
+        assert!(extractor.known_functions.contains(&func_b));
+        assert!(extractor.known_functions.contains(&func_c));
     }
 }

@@ -712,7 +712,20 @@ pub fn is_dead_code(
         }
     }
 
-    // Check if function has incoming calls
+    // For Python files, use the PythonDeadCodeDetector which properly considers
+    // the call graph data from TwoPassExtractor including method calls and implicit calls
+    let language = crate::core::Language::from_path(&func.file);
+    if language == crate::core::Language::Python {
+        let detector = PythonDeadCodeDetector::new();
+        // Use the enhanced detection that considers both call graph and implicit calls
+        if let Some((is_dead, _confidence)) =
+            detector.is_dead_code_with_confidence(func, call_graph, func_id)
+        {
+            return is_dead;
+        }
+    }
+
+    // For other languages, check if function has incoming calls
     let callers = call_graph.get_callers(func_id);
     callers.is_empty()
 }
@@ -1811,6 +1824,8 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         in_test_module: false,
         entropy_score: None,
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
@@ -2168,6 +2183,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.3),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt = classify_test_debt(&test_func);
@@ -2203,6 +2220,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.5),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt = check_enhanced_complexity_hotspot(&complex_func);
@@ -2238,6 +2257,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt = check_enhanced_complexity_hotspot(&simple_func);
@@ -2322,6 +2343,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2358,6 +2381,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2398,6 +2423,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2436,6 +2463,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.9),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2475,6 +2504,8 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.95),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -2514,6 +2545,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(1.0),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let transitive_cov = TransitiveCoverage {
@@ -2557,6 +2590,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.85),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         // Test at cyclomatic=10 (not complex)
@@ -2608,6 +2643,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let func_id = create_function_id(&func);
@@ -2851,6 +2888,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.95),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let debt_type = DebtType::ComplexityHotspot {
@@ -2906,6 +2945,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.85),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         let info = FunctionInfo::from_metrics(&func);

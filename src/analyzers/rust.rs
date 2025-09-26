@@ -534,6 +534,8 @@ impl FunctionVisitor {
             is_pure: metadata.purity_info.0,
             purity_confidence: metadata.purity_info.1,
             detected_patterns: None, // TODO: Add pattern detection for Rust
+            upstream_callers: None,
+            downstream_callees: None,
         }
     }
 
@@ -867,6 +869,8 @@ impl FunctionVisitor {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }
     }
 
@@ -1418,6 +1422,8 @@ mod tests {
                 is_pure: Some(true),
                 purity_confidence: Some(1.0),
                 detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1435,6 +1441,8 @@ mod tests {
                 is_pure: Some(true),
                 purity_confidence: Some(1.0),
                 detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
             },
         ];
 
@@ -1470,6 +1478,8 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }];
         let debt_items = vec![];
         let dependencies = vec![Dependency {
