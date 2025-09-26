@@ -496,10 +496,7 @@ impl UnifiedAnalysis {
                 }
             } else {
                 // Group similar items
-                tier_groups
-                    .entry((tier, debt_type))
-                    .or_default()
-                    .push(item);
+                tier_groups.entry((tier, debt_type)).or_default().push(item);
             }
         }
 
