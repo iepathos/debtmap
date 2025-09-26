@@ -1,4 +1,6 @@
-use crate::priority::{DebtItem, DebtType, FileDebtItem, UnifiedAnalysis, UnifiedDebtItem};
+use crate::priority::{
+    DebtItem, DebtType, DisplayGroup, FileDebtItem, Tier, UnifiedAnalysis, UnifiedDebtItem,
+};
 use std::fmt::Write;
 
 /// Format priorities for markdown output without ANSI color codes
@@ -36,6 +38,259 @@ pub fn format_priorities_markdown(
     }
 
     output
+}
+
+/// Format priorities for markdown output with tiered display
+pub fn format_priorities_tiered_markdown(
+    analysis: &UnifiedAnalysis,
+    limit: usize,
+    verbosity: u8,
+) -> String {
+    let mut output = String::new();
+
+    let version = env!("CARGO_PKG_VERSION");
+    writeln!(output, "# Debtmap v{}\n", version).unwrap();
+
+    let tiered_display = analysis.get_tiered_display(limit);
+
+    writeln!(output, "## Technical Debt Analysis - Priority Tiers\n").unwrap();
+
+    // Format each tier
+    format_tier_section(
+        &mut output,
+        &tiered_display.critical,
+        Tier::Critical,
+        verbosity,
+    );
+    format_tier_section(&mut output, &tiered_display.high, Tier::High, verbosity);
+    format_tier_section(
+        &mut output,
+        &tiered_display.moderate,
+        Tier::Moderate,
+        verbosity,
+    );
+    format_tier_section(&mut output, &tiered_display.low, Tier::Low, verbosity);
+
+    // Add summary
+    writeln!(output, "---\n").unwrap();
+    writeln!(output, "## Summary\n").unwrap();
+
+    let critical_count: usize = tiered_display.critical.iter().map(|g| g.items.len()).sum();
+    let high_count: usize = tiered_display.high.iter().map(|g| g.items.len()).sum();
+    let moderate_count: usize = tiered_display.moderate.iter().map(|g| g.items.len()).sum();
+    let low_count: usize = tiered_display.low.iter().map(|g| g.items.len()).sum();
+
+    writeln!(
+        output,
+        "**Total Debt Items:** {}",
+        critical_count + high_count + moderate_count + low_count
+    )
+    .unwrap();
+    writeln!(output, "- 🚨 Critical: {} items", critical_count).unwrap();
+    writeln!(output, "- ⚠️ High: {} items", high_count).unwrap();
+    writeln!(output, "- 📊 Moderate: {} items", moderate_count).unwrap();
+    writeln!(output, "- 📝 Low: {} items", low_count).unwrap();
+
+    writeln!(output).unwrap();
+    writeln!(
+        output,
+        "**Total Debt Score:** {:.0}",
+        analysis.total_debt_score
+    )
+    .unwrap();
+
+    if let Some(coverage) = analysis.overall_coverage {
+        writeln!(output, "**Overall Coverage:** {:.2}%", coverage).unwrap();
+    }
+
+    output
+}
+
+fn format_tier_section(output: &mut String, groups: &[DisplayGroup], tier: Tier, verbosity: u8) {
+    if groups.is_empty() {
+        return;
+    }
+
+    writeln!(output, "### {}", tier.header()).unwrap();
+    writeln!(output, "_Estimated effort: {}_\n", tier.effort_estimate()).unwrap();
+
+    let max_items_per_tier = 5;
+    let mut items_shown = 0;
+
+    for group in groups {
+        if items_shown >= max_items_per_tier && verbosity < 2 {
+            let remaining: usize = groups.iter().skip(items_shown).map(|g| g.items.len()).sum();
+            if remaining > 0 {
+                writeln!(
+                    output,
+                    "\n_... and {} more items in this tier_\n",
+                    remaining
+                )
+                .unwrap();
+            }
+            break;
+        }
+
+        format_display_group(output, group, verbosity);
+        items_shown += group.items.len();
+    }
+
+    writeln!(output).unwrap();
+}
+
+fn format_display_group(output: &mut String, group: &DisplayGroup, verbosity: u8) {
+    if group.items.len() > 1 && group.batch_action.is_some() {
+        // Format as grouped items
+        writeln!(
+            output,
+            "#### {} ({} items)",
+            group.debt_type,
+            group.items.len()
+        )
+        .unwrap();
+
+        if let Some(action) = &group.batch_action {
+            writeln!(output, "**Batch Action:** {}\n", action).unwrap();
+        }
+
+        if verbosity >= 1 {
+            writeln!(output, "**Items:**").unwrap();
+            for (idx, item) in group.items.iter().take(3).enumerate() {
+                format_debt_item_brief(output, idx + 1, item);
+            }
+            if group.items.len() > 3 {
+                writeln!(
+                    output,
+                    "- _... and {} more similar items_",
+                    group.items.len() - 3
+                )
+                .unwrap();
+            }
+        } else {
+            let total_score: f64 = group.items.iter().map(|i| i.score()).sum();
+            writeln!(output, "- Combined Score: {:.1}", total_score).unwrap();
+            writeln!(output, "- Count: {} items", group.items.len()).unwrap();
+        }
+    } else {
+        // Format as individual item
+        for item in &group.items {
+            format_debt_item_detailed(output, item, verbosity);
+        }
+    }
+    writeln!(output).unwrap();
+}
+
+fn format_debt_item_brief(output: &mut String, rank: usize, item: &DebtItem) {
+    match item {
+        DebtItem::Function(func) => {
+            writeln!(
+                output,
+                "- #{} `{}` (Score: {:.1})",
+                rank, func.location.function, func.unified_score.final_score
+            )
+            .unwrap();
+        }
+        DebtItem::File(file) => {
+            writeln!(
+                output,
+                "- #{} `{}` (Score: {:.1})",
+                rank,
+                file.metrics.path.display(),
+                file.score
+            )
+            .unwrap();
+        }
+    }
+}
+
+fn format_debt_item_detailed(output: &mut String, item: &DebtItem, verbosity: u8) {
+    match item {
+        DebtItem::Function(func) => {
+            format_function_debt_item(output, func, verbosity);
+        }
+        DebtItem::File(file) => {
+            format_file_debt_item(output, file, verbosity);
+        }
+    }
+}
+
+fn format_function_debt_item(output: &mut String, item: &UnifiedDebtItem, verbosity: u8) {
+    let score = item.unified_score.final_score;
+    writeln!(
+        output,
+        "#### {} - Score: {:.1}",
+        item.location.function, score
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "**Location:** `{}:{}`",
+        item.location.file.display(),
+        item.location.line
+    )
+    .unwrap();
+
+    writeln!(output, "**Type:** {}", format_debt_type(&item.debt_type)).unwrap();
+
+    writeln!(output, "**Action:** {}", item.recommendation.primary_action).unwrap();
+
+    if let Some(complexity) = extract_complexity_info(&item.debt_type) {
+        writeln!(output, "**Complexity:** {}", complexity).unwrap();
+    }
+
+    if verbosity >= 1 {
+        writeln!(
+            output,
+            "**Impact:** {}",
+            format_impact(&item.expected_impact)
+        )
+        .unwrap();
+        writeln!(output, "**Why:** {}", item.recommendation.rationale).unwrap();
+    }
+}
+
+fn format_file_debt_item(output: &mut String, item: &FileDebtItem, verbosity: u8) {
+    let score = item.score;
+    let file_name = item
+        .metrics
+        .path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown");
+
+    writeln!(output, "#### {} - Score: {:.1}", file_name, score).unwrap();
+
+    writeln!(
+        output,
+        "**File:** `{}` ({} lines, {} functions)",
+        item.metrics.path.display(),
+        item.metrics.total_lines,
+        item.metrics.function_count
+    )
+    .unwrap();
+
+    if item.metrics.god_object_indicators.is_god_object {
+        writeln!(output, "**Type:** GOD OBJECT").unwrap();
+        writeln!(
+            output,
+            "**Metrics:** {} methods, {} fields, {} responsibilities",
+            item.metrics.god_object_indicators.methods_count,
+            item.metrics.god_object_indicators.fields_count,
+            item.metrics.god_object_indicators.responsibilities
+        )
+        .unwrap();
+    } else if item.metrics.total_lines > 500 {
+        writeln!(output, "**Type:** LARGE FILE").unwrap();
+    } else {
+        writeln!(output, "**Type:** COMPLEX FILE").unwrap();
+    }
+
+    writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
+
+    if verbosity >= 1 {
+        writeln!(output, "**Impact:** {}", format_file_impact(&item.impact)).unwrap();
+    }
 }
 
 fn format_mixed_priority_item_markdown(
@@ -1307,6 +1562,257 @@ mod tests {
 
         assert!(output.contains("[CRITICAL]")); // Score 18.5 is CRITICAL (>=9.0)
         assert!(output.contains("**Type:** FILE"));
+    }
+
+    #[test]
+    fn test_format_priorities_tiered_markdown() {
+        use crate::priority::CallGraph;
+        use std::path::PathBuf;
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Add items with various scores to test tiering
+        let critical_item = UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("critical.rs"),
+                line: 10,
+                function: "critical_func".to_string(),
+            },
+            debt_type: DebtType::GodObject {
+                responsibility_count: 10,
+                complexity_score: 95.0,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 10.0,
+                coverage_factor: 10.0,
+                dependency_factor: 10.0,
+                role_multiplier: 1.0,
+                final_score: 95.0,
+            },
+            function_role: FunctionRole::Unknown,
+            recommendation: ActionableRecommendation {
+                primary_action: "Split into multiple classes".to_string(),
+                rationale: "God object detected".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 50.0,
+                risk_reduction: 5.0,
+                coverage_improvement: 20.0,
+                lines_reduction: 500,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 20,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 0,
+            function_length: 1000,
+            cyclomatic_complexity: 50,
+            cognitive_complexity: 100,
+            entropy_details: None,
+            is_pure: Some(false),
+            purity_confidence: Some(1.0),
+            god_object_indicators: None,
+        };
+
+        let high_item = UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("high.rs"),
+                line: 20,
+                function: "high_func".to_string(),
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 30,
+                cognitive: 40,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 8.0,
+                coverage_factor: 7.0,
+                dependency_factor: 6.0,
+                role_multiplier: 1.0,
+                final_score: 75.0,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Refactor complex function".to_string(),
+                rationale: "High complexity".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 20.0,
+                risk_reduction: 2.0,
+                coverage_improvement: 10.0,
+                lines_reduction: 100,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 2,
+            downstream_dependencies: 5,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 3,
+            function_length: 200,
+            cyclomatic_complexity: 30,
+            cognitive_complexity: 40,
+            entropy_details: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.8),
+            god_object_indicators: None,
+        };
+
+        let moderate_item = UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("moderate.rs"),
+                line: 30,
+                function: "moderate_func".to_string(),
+            },
+            debt_type: DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 10,
+                cognitive: 15,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 5.0,
+                coverage_factor: 6.0,
+                dependency_factor: 4.0,
+                role_multiplier: 1.0,
+                final_score: 55.0,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Add unit tests".to_string(),
+                rationale: "No test coverage".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                risk_reduction: 1.0,
+                coverage_improvement: 50.0,
+                lines_reduction: 0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 1,
+            downstream_dependencies: 2,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 50,
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 15,
+            entropy_details: None,
+            is_pure: Some(true),
+            purity_confidence: Some(0.9),
+            god_object_indicators: None,
+        };
+
+        let low_item = UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("low.rs"),
+                line: 40,
+                function: "low_func".to_string(),
+            },
+            debt_type: DebtType::DeadCode {
+                visibility: FunctionVisibility::Private,
+                cyclomatic: 5,
+                cognitive: 8,
+                usage_hints: vec![],
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 2.0,
+                coverage_factor: 3.0,
+                dependency_factor: 2.0,
+                role_multiplier: 1.0,
+                final_score: 25.0,
+            },
+            function_role: FunctionRole::Unknown,
+            recommendation: ActionableRecommendation {
+                primary_action: "Remove dead code".to_string(),
+                rationale: "Function is not used".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 5.0,
+                risk_reduction: 0.1,
+                coverage_improvement: 0.0,
+                lines_reduction: 30,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 30,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 8,
+            entropy_details: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.5),
+            god_object_indicators: None,
+        };
+
+        analysis.add_item(critical_item);
+        analysis.add_item(high_item);
+        analysis.add_item(moderate_item);
+        analysis.add_item(low_item);
+        analysis.sort_by_priority();
+        analysis.calculate_total_impact();
+
+        let output = format_priorities_tiered_markdown(&analysis, 10, 0);
+
+        // Check that all tier headers are present (if not empty)
+        assert!(output.contains("🚨 CRITICAL"));
+        assert!(output.contains("⚠️ HIGH"));
+        assert!(output.contains("📊 MODERATE"));
+        assert!(output.contains("📝 LOW"));
+
+        // Check that items are in the right sections
+        assert!(output.contains("critical_func"));
+        assert!(output.contains("high_func"));
+        assert!(output.contains("moderate_func"));
+        assert!(output.contains("low_func"));
+
+        // Check effort estimates
+        assert!(output.contains("1-2 days per item"));
+        assert!(output.contains("2-4 hours per item"));
+
+        // Check summary section
+        assert!(output.contains("## Summary"));
+        assert!(output.contains("Total Debt Items:"));
+    }
+
+    #[test]
+    fn test_tier_classification() {
+        assert_eq!(Tier::from_score(95.0), Tier::Critical);
+        assert_eq!(Tier::from_score(90.0), Tier::Critical);
+        assert_eq!(Tier::from_score(89.9), Tier::High);
+        assert_eq!(Tier::from_score(75.0), Tier::High);
+        assert_eq!(Tier::from_score(70.0), Tier::High);
+        assert_eq!(Tier::from_score(69.9), Tier::Moderate);
+        assert_eq!(Tier::from_score(55.0), Tier::Moderate);
+        assert_eq!(Tier::from_score(50.0), Tier::Moderate);
+        assert_eq!(Tier::from_score(49.9), Tier::Low);
+        assert_eq!(Tier::from_score(25.0), Tier::Low);
+        assert_eq!(Tier::from_score(0.0), Tier::Low);
+    }
+
+    #[test]
+    fn test_tier_headers() {
+        assert_eq!(
+            Tier::Critical.header(),
+            "🚨 CRITICAL - Immediate Action Required"
+        );
+        assert_eq!(Tier::High.header(), "⚠️ HIGH - Current Sprint Priority");
+        assert_eq!(
+            Tier::Moderate.header(),
+            "📊 MODERATE - Next Sprint Planning"
+        );
+        assert_eq!(Tier::Low.header(), "📝 LOW - Backlog Consideration");
     }
 
     #[test]

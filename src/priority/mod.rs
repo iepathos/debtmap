@@ -18,11 +18,12 @@ pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage
 pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
 pub use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
 pub use formatter::{format_priorities, OutputFormat};
-pub use formatter_markdown::format_priorities_markdown;
+pub use formatter_markdown::{format_priorities_markdown, format_priorities_tiered_markdown};
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, UnifiedScore};
 
 use im::Vector;
+use std::hash::Hash;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -201,6 +202,59 @@ impl DebtItem {
             DebtItem::File(_) => "FILE",
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Tier {
+    Critical, // Score ≥ 90.0
+    High,     // Score 70.0-89.9
+    Moderate, // Score 50.0-69.9
+    Low,      // Score < 50.0
+}
+
+impl Tier {
+    pub fn from_score(score: f64) -> Self {
+        match score {
+            s if s >= 90.0 => Tier::Critical,
+            s if s >= 70.0 => Tier::High,
+            s if s >= 50.0 => Tier::Moderate,
+            _ => Tier::Low,
+        }
+    }
+
+    pub fn header(&self) -> &'static str {
+        match self {
+            Tier::Critical => "🚨 CRITICAL - Immediate Action Required",
+            Tier::High => "⚠️ HIGH - Current Sprint Priority",
+            Tier::Moderate => "📊 MODERATE - Next Sprint Planning",
+            Tier::Low => "📝 LOW - Backlog Consideration",
+        }
+    }
+
+    pub fn effort_estimate(&self) -> &'static str {
+        match self {
+            Tier::Critical => "1-2 days per item",
+            Tier::High => "2-4 hours per item",
+            Tier::Moderate => "1-2 hours per item",
+            Tier::Low => "30 minutes per item",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DisplayGroup {
+    pub tier: Tier,
+    pub debt_type: String,
+    pub items: Vec<DebtItem>,
+    pub batch_action: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TieredDisplay {
+    pub critical: Vec<DisplayGroup>,
+    pub high: Vec<DisplayGroup>,
+    pub moderate: Vec<DisplayGroup>,
+    pub low: Vec<DisplayGroup>,
 }
 
 impl UnifiedAnalysis {
@@ -404,6 +458,158 @@ impl UnifiedAnalysis {
             self.items.clone()
         } else {
             self.items.iter().skip(total_items - n).cloned().collect()
+        }
+    }
+
+    /// Generate a tiered display of debt items grouped by priority tier
+    pub fn get_tiered_display(&self, limit: usize) -> TieredDisplay {
+        let all_items = self.get_top_mixed_priorities(limit);
+
+        let mut critical_groups: Vec<DisplayGroup> = Vec::new();
+        let mut high_groups: Vec<DisplayGroup> = Vec::new();
+        let mut moderate_groups: Vec<DisplayGroup> = Vec::new();
+        let mut low_groups: Vec<DisplayGroup> = Vec::new();
+
+        // Group items by tier and debt type
+        use std::collections::HashMap;
+        let mut tier_groups: HashMap<(Tier, String), Vec<DebtItem>> = HashMap::new();
+
+        for item in all_items {
+            let tier = Tier::from_score(item.score());
+            let debt_type = self.get_debt_type_key(&item);
+
+            // Never group god objects or architectural issues
+            if self.is_critical_item(&item) {
+                // Add as individual group
+                let group = DisplayGroup {
+                    tier: tier.clone(),
+                    debt_type: debt_type.clone(),
+                    items: vec![item],
+                    batch_action: None,
+                };
+
+                match tier {
+                    Tier::Critical => critical_groups.push(group),
+                    Tier::High => high_groups.push(group),
+                    Tier::Moderate => moderate_groups.push(group),
+                    Tier::Low => low_groups.push(group),
+                }
+            } else {
+                // Group similar items
+                tier_groups
+                    .entry((tier, debt_type))
+                    .or_default()
+                    .push(item);
+            }
+        }
+
+        // Create display groups for grouped items
+        for ((tier, debt_type), items) in tier_groups {
+            if items.is_empty() {
+                continue;
+            }
+
+            let batch_action = if items.len() > 1 {
+                Some(self.generate_batch_action(&debt_type, items.len()))
+            } else {
+                None
+            };
+
+            let group = DisplayGroup {
+                tier: tier.clone(),
+                debt_type,
+                items,
+                batch_action,
+            };
+
+            match tier {
+                Tier::Critical => critical_groups.push(group),
+                Tier::High => high_groups.push(group),
+                Tier::Moderate => moderate_groups.push(group),
+                Tier::Low => low_groups.push(group),
+            }
+        }
+
+        // Sort groups within each tier by total score
+        let sort_groups = |groups: &mut Vec<DisplayGroup>| {
+            groups.sort_by(|a, b| {
+                let a_score: f64 = a.items.iter().map(|i| i.score()).sum();
+                let b_score: f64 = b.items.iter().map(|i| i.score()).sum();
+                b_score
+                    .partial_cmp(&a_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        };
+
+        sort_groups(&mut critical_groups);
+        sort_groups(&mut high_groups);
+        sort_groups(&mut moderate_groups);
+        sort_groups(&mut low_groups);
+
+        TieredDisplay {
+            critical: critical_groups,
+            high: high_groups,
+            moderate: moderate_groups,
+            low: low_groups,
+        }
+    }
+
+    fn get_debt_type_key(&self, item: &DebtItem) -> String {
+        match item {
+            DebtItem::Function(func) => match &func.debt_type {
+                DebtType::TestingGap { .. } => "Untested Complex Functions".to_string(),
+                DebtType::ComplexityHotspot { .. } => "High Complexity Functions".to_string(),
+                DebtType::DeadCode { .. } => "Dead Code".to_string(),
+                DebtType::Duplication { .. } => "Code Duplication".to_string(),
+                DebtType::Risk { .. } => "High Risk Functions".to_string(),
+                DebtType::GodObject { .. } => "God Object".to_string(),
+                DebtType::FeatureEnvy { .. } => "Feature Envy".to_string(),
+                DebtType::TestComplexityHotspot { .. } => "Complex Test Functions".to_string(),
+                _ => "Technical Debt".to_string(),
+            },
+            DebtItem::File(file) => {
+                if file.metrics.god_object_indicators.is_god_object {
+                    "God Object File".to_string()
+                } else if file.metrics.total_lines > 1000 {
+                    "Large File".to_string()
+                } else if file.metrics.avg_complexity > 10.0 {
+                    "Complex File".to_string()
+                } else {
+                    "File-Level Debt".to_string()
+                }
+            }
+        }
+    }
+
+    fn is_critical_item(&self, item: &DebtItem) -> bool {
+        match item {
+            DebtItem::Function(func) => {
+                matches!(func.debt_type, DebtType::GodObject { .. })
+                    || func.unified_score.final_score >= 95.0
+            }
+            DebtItem::File(file) => {
+                file.metrics.god_object_indicators.is_god_object
+                    || file.metrics.total_lines > 2000
+                    || file.score >= 95.0
+            }
+        }
+    }
+
+    fn generate_batch_action(&self, debt_type: &str, count: usize) -> String {
+        match debt_type {
+            "Untested Complex Functions" => {
+                format!("Add test coverage for {} complex functions", count)
+            }
+            "High Complexity Functions" => {
+                format!("Refactor {} complex functions into smaller units", count)
+            }
+            "Dead Code" => format!("Remove {} unused functions", count),
+            "Code Duplication" => format!(
+                "Extract {} duplicated code blocks into shared utilities",
+                count
+            ),
+            "Complex Test Functions" => format!("Simplify {} complex test functions", count),
+            _ => format!("Address {} {} items", count, debt_type.to_lowercase()),
         }
     }
 

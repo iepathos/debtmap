@@ -465,12 +465,45 @@ fn default_max_complexity() -> u32 {
     200
 }
 
+/// Display configuration for output formatting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisplayConfig {
+    /// Whether to use tiered priority display
+    #[serde(default = "default_tiered_display")]
+    pub tiered: bool,
+
+    /// Maximum items to show per tier (default: 5)
+    #[serde(default = "default_items_per_tier")]
+    pub items_per_tier: usize,
+}
+
+impl Default for DisplayConfig {
+    fn default() -> Self {
+        Self {
+            tiered: default_tiered_display(),
+            items_per_tier: default_items_per_tier(),
+        }
+    }
+}
+
+fn default_tiered_display() -> bool {
+    true // Enable tiered display by default
+}
+
+fn default_items_per_tier() -> usize {
+    5
+}
+
 /// Root configuration structure for debtmap
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DebtmapConfig {
     /// Scoring weights configuration
     #[serde(default)]
     pub scoring: Option<ScoringWeights>,
+
+    /// Display configuration for output formatting
+    #[serde(default)]
+    pub display: Option<DisplayConfig>,
 
     /// External API detection configuration
     #[serde(default)]
@@ -994,6 +1027,11 @@ pub fn get_minimum_risk_score() -> f64 {
         .as_ref()
         .and_then(|t| t.minimum_risk_score)
         .unwrap_or(1.0)
+}
+
+/// Get display configuration (with defaults)
+pub fn get_display_config() -> DisplayConfig {
+    get_config().display.clone().unwrap_or_default()
 }
 
 /// Get validation thresholds (with defaults)
