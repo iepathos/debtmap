@@ -222,7 +222,7 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
 
     // Use TwoPassExtractor for two-pass analysis
     use crate::analysis::python_type_tracker::TwoPassExtractor;
-    let mut extractor = TwoPassExtractor::new(ast.path.clone());
+    let mut extractor = TwoPassExtractor::new_with_source(ast.path.clone(), &source_content);
 
     // Phase 1: Register all functions and extract call relationships
     extractor.extract(&ast.module);

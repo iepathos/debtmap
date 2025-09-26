@@ -324,7 +324,7 @@ impl PythonTypeTracker {
                     let func_id = FunctionId {
                         name: format!("{}.{}", class_def.name, method_name),
                         file: self.file_path.clone(),
-                        line: 0, // Would need source mapping for accurate line
+                        line: 0, // Line numbers handled by TwoPassExtractor
                     };
 
                     // Check decorators for static/class methods/properties
@@ -449,6 +449,8 @@ pub struct TwoPassExtractor {
     current_function: Option<FunctionId>,
     /// Current class context
     current_class: Option<String>,
+    /// Source code lines for line number extraction
+    source_lines: Vec<String>,
 }
 
 impl TwoPassExtractor {
@@ -461,7 +463,42 @@ impl TwoPassExtractor {
             function_name_map: HashMap::new(),
             current_function: None,
             current_class: None,
+            source_lines: Vec::new(),
         }
+    }
+
+    /// Create a new extractor with source content for line number extraction
+    pub fn new_with_source(file_path: PathBuf, source: &str) -> Self {
+        let source_lines: Vec<String> = source.lines().map(|s| s.to_string()).collect();
+        Self {
+            phase_one_calls: Vec::new(),
+            type_tracker: PythonTypeTracker::new(file_path.clone()),
+            call_graph: CallGraph::new(),
+            known_functions: HashSet::new(),
+            function_name_map: HashMap::new(),
+            current_function: None,
+            current_class: None,
+            source_lines,
+        }
+    }
+
+    /// Estimate line number for a function by searching for def patterns
+    fn estimate_line_number(&self, func_name: &str) -> usize {
+        if self.source_lines.is_empty() {
+            return 0;
+        }
+
+        let def_pattern = format!("def {}", func_name);
+        let async_def_pattern = format!("async def {}", func_name);
+
+        for (idx, line) in self.source_lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(&def_pattern) || trimmed.starts_with(&async_def_pattern) {
+                return idx + 1; // Line numbers are 1-based
+            }
+        }
+
+        0 // Return 0 if not found (backward compatibility)
     }
 
     /// Extract call graph in two passes
@@ -537,10 +574,13 @@ impl TwoPassExtractor {
             func_def.name.to_string()
         };
 
+        // Extract line number from source if available
+        let line = self.estimate_line_number(func_def.name.as_ref());
+
         let func_id = FunctionId {
             name: func_name.clone(),
             file: self.type_tracker.file_path.clone(),
-            line: 0, // Would need source mapping
+            line,
         };
 
         // Register function with default metrics
@@ -600,10 +640,13 @@ impl TwoPassExtractor {
             func_def.name.to_string()
         };
 
+        // Extract line number from source if available
+        let line = self.estimate_line_number(func_def.name.as_ref());
+
         let func_id = FunctionId {
             name: func_name.clone(),
             file: self.type_tracker.file_path.clone(),
-            line: 0,
+            line,
         };
 
         self.call_graph
@@ -763,9 +806,20 @@ impl TwoPassExtractor {
             if let (Some(receiver_type), Some(method_name)) =
                 (&unresolved.receiver_type, &unresolved.method_name)
             {
-                return self
+                // First resolve the method name using type tracker
+                if let Some(resolved_func_id) = self
                     .type_tracker
-                    .resolve_method_call(receiver_type, method_name);
+                    .resolve_method_call(receiver_type, method_name)
+                {
+                    // Then look up the actual FunctionId with correct line number from our map
+                    if let Some(func_id_with_line) =
+                        self.function_name_map.get(&resolved_func_id.name)
+                    {
+                        return Some(func_id_with_line.clone());
+                    }
+                    // Fallback to the resolved one if not found in map
+                    return Some(resolved_func_id);
+                }
             }
         } else {
             // Function call resolution
@@ -1044,5 +1098,306 @@ def func_c():
         assert!(extractor.known_functions.contains(&func_a));
         assert!(extractor.known_functions.contains(&func_b));
         assert!(extractor.known_functions.contains(&func_c));
+    }
+
+    #[test]
+    fn test_new_with_source() {
+        let source = r#"
+def hello():
+    pass
+
+class MyClass:
+    def method(self):
+        pass
+"#;
+
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+
+        // Verify source lines are correctly stored
+        assert!(!extractor.source_lines.is_empty());
+        assert_eq!(extractor.source_lines.len(), 7); // 7 lines including empty lines
+
+        // Verify the extractor is initialized properly
+        assert_eq!(extractor.phase_one_calls.len(), 0);
+        assert_eq!(extractor.call_graph.get_all_functions().count(), 0);
+        assert!(extractor.known_functions.is_empty());
+        assert!(extractor.current_function.is_none());
+        assert!(extractor.current_class.is_none());
+
+        // Verify source content is preserved
+        assert!(extractor.source_lines[1].contains("def hello()"));
+        assert!(extractor.source_lines[4].contains("class MyClass"));
+    }
+
+    #[test]
+    fn test_estimate_line_number_simple_function() {
+        let source = r#"
+def simple_func():
+    pass
+
+def another_func():
+    pass
+"#;
+
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+
+        // Test finding simple function definitions
+        assert_eq!(extractor.estimate_line_number("simple_func"), 2);
+        assert_eq!(extractor.estimate_line_number("another_func"), 5);
+
+        // Test non-existent function
+        assert_eq!(extractor.estimate_line_number("nonexistent"), 0);
+    }
+
+    #[test]
+    fn test_estimate_line_number_async_function() {
+        let source = r#"
+async def async_func():
+    await something()
+
+async def another_async():
+    pass
+
+def sync_func():
+    pass
+"#;
+
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+
+        // Test finding async functions
+        assert_eq!(extractor.estimate_line_number("async_func"), 2);
+        assert_eq!(extractor.estimate_line_number("another_async"), 5);
+        assert_eq!(extractor.estimate_line_number("sync_func"), 8);
+    }
+
+    #[test]
+    fn test_estimate_line_number_indented_function() {
+        let source = r#"
+class MyClass:
+    def method1(self):
+        pass
+
+    def method2(self):
+        pass
+
+    async def async_method(self):
+        pass
+"#;
+
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+
+        // Test finding indented methods
+        assert_eq!(extractor.estimate_line_number("method1"), 3);
+        assert_eq!(extractor.estimate_line_number("method2"), 6);
+        assert_eq!(extractor.estimate_line_number("async_method"), 9);
+    }
+
+    #[test]
+    fn test_estimate_line_number_decorated_function() {
+        let source = r#"
+@decorator
+def decorated_func():
+    pass
+
+@property
+@cached
+def multi_decorated():
+    pass
+
+    def nested_def():
+        pass
+"#;
+
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+
+        // Test finding decorated functions
+        assert_eq!(extractor.estimate_line_number("decorated_func"), 3);
+        assert_eq!(extractor.estimate_line_number("multi_decorated"), 8);
+        assert_eq!(extractor.estimate_line_number("nested_def"), 11);
+    }
+
+    #[test]
+    fn test_estimate_line_number_multiline_signature() {
+        let source = r#"
+def multiline_func(
+    arg1: str,
+    arg2: int,
+) -> None:
+    pass
+
+def single_line():
+    pass
+
+def another_multiline(arg1,
+                      arg2,
+                      arg3):
+    pass
+"#;
+
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+
+        // Test finding functions with multiline signatures
+        // Should find the line with 'def' keyword
+        assert_eq!(extractor.estimate_line_number("multiline_func"), 2);
+        assert_eq!(extractor.estimate_line_number("single_line"), 8);
+        assert_eq!(extractor.estimate_line_number("another_multiline"), 11);
+    }
+
+    #[test]
+    fn test_estimate_line_number_edge_cases() {
+        let source = r#"
+# def commented_out():
+#     pass
+
+string_with_def = "def not_a_func():"
+
+def real_func():
+    """def in_docstring():"""
+    x = "def in_string():"
+    pass
+"#;
+
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+
+        // Test that we don't match commented or string definitions
+        assert_eq!(extractor.estimate_line_number("commented_out"), 0);
+        assert_eq!(extractor.estimate_line_number("not_a_func"), 0);
+        assert_eq!(extractor.estimate_line_number("in_docstring"), 0);
+        assert_eq!(extractor.estimate_line_number("in_string"), 0);
+
+        // But we should find the real function
+        assert_eq!(extractor.estimate_line_number("real_func"), 7);
+    }
+
+    #[test]
+    fn test_estimate_line_number_empty_source() {
+        let extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), "");
+
+        // Should return 0 for empty source
+        assert_eq!(extractor.estimate_line_number("any_func"), 0);
+    }
+
+    #[test]
+    fn test_integration_line_numbers_in_call_graph() {
+        let source = r#"
+def helper():
+    print("Helper")
+
+def main():
+    helper()
+    another_helper()
+
+def another_helper():
+    pass
+"#;
+
+        let module =
+            rustpython_parser::parse(source, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+        let call_graph = extractor.extract(&module);
+
+        // Check that functions are registered with correct line numbers
+        let main_id = FunctionId {
+            name: "main".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 5, // main is on line 5
+        };
+        let helper_id = FunctionId {
+            name: "helper".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 2, // helper is on line 2
+        };
+        let another_helper_id = FunctionId {
+            name: "another_helper".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 9, // another_helper is on line 9
+        };
+
+        // Verify functions exist with expected line numbers
+        assert!(call_graph.get_function_info(&main_id).is_some());
+        assert!(call_graph.get_function_info(&helper_id).is_some());
+        assert!(call_graph.get_function_info(&another_helper_id).is_some());
+
+        // Check that the calls from main are tracked with correct line numbers
+        let callees = call_graph.get_callees(&main_id);
+        assert_eq!(callees.len(), 2);
+
+        // Verify callee line numbers
+        let helper_callee = callees.iter().find(|f| f.name == "helper").unwrap();
+        assert_eq!(helper_callee.line, 2);
+
+        let another_helper_callee = callees.iter().find(|f| f.name == "another_helper").unwrap();
+        assert_eq!(another_helper_callee.line, 9);
+    }
+
+    #[test]
+    fn test_integration_class_methods_line_numbers() {
+        let source = r#"
+class Calculator:
+    def __init__(self):
+        self.value = 0
+        self.reset()
+
+    def reset(self):
+        self.value = 0
+
+    def add(self, x):
+        self.value += x
+        self.log("add")
+
+    def log(self, msg):
+        print(msg)
+"#;
+
+        let module =
+            rustpython_parser::parse(source, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), source);
+        let call_graph = extractor.extract(&module);
+
+        // Check that methods have correct line numbers
+        let init_id = FunctionId {
+            name: "Calculator.__init__".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 3, // __init__ is on line 3
+        };
+
+        let reset_id = FunctionId {
+            name: "Calculator.reset".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 7, // reset is on line 7
+        };
+
+        let add_id = FunctionId {
+            name: "Calculator.add".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 10, // add is on line 10
+        };
+
+        let log_id = FunctionId {
+            name: "Calculator.log".to_string(),
+            file: PathBuf::from("test.py"),
+            line: 14, // log is on line 14
+        };
+
+        // Verify all methods are tracked with correct line numbers
+        assert!(call_graph.get_function_info(&init_id).is_some());
+        assert!(call_graph.get_function_info(&reset_id).is_some());
+        assert!(call_graph.get_function_info(&add_id).is_some());
+        assert!(call_graph.get_function_info(&log_id).is_some());
+
+        // Verify method calls have correct line numbers
+        let init_callees = call_graph.get_callees(&init_id);
+        let reset_callee = init_callees
+            .iter()
+            .find(|f| f.name == "Calculator.reset")
+            .unwrap();
+        assert_eq!(reset_callee.line, 7);
+
+        let add_callees = call_graph.get_callees(&add_id);
+        let log_callee = add_callees
+            .iter()
+            .find(|f| f.name == "Calculator.log")
+            .unwrap();
+        assert_eq!(log_callee.line, 14);
     }
 }
