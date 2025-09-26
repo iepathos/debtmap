@@ -60,7 +60,8 @@ pub fn format_priorities_categorical_markdown(
     let mut sorted_categories: Vec<(&DebtCategory, &CategorySummary)> =
         categorized.categories.iter().collect();
     sorted_categories.sort_by(|a, b| {
-        b.1.total_score.partial_cmp(&a.1.total_score)
+        b.1.total_score
+            .partial_cmp(&a.1.total_score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
@@ -161,12 +162,7 @@ fn format_categorized_debt_item(output: &mut String, rank: usize, item: &DebtIte
                 func.location.line
             )
             .unwrap();
-            writeln!(
-                output,
-                "   - Type: {}",
-                format_debt_type(&func.debt_type)
-            )
-            .unwrap();
+            writeln!(output, "   - Type: {}", format_debt_type(&func.debt_type)).unwrap();
             if verbosity >= 1 {
                 writeln!(
                     output,
@@ -189,12 +185,7 @@ fn format_categorized_debt_item(output: &mut String, rank: usize, item: &DebtIte
                 rank, file_name, file.score
             )
             .unwrap();
-            writeln!(
-                output,
-                "   - Path: `{}`",
-                file.metrics.path.display()
-            )
-            .unwrap();
+            writeln!(output, "   - Path: `{}`", file.metrics.path.display()).unwrap();
             writeln!(
                 output,
                 "   - Metrics: {} lines, {} functions",
@@ -213,7 +204,11 @@ fn format_cross_category_dependencies(
     dependencies: &[CrossCategoryDependency],
 ) {
     writeln!(output, "### ⚡ Cross-Category Dependencies\n").unwrap();
-    writeln!(output, "These relationships affect how you should prioritize improvements:\n").unwrap();
+    writeln!(
+        output,
+        "These relationships affect how you should prioritize improvements:\n"
+    )
+    .unwrap();
 
     for dep in dependencies {
         let impact_symbol = match dep.impact_level {
@@ -241,13 +236,21 @@ fn format_categorical_summary(output: &mut String, categorized: &CategorizedDebt
     writeln!(output, "## Summary by Category\n").unwrap();
 
     let total_items: usize = categorized.categories.values().map(|c| c.item_count).sum();
-    let total_effort: u32 = categorized.categories.values().map(|c| c.estimated_effort_hours).sum();
+    let total_effort: u32 = categorized
+        .categories
+        .values()
+        .map(|c| c.estimated_effort_hours)
+        .sum();
 
     writeln!(output, "**Total Debt Items:** {}", total_items).unwrap();
     writeln!(output, "**Total Estimated Effort:** {} hours", total_effort).unwrap();
     writeln!(output).unwrap();
 
-    writeln!(output, "| Category | Items | Total Score | Effort (hours) |").unwrap();
+    writeln!(
+        output,
+        "| Category | Items | Total Score | Effort (hours) |"
+    )
+    .unwrap();
     writeln!(output, "|----------|-------|------------|----------------|").unwrap();
 
     for (category, summary) in &categorized.categories {

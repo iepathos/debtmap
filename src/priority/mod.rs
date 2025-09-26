@@ -297,10 +297,10 @@ pub struct CrossCategoryDependency {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImpactLevel {
-    Critical,  // Blocks progress in target category
-    High,      // Significantly affects target category
-    Medium,    // Some effect on target category
-    Low,       // Minor interaction
+    Critical, // Blocks progress in target category
+    High,     // Significantly affects target category
+    Medium,   // Some effect on target category
+    Low,      // Minor interaction
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -808,8 +808,6 @@ impl UnifiedAnalysis {
                         DebtCategory::Architecture
                     } else if file.metrics.coverage_percent < 0.5 {
                         DebtCategory::Testing
-                    } else if file.metrics.avg_complexity > 15.0 {
-                        DebtCategory::CodeQuality
                     } else {
                         DebtCategory::CodeQuality
                     }
@@ -833,21 +831,38 @@ impl UnifiedAnalysis {
             // Estimate effort based on category and average severity
             let effort_per_item = match category {
                 DebtCategory::Architecture => {
-                    if average_severity >= 90.0 { 16 } // 2 days
-                    else if average_severity >= 70.0 { 8 } // 1 day
-                    else { 4 } // Half day
+                    if average_severity >= 90.0 {
+                        16
+                    }
+                    // 2 days
+                    else if average_severity >= 70.0 {
+                        8
+                    }
+                    // 1 day
+                    else {
+                        4
+                    } // Half day
                 }
                 DebtCategory::Testing => {
-                    if average_severity >= 70.0 { 4 }
-                    else { 2 }
+                    if average_severity >= 70.0 {
+                        4
+                    } else {
+                        2
+                    }
                 }
                 DebtCategory::Performance => {
-                    if average_severity >= 70.0 { 8 }
-                    else { 4 }
+                    if average_severity >= 70.0 {
+                        8
+                    } else {
+                        4
+                    }
                 }
                 DebtCategory::CodeQuality => {
-                    if average_severity >= 70.0 { 4 }
-                    else { 2 }
+                    if average_severity >= 70.0 {
+                        4
+                    } else {
+                        2
+                    }
                 }
             };
 
@@ -890,7 +905,9 @@ impl UnifiedAnalysis {
             if let Some(arch) = categories.get(&DebtCategory::Architecture) {
                 // Check for god objects which are hard to test
                 let has_god_objects = arch.top_items.iter().any(|item| match item {
-                    DebtItem::Function(func) => matches!(func.debt_type, DebtType::GodObject { .. }),
+                    DebtItem::Function(func) => {
+                        matches!(func.debt_type, DebtType::GodObject { .. })
+                    }
                     DebtItem::File(file) => file.metrics.god_object_indicators.is_god_object,
                 });
 
@@ -912,7 +929,9 @@ impl UnifiedAnalysis {
             if let Some(perf) = categories.get(&DebtCategory::Performance) {
                 // Check for async misuse which often requires architectural changes
                 let has_async_issues = perf.top_items.iter().any(|item| match item {
-                    DebtItem::Function(func) => matches!(func.debt_type, DebtType::AsyncMisuse { .. }),
+                    DebtItem::Function(func) => {
+                        matches!(func.debt_type, DebtType::AsyncMisuse { .. })
+                    }
                     _ => false,
                 });
 

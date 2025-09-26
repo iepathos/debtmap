@@ -1,18 +1,13 @@
 #[cfg(test)]
 mod tests {
     use crate::priority::{
-        ActionableRecommendation, CallGraph, DebtCategory, DebtType,
-        FileDebtItem, FileDebtMetrics, FileImpact, FunctionRole, FunctionVisibility,
-        GodObjectIndicators, ImpactMetrics, Location, UnifiedAnalysis, UnifiedDebtItem,
-        UnifiedScore,
+        ActionableRecommendation, CallGraph, DebtCategory, DebtType, FileDebtItem, FileDebtMetrics,
+        FileImpact, FunctionRole, FunctionVisibility, GodObjectIndicators, ImpactMetrics, Location,
+        UnifiedAnalysis, UnifiedDebtItem, UnifiedScore,
     };
     use std::path::PathBuf;
 
-    fn create_test_function_item(
-        name: &str,
-        debt_type: DebtType,
-        score: f64,
-    ) -> UnifiedDebtItem {
+    fn create_test_function_item(name: &str, debt_type: DebtType, score: f64) -> UnifiedDebtItem {
         UnifiedDebtItem {
             location: Location {
                 file: PathBuf::from("test.rs"),
@@ -22,7 +17,7 @@ mod tests {
             debt_type,
             unified_score: UnifiedScore {
                 complexity_factor: 5.0,
-                coverage_factor: 8.0,  // Set high enough to avoid filtering
+                coverage_factor: 8.0, // Set high enough to avoid filtering
                 dependency_factor: 5.0,
                 role_multiplier: 1.0,
                 final_score: score,
@@ -274,10 +269,16 @@ mod tests {
         let categorized = analysis.get_categorized_debt(10);
 
         // Verify categories exist
-        assert!(categorized.categories.contains_key(&DebtCategory::Architecture));
+        assert!(categorized
+            .categories
+            .contains_key(&DebtCategory::Architecture));
         assert!(categorized.categories.contains_key(&DebtCategory::Testing));
-        assert!(categorized.categories.contains_key(&DebtCategory::Performance));
-        assert!(categorized.categories.contains_key(&DebtCategory::CodeQuality));
+        assert!(categorized
+            .categories
+            .contains_key(&DebtCategory::Performance));
+        assert!(categorized
+            .categories
+            .contains_key(&DebtCategory::CodeQuality));
 
         // Verify item counts
         let arch_summary = &categorized.categories[&DebtCategory::Architecture];
@@ -318,13 +319,18 @@ mod tests {
         }
 
         // Verify items were added
-        assert!(analysis.items.len() > 0, "Items should have been added to analysis");
+        assert!(
+            analysis.items.len() > 0,
+            "Items should have been added to analysis"
+        );
 
         let categorized = analysis.get_categorized_debt(10);
 
         // Check if Testing category exists
-        assert!(categorized.categories.contains_key(&DebtCategory::Testing),
-                "Testing category should exist");
+        assert!(
+            categorized.categories.contains_key(&DebtCategory::Testing),
+            "Testing category should exist"
+        );
 
         let test_summary = &categorized.categories[&DebtCategory::Testing];
 
@@ -475,9 +481,13 @@ mod tests {
 
         // Only Architecture category should exist
         assert_eq!(categorized.categories.len(), 1);
-        assert!(categorized.categories.contains_key(&DebtCategory::Architecture));
+        assert!(categorized
+            .categories
+            .contains_key(&DebtCategory::Architecture));
         assert!(!categorized.categories.contains_key(&DebtCategory::Testing));
-        assert!(!categorized.categories.contains_key(&DebtCategory::Performance));
+        assert!(!categorized
+            .categories
+            .contains_key(&DebtCategory::Performance));
     }
 
     #[test]
@@ -501,8 +511,12 @@ mod tests {
 
         let categorized = analysis.get_categorized_debt(10);
 
-        assert!(categorized.categories.contains_key(&DebtCategory::Architecture));
+        assert!(categorized
+            .categories
+            .contains_key(&DebtCategory::Architecture));
         assert!(categorized.categories.contains_key(&DebtCategory::Testing));
-        assert!(categorized.categories.contains_key(&DebtCategory::CodeQuality));
+        assert!(categorized
+            .categories
+            .contains_key(&DebtCategory::CodeQuality));
     }
 }
