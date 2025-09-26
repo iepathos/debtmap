@@ -55,6 +55,8 @@ pub struct FunctionMetrics {
     pub is_pure: Option<bool>, // Whether the function is pure (no side effects)
     pub purity_confidence: Option<f32>, // Confidence level of purity detection (0.0 to 1.0)
     pub detected_patterns: Option<Vec<String>>, // Patterns detected for complexity adjustment
+    pub upstream_callers: Option<Vec<String>>, // Functions that call this function
+    pub downstream_callees: Option<Vec<String>>, // Functions that this function calls
 }
 
 /// Entropy details for explainable output
@@ -87,6 +89,8 @@ impl FunctionMetrics {
             is_pure: None,
             purity_confidence: None,
             detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
         }
     }
 

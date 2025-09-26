@@ -96,6 +96,8 @@ impl EvidenceBasedRiskCalculator {
             is_pure: None,          // TODO: Add purity detection for risk analysis
             purity_confidence: None,
             detected_patterns: None, // TODO: Add pattern detection for risk analysis
+            upstream_callers: None,
+            downstream_callees: None,
         };
 
         classify_function_role(&func_metrics, &func_id, call_graph)

@@ -581,6 +581,43 @@ fn format_call_graph_section(item: &UnifiedDebtItem, formatter: &ColoredFormatte
     lines
 }
 
+/// Format basic call graph info for verbosity level 0
+fn format_basic_call_graph(
+    output: &mut String,
+    item: &UnifiedDebtItem,
+    formatter: &ColoredFormatter,
+) {
+    let caller_count = item.upstream_callers.len();
+    let callee_count = item.downstream_callees.len();
+
+    // Only show if there's interesting call graph info
+    if caller_count > 0 || callee_count > 0 {
+        writeln!(
+            output,
+            "{} {} {} caller{}, {} callee{}",
+            formatter.emoji("├─", "-"),
+            "CALLS:".bright_blue(),
+            caller_count,
+            if caller_count == 1 { "" } else { "s" },
+            callee_count,
+            if callee_count == 1 { "" } else { "s" }
+        )
+        .unwrap();
+
+        // Show if function is potentially dead code (no callers)
+        if caller_count == 0 && callee_count > 0 {
+            writeln!(
+                output,
+                "{}   {} {}",
+                formatter.emoji("│", " "),
+                formatter.emoji("⚠", "!"),
+                "No callers detected - may be dead code".yellow()
+            )
+            .unwrap();
+        }
+    }
+}
+
 /// Format the main body of the item (location, action, impact, etc.)
 fn format_item_body(
     output: &mut String,
@@ -633,6 +670,9 @@ fn format_item_body(
 
     // DEPENDENCIES section
     format_dependencies_summary(output, item, formatter, tree_pipe);
+
+    // CALL GRAPH section - show basic info even at verbosity 0
+    format_basic_call_graph(output, item, formatter);
 
     // SCORING breakdown for verbosity >= 1
     if (1..2).contains(&verbosity) {

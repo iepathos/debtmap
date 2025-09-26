@@ -430,6 +430,8 @@ fn extract_functions_from_stmts(
                     is_pure: Some(purity_analysis.is_pure),
                     purity_confidence: Some(purity_analysis.confidence),
                     detected_patterns,
+                    upstream_callers: None,
+                    downstream_callees: None,
                 });
 
                 // Recursively look for nested functions
@@ -494,6 +496,8 @@ fn extract_functions_from_stmts(
                     is_pure: Some(purity_analysis.is_pure),
                     purity_confidence: Some(purity_analysis.confidence),
                     detected_patterns,
+                    upstream_callers: None,
+                    downstream_callees: None,
                 });
 
                 // Recursively look for nested functions

@@ -712,7 +712,18 @@ pub fn is_dead_code(
         }
     }
 
-    // Check if function has incoming calls
+    // For Python files, use the PythonDeadCodeDetector which properly considers
+    // the call graph data from TwoPassExtractor including method calls and implicit calls
+    let language = crate::core::Language::from_path(&func.file);
+    if language == crate::core::Language::Python {
+        let detector = PythonDeadCodeDetector::new();
+        // Use the enhanced detection that considers both call graph and implicit calls
+        if let Some((is_dead, _confidence)) = detector.is_dead_code_with_confidence(func, call_graph, func_id) {
+            return is_dead;
+        }
+    }
+
+    // For other languages, check if function has incoming calls
     let callers = call_graph.get_callers(func_id);
     callers.is_empty()
 }
@@ -1811,6 +1822,8 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         in_test_module: false,
         entropy_score: None,
         detected_patterns: None,
+        upstream_callers: None,
+        downstream_callees: None,
     }
 }
 
