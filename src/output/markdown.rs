@@ -12,7 +12,14 @@ pub fn output_markdown(
     output_file: Option<PathBuf>,
 ) -> Result<()> {
     let limit = calculate_markdown_limit(top, tail);
-    let output = priority::format_priorities_markdown(analysis, limit, verbosity);
+
+    // Check if tiered display is enabled
+    let display_config = crate::config::get_display_config();
+    let output = if display_config.tiered {
+        priority::format_priorities_tiered_markdown(analysis, limit, verbosity)
+    } else {
+        priority::format_priorities_markdown(analysis, limit, verbosity)
+    };
 
     if let Some(path) = output_file {
         let mut file = fs::File::create(path)?;
