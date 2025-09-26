@@ -18,11 +18,15 @@ pub use coverage_propagation::{calculate_transitive_coverage, TransitiveCoverage
 pub use debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId};
 pub use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
 pub use formatter::{format_priorities, OutputFormat};
-pub use formatter_markdown::{format_priorities_markdown, format_priorities_tiered_markdown};
+pub use formatter_markdown::{
+    format_priorities_categorical_markdown, format_priorities_markdown,
+    format_priorities_tiered_markdown,
+};
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, UnifiedScore};
 
 use im::Vector;
+use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::path::PathBuf;
 
@@ -173,6 +177,130 @@ pub enum DebtType {
         collection_type: String,
         inefficiency_type: String,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum DebtCategory {
+    Architecture,
+    Testing,
+    Performance,
+    CodeQuality,
+}
+
+impl DebtCategory {
+    pub fn from_debt_type(debt_type: &DebtType) -> Self {
+        match debt_type {
+            // Architecture Issues
+            DebtType::GodObject { .. } => DebtCategory::Architecture,
+            DebtType::FeatureEnvy { .. } => DebtCategory::Architecture,
+            DebtType::PrimitiveObsession { .. } => DebtCategory::Architecture,
+
+            // Testing Gaps
+            DebtType::TestingGap { .. } => DebtCategory::Testing,
+            DebtType::TestComplexityHotspot { .. } => DebtCategory::Testing,
+            DebtType::TestTodo { .. } => DebtCategory::Testing,
+            DebtType::TestDuplication { .. } => DebtCategory::Testing,
+            DebtType::AssertionComplexity { .. } => DebtCategory::Testing,
+            DebtType::FlakyTestPattern { .. } => DebtCategory::Testing,
+
+            // Performance Issues
+            DebtType::AsyncMisuse { .. } => DebtCategory::Performance,
+            DebtType::CollectionInefficiency { .. } => DebtCategory::Performance,
+            DebtType::NestedLoops { .. } => DebtCategory::Performance,
+            DebtType::BlockingIO { .. } => DebtCategory::Performance,
+            DebtType::AllocationInefficiency { .. } => DebtCategory::Performance,
+            DebtType::StringConcatenation { .. } => DebtCategory::Performance,
+            DebtType::SuboptimalDataStructure { .. } => DebtCategory::Performance,
+            DebtType::ResourceLeak { .. } => DebtCategory::Performance,
+
+            // Code Quality (default category)
+            DebtType::ComplexityHotspot { .. } => DebtCategory::CodeQuality,
+            DebtType::DeadCode { .. } => DebtCategory::CodeQuality,
+            DebtType::Duplication { .. } => DebtCategory::CodeQuality,
+            DebtType::Risk { .. } => DebtCategory::CodeQuality,
+            DebtType::ErrorSwallowing { .. } => DebtCategory::CodeQuality,
+            DebtType::MagicValues { .. } => DebtCategory::CodeQuality,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            DebtCategory::Architecture => "Architecture Issues",
+            DebtCategory::Testing => "Testing Gaps",
+            DebtCategory::Performance => "Performance Issues",
+            DebtCategory::CodeQuality => "Code Quality",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            DebtCategory::Architecture => "🏗️",
+            DebtCategory::Testing => "🧪",
+            DebtCategory::Performance => "⚡",
+            DebtCategory::CodeQuality => "📊",
+        }
+    }
+
+    pub fn strategic_guidance(&self, item_count: usize, estimated_effort_hours: u32) -> String {
+        match self {
+            DebtCategory::Architecture => {
+                format!(
+                    "Focus on breaking down {} complex components. Consider design patterns and dependency injection. Estimated effort: {} hours.",
+                    item_count, estimated_effort_hours
+                )
+            }
+            DebtCategory::Testing => {
+                format!(
+                    "Implement {} missing tests. Target coverage improvement with focus on critical paths. Estimated effort: {} hours.",
+                    item_count, estimated_effort_hours
+                )
+            }
+            DebtCategory::Performance => {
+                format!(
+                    "Optimize {} performance bottlenecks. Profile and measure improvements. Estimated effort: {} hours.",
+                    item_count, estimated_effort_hours
+                )
+            }
+            DebtCategory::CodeQuality => {
+                format!(
+                    "Address {} code quality issues for better maintainability. Estimated effort: {} hours.",
+                    item_count, estimated_effort_hours
+                )
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategorySummary {
+    pub category: DebtCategory,
+    pub total_score: f64,
+    pub item_count: usize,
+    pub estimated_effort_hours: u32,
+    pub average_severity: f64,
+    pub top_items: Vec<DebtItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategorizedDebt {
+    pub categories: BTreeMap<DebtCategory, CategorySummary>,
+    pub cross_category_dependencies: Vec<CrossCategoryDependency>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossCategoryDependency {
+    pub source_category: DebtCategory,
+    pub target_category: DebtCategory,
+    pub description: String,
+    pub impact_level: ImpactLevel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ImpactLevel {
+    Critical, // Blocks progress in target category
+    High,     // Significantly affects target category
+    Medium,   // Some effect on target category
+    Low,      // Minor interaction
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -664,7 +792,182 @@ impl UnifiedAnalysis {
         self.data_flow_graph
             .add_variable_dependencies(func_id, variables);
     }
+
+    /// Generate a categorized view of debt items
+    pub fn get_categorized_debt(&self, limit: usize) -> CategorizedDebt {
+        let all_items = self.get_top_mixed_priorities(limit);
+        let mut categories: BTreeMap<DebtCategory, Vec<DebtItem>> = BTreeMap::new();
+
+        // Categorize all items
+        for item in all_items {
+            let category = match &item {
+                DebtItem::Function(func) => DebtCategory::from_debt_type(&func.debt_type),
+                DebtItem::File(file) => {
+                    // File-level items typically indicate architectural issues
+                    if file.metrics.god_object_indicators.is_god_object {
+                        DebtCategory::Architecture
+                    } else if file.metrics.coverage_percent < 0.5 {
+                        DebtCategory::Testing
+                    } else {
+                        DebtCategory::CodeQuality
+                    }
+                }
+            };
+
+            categories.entry(category).or_default().push(item);
+        }
+
+        // Create category summaries
+        let mut category_summaries = BTreeMap::new();
+        for (category, items) in categories {
+            if items.is_empty() {
+                continue;
+            }
+
+            let total_score: f64 = items.iter().map(|item| item.score()).sum();
+            let item_count = items.len();
+            let average_severity = total_score / item_count as f64;
+
+            // Estimate effort based on category and average severity
+            let effort_per_item = match category {
+                DebtCategory::Architecture => {
+                    if average_severity >= 90.0 {
+                        16
+                    }
+                    // 2 days
+                    else if average_severity >= 70.0 {
+                        8
+                    }
+                    // 1 day
+                    else {
+                        4
+                    } // Half day
+                }
+                DebtCategory::Testing => {
+                    if average_severity >= 70.0 {
+                        4
+                    } else {
+                        2
+                    }
+                }
+                DebtCategory::Performance => {
+                    if average_severity >= 70.0 {
+                        8
+                    } else {
+                        4
+                    }
+                }
+                DebtCategory::CodeQuality => {
+                    if average_severity >= 70.0 {
+                        4
+                    } else {
+                        2
+                    }
+                }
+            };
+
+            let estimated_effort_hours = (item_count as u32) * effort_per_item;
+
+            // Take top 5 items per category
+            let top_items = items.into_iter().take(5).collect();
+
+            let summary = CategorySummary {
+                category: category.clone(),
+                total_score,
+                item_count,
+                estimated_effort_hours,
+                average_severity,
+                top_items,
+            };
+
+            category_summaries.insert(category, summary);
+        }
+
+        // Identify cross-category dependencies
+        let cross_dependencies = self.identify_cross_category_dependencies(&category_summaries);
+
+        CategorizedDebt {
+            categories: category_summaries,
+            cross_category_dependencies: cross_dependencies,
+        }
+    }
+
+    fn identify_cross_category_dependencies(
+        &self,
+        categories: &BTreeMap<DebtCategory, CategorySummary>,
+    ) -> Vec<CrossCategoryDependency> {
+        let mut dependencies = Vec::new();
+
+        // Architecture issues often block effective testing
+        if categories.contains_key(&DebtCategory::Architecture)
+            && categories.contains_key(&DebtCategory::Testing)
+        {
+            if let Some(arch) = categories.get(&DebtCategory::Architecture) {
+                // Check for god objects which are hard to test
+                let has_god_objects = arch.top_items.iter().any(|item| match item {
+                    DebtItem::Function(func) => {
+                        matches!(func.debt_type, DebtType::GodObject { .. })
+                    }
+                    DebtItem::File(file) => file.metrics.god_object_indicators.is_god_object,
+                });
+
+                if has_god_objects {
+                    dependencies.push(CrossCategoryDependency {
+                        source_category: DebtCategory::Architecture,
+                        target_category: DebtCategory::Testing,
+                        description: "God objects and complex architectures make testing difficult. Refactor architecture first to enable effective testing.".to_string(),
+                        impact_level: ImpactLevel::High,
+                    });
+                }
+            }
+        }
+
+        // Performance issues may require architectural changes
+        if categories.contains_key(&DebtCategory::Performance)
+            && categories.contains_key(&DebtCategory::Architecture)
+        {
+            if let Some(perf) = categories.get(&DebtCategory::Performance) {
+                // Check for async misuse which often requires architectural changes
+                let has_async_issues = perf.top_items.iter().any(|item| match item {
+                    DebtItem::Function(func) => {
+                        matches!(func.debt_type, DebtType::AsyncMisuse { .. })
+                    }
+                    _ => false,
+                });
+
+                if has_async_issues {
+                    dependencies.push(CrossCategoryDependency {
+                        source_category: DebtCategory::Performance,
+                        target_category: DebtCategory::Architecture,
+                        description: "Async performance issues may require architectural refactoring for proper async/await patterns.".to_string(),
+                        impact_level: ImpactLevel::Medium,
+                    });
+                }
+            }
+        }
+
+        // Complex code affects testability
+        if categories.contains_key(&DebtCategory::CodeQuality)
+            && categories.contains_key(&DebtCategory::Testing)
+        {
+            if let Some(quality) = categories.get(&DebtCategory::CodeQuality) {
+                if quality.average_severity >= 70.0 {
+                    dependencies.push(CrossCategoryDependency {
+                        source_category: DebtCategory::CodeQuality,
+                        target_category: DebtCategory::Testing,
+                        description: "High complexity code is harder to test effectively. Simplify code first for better test coverage.".to_string(),
+                        impact_level: ImpactLevel::Medium,
+                    });
+                }
+            }
+        }
+
+        dependencies
+    }
 }
 
 #[cfg(test)]
 mod tests {}
+
+#[cfg(test)]
+mod category_tests;
