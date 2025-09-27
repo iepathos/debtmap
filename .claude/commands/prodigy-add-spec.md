@@ -1,6 +1,6 @@
 # /prodigy-add-spec
 
-Generate a new specification document based on a feature description. This command creates a properly formatted specification that follows project conventions and integrates with the existing specification system.
+Generate one or more specification documents based on a feature description. This command intelligently determines whether to create a single focused spec or multiple specs for complex requests, ensuring each specification follows the single responsibility principle.
 
 ## Variables
 
@@ -10,13 +10,7 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
 
 ### Phase 1: Project Context Analysis
 
-1. **Read Project Context**
-   - Read .prodigy context files to understand current project state
-   - Files read in order: .prodigy/PROJECT.md, .prodigy/ARCHITECTURE.md, .prodigy/CONVENTIONS.md, .prodigy/ROADMAP.md, .prodigy/DECISIONS.md
-   - Understand existing capabilities and architectural patterns
-   - Identify current technology stack and dependencies
-
-2. **Analyze Existing Specifications**
+1. **Analyze Existing Specifications**
    - Scan specs/ directory to find existing specification files
    - Parse frontmatter from each spec file to extract metadata
    - Determine next specification number by finding highest existing number + 1
@@ -25,35 +19,77 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
    - Identify related specifications and potential dependencies
    - Determine appropriate specification category (foundation, parallel, storage, etc.)
 
-3. **Feature Analysis**
+2. **Feature Analysis**
    - Parse the provided DESCRIPTION to extract core requirements
    - Identify functional and non-functional requirements
    - Determine integration points with existing system
    - Assess complexity and implementation scope
 
-### Phase 2: Specification Structure Planning
+### Phase 2: Specification Scope Analysis
 
-1. **Determine Specification Details**
+1. **Complexity Assessment**
+   - Analyze the DESCRIPTION for multiple distinct features
+   - Identify logical boundaries between functionality
+   - Determine if features have different concerns or layers
+   - Assess whether splitting would improve clarity and focus
+
+2. **Single vs Multiple Specs Decision**
+
+   **Create Multiple Specs When**:
+   - Description contains "and" connecting unrelated features
+   - Multiple distinct system layers involved (e.g., "authentication and caching")
+   - Features have different implementation timelines or priorities
+   - Total scope would exceed 10 acceptance criteria
+   - Different teams or expertise areas would implement features
+   - Features could be deployed independently
+
+   **Create Single Spec When**:
+   - Features are tightly coupled and interdependent
+   - Single cohesive objective can be defined
+   - Implementation naturally happens together
+   - Features share significant implementation code
+   - Total scope fits within 3-8 acceptance criteria
+
+3. **Specification Planning**
+
+   **For Single Spec**:
    - Generate next specification number (highest existing + 1)
    - Choose descriptive filename: `{number}-{kebab-case-title}.md`
-   - Place all specs directly in specs/ directory
+   - Place spec directly in specs/ directory
    - Determine priority level and category
 
-2. **Requirements Analysis**
+   **For Multiple Specs**:
+   - Identify logical feature groupings
+   - Generate sequential spec numbers for each
+   - Choose descriptive filenames for each spec
+   - Establish dependencies between related specs
+   - Ensure clear boundaries with no overlap
+
+### Phase 3: Requirements Distribution
+
+1. **Single Spec Requirements**
    - Break down feature description into specific requirements
    - Identify acceptance criteria and success metrics
    - Determine dependencies on other specifications
    - Identify potential risks and challenges
 
+2. **Multiple Spec Requirements Distribution**
+   - Allocate requirements to appropriate specs
+   - Ensure each spec has single responsibility
+   - Define clear interfaces between specs
+   - Establish dependency relationships
+   - Avoid duplicating requirements across specs
+
 3. **Technical Design Planning**
-   - Analyze architectural implications
+   - Analyze architectural implications per spec
    - Identify new modules or components needed
    - Determine data structures and interfaces
    - Plan integration with existing codebase
+   - Define boundaries between specs if multiple
 
-### Phase 3: Specification Generation
+### Phase 4: Specification Generation
 
-1. **Create Specification Document**
+1. **Create Specification Document(s)**
    - Generate complete specification following project template
    - Include comprehensive objective and context
    - Define detailed acceptance criteria with measurable outcomes
@@ -69,14 +105,14 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
    - **Dependencies**: Prerequisites and related specifications
    - **Testing Strategy**: How the feature will be validated
    - **Documentation**: Required documentation updates
-   - **Migration**: Any migration considerations (breaking changes allowed during prototype)
+   - **Migration**: Any migration or compatibility considerations
 
 3. **Integration Considerations**
    - Define how feature integrates with existing architecture
    - Specify API changes or new interfaces
    - Identify configuration requirements
 
-### Phase 4: Validation and Refinement
+### Phase 5: Validation and Refinement
 
 1. **Specification Review**
    - Ensure all requirements are clear and testable
@@ -96,34 +132,41 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
    - Check for clarity and unambiguous language
    - Validate technical accuracy
 
-### Phase 5: Context Updates
-
-1. **Update PROJECT.md (if needed)**
-   - Add new planned capability to "What Will Exist" section if major feature
-   - Update feature list with new specification if significant
-   - Adjust project scope if significantly changed
-   - Update complexity assessment if needed
-
 ### Phase 6: File Organization
 
-1. **Create Specification File**
+1. **Create Specification File(s)**
+
+   **For Single Spec**:
    - Write specification to specs/{number}-{kebab-case-title}.md
    - Ensure proper file permissions and formatting
    - Validate file structure and content
    - Include YAML frontmatter with metadata at the very beginning of the file
 
+   **For Multiple Specs**:
+   - Write each specification to its own file
+   - Use sequential numbering for related specs
+   - Ensure consistent formatting across all specs
+   - Include cross-references in dependencies sections
+   - Validate all files have proper structure
+
 ### Phase 7: Commit Changes
 
 1. **Stage All Changes**
-   - Stage the new specification file
-   - Stage any updated context files (PROJECT.md if modified)
+   - Stage the new specification file(s)
 
 2. **Create Commit**
+
+   **For Single Spec**:
    - Use descriptive commit message format: "add: spec {NUMBER} - {title}"
    - Include brief description of the specification purpose
    - Reference the specification number in commit message
    - Ensure all related changes are included in single commit
-   - Do NOT include Claude Code attribution in commit message
+
+   **For Multiple Specs**:
+   - Use descriptive commit message format: "add: specs {FIRST_NUMBER}-{LAST_NUMBER} for {feature_area}"
+   - List all created specs in commit body
+   - Explain the logical grouping of specs
+   - Include brief description of each spec's purpose
 
 3. **Verify Commit**
    - Check that all modified files are included
@@ -134,9 +177,6 @@ DESCRIPTION: $ARGUMENTS (required - natural language description of the feature 
 ## Specification Template Structure
 
 ### Standard Format
-
-**Note**: During the prototype phase, breaking changes are allowed and backward compatibility is not required. Focus on correctness and optimal design over maintaining compatibility.
-
 ```markdown
 ---
 number: {NUMBER}
@@ -216,7 +256,7 @@ created: {YYYY-MM-DD}
 
 ## Migration and Compatibility
 
-{During prototype phase: Breaking changes allowed, focus on correctness over compatibility}
+{Any breaking changes, migration requirements, or compatibility considerations}
 ```
 
 ## Feature Categories
@@ -241,9 +281,9 @@ created: {YYYY-MM-DD}
 
 ### Compatibility Specifications
 - Integration with external systems
-- API design (breaking changes ok during prototype)
+- API compatibility and versioning
 - Cross-platform support
-- System integration patterns
+- Legacy system integration
 
 ### Testing Specifications
 - Test infrastructure and frameworks
@@ -279,12 +319,49 @@ created: {YYYY-MM-DD}
 
 ## Example Usage
 
+### Single Spec Generation
+
 ```
 /prodigy-add-spec "Add user authentication system with JWT tokens"
+# Creates: specs/102-user-authentication-jwt.md
+
 /prodigy-add-spec "Implement caching layer for database queries"
+# Creates: specs/103-database-query-caching.md
+
 /prodigy-add-spec "Add REST API endpoints for project management"
-/prodigy-add-spec "Create automated backup system for project data"
+# Creates: specs/104-project-management-api.md
 ```
+
+### Multiple Spec Generation
+
+```
+/prodigy-add-spec "Add authentication, authorization, and session management"
+# Creates: specs/102-authentication.md
+#          specs/103-authorization.md
+#          specs/104-session-management.md
+
+/prodigy-add-spec "Implement user profiles with avatar upload and notification preferences"
+# Creates: specs/105-user-profiles.md
+#          specs/106-avatar-upload.md
+#          specs/107-notification-preferences.md
+
+/prodigy-add-spec "Add logging, monitoring, and alerting infrastructure"
+# Creates: specs/108-logging-infrastructure.md
+#          specs/109-monitoring-system.md
+#          specs/110-alerting-framework.md
+```
+
+### Decision Criteria Examples
+
+**Split into Multiple Specs**:
+- "Add authentication AND caching" → Different layers, split
+- "Implement search AND export features" → Unrelated features, split
+- "Create user management, roles, and permissions" → Related but distinct, split
+
+**Keep as Single Spec**:
+- "Add JWT authentication with refresh tokens" → Cohesive feature, single spec
+- "Implement database connection pooling" → Single concern, single spec
+- "Create user profile with settings" → Tightly coupled, single spec
 
 ## Integration with Development Workflow
 
