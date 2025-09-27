@@ -10,6 +10,7 @@ use std::path::PathBuf;
 pub struct OutputConfig {
     pub top: Option<usize>,
     pub tail: Option<usize>,
+    pub summary: bool,
     pub verbosity: u8,
     pub output_file: Option<PathBuf>,
     pub output_format: Option<crate::cli::OutputFormat>,
@@ -49,10 +50,11 @@ pub fn output_unified_priorities_with_config(
     _results: &AnalysisResults,
     _coverage_file: Option<&PathBuf>,
 ) -> Result<()> {
-    output_unified_priorities(
+    output_unified_priorities_with_summary(
         analysis,
         config.top,
         config.tail,
+        config.summary,
         config.verbosity,
         config.output_file,
         config.output_format,
@@ -69,6 +71,28 @@ pub fn output_unified_priorities(
     output_format: Option<crate::cli::OutputFormat>,
     formatting_config: FormattingConfig,
 ) -> Result<()> {
+    output_unified_priorities_with_summary(
+        analysis,
+        top,
+        tail,
+        false,  // default to detailed format
+        verbosity,
+        output_file,
+        output_format,
+        formatting_config,
+    )
+}
+
+pub fn output_unified_priorities_with_summary(
+    analysis: priority::UnifiedAnalysis,
+    top: Option<usize>,
+    tail: Option<usize>,
+    summary: bool,
+    verbosity: u8,
+    output_file: Option<PathBuf>,
+    output_format: Option<crate::cli::OutputFormat>,
+    formatting_config: FormattingConfig,
+) -> Result<()> {
     match output_format {
         Some(crate::cli::OutputFormat::Json) => json::output_json(&analysis, output_file),
         Some(crate::cli::OutputFormat::Markdown) => {
@@ -78,13 +102,14 @@ pub fn output_unified_priorities(
             if is_markdown_file(&output_file) {
                 markdown::output_markdown(&analysis, top, tail, verbosity, output_file)
             } else {
-                terminal::output_terminal(
+                terminal::output_terminal_with_mode(
                     &analysis,
                     top,
                     tail,
                     verbosity,
                     output_file,
                     formatting_config,
+                    summary,
                 )
             }
         }

@@ -71,6 +71,10 @@ pub enum Commands {
         #[arg(long = "tail")]
         tail: Option<usize>,
 
+        /// Use summary format with tiered priority display (compact output)
+        #[arg(long = "summary", short = 's')]
+        summary: bool,
+
         /// Disable semantic analysis (fallback mode)
         #[arg(long = "semantic-off")]
         semantic_off: bool,
@@ -234,6 +238,10 @@ pub enum Commands {
         /// Show only bottom N priority items (lowest priority)
         #[arg(long = "tail")]
         tail: Option<usize>,
+
+        /// Use summary format with tiered priority display (compact output)
+        #[arg(long = "summary", short = 's')]
+        summary: bool,
 
         /// Disable semantic analysis (fallback mode)
         #[arg(long = "semantic-off")]

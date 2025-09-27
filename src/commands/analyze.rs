@@ -27,6 +27,7 @@ pub struct AnalyzeConfig {
     pub disable_context: Option<Vec<String>>,
     pub top: Option<usize>,
     pub tail: Option<usize>,
+    pub summary: bool,
     pub semantic_off: bool,
     pub verbosity: u8,
     pub verbose_macro_warnings: bool,
@@ -122,6 +123,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     let output_config = output::OutputConfig {
         top: config.top,
         tail: config.tail,
+        summary: config.summary,
         verbosity: config.verbosity,
         output_file: config.output,
         output_format: Some(config.format),

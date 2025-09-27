@@ -55,13 +55,9 @@ fn format_default_with_config(
     verbosity: u8,
     config: FormattingConfig,
 ) -> String {
-    // Check if tiered display is enabled
-    let display_config = crate::config::get_display_config();
-    if display_config.tiered {
-        return format_tiered_terminal(analysis, limit, verbosity, config);
-    }
-
-    // Fallback to old format if tiered display is disabled
+    // Check if summary mode is explicitly requested
+    // TODO: Add --summary flag to CLI to enable this
+    // For now, always use detailed format to preserve existing functionality
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
     let formatter = ColoredFormatter::new(config);
@@ -165,7 +161,16 @@ fn format_tail_with_config(
     output
 }
 
-/// Format priorities with tiered display for terminal output
+/// Format priorities with tiered display for terminal output (summary mode)
+pub fn format_summary_terminal(
+    analysis: &UnifiedAnalysis,
+    limit: usize,
+    verbosity: u8,
+) -> String {
+    format_tiered_terminal(analysis, limit, verbosity, FormattingConfig::default())
+}
+
+/// Internal implementation of tiered display for terminal output
 fn format_tiered_terminal(
     analysis: &UnifiedAnalysis,
     limit: usize,
