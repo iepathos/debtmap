@@ -162,11 +162,7 @@ fn format_tail_with_config(
 }
 
 /// Format priorities with tiered display for terminal output (summary mode)
-pub fn format_summary_terminal(
-    analysis: &UnifiedAnalysis,
-    limit: usize,
-    verbosity: u8,
-) -> String {
+pub fn format_summary_terminal(analysis: &UnifiedAnalysis, limit: usize, verbosity: u8) -> String {
     format_tiered_terminal(analysis, limit, verbosity, FormattingConfig::default())
 }
 
@@ -208,10 +204,34 @@ fn format_tiered_terminal(
     writeln!(output).unwrap();
 
     // Format each tier
-    format_tier_terminal(&mut output, &tiered_display.critical, Tier::Critical, verbosity, config);
-    format_tier_terminal(&mut output, &tiered_display.high, Tier::High, verbosity, config);
-    format_tier_terminal(&mut output, &tiered_display.moderate, Tier::Moderate, verbosity, config);
-    format_tier_terminal(&mut output, &tiered_display.low, Tier::Low, verbosity, config);
+    format_tier_terminal(
+        &mut output,
+        &tiered_display.critical,
+        Tier::Critical,
+        verbosity,
+        config,
+    );
+    format_tier_terminal(
+        &mut output,
+        &tiered_display.high,
+        Tier::High,
+        verbosity,
+        config,
+    );
+    format_tier_terminal(
+        &mut output,
+        &tiered_display.moderate,
+        Tier::Moderate,
+        verbosity,
+        config,
+    );
+    format_tier_terminal(
+        &mut output,
+        &tiered_display.low,
+        Tier::Low,
+        verbosity,
+        config,
+    );
 
     // Summary section
     let critical_count: usize = tiered_display.critical.iter().map(|g| g.items.len()).sum();

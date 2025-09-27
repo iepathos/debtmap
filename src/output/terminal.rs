@@ -13,7 +13,15 @@ pub fn output_terminal(
     output_file: Option<PathBuf>,
     formatting_config: FormattingConfig,
 ) -> Result<()> {
-    output_terminal_with_mode(analysis, top, tail, verbosity, output_file, formatting_config, false)
+    output_terminal_with_mode(
+        analysis,
+        top,
+        tail,
+        verbosity,
+        output_file,
+        formatting_config,
+        false,
+    )
 }
 
 pub fn output_terminal_with_mode(

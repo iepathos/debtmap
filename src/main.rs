@@ -415,7 +415,7 @@ fn main() -> Result<()> {
             disable_context,
             top,
             tail,
-            summary: _,  // Validate command doesn't use summary yet
+            summary: _, // Validate command doesn't use summary yet
             semantic_off,
             explain_score: _,
             verbosity,

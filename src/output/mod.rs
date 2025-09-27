@@ -75,7 +75,7 @@ pub fn output_unified_priorities(
         analysis,
         top,
         tail,
-        false,  // default to detailed format
+        false, // default to detailed format
         verbosity,
         output_file,
         output_format,
@@ -83,6 +83,7 @@ pub fn output_unified_priorities(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn output_unified_priorities_with_summary(
     analysis: priority::UnifiedAnalysis,
     top: Option<usize>,
