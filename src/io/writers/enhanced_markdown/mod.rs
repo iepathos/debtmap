@@ -31,6 +31,7 @@ pub struct EnhancedMarkdownWriter<W: Write> {
 }
 
 // Pure functions for executive summary calculations
+#[allow(dead_code)]
 fn classify_health_status(score: u32) -> &'static str {
     match score {
         70..=100 => "Good",
@@ -38,18 +39,22 @@ fn classify_health_status(score: u32) -> &'static str {
     }
 }
 
+#[allow(dead_code)]
 fn format_health_metric(name: &str, value: String, status: &str) -> String {
     format!("| {} | {} | {} |", name, value, status)
 }
 
+#[allow(dead_code)]
 fn should_show_complexity_insight(avg_complexity: f64) -> bool {
     avg_complexity > 10.0
 }
 
+#[allow(dead_code)]
 fn should_show_coverage_insight(coverage: Option<f64>) -> bool {
     coverage.is_some_and(|c| c < 0.5)
 }
 
+#[allow(dead_code)]
 fn format_critical_complexity_insight(count: usize) -> String {
     format!(
         "- ⚠️ **{}** critical complexity issues require immediate attention",
@@ -57,6 +62,7 @@ fn format_critical_complexity_insight(count: usize) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn format_high_complexity_insight(avg: f64) -> String {
     format!(
         "- 📈 Average complexity ({:.1}) exceeds recommended threshold",
@@ -64,6 +70,7 @@ fn format_high_complexity_insight(avg: f64) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn format_low_coverage_insight(coverage: f64) -> String {
     format!(
         "- 🔴 Code coverage ({:.1}%) is below minimum recommended level",
@@ -72,6 +79,7 @@ fn format_low_coverage_insight(coverage: f64) -> String {
 }
 
 // Pure functions for health metrics formatting
+#[allow(dead_code)]
 fn format_overall_health_metric(health_score: u32) -> String {
     format_health_metric(
         "**Overall Health**",
@@ -80,6 +88,7 @@ fn format_overall_health_metric(health_score: u32) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn format_complexity_metric(avg_complexity: f64) -> String {
     format_health_metric(
         "**Average Complexity**",
@@ -88,6 +97,7 @@ fn format_complexity_metric(avg_complexity: f64) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn format_coverage_metric(coverage: f64) -> String {
     format_health_metric(
         "**Code Coverage**",
@@ -96,6 +106,7 @@ fn format_coverage_metric(coverage: f64) -> String {
     )
 }
 
+#[allow(dead_code)]
 fn format_debt_metric(debt_count: usize) -> String {
     format_health_metric(
         "**Technical Debt**",
@@ -105,6 +116,7 @@ fn format_debt_metric(debt_count: usize) -> String {
 }
 
 // Pure function for building all metrics
+#[allow(dead_code)]
 fn build_health_metrics(
     health_score: u32,
     avg_complexity: f64,
@@ -126,6 +138,7 @@ fn build_health_metrics(
 
 impl<W: Write> EnhancedMarkdownWriter<W> {
     // Helper functions for health status section
+    #[allow(dead_code)]
     fn write_health_section_header(&mut self) -> Result<()> {
         if self.config.collapsible_sections {
             writeln!(self.writer, "<details open>")?;
@@ -139,6 +152,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn write_health_metrics_table(
         &mut self,
         health_score: u32,
@@ -165,6 +179,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn write_health_section_footer(&mut self) -> Result<()> {
         if self.config.collapsible_sections {
             writeln!(self.writer, "\n</details>\n")?;
@@ -289,6 +304,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn write_health_status_section(
         &mut self,
         health_score: u32,
@@ -469,6 +485,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn write_key_insights_section(
         &mut self,
         avg_complexity: f64,
@@ -487,6 +504,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn collect_insights(
         &self,
         avg_complexity: f64,

@@ -1,6 +1,5 @@
 use crate::core::AnalysisResults;
 use crate::priority::{DebtType, UnifiedAnalysis, UnifiedDebtItem};
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -603,7 +602,7 @@ pub fn estimate_effort_hours(item: &UnifiedDebtItem) -> u32 {
     match &item.debt_type {
         DebtType::TestingGap { cyclomatic, .. } => {
             // Testing effort scales with complexity
-            (cyclomatic / 2).max(2).min(16)
+            (cyclomatic / 2).clamp(2, 16)
         }
         DebtType::ComplexityHotspot {
             cyclomatic,
@@ -611,7 +610,7 @@ pub fn estimate_effort_hours(item: &UnifiedDebtItem) -> u32 {
             ..
         } => {
             // Refactoring effort based on both metrics
-            ((cyclomatic + cognitive) / 3).max(4).min(40)
+            ((cyclomatic + cognitive) / 3).clamp(4, 40)
         }
         DebtType::DeadCode { .. } => {
             // Dead code removal is usually quick
@@ -626,7 +625,7 @@ pub fn estimate_effort_hours(item: &UnifiedDebtItem) -> u32 {
             ..
         } => {
             // God object refactoring is complex
-            (responsibility_count * 4).max(16).min(80)
+            (responsibility_count * 4).clamp(16, 80)
         }
         DebtType::BlockingIO { .. } => {
             // Async refactoring
@@ -650,7 +649,7 @@ pub fn estimate_effort_hours(item: &UnifiedDebtItem) -> u32 {
         }
         DebtType::TestDuplication { instances, .. } => {
             // Test deduplication
-            (instances * 1).min(12)
+            (*instances).min(12)
         }
         DebtType::TestTodo { .. } => {
             // Completing TODO test
