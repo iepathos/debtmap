@@ -1,7 +1,7 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
 use crate::priority::{
-    self, score_formatter, DebtType, FunctionRole, FunctionVisibility, UnifiedAnalysis,
-    UnifiedDebtItem,
+    self, score_formatter, DebtType, DisplayGroup, FunctionRole, FunctionVisibility, Tier,
+    UnifiedAnalysis, UnifiedDebtItem,
 };
 use colored::*;
 use std::fmt::Write;
@@ -55,6 +55,13 @@ fn format_default_with_config(
     verbosity: u8,
     config: FormattingConfig,
 ) -> String {
+    // Check if tiered display is enabled
+    let display_config = crate::config::get_display_config();
+    if display_config.tiered {
+        return format_tiered_terminal(analysis, limit, verbosity, config);
+    }
+
+    // Fallback to old format if tiered display is disabled
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
     let formatter = ColoredFormatter::new(config);
@@ -156,6 +163,323 @@ fn format_tail_with_config(
     }
 
     output
+}
+
+/// Format priorities with tiered display for terminal output
+fn format_tiered_terminal(
+    analysis: &UnifiedAnalysis,
+    limit: usize,
+    verbosity: u8,
+    config: FormattingConfig,
+) -> String {
+    let mut output = String::new();
+    let version = env!("CARGO_PKG_VERSION");
+    let formatter = ColoredFormatter::new(config);
+
+    // Header
+    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
+    writeln!(
+        output,
+        "    {}",
+        format!("Debtmap v{}", version).bright_white().bold()
+    )
+    .unwrap();
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
+    writeln!(output).unwrap();
+
+    // Get tiered display
+    let tiered_display = analysis.get_tiered_display(limit);
+
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("🎯", "[TARGET]"),
+        "TECHNICAL DEBT ANALYSIS - PRIORITY TIERS"
+            .bright_yellow()
+            .bold()
+    )
+    .unwrap();
+    writeln!(output).unwrap();
+
+    // Format each tier
+    format_tier_terminal(&mut output, &tiered_display.critical, Tier::Critical, verbosity, config);
+    format_tier_terminal(&mut output, &tiered_display.high, Tier::High, verbosity, config);
+    format_tier_terminal(&mut output, &tiered_display.moderate, Tier::Moderate, verbosity, config);
+    format_tier_terminal(&mut output, &tiered_display.low, Tier::Low, verbosity, config);
+
+    // Summary section
+    let critical_count: usize = tiered_display.critical.iter().map(|g| g.items.len()).sum();
+    let high_count: usize = tiered_display.high.iter().map(|g| g.items.len()).sum();
+    let moderate_count: usize = tiered_display.moderate.iter().map(|g| g.items.len()).sum();
+    let low_count: usize = tiered_display.low.iter().map(|g| g.items.len()).sum();
+
+    writeln!(output, "{}", divider.bright_blue()).unwrap();
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("📊", "[SUMMARY]"),
+        "DEBT DISTRIBUTION".bright_cyan().bold()
+    )
+    .unwrap();
+
+    if critical_count > 0 {
+        writeln!(
+            output,
+            "  {} Critical: {} items",
+            formatter.emoji("🚨", "[!]"),
+            critical_count.to_string().bright_red()
+        )
+        .unwrap();
+    }
+    if high_count > 0 {
+        writeln!(
+            output,
+            "  {} High: {} items",
+            formatter.emoji("⚠️", "[*]"),
+            high_count.to_string().bright_yellow()
+        )
+        .unwrap();
+    }
+    if moderate_count > 0 {
+        writeln!(
+            output,
+            "  {} Moderate: {} items",
+            formatter.emoji("📊", "[+]"),
+            moderate_count.to_string().bright_blue()
+        )
+        .unwrap();
+    }
+    if low_count > 0 {
+        writeln!(
+            output,
+            "  {} Low: {} items",
+            formatter.emoji("📝", "[-]"),
+            low_count.to_string().white()
+        )
+        .unwrap();
+    }
+
+    writeln!(output).unwrap();
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("📈", "[TOTAL]"),
+        format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
+    )
+    .unwrap();
+
+    if let Some(coverage) = analysis.overall_coverage {
+        writeln!(
+            output,
+            "{} {}",
+            formatter.emoji("📊", "[COVERAGE]"),
+            format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
+        )
+        .unwrap();
+    }
+
+    output
+}
+
+/// Format a single tier for terminal output
+fn format_tier_terminal(
+    output: &mut String,
+    groups: &[DisplayGroup],
+    tier: Tier,
+    verbosity: u8,
+    config: FormattingConfig,
+) {
+    if groups.is_empty() {
+        return;
+    }
+
+    let formatter = ColoredFormatter::new(config);
+
+    // Tier header with color based on tier level
+    let tier_header = match tier {
+        Tier::Critical => format!(
+            "{} {} - {}",
+            formatter.emoji("🚨", "[CRITICAL]"),
+            "CRITICAL".bright_red().bold(),
+            "Immediate Action Required".red()
+        ),
+        Tier::High => format!(
+            "{} {} - {}",
+            formatter.emoji("⚠️", "[HIGH]"),
+            "HIGH PRIORITY".bright_yellow().bold(),
+            "Current Sprint".yellow()
+        ),
+        Tier::Moderate => format!(
+            "{} {} - {}",
+            formatter.emoji("📊", "[MODERATE]"),
+            "MODERATE".bright_blue().bold(),
+            "Next Sprint".blue()
+        ),
+        Tier::Low => format!(
+            "{} {} - {}",
+            formatter.emoji("📝", "[LOW]"),
+            "LOW".white().bold(),
+            "Backlog".white()
+        ),
+    };
+
+    writeln!(output, "{}", tier_header).unwrap();
+    writeln!(output, "{}", tier.effort_estimate().dimmed()).unwrap();
+    writeln!(output).unwrap();
+
+    let max_items_per_tier = if verbosity >= 2 { 999 } else { 5 };
+    let mut items_shown = 0;
+
+    for group in groups {
+        if items_shown >= max_items_per_tier {
+            let remaining: usize = groups.iter().skip(items_shown).map(|g| g.items.len()).sum();
+            if remaining > 0 {
+                writeln!(
+                    output,
+                    "  {} ... and {} more items in this tier",
+                    formatter.emoji("📋", "[+]"),
+                    remaining.to_string().dimmed()
+                )
+                .unwrap();
+            }
+            break;
+        }
+
+        format_display_group_terminal(output, group, &mut items_shown, verbosity, config);
+    }
+
+    writeln!(output).unwrap();
+}
+
+/// Format a display group for terminal output
+fn format_display_group_terminal(
+    output: &mut String,
+    group: &DisplayGroup,
+    items_shown: &mut usize,
+    verbosity: u8,
+    config: FormattingConfig,
+) {
+    let formatter = ColoredFormatter::new(config);
+
+    if group.items.len() > 1 && group.batch_action.is_some() {
+        // Grouped similar items
+        writeln!(
+            output,
+            "  {} {} ({} similar items)",
+            formatter.emoji("📦", "[GROUP]"),
+            group.debt_type.bright_cyan(),
+            group.items.len().to_string().yellow()
+        )
+        .unwrap();
+
+        if let Some(action) = &group.batch_action {
+            writeln!(
+                output,
+                "    {} {}",
+                formatter.emoji("➜", "->"),
+                action.green()
+            )
+            .unwrap();
+        }
+
+        // Show first item as example if verbose
+        if verbosity >= 1 && !group.items.is_empty() {
+            writeln!(
+                output,
+                "    {} Example: {}",
+                formatter.emoji("📍", "[eg]"),
+                format_item_location(&group.items[0]).dimmed()
+            )
+            .unwrap();
+        }
+
+        *items_shown += group.items.len();
+    } else {
+        // Individual items
+        for item in &group.items {
+            if *items_shown >= 5 && verbosity < 2 {
+                return;
+            }
+
+            // Use compact format for tiered display
+            format_compact_item(output, *items_shown + 1, item, verbosity, config);
+            *items_shown += 1;
+        }
+    }
+}
+
+/// Format an item in compact mode for tiered display
+fn format_compact_item(
+    output: &mut String,
+    index: usize,
+    item: &priority::DebtItem,
+    verbosity: u8,
+    config: FormattingConfig,
+) {
+    let formatter = ColoredFormatter::new(config);
+
+    match item {
+        priority::DebtItem::Function(func) => {
+            writeln!(
+                output,
+                "  {} #{} [{}] {}:{} {}",
+                formatter.emoji("▶", ">"),
+                index,
+                format!("{:.1}", func.unified_score.final_score).yellow(),
+                func.location.file.display(),
+                func.location.line,
+                func.location.function.bright_green()
+            )
+            .unwrap();
+
+            // Show brief action
+            writeln!(
+                output,
+                "      {} {}",
+                formatter.emoji("➜", "->"),
+                func.recommendation.primary_action.green()
+            )
+            .unwrap();
+        }
+        priority::DebtItem::File(file) => {
+            writeln!(
+                output,
+                "  {} #{} [{}] {} ({} lines)",
+                formatter.emoji("📁", "[F]"),
+                index,
+                format!("{:.1}", file.score).yellow(),
+                file.metrics.path.display(),
+                file.metrics.total_lines
+            )
+            .unwrap();
+
+            // Show brief action
+            writeln!(
+                output,
+                "      {} {}",
+                formatter.emoji("➜", "->"),
+                file.recommendation.green()
+            )
+            .unwrap();
+        }
+    }
+
+    if verbosity >= 1 {
+        writeln!(output).unwrap();
+    }
+}
+
+/// Helper to format item location
+fn format_item_location(item: &priority::DebtItem) -> String {
+    match item {
+        priority::DebtItem::Function(func) => {
+            format!("{}:{}", func.location.file.display(), func.location.line)
+        }
+        priority::DebtItem::File(file) => {
+            format!("{}", file.metrics.path.display())
+        }
+    }
 }
 
 #[allow(dead_code)]
