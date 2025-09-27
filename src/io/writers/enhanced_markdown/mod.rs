@@ -1,5 +1,6 @@
 pub mod complexity_analyzer;
 pub mod config;
+pub mod executive_summary;
 pub mod formatters;
 pub mod risk_analyzer;
 pub mod statistics;
@@ -16,6 +17,7 @@ use std::io::Write;
 use std::path::Path;
 
 use self::complexity_analyzer::*;
+use self::executive_summary::*;
 use self::formatters::*;
 use self::risk_analyzer::*;
 use self::statistics::*;
@@ -260,13 +262,28 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         let health_score = calculate_health_score(results, coverage_percentage.map(|r| r * 100.0));
         let avg_complexity = calculate_average_complexity(results);
 
-        self.write_health_status_section(
-            health_score,
-            avg_complexity,
-            coverage_percentage,
-            results,
-        )?;
-        self.write_key_insights_section(avg_complexity, coverage_percentage, unified_analysis)?;
+        // Generate enhanced executive summary
+        let summary =
+            generate_executive_summary(results, unified_analysis, health_score, avg_complexity);
+
+        // Write enhanced dashboard
+        self.write_enhanced_health_dashboard(&summary.health_dashboard)?;
+
+        // Write quick wins section
+        if summary.quick_wins.count > 0 {
+            self.write_quick_wins_section(&summary.quick_wins)?;
+        }
+
+        // Write strategic priorities
+        if !summary.strategic_priorities.is_empty() {
+            self.write_strategic_priorities_section(&summary.strategic_priorities)?;
+        }
+
+        // Write team guidance
+        self.write_team_guidance_section(&summary.team_guidance)?;
+
+        // Write success metrics
+        self.write_success_metrics_section(&summary.success_metrics)?;
 
         writeln!(self.writer)?;
         Ok(())
@@ -287,6 +304,169 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
             results,
         )?;
         self.write_health_section_footer()
+    }
+
+    fn write_enhanced_health_dashboard(&mut self, dashboard: &HealthDashboard) -> Result<()> {
+        writeln!(self.writer, "### 📊 Codebase Health Dashboard\n")?;
+
+        // Health status with interpretation
+        writeln!(self.writer, "| Metric | Status | Interpretation |")?;
+        writeln!(self.writer, "|--------|--------|----------------|")?;
+        writeln!(
+            self.writer,
+            "| **Overall Health** | {} | {} |",
+            dashboard.overall_health.as_string(),
+            dashboard.overall_health.interpretation()
+        )?;
+        writeln!(
+            self.writer,
+            "| **Trend** | {} {} | Health is {} over time |",
+            dashboard.trend.as_emoji(),
+            dashboard.trend.as_string(),
+            dashboard.trend.as_string().to_lowercase()
+        )?;
+        writeln!(
+            self.writer,
+            "| **Velocity Impact** | -{:.1}% | {} |",
+            dashboard.velocity_impact.slowdown_percentage, dashboard.velocity_impact.description
+        )?;
+        writeln!(
+            self.writer,
+            "| **Risk Level** | {} | Requires {} attention |",
+            dashboard.risk_level.as_string(),
+            match dashboard.risk_level {
+                RiskLevel::Low => "routine",
+                RiskLevel::Moderate => "regular",
+                RiskLevel::High => "focused",
+                RiskLevel::Critical => "immediate",
+            }
+        )?;
+
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_quick_wins_section(&mut self, quick_wins: &QuickWins) -> Result<()> {
+        writeln!(self.writer, "### 🎯 Quick Wins (< 1 day effort)\n")?;
+
+        writeln!(
+            self.writer,
+            "**{} items** fixable in **{} hours total**",
+            quick_wins.count, quick_wins.total_effort_hours
+        )?;
+
+        if quick_wins.expected_impact.health_improvement > 0.0 {
+            writeln!(self.writer)?;
+            writeln!(self.writer, "**Expected Impact:**")?;
+            writeln!(
+                self.writer,
+                "- Health score improvement: +{:.1}%",
+                quick_wins.expected_impact.health_improvement
+            )?;
+            writeln!(
+                self.writer,
+                "- Complexity reduction: -{:.1}%",
+                quick_wins.expected_impact.complexity_reduction
+            )?;
+            if quick_wins.expected_impact.coverage_increase > 0.0 {
+                writeln!(
+                    self.writer,
+                    "- Coverage increase: +{:.1}%",
+                    quick_wins.expected_impact.coverage_increase
+                )?;
+            }
+        }
+
+        if !quick_wins.recommendations.is_empty() {
+            writeln!(self.writer)?;
+            writeln!(self.writer, "**Specific Actions:**")?;
+            for recommendation in &quick_wins.recommendations {
+                writeln!(self.writer, "- {}", recommendation)?;
+            }
+        }
+
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_strategic_priorities_section(
+        &mut self,
+        priorities: &[StrategicPriority],
+    ) -> Result<()> {
+        writeln!(self.writer, "### 🚨 Strategic Priorities\n")?;
+
+        for (i, priority) in priorities.iter().enumerate() {
+            writeln!(self.writer, "#### {}. {}\n", i + 1, priority.title)?;
+            writeln!(self.writer, "**Location:** `{}`", priority.description)?;
+            writeln!(
+                self.writer,
+                "**Effort:** {} | **Blocking Factor:** {:.1}/10",
+                priority.effort_estimate.as_string(),
+                priority.blocking_factor
+            )?;
+            writeln!(
+                self.writer,
+                "**Business Impact:** {}\n",
+                priority.business_impact
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn write_team_guidance_section(&mut self, guidance: &TeamGuidance) -> Result<()> {
+        writeln!(self.writer, "### 👥 Team Guidance\n")?;
+
+        writeln!(
+            self.writer,
+            "**Recommended Debt Allocation:** {}% of sprint capacity",
+            guidance.recommended_debt_allocation
+        )?;
+
+        if !guidance.focus_areas.is_empty() {
+            writeln!(self.writer)?;
+            writeln!(self.writer, "**Focus Areas:**")?;
+            for area in &guidance.focus_areas {
+                writeln!(self.writer, "- {}", area)?;
+            }
+        }
+
+        if !guidance.process_improvements.is_empty() {
+            writeln!(self.writer)?;
+            writeln!(self.writer, "**Process Improvements:**")?;
+            for improvement in &guidance.process_improvements {
+                writeln!(self.writer, "- {}", improvement)?;
+            }
+        }
+
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
+    fn write_success_metrics_section(&mut self, metrics: &SuccessMetrics) -> Result<()> {
+        writeln!(self.writer, "### ✅ Success Metrics\n")?;
+
+        writeln!(self.writer, "| Target | Value | Timeline |")?;
+        writeln!(self.writer, "|--------|-------|----------|")?;
+        writeln!(
+            self.writer,
+            "| Health Score | {}% | {} |",
+            metrics.target_health_score, metrics.timeline
+        )?;
+        writeln!(
+            self.writer,
+            "| Code Coverage | {:.0}% | {} |",
+            metrics.target_coverage * 100.0,
+            metrics.timeline
+        )?;
+        writeln!(
+            self.writer,
+            "| Complexity Reduction | -{:.0}% | {} |",
+            metrics.target_complexity_reduction, metrics.timeline
+        )?;
+
+        writeln!(self.writer)?;
+        Ok(())
     }
 
     fn write_key_insights_section(
