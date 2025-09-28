@@ -72,6 +72,26 @@ impl ImportTracker {
     }
 
     pub fn resolve_name(&self, name: &str) -> Option<String> {
+        // Check for module attribute access (e.g., "module1.process_data")
+        if let Some(dot_pos) = name.find('.') {
+            let module_part = &name[..dot_pos];
+            let attr_part = &name[dot_pos + 1..];
+
+            // Check if module_part is an imported module or alias
+            for import in &self.imports {
+                if let Some(alias) = &import.alias {
+                    if alias == module_part {
+                        // Alias matches, return module.attribute
+                        return Some(format!("{}.{}", import.module, attr_part));
+                    }
+                } else if import.name == module_part || import.module == module_part {
+                    // Direct module import matches
+                    return Some(name.to_string());
+                }
+            }
+        }
+
+        // Check for direct name matches
         for import in &self.imports {
             if let Some(alias) = &import.alias {
                 if alias == name {

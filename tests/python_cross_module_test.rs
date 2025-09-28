@@ -45,6 +45,7 @@ def main():
     let functions: Vec<_> = call_graph.get_all_functions().collect();
     assert!(functions.len() >= 3); // process_data, helper_function, main
 
+
     // Verify that process_data and helper_function have callers
     let process_data_id = functions
         .iter()
