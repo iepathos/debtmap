@@ -134,8 +134,10 @@ pub fn is_dead_code(
     func_id: &FunctionId,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> bool {
-    // Check hardcoded exclusions (includes test functions, main, etc.)
-    if is_excluded_from_dead_code_analysis(func) {
+    // FIRST: Check if function has incoming calls in the call graph
+    // This includes event handlers bound via Bind() and other framework patterns
+    let callers = call_graph.get_callers(func_id);
+    if !callers.is_empty() {
         return false;
     }
 
@@ -146,9 +148,14 @@ pub fn is_dead_code(
         }
     }
 
-    // Check if function has incoming calls
-    let callers = call_graph.get_callers(func_id);
-    callers.is_empty()
+    // LAST: Check hardcoded exclusions (includes test functions, main, etc.)
+    // This is now a fallback for functions with no callers but might be implicitly called
+    if is_excluded_from_dead_code_analysis(func) {
+        return false;
+    }
+
+    // No callers found and not excluded by patterns
+    true
 }
 
 /// Enhanced dead code detection that uses framework pattern exclusions
@@ -571,7 +578,7 @@ fn is_complexity_hotspot_by_metrics(cyclomatic: u32, cognitive: u32) -> bool {
 mod tests {
     use super::*;
     use crate::core::FunctionMetrics;
-    use crate::priority::call_graph::{CallGraph, FunctionId};
+    use crate::priority::call_graph::{CallGraph, FunctionId, FunctionCall, CallType};
     use std::path::PathBuf;
 
     fn create_test_function(name: &str, visibility: Option<&str>) -> FunctionMetrics {
@@ -683,6 +690,137 @@ mod tests {
     }
 
     #[test]
+    fn test_event_handler_not_dead_code_when_bound() {
+        // Create a Python event handler function
+        let event_handler = FunctionMetrics {
+            name: "on_key_down".to_string(),
+            file: PathBuf::from("test_panel.py"),
+            line: 50,
+            cyclomatic: 6,
+            cognitive: 6,
+            nesting: 3,
+            length: 20,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+        };
+
+        let mut call_graph = CallGraph::new();
+        let event_handler_id = FunctionId {
+            file: PathBuf::from("test_panel.py"),
+            name: "on_key_down".to_string(),
+            line: 50,
+        };
+
+        // Simulate the event handler being bound via Bind()
+        // This would normally be done by the Python call graph analyzer
+        let setup_method_id = FunctionId {
+            file: PathBuf::from("test_panel.py"),
+            name: "setup_events".to_string(),
+            line: 30,
+        };
+        call_graph.add_call(FunctionCall {
+            caller: setup_method_id,
+            callee: event_handler_id.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Test that the event handler is NOT considered dead code
+        let is_dead = is_dead_code(&event_handler, &call_graph, &event_handler_id, None);
+        assert!(!is_dead, "Event handler with Bind() call should not be dead code");
+    }
+
+    #[test]
+    fn test_event_handler_is_dead_code_when_not_bound() {
+        // Create a Python function that looks like a handler but isn't bound
+        // Use a name that doesn't match framework patterns
+        let unused_func = FunctionMetrics {
+            name: "process_data".to_string(), // Not a framework pattern
+            file: PathBuf::from("test_panel.py"),
+            line: 100,
+            cyclomatic: 3,
+            cognitive: 3,
+            nesting: 1,
+            length: 10,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+        };
+
+        let call_graph = CallGraph::new(); // Empty call graph - no callers
+        let unused_func_id = FunctionId {
+            file: PathBuf::from("test_panel.py"),
+            name: "process_data".to_string(),
+            line: 100,
+        };
+
+        // Test that an unbound function IS considered dead code
+        let is_dead = is_dead_code(&unused_func, &call_graph, &unused_func_id, None);
+        assert!(is_dead, "Function with no callers should be dead code");
+    }
+
+    #[test]
+    fn test_observer_method_not_dead_code_when_called() {
+        // Create observer pattern methods
+        let register_observer = FunctionMetrics {
+            name: "register_observer".to_string(),
+            file: PathBuf::from("manager.py"),
+            line: 20,
+            cyclomatic: 2,
+            cognitive: 1,
+            nesting: 1,
+            length: 5,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+        };
+
+        let mut call_graph = CallGraph::new();
+        let register_id = FunctionId {
+            file: PathBuf::from("manager.py"),
+            name: "register_observer".to_string(),
+            line: 20,
+        };
+
+        // Simulate a call from another file
+        let caller_id = FunctionId {
+            file: PathBuf::from("panel.py"),
+            name: "__init__".to_string(),
+            line: 10,
+        };
+        call_graph.add_call(FunctionCall {
+            caller: caller_id,
+            callee: register_id.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Test that register_observer is NOT considered dead code
+        let is_dead = is_dead_code(&register_observer, &call_graph, &register_id, None);
+        assert!(!is_dead, "Called observer method should not be dead code");
+    }
+
+    #[test]
     fn test_generate_usage_hints_multiple_indicators() {
         let func = create_test_function("_old_deprecated_helper", Some("pub"));
         let call_graph = CallGraph::new();
@@ -700,6 +838,147 @@ mod tests {
             &"Name starts with underscore (often indicates internal/unused)".to_string()
         ));
         assert!(hints.contains(&"Name suggests obsolete functionality".to_string()));
+    }
+
+    #[test]
+    fn test_wxpython_event_handlers_not_dead_code() {
+        // This test mimics the exact scenario from promptconstruct-frontend
+        // where event handlers were incorrectly flagged as dead code
+
+        // Create functions that match the patterns from promptconstruct-frontend
+        let on_paint = FunctionMetrics {
+            name: "on_paint".to_string(),
+            file: PathBuf::from("conversation_panel.py"),
+            line: 544,
+            cyclomatic: 6,
+            cognitive: 10,
+            nesting: 4,
+            length: 30,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+        };
+
+        let on_key_down = FunctionMetrics {
+            name: "on_key_down".to_string(),
+            file: PathBuf::from("mainwindow.py"),
+            line: 262,
+            cyclomatic: 6,
+            cognitive: 6,
+            nesting: 3,
+            length: 20,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+        };
+
+        let mut call_graph = CallGraph::new();
+
+        // IDs for the event handlers
+        let on_paint_id = FunctionId {
+            file: PathBuf::from("conversation_panel.py"),
+            name: "on_paint".to_string(),
+            line: 544,
+        };
+
+        let on_key_down_id = FunctionId {
+            file: PathBuf::from("mainwindow.py"),
+            name: "on_key_down".to_string(),
+            line: 262,
+        };
+
+        // Simulate the Bind() calls that would be detected by the Python analyzer
+        // e.g., self.Bind(wx.EVT_PAINT, self.on_paint)
+        let init_id = FunctionId {
+            file: PathBuf::from("conversation_panel.py"),
+            name: "__init__".to_string(),
+            line: 10,
+        };
+
+        call_graph.add_call(FunctionCall {
+            caller: init_id.clone(),
+            callee: on_paint_id.clone(),
+            call_type: CallType::Direct,
+        });
+        call_graph.add_call(FunctionCall {
+            caller: init_id,
+            callee: on_key_down_id.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Test that these event handlers are NOT considered dead code
+        assert!(!is_dead_code(&on_paint, &call_graph, &on_paint_id, None),
+                "on_paint should not be dead code when bound via Bind()");
+
+        assert!(!is_dead_code(&on_key_down, &call_graph, &on_key_down_id, None),
+                "on_key_down should not be dead code when bound via Bind()");
+    }
+
+    #[test]
+    fn test_call_graph_priority_over_patterns() {
+        // This test ensures that call graph evidence takes priority over pattern matching
+        // Even if a function doesn't match any special patterns, if it has callers, it's not dead
+
+        let unusual_name_func = FunctionMetrics {
+            name: "xyz123_unusual".to_string(), // Doesn't match any patterns
+            file: PathBuf::from("module.py"),
+            line: 100,
+            cyclomatic: 2,
+            cognitive: 2,
+            nesting: 1,
+            length: 10,
+            is_test: false,
+            visibility: None,
+            is_trait_method: false,
+            in_test_module: false,
+            entropy_score: None,
+            is_pure: None,
+            purity_confidence: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+        };
+
+        let mut call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: PathBuf::from("module.py"),
+            name: "xyz123_unusual".to_string(),
+            line: 100,
+        };
+
+        // Initially no callers - should be dead code
+        assert!(is_dead_code(&unusual_name_func, &call_graph, &func_id, None),
+                "Function with no callers and no pattern matches should be dead code");
+
+        // Add a caller
+        let caller_id = FunctionId {
+            file: PathBuf::from("module.py"),
+            name: "main".to_string(),
+            line: 10,
+        };
+        call_graph.add_call(FunctionCall {
+            caller: caller_id,
+            callee: func_id.clone(),
+            call_type: CallType::Direct,
+        });
+
+        // Now with a caller - should NOT be dead code
+        assert!(!is_dead_code(&unusual_name_func, &call_graph, &func_id, None),
+                "Function with callers should not be dead code regardless of patterns");
     }
 
     #[test]

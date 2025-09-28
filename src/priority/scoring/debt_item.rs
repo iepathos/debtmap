@@ -700,8 +700,10 @@ pub fn is_dead_code(
     func_id: &FunctionId,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
 ) -> bool {
-    // Check hardcoded exclusions (includes test functions, main, etc.)
-    if is_excluded_from_dead_code_analysis(func) {
+    // FIRST: Check if function has incoming calls in the call graph
+    // This includes event handlers bound via Bind() and other framework patterns
+    let callers = call_graph.get_callers(func_id);
+    if !callers.is_empty() {
         return false;
     }
 
@@ -712,8 +714,8 @@ pub fn is_dead_code(
         }
     }
 
-    // For Python files, use the PythonDeadCodeDetector which properly considers
-    // the call graph data from TwoPassExtractor including method calls and implicit calls
+    // For Python files, use the PythonDeadCodeDetector for additional pattern-based detection
+    // This handles magic methods, framework patterns, etc. that might not show up in call graph
     let language = crate::core::Language::from_path(&func.file);
     if language == crate::core::Language::Python {
         let detector = PythonDeadCodeDetector::new();
@@ -725,9 +727,14 @@ pub fn is_dead_code(
         }
     }
 
-    // For other languages, check if function has incoming calls
-    let callers = call_graph.get_callers(func_id);
-    callers.is_empty()
+    // LAST: Check hardcoded exclusions (includes test functions, main, etc.)
+    // This is now a fallback for functions with no callers but might be implicitly called
+    if is_excluded_from_dead_code_analysis(func) {
+        return false;
+    }
+
+    // No callers found and not excluded by patterns
+    true
 }
 
 /// Enhanced dead code detection that uses framework pattern exclusions
