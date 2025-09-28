@@ -415,7 +415,12 @@ impl PythonTypeTracker {
     }
 
     /// Register a from import (from module import name as alias)
-    pub fn register_from_import(&mut self, module_name: String, name: String, alias: Option<String>) {
+    pub fn register_from_import(
+        &mut self,
+        module_name: String,
+        name: String,
+        alias: Option<String>,
+    ) {
         let key = alias.clone().unwrap_or_else(|| name.clone());
         self.from_imports.insert(key, (module_name, Some(name)));
     }
@@ -505,17 +510,39 @@ impl TwoPassExtractor {
         // Common framework entry points
         let framework_methods = [
             // wxPython
-            "OnInit", "OnExit", "OnClose", "OnDestroy", "OnPaint", "OnSize",
+            "OnInit",
+            "OnExit",
+            "OnClose",
+            "OnDestroy",
+            "OnPaint",
+            "OnSize",
             // unittest
-            "setUp", "tearDown", "setUpClass", "tearDownClass", "setUpModule", "tearDownModule",
+            "setUp",
+            "tearDown",
+            "setUpClass",
+            "tearDownClass",
+            "setUpModule",
+            "tearDownModule",
             // pytest
-            "setup_method", "teardown_method", "setup_class", "teardown_class",
+            "setup_method",
+            "teardown_method",
+            "setup_class",
+            "teardown_class",
             // Django
-            "handle", "ready", "save", "delete", "clean",
+            "handle",
+            "ready",
+            "save",
+            "delete",
+            "clean",
             // FastAPI/Flask
-            "get", "post", "put", "delete", "patch",
+            "get",
+            "post",
+            "put",
+            "delete",
+            "patch",
             // Main entry points
-            "main", "__main__",
+            "main",
+            "__main__",
         ];
 
         framework_methods.contains(&method_name) || method_name.starts_with("test_")
@@ -780,8 +807,13 @@ impl TwoPassExtractor {
         let is_entry_point = Self::is_framework_entry_point(&func_name);
         let is_test = func_name.starts_with("test_") || func_name.contains("::test_");
 
-        self.call_graph
-            .add_function(func_id.clone(), is_entry_point, is_test, 10, func_def.body.len());
+        self.call_graph.add_function(
+            func_id.clone(),
+            is_entry_point,
+            is_test,
+            10,
+            func_def.body.len(),
+        );
 
         // Track function for phase two resolution
         self.known_functions.insert(func_id.clone());
@@ -1144,21 +1176,29 @@ impl TwoPassExtractor {
                             let func_name = attr.attr.as_str();
 
                             // Check if this is an imported module
-                            if let Some(qualified_module) = self.type_tracker.resolve_imported_name(mod_name) {
+                            if let Some(qualified_module) =
+                                self.type_tracker.resolve_imported_name(mod_name)
+                            {
                                 let full_name = format!("{}.{}", qualified_module, func_name);
-                                if let Some(func_id) = context.resolve_function(&self.type_tracker.file_path, &full_name) {
+                                if let Some(func_id) = context
+                                    .resolve_function(&self.type_tracker.file_path, &full_name)
+                                {
                                     return Some(func_id);
                                 }
                             }
 
                             // Try direct resolution
                             let qualified_name = format!("{}.{}", mod_name, func_name);
-                            if let Some(func_id) = context.resolve_function(&self.type_tracker.file_path, &qualified_name) {
+                            if let Some(func_id) = context
+                                .resolve_function(&self.type_tracker.file_path, &qualified_name)
+                            {
                                 return Some(func_id);
                             }
 
                             // Also try just the function name
-                            if let Some(func_id) = context.resolve_function(&self.type_tracker.file_path, func_name) {
+                            if let Some(func_id) =
+                                context.resolve_function(&self.type_tracker.file_path, func_name)
+                            {
                                 return Some(func_id);
                             }
                         }
@@ -1224,10 +1264,13 @@ impl TwoPassExtractor {
                     let func_name = name.id.as_str();
 
                     // First, check if this is an imported name
-                    if let Some(qualified_name) = self.type_tracker.resolve_imported_name(func_name) {
+                    if let Some(qualified_name) = self.type_tracker.resolve_imported_name(func_name)
+                    {
                         // Try cross-module resolution with the qualified name
                         if let Some(context) = &self.cross_module_context {
-                            if let Some(func_id) = context.resolve_function(&self.type_tracker.file_path, &qualified_name) {
+                            if let Some(func_id) = context
+                                .resolve_function(&self.type_tracker.file_path, &qualified_name)
+                            {
                                 return Some(func_id);
                             }
                         }

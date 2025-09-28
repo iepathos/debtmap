@@ -45,7 +45,6 @@ def main():
     let functions: Vec<_> = call_graph.get_all_functions().collect();
     assert!(functions.len() >= 3); // process_data, helper_function, main
 
-
     // Verify that process_data and helper_function have callers
     let process_data_id = functions
         .iter()
@@ -472,11 +471,11 @@ def func_b():
     let context = build_cross_module_context(&files).unwrap();
 
     // Check that symbols are registered
-    assert!(context.symbols.len() > 0, "Context should contain symbols");
+    assert!(!context.symbols.is_empty(), "Context should contain symbols");
 
     // Check that imports are tracked
-    assert!(context.imports.len() > 0, "Context should track imports");
+    assert!(!context.imports.is_empty(), "Context should track imports");
 
     // Check that exports are tracked
-    assert!(context.exports.len() > 0, "Context should track exports");
+    assert!(!context.exports.is_empty(), "Context should track exports");
 }

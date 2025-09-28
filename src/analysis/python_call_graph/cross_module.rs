@@ -97,11 +97,14 @@ impl CrossModuleContext {
                 }
 
                 // Try to find it in any module's exports
-                for (_path, exports) in &self.exports {
+                for exports in self.exports.values() {
                     for export in exports {
                         if export.qualified_name == resolved || export.name == resolved {
-                            if let Some(func_id) = self.symbols.get(&export.qualified_name)
-                                .or_else(|| self.symbols.get(&export.name)) {
+                            if let Some(func_id) = self
+                                .symbols
+                                .get(&export.qualified_name)
+                                .or_else(|| self.symbols.get(&export.name))
+                            {
                                 return Some(func_id.clone());
                             }
                         }
@@ -180,7 +183,7 @@ impl CrossModuleContext {
             if path
                 .file_stem()
                 .and_then(|s| s.to_str())
-                .map_or(false, |name| {
+                .is_some_and(|name| {
                     name == module_name || module_name.ends_with(name)
                 })
             {
@@ -198,6 +201,12 @@ impl CrossModuleContext {
 
 pub struct CrossModuleAnalyzer {
     context: CrossModuleContext,
+}
+
+impl Default for CrossModuleAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CrossModuleAnalyzer {

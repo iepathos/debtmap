@@ -163,7 +163,8 @@ pub fn process_python_files_for_call_graph_with_types(
                                     Err(e) => {
                                         log::warn!(
                                             "Failed to parse Python file {:?}: {}",
-                                            file_path, e
+                                            file_path,
+                                            e
                                         );
                                     }
                                 }
