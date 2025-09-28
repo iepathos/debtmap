@@ -1,7 +1,5 @@
 use debtmap::analysis::python_call_graph::{analyze_python_project, build_cross_module_context};
-use debtmap::priority::call_graph::CallGraph;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]
@@ -59,11 +57,11 @@ def main():
         .expect("helper_function should be found");
 
     assert!(
-        call_graph.get_callers(process_data_id).count() > 0,
+        !call_graph.get_callers(process_data_id).is_empty(),
         "process_data should have callers from module2"
     );
     assert!(
-        call_graph.get_callers(helper_id).count() > 0,
+        !call_graph.get_callers(helper_id).is_empty(),
         "helper_function should have callers from module2"
     );
 }
@@ -121,11 +119,11 @@ def process():
         .expect("calculate_sum should be found");
 
     assert!(
-        call_graph.get_callers(format_string_id).count() > 0,
+        !call_graph.get_callers(format_string_id).is_empty(),
         "format_string should have callers"
     );
     assert!(
-        call_graph.get_callers(calculate_sum_id).count() > 0,
+        !call_graph.get_callers(calculate_sum_id).is_empty(),
         "calculate_sum should have callers"
     );
 }
@@ -193,11 +191,11 @@ def run_application():
         .expect("process_all should be found");
 
     assert!(
-        call_graph.get_callers(add_item_id).count() > 0,
+        !call_graph.get_callers(add_item_id).is_empty(),
         "add_item should have callers from app.py"
     );
     assert!(
-        call_graph.get_callers(process_all_id).count() > 0,
+        !call_graph.get_callers(process_all_id).is_empty(),
         "process_all should have callers from app.py"
     );
 }
@@ -256,11 +254,11 @@ def process_batch(batch):
         .expect("transform_data should be found");
 
     assert!(
-        call_graph.get_callers(validate_id).count() > 0,
+        !call_graph.get_callers(validate_id).is_empty(),
         "validate_input should have callers through alias"
     );
     assert!(
-        call_graph.get_callers(transform_id).count() > 0,
+        !call_graph.get_callers(transform_id).is_empty(),
         "transform_data should have callers through module alias"
     );
 }
@@ -341,11 +339,11 @@ def setup_observers():
     // The update method should have callers (from notify)
     // The handle_event should have callers (from update)
     assert!(
-        call_graph.get_callers(update_id).count() > 0,
+        !call_graph.get_callers(update_id).is_empty(),
         "ConcreteObserver.update should be called through observer pattern"
     );
     assert!(
-        call_graph.get_callers(handle_event_id).count() > 0,
+        !call_graph.get_callers(handle_event_id).is_empty(),
         "handle_event should be called from update"
     );
 }
@@ -432,7 +430,7 @@ class CustomWidget(BaseWidget):
 
     // custom_init should have callers (from OnInit)
     assert!(
-        call_graph.get_callers(custom_init_id).count() > 0,
+        !call_graph.get_callers(custom_init_id).is_empty(),
         "custom_init should be called from OnInit"
     );
 }
