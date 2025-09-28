@@ -320,7 +320,7 @@ mod tests {
 
         // Verify items were added
         assert!(
-            analysis.items.len() > 0,
+            !analysis.items.is_empty(),
             "Items should have been added to analysis"
         );
 

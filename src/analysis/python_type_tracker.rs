@@ -736,6 +736,9 @@ impl TwoPassExtractor {
                 if let Some(caller) = &self.current_function {
                     let unresolved = self.create_unresolved_call(caller.clone(), call);
                     self.phase_one_calls.push(unresolved);
+
+                    // Check for event binding patterns (e.g., Bind(event, self.method))
+                    self.check_for_event_bindings(call);
                 }
 
                 // Recursively analyze arguments
@@ -796,6 +799,67 @@ impl TwoPassExtractor {
                     callee,
                     call_type: unresolved.call_type.clone(),
                 });
+            }
+        }
+    }
+
+    /// Check for event binding patterns like obj.Bind(event, self.method)
+    fn check_for_event_bindings(&mut self, call: &ast::ExprCall) {
+        // Check if this is a method call like obj.Bind(...)
+        if let ast::Expr::Attribute(attr_expr) = &*call.func {
+            let method_name = &attr_expr.attr;
+
+            // List of known event binding methods
+            let event_binding_methods = [
+                "Bind",             // wxPython: obj.Bind(wx.EVT_PAINT, self.on_paint)
+                "bind",             // Tkinter: widget.bind("<Button-1>", self.on_click)
+                "connect",          // PyQt/PySide: signal.connect(self.slot)
+                "on",               // Some frameworks
+                "addEventListener", // Web frameworks
+                "addListener",      // Event systems
+                "subscribe",        // Observer patterns
+                "observe",          // Observer patterns
+                "listen",           // Event systems
+            ];
+
+            // Check if this is an event binding method
+            if event_binding_methods.contains(&method_name.as_str()) {
+                // Look for self/cls method references in arguments
+                for arg in &call.args {
+                    if let ast::Expr::Attribute(handler_attr) = arg {
+                        if let ast::Expr::Name(obj_name) = &*handler_attr.value {
+                            // Check if it's self.method or cls.method
+                            if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" {
+                                // Create a reference from the current function to the handler
+                                if let (Some(class_name), Some(caller_func)) = (&self.current_class, &self.current_function) {
+                                    let handler_name = format!("{}.{}", class_name, handler_attr.attr);
+
+                                    // Estimate handler line number from source
+                                    let handler_line = self.estimate_line_number(&handler_attr.attr);
+
+                                    let handler_id = FunctionId {
+                                        name: handler_name.clone(),
+                                        file: self.type_tracker.file_path.clone(),
+                                        line: handler_line,
+                                    };
+
+                                    // Add the handler to known functions if not already there
+                                    self.known_functions.insert(handler_id.clone());
+                                    self.function_name_map.insert(handler_name, handler_id.clone());
+
+                                    // Create a call from the current function to the handler
+                                    let call_edge = FunctionCall {
+                                        caller: caller_func.clone(),
+                                        callee: handler_id,
+                                        call_type: CallType::Direct, // Event binding creates a direct reference
+                                    };
+
+                                    self.call_graph.add_call(call_edge);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
