@@ -1150,13 +1150,11 @@ impl TwoPassExtractor {
                 }
 
                 // Try resolving as a class method
-                if let Some(receiver_type) = &unresolved.receiver_type {
-                    if let PythonType::Instance(class_name) | PythonType::Class(class_name) =
-                        receiver_type
-                    {
-                        if let Some(func_id) = context.resolve_method(class_name, method_name) {
-                            return Some(func_id);
-                        }
+                if let Some(PythonType::Instance(class_name) | PythonType::Class(class_name)) =
+                    &unresolved.receiver_type
+                {
+                    if let Some(func_id) = context.resolve_method(class_name, method_name) {
+                        return Some(func_id);
                     }
                 }
             } else if let ast::Expr::Call(call) = &unresolved.call_expr {

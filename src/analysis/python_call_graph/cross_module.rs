@@ -183,9 +183,7 @@ impl CrossModuleContext {
             if path
                 .file_stem()
                 .and_then(|s| s.to_str())
-                .is_some_and(|name| {
-                    name == module_name || module_name.ends_with(name)
-                })
+                .is_some_and(|name| name == module_name || module_name.ends_with(name))
             {
                 return Some(exports);
             }

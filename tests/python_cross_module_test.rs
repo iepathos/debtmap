@@ -471,7 +471,10 @@ def func_b():
     let context = build_cross_module_context(&files).unwrap();
 
     // Check that symbols are registered
-    assert!(!context.symbols.is_empty(), "Context should contain symbols");
+    assert!(
+        !context.symbols.is_empty(),
+        "Context should contain symbols"
+    );
 
     // Check that imports are tracked
     assert!(!context.imports.is_empty(), "Context should track imports");
