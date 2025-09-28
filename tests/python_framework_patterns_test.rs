@@ -1,6 +1,5 @@
 /// Tests for Python framework-specific patterns that should not be flagged as dead code
 /// This includes wxPython framework methods, main function patterns, and cross-module calls
-
 use debtmap::analysis::python_type_tracker::TwoPassExtractor;
 use std::path::PathBuf;
 
@@ -51,9 +50,11 @@ if __name__ == "__main__":
             oninit_found = true;
             let callers = call_graph.get_callers(func_id);
             oninit_has_callers = !callers.is_empty();
-            println!("Found OnInit: {} with {} callers",
+            println!(
+                "Found OnInit: {} with {} callers",
                 func_id.name,
-                callers.len());
+                callers.len()
+            );
         }
     }
 
@@ -61,8 +62,10 @@ if __name__ == "__main__":
 
     // EXPECTED TO FAIL: OnInit currently has no callers detected
     // This test documents the false positive issue
-    println!("TEST EXPECTED TO FAIL: OnInit has {} callers (should have implicit framework caller)",
-        if oninit_has_callers { "some" } else { "no" });
+    println!(
+        "TEST EXPECTED TO FAIL: OnInit has {} callers (should have implicit framework caller)",
+        if oninit_has_callers { "some" } else { "no" }
+    );
 }
 
 #[test]
@@ -84,12 +87,9 @@ if __name__ == "__main__":
 "#;
 
     // Parse and analyze
-    let module = rustpython_parser::parse(
-        python_code,
-        rustpython_parser::Mode::Module,
-        "test_main.py",
-    )
-    .expect("Failed to parse Python code");
+    let module =
+        rustpython_parser::parse(python_code, rustpython_parser::Mode::Module, "test_main.py")
+            .expect("Failed to parse Python code");
 
     let file_path = PathBuf::from("test_main.py");
     let mut extractor = TwoPassExtractor::new_with_source(file_path.clone(), python_code);
@@ -116,7 +116,9 @@ if __name__ == "__main__":
     // EXPECTED TO FAIL: main() called from if __name__ == "__main__" is not detected
     // as a call because it's at module level
     if !main_has_callers {
-        println!("TEST SHOWS ISSUE: main() has no callers detected from if __name__ == '__main__' block");
+        println!(
+            "TEST SHOWS ISSUE: main() has no callers detected from if __name__ == '__main__' block"
+        );
         println!("This is a known false positive that needs fixing");
     }
 }
@@ -188,7 +190,10 @@ class ConversationPanel:
         }
     }
 
-    assert!(register_found, "register_observer should be found in call graph");
+    assert!(
+        register_found,
+        "register_observer should be found in call graph"
+    );
 
     // EXPECTED TO FAIL: Instance method calls like
     // conversation_manager.register_observer(self) are not being detected

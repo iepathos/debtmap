@@ -11,10 +11,13 @@
 //! - Functions passed as arguments to callback-accepting functions
 //! - Type-aware method resolution using two-pass analysis
 
+mod analyze;
 mod call_analysis;
 mod callback_patterns;
+pub mod cross_module;
 mod event_tracking;
 mod function_detection;
+pub mod import_tracker;
 
 #[allow(unused_imports)]
 use crate::priority::call_graph::{CallGraph, FunctionId};
@@ -29,6 +32,9 @@ use function_detection::FunctionLineCollector;
 
 // Re-export two-pass extractor for convenience
 pub use crate::analysis::python_type_tracker::TwoPassExtractor;
+
+// Re-export cross-module analysis functions
+pub use analyze::{analyze_python_project, build_cross_module_context};
 
 /// Python-specific call graph analyzer
 #[derive(Default)]

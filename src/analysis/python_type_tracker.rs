@@ -3,6 +3,7 @@
 //! Provides type inference and tracking for Python code to improve call graph accuracy.
 //! Uses two-pass resolution for better method resolution and reduced false positives.
 
+use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
@@ -451,6 +452,8 @@ pub struct TwoPassExtractor {
     current_class: Option<String>,
     /// Source code lines for line number extraction
     source_lines: Vec<String>,
+    /// Optional cross-module context for resolving imports
+    cross_module_context: Option<CrossModuleContext>,
 }
 
 impl TwoPassExtractor {
@@ -464,6 +467,7 @@ impl TwoPassExtractor {
             current_function: None,
             current_class: None,
             source_lines: Vec::new(),
+            cross_module_context: None,
         }
     }
 
@@ -479,6 +483,23 @@ impl TwoPassExtractor {
             current_function: None,
             current_class: None,
             source_lines,
+            cross_module_context: None,
+        }
+    }
+
+    /// Create a new extractor with cross-module context for better resolution
+    pub fn new_with_context(file_path: PathBuf, source: &str, context: CrossModuleContext) -> Self {
+        let source_lines: Vec<String> = source.lines().map(|s| s.to_string()).collect();
+        Self {
+            phase_one_calls: Vec::new(),
+            type_tracker: PythonTypeTracker::new(file_path.clone()),
+            call_graph: CallGraph::new(),
+            known_functions: HashSet::new(),
+            function_name_map: HashMap::new(),
+            current_function: None,
+            current_class: None,
+            source_lines,
+            cross_module_context: Some(context),
         }
     }
 
@@ -878,22 +899,19 @@ impl TwoPassExtractor {
 
     /// Check if this is an if __name__ == "__main__" guard
     fn is_main_guard(&self, test: &ast::Expr) -> bool {
-        match test {
-            ast::Expr::Compare(cmp) => {
-                // Check for __name__ == "__main__" pattern
-                if let ast::Expr::Name(name) = &*cmp.left {
-                    if name.id.as_str() == "__name__" && cmp.ops.len() == 1 {
-                        if let ast::CmpOp::Eq = &cmp.ops[0] {
-                            if let Some(ast::Expr::Constant(const_expr)) = cmp.comparators.get(0) {
-                                if let ast::Constant::Str(s) = &const_expr.value {
-                                    return s == "__main__";
-                                }
+        if let ast::Expr::Compare(cmp) = test {
+            // Check for __name__ == "__main__" pattern
+            if let ast::Expr::Name(name) = &*cmp.left {
+                if name.id.as_str() == "__name__" && cmp.ops.len() == 1 {
+                    if let ast::CmpOp::Eq = &cmp.ops[0] {
+                        if let Some(ast::Expr::Constant(const_expr)) = cmp.comparators.first() {
+                            if let ast::Constant::Str(s) = &const_expr.value {
+                                return s == "__main__";
                             }
                         }
                     }
                 }
             }
-            _ => {}
         }
         false
     }
@@ -909,7 +927,8 @@ impl TwoPassExtractor {
 
         // Add this pseudo-function to known functions
         self.known_functions.insert(module_main_id.clone());
-        self.function_name_map.insert("__module_main__".to_string(), module_main_id.clone());
+        self.function_name_map
+            .insert("__module_main__".to_string(), module_main_id.clone());
 
         // Temporarily set current function to module main
         let prev_function = self.current_function.clone();
@@ -933,7 +952,8 @@ impl TwoPassExtractor {
                     if let ast::Expr::Name(name) = &*call.func {
                         if let Some(func_id) = self.function_name_map.get(name.id.as_str()) {
                             // Add a call from __module_main__ to the function
-                            let module_main = self.function_name_map.get("__module_main__").unwrap();
+                            let module_main =
+                                self.function_name_map.get("__module_main__").unwrap();
                             self.call_graph.add_call(FunctionCall {
                                 caller: module_main.clone(),
                                 callee: func_id.clone(),
@@ -952,6 +972,39 @@ impl TwoPassExtractor {
 
     /// Resolve a call using type information
     fn resolve_call(&self, unresolved: &UnresolvedCall) -> Option<FunctionId> {
+        // Try cross-module resolution first if context is available
+        if let Some(context) = &self.cross_module_context {
+            if let Some(method_name) = &unresolved.method_name {
+                // Try to resolve using cross-module context
+                if let Some(func_id) =
+                    context.resolve_function(&self.type_tracker.file_path, method_name)
+                {
+                    return Some(func_id);
+                }
+
+                // Try resolving as a class method
+                if let Some(receiver_type) = &unresolved.receiver_type {
+                    if let PythonType::Instance(class_name) | PythonType::Class(class_name) =
+                        receiver_type
+                    {
+                        if let Some(func_id) = context.resolve_method(class_name, method_name) {
+                            return Some(func_id);
+                        }
+                    }
+                }
+            } else if let ast::Expr::Call(call) = &unresolved.call_expr {
+                if let ast::Expr::Name(name) = &*call.func {
+                    // Try to resolve function using cross-module context
+                    if let Some(func_id) =
+                        context.resolve_function(&self.type_tracker.file_path, name.id.as_str())
+                    {
+                        return Some(func_id);
+                    }
+                }
+            }
+        }
+
+        // Fall back to local resolution
         if unresolved.method_name.is_some() {
             if let (Some(receiver_type), Some(method_name)) =
                 (&unresolved.receiver_type, &unresolved.method_name)
@@ -975,7 +1028,7 @@ impl TwoPassExtractor {
                 // This handles cases like: conversation_manager.register_observer(self)
                 // where conversation_manager is a parameter
                 if let ast::Expr::Call(call) = &unresolved.call_expr {
-                    if let ast::Expr::Attribute(attr_expr) = &*call.func {
+                    if let ast::Expr::Attribute(_attr_expr) = &*call.func {
                         // Check all known classes for this method
                         for (func_name, func_id) in &self.function_name_map {
                             if func_name.ends_with(&format!(".{}", method_name)) {
