@@ -1,6 +1,8 @@
 use crate::{
     analysis::call_graph::RustCallGraphBuilder,
-    analysis::python_call_graph::{PythonCallGraphAnalyzer, TwoPassExtractor},
+    analysis::python_call_graph::{
+        analyze_python_project, PythonCallGraphAnalyzer, TwoPassExtractor,
+    },
     analyzers::rust_call_graph::extract_call_graph_multi_file,
     config,
     core::FunctionMetrics,
@@ -126,30 +128,80 @@ pub fn process_python_files_for_call_graph_with_types(
             .context("Failed to find Python files for call graph")?;
 
     if use_type_tracking {
-        // Use two-pass type-aware extraction for better accuracy
-        for file_path in &python_files {
-            match io::read_file(file_path) {
-                Ok(content) => {
-                    match rustpython_parser::parse(
-                        &content,
-                        rustpython_parser::Mode::Module,
-                        "<module>",
-                    ) {
-                        Ok(module) => {
-                            let mut extractor = TwoPassExtractor::new_with_source(
-                                file_path.to_path_buf(),
-                                &content,
-                            );
-                            let file_call_graph = extractor.extract(&module);
-                            call_graph.merge(file_call_graph);
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
+        // When we have multiple Python files, use cross-module analysis for better accuracy
+        if python_files.len() > 1 {
+            log::debug!(
+                "Using cross-module analysis for {} Python files",
+                python_files.len()
+            );
+            match analyze_python_project(&python_files) {
+                Ok(cross_module_graph) => {
+                    call_graph.merge(cross_module_graph);
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Cross-module analysis failed, falling back to single-file analysis: {}",
+                        e
+                    );
+                    // Fall back to single-file analysis if cross-module fails
+                    for file_path in &python_files {
+                        match io::read_file(file_path) {
+                            Ok(content) => {
+                                match rustpython_parser::parse(
+                                    &content,
+                                    rustpython_parser::Mode::Module,
+                                    "<module>",
+                                ) {
+                                    Ok(module) => {
+                                        let mut extractor = TwoPassExtractor::new_with_source(
+                                            file_path.to_path_buf(),
+                                            &content,
+                                        );
+                                        let file_call_graph = extractor.extract(&module);
+                                        call_graph.merge(file_call_graph);
+                                    }
+                                    Err(e) => {
+                                        log::warn!(
+                                            "Failed to parse Python file {:?}: {}",
+                                            file_path,
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+                            }
                         }
                     }
                 }
-                Err(e) => {
-                    log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+            }
+        } else {
+            // Single file - use existing two-pass type-aware extraction
+            for file_path in &python_files {
+                match io::read_file(file_path) {
+                    Ok(content) => {
+                        match rustpython_parser::parse(
+                            &content,
+                            rustpython_parser::Mode::Module,
+                            "<module>",
+                        ) {
+                            Ok(module) => {
+                                let mut extractor = TwoPassExtractor::new_with_source(
+                                    file_path.to_path_buf(),
+                                    &content,
+                                );
+                                let file_call_graph = extractor.extract(&module);
+                                call_graph.merge(file_call_graph);
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+                    }
                 }
             }
         }

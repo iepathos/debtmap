@@ -1,7 +1,6 @@
 /// Simple test for cross-module Python call graph
 use debtmap::analysis::python_type_tracker::TwoPassExtractor;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]

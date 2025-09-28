@@ -474,7 +474,7 @@ fn test_python_confidence_levels() {
         RemovalConfidence::Magic
     );
 
-    // Event handler should have Unsafe confidence
+    // Event handler should have Framework confidence (matches wxPython event pattern)
     let event_func = FunctionMetrics::new(
         "Panel.on_click".to_string(),
         Path::new("panel.py").to_path_buf(),
@@ -482,7 +482,7 @@ fn test_python_confidence_levels() {
     );
     assert_eq!(
         detector.get_removal_confidence(&event_func),
-        RemovalConfidence::Unsafe
+        RemovalConfidence::Framework
     );
 
     // Private method should have Safe confidence

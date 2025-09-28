@@ -698,7 +698,7 @@ mod tests {
             RemovalConfidence::Magic
         );
 
-        // Event handler
+        // Event handler (matches wxPython event pattern)
         let event_func = FunctionMetrics::new(
             "Panel.on_click".to_string(),
             Path::new("ui.py").to_path_buf(),
@@ -706,7 +706,7 @@ mod tests {
         );
         assert_eq!(
             detector.get_removal_confidence(&event_func),
-            RemovalConfidence::Unsafe
+            RemovalConfidence::Framework
         );
 
         // Private method

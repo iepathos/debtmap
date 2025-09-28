@@ -83,12 +83,37 @@ impl CrossModuleContext {
     pub fn resolve_function(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
         if let Some(tracker) = self.module_trackers.get(module_path) {
             if let Some(resolved) = tracker.resolve_name(name) {
+                // Try direct resolution first
                 if let Some(func_id) = self.symbols.get(&resolved) {
                     return Some(func_id.clone());
+                }
+
+                // Try without module qualification if it's a module.function format
+                if let Some(dot_pos) = resolved.rfind('.') {
+                    let func_name = &resolved[dot_pos + 1..];
+                    if let Some(func_id) = self.symbols.get(func_name) {
+                        return Some(func_id.clone());
+                    }
+                }
+
+                // Try to find it in any module's exports
+                for exports in self.exports.values() {
+                    for export in exports {
+                        if export.qualified_name == resolved || export.name == resolved {
+                            if let Some(func_id) = self
+                                .symbols
+                                .get(&export.qualified_name)
+                                .or_else(|| self.symbols.get(&export.name))
+                            {
+                                return Some(func_id.clone());
+                            }
+                        }
+                    }
                 }
             }
         }
 
+        // Try direct lookup
         self.symbols
             .get(name)
             .or_else(|| {
@@ -158,9 +183,7 @@ impl CrossModuleContext {
             if path
                 .file_stem()
                 .and_then(|s| s.to_str())
-                .map_or(false, |name| {
-                    name == module_name || module_name.ends_with(name)
-                })
+                .is_some_and(|name| name == module_name || module_name.ends_with(name))
             {
                 return Some(exports);
             }
@@ -178,11 +201,39 @@ pub struct CrossModuleAnalyzer {
     context: CrossModuleContext,
 }
 
+impl Default for CrossModuleAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CrossModuleAnalyzer {
     pub fn new() -> Self {
         Self {
             context: CrossModuleContext::new(),
         }
+    }
+
+    /// Estimate line number for a function by searching for def patterns
+    fn estimate_line_number(&self, source_lines: &[String], func_name: &str) -> usize {
+        // Handle class methods (e.g., "ClassName.method_name")
+        let search_name = if let Some(dot_pos) = func_name.rfind('.') {
+            &func_name[dot_pos + 1..]
+        } else {
+            func_name
+        };
+
+        let def_pattern = format!("def {}", search_name);
+        let async_def_pattern = format!("async def {}", search_name);
+
+        for (idx, line) in source_lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(&def_pattern) || trimmed.starts_with(&async_def_pattern) {
+                return idx + 1; // Line numbers are 1-based
+            }
+        }
+
+        0 // Return 0 if not found
     }
 
     pub fn analyze_file(&mut self, path: &Path, content: &str) -> anyhow::Result<()> {
@@ -193,6 +244,9 @@ impl CrossModuleAnalyzer {
         )?;
 
         let mut tracker = ImportTracker::new(path.to_path_buf());
+
+        // Create source lines for line number extraction
+        let source_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
         if let ast::Mod::Module(module) = &module {
             for stmt in &module.body {
@@ -213,10 +267,12 @@ impl CrossModuleAnalyzer {
         // Register exported functions in the global symbol table
         for export in &exports {
             if export.is_function || export.is_class {
+                // Extract line number for the function
+                let line = self.estimate_line_number(&source_lines, &export.name);
                 let func_id = FunctionId {
                     name: export.qualified_name.clone(),
                     file: path.to_path_buf(),
-                    line: 0, // We could extract line numbers if needed
+                    line,
                 };
                 self.context.register_function(path, &export.name, func_id);
             }

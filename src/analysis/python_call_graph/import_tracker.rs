@@ -20,6 +20,7 @@ pub struct ExportedSymbol {
 #[derive(Debug, Default, Clone)]
 pub struct ImportTracker {
     imports: Vec<ImportedSymbol>,
+    #[allow(dead_code)]
     module_path: PathBuf,
 }
 
@@ -71,16 +72,58 @@ impl ImportTracker {
     }
 
     pub fn resolve_name(&self, name: &str) -> Option<String> {
+        // Check for module attribute access (e.g., "module1.process_data" or "h.transform_data")
+        if let Some(dot_pos) = name.find('.') {
+            let module_part = &name[..dot_pos];
+            let attr_part = &name[dot_pos + 1..];
+
+            // Check if module_part is an imported module or alias
+            for import in &self.imports {
+                if let Some(alias) = &import.alias {
+                    if alias == module_part {
+                        // Alias matches, return module.attribute
+                        // For module imports with alias: import helpers as h -> h.transform_data -> helpers.transform_data
+                        if import.module == import.name {
+                            // This is a module import with alias
+                            return Some(format!("{}.{}", import.module, attr_part));
+                        } else {
+                            // This is a from import with alias
+                            return Some(format!("{}.{}", import.module, attr_part));
+                        }
+                    }
+                } else if import.name == module_part || import.module == module_part {
+                    // Direct module import matches
+                    if import.module == module_part {
+                        return Some(format!("{}.{}", import.module, attr_part));
+                    } else {
+                        return Some(name.to_string());
+                    }
+                }
+            }
+        }
+
+        // Check for direct name matches (e.g., "validate" for "from helpers import validate_input as validate")
         for import in &self.imports {
             if let Some(alias) = &import.alias {
                 if alias == name {
-                    return Some(format!("{}.{}", import.module, import.name));
+                    // For from imports with alias: from helpers import validate_input as validate
+                    if import.module != import.name {
+                        return Some(format!("{}.{}", import.module, import.name));
+                    } else {
+                        // For module imports with alias: import helpers as h
+                        return Some(import.module.clone());
+                    }
                 }
             } else if import.name == name {
                 if import.module == "." || import.module.is_empty() {
                     return Some(import.name.clone());
                 }
-                return Some(format!("{}.{}", import.module, import.name));
+                // Check if this is a from import (module != name)
+                if import.module != import.name {
+                    return Some(format!("{}.{}", import.module, import.name));
+                }
+                // This is a direct module import
+                return Some(import.module.clone());
             } else if import.module == name && !import.is_wildcard {
                 return Some(import.module.clone());
             }

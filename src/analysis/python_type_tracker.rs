@@ -93,6 +93,10 @@ pub struct PythonTypeTracker {
     pub current_scope: Vec<Scope>,
     /// File path for generating function IDs
     file_path: PathBuf,
+    /// Imported modules and their aliases
+    imports: HashMap<String, String>, // alias -> module_name
+    /// Imported symbols from modules
+    from_imports: HashMap<String, (String, Option<String>)>, // name -> (module, alias)
 }
 
 impl PythonTypeTracker {
@@ -103,6 +107,8 @@ impl PythonTypeTracker {
             function_signatures: HashMap::new(),
             current_scope: vec![Scope::new()],
             file_path,
+            imports: HashMap::new(),
+            from_imports: HashMap::new(),
         }
     }
 
@@ -402,6 +408,41 @@ impl PythonTypeTracker {
     }
 
     /// Resolve method in class hierarchy (with inheritance)
+    /// Register a module import (import module as alias)
+    pub fn register_import(&mut self, module_name: String, alias: Option<String>) {
+        let key = alias.unwrap_or_else(|| module_name.clone());
+        self.imports.insert(key, module_name);
+    }
+
+    /// Register a from import (from module import name as alias)
+    pub fn register_from_import(
+        &mut self,
+        module_name: String,
+        name: String,
+        alias: Option<String>,
+    ) {
+        let key = alias.clone().unwrap_or_else(|| name.clone());
+        self.from_imports.insert(key, (module_name, Some(name)));
+    }
+
+    /// Resolve an imported name to its fully qualified form
+    pub fn resolve_imported_name(&self, name: &str) -> Option<String> {
+        // Check if it's an aliased module import
+        if let Some(module_name) = self.imports.get(name) {
+            return Some(module_name.clone());
+        }
+
+        // Check if it's a from import
+        if let Some((module, original_name)) = self.from_imports.get(name) {
+            if let Some(orig) = original_name {
+                return Some(format!("{}.{}", module, orig));
+            }
+            return Some(module.clone());
+        }
+
+        None
+    }
+
     fn resolve_method_in_hierarchy(
         &self,
         class_name: &str,
@@ -457,6 +498,56 @@ pub struct TwoPassExtractor {
 }
 
 impl TwoPassExtractor {
+    /// Check if a function name is a framework entry point
+    fn is_framework_entry_point(func_name: &str) -> bool {
+        // Extract the method name if it's a class method (e.g., "ClassName.methodName")
+        let method_name = if let Some(pos) = func_name.rfind('.') {
+            &func_name[pos + 1..]
+        } else {
+            func_name
+        };
+
+        // Common framework entry points
+        let framework_methods = [
+            // wxPython
+            "OnInit",
+            "OnExit",
+            "OnClose",
+            "OnDestroy",
+            "OnPaint",
+            "OnSize",
+            // unittest
+            "setUp",
+            "tearDown",
+            "setUpClass",
+            "tearDownClass",
+            "setUpModule",
+            "tearDownModule",
+            // pytest
+            "setup_method",
+            "teardown_method",
+            "setup_class",
+            "teardown_class",
+            // Django
+            "handle",
+            "ready",
+            "save",
+            "delete",
+            "clean",
+            // FastAPI/Flask
+            "get",
+            "post",
+            "put",
+            "delete",
+            "patch",
+            // Main entry points
+            "main",
+            "__main__",
+        ];
+
+        framework_methods.contains(&method_name) || method_name.starts_with("test_")
+    }
+
     pub fn new(file_path: PathBuf) -> Self {
         Self {
             phase_one_calls: Vec::new(),
@@ -590,6 +681,37 @@ impl TwoPassExtractor {
                     self.analyze_main_block(&if_stmt.body);
                 }
             }
+            ast::Stmt::Import(import_stmt) => {
+                // Track imports for resolution
+                for alias in &import_stmt.names {
+                    let module_name = alias.name.as_str();
+                    let alias_name = alias.asname.as_ref().map(|n| n.as_str());
+
+                    // Register the import in type tracker for later resolution
+                    self.type_tracker.register_import(
+                        module_name.to_string(),
+                        alias_name.map(|s| s.to_string()),
+                    );
+                }
+            }
+            ast::Stmt::ImportFrom(import_from) => {
+                // Track from imports for resolution
+                if let Some(module) = &import_from.module {
+                    let module_name = module.as_str();
+
+                    for alias in &import_from.names {
+                        let imported_name = alias.name.as_str();
+                        let alias_name = alias.asname.as_ref().map(|n| n.as_str());
+
+                        // Register the import in type tracker
+                        self.type_tracker.register_from_import(
+                            module_name.to_string(),
+                            imported_name.to_string(),
+                            alias_name.map(|s| s.to_string()),
+                        );
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -611,11 +733,15 @@ impl TwoPassExtractor {
             line,
         };
 
-        // Register function with default metrics
+        // Check for framework methods and test functions
+        let is_entry_point = Self::is_framework_entry_point(&func_name);
+        let is_test = func_name.starts_with("test_") || func_name.contains("::test_");
+
+        // Register function with appropriate metrics
         self.call_graph.add_function(
             func_id.clone(),
-            false,               // is_entry_point - could check for main() or __main__
-            false,               // is_test - could check for test_ prefix
+            is_entry_point,
+            is_test,
             10,                  // default complexity
             func_def.body.len(), // line count approximation
         );
@@ -677,8 +803,17 @@ impl TwoPassExtractor {
             line,
         };
 
-        self.call_graph
-            .add_function(func_id.clone(), false, false, 10, func_def.body.len());
+        // Check for framework methods and test functions
+        let is_entry_point = Self::is_framework_entry_point(&func_name);
+        let is_test = func_name.starts_with("test_") || func_name.contains("::test_");
+
+        self.call_graph.add_function(
+            func_id.clone(),
+            is_entry_point,
+            is_test,
+            10,
+            func_def.body.len(),
+        );
 
         // Track function for phase two resolution
         self.known_functions.insert(func_id.clone());
@@ -789,6 +924,38 @@ impl TwoPassExtractor {
                 self.analyze_expr_for_calls(&comp.elt);
                 for generator in &comp.generators {
                     self.analyze_expr_for_calls(&generator.iter);
+                    // Also analyze the if clauses (filters)
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
+                }
+            }
+            ast::Expr::SetComp(comp) => {
+                self.analyze_expr_for_calls(&comp.elt);
+                for generator in &comp.generators {
+                    self.analyze_expr_for_calls(&generator.iter);
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
+                }
+            }
+            ast::Expr::DictComp(comp) => {
+                self.analyze_expr_for_calls(&comp.key);
+                self.analyze_expr_for_calls(&comp.value);
+                for generator in &comp.generators {
+                    self.analyze_expr_for_calls(&generator.iter);
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
+                }
+            }
+            ast::Expr::GeneratorExp(comp) => {
+                self.analyze_expr_for_calls(&comp.elt);
+                for generator in &comp.generators {
+                    self.analyze_expr_for_calls(&generator.iter);
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
                 }
             }
             _ => {}
@@ -983,23 +1150,58 @@ impl TwoPassExtractor {
                 }
 
                 // Try resolving as a class method
-                if let Some(receiver_type) = &unresolved.receiver_type {
-                    if let PythonType::Instance(class_name) | PythonType::Class(class_name) =
-                        receiver_type
-                    {
-                        if let Some(func_id) = context.resolve_method(class_name, method_name) {
-                            return Some(func_id);
-                        }
+                if let Some(PythonType::Instance(class_name) | PythonType::Class(class_name)) =
+                    &unresolved.receiver_type
+                {
+                    if let Some(func_id) = context.resolve_method(class_name, method_name) {
+                        return Some(func_id);
                     }
                 }
             } else if let ast::Expr::Call(call) = &unresolved.call_expr {
-                if let ast::Expr::Name(name) = &*call.func {
-                    // Try to resolve function using cross-module context
-                    if let Some(func_id) =
-                        context.resolve_function(&self.type_tracker.file_path, name.id.as_str())
-                    {
-                        return Some(func_id);
+                match &*call.func {
+                    ast::Expr::Name(name) => {
+                        // Try to resolve function using cross-module context
+                        if let Some(func_id) =
+                            context.resolve_function(&self.type_tracker.file_path, name.id.as_str())
+                        {
+                            return Some(func_id);
+                        }
                     }
+                    ast::Expr::Attribute(attr) => {
+                        // Handle module.function() or instance.method() patterns
+                        if let ast::Expr::Name(module_name) = &*attr.value {
+                            let mod_name = module_name.id.as_str();
+                            let func_name = attr.attr.as_str();
+
+                            // Check if this is an imported module
+                            if let Some(qualified_module) =
+                                self.type_tracker.resolve_imported_name(mod_name)
+                            {
+                                let full_name = format!("{}.{}", qualified_module, func_name);
+                                if let Some(func_id) = context
+                                    .resolve_function(&self.type_tracker.file_path, &full_name)
+                                {
+                                    return Some(func_id);
+                                }
+                            }
+
+                            // Try direct resolution
+                            let qualified_name = format!("{}.{}", mod_name, func_name);
+                            if let Some(func_id) = context
+                                .resolve_function(&self.type_tracker.file_path, &qualified_name)
+                            {
+                                return Some(func_id);
+                            }
+
+                            // Also try just the function name
+                            if let Some(func_id) =
+                                context.resolve_function(&self.type_tracker.file_path, func_name)
+                            {
+                                return Some(func_id);
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1029,7 +1231,19 @@ impl TwoPassExtractor {
                 // where conversation_manager is a parameter
                 if let ast::Expr::Call(call) = &unresolved.call_expr {
                     if let ast::Expr::Attribute(_attr_expr) = &*call.func {
-                        // Check all known classes for this method
+                        // First check the cross-module context for methods
+                        if let Some(context) = &self.cross_module_context {
+                            // Try to find methods with this name across all modules
+                            for (symbol_name, func_id) in &context.symbols {
+                                if symbol_name.ends_with(&format!(".{}", method_name)) {
+                                    // For observer patterns, we want to find all implementations
+                                    // Add this call to all matching methods
+                                    return Some(func_id.clone());
+                                }
+                            }
+                        }
+
+                        // Fall back to checking local function map
                         for (func_name, func_id) in &self.function_name_map {
                             if func_name.ends_with(&format!(".{}", method_name)) {
                                 // Found a method with this name, use it
@@ -1045,8 +1259,23 @@ impl TwoPassExtractor {
             // Function call resolution
             if let ast::Expr::Call(call) = &unresolved.call_expr {
                 if let ast::Expr::Name(name) = &*call.func {
+                    let func_name = name.id.as_str();
+
+                    // First, check if this is an imported name
+                    if let Some(qualified_name) = self.type_tracker.resolve_imported_name(func_name)
+                    {
+                        // Try cross-module resolution with the qualified name
+                        if let Some(context) = &self.cross_module_context {
+                            if let Some(func_id) = context
+                                .resolve_function(&self.type_tracker.file_path, &qualified_name)
+                            {
+                                return Some(func_id);
+                            }
+                        }
+                    }
+
                     // Look up function by name
-                    if let Some(func_id) = self.function_name_map.get(name.id.as_str()) {
+                    if let Some(func_id) = self.function_name_map.get(func_name) {
                         return Some(func_id.clone());
                     }
                 }

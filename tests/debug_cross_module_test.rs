@@ -42,5 +42,5 @@ def func_b():
         println!("  - {}", func.name);
     }
 
-    assert!(all_functions.len() > 0, "Should find some functions");
+    assert!(!all_functions.is_empty(), "Should find some functions");
 }

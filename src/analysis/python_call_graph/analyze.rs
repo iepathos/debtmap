@@ -58,6 +58,7 @@ fn analyze_file_with_context(file: &Path, context: &CrossModuleContext) -> Resul
 }
 
 /// Analyze Python imports in a file
+#[allow(dead_code)]
 pub fn analyze_imports(file: &Path) -> Result<ImportTracker> {
     let content = fs::read_to_string(file)
         .with_context(|| format!("Failed to read file: {}", file.display()))?;
