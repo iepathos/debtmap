@@ -892,6 +892,38 @@ impl TwoPassExtractor {
                 self.analyze_expr_for_calls(&comp.elt);
                 for generator in &comp.generators {
                     self.analyze_expr_for_calls(&generator.iter);
+                    // Also analyze the if clauses (filters)
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
+                }
+            }
+            ast::Expr::SetComp(comp) => {
+                self.analyze_expr_for_calls(&comp.elt);
+                for generator in &comp.generators {
+                    self.analyze_expr_for_calls(&generator.iter);
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
+                }
+            }
+            ast::Expr::DictComp(comp) => {
+                self.analyze_expr_for_calls(&comp.key);
+                self.analyze_expr_for_calls(&comp.value);
+                for generator in &comp.generators {
+                    self.analyze_expr_for_calls(&generator.iter);
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
+                }
+            }
+            ast::Expr::GeneratorExp(comp) => {
+                self.analyze_expr_for_calls(&comp.elt);
+                for generator in &comp.generators {
+                    self.analyze_expr_for_calls(&generator.iter);
+                    for if_clause in &generator.ifs {
+                        self.analyze_expr_for_calls(if_clause);
+                    }
                 }
             }
             _ => {}
