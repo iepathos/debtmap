@@ -1,10 +1,8 @@
 /// Integration test for Python event binding detection
 /// This test reproduces the issue where wxPython Bind() calls aren't being detected
 /// and event handlers are incorrectly showing as having no callers
-
 use debtmap::analysis::python_type_tracker::TwoPassExtractor;
 use debtmap::priority::call_graph::FunctionId;
-use rustpython_parser;
 use std::path::PathBuf;
 
 #[test]
@@ -52,8 +50,9 @@ class TestApp(wx.App):
     let module = rustpython_parser::parse(
         python_code,
         rustpython_parser::Mode::Module,
-        "test_wxpython.py"
-    ).expect("Failed to parse Python code");
+        "test_wxpython.py",
+    )
+    .expect("Failed to parse Python code");
 
     // Extract the call graph using TwoPassExtractor with source
     let file_path = PathBuf::from("test_wxpython.py");
@@ -99,8 +98,14 @@ class TestApp(wx.App):
     }
 
     // Assertions
-    assert!(on_key_down_found, "on_key_down function not found in call graph");
-    assert!(unused_method_found, "unused_method function not found in call graph");
+    assert!(
+        on_key_down_found,
+        "on_key_down function not found in call graph"
+    );
+    assert!(
+        unused_method_found,
+        "unused_method function not found in call graph"
+    );
 
     // THE KEY ASSERTION: on_key_down should have callers from the Bind() call
     assert!(

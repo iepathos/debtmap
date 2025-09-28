@@ -562,6 +562,13 @@ impl TwoPassExtractor {
                         .track_assignment(&ann_assign.target, value);
                 }
             }
+            ast::Stmt::If(if_stmt) => {
+                // Check for if __name__ == "__main__" pattern
+                if self.is_main_guard(&if_stmt.test) {
+                    // Analyze the body as if it were a special module-level function
+                    self.analyze_main_block(&if_stmt.body);
+                }
+            }
             _ => {}
         }
     }
@@ -831,11 +838,15 @@ impl TwoPassExtractor {
                             // Check if it's self.method or cls.method
                             if obj_name.id.as_str() == "self" || obj_name.id.as_str() == "cls" {
                                 // Create a reference from the current function to the handler
-                                if let (Some(class_name), Some(caller_func)) = (&self.current_class, &self.current_function) {
-                                    let handler_name = format!("{}.{}", class_name, handler_attr.attr);
+                                if let (Some(class_name), Some(caller_func)) =
+                                    (&self.current_class, &self.current_function)
+                                {
+                                    let handler_name =
+                                        format!("{}.{}", class_name, handler_attr.attr);
 
                                     // Estimate handler line number from source
-                                    let handler_line = self.estimate_line_number(&handler_attr.attr);
+                                    let handler_line =
+                                        self.estimate_line_number(&handler_attr.attr);
 
                                     let handler_id = FunctionId {
                                         name: handler_name.clone(),
@@ -845,7 +856,8 @@ impl TwoPassExtractor {
 
                                     // Add the handler to known functions if not already there
                                     self.known_functions.insert(handler_id.clone());
-                                    self.function_name_map.insert(handler_name, handler_id.clone());
+                                    self.function_name_map
+                                        .insert(handler_name, handler_id.clone());
 
                                     // Create a call from the current function to the handler
                                     let call_edge = FunctionCall {
@@ -860,6 +872,80 @@ impl TwoPassExtractor {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Check if this is an if __name__ == "__main__" guard
+    fn is_main_guard(&self, test: &ast::Expr) -> bool {
+        match test {
+            ast::Expr::Compare(cmp) => {
+                // Check for __name__ == "__main__" pattern
+                if let ast::Expr::Name(name) = &*cmp.left {
+                    if name.id.as_str() == "__name__" && cmp.ops.len() == 1 {
+                        if let ast::CmpOp::Eq = &cmp.ops[0] {
+                            if let Some(ast::Expr::Constant(const_expr)) = cmp.comparators.get(0) {
+                                if let ast::Constant::Str(s) = &const_expr.value {
+                                    return s == "__main__";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
+    /// Analyze the main block (if __name__ == "__main__")
+    fn analyze_main_block(&mut self, body: &[ast::Stmt]) {
+        // Create a pseudo-function ID for the main block
+        let module_main_id = FunctionId {
+            name: "__module_main__".to_string(),
+            file: self.type_tracker.file_path.clone(),
+            line: 0,
+        };
+
+        // Add this pseudo-function to known functions
+        self.known_functions.insert(module_main_id.clone());
+        self.function_name_map.insert("__module_main__".to_string(), module_main_id.clone());
+
+        // Temporarily set current function to module main
+        let prev_function = self.current_function.clone();
+        self.current_function = Some(module_main_id.clone());
+
+        // Analyze all statements in the main block for calls
+        for stmt in body {
+            self.analyze_stmt_in_main_block(stmt);
+        }
+
+        self.current_function = prev_function;
+    }
+
+    /// Analyze statements in the main block
+    fn analyze_stmt_in_main_block(&mut self, stmt: &ast::Stmt) {
+        match stmt {
+            ast::Stmt::Expr(expr_stmt) => {
+                // Check for function calls
+                if let ast::Expr::Call(call) = &*expr_stmt.value {
+                    // Check if it's calling main() or other functions
+                    if let ast::Expr::Name(name) = &*call.func {
+                        if let Some(func_id) = self.function_name_map.get(name.id.as_str()) {
+                            // Add a call from __module_main__ to the function
+                            let module_main = self.function_name_map.get("__module_main__").unwrap();
+                            self.call_graph.add_call(FunctionCall {
+                                caller: module_main.clone(),
+                                callee: func_id.clone(),
+                                call_type: CallType::Direct,
+                            });
+                        }
+                    }
+                }
+                self.analyze_expr_for_calls(&expr_stmt.value);
+            }
+            _ => {
+                // Handle other statement types if needed
             }
         }
     }
@@ -883,6 +969,23 @@ impl TwoPassExtractor {
                     }
                     // Fallback to the resolved one if not found in map
                     return Some(resolved_func_id);
+                }
+
+                // Fallback: Try to resolve parameter-based method calls
+                // This handles cases like: conversation_manager.register_observer(self)
+                // where conversation_manager is a parameter
+                if let ast::Expr::Call(call) = &unresolved.call_expr {
+                    if let ast::Expr::Attribute(attr_expr) = &*call.func {
+                        // Check all known classes for this method
+                        for (func_name, func_id) in &self.function_name_map {
+                            if func_name.ends_with(&format!(".{}", method_name)) {
+                                // Found a method with this name, use it
+                                // This is a heuristic that may have false positives
+                                // but helps detect cross-module calls
+                                return Some(func_id.clone());
+                            }
+                        }
+                    }
                 }
             }
         } else {

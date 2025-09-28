@@ -419,8 +419,22 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
     let language = Language::from_path(&func.file);
 
     if language == Language::Python {
-        // Use Python-specific dead code detector
-        let detector = PythonDeadCodeDetector::new();
+        // Use Python-specific dead code detector with auto-detection
+        let mut detector = PythonDeadCodeDetector::new();
+
+        // Auto-detect frameworks based on file path
+        detector.auto_detect_frameworks(&func.file, &[]);
+
+        // Also explicitly add common frameworks for better coverage
+        let common_frameworks = vec![
+            "wxpython".to_string(),
+            "unittest".to_string(),
+            "pytest".to_string(),
+            "django".to_string(),
+            "flask".to_string(),
+        ];
+        detector = detector.with_frameworks(common_frameworks);
+
         if detector.is_implicitly_called(func) {
             return true;
         }
@@ -578,7 +592,7 @@ fn is_complexity_hotspot_by_metrics(cyclomatic: u32, cognitive: u32) -> bool {
 mod tests {
     use super::*;
     use crate::core::FunctionMetrics;
-    use crate::priority::call_graph::{CallGraph, FunctionId, FunctionCall, CallType};
+    use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
     use std::path::PathBuf;
 
     fn create_test_function(name: &str, visibility: Option<&str>) -> FunctionMetrics {
@@ -734,7 +748,10 @@ mod tests {
 
         // Test that the event handler is NOT considered dead code
         let is_dead = is_dead_code(&event_handler, &call_graph, &event_handler_id, None);
-        assert!(!is_dead, "Event handler with Bind() call should not be dead code");
+        assert!(
+            !is_dead,
+            "Event handler with Bind() call should not be dead code"
+        );
     }
 
     #[test]
@@ -921,11 +938,15 @@ mod tests {
         });
 
         // Test that these event handlers are NOT considered dead code
-        assert!(!is_dead_code(&on_paint, &call_graph, &on_paint_id, None),
-                "on_paint should not be dead code when bound via Bind()");
+        assert!(
+            !is_dead_code(&on_paint, &call_graph, &on_paint_id, None),
+            "on_paint should not be dead code when bound via Bind()"
+        );
 
-        assert!(!is_dead_code(&on_key_down, &call_graph, &on_key_down_id, None),
-                "on_key_down should not be dead code when bound via Bind()");
+        assert!(
+            !is_dead_code(&on_key_down, &call_graph, &on_key_down_id, None),
+            "on_key_down should not be dead code when bound via Bind()"
+        );
     }
 
     #[test]
@@ -961,8 +982,10 @@ mod tests {
         };
 
         // Initially no callers - should be dead code
-        assert!(is_dead_code(&unusual_name_func, &call_graph, &func_id, None),
-                "Function with no callers and no pattern matches should be dead code");
+        assert!(
+            is_dead_code(&unusual_name_func, &call_graph, &func_id, None),
+            "Function with no callers and no pattern matches should be dead code"
+        );
 
         // Add a caller
         let caller_id = FunctionId {
@@ -977,8 +1000,10 @@ mod tests {
         });
 
         // Now with a caller - should NOT be dead code
-        assert!(!is_dead_code(&unusual_name_func, &call_graph, &func_id, None),
-                "Function with callers should not be dead code regardless of patterns");
+        assert!(
+            !is_dead_code(&unusual_name_func, &call_graph, &func_id, None),
+            "Function with callers should not be dead code regardless of patterns"
+        );
     }
 
     #[test]

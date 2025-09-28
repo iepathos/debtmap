@@ -372,11 +372,19 @@ impl PythonDeadCodeDetector {
             "@abstractmethod".to_string(),
         ];
 
+        // Always activate common frameworks for better detection
+        let mut active_frameworks = HashSet::new();
+        active_frameworks.insert("wxpython".to_string());
+        active_frameworks.insert("unittest".to_string());
+        active_frameworks.insert("pytest".to_string());
+        active_frameworks.insert("django".to_string());
+        active_frameworks.insert("flask".to_string());
+
         Self {
             magic_methods: &MAGIC_METHODS,
             framework_patterns,
             _decorator_handlers: decorator_handlers,
-            active_frameworks: HashSet::new(),
+            active_frameworks,
         }
     }
 
@@ -414,6 +422,11 @@ impl PythonDeadCodeDetector {
             return true;
         }
 
+        // Check if it's a main entry point
+        if self.is_main_entry_point(func) {
+            return true;
+        }
+
         // Check framework patterns
         if self.is_framework_method(method_name, func) {
             return true;
@@ -430,6 +443,12 @@ impl PythonDeadCodeDetector {
     /// Check if a method is a Python magic method
     fn is_magic_method(&self, method_name: &str) -> bool {
         self.magic_methods.contains(method_name)
+    }
+
+    /// Check if function is called from if __name__ == "__main__" block
+    pub fn is_main_entry_point(&self, func: &FunctionMetrics) -> bool {
+        // Check if this is a main() function that would be called from if __name__ == "__main__"
+        func.name == "main" || func.name == "cli" || func.name == "run"
     }
 
     /// Check if a method matches framework patterns
