@@ -93,6 +93,10 @@ pub struct PythonTypeTracker {
     pub current_scope: Vec<Scope>,
     /// File path for generating function IDs
     file_path: PathBuf,
+    /// Imported modules and their aliases
+    imports: HashMap<String, String>, // alias -> module_name
+    /// Imported symbols from modules
+    from_imports: HashMap<String, (String, Option<String>)>, // name -> (module, alias)
 }
 
 impl PythonTypeTracker {
@@ -103,6 +107,8 @@ impl PythonTypeTracker {
             function_signatures: HashMap::new(),
             current_scope: vec![Scope::new()],
             file_path,
+            imports: HashMap::new(),
+            from_imports: HashMap::new(),
         }
     }
 
@@ -402,6 +408,36 @@ impl PythonTypeTracker {
     }
 
     /// Resolve method in class hierarchy (with inheritance)
+    /// Register a module import (import module as alias)
+    pub fn register_import(&mut self, module_name: String, alias: Option<String>) {
+        let key = alias.unwrap_or_else(|| module_name.clone());
+        self.imports.insert(key, module_name);
+    }
+
+    /// Register a from import (from module import name as alias)
+    pub fn register_from_import(&mut self, module_name: String, name: String, alias: Option<String>) {
+        let key = alias.clone().unwrap_or_else(|| name.clone());
+        self.from_imports.insert(key, (module_name, Some(name)));
+    }
+
+    /// Resolve an imported name to its fully qualified form
+    pub fn resolve_imported_name(&self, name: &str) -> Option<String> {
+        // Check if it's an aliased module import
+        if let Some(module_name) = self.imports.get(name) {
+            return Some(module_name.clone());
+        }
+
+        // Check if it's a from import
+        if let Some((module, original_name)) = self.from_imports.get(name) {
+            if let Some(orig) = original_name {
+                return Some(format!("{}.{}", module, orig));
+            }
+            return Some(module.clone());
+        }
+
+        None
+    }
+
     fn resolve_method_in_hierarchy(
         &self,
         class_name: &str,
@@ -588,6 +624,44 @@ impl TwoPassExtractor {
                 if self.is_main_guard(&if_stmt.test) {
                     // Analyze the body as if it were a special module-level function
                     self.analyze_main_block(&if_stmt.body);
+                }
+            }
+            ast::Stmt::Import(import_stmt) => {
+                // Track imports for cross-module resolution
+                if let Some(context) = &self.cross_module_context {
+                    for alias in &import_stmt.names {
+                        let module_name = alias.name.as_str();
+                        let alias_name = alias.asname.as_ref().map(|n| n.as_str());
+
+                        // Try to resolve imported module functions
+                        if let Some(_tracker) = context.module_trackers.get(&self.type_tracker.file_path) {
+                            // Register the import in type tracker for later resolution
+                            self.type_tracker.register_import(
+                                module_name.to_string(),
+                                alias_name.map(|s| s.to_string()),
+                            );
+                        }
+                    }
+                }
+            }
+            ast::Stmt::ImportFrom(import_from) => {
+                // Track from imports for cross-module resolution
+                if let Some(_context) = &self.cross_module_context {
+                    if let Some(module) = &import_from.module {
+                        let module_name = module.as_str();
+
+                        for alias in &import_from.names {
+                            let imported_name = alias.name.as_str();
+                            let alias_name = alias.asname.as_ref().map(|n| n.as_str());
+
+                            // Register the import in type tracker
+                            self.type_tracker.register_from_import(
+                                module_name.to_string(),
+                                imported_name.to_string(),
+                                alias_name.map(|s| s.to_string()),
+                            );
+                        }
+                    }
                 }
             }
             _ => {}
@@ -993,13 +1067,37 @@ impl TwoPassExtractor {
                     }
                 }
             } else if let ast::Expr::Call(call) = &unresolved.call_expr {
-                if let ast::Expr::Name(name) = &*call.func {
-                    // Try to resolve function using cross-module context
-                    if let Some(func_id) =
-                        context.resolve_function(&self.type_tracker.file_path, name.id.as_str())
-                    {
-                        return Some(func_id);
+                match &*call.func {
+                    ast::Expr::Name(name) => {
+                        // Try to resolve function using cross-module context
+                        if let Some(func_id) =
+                            context.resolve_function(&self.type_tracker.file_path, name.id.as_str())
+                        {
+                            return Some(func_id);
+                        }
                     }
+                    ast::Expr::Attribute(attr) => {
+                        // Handle module.function() or instance.method() patterns
+                        if let ast::Expr::Name(module_name) = &*attr.value {
+                            let mod_name = module_name.id.as_str();
+                            let func_name = attr.attr.as_str();
+
+                            // Check if this is an imported module
+                            if let Some(qualified_module) = self.type_tracker.resolve_imported_name(mod_name) {
+                                let full_name = format!("{}.{}", qualified_module, func_name);
+                                if let Some(func_id) = context.resolve_function(&self.type_tracker.file_path, &full_name) {
+                                    return Some(func_id);
+                                }
+                            }
+
+                            // Try direct resolution
+                            let qualified_name = format!("{}.{}", mod_name, func_name);
+                            if let Some(func_id) = context.resolve_function(&self.type_tracker.file_path, &qualified_name) {
+                                return Some(func_id);
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1045,8 +1143,20 @@ impl TwoPassExtractor {
             // Function call resolution
             if let ast::Expr::Call(call) = &unresolved.call_expr {
                 if let ast::Expr::Name(name) = &*call.func {
+                    let func_name = name.id.as_str();
+
+                    // First, check if this is an imported name
+                    if let Some(qualified_name) = self.type_tracker.resolve_imported_name(func_name) {
+                        // Try cross-module resolution with the qualified name
+                        if let Some(context) = &self.cross_module_context {
+                            if let Some(func_id) = context.resolve_function(&self.type_tracker.file_path, &qualified_name) {
+                                return Some(func_id);
+                            }
+                        }
+                    }
+
                     // Look up function by name
-                    if let Some(func_id) = self.function_name_map.get(name.id.as_str()) {
+                    if let Some(func_id) = self.function_name_map.get(func_name) {
                         return Some(func_id.clone());
                     }
                 }

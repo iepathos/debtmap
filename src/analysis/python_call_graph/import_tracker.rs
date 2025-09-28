@@ -20,6 +20,7 @@ pub struct ExportedSymbol {
 #[derive(Debug, Default, Clone)]
 pub struct ImportTracker {
     imports: Vec<ImportedSymbol>,
+    #[allow(dead_code)]
     module_path: PathBuf,
 }
 
