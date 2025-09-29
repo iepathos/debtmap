@@ -1036,17 +1036,18 @@ impl TwoPassExtractor {
                 let receiver_type = self.type_tracker.infer_type(&attr.value);
 
                 // Check if receiver is an imported module
-                let (module_alias, is_imported, import_context) = if let ast::Expr::Name(name) = &*attr.value {
-                    let name_str = name.id.as_str();
-                    if self.type_tracker.is_imported_name(name_str) {
-                        let context = self.type_tracker.get_import_module(name_str);
-                        (Some(name_str.to_string()), true, context)
+                let (module_alias, is_imported, import_context) =
+                    if let ast::Expr::Name(name) = &*attr.value {
+                        let name_str = name.id.as_str();
+                        if self.type_tracker.is_imported_name(name_str) {
+                            let context = self.type_tracker.get_import_module(name_str);
+                            (Some(name_str.to_string()), true, context)
+                        } else {
+                            (None, false, None)
+                        }
                     } else {
                         (None, false, None)
-                    }
-                } else {
-                    (None, false, None)
-                };
+                    };
 
                 UnresolvedCall {
                     caller,
@@ -1073,7 +1074,7 @@ impl TwoPassExtractor {
                     caller,
                     call_expr: ast::Expr::Call(call.clone()),
                     receiver_type: None,
-                    method_name: None,  // For direct function calls, method_name should be None
+                    method_name: None, // For direct function calls, method_name should be None
                     call_type: CallType::Direct,
                     module_alias: None,
                     is_imported,
@@ -1274,11 +1275,12 @@ impl TwoPassExtractor {
                 if let Some(module_alias) = &unresolved.module_alias {
                     if let Some(method_name) = &unresolved.method_name {
                         // Get the actual module name for the alias
-                        if let Some(module_name) = self.type_tracker.get_import_module(module_alias) {
+                        if let Some(module_name) = self.type_tracker.get_import_module(module_alias)
+                        {
                             // Try to resolve module.function
                             let qualified_name = format!("{}.{}", module_name, method_name);
-                            if let Some(func_id) =
-                                context.resolve_function(&self.type_tracker.file_path, &qualified_name)
+                            if let Some(func_id) = context
+                                .resolve_function(&self.type_tracker.file_path, &qualified_name)
                             {
                                 return Some(func_id);
                             }

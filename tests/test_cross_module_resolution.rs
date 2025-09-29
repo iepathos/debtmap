@@ -1,7 +1,6 @@
 //! Integration tests for cross-module call resolution (spec 104)
 
 use debtmap::analysis::python_call_graph::{analyze_python_project, build_cross_module_context};
-use debtmap::priority::call_graph::FunctionId;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
