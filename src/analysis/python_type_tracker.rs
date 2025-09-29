@@ -443,6 +443,53 @@ impl PythonTypeTracker {
         None
     }
 
+    /// Track import statement (import module as alias)
+    pub fn track_import_stmt(&mut self, import: &ast::StmtImport) {
+        for alias in &import.names {
+            let module_name = alias.name.to_string();
+            let alias_name = alias.asname.as_ref().map(|s| s.to_string());
+            self.register_import(module_name, alias_name);
+        }
+    }
+
+    /// Track from import statement (from module import name as alias)
+    pub fn track_import_from_stmt(&mut self, import_from: &ast::StmtImportFrom) {
+        let module_name = import_from
+            .module
+            .as_ref()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| String::from("."));
+
+        for alias in &import_from.names {
+            let name = alias.name.to_string();
+            let alias_name = alias.asname.as_ref().map(|s| s.to_string());
+
+            // Handle wildcard imports
+            if name == "*" {
+                // For wildcard imports, we just track the module
+                self.register_import(module_name.clone(), None);
+            } else {
+                self.register_from_import(module_name.clone(), name, alias_name);
+            }
+        }
+    }
+
+    /// Check if a name is an imported function/class
+    pub fn is_imported_name(&self, name: &str) -> bool {
+        self.imports.contains_key(name) || self.from_imports.contains_key(name)
+    }
+
+    /// Get the module for an imported name
+    pub fn get_import_module(&self, name: &str) -> Option<String> {
+        if let Some(module) = self.imports.get(name) {
+            return Some(module.clone());
+        }
+        if let Some((module, _)) = self.from_imports.get(name) {
+            return Some(module.clone());
+        }
+        None
+    }
+
     fn resolve_method_in_hierarchy(
         &self,
         class_name: &str,
@@ -473,6 +520,12 @@ pub struct UnresolvedCall {
     pub receiver_type: Option<PythonType>,
     pub method_name: Option<String>,
     pub call_type: CallType,
+    /// Module alias if the call is through an imported module
+    pub module_alias: Option<String>,
+    /// Whether this call is to an imported function
+    pub is_imported: bool,
+    /// Import context for resolving the call
+    pub import_context: Option<String>,
 }
 
 /// Two-pass call graph extractor for Python
@@ -632,6 +685,20 @@ impl TwoPassExtractor {
     /// Phase 1: Build type information and collect unresolved calls
     fn phase_one(&mut self, module: &ast::Mod) {
         if let ast::Mod::Module(module) = module {
+            // First pass: Track imports to build namespace
+            for stmt in &module.body {
+                match stmt {
+                    ast::Stmt::Import(import) => {
+                        self.type_tracker.track_import_stmt(import);
+                    }
+                    ast::Stmt::ImportFrom(import_from) => {
+                        self.type_tracker.track_import_from_stmt(import_from);
+                    }
+                    _ => {}
+                }
+            }
+
+            // Second pass: Analyze functions and collect calls
             for stmt in &module.body {
                 self.analyze_stmt_phase_one(stmt);
             }
@@ -967,12 +1034,50 @@ impl TwoPassExtractor {
         match &*call.func {
             ast::Expr::Attribute(attr) => {
                 let receiver_type = self.type_tracker.infer_type(&attr.value);
+
+                // Check if receiver is an imported module
+                let (module_alias, is_imported, import_context) = if let ast::Expr::Name(name) = &*attr.value {
+                    let name_str = name.id.as_str();
+                    if self.type_tracker.is_imported_name(name_str) {
+                        let context = self.type_tracker.get_import_module(name_str);
+                        (Some(name_str.to_string()), true, context)
+                    } else {
+                        (None, false, None)
+                    }
+                } else {
+                    (None, false, None)
+                };
+
                 UnresolvedCall {
                     caller,
                     call_expr: ast::Expr::Call(call.clone()),
                     receiver_type: Some(receiver_type),
                     method_name: Some(attr.attr.to_string()),
                     call_type: CallType::Direct,
+                    module_alias,
+                    is_imported,
+                    import_context,
+                }
+            }
+            ast::Expr::Name(name) => {
+                // Check if this is an imported function
+                let name_str = name.id.as_str();
+                let is_imported = self.type_tracker.is_imported_name(name_str);
+                let import_context = if is_imported {
+                    self.type_tracker.resolve_imported_name(name_str)
+                } else {
+                    None
+                };
+
+                UnresolvedCall {
+                    caller,
+                    call_expr: ast::Expr::Call(call.clone()),
+                    receiver_type: None,
+                    method_name: Some(name_str.to_string()),
+                    call_type: CallType::Direct,
+                    module_alias: None,
+                    is_imported,
+                    import_context,
                 }
             }
             _ => UnresolvedCall {
@@ -981,6 +1086,9 @@ impl TwoPassExtractor {
                 receiver_type: None,
                 method_name: None,
                 call_type: CallType::Direct,
+                module_alias: None,
+                is_imported: false,
+                import_context: None,
             },
         }
     }
@@ -1141,6 +1249,52 @@ impl TwoPassExtractor {
     fn resolve_call(&self, unresolved: &UnresolvedCall) -> Option<FunctionId> {
         // Try cross-module resolution first if context is available
         if let Some(context) = &self.cross_module_context {
+            // If this is an imported call, use the import context first
+            if unresolved.is_imported {
+                if let Some(import_context) = &unresolved.import_context {
+                    // Try to resolve the imported function directly
+                    if let Some(func_id) =
+                        context.resolve_function(&self.type_tracker.file_path, import_context)
+                    {
+                        return Some(func_id);
+                    }
+
+                    // If import_context is module.function, extract function name
+                    if let Some(dot_pos) = import_context.rfind('.') {
+                        let func_name = &import_context[dot_pos + 1..];
+                        if let Some(func_id) =
+                            context.resolve_function(&self.type_tracker.file_path, func_name)
+                        {
+                            return Some(func_id);
+                        }
+                    }
+                }
+
+                // If it's a module.method call pattern
+                if let Some(module_alias) = &unresolved.module_alias {
+                    if let Some(method_name) = &unresolved.method_name {
+                        // Get the actual module name for the alias
+                        if let Some(module_name) = self.type_tracker.get_import_module(module_alias) {
+                            // Try to resolve module.function
+                            let qualified_name = format!("{}.{}", module_name, method_name);
+                            if let Some(func_id) =
+                                context.resolve_function(&self.type_tracker.file_path, &qualified_name)
+                            {
+                                return Some(func_id);
+                            }
+
+                            // Also try just the function name (might be registered without qualification)
+                            if let Some(func_id) =
+                                context.resolve_function(&self.type_tracker.file_path, method_name)
+                            {
+                                return Some(func_id);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Regular resolution for non-imported or local calls
             if let Some(method_name) = &unresolved.method_name {
                 // Try to resolve using cross-module context
                 if let Some(func_id) =

@@ -56,27 +56,26 @@ main()
     let call_graph = analyze_python_project(&files).unwrap();
 
     // Verify that imported functions are properly linked
-    let log_func = FunctionId {
-        name: "log_message".to_string(),
-        file: helpers_file.clone(),
-        line: 0, // Line numbers may vary
-    };
+    // Find the actual FunctionId with correct line number
+    let log_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "log_message" && f.file == helpers_file)
+        .expect("log_message function should exist in call graph");
 
     // log_message should have callers (called from main)
-    let callers = call_graph.get_callers(&log_func);
+    let callers = call_graph.get_callers(log_func);
     assert!(
         !callers.is_empty(),
         "log_message should have callers from main module"
     );
 
     // validate_input should have callers from both process_data and main
-    let validate_func = FunctionId {
-        name: "validate_input".to_string(),
-        file: helpers_file.clone(),
-        line: 0,
-    };
+    let validate_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "validate_input" && f.file == helpers_file)
+        .expect("validate_input function should exist in call graph");
 
-    let validate_callers = call_graph.get_callers(&validate_func);
+    let validate_callers = call_graph.get_callers(validate_func);
     assert!(
         validate_callers.len() >= 2,
         "validate_input should have multiple callers"
@@ -117,25 +116,23 @@ def process_text(text):
     let call_graph = analyze_python_project(&files).unwrap();
 
     // Verify aliased imports are resolved
-    let transform_func = FunctionId {
-        name: "transform_data".to_string(),
-        file: helpers_file.clone(),
-        line: 0,
-    };
+    let transform_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "transform_data" && f.file == helpers_file)
+        .expect("transform_data function should exist in call graph");
 
-    let callers = call_graph.get_callers(&transform_func);
+    let callers = call_graph.get_callers(transform_func);
     assert!(
         !callers.is_empty(),
         "transform_data should have callers through alias 'transform'"
     );
 
-    let validate_func = FunctionId {
-        name: "validate_format".to_string(),
-        file: helpers_file.clone(),
-        line: 0,
-    };
+    let validate_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "validate_format" && f.file == helpers_file)
+        .expect("validate_format function should exist in call graph");
 
-    let validate_callers = call_graph.get_callers(&validate_func);
+    let validate_callers = call_graph.get_callers(validate_func);
     assert!(
         !validate_callers.is_empty(),
         "validate_format should have callers through alias 'validate'"
@@ -175,25 +172,23 @@ def run_calculation():
     let call_graph = analyze_python_project(&files).unwrap();
 
     // Verify module.function calls are resolved
-    let calculate_func = FunctionId {
-        name: "calculate".to_string(),
-        file: utils_file.clone(),
-        line: 0,
-    };
+    let calculate_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "calculate" && f.file == utils_file)
+        .expect("calculate function should exist in call graph");
 
-    let callers = call_graph.get_callers(&calculate_func);
+    let callers = call_graph.get_callers(calculate_func);
     assert!(
         !callers.is_empty(),
         "calculate should have callers through utils.calculate()"
     );
 
-    let format_func = FunctionId {
-        name: "format_result".to_string(),
-        file: utils_file.clone(),
-        line: 0,
-    };
+    let format_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "format_result" && f.file == utils_file)
+        .expect("format_result function should exist in call graph");
 
-    let format_callers = call_graph.get_callers(&format_func);
+    let format_callers = call_graph.get_callers(format_func);
     assert!(
         !format_callers.is_empty(),
         "format_result should have callers through utils.format_result()"
@@ -238,37 +233,34 @@ def fetch_data():
     let call_graph = analyze_python_project(&files).unwrap();
 
     // Verify aliased module calls are resolved
-    let connect_func = FunctionId {
-        name: "connect".to_string(),
-        file: db_file.clone(),
-        line: 0,
-    };
+    let connect_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "connect" && f.file == db_file)
+        .expect("connect function should exist in call graph");
 
-    let callers = call_graph.get_callers(&connect_func);
+    let callers = call_graph.get_callers(connect_func);
     assert!(
         !callers.is_empty(),
         "connect should have callers through db.connect()"
     );
 
-    let query_func = FunctionId {
-        name: "query".to_string(),
-        file: db_file.clone(),
-        line: 0,
-    };
+    let query_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "query" && f.file == db_file)
+        .expect("query function should exist in call graph");
 
-    let query_callers = call_graph.get_callers(&query_func);
+    let query_callers = call_graph.get_callers(query_func);
     assert!(
         !query_callers.is_empty(),
         "query should have callers through db.query()"
     );
 
-    let close_func = FunctionId {
-        name: "close".to_string(),
-        file: db_file.clone(),
-        line: 0,
-    };
+    let close_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "close" && f.file == db_file)
+        .expect("close function should exist in call graph");
 
-    let close_callers = call_graph.get_callers(&close_func);
+    let close_callers = call_graph.get_callers(close_func);
     assert!(
         !close_callers.is_empty(),
         "close should have callers through db.close()"
@@ -313,37 +305,34 @@ def calculate_expression():
     let call_graph = analyze_python_project(&files).unwrap();
 
     // Verify wildcard imported functions are resolved
-    let add_func = FunctionId {
-        name: "add".to_string(),
-        file: math_file.clone(),
-        line: 0,
-    };
+    let add_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "add" && f.file == math_file)
+        .expect("add function should exist in call graph");
 
-    let add_callers = call_graph.get_callers(&add_func);
+    let add_callers = call_graph.get_callers(add_func);
     assert!(
         !add_callers.is_empty(),
         "add should have callers through wildcard import"
     );
 
-    let multiply_func = FunctionId {
-        name: "multiply".to_string(),
-        file: math_file.clone(),
-        line: 0,
-    };
+    let multiply_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "multiply" && f.file == math_file)
+        .expect("multiply function should exist in call graph");
 
-    let multiply_callers = call_graph.get_callers(&multiply_func);
+    let multiply_callers = call_graph.get_callers(multiply_func);
     assert!(
         !multiply_callers.is_empty(),
         "multiply should have callers through wildcard import"
     );
 
-    let divide_func = FunctionId {
-        name: "divide".to_string(),
-        file: math_file.clone(),
-        line: 0,
-    };
+    let divide_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "divide" && f.file == math_file)
+        .expect("divide function should exist in call graph");
 
-    let divide_callers = call_graph.get_callers(&divide_func);
+    let divide_callers = call_graph.get_callers(divide_func);
     assert!(
         !divide_callers.is_empty(),
         "divide should have callers through wildcard import"
@@ -394,25 +383,23 @@ def main():
     let call_graph = analyze_python_project(&files).unwrap();
 
     // Verify class methods are resolved
-    let add_method = FunctionId {
-        name: "DataManager.add_item".to_string(),
-        file: manager_file.clone(),
-        line: 0,
-    };
+    let add_method = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "DataManager.add_item" && f.file == manager_file)
+        .expect("DataManager.add_item method should exist in call graph");
 
-    let add_callers = call_graph.get_callers(&add_method);
+    let add_callers = call_graph.get_callers(add_method);
     assert!(
         !add_callers.is_empty(),
         "add_item should have callers from main"
     );
 
-    let process_method = FunctionId {
-        name: "DataManager.process_all".to_string(),
-        file: manager_file.clone(),
-        line: 0,
-    };
+    let process_method = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "DataManager.process_all" && f.file == manager_file)
+        .expect("DataManager.process_all method should exist in call graph");
 
-    let process_callers = call_graph.get_callers(&process_method);
+    let process_callers = call_graph.get_callers(process_method);
     assert!(
         !process_callers.is_empty(),
         "process_all should have callers from main"
@@ -457,25 +444,23 @@ def main():
     let call_graph = analyze_python_project(&files).unwrap();
 
     // Verify chained imports are resolved
-    let core_func = FunctionId {
-        name: "core_function".to_string(),
-        file: c_file.clone(),
-        line: 0,
-    };
+    let core_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "core_function" && f.file == c_file)
+        .expect("core_function should exist in call graph");
 
-    let core_callers = call_graph.get_callers(&core_func);
+    let core_callers = call_graph.get_callers(core_func);
     assert!(
         !core_callers.is_empty(),
         "core_function should have callers through chained imports"
     );
 
-    let wrapper_func = FunctionId {
-        name: "wrapper_function".to_string(),
-        file: b_file.clone(),
-        line: 0,
-    };
+    let wrapper_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "wrapper_function" && f.file == b_file)
+        .expect("wrapper_function should exist in call graph");
 
-    let wrapper_callers = call_graph.get_callers(&wrapper_func);
+    let wrapper_callers = call_graph.get_callers(wrapper_func);
     assert!(
         !wrapper_callers.is_empty(),
         "wrapper_function should have callers from module_a"
@@ -535,25 +520,23 @@ def main():
     );
 
     // Verify correct functions are marked as used/unused
-    let utility_func = FunctionId {
-        name: "utility_function".to_string(),
-        file: utils_file.clone(),
-        line: 0,
-    };
+    let utility_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "utility_function" && f.file == utils_file)
+        .expect("utility_function should exist in call graph");
 
-    let utility_callers = call_graph.get_callers(&utility_func);
+    let utility_callers = call_graph.get_callers(utility_func);
     assert!(
         !utility_callers.is_empty(),
         "utility_function should have callers"
     );
 
-    let unused_func = FunctionId {
-        name: "unused_function".to_string(),
-        file: utils_file.clone(),
-        line: 0,
-    };
+    let unused_func = call_graph
+        .get_all_functions()
+        .find(|f| f.name == "unused_function" && f.file == utils_file)
+        .expect("unused_function should exist in call graph");
 
-    let unused_callers = call_graph.get_callers(&unused_func);
+    let unused_callers = call_graph.get_callers(unused_func);
     assert!(
         unused_callers.is_empty(),
         "unused_function should have no callers"
