@@ -1,4 +1,5 @@
 use super::import_tracker::{ExportedSymbol, ImportTracker, ImportedSymbol};
+use super::namespace::{build_module_namespace, ImportUsage, ModuleNamespace};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
 use std::collections::HashMap;
@@ -11,6 +12,12 @@ pub struct CrossModuleContext {
     pub imports: HashMap<PathBuf, Vec<ImportedSymbol>>,
     pub exports: HashMap<PathBuf, Vec<ExportedSymbol>>,
     pub module_trackers: HashMap<PathBuf, ImportTracker>,
+    /// Module namespaces for import resolution
+    pub namespaces: HashMap<PathBuf, ModuleNamespace>,
+    /// Import usage tracking
+    pub import_usage: HashMap<PathBuf, Vec<ImportUsage>>,
+    /// Resolution cache for performance
+    pub resolution_cache: HashMap<(PathBuf, String), Option<FunctionId>>,
 }
 
 impl CrossModuleContext {
@@ -23,6 +30,7 @@ impl CrossModuleContext {
         path: PathBuf,
         tracker: ImportTracker,
         exports: Vec<ExportedSymbol>,
+        namespace: ModuleNamespace,
     ) {
         let imports = tracker.get_imports().to_vec();
 
@@ -35,7 +43,8 @@ impl CrossModuleContext {
 
         self.imports.insert(path.clone(), imports);
         self.exports.insert(path.clone(), exports);
-        self.module_trackers.insert(path, tracker);
+        self.module_trackers.insert(path.clone(), tracker);
+        self.namespaces.insert(path, namespace);
     }
 
     fn resolve_import_path(&self, from_path: &Path, module_name: &str) -> Option<PathBuf> {
@@ -81,6 +90,32 @@ impl CrossModuleContext {
     }
 
     pub fn resolve_function(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
+        // Check resolution cache first
+        let cache_key = (module_path.to_path_buf(), name.to_string());
+        if self.resolution_cache.contains_key(&cache_key) {
+            return self.resolution_cache[&cache_key].clone();
+        }
+
+        // Try namespace-based resolution first
+        if let Some(namespace) = self.namespaces.get(module_path) {
+            if let Some((source_module, original_name)) = namespace.resolve_import(name) {
+                // Resolve through the source module
+                if let Some(func_id) =
+                    self.resolve_function_in_module(&source_module, &original_name)
+                {
+                    return Some(func_id);
+                }
+            }
+
+            // Check wildcard imports
+            for wildcard_module in &namespace.wildcard_imports {
+                if let Some(func_id) = self.resolve_function_in_module(wildcard_module, name) {
+                    return Some(func_id);
+                }
+            }
+        }
+
+        // Fall back to tracker-based resolution
         if let Some(tracker) = self.module_trackers.get(module_path) {
             if let Some(resolved) = tracker.resolve_name(name) {
                 // Try direct resolution first
@@ -126,6 +161,44 @@ impl CrossModuleContext {
                     name
                 );
                 self.symbols.get(&qualified)
+            })
+            .cloned()
+    }
+
+    /// Resolve a function within a specific module
+    fn resolve_function_in_module(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
+        // Check exports of the target module
+        if let Some(exports) = self.exports.get(module_path) {
+            for export in exports {
+                if export.name == name || export.qualified_name == name {
+                    // Try to find the FunctionId for this export
+                    return self
+                        .symbols
+                        .get(&export.qualified_name)
+                        .or_else(|| self.symbols.get(&export.name))
+                        .or_else(|| {
+                            let full_path_name = format!("{}:{}", module_path.display(), name);
+                            self.symbols.get(&full_path_name)
+                        })
+                        .cloned();
+                }
+            }
+        }
+
+        // Try direct lookup with module qualification
+        let qualified = format!(
+            "{}.{}",
+            module_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown"),
+            name
+        );
+        self.symbols
+            .get(&qualified)
+            .or_else(|| {
+                let full_path_name = format!("{}:{}", module_path.display(), name);
+                self.symbols.get(&full_path_name)
             })
             .cloned()
     }
@@ -264,6 +337,9 @@ impl CrossModuleAnalyzer {
 
         let exports = super::import_tracker::extract_exports(&module);
 
+        // Build module namespace
+        let namespace = build_module_namespace(&module, path);
+
         // Register exported functions in the global symbol table
         for export in &exports {
             if export.is_function || export.is_class {
@@ -279,7 +355,7 @@ impl CrossModuleAnalyzer {
         }
 
         self.context
-            .add_module(path.to_path_buf(), tracker, exports);
+            .add_module(path.to_path_buf(), tracker, exports, namespace);
 
         Ok(())
     }
@@ -303,9 +379,11 @@ mod tests {
         let path = PathBuf::from("test.py");
         let tracker = ImportTracker::new(path.clone());
         let exports = vec![];
+        let namespace = ModuleNamespace::new();
 
-        context.add_module(path.clone(), tracker, exports);
+        context.add_module(path.clone(), tracker, exports, namespace);
         assert!(context.module_trackers.contains_key(&path));
+        assert!(context.namespaces.contains_key(&path));
     }
 
     #[test]

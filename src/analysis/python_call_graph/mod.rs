@@ -18,6 +18,7 @@ pub mod cross_module;
 mod event_tracking;
 mod function_detection;
 pub mod import_tracker;
+pub mod namespace;
 
 #[allow(unused_imports)]
 use crate::priority::call_graph::{CallGraph, FunctionId};
