@@ -33,8 +33,6 @@ pub mod utils;
 mod example_complex_function;
 #[cfg(test)]
 mod example_refactor;
-#[cfg(test)]
-mod test_debug;
 
 // Re-export commonly used types
 pub use crate::core::{

@@ -1073,7 +1073,7 @@ impl TwoPassExtractor {
                     caller,
                     call_expr: ast::Expr::Call(call.clone()),
                     receiver_type: None,
-                    method_name: Some(name_str.to_string()),
+                    method_name: None,  // For direct function calls, method_name should be None
                     call_type: CallType::Direct,
                     module_alias: None,
                     is_imported,
