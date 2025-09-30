@@ -22,6 +22,9 @@ pub fn output_markdown(
     };
 
     if let Some(path) = output_file {
+        if let Some(parent) = path.parent() {
+            crate::io::ensure_dir(parent)?;
+        }
         let mut file = fs::File::create(path)?;
         file.write_all(output.as_bytes())?;
     } else {

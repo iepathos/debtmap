@@ -49,6 +49,9 @@ pub fn output_terminal_with_mode(
     };
 
     if let Some(path) = output_file {
+        if let Some(parent) = path.parent() {
+            crate::io::ensure_dir(parent)?;
+        }
         let mut file = fs::File::create(path)?;
         file.write_all(output.as_bytes())?;
     } else {
