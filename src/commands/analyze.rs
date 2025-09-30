@@ -55,11 +55,17 @@ pub struct AnalyzeConfig {
     pub aggregation_method: Option<String>,
     pub min_problematic: Option<usize>,
     pub no_god_object: bool,
+    pub max_files: Option<usize>,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     configure_output(&config);
     set_threshold_preset(config.threshold_preset);
+
+    // Set max files environment variable if specified
+    if let Some(max_files) = config.max_files {
+        std::env::set_var("DEBTMAP_MAX_FILES", max_files.to_string());
+    }
 
     // Set jobs environment variable for parallel processing
     if config.jobs > 0 {
@@ -298,88 +304,52 @@ fn analyze_and_configure_project_size(
                 }
             }
             501..=1000 => {
-                // Large project - warnings and optimizations
+                // Large project - inform user
                 if use_emoji {
-                    eprintln!("📁 Analyzing {} files (large project) ⚠️", file_count);
-                    eprintln!("🚀 Enabling performance optimizations automatically");
-                    eprintln!("💡 Consider setting DEBTMAP_MAX_FILES if analysis is slow");
+                    eprintln!("📁 Analyzing {} files (large project)", file_count);
                 } else {
-                    eprintln!("Analyzing {} files (large project) [WARN]", file_count);
-                    eprintln!("Enabling performance optimizations automatically");
-                    eprintln!("Consider setting DEBTMAP_MAX_FILES if analysis is slow");
-                }
-
-                // Auto-enable performance optimizations for large projects
-                if std::env::var("DEBTMAP_MAX_FILES").is_err() {
-                    std::env::set_var("DEBTMAP_MAX_FILES", "800");
+                    eprintln!("Analyzing {} files (large project)", file_count);
                 }
 
                 // Enable parallel processing by default
                 std::env::set_var("RUST_BACKTRACE", "0"); // Reduce noise
             }
             1001..=2000 => {
-                // Very large project - strong warnings
+                // Very large project - inform user
                 if use_emoji {
-                    eprintln!(
-                        "📁 Analyzing {} files (very large project) ⚠️⚠️",
-                        file_count
-                    );
-                    eprintln!("🐌 Large codebases may take significant time to analyze");
-                    eprintln!("🚀 Auto-limiting to 1000 files for performance");
-                    eprintln!("📝 Set DEBTMAP_MAX_FILES=0 to disable limits (not recommended)");
+                    eprintln!("📁 Analyzing {} files (very large project)", file_count);
+                    eprint!("⏱️  Starting analysis...");
                 } else {
-                    eprintln!(
-                        "Analyzing {} files (very large project) [WARN][WARN]",
-                        file_count
-                    );
-                    eprintln!("Large codebases may take significant time to analyze");
-                    eprintln!("Auto-limiting to 1000 files for performance");
-                    eprintln!("Set DEBTMAP_MAX_FILES=0 to disable limits (not recommended)");
-                }
-
-                // Auto-limit for very large projects
-                if std::env::var("DEBTMAP_MAX_FILES").is_err() {
-                    std::env::set_var("DEBTMAP_MAX_FILES", "1000");
+                    eprintln!("Analyzing {} files (very large project)", file_count);
+                    eprint!("Starting analysis...");
                 }
 
                 // Enable all performance optimizations
                 std::env::set_var("RUST_BACKTRACE", "0");
-
-                // Add timeout warning
-                if use_emoji {
-                    eprint!("⏱️  Starting analysis (this may take several minutes)...");
-                } else {
-                    eprint!("Starting analysis (this may take several minutes)...");
-                }
                 std::io::stderr().flush().unwrap();
             }
             _ => {
-                // Massive project - intervention required
+                // Massive project - inform user
                 if use_emoji {
-                    eprintln!("📁 Found {} files (massive project) 🚨", file_count);
-                    eprintln!("⛔ Projects this large require special handling");
-                    eprintln!("🛠️  Auto-limiting to 800 files to prevent hangs");
-                    eprintln!("📖 See documentation for large project optimization tips");
+                    eprintln!("📁 Analyzing {} files (massive project)", file_count);
                     eprintln!();
                     eprintln!("💡 Suggestions:");
                     eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
                     eprintln!("   • Focus analysis on specific modules with targeted paths");
-                    eprintln!("   • Consider running analysis on CI with longer timeouts");
+                    eprintln!();
+                    eprint!("⏱️  Starting analysis...");
                 } else {
-                    eprintln!("Found {} files (massive project) [ALERT]", file_count);
-                    eprintln!("Projects this large require special handling");
-                    eprintln!("Auto-limiting to 800 files to prevent hangs");
-                    eprintln!("See documentation for large project optimization tips");
+                    eprintln!("Analyzing {} files (massive project)", file_count);
                     eprintln!();
                     eprintln!("Suggestions:");
                     eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
                     eprintln!("   • Focus analysis on specific modules with targeted paths");
-                    eprintln!("   • Consider running analysis on CI with longer timeouts");
+                    eprintln!();
+                    eprint!("Starting analysis...");
                 }
 
-                // Aggressive limits for massive projects
-                std::env::set_var("DEBTMAP_MAX_FILES", "800");
                 std::env::set_var("RUST_BACKTRACE", "0");
+                std::io::stderr().flush().unwrap();
             }
         }
     }

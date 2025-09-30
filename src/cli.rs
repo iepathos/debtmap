@@ -189,6 +189,10 @@ pub enum Commands {
         /// Disable god object detection
         #[arg(long = "no-god-object")]
         no_god_object: bool,
+
+        /// Maximum number of files to analyze (0 = no limit, default: no limit)
+        #[arg(long = "max-files")]
+        max_files: Option<usize>,
     },
 
     /// Initialize configuration file
@@ -230,6 +234,10 @@ pub enum Commands {
         /// Disable specific context providers
         #[arg(long = "disable-context", value_delimiter = ',')]
         disable_context: Option<Vec<String>>,
+
+        /// Maximum debt density allowed (per 1000 LOC)
+        #[arg(long = "max-debt-density")]
+        max_debt_density: Option<f64>,
 
         /// Show only top N priority items
         #[arg(long = "top", visible_alias = "head")]

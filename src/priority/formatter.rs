@@ -100,6 +100,18 @@ fn format_default_with_config(
     )
     .unwrap();
 
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("📏", "[DENSITY]"),
+        format!(
+            "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
+            analysis.debt_density, analysis.total_lines_of_code
+        )
+        .bright_yellow()
+    )
+    .unwrap();
+
     if let Some(coverage) = analysis.overall_coverage {
         writeln!(
             output,
@@ -244,7 +256,7 @@ fn format_tiered_terminal(
         output,
         "{} {}",
         formatter.emoji("📊", "[SUMMARY]"),
-        "DEBT DISTRIBUTION".bright_cyan().bold()
+        "DEBT DISTRIBUTION"
     )
     .unwrap();
 
@@ -294,6 +306,18 @@ fn format_tiered_terminal(
     )
     .unwrap();
 
+    writeln!(
+        output,
+        "{} {}",
+        formatter.emoji("📏", "[DENSITY]"),
+        format!(
+            "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
+            analysis.debt_density, analysis.total_lines_of_code
+        )
+        .bright_yellow()
+    )
+    .unwrap();
+
     if let Some(coverage) = analysis.overall_coverage {
         writeln!(
             output,
@@ -332,7 +356,7 @@ fn format_tier_terminal(
         Tier::High => format!(
             "{} {} - {}",
             formatter.emoji("⚠️", "[HIGH]"),
-            "HIGH PRIORITY".bright_yellow().bold(),
+            "HIGH PRIORITY",
             "Current Sprint".yellow()
         ),
         Tier::Moderate => format!(
@@ -350,7 +374,7 @@ fn format_tier_terminal(
     };
 
     writeln!(output, "{}", tier_header).unwrap();
-    writeln!(output, "{}", tier.effort_estimate().dimmed()).unwrap();
+    writeln!(output, "{}", tier.effort_estimate()).unwrap();
     writeln!(output).unwrap();
 
     let max_items_per_tier = if verbosity >= 2 { 999 } else { 5 };
@@ -364,7 +388,7 @@ fn format_tier_terminal(
                     output,
                     "  {} ... and {} more items in this tier",
                     formatter.emoji("📋", "[+]"),
-                    remaining.to_string().dimmed()
+                    remaining.to_string()
                 )
                 .unwrap();
             }
@@ -414,7 +438,7 @@ fn format_display_group_terminal(
                 output,
                 "    {} Example: {}",
                 formatter.emoji("📍", "[eg]"),
-                format_item_location(&group.items[0]).dimmed()
+                format_item_location(&group.items[0])
             )
             .unwrap();
         }
@@ -531,7 +555,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     writeln!(
         output,
         "📉 {} (items {}-{})",
-        format!("BOTTOM {count} ITEMS").bright_yellow().bold(),
+        format!("BOTTOM {count} ITEMS"),
         total_items.saturating_sub(count - 1),
         total_items
     )
@@ -668,84 +692,351 @@ fn generate_why_message(
     }
 }
 
-// Pure function to format implementation steps for god objects
+// Pure function to get file extension or default based on path
+fn get_file_extension(file_path: &std::path::Path) -> &str {
+    file_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("py")
+}
+
+// Pure function to get language name from extension
+fn get_language_name(extension: &str) -> &str {
+    match extension {
+        "rs" => "Rust",
+        "py" => "Python",
+        "js" => "JavaScript",
+        "ts" => "TypeScript",
+        "jsx" => "JavaScript",
+        "tsx" => "TypeScript",
+        _ => "code",
+    }
+}
+
+// Pure function to format implementation steps for god objects with detailed split recommendations
 fn format_god_object_steps(
     output: &mut String,
     formatter: &ColoredFormatter,
-    fields_count: usize,
-    file_path: &std::path::Path,
-    file_name: &str,
+    item: &priority::FileDebtItem,
 ) {
-    if fields_count > 5 {
-        // God Object (class with many fields)
+    let extension = get_file_extension(&item.metrics.path);
+    let language = get_language_name(extension);
+    let indicators = &item.metrics.god_object_indicators;
+
+    // If we have detailed split recommendations, use them
+    if !indicators.recommended_splits.is_empty() {
         writeln!(
             output,
-            "{}  {} 1. Identify distinct responsibilities in the class",
+            "{}  {} RECOMMENDED SPLITS ({} modules):",
             formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
+            formatter.emoji("├─", "-"),
+            indicators.recommended_splits.len()
         )
         .unwrap();
-        writeln!(
-            output,
-            "{}  {} 2. Group methods and fields by responsibility",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "{}  {} 3. Extract each group into a separate focused class",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "{}  {} 4. Use composition or dependency injection to connect the new classes",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
-        )
-        .unwrap();
+
+        for (idx, split) in indicators.recommended_splits.iter().enumerate() {
+            let is_last = idx == indicators.recommended_splits.len() - 1;
+            let branch = if is_last {
+                formatter.emoji("└─", "-")
+            } else {
+                formatter.emoji("├─", "-")
+            };
+
+            // Show module name and responsibility
+            writeln!(
+                output,
+                "{}  {}  {} {}.{} - {} ({} methods, ~{} lines)",
+                formatter.emoji("│", ""),
+                branch,
+                formatter.emoji("📦", "[M]"),
+                split.suggested_name,
+                extension,
+                split.responsibility,
+                split.methods_to_move.len(),
+                split.estimated_lines
+            )
+            .unwrap();
+
+            // Show first few methods as examples
+            if !split.methods_to_move.is_empty() {
+                let sample_size = 3.min(split.methods_to_move.len());
+                let methods_display: Vec<String> = split
+                    .methods_to_move
+                    .iter()
+                    .take(sample_size)
+                    .map(|m| format!("{}()", m))
+                    .collect();
+
+                let continuation = if split.methods_to_move.len() > sample_size {
+                    let branch_prefix = if is_last { " " } else { "│" };
+                    writeln!(
+                        output,
+                        "{}  {}     {} Methods: {}, ... +{} more",
+                        formatter.emoji("│", ""),
+                        formatter.emoji(branch_prefix, ""),
+                        formatter.emoji("→", "->"),
+                        methods_display.join(", "),
+                        split.methods_to_move.len() - sample_size
+                    )
+                } else {
+                    let branch_prefix = if is_last { " " } else { "│" };
+                    writeln!(
+                        output,
+                        "{}  {}     {} Methods: {}",
+                        formatter.emoji("│", ""),
+                        formatter.emoji(branch_prefix, ""),
+                        formatter.emoji("→", "->"),
+                        methods_display.join(", ")
+                    )
+                };
+                continuation.unwrap();
+            }
+        }
+
+        // Add language-specific advice
+        writeln!(output, "{}", formatter.emoji("│", "")).unwrap();
+
+        format_language_specific_advice(output, formatter, language, extension);
     } else {
-        // God Module (many functions, few fields)
-        writeln!(
-            output,
-            "{}  {} 1. Run `grep -n \"^pub fn\\|^fn\" {}` to list all functions",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan(),
-            file_path.display()
-        )
-        .unwrap();
-        writeln!(
-            output,
-            "{}  {} 2. Group functions by: a) AST node types they handle b) similar prefixes c) data flow patterns",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-").cyan()
-        )
-        .unwrap();
+        // Fallback to generic advice if no detailed splits available
+        format_generic_god_object_steps(output, formatter, item, extension);
     }
 
-    // Common steps for both god objects and modules
+    // Add implementation guidance
+    writeln!(output, "{}", formatter.emoji("│", "")).unwrap();
     writeln!(
         output,
-        "{}  {} 3. Create new files: `{}_core.rs`, `{}_io.rs`, `{}_utils.rs` (adjust names to match groups)",
+        "{}  {} IMPLEMENTATION ORDER:",
         formatter.emoji("│", ""),
-        formatter.emoji("├─", "-").cyan(),
-        file_name, file_name, file_name
+        formatter.emoji("├─", "-")
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {} 4. Move functions in groups of 10-20, test after each move",
+        "{}  {}  {} Start with lowest coupling modules (Data Access, Utilities)",
         formatter.emoji("│", ""),
-        formatter.emoji("├─", "-").cyan()
+        formatter.emoji("├─", "-"),
+        formatter.emoji("⭐", "[1]")
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {} 5. DO NOT: Try to fix everything at once. Move incrementally, test frequently",
+        "{}  {}  {} Move 10-20 methods at a time, test after each move",
         formatter.emoji("│", ""),
-        formatter.emoji("└─", "-").cyan()
+        formatter.emoji("├─", "-"),
+        formatter.emoji("⚙️", "[2]")
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "{}  {}  {} Keep original file as facade during migration",
+        formatter.emoji("│", ""),
+        formatter.emoji("├─", "-"),
+        formatter.emoji("🔄", "[3]")
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "{}  {}  {} DO NOT: Try to refactor everything at once",
+        formatter.emoji("│", ""),
+        formatter.emoji("└─", "-"),
+        formatter.emoji("⚠️", "[!]")
+    )
+    .unwrap();
+}
+
+// Format language-specific refactoring advice
+fn format_language_specific_advice(
+    output: &mut String,
+    formatter: &ColoredFormatter,
+    language: &str,
+    extension: &str,
+) {
+    writeln!(
+        output,
+        "{}  {} {} PATTERNS:",
+        formatter.emoji("│", ""),
+        formatter.emoji("├─", "-"),
+        language
+    )
+    .unwrap();
+
+    match extension {
+        "py" => {
+            writeln!(
+                output,
+                "{}  {}  {} Use dataclasses/attrs for data-heavy classes",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Extract interfaces with Protocol/ABC",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Prefer composition over inheritance",
+                formatter.emoji("│", ""),
+                formatter.emoji("└─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+        }
+        "rs" => {
+            writeln!(
+                output,
+                "{}  {}  {} Extract traits for shared behavior",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Use newtype pattern for domain types",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Consider builder pattern for complex construction",
+                formatter.emoji("│", ""),
+                formatter.emoji("└─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+        }
+        "js" | "jsx" => {
+            writeln!(
+                output,
+                "{}  {}  {} Decompose into smaller classes/modules",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Use functional composition where possible",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Extract hooks for React components",
+                formatter.emoji("│", ""),
+                formatter.emoji("└─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+        }
+        "ts" | "tsx" => {
+            writeln!(
+                output,
+                "{}  {}  {} Extract interfaces for contracts",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Use type guards for domain logic",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Leverage discriminated unions",
+                formatter.emoji("│", ""),
+                formatter.emoji("└─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+        }
+        _ => {
+            writeln!(
+                output,
+                "{}  {}  {} Extract interfaces/protocols for shared behavior",
+                formatter.emoji("│", ""),
+                formatter.emoji("├─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "{}  {}  {} Prefer composition over inheritance",
+                formatter.emoji("│", ""),
+                formatter.emoji("└─", "-"),
+                formatter.emoji("•", "-")
+            )
+            .unwrap();
+        }
+    }
+}
+
+// Fallback generic advice when detailed splits aren't available
+fn format_generic_god_object_steps(
+    output: &mut String,
+    formatter: &ColoredFormatter,
+    item: &priority::FileDebtItem,
+    extension: &str,
+) {
+    let file_name = item
+        .metrics
+        .path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("module");
+
+    writeln!(
+        output,
+        "{}  {} SUGGESTED SPLIT (generic - no detailed analysis available):",
+        formatter.emoji("│", ""),
+        formatter.emoji("├─", "-").yellow()
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "{}  {}  {} {}_core.{} - Core business logic",
+        formatter.emoji("│", ""),
+        formatter.emoji("├─", "-"),
+        formatter.emoji("📦", "[1]"),
+        file_name,
+        extension
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "{}  {}  {} {}_io.{} - Input/output operations",
+        formatter.emoji("│", ""),
+        formatter.emoji("├─", "-"),
+        formatter.emoji("📦", "[2]"),
+        file_name,
+        extension
+    )
+    .unwrap();
+    writeln!(
+        output,
+        "{}  {}  {} {}_utils.{} - Helper functions",
+        formatter.emoji("│", ""),
+        formatter.emoji("└─", "-"),
+        formatter.emoji("📦", "[3]"),
+        file_name,
+        extension
     )
     .unwrap();
 }
@@ -833,7 +1124,7 @@ fn format_scoring_and_dependencies(
             formatter
                 .emoji("└─ DEPENDENCIES:", "└─ DEPENDENCIES:")
                 .bright_blue(),
-            function_count.to_string().cyan()
+            function_count.to_string()
         )
         .unwrap();
     }
@@ -858,7 +1149,7 @@ fn format_file_priority_item(
     writeln!(
         output,
         "#{} {} [{}]",
-        rank.to_string().bright_cyan().bold(),
+        rank.to_string(),
         format!("SCORE: {}", score_formatter::format_score(item.score)).bright_yellow(),
         format!("{} - {}", severity, type_label)
             .color(severity_color)
@@ -902,20 +1193,7 @@ fn format_file_priority_item(
     .unwrap();
 
     if item.metrics.god_object_indicators.is_god_object {
-        let file_name = item
-            .metrics
-            .path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("module");
-
-        format_god_object_steps(
-            output,
-            &formatter,
-            item.metrics.god_object_indicators.fields_count,
-            &item.metrics.path,
-            file_name,
-        );
+        format_god_object_steps(output, &formatter, item);
     }
 
     let impact = calculate_impact_message(
@@ -1127,7 +1405,7 @@ fn generate_formatted_sections(context: &FormatContext) -> FormattedSections {
 fn format_header_section(context: &FormatContext) -> String {
     format!(
         "#{} {} [{}]",
-        context.rank.to_string().bright_cyan().bold(),
+        context.rank.to_string(),
         format!("SCORE: {}", score_formatter::format_score(context.score)).bright_yellow(),
         context
             .severity_info
@@ -1191,14 +1469,14 @@ fn format_dependencies_section(context: &FormatContext) -> Option<String> {
     let mut section = format!(
         "{} {} upstream, {} downstream",
         "├─ DEPENDENCIES:".bright_blue(),
-        context.dependency_info.upstream.to_string().cyan(),
-        context.dependency_info.downstream.to_string().cyan()
+        context.dependency_info.upstream.to_string(),
+        context.dependency_info.downstream.to_string()
     );
 
     // Add callers information
     if !context.dependency_info.upstream_callers.is_empty() {
         let callers_display = format_truncated_list(&context.dependency_info.upstream_callers, 3);
-        section.push_str(&format!("\n│  ├─ CALLERS: {}", callers_display.cyan()));
+        section.push_str(&format!("\n│  ├─ CALLERS: {}", callers_display));
     }
 
     // Add callees information
@@ -1946,6 +2224,8 @@ mod tests {
                     responsibilities: 8,
                     is_god_object: true,
                     god_object_score: 0.85,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
             },

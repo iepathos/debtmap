@@ -22,6 +22,8 @@ fn test_file_level_scoring_integration() {
             responsibilities: 8,
             is_god_object: false,
             god_object_score: 0.0,
+            responsibility_names: Vec::new(),
+            recommended_splits: Vec::new(),
         },
         function_scores: vec![],
     };
@@ -79,6 +81,8 @@ fn test_file_scoring_with_god_object_detection() {
             responsibilities: 12,
             is_god_object: true,
             god_object_score: 0.9,
+            responsibility_names: Vec::new(),
+            recommended_splits: Vec::new(),
         },
         function_scores: vec![8.0; 80], // High scores for all functions
     };
@@ -137,6 +141,8 @@ fn test_file_scoring_priorities() {
             god_object_indicators: GodObjectIndicators {
                 is_god_object: true,
                 god_object_score: 0.7,
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
                 ..Default::default()
             },
             function_scores: vec![7.0; 60],
@@ -336,6 +342,8 @@ fn test_file_scoring_with_real_world_scenarios() {
             responsibilities: 15,
             is_god_object: true,
             god_object_score: 0.95,
+            responsibility_names: Vec::new(),
+            recommended_splits: Vec::new(),
         },
         function_scores: vec![9.0; 70],
     };

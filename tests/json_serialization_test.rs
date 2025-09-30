@@ -15,6 +15,8 @@ fn test_unified_analysis_json_serialization() {
             risk_reduction: 0.0,
         },
         total_debt_score: 0.0,
+        debt_density: 0.0,
+        total_lines_of_code: 0,
         call_graph: CallGraph::new(),
         data_flow_graph: DataFlowGraph::new(),
         overall_coverage: None,

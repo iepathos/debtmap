@@ -413,6 +413,7 @@ fn main() -> Result<()> {
             enable_context,
             context_providers,
             disable_context,
+            max_debt_density,
             top,
             tail,
             summary: _, // Validate command doesn't use summary yet
@@ -429,6 +430,7 @@ fn main() -> Result<()> {
                 enable_context,
                 context_providers,
                 disable_context,
+                max_debt_density,
                 top,
                 tail,
                 semantic_off,
@@ -484,6 +486,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         aggregation_method,
         min_problematic,
         no_god_object,
+        max_files,
     } = command
     {
         // Apply side effects first
@@ -536,6 +539,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             aggregation_method,
             min_problematic,
             no_god_object,
+            max_files,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -715,6 +719,7 @@ fn build_analyze_config(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
+    max_files: Option<usize>,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -757,5 +762,6 @@ fn build_analyze_config(
         aggregation_method,
         min_problematic,
         no_god_object,
+        max_files,
     }
 }

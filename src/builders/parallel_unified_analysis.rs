@@ -134,6 +134,8 @@ mod file_analysis {
             responsibilities: 0,
             is_god_object: false,
             god_object_score: 0.0,
+            responsibility_names: Vec::new(),
+            recommended_splits: Vec::new(),
         }
     }
 

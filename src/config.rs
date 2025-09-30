@@ -633,6 +633,10 @@ pub struct ValidationThresholds {
     /// Minimum required code coverage percentage (default: 0.0 - no minimum)
     #[serde(default = "default_min_coverage")]
     pub min_coverage_percentage: f64,
+
+    /// Maximum allowed debt density per 1000 LOC (default: 50.0)
+    #[serde(default = "default_max_debt_density")]
+    pub max_debt_density: f64,
 }
 
 impl Default for ValidationThresholds {
@@ -645,6 +649,7 @@ impl Default for ValidationThresholds {
             max_codebase_risk_score: default_max_codebase_risk(),
             max_high_risk_functions: default_max_high_risk_count(),
             min_coverage_percentage: default_min_coverage(),
+            max_debt_density: default_max_debt_density(),
         }
     }
 }
@@ -670,6 +675,9 @@ fn default_max_high_risk_count() -> usize {
 }
 fn default_min_coverage() -> f64 {
     0.0
+}
+fn default_max_debt_density() -> f64 {
+    50.0 // 50 debt points per 1000 LOC - reasonable default for most projects
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

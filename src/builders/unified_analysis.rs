@@ -1214,6 +1214,8 @@ fn create_empty_god_object_indicators() -> crate::priority::file_metrics::GodObj
         responsibilities: 0,
         is_god_object: false,
         god_object_score: 0.0,
+        responsibility_names: Vec::new(),
+        recommended_splits: Vec::new(),
     }
 }
 

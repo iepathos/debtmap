@@ -48,6 +48,10 @@ pub fn print_validation_details(details: &ValidationDetails) {
         "    Total debt score: {} (threshold: {})",
         details.total_debt_score, details.max_total_debt_score
     );
+    println!(
+        "    Debt density: {:.1} per 1K LOC (threshold: {:.1})",
+        details.debt_density, details.max_debt_density
+    );
 
     if details.max_codebase_risk_score > 0.0 || details.codebase_risk_score > 0.0 {
         println!(
@@ -142,6 +146,13 @@ fn create_validation_checks(details: &ValidationDetails) -> Vec<ValidationCheck>
             threshold: details.max_total_debt_score.to_string(),
             comparison: ">",
             failed: exceeds_max_threshold(details.total_debt_score, details.max_total_debt_score),
+        },
+        ValidationCheck {
+            metric_name: "Debt density",
+            actual: format!("{:.1}", details.debt_density),
+            threshold: format!("{:.1}", details.max_debt_density),
+            comparison: ">",
+            failed: exceeds_max_threshold(details.debt_density, details.max_debt_density),
         },
         ValidationCheck {
             metric_name: "Codebase risk score",
@@ -299,6 +310,8 @@ mod tests {
             max_debt_items: 20,
             total_debt_score: 50,
             max_total_debt_score: 100,
+            debt_density: 10.0,
+            max_debt_density: 50.0,
             codebase_risk_score: 3.0,
             max_codebase_risk_score: 5.0,
             high_risk_functions: 1,
@@ -308,7 +321,7 @@ mod tests {
         };
 
         let checks = create_validation_checks(&details);
-        assert_eq!(checks.len(), 7);
+        assert_eq!(checks.len(), 8);
 
         // All checks should pass
         let failed_count = checks.iter().filter(|c| c.is_failed()).count();
@@ -326,6 +339,8 @@ mod tests {
             max_debt_items: 20,
             total_debt_score: 50, // Within threshold
             max_total_debt_score: 100,
+            debt_density: 25.0, // Within threshold
+            max_debt_density: 50.0,
             codebase_risk_score: 3.0, // Within threshold
             max_codebase_risk_score: 5.0,
             high_risk_functions: 1, // Within threshold
@@ -360,6 +375,8 @@ mod tests {
             max_debt_items: 20,
             total_debt_score: 50,
             max_total_debt_score: 100,
+            debt_density: 30.0,
+            max_debt_density: 50.0,
             codebase_risk_score: 10.0,    // Would exceed if enabled
             max_codebase_risk_score: 0.0, // Disabled (0.0)
             high_risk_functions: 10,      // Would exceed if enabled

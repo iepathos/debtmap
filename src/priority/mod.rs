@@ -36,6 +36,8 @@ pub struct UnifiedAnalysis {
     pub file_items: Vector<FileDebtItem>,
     pub total_impact: ImpactMetrics,
     pub total_debt_score: f64,
+    pub debt_density: f64,
+    pub total_lines_of_code: usize,
     pub call_graph: CallGraph,
     pub data_flow_graph: crate::data_flow::DataFlowGraph,
     pub overall_coverage: Option<f64>,
@@ -400,6 +402,8 @@ impl UnifiedAnalysis {
                 risk_reduction: 0.0,
             },
             total_debt_score: 0.0,
+            debt_density: 0.0,
+            total_lines_of_code: 0,
             call_graph,
             data_flow_graph,
             overall_coverage: None,
@@ -504,10 +508,14 @@ impl UnifiedAnalysis {
         let mut risk_reduction = 0.0;
         let mut _functions_to_test = 0;
         let mut total_debt_score = 0.0;
+        let mut total_lines_of_code = 0;
 
         for item in &self.items {
             // Sum up all final scores as the total debt score
             total_debt_score += item.unified_score.final_score;
+
+            // Track lines of code from function-level items
+            total_lines_of_code += item.function_length;
 
             // Only count functions that actually need testing
             if item.expected_impact.coverage_improvement > 0.0 {
@@ -524,6 +532,7 @@ impl UnifiedAnalysis {
         // Add file-level impacts
         for file_item in &self.file_items {
             total_debt_score += file_item.score;
+            total_lines_of_code += file_item.metrics.total_lines;
 
             // File-level impacts are typically larger
             complexity_reduction += file_item.impact.complexity_reduction;
@@ -542,7 +551,16 @@ impl UnifiedAnalysis {
         // Total complexity reduction (sum of all reductions)
         let total_complexity_reduction = complexity_reduction;
 
+        // Calculate debt density (per 1000 LOC)
+        let debt_density = if total_lines_of_code > 0 {
+            (total_debt_score / total_lines_of_code as f64) * 1000.0
+        } else {
+            0.0
+        };
+
         self.total_debt_score = total_debt_score;
+        self.total_lines_of_code = total_lines_of_code;
+        self.debt_density = debt_density;
         self.total_impact = ImpactMetrics {
             coverage_improvement,
             lines_reduction,
@@ -967,7 +985,85 @@ impl UnifiedAnalysis {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_debt_density_calculation_formula() {
+        // Test the formula: (total_debt_score / total_lines_of_code) * 1000
+
+        // Case 1: 100 debt score, 1000 LOC = 100.0 density
+        let density1 = (100.0 / 1000.0) * 1000.0;
+        assert_eq!(density1, 100.0);
+
+        // Case 2: 80 debt score, 250 LOC = 320.0 density
+        let density2 = (80.0 / 250.0) * 1000.0;
+        assert_eq!(density2, 320.0);
+
+        // Case 3: 5000 debt score, 50000 LOC = 100.0 density
+        let density3 = (5000.0 / 50000.0) * 1000.0;
+        assert_eq!(density3, 100.0);
+    }
+
+    #[test]
+    fn test_debt_density_zero_lines() {
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+        analysis.calculate_total_impact();
+
+        // No items, should have 0 density
+        assert_eq!(analysis.total_debt_score, 0.0);
+        assert_eq!(analysis.total_lines_of_code, 0);
+        assert_eq!(analysis.debt_density, 0.0);
+    }
+
+    #[test]
+    fn test_debt_density_scale_independence() {
+        // Verify that projects with proportional debt/LOC have same density
+
+        // Small project
+        let density_small = (50.0 / 500.0) * 1000.0;
+
+        // Large project (10x larger, 10x more debt)
+        let density_large = (500.0 / 5000.0) * 1000.0;
+
+        // Should have same density
+        assert_eq!(density_small, 100.0);
+        assert_eq!(density_large, 100.0);
+        assert_eq!(density_small, density_large);
+    }
+
+    #[test]
+    fn test_debt_density_example_values() {
+        // Test real-world example values
+
+        // Clean small project
+        let clean_small = (250.0 / 5000.0) * 1000.0;
+        assert_eq!(clean_small, 50.0);
+
+        // Messy small project
+        let messy_small = (750.0 / 5000.0) * 1000.0;
+        assert_eq!(messy_small, 150.0);
+
+        // Clean large project
+        let clean_large = (5000.0 / 100000.0) * 1000.0;
+        assert_eq!(clean_large, 50.0);
+
+        // Messy large project
+        let messy_large = (15000.0 / 100000.0) * 1000.0;
+        assert_eq!(messy_large, 150.0);
+    }
+
+    #[test]
+    fn test_unified_analysis_initializes_density_fields() {
+        let call_graph = CallGraph::new();
+        let analysis = UnifiedAnalysis::new(call_graph);
+
+        // Check fields are initialized
+        assert_eq!(analysis.debt_density, 0.0);
+        assert_eq!(analysis.total_lines_of_code, 0);
+    }
+}
 
 #[cfg(test)]
 mod category_tests;

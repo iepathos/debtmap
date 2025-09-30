@@ -23,6 +23,20 @@ pub struct GodObjectIndicators {
     pub responsibilities: usize,
     pub is_god_object: bool,
     pub god_object_score: f64,
+    /// Detailed list of identified responsibilities (e.g., "Data Access", "Validation")
+    #[serde(default)]
+    pub responsibility_names: Vec<String>,
+    /// Recommended module splits with methods to move
+    #[serde(default)]
+    pub recommended_splits: Vec<ModuleSplit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleSplit {
+    pub suggested_name: String,
+    pub methods_to_move: Vec<String>,
+    pub responsibility: String,
+    pub estimated_lines: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -160,6 +174,8 @@ impl Default for GodObjectIndicators {
             responsibilities: 0,
             is_god_object: false,
             god_object_score: 0.0,
+            responsibility_names: Vec::new(),
+            recommended_splits: Vec::new(),
         }
     }
 }
@@ -207,6 +223,8 @@ mod tests {
                 responsibilities: 10,
                 is_god_object: true,
                 god_object_score: 0.8,
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
             },
             function_scores: vec![5.0; 60],
         };

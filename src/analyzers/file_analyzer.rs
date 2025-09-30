@@ -1,7 +1,7 @@
 use crate::analyzers::FileAnalyzer;
 use crate::core::FunctionMetrics;
 use crate::organization::GodObjectDetector;
-use crate::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators};
+use crate::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators, ModuleSplit};
 use crate::risk::lcov::LcovData;
 use anyhow::Result;
 use std::path::Path;
@@ -44,12 +44,26 @@ impl UnifiedFileAnalyzer {
                 let detector = GodObjectDetector::with_source_content(content);
                 let analysis = detector.analyze_comprehensive(path, &ast);
 
+                // Convert recommended splits to our format
+                let recommended_splits: Vec<ModuleSplit> = analysis
+                    .recommended_splits
+                    .iter()
+                    .map(|split| ModuleSplit {
+                        suggested_name: split.suggested_name.clone(),
+                        methods_to_move: split.methods_to_move.clone(),
+                        responsibility: split.responsibility.clone(),
+                        estimated_lines: split.estimated_lines,
+                    })
+                    .collect();
+
                 return GodObjectIndicators {
                     methods_count: analysis.method_count,
                     fields_count: analysis.field_count,
                     responsibilities: analysis.responsibility_count,
                     is_god_object: analysis.is_god_object,
                     god_object_score: analysis.god_object_score.min(100.0) / 100.0, // Normalize to 0-1
+                    responsibility_names: analysis.responsibilities.clone(),
+                    recommended_splits,
                 };
             }
         }
@@ -75,6 +89,8 @@ impl UnifiedFileAnalyzer {
             responsibilities: if is_god_object { 5 } else { 1 },
             is_god_object,
             god_object_score: god_object_score.min(1.0),
+            responsibility_names: Vec::new(),
+            recommended_splits: Vec::new(),
         }
     }
 
@@ -178,6 +194,8 @@ impl UnifiedFileAnalyzer {
             responsibilities: if is_god_object { 5 } else { 2 },
             is_god_object,
             god_object_score,
+            responsibility_names: Vec::new(),
+            recommended_splits: Vec::new(),
         }
     }
 }

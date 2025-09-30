@@ -34,6 +34,13 @@ pub fn format_priorities_markdown(
     )
     .unwrap();
 
+    writeln!(
+        output,
+        "**Debt Density:** {:.1} per 1K LOC ({} total LOC)",
+        analysis.debt_density, analysis.total_lines_of_code
+    )
+    .unwrap();
+
     if let Some(coverage) = analysis.overall_coverage {
         writeln!(output, "**Overall Coverage:** {:.2}%", coverage).unwrap();
     }
@@ -83,6 +90,13 @@ pub fn format_priorities_categorical_markdown(
         output,
         "**Total Debt Score:** {:.0}",
         analysis.total_debt_score
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "**Debt Density:** {:.1} per 1K LOC ({} total LOC)",
+        analysis.debt_density, analysis.total_lines_of_code
     )
     .unwrap();
 
@@ -323,6 +337,13 @@ pub fn format_priorities_tiered_markdown(
         output,
         "**Total Debt Score:** {:.0}",
         analysis.total_debt_score
+    )
+    .unwrap();
+
+    writeln!(
+        output,
+        "**Debt Density:** {:.1} per 1K LOC ({} total LOC)",
+        analysis.debt_density, analysis.total_lines_of_code
     )
     .unwrap();
 
@@ -1503,6 +1524,8 @@ mod tests {
                     responsibilities: 2,
                     is_god_object: false,
                     god_object_score: 0.0,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![10.0, 8.0, 6.0],
             },
@@ -1549,6 +1572,8 @@ mod tests {
                     responsibilities: 8,
                     is_god_object: true,
                     god_object_score: 3.5,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![],
             },
@@ -1597,6 +1622,8 @@ mod tests {
                     responsibilities: 4,
                     is_god_object: false,
                     god_object_score: 0.0,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![],
             },
@@ -1641,6 +1668,8 @@ mod tests {
                     responsibilities: 3,
                     is_god_object: false,
                     god_object_score: 0.0,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![],
             },
@@ -1687,6 +1716,8 @@ mod tests {
                     responsibilities: 0,
                     is_god_object: false,
                     god_object_score: 0.0,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![],
             },
@@ -1729,6 +1760,8 @@ mod tests {
                     responsibilities: 12,
                     is_god_object: true,
                     god_object_score: 5.0,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![],
             },
@@ -1771,6 +1804,8 @@ mod tests {
                     responsibilities: 1,
                     is_god_object: false,
                     god_object_score: 0.0,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![],
             },
@@ -2064,6 +2099,8 @@ mod tests {
                     responsibilities: 5,
                     is_god_object: false,
                     god_object_score: 0.0,
+                    responsibility_names: Vec::new(),
+                    recommended_splits: Vec::new(),
                 },
                 function_scores: vec![],
             },
