@@ -294,9 +294,7 @@ fn analyze_and_configure_project_size(
                         "💡 Using sequential processing (use default for better performance)"
                     );
                 } else {
-                    eprintln!(
-                        "Using sequential processing (use default for better performance)"
-                    );
+                    eprintln!("Using sequential processing (use default for better performance)");
                 }
             }
             501..=1000 => {

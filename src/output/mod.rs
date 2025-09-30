@@ -95,7 +95,9 @@ pub fn output_unified_priorities_with_summary(
     formatting_config: FormattingConfig,
 ) -> Result<()> {
     match output_format {
-        Some(crate::cli::OutputFormat::Json) => json::output_json(&analysis, output_file),
+        Some(crate::cli::OutputFormat::Json) => {
+            json::output_json_with_filters(&analysis, top, tail, output_file)
+        }
         Some(crate::cli::OutputFormat::Markdown) => {
             markdown::output_markdown(&analysis, top, tail, verbosity, output_file)
         }
