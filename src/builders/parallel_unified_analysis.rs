@@ -380,10 +380,16 @@ impl ParallelUnifiedAnalysisBuilder {
         let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
         let show_progress =
             transformations::should_show_progress(quiet_mode, self.options.progress);
+        let use_emoji = std::env::var("DEBTMAP_NO_EMOJI").is_err();
 
         if show_progress {
-            eprintln!(" ✓");
-            eprintln!("🚀 Starting parallel phase 1 (initialization)...");
+            if use_emoji {
+                eprintln!(" ✓");
+                eprintln!("🚀 Starting parallel phase 1 (initialization)...");
+            } else {
+                eprintln!(" [OK]");
+                eprintln!("Starting parallel phase 1 (initialization)...");
+            }
         }
 
         // Execute parallel initialization tasks
@@ -557,14 +563,26 @@ impl ParallelUnifiedAnalysisBuilder {
     }
 
     fn report_phase1_completion(&self, phase1_time: Duration) {
-        eprintln!(
-            "✅ Phase 1 complete in {:?} (DF: {:?}, Purity: {:?}, Test: {:?}, Debt: {:?})",
-            phase1_time,
-            self.timings.data_flow_creation,
-            self.timings.purity_analysis,
-            self.timings.test_detection,
-            self.timings.debt_aggregation,
-        );
+        let use_emoji = std::env::var("DEBTMAP_NO_EMOJI").is_err();
+        if use_emoji {
+            eprintln!(
+                "✅ Phase 1 complete in {:?} (DF: {:?}, Purity: {:?}, Test: {:?}, Debt: {:?})",
+                phase1_time,
+                self.timings.data_flow_creation,
+                self.timings.purity_analysis,
+                self.timings.test_detection,
+                self.timings.debt_aggregation,
+            );
+        } else {
+            eprintln!(
+                "Phase 1 complete in {:?} (DF: {:?}, Purity: {:?}, Test: {:?}, Debt: {:?})",
+                phase1_time,
+                self.timings.data_flow_creation,
+                self.timings.purity_analysis,
+                self.timings.test_detection,
+                self.timings.debt_aggregation,
+            );
+        }
     }
 
     /// Execute phase 2: Parallel function processing using functional pipeline
@@ -583,9 +601,14 @@ impl ParallelUnifiedAnalysisBuilder {
         let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
         let show_progress =
             transformations::should_show_progress(quiet_mode, self.options.progress);
+        let use_emoji = std::env::var("DEBTMAP_NO_EMOJI").is_err();
 
         if show_progress {
-            eprintln!("🚀 Starting parallel phase 2 (function analysis)...");
+            if use_emoji {
+                eprintln!("🚀 Starting parallel phase 2 (function analysis)...");
+            } else {
+                eprintln!("Starting parallel phase 2 (function analysis)...");
+            }
         }
 
         // Create analysis context for the pipeline
@@ -605,11 +628,19 @@ impl ParallelUnifiedAnalysisBuilder {
         self.timings.function_analysis = start.elapsed();
 
         if show_progress {
-            eprintln!(
-                "✅ Phase 2 complete in {:?} ({} items processed)",
-                self.timings.function_analysis,
-                items.len()
-            );
+            if use_emoji {
+                eprintln!(
+                    "✅ Phase 2 complete in {:?} ({} items processed)",
+                    self.timings.function_analysis,
+                    items.len()
+                );
+            } else {
+                eprintln!(
+                    "Phase 2 complete in {:?} ({} items processed)",
+                    self.timings.function_analysis,
+                    items.len()
+                );
+            }
         }
 
         items
@@ -678,9 +709,14 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<FileDebtItem> {
         let start = Instant::now();
         let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+        let use_emoji = std::env::var("DEBTMAP_NO_EMOJI").is_err();
 
         if !quiet_mode && self.options.progress {
-            eprintln!("🚀 Starting parallel phase 3 (file analysis)...");
+            if use_emoji {
+                eprintln!("🚀 Starting parallel phase 3 (file analysis)...");
+            } else {
+                eprintln!("Starting parallel phase 3 (file analysis)...");
+            }
         }
 
         // Group functions by file
@@ -703,11 +739,19 @@ impl ParallelUnifiedAnalysisBuilder {
         self.timings.file_analysis = start.elapsed();
 
         if !quiet_mode && self.options.progress {
-            eprintln!(
-                "✅ Phase 3 complete in {:?} ({} file items)",
-                self.timings.file_analysis,
-                file_items.len()
-            );
+            if use_emoji {
+                eprintln!(
+                    "✅ Phase 3 complete in {:?} ({} file items)",
+                    self.timings.file_analysis,
+                    file_items.len()
+                );
+            } else {
+                eprintln!(
+                    "Phase 3 complete in {:?} ({} file items)",
+                    self.timings.file_analysis,
+                    file_items.len()
+                );
+            }
         }
 
         file_items
@@ -841,7 +885,12 @@ impl ParallelUnifiedAnalysisBuilder {
             + self.timings.sorting;
 
         if !quiet_mode && self.options.progress {
-            eprintln!("⏱️  Total parallel analysis time: {:?}", self.timings.total);
+            let use_emoji = std::env::var("DEBTMAP_NO_EMOJI").is_err();
+            if use_emoji {
+                eprintln!("⏱️  Total parallel analysis time: {:?}", self.timings.total);
+            } else {
+                eprintln!("Total parallel analysis time: {:?}", self.timings.total);
+            }
             eprintln!("  - Data flow: {:?}", self.timings.data_flow_creation);
             eprintln!("  - Purity: {:?}", self.timings.purity_analysis);
             eprintln!("  - Test detection: {:?}", self.timings.test_detection);

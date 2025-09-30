@@ -42,6 +42,7 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub aggregation_method: Option<String>,
     pub min_problematic: Option<usize>,
     pub no_god_object: bool,
+    pub formatting_config: crate::formatting::FormattingConfig,
 }
 
 pub fn perform_unified_analysis(
@@ -69,6 +70,7 @@ pub fn perform_unified_analysis(
         aggregation_method: None,
         min_problematic: None,
         no_god_object: false,
+        formatting_config: crate::formatting::FormattingConfig::from_env(),
     })
 }
 
@@ -92,6 +94,7 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
+        formatting_config,
     } = options;
 
     // Extract files and create computation parameters in pure functional style
@@ -111,6 +114,7 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
+        formatting_config,
     );
 
     // Apply caching strategy using function composition
@@ -136,6 +140,7 @@ fn create_analysis_parameters<'a>(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
+    formatting_config: crate::formatting::FormattingConfig,
 ) -> AnalysisParameters<'a> {
     let files = extract_unique_files(&results.complexity.metrics);
     let cache_config = CacheConfiguration::new(use_cache, files.len(), coverage_file.is_some());
@@ -157,6 +162,7 @@ fn create_analysis_parameters<'a>(
         no_god_object,
         files,
         cache_config,
+        formatting_config,
     }
 }
 
@@ -188,6 +194,7 @@ struct AnalysisParameters<'a> {
     no_god_object: bool,
     files: Vec<PathBuf>,
     cache_config: CacheConfiguration,
+    formatting_config: crate::formatting::FormattingConfig,
 }
 
 // Pure function for cache configuration
@@ -219,7 +226,7 @@ fn attempt_cached_analysis(params: &AnalysisParameters) -> Option<Result<Unified
     let cache_key = create_cache_key(params).ok()?;
 
     unified_cache.get(&cache_key).map(|cached_analysis| {
-        log_cache_hit();
+        log_cache_hit(params.formatting_config);
         Ok(cached_analysis)
     })
 }
@@ -250,10 +257,16 @@ fn create_cache_key(params: &AnalysisParameters) -> Result<UnifiedAnalysisCacheK
 }
 
 // I/O function for logging cache hit
-fn log_cache_hit() {
+fn log_cache_hit(formatting_config: crate::formatting::FormattingConfig) {
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+    let use_emoji =
+        formatting_config.emoji.should_use_emoji() && std::env::var("DEBTMAP_NO_EMOJI").is_err();
     if !quiet_mode {
-        eprintln!("🎯 Using cached unified analysis ✓");
+        if use_emoji {
+            eprintln!("🎯 Using cached unified analysis ✓");
+        } else {
+            eprintln!("Using cached unified analysis [OK]");
+        }
     }
 }
 
@@ -294,6 +307,7 @@ fn perform_computation(params: &AnalysisParameters) -> Result<UnifiedAnalysis> {
         params.aggregation_method.clone(),
         params.min_problematic,
         params.no_god_object,
+        params.formatting_config,
     )
 }
 
@@ -315,6 +329,7 @@ fn perform_unified_analysis_computation(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
+    formatting_config: crate::formatting::FormattingConfig,
 ) -> Result<UnifiedAnalysis> {
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
@@ -328,8 +343,14 @@ fn perform_unified_analysis_computation(
 
     // Progress tracking
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+    let use_emoji =
+        formatting_config.emoji.should_use_emoji() && std::env::var("DEBTMAP_NO_EMOJI").is_err();
     if !quiet_mode {
-        eprint!("🔗 Building call graph...");
+        if use_emoji {
+            eprint!("🔗 Building call graph...");
+        } else {
+            eprint!("Building call graph...");
+        }
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
@@ -352,16 +373,26 @@ fn perform_unified_analysis_computation(
     };
 
     if !quiet_mode {
-        eprintln!(" ✓");
-        eprint!("📊 Loading coverage data...");
+        if use_emoji {
+            eprintln!(" ✓");
+            eprint!("📊 Loading coverage data...");
+        } else {
+            eprintln!(" [OK]");
+            eprint!("Loading coverage data...");
+        }
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
     let coverage_data = load_coverage_data(coverage_file.cloned())?;
 
     if !quiet_mode {
-        eprintln!(" ✓");
-        eprint!("🎯 Creating unified analysis... ");
+        if use_emoji {
+            eprintln!(" ✓");
+            eprint!("🎯 Creating unified analysis... ");
+        } else {
+            eprintln!(" [OK]");
+            eprint!("Creating unified analysis... ");
+        }
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
@@ -389,7 +420,11 @@ fn perform_unified_analysis_computation(
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
     if !quiet_mode && !parallel_enabled {
-        eprintln!(" ✓");
+        if use_emoji {
+            eprintln!(" ✓");
+        } else {
+            eprintln!(" [OK]");
+        }
     }
 
     Ok(result)

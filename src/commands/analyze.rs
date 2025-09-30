@@ -97,6 +97,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.threshold_complexity,
         config.threshold_duplication,
         config.parallel,
+        config.formatting_config,
     )?;
 
     let unified_analysis = unified_analysis::perform_unified_analysis_with_options(
@@ -117,6 +118,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             aggregation_method: config.aggregation_method.clone(),
             min_problematic: config.min_problematic,
             no_god_object: config.no_god_object,
+            formatting_config: config.formatting_config,
         },
     )?;
 
@@ -146,6 +148,11 @@ fn configure_output(config: &AnalyzeConfig) {
     } else {
         colored::control::set_override(false);
     }
+
+    // Set emoji mode environment variable for components that can't access FormattingConfig
+    if !config.formatting_config.emoji.should_use_emoji() {
+        std::env::set_var("DEBTMAP_NO_EMOJI", "1");
+    }
 }
 
 fn set_threshold_preset(preset: Option<cli::ThresholdPreset>) {
@@ -168,6 +175,7 @@ fn analyze_project(
     complexity_threshold: u32,
     duplication_threshold: usize,
     parallel_enabled: bool,
+    formatting_config: FormattingConfig,
 ) -> Result<AnalysisResults> {
     // Set environment variables for parallel processing
     if parallel_enabled {
@@ -178,7 +186,7 @@ fn analyze_project(
         .context("Failed to find project files")?;
 
     // Analyze project size and apply graduated optimizations
-    analyze_and_configure_project_size(&files, parallel_enabled)?;
+    analyze_and_configure_project_size(&files, parallel_enabled, formatting_config)?;
 
     // Initialize cache (enabled by default unless DEBTMAP_NO_CACHE is set)
     let cache_enabled = std::env::var("DEBTMAP_NO_CACHE").is_err();
@@ -249,32 +257,59 @@ fn collect_file_metrics_with_cache(
 }
 
 /// Analyze project size and configure optimizations based on scale
-fn analyze_and_configure_project_size(files: &[PathBuf], parallel_enabled: bool) -> Result<()> {
+fn analyze_and_configure_project_size(
+    files: &[PathBuf],
+    parallel_enabled: bool,
+    formatting_config: FormattingConfig,
+) -> Result<()> {
     let file_count = files.len();
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+    let use_emoji = formatting_config.emoji.should_use_emoji();
 
     if !quiet_mode {
         match file_count {
             0..=100 => {
                 // Small project - no warnings needed
-                eprintln!("📁 Analyzing {} files (small project)", file_count);
+                if use_emoji {
+                    eprintln!("📁 Analyzing {} files (small project)", file_count);
+                } else {
+                    eprintln!("Analyzing {} files (small project)", file_count);
+                }
             }
             101..=500 => {
                 // Medium project - inform user
-                eprintln!("📁 Analyzing {} files (medium project)", file_count);
-                if parallel_enabled {
-                    eprintln!("💡 Parallel processing enabled for better performance");
+                if use_emoji {
+                    eprintln!("📁 Analyzing {} files (medium project)", file_count);
                 } else {
+                    eprintln!("Analyzing {} files (medium project)", file_count);
+                }
+                if parallel_enabled {
+                    if use_emoji {
+                        eprintln!("💡 Parallel processing enabled for better performance");
+                    } else {
+                        eprintln!("Parallel processing enabled for better performance");
+                    }
+                } else if use_emoji {
                     eprintln!(
                         "💡 Using sequential processing (use default for better performance)"
+                    );
+                } else {
+                    eprintln!(
+                        "Using sequential processing (use default for better performance)"
                     );
                 }
             }
             501..=1000 => {
                 // Large project - warnings and optimizations
-                eprintln!("📁 Analyzing {} files (large project) ⚠️", file_count);
-                eprintln!("🚀 Enabling performance optimizations automatically");
-                eprintln!("💡 Consider setting DEBTMAP_MAX_FILES if analysis is slow");
+                if use_emoji {
+                    eprintln!("📁 Analyzing {} files (large project) ⚠️", file_count);
+                    eprintln!("🚀 Enabling performance optimizations automatically");
+                    eprintln!("💡 Consider setting DEBTMAP_MAX_FILES if analysis is slow");
+                } else {
+                    eprintln!("Analyzing {} files (large project) [WARN]", file_count);
+                    eprintln!("Enabling performance optimizations automatically");
+                    eprintln!("Consider setting DEBTMAP_MAX_FILES if analysis is slow");
+                }
 
                 // Auto-enable performance optimizations for large projects
                 if std::env::var("DEBTMAP_MAX_FILES").is_err() {
@@ -286,13 +321,23 @@ fn analyze_and_configure_project_size(files: &[PathBuf], parallel_enabled: bool)
             }
             1001..=2000 => {
                 // Very large project - strong warnings
-                eprintln!(
-                    "📁 Analyzing {} files (very large project) ⚠️⚠️",
-                    file_count
-                );
-                eprintln!("🐌 Large codebases may take significant time to analyze");
-                eprintln!("🚀 Auto-limiting to 1000 files for performance");
-                eprintln!("📝 Set DEBTMAP_MAX_FILES=0 to disable limits (not recommended)");
+                if use_emoji {
+                    eprintln!(
+                        "📁 Analyzing {} files (very large project) ⚠️⚠️",
+                        file_count
+                    );
+                    eprintln!("🐌 Large codebases may take significant time to analyze");
+                    eprintln!("🚀 Auto-limiting to 1000 files for performance");
+                    eprintln!("📝 Set DEBTMAP_MAX_FILES=0 to disable limits (not recommended)");
+                } else {
+                    eprintln!(
+                        "Analyzing {} files (very large project) [WARN][WARN]",
+                        file_count
+                    );
+                    eprintln!("Large codebases may take significant time to analyze");
+                    eprintln!("Auto-limiting to 1000 files for performance");
+                    eprintln!("Set DEBTMAP_MAX_FILES=0 to disable limits (not recommended)");
+                }
 
                 // Auto-limit for very large projects
                 if std::env::var("DEBTMAP_MAX_FILES").is_err() {
@@ -303,20 +348,36 @@ fn analyze_and_configure_project_size(files: &[PathBuf], parallel_enabled: bool)
                 std::env::set_var("RUST_BACKTRACE", "0");
 
                 // Add timeout warning
-                eprint!("⏱️  Starting analysis (this may take several minutes)...");
+                if use_emoji {
+                    eprint!("⏱️  Starting analysis (this may take several minutes)...");
+                } else {
+                    eprint!("Starting analysis (this may take several minutes)...");
+                }
                 std::io::stderr().flush().unwrap();
             }
             _ => {
                 // Massive project - intervention required
-                eprintln!("📁 Found {} files (massive project) 🚨", file_count);
-                eprintln!("⛔ Projects this large require special handling");
-                eprintln!("🛠️  Auto-limiting to 800 files to prevent hangs");
-                eprintln!("📖 See documentation for large project optimization tips");
-                eprintln!();
-                eprintln!("💡 Suggestions:");
-                eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
-                eprintln!("   • Focus analysis on specific modules with targeted paths");
-                eprintln!("   • Consider running analysis on CI with longer timeouts");
+                if use_emoji {
+                    eprintln!("📁 Found {} files (massive project) 🚨", file_count);
+                    eprintln!("⛔ Projects this large require special handling");
+                    eprintln!("🛠️  Auto-limiting to 800 files to prevent hangs");
+                    eprintln!("📖 See documentation for large project optimization tips");
+                    eprintln!();
+                    eprintln!("💡 Suggestions:");
+                    eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
+                    eprintln!("   • Focus analysis on specific modules with targeted paths");
+                    eprintln!("   • Consider running analysis on CI with longer timeouts");
+                } else {
+                    eprintln!("Found {} files (massive project) [ALERT]", file_count);
+                    eprintln!("Projects this large require special handling");
+                    eprintln!("Auto-limiting to 800 files to prevent hangs");
+                    eprintln!("See documentation for large project optimization tips");
+                    eprintln!();
+                    eprintln!("Suggestions:");
+                    eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
+                    eprintln!("   • Focus analysis on specific modules with targeted paths");
+                    eprintln!("   • Consider running analysis on CI with longer timeouts");
+                }
 
                 // Aggressive limits for massive projects
                 std::env::set_var("DEBTMAP_MAX_FILES", "800");
