@@ -239,6 +239,54 @@ Options:
   --no-context-aware                  Disable context-aware false positive reduction
 ```
 
+### `compare`
+Compare two debtmap analysis results to track improvements and detect regressions. Ideal for validating that refactoring efforts achieved their goals.
+
+```bash
+debtmap compare --before <FILE> --after <FILE> [OPTIONS]
+
+Options:
+  --before <FILE>                     Path to baseline analysis (JSON format)
+  --after <FILE>                      Path to current analysis (JSON format)
+  --plan <FILE>                       Implementation plan file (extracts target from **Target:** markers)
+  --target <LOCATION>                 Target location to track (format: file:function:line)
+  -f, --format <FORMAT>               Output format [possible values: json, markdown, terminal]
+  -o, --output <FILE>                 Output file (stdout if not specified)
+```
+
+**Example workflow:**
+```bash
+# Generate baseline analysis
+debtmap analyze . --format json --output before.json
+
+# Make improvements to your code
+# ... refactor, add tests, etc ...
+
+# Generate new analysis
+debtmap analyze . --format json --output after.json
+
+# Compare and verify improvements
+debtmap compare --before before.json --after after.json --target src/main.rs:complex_function:100
+
+# Or use with an implementation plan
+debtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md
+
+# Output in different formats
+debtmap compare --before before.json --after after.json --format markdown --output report.md
+```
+
+**Target Location Format:**
+- `file:function:line` - e.g., `src/main.rs:process_data:100`
+- Can be extracted automatically from plan files containing `**Target**: file:function:line` markers
+- When specified, comparison focuses on whether the target item improved
+
+**Comparison Results:**
+- **Target Status**: Resolved, Improved, Unchanged, Regressed, or Not Found
+- **Overall Trend**: Improving, Stable, or Regressing
+- **Regressions**: New critical debt items introduced
+- **Metrics**: Complexity reduction, coverage improvement, score changes
+- **Project Health**: Before/after comparison with detailed breakdowns
+
 ## Verbosity Levels
 
 Control the amount of detail in the output using the `-v` flag:
