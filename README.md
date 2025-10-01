@@ -1079,7 +1079,7 @@ We use [prodigy](https://github.com/iepathos/prodigy) for automated technical de
 
 ```bash
 # Run automated debt reduction (5 iterations)
-prodigy cook workflows/debtmap.yml -wn 5
+prodigy run workflows/debtmap.yml -yn 5
 ```
 
 This command:
