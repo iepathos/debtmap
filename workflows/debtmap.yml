@@ -1,34 +1,49 @@
-# Sequential workflow. Fix top technical item
-- shell: "just build-release"
+# Sequential workflow. Fix top technical debt item
 
+# Phase 1: Generate coverage data
 - shell: "just coverage-lcov"
 
-# Capture initial debtmap state for validation
-- shell: "target/release/debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json -vv"
+# Phase 2: Analyze tech debt and capture baseline
+- shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
 
-- claude: "/debtmap"
+# Phase 3: Create implementation plan (PLANNING PHASE)
+- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+  capture_output: true
+  # This creates .prodigy/IMPLEMENTATION_PLAN.md with phased approach
+  validate:
+    # Validate the plan addresses the debt item
+    claude: "/prodigy-validate-debtmap-plan --before .prodigy/debtmap-before.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/plan-validation.json"
+    result_file: ".prodigy/plan-validation.json"
+    threshold: 75  # Plan must score at least 75/100
+    on_incomplete:
+      claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+      max_attempts: 3
+      fail_workflow: false # Continue even if plan isn't perfect
+
+# Phase 4: Execute the plan (IMPLEMENTATION PHASE)
+- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
   commit_required: true
   validate:
     # Capture state after changes and validate improvement
-    shell: "target/release/debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json -vv"
+    shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
     claude: "/prodigy-validate-debtmap-improvement --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --output .prodigy/debtmap-validation.json"
     result_file: ".prodigy/debtmap-validation.json"
     threshold: 75  # Debtmap item should be at least 75% improved
     on_incomplete:
-      claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps}"
-      max_attempts: 3
-      fail_workflow: false  # Continue even if we can't reach threshold
+      claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+      max_attempts: 5
+      fail_workflow: true # Continue even if we can't reach threshold
       commit_required: true
 
 - shell: "just test"
   on_failure:
     claude: "/prodigy-debug-test-failure --output ${shell.output}"
-    max_attempts: 3
-    fail_workflow: false  # Continue workflow even if tests can't be fixed
+    max_attempts: 5
+    fail_workflow: true  # Continue workflow even if tests can't be fixed
 
 # Run linting and formatting after implementation
 - shell: "just fmt-check && just lint"
   on_failure:
     claude: "/prodigy-lint ${shell.output}"
-    max_attempts: 3
-    fail_workflow: false
+    max_attempts: 5
+    fail_workflow: true
