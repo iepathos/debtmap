@@ -266,6 +266,34 @@ pub enum Commands {
         #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
         verbosity: u8,
     },
+
+    /// Compare two analysis results and generate diff
+    Compare {
+        /// Path to "before" analysis JSON
+        #[arg(long, value_name = "FILE")]
+        before: PathBuf,
+
+        /// Path to "after" analysis JSON
+        #[arg(long, value_name = "FILE")]
+        after: PathBuf,
+
+        /// Path to implementation plan (to extract target location)
+        #[arg(long, value_name = "FILE")]
+        plan: Option<PathBuf>,
+
+        /// Target location (alternative to --plan)
+        /// Format: file:function:line
+        #[arg(long, value_name = "LOCATION", conflicts_with = "plan")]
+        target_location: Option<String>,
+
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "json")]
+        format: OutputFormat,
+
+        /// Output file (defaults to stdout)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
