@@ -26,14 +26,19 @@
   validate:
     # Capture state after changes and validate improvement
     shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
-    claude: "/prodigy-validate-debtmap-improvement --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --output .prodigy/debtmap-validation.json"
+    claude: "/prodigy-validate-debtmap-improvement --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/debtmap-validation.json"
     result_file: ".prodigy/debtmap-validation.json"
     threshold: 75  # Debtmap item should be at least 75% improved
     on_incomplete:
+      # Step 1: Apply fixes based on validation gaps
       claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+      commit_required: true
+      # Step 2: Regenerate coverage to capture test improvements
+      shell: "just coverage-lcov"
+      # Step 3: Re-analyze with updated coverage
+      shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
       max_attempts: 5
       fail_workflow: true # Continue even if we can't reach threshold
-      commit_required: true
 
 - shell: "just test"
   on_failure:

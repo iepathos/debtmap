@@ -7,11 +7,11 @@ Arguments: $ARGUMENTS
 ## Usage
 
 ```
-/prodigy-validate-debtmap-improvement --before <before-json-file> --after <after-json-file> [--output <filepath>]
+/prodigy-validate-debtmap-improvement --before <before-json-file> --after <after-json-file> --plan <plan-file> [--output <filepath>]
 ```
 
 Examples:
-- `/prodigy-validate-debtmap-improvement --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --output .prodigy/debtmap-validation.json`
+- `/prodigy-validate-debtmap-improvement --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/debtmap-validation.json`
 
 ## What This Command Does
 
@@ -32,76 +32,151 @@ Examples:
 
 ## Execution Process
 
-### Step 1: Parse Arguments and Load Data
+### Step 1: Parse Arguments, Load Data, and Identify Target Item
 
 The command will:
 - Parse $ARGUMENTS to extract:
   - `--before` parameter with path to pre-fix debtmap JSON
   - `--after` parameter with path to post-fix debtmap JSON
+  - **`--plan` parameter with path to implementation plan (REQUIRED)**
   - `--output` parameter with filepath (required when called from workflow)
 - If missing parameters, fail with error message
 - If no `--output` parameter, default to `.prodigy/debtmap-validation.json`
 - Load both JSON files and validate they contain debtmap output
 
-### Step 2: Compare Overall Metrics
+**CRITICAL - Identify the target debt item:**
+1. Read the implementation plan file (markdown)
+2. Extract the target location from the plan:
+   - Look for "**Location**:" or "Problem location" in the plan
+   - Parse format: `./path/to/file.rs:function_name:line_number`
+   - Example: `./src/builders/call_graph.rs:process_python_files_for_call_graph_with_types:120`
+3. This is the ONLY item to validate - ignore all other debt items
 
-Compare high-level improvements:
-- **Total Debt Items**: Before vs after count
-- **High Priority Items**: Critical debt items (score >= 8)
-- **Average Complexity**: Overall complexity metrics
-- **Coverage Gaps**: Functions with poor test coverage
-- **Technical Debt Score**: Overall project health
+### Step 2: Extract Target Item from Before/After States
 
-### Step 3: Identify Specific Improvements
+**CRITICAL**: Only compare the single target item identified in Step 1.
 
-Track improvements in individual debt items:
-- **Resolved Items**: Debt items that no longer appear
-- **Improved Items**: Items with reduced complexity/better coverage
-- **New Items**: Any new debt introduced (negative impact)
-- **Unchanged Critical Items**: High-priority items still present
+1. **Find target in before JSON:**
+   - Search `before['items']` for item matching target location
+   - Match on: `location.file`, `location.function`, `location.line`
+   - Store as `before_target_item`
 
-### Step 4: Calculate Improvement Score
+2. **Find target in after JSON:**
+   - Search `after['items']` for item matching target location
+   - Store as `after_target_item`
+   - If not found → item was completely resolved! (100% improvement)
 
-Calculate improvement percentage based on:
+3. **Extract metrics for comparison:**
+   - From `before_target_item`:
+     - Score: `unified_score.final_score`
+     - Complexity: `debt_type` details (cyclomatic, cognitive)
+     - Coverage: from `debt_type.TestingGap.coverage` if present
+   - From `after_target_item`:
+     - Same metrics as above
 
+### Step 3: Calculate Target Item Improvement
+
+Compare ONLY the target item's metrics:
+
+**If target item resolved (not in after):**
+- Item completely eliminated from debt report
+- Improvement score: 100%
+- Status: "complete"
+
+**If target item still present:**
+Calculate improvement based on:
+1. **Score reduction**: `(before_score - after_score) / before_score * 100`
+2. **Complexity reduction**: Check if cyclomatic/cognitive improved
+3. **Coverage improvement**: Check if test coverage increased
+4. **Metrics changes**: Any other relevant metrics that improved
+
+### Step 4: Calculate Improvement Score (FOR SINGLE TARGET ITEM)
+
+**NEW FORMULA** - For single-item validation:
+
+```python
+if not after_target_item:
+    # Item completely resolved
+    improvement_score = 100.0
+    status = 'complete'
+else:
+    # Compare before/after metrics for target item only
+    before_score = before_target_item['unified_score']['final_score']
+    after_score = after_target_item['unified_score']['final_score']
+
+    # Calculate percentage reduction in score
+    score_reduction_pct = max(0, (before_score - after_score) / before_score * 100)
+
+    # Check complexity improvements
+    before_complexity = get_complexity(before_target_item)  # cyclomatic + cognitive
+    after_complexity = get_complexity(after_target_item)
+    complexity_reduction_pct = max(0, (before_complexity - after_complexity) / before_complexity * 100)
+
+    # Check coverage improvements (if applicable)
+    before_coverage = get_coverage(before_target_item)  # 0-100%
+    after_coverage = get_coverage(after_target_item)
+    coverage_improvement_pct = max(0, after_coverage - before_coverage)
+
+    # Improved formula: Reward strong improvement in ANY metric
+    # Take the best improvement, plus partial credit for others
+    all_improvements = [score_reduction_pct, complexity_reduction_pct, coverage_improvement_pct]
+    max_improvement = max(all_improvements)
+    other_improvements = sum(all_improvements) - max_improvement
+
+    improvement_score = max_improvement * 0.7 + other_improvements * 0.15
+
+    status = 'complete' if improvement_score >= 75.0 else 'incomplete'
 ```
-improvement_score = weighted_average(
-    resolved_high_priority * 0.4,    // Fixing critical items
-    overall_score_improvement * 0.3,  // Project-wide improvement
-    complexity_reduction * 0.2,       // Specific metrics improved
-    no_new_critical_debt * 0.1       // No regression
-)
+
+**Key differences from old formula:**
+- ✅ Compares ONE item, not all items
+- ✅ Rewards strong improvement in ANY dimension (70% weight to best)
+- ✅ Still values other improvements (15% each to remaining metrics)
+- ✅ 75% threshold is achievable:
+  - Excellent work in one area (80%) + moderate in others (40%) = 76%
+  - Good work across the board (60% each) = 60% (would need slight push)
+  - Complete resolution (100%) = 100%
+
+### Step 5: Identify Improvement Gaps (FOR TARGET ITEM)
+
+If improvement score < threshold (75%), identify specific gaps for the TARGET item only:
+
+1. **Target Item Still Present** (if item not resolved):
+   - Include target item location and current metrics
+   - Show what changed vs what didn't change
+   - Identify which metrics need more work
+
+2. **Insufficient Score Reduction**:
+   - Target item score reduced by less than 50%
+   - Example: 81.9 → 70.0 (14.5% reduction) - need ~50% for good score
+   - Suggest: More aggressive refactoring needed
+
+3. **Complexity Not Reduced Enough**:
+   - Cyclomatic/cognitive complexity still high
+   - Example: 17 → 12 (29% reduction) - need ~40% for good score
+   - Suggest: Extract more pure functions, reduce nesting
+
+4. **Coverage Not Improved**:
+   - Test coverage still low or unchanged
+   - Example: 0% → 0% (no improvement)
+   - Suggest: Add comprehensive tests for all branches
+
+**Gap structure for target item:**
+```json
+{
+  "target_item_not_improved": {
+    "description": "Target debt item still has high score",
+    "location": "./src/file.rs:function:line",
+    "severity": "high",
+    "before_score": 81.9,
+    "after_score": 81.9,
+    "score_reduction_pct": 0.0,
+    "complexity_reduction_pct": 0.0,
+    "coverage_improvement_pct": 0.0,
+    "suggested_fix": "Apply functional programming patterns to reduce complexity"
+  }
+}
 ```
-
-Where:
-- `resolved_high_priority` = percentage of high-priority items fixed
-- `overall_score_improvement` = improvement in total debt score
-- `complexity_reduction` = average complexity reduction across modified functions
-- `no_new_critical_debt` = penalty if new critical issues introduced
-
-### Step 5: Identify Improvement Gaps
-
-If improvement score < threshold (75%), identify specific gaps:
-
-1. **Insufficient Impact**:
-   - High-priority debt items still present
-   - Only cosmetic changes made (formatting, comments)
-   - Wrong items addressed (low-priority vs high-priority)
-
-2. **Incomplete Implementation**:
-   - Partial refactoring that didn't reduce complexity enough
-   - Tests added but coverage still insufficient
-   - Function shortened but still too complex
-
-3. **Regression Issues**:
-   - New debt items introduced
-   - Existing items made worse
-   - Test coverage decreased
-
-4. **Missing Core Work**:
-   - Primary recommendation not addressed
-   - Complex functions left untouched
-   - Critical coverage gaps remain
 
 ### Step 6: Write Validation Results
 
@@ -118,49 +193,84 @@ If improvement score < threshold (75%), identify specific gaps:
 
 3. **Do NOT output JSON to stdout** - Prodigy will read from the file
 
-The JSON format is:
+The JSON format (for single-item validation):
 
 ```json
 {
   "completion_percentage": 82.0,
-  "status": "incomplete",
+  "status": "complete",
+  "target_item": {
+    "location": "./src/builders/call_graph.rs:process_python_files_for_call_graph_with_types:120",
+    "before_score": 81.9,
+    "after_score": 14.5,
+    "score_reduction_pct": 82.3,
+    "complexity_reduction_pct": 64.7,
+    "coverage_improvement_pct": 50.0
+  },
   "improvements": [
-    "Resolved 2 high-priority debt items",
-    "Reduced average cyclomatic complexity by 25%",
-    "Added test coverage for 3 critical functions"
+    "Target item score reduced from 81.9 to 14.5 (82.3% reduction)",
+    "Cyclomatic complexity reduced from 17 to 6 (64.7% reduction)",
+    "Test coverage improved from 0% to 50%",
+    "Function length reduced from 122 to 45 lines"
+  ],
+  "remaining_issues": [],
+  "gaps": {},
+  "before_summary": {
+    "target_score": 81.9,
+    "target_cyclomatic": 17,
+    "target_cognitive": 62,
+    "target_coverage": 0.0
+  },
+  "after_summary": {
+    "target_score": 14.5,
+    "target_cyclomatic": 6,
+    "target_cognitive": 22,
+    "target_coverage": 50.0
+  }
+}
+```
+
+**For incomplete improvement:**
+```json
+{
+  "completion_percentage": 35.0,
+  "status": "incomplete",
+  "target_item": {
+    "location": "./src/builders/call_graph.rs:process_python_files_for_call_graph_with_types:120",
+    "before_score": 81.9,
+    "after_score": 75.0,
+    "score_reduction_pct": 8.4,
+    "complexity_reduction_pct": 17.6,
+    "coverage_improvement_pct": 0.0
+  },
+  "improvements": [
+    "Some code refactoring performed",
+    "Cyclomatic complexity reduced from 17 to 14"
   ],
   "remaining_issues": [
-    "1 critical debt item still present",
-    "Complex function in auth.rs needs refactoring"
+    "Target item score only reduced by 8.4% (need 50%+ for good improvement)",
+    "Test coverage still 0% (no tests added)",
+    "Cognitive complexity still high (62 → 55)"
   ],
   "gaps": {
-    "critical_debt_remaining": {
-      "description": "High-priority debt item still present in user authentication",
-      "location": "src/auth.rs:authenticate_user:45",
+    "insufficient_score_reduction": {
+      "description": "Target item score reduced by only 8.4%",
+      "location": "./src/builders/call_graph.rs:process_python_files_for_call_graph_with_types:120",
       "severity": "high",
-      "suggested_fix": "Apply functional programming patterns to reduce complexity",
-      "original_score": 9.2,
-      "current_score": 9.2
-    },
-    "insufficient_refactoring": {
-      "description": "Function complexity reduced but still above threshold",
-      "location": "src/parser.rs:parse_config:123",
-      "severity": "medium",
-      "suggested_fix": "Extract helper functions using pure functional patterns",
-      "original_complexity": 15,
-      "current_complexity": 12,
-      "target_complexity": 8
+      "before_score": 81.9,
+      "after_score": 75.0,
+      "suggested_fix": "Need more aggressive refactoring - extract pure functions, add tests, reduce nesting"
     }
   },
   "before_summary": {
-    "total_items": 45,
-    "high_priority_items": 8,
-    "average_score": 6.2
+    "target_score": 81.9,
+    "target_cyclomatic": 17,
+    "target_coverage": 0.0
   },
   "after_summary": {
-    "total_items": 41,
-    "high_priority_items": 6,
-    "average_score": 5.8
+    "target_score": 75.0,
+    "target_cyclomatic": 14,
+    "target_coverage": 0.0
   }
 }
 ```
@@ -293,16 +403,26 @@ This command is designed to work with Prodigy workflows:
 
 ## Important Implementation Notes
 
-1. **Parse arguments correctly** - Extract before, after, and output paths from $ARGUMENTS
-2. **Write JSON to file**:
+**CRITICAL CHANGES** - This command now validates SINGLE items, not all items:
+
+1. **Parse arguments correctly** - Extract before, after, **plan**, and output paths from $ARGUMENTS
+2. **Read the plan file** to identify the target debt item (file, function, line)
+3. **Filter before/after JSON** to only compare the single target item
+4. **Calculate improvement** based on target item's score/complexity/coverage changes
+5. **Write JSON to file**:
    - Use path from `--output` parameter, or default `.prodigy/debtmap-validation.json`
    - Create parent directories if they don't exist
    - Write complete JSON validation result to the file
-3. **Always write valid JSON** to the file, even if validation fails
-4. **Exit code 0** indicates command ran successfully (regardless of validation result)
-5. **Improvement percentage** determines if validation passed based on threshold
-6. **Gap details** help subsequent commands fix remaining issues
-7. **Keep JSON compact** - Prodigy will parse it programmatically
-8. **Do NOT output JSON to stdout** - only progress messages should go to stdout
-9. **Focus on technical debt metrics** - complexity, coverage, function length, nesting
-10. **Prioritize high-impact improvements** - critical debt items matter most
+6. **Always write valid JSON** to the file, even if validation fails
+7. **Exit code 0** indicates command ran successfully (regardless of validation result)
+8. **Improvement percentage** determines if validation passed based on threshold
+9. **Gap details** should reference ONLY the target item, not other items
+10. **Keep JSON compact** - Prodigy will parse it programmatically
+11. **Do NOT output JSON to stdout** - only progress messages should go to stdout
+12. **Focus on target item metrics** - its score, complexity, coverage only
+
+**Implementation approach:**
+- Use Python script or shell script with jq to parse JSON
+- Match items by comparing `location.file`, `location.function`, `location.line`
+- If target not found in after → 100% improvement (resolved!)
+- If target still present → calculate percentage improvements in each metric
