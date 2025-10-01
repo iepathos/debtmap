@@ -1,0 +1,79 @@
+{
+  "items": [
+    {
+      "location": {
+        "file": "src/example.rs",
+        "function": "complex_function",
+        "line": 45
+      },
+      "debt_type": {
+        "ComplexityHotspot": {
+          "cyclomatic": 8,
+          "cognitive": 15
+        }
+      },
+      "unified_score": {
+        "complexity_factor": 8.0,
+        "coverage_factor": 10.0,
+        "dependency_factor": 5.0,
+        "role_multiplier": 1.3,
+        "final_score": 85.5
+      },
+      "function_role": "PureLogic",
+      "recommendation": {
+        "primary_action": "Refactor to reduce nesting",
+        "rationale": "High cognitive complexity",
+        "implementation_steps": ["Extract nested logic"],
+        "related_items": []
+      },
+      "expected_impact": {
+        "coverage_improvement": 15.0,
+        "lines_reduction": 20,
+        "complexity_reduction": 12.0,
+        "risk_reduction": 8.5
+      },
+      "transitive_coverage": null,
+      "upstream_dependencies": 3,
+      "downstream_dependencies": 2,
+      "upstream_callers": [],
+      "downstream_callees": [],
+      "nesting_depth": 4,
+      "function_length": 45,
+      "cyclomatic_complexity": 8,
+      "cognitive_complexity": 15,
+      "entropy_details": null,
+      "is_pure": true,
+      "purity_confidence": 0.9,
+      "god_object_indicators": null
+    }
+  ],
+  "file_items": [],
+  "total_impact": {
+    "coverage_improvement": 15.0,
+    "lines_reduction": 20,
+    "complexity_reduction": 12.0,
+    "risk_reduction": 8.5
+  },
+  "total_debt_score": 85.5,
+  "debt_density": 1.9,
+  "total_lines_of_code": 45,
+  "call_graph": {
+    "nodes": {},
+    "edges": [],
+    "caller_index": {},
+    "callee_index": {}
+  },
+  "data_flow_graph": {
+    "call_graph": {
+      "nodes": {},
+      "edges": [],
+      "caller_index": {},
+      "callee_index": {}
+    },
+    "variable_deps": {},
+    "data_transformations": {},
+    "io_operations": {},
+    "purity_analysis": {}
+  },
+  "overall_coverage": null
+}

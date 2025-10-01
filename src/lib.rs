@@ -7,6 +7,7 @@ pub mod cache;
 pub mod cli;
 pub mod commands;
 pub mod common;
+pub mod comparison;
 pub mod complexity;
 pub mod config;
 pub mod context;

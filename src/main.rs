@@ -439,6 +439,24 @@ fn main() -> Result<()> {
             debtmap::commands::validate::validate_project(validate_config)?;
             Ok(())
         }
+        Commands::Compare {
+            before,
+            after,
+            plan,
+            target_location,
+            format,
+            output,
+        } => {
+            handle_compare_command(
+                &before,
+                &after,
+                plan.as_deref(),
+                target_location,
+                format,
+                output.as_deref(),
+            )?;
+            Ok(())
+        }
     }
 }
 
@@ -764,4 +782,185 @@ fn build_analyze_config(
         no_god_object,
         max_files,
     }
+}
+
+// Handle compare command
+fn handle_compare_command(
+    before: &Path,
+    after: &Path,
+    plan: Option<&Path>,
+    target_location: Option<String>,
+    format: debtmap::cli::OutputFormat,
+    output: Option<&Path>,
+) -> Result<()> {
+    use debtmap::comparison::{Comparator, PlanParser};
+    use debtmap::priority::UnifiedAnalysis;
+    use std::fs;
+
+    // Extract target location from plan or use explicit location
+    let target = if let Some(plan_path) = plan {
+        Some(PlanParser::extract_target_location(plan_path)?)
+    } else {
+        target_location
+    };
+
+    // Load analysis results
+    let before_content = fs::read_to_string(before)?;
+    let before_results: UnifiedAnalysis = serde_json::from_str(&before_content)?;
+
+    let after_content = fs::read_to_string(after)?;
+    let after_results: UnifiedAnalysis = serde_json::from_str(&after_content)?;
+
+    // Perform comparison
+    let comparator = Comparator::new(before_results, after_results, target);
+    let comparison = comparator.compare()?;
+
+    // Output results
+    let output_str = match format {
+        debtmap::cli::OutputFormat::Json => serde_json::to_string_pretty(&comparison)?,
+        debtmap::cli::OutputFormat::Markdown => format_comparison_markdown(&comparison),
+        debtmap::cli::OutputFormat::Terminal => {
+            print_comparison_terminal(&comparison);
+            return Ok(());
+        }
+    };
+
+    // Write to file or stdout
+    if let Some(output_path) = output {
+        fs::write(output_path, output_str)?;
+    } else {
+        println!("{}", output_str);
+    }
+
+    Ok(())
+}
+
+// Format comparison as markdown
+fn format_comparison_markdown(comparison: &debtmap::comparison::ComparisonResult) -> String {
+    use debtmap::comparison::{DebtTrend, TargetStatus};
+
+    let mut md = String::new();
+
+    md.push_str("# Debtmap Comparison Report\n\n");
+    md.push_str(&format!(
+        "**Date**: {}\n\n",
+        comparison.metadata.comparison_date
+    ));
+
+    if let Some(target) = &comparison.target_item {
+        md.push_str("## Target Item Analysis\n\n");
+
+        let status_icon = match target.status {
+            TargetStatus::Resolved => "✅",
+            TargetStatus::Improved => "✅",
+            TargetStatus::Unchanged => "⚠️",
+            TargetStatus::Regressed => "❌",
+            TargetStatus::NotFoundBefore | TargetStatus::NotFound => "❓",
+        };
+
+        md.push_str(&format!(
+            "{} **Status**: {:?}\n\n",
+            status_icon, target.status
+        ));
+        md.push_str(&format!("**Location**: `{}`\n\n", target.location));
+
+        md.push_str("### Before\n");
+        md.push_str(&format!("- **Score**: {:.1}\n", target.before.score));
+        md.push_str(&format!(
+            "- **Complexity**: Cyclomatic {}, Cognitive {}\n",
+            target.before.cyclomatic_complexity, target.before.cognitive_complexity
+        ));
+        md.push_str(&format!("- **Coverage**: {:.1}%\n", target.before.coverage));
+        md.push_str(&format!(
+            "- **Function Length**: {} lines\n\n",
+            target.before.function_length
+        ));
+
+        if let Some(after_metrics) = &target.after {
+            md.push_str("### After\n");
+            md.push_str(&format!("- **Score**: {:.1}\n", after_metrics.score));
+            md.push_str(&format!(
+                "- **Complexity**: Cyclomatic {}, Cognitive {}\n",
+                after_metrics.cyclomatic_complexity, after_metrics.cognitive_complexity
+            ));
+            md.push_str(&format!("- **Coverage**: {:.1}%\n", after_metrics.coverage));
+            md.push_str(&format!(
+                "- **Function Length**: {} lines\n\n",
+                after_metrics.function_length
+            ));
+        }
+
+        md.push_str("### Improvements\n");
+        md.push_str(&format!(
+            "- Score reduced by **{:.1}%**\n",
+            target.improvements.score_reduction_pct
+        ));
+        md.push_str(&format!(
+            "- Complexity reduced by **{:.1}%**\n",
+            target.improvements.complexity_reduction_pct
+        ));
+        md.push_str(&format!(
+            "- Coverage improved by **{:.1}%**\n\n",
+            target.improvements.coverage_improvement_pct
+        ));
+    }
+
+    md.push_str("## Project Health\n\n");
+
+    let trend_icon = match comparison.summary.overall_debt_trend {
+        DebtTrend::Improving => "📉",
+        DebtTrend::Stable => "➡️",
+        DebtTrend::Regressing => "📈",
+    };
+
+    md.push_str(&format!(
+        "### Overall Trend: {} {:?}\n\n",
+        trend_icon, comparison.summary.overall_debt_trend
+    ));
+    md.push_str(&format!(
+        "- Total debt: {:.1} → {:.1} ({:+.1}%)\n",
+        comparison.project_health.before.total_debt_score,
+        comparison.project_health.after.total_debt_score,
+        comparison.project_health.changes.debt_score_change_pct
+    ));
+    md.push_str(&format!(
+        "- Critical items: {} → {} ({:+})\n",
+        comparison.project_health.before.critical_items,
+        comparison.project_health.after.critical_items,
+        comparison.project_health.changes.critical_items_change
+    ));
+
+    if !comparison.regressions.is_empty() {
+        md.push_str(&format!(
+            "\n⚠️ {} new critical item(s) detected\n\n",
+            comparison.regressions.len()
+        ));
+
+        md.push_str("### Regressions\n\n");
+        for reg in &comparison.regressions {
+            md.push_str(&format!("- `{}` (score: {:.1})\n", reg.location, reg.score));
+        }
+    } else {
+        md.push_str("\n✅ No new critical items introduced\n");
+    }
+
+    md.push_str("\n## Summary\n\n");
+    if comparison.summary.target_improved {
+        md.push_str("✅ Target item significantly improved\n");
+    }
+    if comparison.summary.new_critical_count == 0 {
+        md.push_str("✅ No regressions detected\n");
+    }
+    match comparison.summary.overall_debt_trend {
+        DebtTrend::Improving => md.push_str("✅ Overall project health improved\n"),
+        DebtTrend::Stable => md.push_str("➡️ Overall project health stable\n"),
+        DebtTrend::Regressing => md.push_str("⚠️ Overall project health declined\n"),
+    }
+
+    md
+}
+
+// Print comparison to terminal
+fn print_comparison_terminal(comparison: &debtmap::comparison::ComparisonResult) {
+    println!("{}", format_comparison_markdown(comparison));
 }
