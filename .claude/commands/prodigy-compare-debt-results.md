@@ -41,34 +41,32 @@ Analyze the difference between before and after debtmap results to quantify tech
 
 ## Process
 
-**CRITICAL**: This is a Rust project. Use shell commands with jq for JSON processing. Do NOT create Python scripts.
+**CRITICAL**: Use the `debtmap compare` command for efficient comparison. This reduces processing overhead from 40MB JSON files to <10KB output (99.975% reduction).
 
-1. **Load and Parse JSON Files**
-   - Read the before and after debtmap.json files using jq
-   - Parse the JSON structures with jq queries
+1. **Run Debtmap Compare Command**
+   ```bash
+   cargo run --release -- compare \
+     --before <before-path> \
+     --after <after-path> \
+     --output comparison-result.json \
+     --format json
+   ```
 
-2. **Calculate Overall Metrics**
-   - Compare total debt scores
-   - Count total items before/after
-   - Calculate percentage improvements
+   This command:
+   - Efficiently compares large debtmap analyses
+   - Identifies resolved, improved, worsened, and new items
+   - Calculates project health metrics
+   - Generates summary statistics
 
-3. **Analyze Item-Level Changes**
-   - Match items by location (file, function, line)
-   - Identify:
-     - Items completely resolved (no longer in after)
-     - Items with reduced scores
-     - Items with increased scores (regression)
-     - New items introduced
+2. **Parse Comparison Results**
+   - Read the comparison-result.json output
+   - Extract key metrics from structured output:
+     - `project_health`: Overall project metrics before/after
+     - `improvements`: Items that were resolved or improved
+     - `regressions`: Items that worsened or new items added
+     - `summary`: High-level statistics and status
 
-4. **Category Analysis**
-   - Group improvements by debt type:
-     - Complexity debt
-     - Duplication debt
-     - Coverage debt
-     - Dependency debt
-   - Show which categories improved most
-
-5. **Generate Summary Report**
+3. **Generate Summary Report**
    Format a concise summary for the commit message:
    ```
    Technical Debt Improvements:
@@ -127,45 +125,50 @@ Generate a concise, markdown-formatted summary suitable for inclusion in a git c
 - If JSON structure is unexpected, provide details
 - Handle cases where items may have moved (line number changes)
 
-## Example Implementation Using Shell and jq
+## Example Implementation Using Debtmap Compare
 
-**IMPORTANT**: Use shell commands with jq for JSON processing. Do NOT create Python scripts in this Rust project.
+**IMPORTANT**: Use the `debtmap compare` command instead of manual jq processing. This is more efficient and accurate.
 
 ```bash
-# Example shell implementation using jq
-# Load total scores
-BEFORE_SCORE=$(jq -r '.total_debt_score // 0' debtmap.json)
-AFTER_SCORE=$(jq -r '.total_debt_score // 0' debtmap-after.json)
+# Step 1: Run debtmap compare
+cargo run --release -- compare \
+  --before "$BEFORE_PATH" \
+  --after "$AFTER_PATH" \
+  --output comparison-result.json \
+  --format json
 
-# Count items
-BEFORE_COUNT=$(jq -r '.items | length' debtmap.json)
-AFTER_COUNT=$(jq -r '.items | length' debtmap-after.json)
+# Step 2: Extract summary information from comparison result
+RESOLVED_COUNT=$(jq -r '.summary.resolved_count' comparison-result.json)
+IMPROVED_COUNT=$(jq -r '.summary.total_improvements' comparison-result.json)
+WORSENED_COUNT=$(jq -r '.summary.total_regressions' comparison-result.json)
+STATUS=$(jq -r '.summary.status' comparison-result.json)
 
-# Calculate percentage improvement
-IMPROVEMENT=$(echo "scale=1; (($BEFORE_SCORE - $AFTER_SCORE) / $BEFORE_SCORE) * 100" | bc)
+# Step 3: Extract project health metrics
+BEFORE_ITEMS=$(jq -r '.project_health.total_items_before' comparison-result.json)
+AFTER_ITEMS=$(jq -r '.project_health.total_items_after' comparison-result.json)
+BEFORE_HIGH=$(jq -r '.project_health.high_priority_before' comparison-result.json)
+AFTER_HIGH=$(jq -r '.project_health.high_priority_after' comparison-result.json)
 
-# Format the commit message
+# Step 4: Format the commit message
 cat <<EOF
 fix: eliminate technical debt items via MapReduce
 
 Processed debt items in parallel:
-- Successfully fixed: ${SUCCESSFUL} items  
+- Successfully fixed: ${SUCCESSFUL} items
 - Failed to fix: ${FAILED} items
 - Total items processed: ${TOTAL}
 
 Technical Debt Improvements:
-- Total debt score: ${BEFORE_SCORE} → ${AFTER_SCORE} (-${IMPROVEMENT}%)
-- Total items: ${BEFORE_COUNT} → ${AFTER_COUNT}
+- Total items: ${BEFORE_ITEMS} → ${AFTER_ITEMS}
+- High priority items: ${BEFORE_HIGH} → ${AFTER_HIGH}
+- Items resolved: ${RESOLVED_COUNT}
+- Items improved: ${IMPROVED_COUNT}
+- Status: ${STATUS}
 EOF
 
-# Create the git commit
+# Step 5: Create the git commit
 git add -A
-git commit -m "$(cat <<EOF
-fix: eliminate technical debt items via MapReduce
-
-[Include formatted summary here]
-EOF
-)"
+git commit -m "$(cat comparison-result.json | jq -r '.summary.commit_message // "fix: eliminate technical debt items"')"
 ```
 
 ## Integration Notes
