@@ -2,8 +2,8 @@
 // These tests verify the end-to-end workflow of comparing debtmap analyses
 
 use anyhow::Result;
+use debtmap::comparison::types::{ComparisonResult, DebtTrend, TargetStatus};
 use debtmap::comparison::{Comparator, PlanParser};
-use debtmap::comparison::types::{ComparisonResult, TargetStatus, DebtTrend};
 use debtmap::priority::UnifiedAnalysis;
 use std::fs;
 use std::path::PathBuf;
@@ -26,7 +26,11 @@ fn test_compare_with_improvement() -> Result<()> {
     let target_location = PlanParser::extract_target_location(&plan_path)?;
 
     // Perform comparison
-    let comparator = Comparator::new(before_analysis, after_analysis, Some(target_location.clone()));
+    let comparator = Comparator::new(
+        before_analysis,
+        after_analysis,
+        Some(target_location.clone()),
+    );
     let result = comparator.compare()?;
 
     // Verify the comparison result structure
@@ -150,8 +154,14 @@ fn test_compare_result_serialization() -> Result<()> {
 
     // Deserialize back and verify
     let deserialized: ComparisonResult = serde_json::from_str(&json)?;
-    assert_eq!(deserialized.summary.target_improved, result.summary.target_improved);
-    assert_eq!(deserialized.summary.resolved_count, result.summary.resolved_count);
+    assert_eq!(
+        deserialized.summary.target_improved,
+        result.summary.target_improved
+    );
+    assert_eq!(
+        deserialized.summary.resolved_count,
+        result.summary.resolved_count
+    );
 
     Ok(())
 }
@@ -182,7 +192,7 @@ fn test_plan_parser_api() -> Result<()> {
 fn test_comparison_types_serialization() -> Result<()> {
     // Verify comparison result types can be serialized/deserialized
     use debtmap::comparison::types::{
-        ComparisonMetadata, DebtTrend, TargetStatus, ComparisonSummary
+        ComparisonMetadata, ComparisonSummary, DebtTrend, TargetStatus,
     };
     use serde_json;
 
