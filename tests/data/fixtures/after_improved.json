@@ -1,0 +1,32 @@
+{
+  "items": [],
+  "file_items": [],
+  "total_impact": {
+    "coverage_improvement": 0.0,
+    "lines_reduction": 0,
+    "complexity_reduction": 0.0,
+    "risk_reduction": 0.0
+  },
+  "total_debt_score": 0.0,
+  "debt_density": 0.0,
+  "total_lines_of_code": 0,
+  "call_graph": {
+    "nodes": {},
+    "edges": [],
+    "caller_index": {},
+    "callee_index": {}
+  },
+  "data_flow_graph": {
+    "call_graph": {
+      "nodes": {},
+      "edges": [],
+      "caller_index": {},
+      "callee_index": {}
+    },
+    "variable_deps": {},
+    "data_transformations": {},
+    "io_operations": {},
+    "purity_analysis": {}
+  },
+  "overall_coverage": null
+}
