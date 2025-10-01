@@ -22,7 +22,7 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
     {
         Some(0) => {
             // DEBTMAP_MAX_FILES=0 means no limit
-            (files.len(), files.as_ref())
+            (files.len(), files)
         }
         Some(max_files) => {
             let limited = files.len().min(max_files);
@@ -37,7 +37,7 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
         }
         None => {
             // No limit by default
-            (files.len(), files.as_ref())
+            (files.len(), files)
         }
     };
 

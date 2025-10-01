@@ -88,6 +88,7 @@ fn benchmark_sequential_analysis(c: &mut Criterion) {
                         aggregation_method: None,
                         min_problematic: None,
                         no_god_object: false,
+                        formatting_config: Default::default(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -131,6 +132,7 @@ fn benchmark_parallel_analysis(c: &mut Criterion) {
                         aggregation_method: None,
                         min_problematic: None,
                         no_god_object: false,
+                        formatting_config: Default::default(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -173,6 +175,7 @@ fn benchmark_parallel_with_job_counts(c: &mut Criterion) {
                         aggregation_method: None,
                         min_problematic: None,
                         no_god_object: false,
+                        formatting_config: Default::default(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -216,6 +219,7 @@ fn benchmark_file_counts(c: &mut Criterion) {
                         aggregation_method: None,
                         min_problematic: None,
                         no_god_object: false,
+                        formatting_config: Default::default(),
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);

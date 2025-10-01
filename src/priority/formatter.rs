@@ -254,9 +254,8 @@ fn format_tiered_terminal(
     writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
-        "{} {}",
-        formatter.emoji("📊", "[SUMMARY]"),
-        "DEBT DISTRIBUTION"
+        "{} DEBT DISTRIBUTION",
+        formatter.emoji("📊", "[SUMMARY]")
     )
     .unwrap();
 
@@ -388,7 +387,7 @@ fn format_tier_terminal(
                     output,
                     "  {} ... and {} more items in this tier",
                     formatter.emoji("📋", "[+]"),
-                    remaining.to_string()
+                    remaining
                 )
                 .unwrap();
             }
@@ -554,8 +553,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
 
     writeln!(
         output,
-        "📉 {} (items {}-{})",
-        format!("BOTTOM {count} ITEMS"),
+        "📉 BOTTOM {count} ITEMS (items {}-{})",
         total_items.saturating_sub(count - 1),
         total_items
     )
@@ -1124,7 +1122,7 @@ fn format_scoring_and_dependencies(
             formatter
                 .emoji("└─ DEPENDENCIES:", "└─ DEPENDENCIES:")
                 .bright_blue(),
-            function_count.to_string()
+            function_count
         )
         .unwrap();
     }
@@ -1149,7 +1147,7 @@ fn format_file_priority_item(
     writeln!(
         output,
         "#{} {} [{}]",
-        rank.to_string(),
+        rank,
         format!("SCORE: {}", score_formatter::format_score(item.score)).bright_yellow(),
         format!("{} - {}", severity, type_label)
             .color(severity_color)
@@ -1405,7 +1403,7 @@ fn generate_formatted_sections(context: &FormatContext) -> FormattedSections {
 fn format_header_section(context: &FormatContext) -> String {
     format!(
         "#{} {} [{}]",
-        context.rank.to_string(),
+        context.rank,
         format!("SCORE: {}", score_formatter::format_score(context.score)).bright_yellow(),
         context
             .severity_info
@@ -1453,10 +1451,10 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
     Some(format!(
         "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
         "├─ COMPLEXITY:".bright_blue(),
-        context.complexity_info.cyclomatic.to_string().yellow(),
-        context.complexity_info.branch_count.to_string().yellow(),
-        context.complexity_info.cognitive.to_string().yellow(),
-        context.complexity_info.nesting.to_string().yellow()
+        format!("{}", context.complexity_info.cyclomatic).yellow(),
+        format!("{}", context.complexity_info.branch_count).yellow(),
+        format!("{}", context.complexity_info.cognitive).yellow(),
+        format!("{}", context.complexity_info.nesting).yellow()
     ))
 }
 
@@ -1469,8 +1467,8 @@ fn format_dependencies_section(context: &FormatContext) -> Option<String> {
     let mut section = format!(
         "{} {} upstream, {} downstream",
         "├─ DEPENDENCIES:".bright_blue(),
-        context.dependency_info.upstream.to_string(),
-        context.dependency_info.downstream.to_string()
+        context.dependency_info.upstream,
+        context.dependency_info.downstream
     );
 
     // Add callers information
