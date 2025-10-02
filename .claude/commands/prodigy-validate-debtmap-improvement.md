@@ -1,29 +1,29 @@
 # Validate Debtmap Improvement Command
 
-Validates that technical debt improvements have been made by comparing debtmap JSON output before and after changes.
+Validates that technical debt improvements have been made by analyzing the compact comparison output from `debtmap compare`.
 
 Arguments: $ARGUMENTS
 
 ## Usage
 
 ```
-/prodigy-validate-debtmap-improvement --before <before-json-file> --after <after-json-file> --plan <plan-file> [--output <filepath>]
+/prodigy-validate-debtmap-improvement --comparison <comparison-json-file> [--output <filepath>]
 ```
 
 Examples:
-- `/prodigy-validate-debtmap-improvement --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/debtmap-validation.json`
+- `/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json`
 
 ## What This Command Does
 
-1. **Compares Debtmap States**
-   - Loads JSON output from before and after the fix attempt
-   - Identifies changes in debt items and overall metrics
+1. **Reads Compact Comparison**
+   - Loads JSON comparison output from `debtmap compare` command
+   - Contains target item analysis, regressions, improvements, and project health
    - Validates that improvements were made
 
 2. **Analyzes Improvement Quality**
-   - Checks if high-priority debt items were addressed
-   - Validates that technical debt score improved
-   - Ensures no new critical issues were introduced
+   - Checks if target debt item was successfully improved
+   - Validates that no new critical issues were introduced (regressions)
+   - Ensures overall project technical debt improved
 
 3. **Outputs Validation Result**
    - Produces JSON-formatted validation result for Prodigy to parse
@@ -32,209 +32,137 @@ Examples:
 
 ## Execution Process
 
-### Step 1: Parse Arguments, Load Data, and Identify Target Item
+### Step 1: Parse Arguments and Load Comparison
 
 The command will:
 - Parse $ARGUMENTS to extract:
-  - `--before` parameter with path to pre-fix debtmap JSON
-  - `--after` parameter with path to post-fix debtmap JSON
-  - **`--plan` parameter with path to implementation plan (REQUIRED)**
+  - `--comparison` parameter with path to comparison JSON (from `debtmap compare`)
   - `--output` parameter with filepath (required when called from workflow)
 - If missing parameters, fail with error message
 - If no `--output` parameter, default to `.prodigy/debtmap-validation.json`
-- Load both JSON files and validate they contain debtmap output
+- Load comparison JSON and validate it contains comparison output
 
-**CRITICAL - Identify the target debt item:**
-1. Read the implementation plan file (markdown)
-2. Extract the target location from the plan:
-   - Look for "**Location**:" or "Problem location" in the plan
-   - Parse format: `./path/to/file.rs:function_name:line_number`
-   - Example: `./src/builders/call_graph.rs:process_python_files_for_call_graph_with_types:120`
-3. This is the ONLY item to validate - ignore all other debt items
+### Step 2: Analyze Target Item Improvement
 
-### Step 2: Extract Target Item from Before/After States
+The comparison.json contains a `target_item` field with detailed analysis:
 
-**CRITICAL**: Only compare the single target item identified in Step 1.
-
-1. **Find target in before JSON:**
-   - Search `before['items']` for item matching target location
-   - Match on: `location.file`, `location.function`, `location.line`
-   - Store as `before_target_item`
-
-2. **Find target in after JSON:**
-   - Search `after['items']` for item matching target location
-   - Store as `after_target_item`
-   - If not found → item was completely resolved! (100% improvement)
-
-3. **Extract metrics for comparison:**
-   - From `before_target_item`:
-     - Score: `unified_score.final_score`
-     - Complexity: `debt_type` details (cyclomatic, cognitive)
-     - Coverage: from `debt_type.TestingGap.coverage` if present
-   - From `after_target_item`:
-     - Same metrics as above
-
-### Step 3: Calculate Target Item Improvement
-
-Compare ONLY the target item's metrics:
-
-**If target item resolved (not in after):**
-- Item completely eliminated from debt report
-- Improvement score: 100%
-- Status: "complete"
-
-**If target item still present:**
-Calculate improvement based on:
-1. **Score reduction**: `(before_score - after_score) / before_score * 100`
-2. **Complexity reduction**: Check if cyclomatic/cognitive improved
-3. **Coverage improvement**: Check if test coverage increased
-4. **Metrics changes**: Any other relevant metrics that improved
-
-### Step 4: Calculate Improvement Score (ENHANCED - Target + Project Health)
-
-**CRITICAL**: Validate both target improvement AND overall project health to catch regressions.
-
-**Why**: Refactoring can shift debt to new locations. Must check:
-1. Target item improved (primary goal)
-2. No new critical debt introduced (regression check)
-3. Overall project debt didn't increase (holistic view)
-
-```python
-# 1. Find and compare target item
-target_before = find_item(before, target_location)
-target_after = find_item(after, target_location)
-
-if not target_after:
-    # Item completely resolved
-    target_score_reduction = 100.0
-else:
-    # Calculate target item improvements
-    before_score = target_before['unified_score']['final_score']
-    after_score = target_after['unified_score']['final_score']
-    target_score_reduction = max(0, (before_score - after_score) / before_score * 100)
-
-    before_complexity = get_complexity(target_before)
-    after_complexity = get_complexity(target_after)
-    target_complexity_reduction = max(0, (before_complexity - after_complexity) / before_complexity * 100)
-
-    before_coverage = get_coverage(target_before)
-    after_coverage = get_coverage(target_after)
-    target_coverage_improvement = max(0, after_coverage - before_coverage)
-
-# 2. Check for NEW critical debt items (regression detection)
-before_critical_items = {item_key(i) for i in before['items'] if i['unified_score']['final_score'] >= 60.0}
-after_critical_items = {item_key(i) for i in after['items'] if i['unified_score']['final_score'] >= 60.0}
-new_critical_items = after_critical_items - before_critical_items
-
-# Calculate regression penalty
-regression_penalty = min(100, len(new_critical_items) * 20)  # -20% per new critical item
-
-# 3. Check overall project debt
-total_debt_before = before['total_debt_score']
-total_debt_after = after['total_debt_score']
-total_debt_improvement = max(0, (total_debt_before - total_debt_after) / total_debt_before * 100) if total_debt_before > 0 else 0
-
-# 4. Calculate composite improvement score
-# Primary: Target item improved (50% weight)
-all_target_improvements = [target_score_reduction, target_complexity_reduction, target_coverage_improvement]
-max_target_improvement = max(all_target_improvements)
-other_target_improvements = sum(all_target_improvements) - max_target_improvement
-target_component = max_target_improvement * 0.7 + other_target_improvements * 0.15
-
-# Secondary: Project health (30% weight)
-project_health_component = total_debt_improvement if regression_penalty == 0 else 0
-
-# Tertiary: No regressions (20% weight)
-no_regression_component = 100 - regression_penalty
-
-# Final score
-improvement_score = (
-    target_component * 0.5 +           # 50%: Target improved
-    project_health_component * 0.3 +   # 30%: Overall debt improved
-    no_regression_component * 0.2      # 20%: No new critical items
-)
-
-status = 'complete' if improvement_score >= 75.0 else 'incomplete'
-```
-
-**Key features:**
-- ✅ Target item is primary focus (50% weight)
-- ✅ Detects and penalizes new critical debt items
-- ✅ Validates overall project health
-- ✅ 75% threshold achievable with good refactoring + no regressions
-- ✅ Fails if refactoring creates more problems than it solves
-
-### Step 5: Identify Improvement Gaps (ENHANCED - Target + Regressions)
-
-If improvement score < threshold (75%), identify specific gaps:
-
-**A. Target Item Gaps**:
-
-1. **Target Item Still Present** (if item not resolved):
-   - Include target item location and current metrics
-   - Show what changed vs what didn't change
-   - Identify which metrics need more work
-
-2. **Insufficient Score Reduction**:
-   - Target item score reduced by less than 50%
-   - Example: 81.9 → 70.0 (14.5% reduction) - need ~50% for good score
-   - Suggest: More aggressive refactoring needed
-
-3. **Complexity Not Reduced Enough**:
-   - Cyclomatic/cognitive complexity still high
-   - Example: 17 → 12 (29% reduction) - need ~40% for good score
-   - Suggest: Extract more pure functions, reduce nesting
-
-4. **Coverage Not Improved**:
-   - Test coverage still low or unchanged
-   - Example: 0% → 0% (no improvement)
-   - Suggest: Add comprehensive tests for all branches
-
-**B. Regression Gaps** (NEW - Critical!):
-
-5. **New Critical Debt Items Introduced**:
-   - List all new debt items with score >= 60.0
-   - Show location, score, and debt type
-   - Example: "Refactoring created 3 new complex helper functions"
-   - Suggest: Simplify extracted functions, ensure they're pure
-
-6. **Overall Project Debt Increased**:
-   - Total debt score went UP instead of down
-   - Example: 5,234 → 5,456 (+4.2%)
-   - Suggest: Review refactoring approach - may be shifting rather than reducing debt
-
-**Gap structure including regressions:**
 ```json
 {
-  "target_item_not_improved": {
-    "description": "Target debt item still has high score",
-    "location": "./src/file.rs:function:line",
-    "severity": "high",
-    "before_score": 81.9,
-    "after_score": 75.0,
-    "score_reduction_pct": 8.4,
-    "suggested_fix": "Need more aggressive refactoring - extract pure functions"
-  },
-  "new_critical_debt_0": {
-    "description": "New high-complexity helper function introduced",
-    "location": "./src/file.rs:process_with_cross_module:156",
-    "severity": "critical",
-    "score": 65.3,
-    "debt_type": "Complexity",
-    "suggested_fix": "Simplify this extracted function - break into smaller pieces"
-  },
-  "project_debt_increased": {
-    "description": "Overall project technical debt increased",
-    "severity": "high",
-    "before_total": 5234.2,
-    "after_total": 5456.8,
-    "change_pct": 4.2,
-    "suggested_fix": "Review refactoring approach - may be shifting debt instead of reducing it"
+  "target_item": {
+    "location": "src/analyzers/rust_analyzer.rs:build_call_graph:523",
+    "before": {
+      "unified_score": { "final_score": 81.9 },
+      "complexity": { "cognitive": 22 }
+    },
+    "after": {
+      "unified_score": { "final_score": 15.2 },
+      "complexity": { "cognitive": 3 }
+    },
+    "improvement": {
+      "score_reduction": 66.7,
+      "score_reduction_percent": 81.4,
+      "complexity_reduction": 19,
+      "status": "significantly_improved"
+    }
   }
 }
 ```
 
-### Step 6: Write Validation Results
+Extract:
+- **Target score improvement**: `improvement.score_reduction_percent`
+- **Target status**: `improvement.status` (significantly_improved, moderately_improved, slightly_improved, unchanged, degraded)
+- **Complexity reduction**: `improvement.complexity_reduction`
+
+### Step 3: Check for Regressions
+
+The comparison.json contains a `regressions` array with new critical debt items:
+
+```json
+{
+  "regressions": [
+    {
+      "location": "src/analyzers/rust_analyzer.rs:process_helper:589",
+      "score": 65.3,
+      "description": "New complex helper function introduced during refactoring"
+    }
+  ]
+}
+```
+
+Calculate regression penalty:
+- Each new critical item (score >= 60) reduces improvement score by 20%
+- Maximum regression penalty: 100% (complete failure)
+
+### Step 4: Analyze Project Health
+
+The comparison.json contains overall project metrics:
+
+```json
+{
+  "project_health": {
+    "total_debt_score_before": 1247.3,
+    "total_debt_score_after": 1182.6,
+    "improvement": 64.7,
+    "improvement_percent": 5.2,
+    "items_before": 1293,
+    "items_after": 1285,
+    "items_resolved": 12,
+    "items_new": 4
+  }
+}
+```
+
+Extract:
+- **Overall debt improvement**: `project_health.improvement_percent`
+- **Items resolved vs new**: Compare `items_resolved` vs `items_new`
+
+### Step 5: Calculate Improvement Score
+
+Calculate improvement percentage using the formula:
+
+```
+target_component = target_item.improvement.score_reduction_percent
+regression_penalty = min(100, len(regressions) * 20)
+no_regression_component = max(0, 100 - regression_penalty)
+project_health_component = min(100, project_health.improvement_percent * 10)
+
+improvement_score = (
+    target_component * 0.5 +           # 50%: Target item improved
+    project_health_component * 0.3 +   # 30%: Overall debt improved
+    no_regression_component * 0.2      # 20%: No new critical items
+)
+```
+
+Where:
+- `target_component` = 0-100 based on target item score reduction
+- `no_regression_component` = 100 if no regressions, 80 for 1 regression, 60 for 2, etc.
+- `project_health_component` = scaled overall debt improvement (5% improvement = 50 points)
+
+### Step 6: Identify Improvement Gaps
+
+If improvement score < threshold (75%), identify specific gaps from the comparison:
+
+1. **Insufficient Target Improvement**:
+   - Target item status is "unchanged" or "slightly_improved"
+   - Score reduction < 50%
+   - Complexity still above threshold
+
+2. **Regression Issues**:
+   - New critical debt items introduced (from `regressions` array)
+   - Overall project debt increased instead of decreased
+   - New complex functions created during refactoring
+
+3. **Incomplete Implementation**:
+   - Target item improved but not enough (e.g., 40% vs 75% goal)
+   - Some tests added but coverage still insufficient
+   - Function shortened but still too complex
+
+4. **Project Health Degradation**:
+   - More new items than resolved items
+   - Overall debt score increased
+   - Average complexity increased
+
+### Step 7: Write Validation Results
 
 **CRITICAL**: Write validation results to the output file:
 
@@ -249,91 +177,42 @@ If improvement score < threshold (75%), identify specific gaps:
 
 3. **Do NOT output JSON to stdout** - Prodigy will read from the file
 
-The JSON format (ENHANCED - includes regression detection):
+The JSON format is:
 
-**Successful validation (target improved, no regressions):**
 ```json
 {
   "completion_percentage": 82.0,
-  "status": "complete",
-  "target_item": {
-    "location": "./src/builders/call_graph.rs:process_python_files_for_call_graph_with_types:120",
-    "before_score": 81.9,
-    "after_score": 14.5,
-    "score_reduction_pct": 82.3,
-    "complexity_reduction_pct": 64.7,
-    "coverage_improvement_pct": 50.0
-  },
-  "project_health": {
-    "total_debt_before": 5234.2,
-    "total_debt_after": 4987.6,
-    "improvement_pct": 4.7,
-    "new_critical_items": 0,
-    "regression_penalty": 0
-  },
-  "improvements": [
-    "Target item score reduced from 81.9 to 14.5 (82.3% reduction)",
-    "Cyclomatic complexity reduced from 17 to 6 (64.7% reduction)",
-    "Test coverage improved from 0% to 50%",
-    "Overall project debt reduced by 4.7%",
-    "No new critical debt items introduced"
-  ],
-  "remaining_issues": [],
-  "gaps": {}
-}
-```
-
-**Failed validation (regressions detected):**
-```json
-{
-  "completion_percentage": 45.0,
   "status": "incomplete",
-  "target_item": {
-    "location": "./src/builders/call_graph.rs:process_python_files_for_call_graph_with_types:120",
-    "before_score": 81.9,
-    "after_score": 15.2,
-    "score_reduction_pct": 81.4
-  },
-  "project_health": {
-    "total_debt_before": 5234.2,
-    "total_debt_after": 5456.8,
-    "improvement_pct": -4.2,
-    "new_critical_items": 3,
-    "regression_penalty": 60
-  },
   "improvements": [
-    "Target item score reduced from 81.9 to 15.2 (81.4% reduction)"
+    "Target item score reduced by 66.7% (81.9 → 15.2)",
+    "Reduced cognitive complexity by 19 (22 → 3)",
+    "Overall project debt reduced by 5.2%"
   ],
   "remaining_issues": [
-    "3 new critical debt items introduced (regression!)",
-    "Overall project debt increased by 4.2%",
-    "Refactoring shifted complexity to helper functions"
+    "1 new critical debt item introduced during refactoring"
   ],
   "gaps": {
-    "new_critical_debt_0": {
-      "description": "New high-complexity helper function",
-      "location": "./src/builders/call_graph.rs:process_with_cross_module:156",
-      "severity": "critical",
-      "score": 65.3,
-      "debt_type": "Complexity",
-      "suggested_fix": "Simplify this extracted function"
-    },
-    "new_critical_debt_1": {
-      "description": "New high-complexity helper function",
-      "location": "./src/builders/call_graph.rs:handle_cross_module_fallback:189",
-      "severity": "critical",
-      "score": 58.7,
-      "debt_type": "Complexity",
-      "suggested_fix": "Break this into smaller pure functions"
-    },
-    "project_debt_increased": {
-      "description": "Overall project debt increased",
+    "regression_introduced": {
+      "description": "New complex helper function introduced during refactoring",
+      "location": "src/analyzers/rust_analyzer.rs:process_helper:589",
       "severity": "high",
-      "before_total": 5234.2,
-      "after_total": 5456.8,
-      "change_pct": 4.2,
-      "suggested_fix": "Review refactoring - may be shifting debt instead of reducing it"
+      "suggested_fix": "Simplify process_helper using pure functional patterns",
+      "current_score": 65.3
     }
+  },
+  "target_summary": {
+    "location": "src/analyzers/rust_analyzer.rs:build_call_graph:523",
+    "score_before": 81.9,
+    "score_after": 15.2,
+    "improvement_percent": 81.4,
+    "status": "significantly_improved"
+  },
+  "project_summary": {
+    "total_debt_before": 1247.3,
+    "total_debt_after": 1182.6,
+    "improvement_percent": 5.2,
+    "items_resolved": 12,
+    "items_new": 4
   }
 }
 ```
@@ -342,33 +221,91 @@ The JSON format (ENHANCED - includes regression detection):
 
 ### Improvement Scoring
 
-- **90-100%**: Excellent improvement - major debt resolved, no regression
-- **75-89%**: Good improvement - significant progress on high-priority items
-- **60-74%**: Moderate improvement - some progress but gaps remain
-- **40-59%**: Minor improvement - mostly cosmetic changes
-- **Below 40%**: Insufficient improvement or regression
+- **90-100%**: Excellent improvement - target resolved, no regressions, project health improved
+- **75-89%**: Good improvement - significant target progress, minimal regressions
+- **60-74%**: Moderate improvement - target improved but regressions or incomplete work
+- **40-59%**: Minor improvement - target barely improved or significant regressions
+- **Below 40%**: Insufficient improvement or major regressions
 
-### Priority Categories
+### Component Weights
 
-1. **Critical (Score >= 8)**
-   - Must be addressed for high completion percentage
-   - Each unresolved critical item reduces score by 15-20%
-   - New critical items reduce score by 25%
+1. **Target Item (50%)**
+   - Primary goal - must make significant progress on target debt item
+   - Score reduction >= 75% → 100 points
+   - Score reduction 50-75% → 70 points
+   - Score reduction 25-50% → 40 points
+   - Score reduction < 25% → 10 points
 
-2. **High Priority (Score 6-8)**
-   - Important for good completion percentage
-   - Each unresolved item reduces score by 8-12%
-   - Progress on these items counts significantly
+2. **Project Health (30%)**
+   - Overall debt should improve or stay stable
+   - 5% improvement → 50 points
+   - 0% change → 0 points
+   - Negative change → negative points (capped at -100)
 
-3. **Medium Priority (Score 4-6)**
-   - Nice to have improvements
-   - Each unresolved item reduces score by 3-5%
-   - Can compensate for other gaps
+3. **No Regressions (20%)**
+   - New critical items significantly impact score
+   - 0 regressions → 100 points
+   - 1 regression → 80 points
+   - 2 regressions → 60 points
+   - 3+ regressions → 40 points or less
 
-4. **Low Priority (Score < 4)**
-   - Minimal impact on overall score
-   - Useful for edge case improvements
-   - Each unresolved item reduces score by 1-2%
+## Comparison JSON Format
+
+The comparison.json file is generated by `debtmap compare` and contains:
+
+```json
+{
+  "metadata": {
+    "before_file": ".prodigy/debtmap-before.json",
+    "after_file": ".prodigy/debtmap-after.json",
+    "plan_file": ".prodigy/IMPLEMENTATION_PLAN.md",
+    "timestamp": "2025-10-01T10:30:00Z"
+  },
+  "target_item": {
+    "location": "file:function:line",
+    "before": { /* full debt item */ },
+    "after": { /* full debt item or null if resolved */ },
+    "improvement": {
+      "score_reduction": 66.7,
+      "score_reduction_percent": 81.4,
+      "complexity_reduction": 19,
+      "status": "significantly_improved"
+    }
+  },
+  "project_health": {
+    "total_debt_score_before": 1247.3,
+    "total_debt_score_after": 1182.6,
+    "improvement": 64.7,
+    "improvement_percent": 5.2,
+    "items_before": 1293,
+    "items_after": 1285,
+    "items_resolved": 12,
+    "items_new": 4
+  },
+  "regressions": [
+    {
+      "location": "file:function:line",
+      "score": 65.3,
+      "description": "New complex function",
+      "item": { /* full debt item */ }
+    }
+  ],
+  "improvements": [
+    {
+      "location": "file:function:line",
+      "score_before": 72.1,
+      "score_after": 42.3,
+      "improvement": 29.8
+    }
+  ],
+  "summary": {
+    "target_improved": true,
+    "regressions_count": 1,
+    "improvements_count": 8,
+    "net_improvement": true
+  }
+}
+```
 
 ## Automation Mode Behavior
 
@@ -383,8 +320,8 @@ The JSON format (ENHANCED - includes regression detection):
 ## Error Handling
 
 The command will:
-- Handle missing or malformed JSON files gracefully
-- Work with partial debtmap outputs
+- Handle missing or malformed comparison JSON files gracefully
+- Work with partial comparison outputs
 - Provide clear error messages
 - Always output valid JSON (even on errors)
 
@@ -396,13 +333,12 @@ The command will:
   "completion_percentage": 85.0,
   "status": "complete",
   "improvements": [
-    "Resolved 3 of 4 critical debt items",
-    "Reduced project debt score from 6.2 to 4.8",
-    "Added comprehensive test coverage to auth module"
+    "Target item score reduced by 81.4% (81.9 → 15.2)",
+    "Cognitive complexity reduced by 19 points",
+    "Overall project debt reduced by 5.2%",
+    "Resolved 12 debt items, introduced 4 new items"
   ],
-  "remaining_issues": [
-    "1 medium-priority complexity issue in parser.rs"
-  ],
+  "remaining_issues": [],
   "gaps": {}
 }
 ```
@@ -413,43 +349,58 @@ The command will:
   "completion_percentage": 65.0,
   "status": "incomplete",
   "improvements": [
-    "Reduced complexity in 2 functions",
-    "Added some test coverage"
+    "Target item score reduced by 40.2% (81.9 → 49.0)",
+    "Reduced complexity by 8 points"
   ],
   "remaining_issues": [
-    "2 critical debt items unresolved",
-    "New complexity introduced in util.rs"
+    "1 new critical debt item introduced",
+    "Target improvement insufficient (40% vs 75% goal)"
   ],
   "gaps": {
-    "critical_debt_unresolved": {
-      "description": "High-priority authentication function still too complex",
-      "location": "src/auth.rs:authenticate_user:45",
-      "severity": "critical",
-      "suggested_fix": "Extract pure functions for validation logic",
-      "original_score": 9.2,
-      "current_score": 9.2
+    "insufficient_target_improvement": {
+      "description": "Target function still above complexity threshold",
+      "location": "src/analyzers/rust_analyzer.rs:build_call_graph:523",
+      "severity": "medium",
+      "suggested_fix": "Further extract helper functions to reduce complexity below 10",
+      "original_score": 81.9,
+      "current_score": 49.0,
+      "target_score": 20.0
     },
-    "regression_detected": {
-      "description": "New complexity introduced during refactoring",
-      "location": "src/util.rs:process_data:78",
+    "regression_introduced": {
+      "description": "New complex helper function created during refactoring",
+      "location": "src/analyzers/rust_analyzer.rs:process_node:589",
       "severity": "high",
-      "suggested_fix": "Simplify the newly added conditional logic",
-      "original_score": null,
-      "current_score": 7.8
+      "suggested_fix": "Simplify process_node using pure functional patterns",
+      "current_score": 65.3
     }
   }
 }
 ```
 
-### Validation Failure
+### Validation with Major Regressions (35%)
 ```json
 {
-  "completion_percentage": 0.0,
-  "status": "failed",
-  "improvements": [],
-  "remaining_issues": ["Unable to compare: malformed debtmap JSON"],
-  "gaps": {},
-  "raw_output": "Error details here"
+  "completion_percentage": 35.0,
+  "status": "incomplete",
+  "improvements": [
+    "Target item score reduced by 50.1% (81.9 → 40.8)"
+  ],
+  "remaining_issues": [
+    "3 new critical debt items introduced during refactoring",
+    "Overall project debt increased by 2.3%"
+  ],
+  "gaps": {
+    "major_regressions": {
+      "description": "Refactoring created 3 new complex functions",
+      "severity": "critical",
+      "suggested_fix": "Simplify new helper functions or consolidate logic differently",
+      "new_items": [
+        "src/analyzers/rust_analyzer.rs:process_helper_a:589 (score: 67.2)",
+        "src/analyzers/rust_analyzer.rs:process_helper_b:623 (score: 58.1)",
+        "src/analyzers/rust_analyzer.rs:validate_result:701 (score: 62.4)"
+      ]
+    }
+  }
 }
 ```
 
@@ -457,21 +408,20 @@ The command will:
 
 This command is designed to work with Prodigy workflows:
 
-1. **Workflow captures before state**
-2. **Workflow runs debtmap fix command**
-3. **Workflow captures after state**
-4. **This command validates improvement**
-5. **If incomplete, workflow triggers completion logic**
-6. **Process repeats up to max_attempts**
+1. **Workflow captures before state** (debtmap analyze)
+2. **Workflow runs debtmap fix command** (Claude implementation)
+3. **Workflow captures after state** (debtmap analyze)
+4. **Workflow generates comparison** (`debtmap compare`)
+5. **This command validates improvement** (using comparison.json)
+6. **If incomplete, workflow triggers completion logic**
+7. **Process repeats up to max_attempts**
 
 ## Important Implementation Notes
 
-**CRITICAL CHANGES** - This command now validates SINGLE items, not all items:
-
-1. **Parse arguments correctly** - Extract before, after, **plan**, and output paths from $ARGUMENTS
-2. **Read the plan file** to identify the target debt item (file, function, line)
-3. **Filter before/after JSON** to only compare the single target item
-4. **Calculate improvement** based on target item's score/complexity/coverage changes
+1. **Parse arguments correctly** - Extract comparison and output paths from $ARGUMENTS
+2. **Read compact comparison.json** - Much smaller than before/after files (10KB vs 40MB)
+3. **Extract improvement metrics** - Use pre-calculated values from comparison
+4. **Calculate composite score** - 50% target, 30% project health, 20% no regressions
 5. **Write JSON to file**:
    - Use path from `--output` parameter, or default `.prodigy/debtmap-validation.json`
    - Create parent directories if they don't exist
@@ -479,13 +429,7 @@ This command is designed to work with Prodigy workflows:
 6. **Always write valid JSON** to the file, even if validation fails
 7. **Exit code 0** indicates command ran successfully (regardless of validation result)
 8. **Improvement percentage** determines if validation passed based on threshold
-9. **Gap details** should reference ONLY the target item, not other items
-10. **Keep JSON compact** - Prodigy will parse it programmatically
-11. **Do NOT output JSON to stdout** - only progress messages should go to stdout
-12. **Focus on target item metrics** - its score, complexity, coverage only
-
-**Implementation approach:**
-- Use Python script or shell script with jq to parse JSON
-- Match items by comparing `location.file`, `location.function`, `location.line`
-- If target not found in after → 100% improvement (resolved!)
-- If target still present → calculate percentage improvements in each metric
+9. **Gap details** help subsequent commands fix remaining issues
+10. **Do NOT output JSON to stdout** - only progress messages should go to stdout
+11. **Trust comparison.json data** - All analysis already done by `debtmap compare`
+12. **Focus on actionable gaps** - Identify specific remaining work needed

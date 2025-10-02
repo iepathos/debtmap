@@ -7,7 +7,13 @@ debtmap-after.json
 debtmap-report.json
 .metadata/
 .prodigy/validation-result.json
-.prodigy/debt-validation-result.json"
+.prodigy/debt-validation-result.json
+.prodigy/debtmap-before.json
+.prodigy/debtmap-after.json
+.prodigy/comparison.json
+.prodigy/debtmap-validation.json
+.prodigy/plan-validation.json
+.prodigy/IMPLEMENTATION_PLAN.md
 
 # Rust build artifacts
 /target/
