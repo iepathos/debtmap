@@ -165,64 +165,80 @@ impl<'a> PythonErrorHandlingAnalyzer<'a> {
 
     fn analyze_exception_handler(&self, handler: &ast::ExceptHandler) -> Vec<DebtItem> {
         let ast::ExceptHandler::ExceptHandler(h) = handler;
-        let mut items = Vec::new();
 
-        // Check for bare except
+        // Handle bare except case early
         if h.type_.is_none() {
-            items.push(self.create_debt_item(
-                self.current_line,
-                ErrorPattern::BareExcept,
-                "Bare except clause catches all exceptions including system exits",
-            ));
-            // For bare except, still check if handler is empty
-            if self.is_empty_handler(&h.body) {
-                items.push(self.create_debt_item(
-                    self.current_line,
-                    ErrorPattern::EmptyHandler,
-                    "Empty exception handler swallows errors without handling",
-                ));
-            }
-            return items;
+            return self.analyze_bare_except(&h.body);
         }
 
-        // Check for overly broad exception catching
-        if let Some(typ) = &h.type_ {
-            if let Some(pattern) = self.check_broad_exception(typ) {
-                items.push(self.create_debt_item(
-                    self.current_line,
-                    pattern,
-                    "Overly broad exception catching may hide bugs",
-                ));
-            }
+        // Analyze typed exception handler
+        h.type_
+            .as_ref()
+            .map(|typ| self.analyze_typed_exception(typ, &h.body))
+            .unwrap_or_default()
+    }
 
-            // Check for system exception suppression
-            if let Some(pattern) = self.check_system_exception(typ) {
-                items.push(self.create_debt_item(
-                    self.current_line,
-                    pattern,
-                    "System exceptions should not be caught",
-                ));
-            }
-        }
+    fn analyze_bare_except(&self, body: &[ast::Stmt]) -> Vec<DebtItem> {
+        let mut items = vec![self.create_debt_item(
+            self.current_line,
+            ErrorPattern::BareExcept,
+            "Bare except clause catches all exceptions including system exits",
+        )];
 
-        // Check for empty handler (pass or ellipsis only)
-        if self.is_empty_handler(&h.body) {
+        if self.is_empty_handler(body) {
             items.push(self.create_debt_item(
                 self.current_line,
                 ErrorPattern::EmptyHandler,
                 "Empty exception handler swallows errors without handling",
             ));
         }
-        // Check for missing error context (no logging, re-raising, or context)
-        else if !self.has_error_context(&h.body) {
+
+        items
+    }
+
+    fn analyze_typed_exception(&self, typ: &ast::Expr, body: &[ast::Stmt]) -> Vec<DebtItem> {
+        let mut items = Vec::new();
+
+        // Check for broad exceptions
+        if let Some(pattern) = self.check_broad_exception(typ) {
             items.push(self.create_debt_item(
                 self.current_line,
-                ErrorPattern::NoErrorContext,
-                "Exception caught without logging, re-raising, or context",
+                pattern,
+                "Overly broad exception catching may hide bugs",
             ));
         }
 
+        // Check for system exceptions
+        if let Some(pattern) = self.check_system_exception(typ) {
+            items.push(self.create_debt_item(
+                self.current_line,
+                pattern,
+                "System exceptions should not be caught",
+            ));
+        }
+
+        // Check handler body
+        items.extend(self.check_handler_body(body));
+
         items
+    }
+
+    fn check_handler_body(&self, body: &[ast::Stmt]) -> Option<DebtItem> {
+        if self.is_empty_handler(body) {
+            Some(self.create_debt_item(
+                self.current_line,
+                ErrorPattern::EmptyHandler,
+                "Empty exception handler swallows errors without handling",
+            ))
+        } else if !self.has_error_context(body) {
+            Some(self.create_debt_item(
+                self.current_line,
+                ErrorPattern::NoErrorContext,
+                "Exception caught without logging, re-raising, or context",
+            ))
+        } else {
+            None
+        }
     }
 
     fn is_empty_handler(&self, body: &[ast::Stmt]) -> bool {
@@ -238,62 +254,55 @@ impl<'a> PythonErrorHandlingAnalyzer<'a> {
 
     fn check_broad_exception(&self, typ: &ast::Expr) -> Option<ErrorPattern> {
         match typ {
-            ast::Expr::Name(name) => match name.id.as_str() {
-                "Exception" => Some(ErrorPattern::OverlyBroad("Exception".to_string())),
-                "BaseException" => Some(ErrorPattern::OverlyBroad("BaseException".to_string())),
-                _ => None,
-            },
-            ast::Expr::Tuple(tuple) => {
-                // Check if tuple contains broad exceptions
-                for elt in &tuple.elts {
-                    if let ast::Expr::Name(name) = elt {
-                        match name.id.as_str() {
-                            "Exception" | "BaseException" => {
-                                return Some(ErrorPattern::OverlyBroad(format!(
-                                    "{} in tuple",
-                                    name.id
-                                )));
-                            }
-                            _ => {}
-                        }
-                    }
+            ast::Expr::Name(name) => Self::check_broad_exception_name(&name.id),
+            ast::Expr::Tuple(tuple) => Self::check_broad_exception_tuple(tuple),
+            _ => None,
+        }
+    }
+
+    fn check_broad_exception_name(name: &str) -> Option<ErrorPattern> {
+        match name {
+            "Exception" | "BaseException" => Some(ErrorPattern::OverlyBroad(name.to_string())),
+            _ => None,
+        }
+    }
+
+    fn check_broad_exception_tuple(tuple: &ast::ExprTuple) -> Option<ErrorPattern> {
+        tuple.elts.iter().find_map(|elt| {
+            if let ast::Expr::Name(name) = elt {
+                if matches!(name.id.as_str(), "Exception" | "BaseException") {
+                    return Some(ErrorPattern::OverlyBroad(format!("{} in tuple", name.id)));
                 }
-                None
+            }
+            None
+        })
+    }
+
+    fn check_system_exception(&self, typ: &ast::Expr) -> Option<ErrorPattern> {
+        match typ {
+            ast::Expr::Name(name) => Self::check_system_exception_name(&name.id),
+            ast::Expr::Tuple(tuple) => Self::check_system_exception_tuple(tuple),
+            _ => None,
+        }
+    }
+
+    fn check_system_exception_name(name: &str) -> Option<ErrorPattern> {
+        match name {
+            "KeyboardInterrupt" | "SystemExit" | "GeneratorExit" => {
+                Some(ErrorPattern::SystemExceptionSuppressed(name.to_string()))
             }
             _ => None,
         }
     }
 
-    fn check_system_exception(&self, typ: &ast::Expr) -> Option<ErrorPattern> {
-        let check_name = |name: &str| -> Option<ErrorPattern> {
-            match name {
-                "KeyboardInterrupt" => Some(ErrorPattern::SystemExceptionSuppressed(
-                    "KeyboardInterrupt".to_string(),
-                )),
-                "SystemExit" => Some(ErrorPattern::SystemExceptionSuppressed(
-                    "SystemExit".to_string(),
-                )),
-                "GeneratorExit" => Some(ErrorPattern::SystemExceptionSuppressed(
-                    "GeneratorExit".to_string(),
-                )),
-                _ => None,
-            }
-        };
-
-        match typ {
-            ast::Expr::Name(name) => check_name(&name.id),
-            ast::Expr::Tuple(tuple) => {
-                for elt in &tuple.elts {
-                    if let ast::Expr::Name(name) = elt {
-                        if let Some(pattern) = check_name(&name.id) {
-                            return Some(pattern);
-                        }
-                    }
-                }
+    fn check_system_exception_tuple(tuple: &ast::ExprTuple) -> Option<ErrorPattern> {
+        tuple.elts.iter().find_map(|elt| {
+            if let ast::Expr::Name(name) = elt {
+                Self::check_system_exception_name(&name.id)
+            } else {
                 None
             }
-            _ => None,
-        }
+        })
     }
 
     fn has_error_context(&self, body: &[ast::Stmt]) -> bool {

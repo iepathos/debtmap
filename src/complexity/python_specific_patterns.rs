@@ -165,6 +165,172 @@ pub struct PythonSpecificPatternDetector {
     framework_indicators: HashMap<String, FrameworkType>,
 }
 
+// Pure helper functions for decorator analysis
+
+/// Extracts decorator name from an expression
+fn extract_decorator_name<F>(expr: &ast::Expr, expr_to_string: F) -> Option<String>
+where
+    F: Fn(&ast::Expr) -> String,
+{
+    match expr {
+        ast::Expr::Name(name) => Some(name.id.to_string()),
+        ast::Expr::Attribute(attr) => {
+            Some(format!("{}.{}", expr_to_string(&attr.value), attr.attr))
+        }
+        ast::Expr::Call(call) => extract_decorator_name_from_call(call, expr_to_string),
+        _ => None,
+    }
+}
+
+/// Extracts decorator name from a call expression
+fn extract_decorator_name_from_call<F>(call: &ast::ExprCall, expr_to_string: F) -> Option<String>
+where
+    F: Fn(&ast::Expr) -> String,
+{
+    match &*call.func {
+        ast::Expr::Name(name) => Some(name.id.to_string()),
+        ast::Expr::Attribute(attr) => {
+            Some(format!("{}.{}", expr_to_string(&attr.value), attr.attr))
+        }
+        _ => None,
+    }
+}
+
+/// Extracts all decorator names from a list of decorator expressions
+fn extract_decorator_names<F>(decorators: &[ast::Expr], expr_to_string: F) -> Vec<String>
+where
+    F: Fn(&ast::Expr) -> String + Copy,
+{
+    decorators
+        .iter()
+        .filter_map(|dec| extract_decorator_name(dec, expr_to_string))
+        .collect()
+}
+
+/// Checks if a decorator is a property decorator
+fn is_property_decorator(name: &str) -> bool {
+    name == "property" || name.ends_with(".property")
+}
+
+/// Checks if any decorator in the list is a property decorator
+fn has_property_decorator(decorator_names: &[String]) -> bool {
+    decorator_names
+        .iter()
+        .any(|name| is_property_decorator(name))
+}
+
+/// Checks if a decorator name indicates a factory pattern
+fn is_factory_decorator(name: &str) -> bool {
+    name.contains('(') || name.contains('.')
+}
+
+/// Checks if any decorator in the list is a factory decorator
+fn has_factory_decorator(decorator_names: &[String]) -> bool {
+    decorator_names
+        .iter()
+        .any(|name| is_factory_decorator(name))
+}
+
+/// Creates a decorator pattern from analyzed decorator information
+fn create_decorator_pattern(
+    decorators: &[ast::Expr],
+    decorator_names: Vec<String>,
+    is_class: bool,
+) -> DecoratorPattern {
+    DecoratorPattern {
+        location: (0, 0),
+        stack_depth: decorators.len() as u32,
+        is_property: has_property_decorator(&decorator_names),
+        is_class_decorator: is_class,
+        is_factory: has_factory_decorator(&decorator_names),
+        decorator_names,
+    }
+}
+
+// Pure helper functions for class analysis
+
+/// Extracts metaclass name from a keyword argument
+fn extract_metaclass_name(keyword: &ast::Keyword) -> Option<String> {
+    if let Some(ref arg) = keyword.arg {
+        if arg == "metaclass" {
+            if let ast::Expr::Name(name) = &keyword.value {
+                return Some(name.id.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Checks if a class has a specific method
+fn has_method(body: &[ast::Stmt], method_name: &str) -> bool {
+    body.iter().any(|stmt| {
+        if let ast::Stmt::FunctionDef(func) = stmt {
+            func.name.as_str() == method_name
+        } else {
+            false
+        }
+    })
+}
+
+/// Extracts metaclass pattern from a class definition
+fn extract_metaclass_pattern(
+    class: &ast::StmtClassDef,
+    _detector: &PythonSpecificPatternDetector,
+) -> Option<MetaclassPattern> {
+    class.keywords.iter().find_map(|keyword| {
+        extract_metaclass_name(keyword).map(|metaclass_name| MetaclassPattern {
+            location: (0, 0),
+            class_name: class.name.to_string(),
+            metaclass_name,
+            has_custom_new: has_method(&class.body, "__new__"),
+            has_custom_init: has_method(&class.body, "__init__"),
+        })
+    })
+}
+
+/// Extracts base class names from class bases
+fn extract_base_class_names(bases: &[ast::Expr]) -> Vec<String> {
+    bases
+        .iter()
+        .filter_map(|base| {
+            if let ast::Expr::Name(name) = base {
+                Some(name.id.to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Counts mixins in base classes
+fn count_mixins(base_names: &[String], known_mixins: &HashSet<String>) -> u32 {
+    base_names
+        .iter()
+        .filter(|name| known_mixins.iter().any(|mixin| name.contains(mixin)))
+        .count() as u32
+}
+
+/// Extracts inheritance pattern from a class definition
+fn extract_inheritance_pattern(
+    class: &ast::StmtClassDef,
+    detector: &PythonSpecificPatternDetector,
+) -> Option<InheritancePattern> {
+    if class.bases.is_empty() {
+        return None;
+    }
+
+    let base_names = extract_base_class_names(&class.bases);
+    let mixin_count = count_mixins(&base_names, &detector.known_mixins);
+
+    Some(InheritancePattern {
+        location: (0, 0),
+        class_name: class.name.to_string(),
+        base_classes: base_names.clone(),
+        is_diamond: detector.detect_diamond_inheritance(&base_names),
+        mixin_count,
+    })
+}
+
 impl PythonSpecificPatternDetector {
     pub fn new() -> Self {
         let mut framework_indicators = HashMap::new();
@@ -386,51 +552,19 @@ impl PythonSpecificPatternDetector {
         let old_class = self.current_class.clone();
         self.current_class = Some(class.name.to_string());
 
-        // Check decorators
+        // Analyze decorators
         if !class.decorator_list.is_empty() {
             self.analyze_decorators(&class.decorator_list, true);
         }
 
-        // Check metaclass
-        for keyword in &class.keywords {
-            if let Some(ref arg) = keyword.arg {
-                if arg == "metaclass" {
-                    if let ast::Expr::Name(name) = &keyword.value {
-                        self.patterns.metaclasses.push(MetaclassPattern {
-                            location: (0, 0),
-                            class_name: class.name.to_string(),
-                            metaclass_name: name.id.to_string(),
-                            has_custom_new: self.has_method(&class.body, "__new__"),
-                            has_custom_init: self.has_method(&class.body, "__init__"),
-                        });
-                    }
-                }
-            }
+        // Analyze metaclass if present
+        if let Some(metaclass_pattern) = extract_metaclass_pattern(class, self) {
+            self.patterns.metaclasses.push(metaclass_pattern);
         }
 
-        // Check inheritance
-        if !class.bases.is_empty() {
-            let base_names: Vec<String> = class
-                .bases
-                .iter()
-                .filter_map(|base| {
-                    if let ast::Expr::Name(name) = base {
-                        Some(name.id.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            let mixin_count = base_names.iter().filter(|name| self.is_mixin(name)).count() as u32;
-
-            self.patterns.inheritance.push(InheritancePattern {
-                location: (0, 0),
-                class_name: class.name.to_string(),
-                base_classes: base_names.clone(),
-                is_diamond: self.detect_diamond_inheritance(&base_names),
-                mixin_count,
-            });
+        // Analyze inheritance if present
+        if let Some(inheritance_pattern) = extract_inheritance_pattern(class, self) {
+            self.patterns.inheritance.push(inheritance_pattern);
         }
 
         self.analyze_body(&class.body);
@@ -669,44 +803,9 @@ impl PythonSpecificPatternDetector {
     }
 
     fn analyze_decorators(&mut self, decorators: &[ast::Expr], is_class: bool) {
-        let decorator_names: Vec<String> = decorators
-            .iter()
-            .filter_map(|dec| match dec {
-                ast::Expr::Name(name) => Some(name.id.to_string()),
-                ast::Expr::Attribute(attr) => Some(format!(
-                    "{}.{}",
-                    self.expr_to_string(&attr.value),
-                    attr.attr
-                )),
-                ast::Expr::Call(call) => match &*call.func {
-                    ast::Expr::Name(name) => Some(name.id.to_string()),
-                    ast::Expr::Attribute(attr) => Some(format!(
-                        "{}.{}",
-                        self.expr_to_string(&attr.value),
-                        attr.attr
-                    )),
-                    _ => None,
-                },
-                _ => None,
-            })
-            .collect();
-
-        let is_property = decorator_names
-            .iter()
-            .any(|name| name == "property" || name.ends_with(".property"));
-
-        let is_factory = decorator_names
-            .iter()
-            .any(|name| name.contains('(') || name.contains('.'));
-
-        self.patterns.decorators.push(DecoratorPattern {
-            location: (0, 0),
-            stack_depth: decorators.len() as u32,
-            decorator_names,
-            is_property,
-            is_class_decorator: is_class,
-            is_factory,
-        });
+        let decorator_names = extract_decorator_names(decorators, |expr| self.expr_to_string(expr));
+        let pattern = create_decorator_pattern(decorators, decorator_names, is_class);
+        self.patterns.decorators.push(pattern);
     }
 
     fn contains_yield(&self, body: &[ast::Stmt]) -> bool {
@@ -800,21 +899,6 @@ impl PythonSpecificPatternDetector {
         } else {
             name.to_string()
         }
-    }
-
-    fn has_method(&self, body: &[ast::Stmt], method_name: &str) -> bool {
-        for stmt in body {
-            if let ast::Stmt::FunctionDef(func) = stmt {
-                if func.name.as_str() == method_name {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
-    fn is_mixin(&self, name: &str) -> bool {
-        self.known_mixins.iter().any(|mixin| name.contains(mixin))
     }
 
     fn detect_diamond_inheritance(&self, _base_classes: &[String]) -> bool {
