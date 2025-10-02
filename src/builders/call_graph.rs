@@ -135,6 +135,56 @@ fn log_python_file_error(error_type: &str, file_path: &Path, error: &dyn std::er
     log::warn!("Failed to {} Python file {:?}: {}", error_type, file_path, error);
 }
 
+/// Determine if cross-module analysis should be used based on file count
+fn should_use_cross_module_analysis(python_files: &[std::path::PathBuf]) -> bool {
+    python_files.len() > 1
+}
+
+/// Process Python files using cross-module analysis
+fn process_with_cross_module_analysis(
+    python_files: &[std::path::PathBuf],
+    call_graph: &mut priority::CallGraph,
+) -> Result<()> {
+    log::debug!(
+        "Using cross-module analysis for {} Python files",
+        python_files.len()
+    );
+
+    match analyze_python_project(python_files) {
+        Ok(cross_module_graph) => {
+            call_graph.merge(cross_module_graph);
+            Ok(())
+        }
+        Err(e) => {
+            log::warn!(
+                "Cross-module analysis failed, falling back to single-file analysis: {}",
+                e
+            );
+            process_with_fallback_analysis(python_files, call_graph)
+        }
+    }
+}
+
+/// Process Python files using fallback single-file analysis with type tracking
+fn process_with_fallback_analysis(
+    python_files: &[std::path::PathBuf],
+    call_graph: &mut priority::CallGraph,
+) -> Result<()> {
+    for file_path in python_files {
+        match read_and_parse_python_file(file_path) {
+            Ok((content, module)) => {
+                let file_call_graph =
+                    extract_call_graph_from_parsed_python(&module, file_path, &content);
+                call_graph.merge(file_call_graph);
+            }
+            Err(e) => {
+                log_python_file_error("parse", file_path, e.as_ref());
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn process_python_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
@@ -154,56 +204,10 @@ pub fn process_python_files_for_call_graph_with_types(
             .context("Failed to find Python files for call graph")?;
 
     if use_type_tracking {
-        // When we have multiple Python files, use cross-module analysis for better accuracy
-        if python_files.len() > 1 {
-            log::debug!(
-                "Using cross-module analysis for {} Python files",
-                python_files.len()
-            );
-            match analyze_python_project(&python_files) {
-                Ok(cross_module_graph) => {
-                    call_graph.merge(cross_module_graph);
-                }
-                Err(e) => {
-                    log::warn!(
-                        "Cross-module analysis failed, falling back to single-file analysis: {}",
-                        e
-                    );
-                    // Fall back to single-file analysis if cross-module fails
-                    for file_path in &python_files {
-                        match read_and_parse_python_file(file_path) {
-                            Ok((content, module)) => {
-                                let file_call_graph = extract_call_graph_from_parsed_python(
-                                    &module,
-                                    file_path,
-                                    &content,
-                                );
-                                call_graph.merge(file_call_graph);
-                            }
-                            Err(e) => {
-                                log_python_file_error("parse", file_path, e.as_ref());
-                            }
-                        }
-                    }
-                }
-            }
+        if should_use_cross_module_analysis(&python_files) {
+            process_with_cross_module_analysis(&python_files, call_graph)?;
         } else {
-            // Single file - use existing two-pass type-aware extraction
-            for file_path in &python_files {
-                match read_and_parse_python_file(file_path) {
-                    Ok((content, module)) => {
-                        let file_call_graph = extract_call_graph_from_parsed_python(
-                            &module,
-                            file_path,
-                            &content,
-                        );
-                        call_graph.merge(file_call_graph);
-                    }
-                    Err(e) => {
-                        log_python_file_error("parse", file_path, e.as_ref());
-                    }
-                }
-            }
+            process_with_fallback_analysis(&python_files, call_graph)?;
         }
     } else {
         // Fall back to original implementation
@@ -289,5 +293,39 @@ mod tests {
 
         // This test ensures the function doesn't panic
         log_python_file_error("test", temp_file.path(), &error);
+    }
+
+    #[test]
+    fn test_should_use_cross_module_analysis_single_file() {
+        let files = vec![std::path::PathBuf::from("single.py")];
+        assert!(!should_use_cross_module_analysis(&files));
+    }
+
+    #[test]
+    fn test_should_use_cross_module_analysis_multiple_files() {
+        let files = vec![
+            std::path::PathBuf::from("file1.py"),
+            std::path::PathBuf::from("file2.py"),
+        ];
+        assert!(should_use_cross_module_analysis(&files));
+    }
+
+    #[test]
+    fn test_should_use_cross_module_analysis_empty() {
+        let files: Vec<std::path::PathBuf> = vec![];
+        assert!(!should_use_cross_module_analysis(&files));
+    }
+
+    #[test]
+    fn test_process_with_fallback_analysis() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let python_code = "def test():\n    pass\n";
+        temp_file.write_all(python_code.as_bytes()).unwrap();
+
+        let files = vec![temp_file.path().to_path_buf()];
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_with_fallback_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
     }
 }
