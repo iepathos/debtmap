@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_cache_put_and_get_memory_cache() {
-        use crate::priority::{UnifiedAnalysis, CallGraph};
+        use crate::priority::{CallGraph, UnifiedAnalysis};
 
         let temp_dir = TempDir::new().unwrap();
         let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_cache_put_and_get_shared_cache() {
-        use crate::priority::{UnifiedAnalysis, CallGraph};
+        use crate::priority::{CallGraph, UnifiedAnalysis};
 
         let temp_dir = TempDir::new().unwrap();
 
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_cache_clear() {
-        use crate::priority::{UnifiedAnalysis, CallGraph};
+        use crate::priority::{CallGraph, UnifiedAnalysis};
 
         let temp_dir = TempDir::new().unwrap();
         let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_cache_put_updates_existing_entry() {
-        use crate::priority::{UnifiedAnalysis, CallGraph};
+        use crate::priority::{CallGraph, UnifiedAnalysis};
 
         let temp_dir = TempDir::new().unwrap();
         let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
@@ -425,7 +425,7 @@ mod tests {
 
     #[test]
     fn test_cache_get_with_coverage_hash() {
-        use crate::priority::{UnifiedAnalysis, CallGraph};
+        use crate::priority::{CallGraph, UnifiedAnalysis};
 
         let temp_dir = TempDir::new().unwrap();
         let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();

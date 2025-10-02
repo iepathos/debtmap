@@ -450,7 +450,11 @@ mod tests {
         let file1 = temp_dir.path().join("module1.py");
         let file2 = temp_dir.path().join("module2.py");
         std::fs::write(&file1, "def func1():\n    pass\n").unwrap();
-        std::fs::write(&file2, "from module1 import func1\ndef func2():\n    func1()\n").unwrap();
+        std::fs::write(
+            &file2,
+            "from module1 import func1\ndef func2():\n    func1()\n",
+        )
+        .unwrap();
 
         let files = vec![file1, file2];
         let mut call_graph = priority::CallGraph::new();
@@ -547,7 +551,11 @@ mod tests {
         let file1 = temp_dir.path().join("mod1.py");
         let file2 = temp_dir.path().join("mod2.py");
         std::fs::write(&file1, "def helper():\n    return 42\n").unwrap();
-        std::fs::write(&file2, "from mod1 import helper\ndef main():\n    helper()\n").unwrap();
+        std::fs::write(
+            &file2,
+            "from mod1 import helper\ndef main():\n    helper()\n",
+        )
+        .unwrap();
 
         let files = vec![file1, file2];
         let mut call_graph = priority::CallGraph::new();

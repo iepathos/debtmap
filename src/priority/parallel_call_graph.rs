@@ -475,10 +475,9 @@ mod tests {
 
     #[test]
     fn test_parallel_config_with_progress() {
-        let config = ParallelConfig::default()
-            .with_progress(|current, total| {
-                println!("Progress: {}/{}", current, total);
-            });
+        let config = ParallelConfig::default().with_progress(|current, total| {
+            println!("Progress: {}/{}", current, total);
+        });
 
         assert!(config.progress_callback.is_some());
     }

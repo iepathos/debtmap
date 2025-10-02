@@ -174,11 +174,9 @@ where
 {
     match expr {
         ast::Expr::Name(name) => Some(name.id.to_string()),
-        ast::Expr::Attribute(attr) => Some(format!(
-            "{}.{}",
-            expr_to_string(&attr.value),
-            attr.attr
-        )),
+        ast::Expr::Attribute(attr) => {
+            Some(format!("{}.{}", expr_to_string(&attr.value), attr.attr))
+        }
         ast::Expr::Call(call) => extract_decorator_name_from_call(call, expr_to_string),
         _ => None,
     }
@@ -191,11 +189,9 @@ where
 {
     match &*call.func {
         ast::Expr::Name(name) => Some(name.id.to_string()),
-        ast::Expr::Attribute(attr) => Some(format!(
-            "{}.{}",
-            expr_to_string(&attr.value),
-            attr.attr
-        )),
+        ast::Expr::Attribute(attr) => {
+            Some(format!("{}.{}", expr_to_string(&attr.value), attr.attr))
+        }
         _ => None,
     }
 }
@@ -218,7 +214,9 @@ fn is_property_decorator(name: &str) -> bool {
 
 /// Checks if any decorator in the list is a property decorator
 fn has_property_decorator(decorator_names: &[String]) -> bool {
-    decorator_names.iter().any(|name| is_property_decorator(name))
+    decorator_names
+        .iter()
+        .any(|name| is_property_decorator(name))
 }
 
 /// Checks if a decorator name indicates a factory pattern
@@ -228,7 +226,9 @@ fn is_factory_decorator(name: &str) -> bool {
 
 /// Checks if any decorator in the list is a factory decorator
 fn has_factory_decorator(decorator_names: &[String]) -> bool {
-    decorator_names.iter().any(|name| is_factory_decorator(name))
+    decorator_names
+        .iter()
+        .any(|name| is_factory_decorator(name))
 }
 
 /// Creates a decorator pattern from analyzed decorator information
@@ -558,12 +558,12 @@ impl PythonSpecificPatternDetector {
         }
 
         // Analyze metaclass if present
-        if let Some(metaclass_pattern) = extract_metaclass_pattern(class, &self) {
+        if let Some(metaclass_pattern) = extract_metaclass_pattern(class, self) {
             self.patterns.metaclasses.push(metaclass_pattern);
         }
 
         // Analyze inheritance if present
-        if let Some(inheritance_pattern) = extract_inheritance_pattern(class, &self) {
+        if let Some(inheritance_pattern) = extract_inheritance_pattern(class, self) {
             self.patterns.inheritance.push(inheritance_pattern);
         }
 
@@ -900,7 +900,6 @@ impl PythonSpecificPatternDetector {
             name.to_string()
         }
     }
-
 
     fn detect_diamond_inheritance(&self, _base_classes: &[String]) -> bool {
         // Simplified detection - would need more complex MRO analysis
