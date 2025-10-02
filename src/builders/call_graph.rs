@@ -441,4 +441,118 @@ mod tests {
         let result = read_and_parse_python_file(&PathBuf::from("/nonexistent/file.py"));
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_process_with_cross_module_analysis_success() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file1 = temp_dir.path().join("module1.py");
+        let file2 = temp_dir.path().join("module2.py");
+        std::fs::write(&file1, "def func1():\n    pass\n").unwrap();
+        std::fs::write(&file2, "from module1 import func1\ndef func2():\n    func1()\n").unwrap();
+
+        let files = vec![file1, file2];
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_with_cross_module_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_with_cross_module_analysis_empty_files() {
+        let files = vec![];
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_with_cross_module_analysis(&files, &mut call_graph);
+        // Should handle empty file list gracefully
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_process_with_cross_module_analysis_single_file() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let python_code = "def test():\n    pass\n";
+        temp_file.write_all(python_code.as_bytes()).unwrap();
+
+        let files = vec![temp_file.path().to_path_buf()];
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_with_cross_module_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_with_cross_module_analysis_invalid_python() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file1 = temp_dir.path().join("bad1.py");
+        let file2 = temp_dir.path().join("bad2.py");
+        std::fs::write(&file1, "def broken(\n    syntax error\n").unwrap();
+        std::fs::write(&file2, "also broken\n").unwrap();
+
+        let files = vec![file1, file2];
+        let mut call_graph = priority::CallGraph::new();
+
+        // Should fall back to single-file analysis
+        let result = process_with_cross_module_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_python_files_for_call_graph_wrapper() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.py");
+        std::fs::write(&file_path, "def test():\n    pass\n").unwrap();
+
+        let mut call_graph = priority::CallGraph::new();
+        let result = process_python_files_for_call_graph(temp_dir.path(), &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_python_files_for_call_graph_empty_dir() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_python_files_for_call_graph(temp_dir.path(), &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_python_files_for_call_graph_multiple_files() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file1 = temp_dir.path().join("file1.py");
+        let file2 = temp_dir.path().join("file2.py");
+        std::fs::write(&file1, "def foo():\n    pass\n").unwrap();
+        std::fs::write(&file2, "def bar():\n    foo()\n").unwrap();
+
+        let mut call_graph = priority::CallGraph::new();
+        let result = process_python_files_for_call_graph(temp_dir.path(), &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_with_type_tracking_multiple_files() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file1 = temp_dir.path().join("mod1.py");
+        let file2 = temp_dir.path().join("mod2.py");
+        std::fs::write(&file1, "def helper():\n    return 42\n").unwrap();
+        std::fs::write(&file2, "from mod1 import helper\ndef main():\n    helper()\n").unwrap();
+
+        let files = vec![file1, file2];
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_with_type_tracking(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
 }

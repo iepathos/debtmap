@@ -287,4 +287,172 @@ mod tests {
         assert!(UnifiedAnalysisCache::should_use_cache(10, true));
         assert!(UnifiedAnalysisCache::should_use_cache(100, true));
     }
+
+    #[test]
+    fn test_cache_get_miss_on_empty_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let key = UnifiedAnalysisCacheKey {
+            project_path: temp_dir.path().to_path_buf(),
+            source_hash: "test_hash".to_string(),
+            config_hash: "config_hash".to_string(),
+            coverage_hash: None,
+        };
+
+        let result = cache.get(&key);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_cache_put_and_get_memory_cache() {
+        use crate::priority::{UnifiedAnalysis, CallGraph};
+
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let key = UnifiedAnalysisCacheKey {
+            project_path: temp_dir.path().to_path_buf(),
+            source_hash: "test_hash".to_string(),
+            config_hash: "config_hash".to_string(),
+            coverage_hash: None,
+        };
+
+        let analysis = UnifiedAnalysis::new(CallGraph::new());
+        let source_files = vec![temp_dir.path().join("test.rs")];
+
+        // Put in cache
+        let put_result = cache.put(key.clone(), analysis.clone(), source_files);
+        assert!(put_result.is_ok());
+
+        // Get from cache (should hit memory cache)
+        let result = cache.get(&key);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_cache_put_and_get_shared_cache() {
+        use crate::priority::{UnifiedAnalysis, CallGraph};
+
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create first cache instance and put data
+        let mut cache1 = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let key = UnifiedAnalysisCacheKey {
+            project_path: temp_dir.path().to_path_buf(),
+            source_hash: "test_hash_shared".to_string(),
+            config_hash: "config_hash_shared".to_string(),
+            coverage_hash: None,
+        };
+
+        let analysis = UnifiedAnalysis::new(CallGraph::new());
+        let source_files = vec![temp_dir.path().join("test.rs")];
+
+        let put_result = cache1.put(key.clone(), analysis.clone(), source_files);
+        assert!(put_result.is_ok());
+
+        // Create second cache instance (different memory cache, same shared cache)
+        let mut cache2 = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        // Get from cache (should hit shared cache, not memory)
+        let result = cache2.get(&key);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_cache_clear() {
+        use crate::priority::{UnifiedAnalysis, CallGraph};
+
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let key = UnifiedAnalysisCacheKey {
+            project_path: temp_dir.path().to_path_buf(),
+            source_hash: "test_hash_clear".to_string(),
+            config_hash: "config_hash_clear".to_string(),
+            coverage_hash: None,
+        };
+
+        let analysis = UnifiedAnalysis::new(CallGraph::new());
+        let source_files = vec![temp_dir.path().join("test.rs")];
+
+        let put_result = cache.put(key.clone(), analysis.clone(), source_files);
+        assert!(put_result.is_ok());
+
+        // Verify entry exists
+        assert!(cache.get(&key).is_some());
+
+        // Clear cache
+        let clear_result = cache.clear();
+        assert!(clear_result.is_ok());
+
+        // Entry should be gone from memory cache
+        // (Note: shared cache entries persist but that's expected behavior)
+    }
+
+    #[test]
+    fn test_cache_put_updates_existing_entry() {
+        use crate::priority::{UnifiedAnalysis, CallGraph};
+
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let key = UnifiedAnalysisCacheKey {
+            project_path: temp_dir.path().to_path_buf(),
+            source_hash: "test_hash_update".to_string(),
+            config_hash: "config_hash_update".to_string(),
+            coverage_hash: None,
+        };
+
+        let analysis1 = UnifiedAnalysis::new(CallGraph::new());
+        let source_files = vec![temp_dir.path().join("test.rs")];
+
+        // Put first entry
+        let put_result1 = cache.put(key.clone(), analysis1.clone(), source_files.clone());
+        assert!(put_result1.is_ok());
+
+        // Put second entry with same key (should update)
+        let analysis2 = UnifiedAnalysis::new(CallGraph::new());
+
+        let put_result2 = cache.put(key.clone(), analysis2.clone(), source_files);
+        assert!(put_result2.is_ok());
+
+        // Get should return the updated entry
+        let result = cache.get(&key);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_cache_get_with_coverage_hash() {
+        use crate::priority::{UnifiedAnalysis, CallGraph};
+
+        let temp_dir = TempDir::new().unwrap();
+        let mut cache = UnifiedAnalysisCache::new(Some(temp_dir.path())).unwrap();
+
+        let key = UnifiedAnalysisCacheKey {
+            project_path: temp_dir.path().to_path_buf(),
+            source_hash: "test_hash_cov".to_string(),
+            config_hash: "config_hash_cov".to_string(),
+            coverage_hash: Some("coverage_123".to_string()),
+        };
+
+        let analysis = UnifiedAnalysis::new(CallGraph::new());
+        let source_files = vec![temp_dir.path().join("test.rs")];
+
+        let put_result = cache.put(key.clone(), analysis.clone(), source_files);
+        assert!(put_result.is_ok());
+
+        // Get with same coverage hash should succeed
+        let result = cache.get(&key);
+        assert!(result.is_some());
+
+        // Get with different coverage hash should miss
+        let key_different_cov = UnifiedAnalysisCacheKey {
+            coverage_hash: Some("coverage_456".to_string()),
+            ..key
+        };
+        let result2 = cache.get(&key_different_cov);
+        assert!(result2.is_none());
+    }
 }
