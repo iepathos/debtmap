@@ -185,6 +185,33 @@ fn process_with_fallback_analysis(
     Ok(())
 }
 
+/// Process Python files using basic (non-type-aware) analysis
+fn process_with_basic_analysis(
+    python_files: &[std::path::PathBuf],
+    call_graph: &mut priority::CallGraph,
+) -> Result<()> {
+    let mut analyzer = PythonCallGraphAnalyzer::new();
+
+    for file_path in python_files {
+        match read_and_parse_python_file(file_path) {
+            Ok((content, module)) => {
+                if let Err(e) = analyzer.analyze_module_with_source(
+                    &module,
+                    file_path,
+                    &content,
+                    call_graph,
+                ) {
+                    log_python_file_error("analyze", file_path, e.as_ref());
+                }
+            }
+            Err(e) => {
+                log_python_file_error("parse", file_path, e.as_ref());
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn process_python_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
@@ -210,26 +237,7 @@ pub fn process_python_files_for_call_graph_with_types(
             process_with_fallback_analysis(&python_files, call_graph)?;
         }
     } else {
-        // Fall back to original implementation
-        let mut analyzer = PythonCallGraphAnalyzer::new();
-
-        for file_path in &python_files {
-            match read_and_parse_python_file(file_path) {
-                Ok((content, module)) => {
-                    if let Err(e) = analyzer.analyze_module_with_source(
-                        &module,
-                        file_path,
-                        &content,
-                        call_graph,
-                    ) {
-                        log_python_file_error("analyze", file_path, e.as_ref());
-                    }
-                }
-                Err(e) => {
-                    log_python_file_error("parse", file_path, e.as_ref());
-                }
-            }
-        }
+        process_with_basic_analysis(&python_files, call_graph)?;
     }
 
     Ok(())
@@ -326,6 +334,19 @@ mod tests {
         let mut call_graph = priority::CallGraph::new();
 
         let result = process_with_fallback_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_with_basic_analysis() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let python_code = "def foo():\n    bar()\n\ndef bar():\n    pass\n";
+        temp_file.write_all(python_code.as_bytes()).unwrap();
+
+        let files = vec![temp_file.path().to_path_buf()];
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_with_basic_analysis(&files, &mut call_graph);
         assert!(result.is_ok());
     }
 }
