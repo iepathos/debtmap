@@ -12,43 +12,45 @@
   # This creates .prodigy/IMPLEMENTATION_PLAN.md with phased approach
   validate:
     # Validate the plan addresses the debt item
-    claude: "/prodigy-validate-debtmap-plan --before .prodigy/debtmap-before.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/plan-validation.json"
-    result_file: ".prodigy/plan-validation.json"
-    threshold: 75  # Plan must score at least 75/100
-    on_incomplete:
-      claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
-      max_attempts: 3
-      fail_workflow: false # Continue even if plan isn't perfect
+    - claude: "/prodigy-validate-debtmap-plan --before .prodigy/debtmap-before.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/plan-validation.json"
+      result_file: ".prodigy/plan-validation.json"
+      threshold: 75  # Plan must score at least 75/100
+      on_incomplete:
+        - claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+          max_attempts: 3
+          fail_workflow: false # Continue even if plan isn't perfect
 
 # Phase 4: Execute the plan (IMPLEMENTATION PHASE)
 - claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
   commit_required: true
   validate:
-    # Capture state after changes and validate improvement
-    shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
-    claude: "/prodigy-validate-debtmap-improvement --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/debtmap-validation.json"
-    result_file: ".prodigy/debtmap-validation.json"
-    threshold: 75  # Debtmap item should be at least 75% improved
-    on_incomplete:
-      # Step 1: Apply fixes based on validation gaps
-      claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
-      commit_required: true
-      # Step 2: Regenerate coverage to capture test improvements
-      shell: "just coverage-lcov"
-      # Step 3: Re-analyze with updated coverage
-      shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
-      max_attempts: 5
-      fail_workflow: true # Continue even if we can't reach threshold
+    # Capture state after changes and generate comparison
+    - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+    - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
+    - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+      result_file: ".prodigy/debtmap-validation.json"
+      threshold: 75  # Debtmap item should be at least 75% improved
+      on_incomplete:
+        # Step 1: Apply fixes based on validation gaps
+        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+          commit_required: true
+        # Step 2: Regenerate coverage to capture test improvements
+        - shell: "just coverage-lcov"
+        # Step 3: Re-analyze and re-compare with updated coverage
+        - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+        - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
+          max_attempts: 5
+          fail_workflow: true # Continue even if we can't reach threshold
 
 - shell: "just test"
   on_failure:
-    claude: "/prodigy-debug-test-failure --output ${shell.output}"
-    max_attempts: 5
-    fail_workflow: true  # Continue workflow even if tests can't be fixed
+    - claude: "/prodigy-debug-test-failure --output ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true  # Continue workflow even if tests can't be fixed
 
 # Run linting and formatting after implementation
 - shell: "just fmt-check && just lint"
   on_failure:
-    claude: "/prodigy-lint ${shell.output}"
-    max_attempts: 5
-    fail_workflow: true
+    - claude: "/prodigy-lint ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true
