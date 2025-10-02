@@ -212,6 +212,18 @@ fn process_with_basic_analysis(
     Ok(())
 }
 
+/// Process Python files with type-aware analysis (cross-module or single-file)
+fn process_with_type_tracking(
+    python_files: &[std::path::PathBuf],
+    call_graph: &mut priority::CallGraph,
+) -> Result<()> {
+    if should_use_cross_module_analysis(python_files) {
+        process_with_cross_module_analysis(python_files, call_graph)
+    } else {
+        process_with_fallback_analysis(python_files, call_graph)
+    }
+}
+
 pub fn process_python_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
@@ -231,16 +243,10 @@ pub fn process_python_files_for_call_graph_with_types(
             .context("Failed to find Python files for call graph")?;
 
     if use_type_tracking {
-        if should_use_cross_module_analysis(&python_files) {
-            process_with_cross_module_analysis(&python_files, call_graph)?;
-        } else {
-            process_with_fallback_analysis(&python_files, call_graph)?;
-        }
+        process_with_type_tracking(&python_files, call_graph)
     } else {
-        process_with_basic_analysis(&python_files, call_graph)?;
+        process_with_basic_analysis(&python_files, call_graph)
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -347,6 +353,68 @@ mod tests {
         let mut call_graph = priority::CallGraph::new();
 
         let result = process_with_basic_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_with_type_tracking_single_file() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let python_code = "def test():\n    pass\n";
+        temp_file.write_all(python_code.as_bytes()).unwrap();
+
+        let files = vec![temp_file.path().to_path_buf()];
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_with_type_tracking(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_main_function_with_type_tracking() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.py");
+        std::fs::write(&file_path, "def test():\n    pass\n").unwrap();
+
+        let mut call_graph = priority::CallGraph::new();
+        let result = process_python_files_for_call_graph_with_types(
+            temp_dir.path(),
+            &mut call_graph,
+            true,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_main_function_without_type_tracking() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.py");
+        std::fs::write(&file_path, "def foo():\n    bar()\n").unwrap();
+
+        let mut call_graph = priority::CallGraph::new();
+        let result = process_python_files_for_call_graph_with_types(
+            temp_dir.path(),
+            &mut call_graph,
+            false,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_main_function_with_empty_directory() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let mut call_graph = priority::CallGraph::new();
+
+        let result = process_python_files_for_call_graph_with_types(
+            temp_dir.path(),
+            &mut call_graph,
+            true,
+        );
         assert!(result.is_ok());
     }
 }
