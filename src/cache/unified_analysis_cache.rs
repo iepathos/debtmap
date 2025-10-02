@@ -64,61 +64,76 @@ impl UnifiedAnalysisCache {
         semantic_off: bool,
         parallel: bool,
     ) -> Result<UnifiedAnalysisCacheKey> {
-        // Hash source files content and modification times
-        let mut hasher = Sha256::new();
-
-        // Add project path
-        hasher.update(project_path.to_string_lossy().as_bytes());
-
-        // Sort files for consistent hashing
-        let mut sorted_files = source_files.to_vec();
-        sorted_files.sort();
-
-        for file in &sorted_files {
-            if let Ok(content) = std::fs::read_to_string(file) {
-                hasher.update(file.to_string_lossy().as_bytes());
-                hasher.update(content.as_bytes());
-
-                // Include modification time for cache invalidation
-                if let Ok(metadata) = std::fs::metadata(file) {
-                    if let Ok(modified) = metadata.modified() {
-                        if let Ok(duration) = modified.duration_since(SystemTime::UNIX_EPOCH) {
-                            hasher.update(duration.as_secs().to_le_bytes());
-                        }
-                    }
-                }
-            }
-        }
-
-        let source_hash = format!("{:x}", hasher.finalize());
-
-        // Generate config hash
-        let mut config_hasher = Sha256::new();
-        config_hasher.update(complexity_threshold.to_le_bytes());
-        config_hasher.update(duplication_threshold.to_le_bytes());
-        config_hasher.update([semantic_off as u8]);
-        config_hasher.update([parallel as u8]);
-
-        let config_hash = format!("{:x}", config_hasher.finalize());
-
-        // Generate coverage hash if present
-        let coverage_hash = if let Some(coverage_path) = coverage_file {
-            if let Ok(coverage_content) = std::fs::read_to_string(coverage_path) {
-                let mut coverage_hasher = Sha256::new();
-                coverage_hasher.update(coverage_content.as_bytes());
-                Some(format!("{:x}", coverage_hasher.finalize()))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let source_hash = Self::hash_source_files(project_path, source_files);
+        let config_hash = Self::hash_config(
+            complexity_threshold,
+            duplication_threshold,
+            semantic_off,
+            parallel,
+        );
+        let coverage_hash = coverage_file.and_then(Self::hash_coverage_file);
 
         Ok(UnifiedAnalysisCacheKey {
             source_hash,
             project_path: project_path.to_path_buf(),
             config_hash,
             coverage_hash,
+        })
+    }
+
+    fn hash_source_files(project_path: &Path, source_files: &[PathBuf]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(project_path.to_string_lossy().as_bytes());
+
+        let mut sorted_files = source_files.to_vec();
+        sorted_files.sort();
+
+        for file in &sorted_files {
+            Self::hash_file_content(&mut hasher, file);
+            Self::hash_file_mtime(&mut hasher, file);
+        }
+
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn hash_file_content(hasher: &mut Sha256, file: &Path) {
+        if let Ok(content) = std::fs::read_to_string(file) {
+            hasher.update(file.to_string_lossy().as_bytes());
+            hasher.update(content.as_bytes());
+        }
+    }
+
+    fn hash_file_mtime(hasher: &mut Sha256, file: &Path) {
+        let mtime_secs = std::fs::metadata(file)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+
+        if let Some(secs) = mtime_secs {
+            hasher.update(secs.to_le_bytes());
+        }
+    }
+
+    fn hash_config(
+        complexity_threshold: u32,
+        duplication_threshold: usize,
+        semantic_off: bool,
+        parallel: bool,
+    ) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(complexity_threshold.to_le_bytes());
+        hasher.update(duplication_threshold.to_le_bytes());
+        hasher.update([semantic_off as u8]);
+        hasher.update([parallel as u8]);
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn hash_coverage_file(coverage_path: &Path) -> Option<String> {
+        std::fs::read_to_string(coverage_path).ok().map(|content| {
+            let mut hasher = Sha256::new();
+            hasher.update(content.as_bytes());
+            format!("{:x}", hasher.finalize())
         })
     }
 
