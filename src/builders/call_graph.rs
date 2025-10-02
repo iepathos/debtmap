@@ -132,7 +132,12 @@ fn extract_call_graph_from_parsed_python(
 
 /// Log a Python file processing error with consistent formatting
 fn log_python_file_error(error_type: &str, file_path: &Path, error: &dyn std::error::Error) {
-    log::warn!("Failed to {} Python file {:?}: {}", error_type, file_path, error);
+    log::warn!(
+        "Failed to {} Python file {:?}: {}",
+        error_type,
+        file_path,
+        error
+    );
 }
 
 /// Determine if cross-module analysis should be used based on file count
@@ -195,12 +200,9 @@ fn process_with_basic_analysis(
     for file_path in python_files {
         match read_and_parse_python_file(file_path) {
             Ok((content, module)) => {
-                if let Err(e) = analyzer.analyze_module_with_source(
-                    &module,
-                    file_path,
-                    &content,
-                    call_graph,
-                ) {
+                if let Err(e) =
+                    analyzer.analyze_module_with_source(&module, file_path, &content, call_graph)
+                {
                     log_python_file_error("analyze", file_path, e.as_ref());
                 }
             }
@@ -281,18 +283,13 @@ mod tests {
     #[test]
     fn test_extract_call_graph_from_simple_function() {
         let python_code = "def foo():\n    bar()\n\ndef bar():\n    pass\n";
-        let module = rustpython_parser::parse(
-            python_code,
-            rustpython_parser::Mode::Module,
-            "<module>",
-        ).unwrap();
+        let module =
+            rustpython_parser::parse(python_code, rustpython_parser::Mode::Module, "<module>")
+                .unwrap();
 
         let temp_file = NamedTempFile::new().unwrap();
-        let call_graph = extract_call_graph_from_parsed_python(
-            &module,
-            temp_file.path(),
-            python_code,
-        );
+        let call_graph =
+            extract_call_graph_from_parsed_python(&module, temp_file.path(), python_code);
 
         // Verify the call graph contains functions
         assert!(!call_graph.is_empty());
@@ -378,11 +375,8 @@ mod tests {
         std::fs::write(&file_path, "def test():\n    pass\n").unwrap();
 
         let mut call_graph = priority::CallGraph::new();
-        let result = process_python_files_for_call_graph_with_types(
-            temp_dir.path(),
-            &mut call_graph,
-            true,
-        );
+        let result =
+            process_python_files_for_call_graph_with_types(temp_dir.path(), &mut call_graph, true);
         assert!(result.is_ok());
     }
 
@@ -395,11 +389,8 @@ mod tests {
         std::fs::write(&file_path, "def foo():\n    bar()\n").unwrap();
 
         let mut call_graph = priority::CallGraph::new();
-        let result = process_python_files_for_call_graph_with_types(
-            temp_dir.path(),
-            &mut call_graph,
-            false,
-        );
+        let result =
+            process_python_files_for_call_graph_with_types(temp_dir.path(), &mut call_graph, false);
         assert!(result.is_ok());
     }
 
@@ -410,11 +401,8 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let mut call_graph = priority::CallGraph::new();
 
-        let result = process_python_files_for_call_graph_with_types(
-            temp_dir.path(),
-            &mut call_graph,
-            true,
-        );
+        let result =
+            process_python_files_for_call_graph_with_types(temp_dir.path(), &mut call_graph, true);
         assert!(result.is_ok());
     }
 
