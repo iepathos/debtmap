@@ -417,4 +417,40 @@ mod tests {
         );
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_process_with_fallback_analysis_handles_parse_errors() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let invalid_python = "def broken(\n    syntax error\n";
+        temp_file.write_all(invalid_python.as_bytes()).unwrap();
+
+        let files = vec![temp_file.path().to_path_buf()];
+        let mut call_graph = priority::CallGraph::new();
+
+        // Should succeed despite parse errors (logs warning internally)
+        let result = process_with_fallback_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_process_with_basic_analysis_handles_parse_errors() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let invalid_python = "def broken(\n    syntax error\n";
+        temp_file.write_all(invalid_python.as_bytes()).unwrap();
+
+        let files = vec![temp_file.path().to_path_buf()];
+        let mut call_graph = priority::CallGraph::new();
+
+        // Should succeed despite parse errors (logs warning internally)
+        let result = process_with_basic_analysis(&files, &mut call_graph);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_read_and_parse_nonexistent_file() {
+        use std::path::PathBuf;
+
+        let result = read_and_parse_python_file(&PathBuf::from("/nonexistent/file.py"));
+        assert!(result.is_err());
+    }
 }
