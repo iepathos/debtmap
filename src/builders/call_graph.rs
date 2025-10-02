@@ -109,6 +109,32 @@ pub fn process_rust_files_for_call_graph(
     Ok((framework_exclusions_std, function_pointer_used_std))
 }
 
+/// Read and parse a Python file, returning the content and parsed AST
+fn read_and_parse_python_file(file_path: &Path) -> Result<(String, rustpython_parser::ast::Mod)> {
+    let content = io::read_file(file_path)
+        .with_context(|| format!("Failed to read Python file {:?}", file_path))?;
+
+    let module = rustpython_parser::parse(&content, rustpython_parser::Mode::Module, "<module>")
+        .with_context(|| format!("Failed to parse Python file {:?}", file_path))?;
+
+    Ok((content, module))
+}
+
+/// Extract call graph from a parsed Python AST using TwoPassExtractor
+fn extract_call_graph_from_parsed_python(
+    module: &rustpython_parser::ast::Mod,
+    file_path: &Path,
+    content: &str,
+) -> priority::CallGraph {
+    let mut extractor = TwoPassExtractor::new_with_source(file_path.to_path_buf(), content);
+    extractor.extract(module)
+}
+
+/// Log a Python file processing error with consistent formatting
+fn log_python_file_error(error_type: &str, file_path: &Path, error: &dyn std::error::Error) {
+    log::warn!("Failed to {} Python file {:?}: {}", error_type, file_path, error);
+}
+
 pub fn process_python_files_for_call_graph(
     project_path: &Path,
     call_graph: &mut priority::CallGraph,
@@ -145,32 +171,17 @@ pub fn process_python_files_for_call_graph_with_types(
                     );
                     // Fall back to single-file analysis if cross-module fails
                     for file_path in &python_files {
-                        match io::read_file(file_path) {
-                            Ok(content) => {
-                                match rustpython_parser::parse(
+                        match read_and_parse_python_file(file_path) {
+                            Ok((content, module)) => {
+                                let file_call_graph = extract_call_graph_from_parsed_python(
+                                    &module,
+                                    file_path,
                                     &content,
-                                    rustpython_parser::Mode::Module,
-                                    "<module>",
-                                ) {
-                                    Ok(module) => {
-                                        let mut extractor = TwoPassExtractor::new_with_source(
-                                            file_path.to_path_buf(),
-                                            &content,
-                                        );
-                                        let file_call_graph = extractor.extract(&module);
-                                        call_graph.merge(file_call_graph);
-                                    }
-                                    Err(e) => {
-                                        log::warn!(
-                                            "Failed to parse Python file {:?}: {}",
-                                            file_path,
-                                            e
-                                        );
-                                    }
-                                }
+                                );
+                                call_graph.merge(file_call_graph);
                             }
                             Err(e) => {
-                                log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+                                log_python_file_error("parse", file_path, e.as_ref());
                             }
                         }
                     }
@@ -179,28 +190,17 @@ pub fn process_python_files_for_call_graph_with_types(
         } else {
             // Single file - use existing two-pass type-aware extraction
             for file_path in &python_files {
-                match io::read_file(file_path) {
-                    Ok(content) => {
-                        match rustpython_parser::parse(
+                match read_and_parse_python_file(file_path) {
+                    Ok((content, module)) => {
+                        let file_call_graph = extract_call_graph_from_parsed_python(
+                            &module,
+                            file_path,
                             &content,
-                            rustpython_parser::Mode::Module,
-                            "<module>",
-                        ) {
-                            Ok(module) => {
-                                let mut extractor = TwoPassExtractor::new_with_source(
-                                    file_path.to_path_buf(),
-                                    &content,
-                                );
-                                let file_call_graph = extractor.extract(&module);
-                                call_graph.merge(file_call_graph);
-                            }
-                            Err(e) => {
-                                log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
-                            }
-                        }
+                        );
+                        call_graph.merge(file_call_graph);
                     }
                     Err(e) => {
-                        log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+                        log_python_file_error("parse", file_path, e.as_ref());
                     }
                 }
             }
@@ -210,31 +210,84 @@ pub fn process_python_files_for_call_graph_with_types(
         let mut analyzer = PythonCallGraphAnalyzer::new();
 
         for file_path in &python_files {
-            match io::read_file(file_path) {
-                Ok(content) => {
-                    match rustpython_parser::parse(
+            match read_and_parse_python_file(file_path) {
+                Ok((content, module)) => {
+                    if let Err(e) = analyzer.analyze_module_with_source(
+                        &module,
+                        file_path,
                         &content,
-                        rustpython_parser::Mode::Module,
-                        "<module>",
+                        call_graph,
                     ) {
-                        Ok(module) => {
-                            if let Err(e) = analyzer.analyze_module_with_source(
-                                &module, file_path, &content, call_graph,
-                            ) {
-                                log::warn!("Failed to analyze Python file {:?}: {}", file_path, e);
-                            }
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to parse Python file {:?}: {}", file_path, e);
-                        }
+                        log_python_file_error("analyze", file_path, e.as_ref());
                     }
                 }
                 Err(e) => {
-                    log::warn!("Failed to read Python file {:?}: {}", file_path, e);
+                    log_python_file_error("parse", file_path, e.as_ref());
                 }
             }
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_read_and_parse_valid_python_file() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let python_code = "def hello():\n    return 'world'\n";
+        temp_file.write_all(python_code.as_bytes()).unwrap();
+
+        let result = read_and_parse_python_file(temp_file.path());
+        assert!(result.is_ok());
+
+        let (content, _module) = result.unwrap();
+        assert_eq!(content, python_code);
+    }
+
+    #[test]
+    fn test_read_and_parse_invalid_python_file() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        let invalid_python = "def broken(\n    syntax error\n";
+        temp_file.write_all(invalid_python.as_bytes()).unwrap();
+
+        let result = read_and_parse_python_file(temp_file.path());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extract_call_graph_from_simple_function() {
+        let python_code = "def foo():\n    bar()\n\ndef bar():\n    pass\n";
+        let module = rustpython_parser::parse(
+            python_code,
+            rustpython_parser::Mode::Module,
+            "<module>",
+        ).unwrap();
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let call_graph = extract_call_graph_from_parsed_python(
+            &module,
+            temp_file.path(),
+            python_code,
+        );
+
+        // Verify the call graph contains functions
+        assert!(!call_graph.is_empty());
+    }
+
+    #[test]
+    fn test_log_python_file_error_formats_correctly() {
+        use std::io;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let error = io::Error::new(io::ErrorKind::NotFound, "test error");
+
+        // This test ensures the function doesn't panic
+        log_python_file_error("test", temp_file.path(), &error);
+    }
 }
