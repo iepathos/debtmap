@@ -61,11 +61,13 @@ jq '.items[0] | {
 
 Output the target for confirmation:
 ```
-Target: <file>:<line> - <function_name>
+Target: <file>:<function_name>:<line>
 Score: <unified_score>
 Debt Type: <debt_type>
 Action: <primary_action>
 ```
+
+**CRITICAL**: The location must be in the format `file:function:line` (from the `.location` field in debtmap JSON). This exact format is required for later workflow steps.
 
 ### Step 3: Analyze the Problem
 
@@ -113,7 +115,7 @@ Create a file at `$ARG_output` with this structure:
 
 ## Problem Summary
 
-**Location**: <file:line from debtmap>
+**Location**: <location from debtmap - must be in format: ./file.rs:function:line>
 **Priority Score**: <unified_score from debtmap>
 **Debt Type**: <debt_type from debtmap>
 **Current Metrics**:
