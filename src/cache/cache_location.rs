@@ -210,21 +210,73 @@ mod dirs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::env;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    /// Thread-safe environment guard for isolated testing
+    struct EnvGuard {
+        original_values: HashMap<String, Option<String>>,
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+
+    impl EnvGuard {
+        fn new() -> Self {
+            static ENV_MUTEX: Mutex<()> = Mutex::new(());
+            let lock = ENV_MUTEX.lock().expect("Failed to acquire env mutex");
+            Self {
+                original_values: HashMap::new(),
+                _lock: lock,
+            }
+        }
+
+        fn set(&mut self, key: &str, value: &str) {
+            if !self.original_values.contains_key(key) {
+                self.original_values
+                    .insert(key.to_string(), env::var(key).ok());
+            }
+            env::set_var(key, value);
+        }
+
+        fn remove(&mut self, key: &str) {
+            if !self.original_values.contains_key(key) {
+                self.original_values
+                    .insert(key.to_string(), env::var(key).ok());
+            }
+            env::remove_var(key);
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in &self.original_values {
+                match value {
+                    Some(v) => env::set_var(key, v),
+                    None => env::remove_var(key),
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_cache_strategy_from_env() {
-        // Test DEBTMAP_CACHE_DIR
-        let temp_dir = TempDir::new().unwrap();
-        env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
-        let location = CacheLocation::resolve(None).unwrap();
-        assert!(matches!(location.strategy, CacheStrategy::Custom(_)));
-        env::remove_var("DEBTMAP_CACHE_DIR");
+        // Test DEBTMAP_CACHE_DIR with proper isolation
+        {
+            let temp_dir = TempDir::new().unwrap();
+            let mut guard = EnvGuard::new();
+            guard.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+            let location = CacheLocation::resolve(None).unwrap();
+            assert!(matches!(location.strategy, CacheStrategy::Custom(_)));
+        } // Guard drops here, restoring original env
 
         // Test default (no env vars) = shared
-        let location = CacheLocation::resolve(None).unwrap();
-        assert_eq!(location.strategy, CacheStrategy::Shared);
+        {
+            let mut guard = EnvGuard::new();
+            guard.remove("DEBTMAP_CACHE_DIR");
+            let location = CacheLocation::resolve(None).unwrap();
+            assert_eq!(location.strategy, CacheStrategy::Shared);
+        }
     }
 
     #[test]
@@ -237,20 +289,29 @@ mod tests {
 
     #[test]
     fn test_cache_scope() {
-        env::set_var("DEBTMAP_CACHE_SCOPE", "feature-branch");
-        assert_eq!(
-            CacheLocation::get_cache_scope(),
-            Some("feature-branch".to_string())
-        );
-        env::remove_var("DEBTMAP_CACHE_SCOPE");
+        // Test with scope set
+        {
+            let mut guard = EnvGuard::new();
+            guard.set("DEBTMAP_CACHE_SCOPE", "feature-branch");
+            assert_eq!(
+                CacheLocation::get_cache_scope(),
+                Some("feature-branch".to_string())
+            );
+        }
 
-        assert_eq!(CacheLocation::get_cache_scope(), None);
+        // Test with no scope
+        {
+            let mut guard = EnvGuard::new();
+            guard.remove("DEBTMAP_CACHE_SCOPE");
+            assert_eq!(CacheLocation::get_cache_scope(), None);
+        }
     }
 
     #[test]
     fn test_ensure_directories() {
         let temp_dir = TempDir::new().unwrap();
-        env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        let mut guard = EnvGuard::new();
+        guard.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
 
         let location = CacheLocation::resolve(None).unwrap();
         location.ensure_directories().unwrap();
@@ -260,7 +321,5 @@ mod tests {
         assert!(location.get_component_path("analysis").exists());
         assert!(location.get_component_path("metadata").exists());
         assert!(location.get_component_path("temp").exists());
-
-        env::remove_var("DEBTMAP_CACHE_DIR");
     }
 }
