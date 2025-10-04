@@ -314,22 +314,22 @@ pub enum FunctionVisibility {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DebtItem {
-    Function(Box<UnifiedDebtItem>),
     File(Box<FileDebtItem>),
+    Function(Box<UnifiedDebtItem>),
 }
 
 impl DebtItem {
     pub fn score(&self) -> f64 {
         match self {
-            DebtItem::Function(item) => item.unified_score.final_score,
             DebtItem::File(item) => item.score,
+            DebtItem::Function(item) => item.unified_score.final_score,
         }
     }
 
     pub fn display_type(&self) -> &str {
         match self {
-            DebtItem::Function(_) => "FUNCTION",
             DebtItem::File(_) => "FILE",
+            DebtItem::Function(_) => "FUNCTION",
         }
     }
 }
@@ -987,6 +987,115 @@ impl UnifiedAnalysis {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_debtitem_file_roundtrip() {
+        use file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        // Create a File debt item
+        let file_item = DebtItem::File(Box::new(FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("./test.rs"),
+                total_lines: 100,
+                function_count: 5,
+                class_count: 1,
+                avg_complexity: 3.0,
+                max_complexity: 10,
+                total_complexity: 50,
+                coverage_percent: 0.5,
+                uncovered_lines: 50,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 5,
+                    fields_count: 0,
+                    responsibilities: 1,
+                    is_god_object: false,
+                    god_object_score: 0.0,
+                    responsibility_names: vec![],
+                    recommended_splits: vec![],
+                },
+                function_scores: vec![],
+            },
+            score: 50.0,
+            priority_rank: 1,
+            recommendation: "Test".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 10.0,
+                maintainability_improvement: 5.0,
+                test_effort: 2.0,
+            },
+        }));
+
+        // Serialize to JSON
+        let json = serde_json::to_string_pretty(&file_item).unwrap();
+        eprintln!("Serialized JSON:\n{}", json);
+
+        // Try to deserialize it back
+        let result: Result<DebtItem, _> = serde_json::from_str(&json);
+        if let Err(e) = &result {
+            eprintln!("Deserialization error: {}", e);
+        }
+        assert!(result.is_ok(), "Failed to deserialize: {:?}", result.err());
+
+        match result.unwrap() {
+            DebtItem::File(_) => {} // Success
+            DebtItem::Function(_) => panic!("Deserialized as wrong variant!"),
+        }
+    }
+
+    #[test]
+    fn test_debtitem_from_real_json() {
+        // This is the actual format from debtmap analyze output
+        let json = r#"{
+          "File": {
+            "metrics": {
+              "path": "./test.rs",
+              "total_lines": 100,
+              "function_count": 5,
+              "class_count": 1,
+              "avg_complexity": 3.0,
+              "max_complexity": 10,
+              "total_complexity": 50,
+              "coverage_percent": 0.5,
+              "uncovered_lines": 50,
+              "god_object_indicators": {
+                "methods_count": 5,
+                "fields_count": 0,
+                "responsibilities": 1,
+                "is_god_object": false,
+                "god_object_score": 0.0
+              },
+              "function_scores": []
+            },
+            "score": 50.0,
+            "priority_rank": 1,
+            "recommendation": "Test",
+            "impact": {
+              "complexity_reduction": 10.0,
+              "maintainability_improvement": 5.0,
+              "test_effort": 2.0
+            }
+          }
+        }"#;
+
+        let result: Result<DebtItem, _> = serde_json::from_str(json);
+        if let Err(e) = &result {
+            eprintln!("Deserialization error: {}", e);
+        }
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize real JSON: {:?}",
+            result.err()
+        );
+
+        match result.unwrap() {
+            DebtItem::File(f) => {
+                assert_eq!(f.score, 50.0);
+                assert_eq!(f.metrics.total_lines, 100);
+            }
+            DebtItem::Function(_) => panic!("Deserialized as wrong variant!"),
+        }
+    }
 
     #[test]
     fn test_debt_density_calculation_formula() {

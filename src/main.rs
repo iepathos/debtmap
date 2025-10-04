@@ -784,6 +784,42 @@ fn build_analyze_config(
     }
 }
 
+/// Pure function to convert UnifiedJsonOutput to UnifiedAnalysis
+/// Splits merged DebtItem enum into separate function and file vectors
+fn json_to_analysis(
+    json: debtmap::output::json::UnifiedJsonOutput,
+) -> debtmap::priority::UnifiedAnalysis {
+    use debtmap::priority::{call_graph::CallGraph, DebtItem, UnifiedAnalysis};
+    use im::Vector;
+
+    let mut items = Vector::new();
+    let mut file_items = Vector::new();
+
+    // Split DebtItems into function and file items
+    for item in json.items {
+        match item {
+            DebtItem::Function(func) => items.push_back(*func),
+            DebtItem::File(file) => file_items.push_back(*file),
+        }
+    }
+
+    // Create UnifiedAnalysis with empty call graph and data flow graph
+    // These aren't serialized in JSON output anyway
+    let call_graph = CallGraph::new();
+
+    UnifiedAnalysis {
+        items,
+        file_items,
+        total_impact: json.total_impact,
+        total_debt_score: json.total_debt_score,
+        debt_density: json.debt_density,
+        total_lines_of_code: json.total_lines_of_code,
+        call_graph: call_graph.clone(),
+        data_flow_graph: debtmap::data_flow::DataFlowGraph::from_call_graph(call_graph),
+        overall_coverage: json.overall_coverage,
+    }
+}
+
 // Handle compare command
 fn handle_compare_command(
     before: &Path,
@@ -794,7 +830,7 @@ fn handle_compare_command(
     output: Option<&Path>,
 ) -> Result<()> {
     use debtmap::comparison::{Comparator, PlanParser};
-    use debtmap::priority::UnifiedAnalysis;
+    use debtmap::output::json::UnifiedJsonOutput;
     use std::fs;
 
     // Extract target location from plan or use explicit location
@@ -804,12 +840,14 @@ fn handle_compare_command(
         target_location
     };
 
-    // Load analysis results
+    // Load JSON output and convert to UnifiedAnalysis
     let before_content = fs::read_to_string(before)?;
-    let before_results: UnifiedAnalysis = serde_json::from_str(&before_content)?;
+    let before_json: UnifiedJsonOutput = serde_json::from_str(&before_content)?;
+    let before_results = json_to_analysis(before_json);
 
     let after_content = fs::read_to_string(after)?;
-    let after_results: UnifiedAnalysis = serde_json::from_str(&after_content)?;
+    let after_json: UnifiedJsonOutput = serde_json::from_str(&after_content)?;
+    let after_results = json_to_analysis(after_json);
 
     // Perform comparison
     let comparator = Comparator::new(before_results, after_results, target);

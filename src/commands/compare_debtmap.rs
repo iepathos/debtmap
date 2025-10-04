@@ -1,4 +1,4 @@
-use crate::priority::UnifiedAnalysis;
+use crate::output::json::UnifiedJsonOutput;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -73,7 +73,7 @@ pub fn compare_debtmaps(config: CompareConfig) -> Result<()> {
     Ok(())
 }
 
-fn load_debtmap(path: &Path) -> Result<UnifiedAnalysis> {
+fn load_debtmap(path: &Path) -> Result<UnifiedJsonOutput> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read debtmap file: {}", path.display()))?;
 
@@ -82,8 +82,8 @@ fn load_debtmap(path: &Path) -> Result<UnifiedAnalysis> {
 }
 
 fn perform_validation(
-    before: &UnifiedAnalysis,
-    after: &UnifiedAnalysis,
+    before: &UnifiedJsonOutput,
+    after: &UnifiedJsonOutput,
 ) -> Result<ValidationResult> {
     let before_summary = create_summary(before);
     let after_summary = create_summary(after);
@@ -206,26 +206,36 @@ fn perform_validation(
     })
 }
 
-fn create_summary(analysis: &UnifiedAnalysis) -> AnalysisSummary {
-    let high_priority_items = analysis
+fn create_summary(analysis: &UnifiedJsonOutput) -> AnalysisSummary {
+    use crate::priority::DebtItem;
+
+    // Only count Function items for summary
+    let function_items: Vec<_> = analysis
         .items
+        .iter()
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => Some(f.as_ref()),
+            DebtItem::File(_) => None,
+        })
+        .collect();
+
+    let high_priority_items = function_items
         .iter()
         .filter(|item| item.unified_score.final_score >= 8.0)
         .count();
 
-    let average_score = if analysis.items.is_empty() {
+    let average_score = if function_items.is_empty() {
         0.0
     } else {
-        analysis
-            .items
+        function_items
             .iter()
             .map(|i| i.unified_score.final_score)
             .sum::<f64>()
-            / analysis.items.len() as f64
+            / function_items.len() as f64
     };
 
     AnalysisSummary {
-        total_items: analysis.items.len(),
+        total_items: function_items.len(),
         high_priority_items,
         average_score,
     }
@@ -237,18 +247,31 @@ struct ResolvedItems {
     total_count: usize,
 }
 
-fn identify_resolved_items(before: &UnifiedAnalysis, after: &UnifiedAnalysis) -> ResolvedItems {
+fn identify_resolved_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> ResolvedItems {
+    use crate::priority::DebtItem;
+
+    // Extract Function items only
     let after_keys: HashSet<_> = after
         .items
         .iter()
-        .map(|i| (i.location.file.clone(), i.location.function.clone()))
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => Some((f.location.file.clone(), f.location.function.clone())),
+            DebtItem::File(_) => None,
+        })
         .collect();
 
     let resolved: Vec<_> = before
         .items
         .iter()
-        .filter(|item| {
-            !after_keys.contains(&(item.location.file.clone(), item.location.function.clone()))
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => {
+                if !after_keys.contains(&(f.location.file.clone(), f.location.function.clone())) {
+                    Some(f.as_ref())
+                } else {
+                    None
+                }
+            }
+            DebtItem::File(_) => None,
         })
         .collect();
 
@@ -269,49 +292,58 @@ struct ImprovedItems {
     coverage_improvement_count: usize,
 }
 
-fn identify_improved_items(before: &UnifiedAnalysis, after: &UnifiedAnalysis) -> ImprovedItems {
+fn identify_improved_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> ImprovedItems {
+    use crate::priority::DebtItem;
+
     let before_map: HashMap<_, _> = before
         .items
         .iter()
-        .map(|i| ((i.location.file.clone(), i.location.function.clone()), i))
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => {
+                Some(((f.location.file.clone(), f.location.function.clone()), f))
+            }
+            DebtItem::File(_) => None,
+        })
         .collect();
 
     let mut total_complexity_reduction = 0.0;
     let mut coverage_improvement_count = 0;
     let mut improved_count = 0;
 
-    for after_item in &after.items {
-        let key = (
-            after_item.location.file.clone(),
-            after_item.location.function.clone(),
-        );
-        if let Some(before_item) = before_map.get(&key) {
-            let score_improvement =
-                before_item.unified_score.final_score - after_item.unified_score.final_score;
-            if score_improvement > 0.5 {
-                improved_count += 1;
+    for item in &after.items {
+        if let DebtItem::Function(after_item) = item {
+            let key = (
+                after_item.location.file.clone(),
+                after_item.location.function.clone(),
+            );
+            if let Some(before_item) = before_map.get(&key) {
+                let score_improvement =
+                    before_item.unified_score.final_score - after_item.unified_score.final_score;
+                if score_improvement > 0.5 {
+                    improved_count += 1;
 
-                if after_item.cyclomatic_complexity < before_item.cyclomatic_complexity {
-                    let reduction = (before_item.cyclomatic_complexity
-                        - after_item.cyclomatic_complexity)
-                        as f64
-                        / before_item.cyclomatic_complexity as f64;
-                    total_complexity_reduction += reduction;
-                }
+                    if after_item.cyclomatic_complexity < before_item.cyclomatic_complexity {
+                        let reduction = (before_item.cyclomatic_complexity
+                            - after_item.cyclomatic_complexity)
+                            as f64
+                            / before_item.cyclomatic_complexity as f64;
+                        total_complexity_reduction += reduction;
+                    }
 
-                let after_coverage = after_item
-                    .transitive_coverage
-                    .as_ref()
-                    .map(|tc| tc.direct.max(tc.transitive))
-                    .unwrap_or(0.0);
-                let before_coverage = before_item
-                    .transitive_coverage
-                    .as_ref()
-                    .map(|tc| tc.direct.max(tc.transitive))
-                    .unwrap_or(0.0);
+                    let after_coverage = after_item
+                        .transitive_coverage
+                        .as_ref()
+                        .map(|tc| tc.direct.max(tc.transitive))
+                        .unwrap_or(0.0);
+                    let before_coverage = before_item
+                        .transitive_coverage
+                        .as_ref()
+                        .map(|tc| tc.direct.max(tc.transitive))
+                        .unwrap_or(0.0);
 
-                if after_coverage > before_coverage {
-                    coverage_improvement_count += 1;
+                    if after_coverage > before_coverage {
+                        coverage_improvement_count += 1;
+                    }
                 }
             }
         }
@@ -340,25 +372,37 @@ struct ItemInfo {
     score: f64,
 }
 
-fn identify_new_items(before: &UnifiedAnalysis, after: &UnifiedAnalysis) -> NewItems {
+fn identify_new_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> NewItems {
+    use crate::priority::DebtItem;
+
     let before_keys: HashSet<_> = before
         .items
         .iter()
-        .map(|i| (i.location.file.clone(), i.location.function.clone()))
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => Some((f.location.file.clone(), f.location.function.clone())),
+            DebtItem::File(_) => None,
+        })
         .collect();
 
     let new_items: Vec<_> = after
         .items
         .iter()
-        .filter(|item| {
-            !before_keys.contains(&(item.location.file.clone(), item.location.function.clone()))
-        })
-        .filter(|item| item.unified_score.final_score >= 8.0)
-        .map(|item| ItemInfo {
-            file: item.location.file.clone(),
-            function: item.location.function.clone(),
-            line: item.location.line,
-            score: item.unified_score.final_score,
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => {
+                if !before_keys.contains(&(f.location.file.clone(), f.location.function.clone()))
+                    && f.unified_score.final_score >= 8.0
+                {
+                    Some(ItemInfo {
+                        file: f.location.file.clone(),
+                        function: f.location.function.clone(),
+                        line: f.location.line,
+                        score: f.unified_score.final_score,
+                    })
+                } else {
+                    None
+                }
+            }
+            DebtItem::File(_) => None,
         })
         .collect();
 
@@ -374,34 +418,43 @@ struct UnchangedCritical {
 }
 
 fn identify_unchanged_critical(
-    before: &UnifiedAnalysis,
-    after: &UnifiedAnalysis,
+    before: &UnifiedJsonOutput,
+    after: &UnifiedJsonOutput,
 ) -> UnchangedCritical {
+    use crate::priority::DebtItem;
+
     let mut unchanged_critical = Vec::new();
 
     let after_map: HashMap<_, _> = after
         .items
         .iter()
-        .map(|i| ((i.location.file.clone(), i.location.function.clone()), i))
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => {
+                Some(((f.location.file.clone(), f.location.function.clone()), f))
+            }
+            DebtItem::File(_) => None,
+        })
         .collect();
 
-    for before_item in &before.items {
-        if before_item.unified_score.final_score >= 8.0 {
-            let key = (
-                before_item.location.file.clone(),
-                before_item.location.function.clone(),
-            );
-            if let Some(after_item) = after_map.get(&key) {
-                let score_change = (before_item.unified_score.final_score
-                    - after_item.unified_score.final_score)
-                    .abs();
-                if score_change < 0.5 && after_item.unified_score.final_score >= 8.0 {
-                    unchanged_critical.push(ItemInfo {
-                        file: before_item.location.file.clone(),
-                        function: before_item.location.function.clone(),
-                        line: before_item.location.line,
-                        score: before_item.unified_score.final_score,
-                    });
+    for item in &before.items {
+        if let DebtItem::Function(before_item) = item {
+            if before_item.unified_score.final_score >= 8.0 {
+                let key = (
+                    before_item.location.file.clone(),
+                    before_item.location.function.clone(),
+                );
+                if let Some(after_item) = after_map.get(&key) {
+                    let score_change = (before_item.unified_score.final_score
+                        - after_item.unified_score.final_score)
+                        .abs();
+                    if score_change < 0.5 && after_item.unified_score.final_score >= 8.0 {
+                        unchanged_critical.push(ItemInfo {
+                            file: before_item.location.file.clone(),
+                            function: before_item.location.function.clone(),
+                            line: before_item.location.line,
+                            score: before_item.unified_score.final_score,
+                        });
+                    }
                 }
             }
         }

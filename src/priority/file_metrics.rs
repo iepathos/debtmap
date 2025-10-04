@@ -42,10 +42,18 @@ pub struct ModuleSplit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDebtItem {
     pub metrics: FileDebtMetrics,
+    #[serde(default)]
     pub score: f64,
+    #[serde(default)]
     pub priority_rank: usize,
+    #[serde(default = "default_recommendation")]
     pub recommendation: String,
+    #[serde(default)]
     pub impact: FileImpact,
+}
+
+fn default_recommendation() -> String {
+    "Refactor for better maintainability".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +61,16 @@ pub struct FileImpact {
     pub complexity_reduction: f64,
     pub maintainability_improvement: f64,
     pub test_effort: f64,
+}
+
+impl Default for FileImpact {
+    fn default() -> Self {
+        Self {
+            complexity_reduction: 0.0,
+            maintainability_improvement: 0.0,
+            test_effort: 0.0,
+        }
+    }
 }
 
 impl FileDebtMetrics {
@@ -176,6 +194,28 @@ impl Default for GodObjectIndicators {
             god_object_score: 0.0,
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
+        }
+    }
+}
+
+// Extension to support legacy JSON format that only has metrics
+impl FileDebtItem {
+    pub fn from_metrics(metrics: FileDebtMetrics) -> Self {
+        let score = metrics.calculate_score();
+        let recommendation = metrics.generate_recommendation();
+        let impact = FileImpact {
+            complexity_reduction: metrics.avg_complexity * metrics.function_count as f64 * 0.2,
+            maintainability_improvement: (metrics.max_complexity as f64 - metrics.avg_complexity)
+                * 10.0,
+            test_effort: metrics.uncovered_lines as f64 * 0.1,
+        };
+
+        FileDebtItem {
+            metrics,
+            score,
+            priority_rank: 0,
+            recommendation,
+            impact,
         }
     }
 }
