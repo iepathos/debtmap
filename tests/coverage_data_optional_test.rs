@@ -200,8 +200,10 @@ fn test_detailed_score_calculation_respects_coverage_flag() {
     analysis_without.sort_by_priority();
 
     // Format with verbosity 2 (detailed calculation)
-    let output_with_coverage = format_priorities_with_verbosity(&analysis_with, OutputFormat::Top(1), 2);
-    let output_without_coverage = format_priorities_with_verbosity(&analysis_without, OutputFormat::Top(1), 2);
+    let output_with_coverage =
+        format_priorities_with_verbosity(&analysis_with, OutputFormat::Top(1), 2);
+    let output_without_coverage =
+        format_priorities_with_verbosity(&analysis_without, OutputFormat::Top(1), 2);
 
     // Both should show score calculation (scores are always calculated)
     assert!(output_with_coverage.contains("SCORE CALCULATION:"));
