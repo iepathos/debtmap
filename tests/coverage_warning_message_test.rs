@@ -48,21 +48,21 @@ fn test_unified_analysis_has_coverage_data_flag() {
     let mut analysis = UnifiedAnalysis::new(call_graph);
 
     // By default, should be false
-    assert_eq!(
-        analysis.has_coverage_data, false,
+    assert!(
+        !analysis.has_coverage_data,
         "New analysis should default to has_coverage_data=false"
     );
 
     // Should be able to set it
     analysis.has_coverage_data = true;
-    assert_eq!(
-        analysis.has_coverage_data, true,
+    assert!(
+        analysis.has_coverage_data,
         "Should be able to set has_coverage_data to true"
     );
 
     analysis.has_coverage_data = false;
-    assert_eq!(
-        analysis.has_coverage_data, false,
+    assert!(
+        !analysis.has_coverage_data,
         "Should be able to set has_coverage_data to false"
     );
 }

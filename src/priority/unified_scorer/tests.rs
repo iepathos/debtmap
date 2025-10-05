@@ -1,14 +1,8 @@
-#[cfg(test)]
-mod tests {
-    use super::super::unified_scorer::*;
-    use crate::core::FunctionMetrics;
-    use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
-    use crate::priority::coverage_propagation::TransitiveCoverage;
-    use crate::priority::semantic_classifier::FunctionRole;
-    use crate::priority::scoring::classification::{classify_test_debt, is_complexity_hotspot, classify_simple_function_risk, classify_risk_based_debt};
-    use crate::priority::{DebtType, FunctionVisibility};
-    use crate::risk::lcov::{FunctionCoverage, LcovData};
-    use std::path::PathBuf;
+use super::*;
+use crate::core::FunctionMetrics;
+use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use crate::risk::lcov::{FunctionCoverage, LcovData};
+use std::path::PathBuf;
 
     fn create_test_metrics() -> FunctionMetrics {
         FunctionMetrics {
@@ -130,7 +124,7 @@ mod tests {
         assert_zero_coverage_boost(&score);
     }
     
-    fn create_coverage_function(func: &FunctionMetrics, execution_count: i32, coverage_percentage: f64) -> LcovData {
+    fn create_coverage_function(func: &FunctionMetrics, execution_count: u64, coverage_percentage: f64) -> LcovData {
         let mut lcov = LcovData::default();
         lcov.functions.insert(
             func.file.clone(),
@@ -218,5 +212,84 @@ mod tests {
         assert!(score.complexity_factor > 0.0);
     }
 
+    #[test]
+    fn test_complexity_factor_stores_calculated_factor_not_raw_complexity() {
+        // Test spec 109: UnifiedScore.complexity_factor should store the result of
+        // calculate_complexity_factor(raw_complexity), not raw_complexity itself
+        let mut func = create_test_metrics();
+        func.cyclomatic = 5;
+        func.cognitive = 15;
+        // raw_complexity = max(cyclomatic, cognitive * 0.4) = max(5, 6) = 6.0
+        // calculate_complexity_factor(6.0) should return 3.0 (halved because >= 5.0)
+
+        let call_graph = CallGraph::new();
+        let score = calculate_unified_priority(&func, &call_graph, None, None);
+
+        // The complexity_factor field should store the calculated factor (3.0), not raw_complexity (6.0)
+        assert_eq!(
+            score.complexity_factor, 3.0,
+            "complexity_factor should store calculate_complexity_factor(6.0) = 3.0, not raw_complexity = 6.0"
+        );
+    }
+
+    #[test]
+    fn test_god_object_multiplier_applies_to_calculated_factor() {
+        // Test spec 109: god_object_multiplier should apply to the calculated complexity_factor,
+        // not the raw_complexity value
+        let mut func = create_test_metrics();
+        func.cyclomatic = 5;
+        func.cognitive = 15;
+        // raw_complexity = 6.0, complexity_factor = 3.0
+
+        let mut call_graph = CallGraph::new();
+        let func_id = FunctionId {
+            file: func.file.clone(),
+            name: func.name.clone(),
+            line: func.line,
+        };
+
+        // Create god object scenario: 20+ downstream callees
+        for i in 0..25 {
+            call_graph.add_call(FunctionCall {
+                caller: func_id.clone(),
+                callee: FunctionId {
+                    file: PathBuf::from("test.rs"),
+                    name: format!("callee_{}", i),
+                    line: 100 + i,
+                },
+                call_type: CallType::Direct,
+            });
+        }
+
+        let score = calculate_unified_priority(&func, &call_graph, None, None);
+
+        // God object multiplier is 1.5x, so complexity_factor should be 3.0 * 1.5 = 4.5
+        assert!(
+            (score.complexity_factor - 4.5).abs() < 0.01,
+            "God object multiplier should apply to calculated factor (3.0 * 1.5 = 4.5), got {}",
+            score.complexity_factor
+        );
+    }
+
+    #[test]
+    fn test_well_tested_simple_function_scores_below_20() {
+        // Test spec 109: Well-tested simple functions (100% coverage, cyclomatic < 10)
+        // should score below 20.0 (spec example shows ~16.25)
+        let mut func = create_test_metrics();
+        func.cyclomatic = 5;
+        func.cognitive = 15;
+        func.is_test = false;
+
+        let call_graph = CallGraph::new();
+        let lcov = create_full_coverage_data(&func);
+
+        let score = calculate_unified_priority(&func, &call_graph, Some(&lcov), None);
+
+        assert!(
+            score.final_score < 20.0,
+            "Well-tested simple function (100% coverage, cyclomatic=5) should score < 20.0, got {}",
+            score.final_score
+        );
+    }
+
     // Add more tests as needed...
-}

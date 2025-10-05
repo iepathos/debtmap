@@ -350,3 +350,7 @@ pub fn is_dead_code_with_exclusions(
     // Use the enhanced dead code detection with function pointer information
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
+
+#[cfg(test)]
+mod tests;
+
