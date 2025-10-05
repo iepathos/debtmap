@@ -20,6 +20,7 @@ fn test_unified_analysis_json_serialization() {
         call_graph: CallGraph::new(),
         data_flow_graph: DataFlowGraph::new(),
         overall_coverage: None,
+        has_coverage_data: false,
     };
 
     // Attempt to serialize to JSON

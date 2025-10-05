@@ -817,6 +817,7 @@ fn json_to_analysis(
         call_graph: call_graph.clone(),
         data_flow_graph: debtmap::data_flow::DataFlowGraph::from_call_graph(call_graph),
         overall_coverage: json.overall_coverage,
+        has_coverage_data: json.overall_coverage.is_some(),
     }
 }
 

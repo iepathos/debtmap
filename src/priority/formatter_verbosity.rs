@@ -15,7 +15,11 @@ fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static st
 }
 
 // Pure function to get coverage indicator
-fn get_coverage_indicator(item: &UnifiedDebtItem) -> &'static str {
+fn get_coverage_indicator(item: &UnifiedDebtItem, has_coverage_data: bool) -> &'static str {
+    if !has_coverage_data {
+        return ""; // No coverage data, no indicator
+    }
+
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
         classify_coverage_percentage(coverage_pct).0
@@ -42,7 +46,12 @@ fn format_coverage_status(coverage_pct: f64) -> String {
 fn format_coverage_factor_description(
     item: &UnifiedDebtItem,
     _weights: &crate::config::ScoringWeights,
+    has_coverage_data: bool,
 ) -> Option<String> {
+    if !has_coverage_data {
+        return None; // Don't show coverage info when not available
+    }
+
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
         match coverage_pct {
@@ -169,11 +178,12 @@ fn format_uncovered_lines_summary(uncovered_lines: &[usize], max_ranges: usize) 
 fn collect_scoring_factors(
     item: &UnifiedDebtItem,
     weights: &crate::config::ScoringWeights,
+    has_coverage_data: bool,
 ) -> Vec<String> {
     let mut factors = vec![];
 
-    // Coverage factor (50% weight in weighted sum model)
-    if let Some(desc) = format_coverage_factor_description(item, weights) {
+    // Coverage factor (50% weight in weighted sum model) - only if coverage data available
+    if let Some(desc) = format_coverage_factor_description(item, weights, has_coverage_data) {
         factors.push(desc);
     }
 
@@ -324,7 +334,15 @@ pub fn format_priority_item_with_verbosity(
     item: &UnifiedDebtItem,
     verbosity: u8,
 ) {
-    format_priority_item_with_config(output, rank, item, verbosity, FormattingConfig::default())
+    // Legacy function - assumes no coverage data
+    format_priority_item_with_config(
+        output,
+        rank,
+        item,
+        verbosity,
+        FormattingConfig::default(),
+        false,
+    )
 }
 
 /// Format the score header line with severity
@@ -947,6 +965,7 @@ pub fn format_priority_item_with_config(
     item: &UnifiedDebtItem,
     verbosity: u8,
     config: FormattingConfig,
+    has_coverage_data: bool,
 ) {
     let formatter = ColoredFormatter::new(config);
     let severity = crate::priority::formatter::get_severity_label(item.unified_score.final_score);
@@ -955,7 +974,7 @@ pub fn format_priority_item_with_config(
     let tree_pipe = formatter.emoji("│", " ");
 
     // Format and write the score header
-    let coverage_indicator = get_coverage_indicator(item);
+    let coverage_indicator = get_coverage_indicator(item, has_coverage_data);
     let score_header = format_score_header(
         rank,
         item.unified_score.final_score,
@@ -968,7 +987,7 @@ pub fn format_priority_item_with_config(
     // Add main factors for verbosity >= 1
     if verbosity >= 1 {
         let weights = crate::config::get_scoring_weights();
-        let factors = collect_scoring_factors(item, weights);
+        let factors = collect_scoring_factors(item, weights, has_coverage_data);
         let factors_line = format_main_factors(&factors, &formatter);
         if !factors_line.is_empty() {
             writeln!(output, "{}", factors_line).unwrap();
@@ -1350,7 +1369,7 @@ mod tests {
         item.unified_score.complexity_factor = 3.5;
         item.unified_score.dependency_factor = 1.0;
 
-        let factors = collect_scoring_factors(&item, &weights);
+        let factors = collect_scoring_factors(&item, &weights, true); // has_coverage_data = true
         assert!(factors.iter().any(|f| f.contains("UNTESTED")));
         assert!(factors.iter().any(|f| f.contains("Moderate complexity")));
 
@@ -1359,7 +1378,7 @@ mod tests {
             depth: 3,
             complexity_estimate: "O(n^3)".to_string(),
         };
-        let factors = collect_scoring_factors(&item, &weights);
+        let factors = collect_scoring_factors(&item, &weights, true);
         assert!(factors
             .iter()
             .any(|f| f.contains("Performance impact (High)")));

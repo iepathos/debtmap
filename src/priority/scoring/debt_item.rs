@@ -177,12 +177,14 @@ fn analyze_debt(
     );
 
     // Calculate unified score
+    let has_coverage_data = coverage.is_some();
     let unified_score = calculate_unified_priority_with_debt(
         func,
         call_graph,
         coverage,
         None,
         Some(debt_aggregator),
+        has_coverage_data,
     );
 
     // Determine function role

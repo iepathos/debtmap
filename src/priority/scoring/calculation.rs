@@ -68,6 +68,26 @@ pub fn calculate_base_score(
         + (dependency_score * dependency_weight)
 }
 
+/// Calculate base score when coverage data is not available.
+///
+/// Uses adjusted weights focusing on observable code quality metrics:
+/// - 50% complexity (cyclomatic and cognitive complexity)
+/// - 25% dependencies (upstream callers indicating change risk)
+/// - 25% reserved for debt patterns (to be added with debt_adjustment)
+///
+/// This provides meaningful prioritization even without test coverage data.
+pub fn calculate_base_score_no_coverage(complexity_factor: f64, dependency_factor: f64) -> f64 {
+    let complexity_weight = 0.50; // 50% weight on complexity
+    let dependency_weight = 0.25; // 25% weight on dependencies
+
+    // Convert factors to 0-100 scale
+    let complexity_score = complexity_factor * 10.0;
+    let dependency_score = dependency_factor * 10.0;
+
+    // Weighted sum - debt pattern weight applied separately via debt_adjustment
+    (complexity_score * complexity_weight) + (dependency_score * dependency_weight)
+}
+
 /// Structure to hold normalized score with metadata
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NormalizedScore {
