@@ -240,7 +240,7 @@ fn calculate_score_factors(item: &UnifiedDebtItem) -> ScoreFactors {
         coverage_gap,
         coverage_pct,
         coverage_factor: (coverage_gap.powf(1.5) + 0.1).max(0.1),
-        complexity_factor: item.unified_score.complexity_factor.powf(0.8),
+        complexity_factor: item.unified_score.complexity_factor,
         dependency_factor: ((item.unified_score.dependency_factor + 1.0).sqrt() / 2.0).min(1.0),
     }
 }

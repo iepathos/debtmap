@@ -189,9 +189,9 @@ pub fn calculate_unified_priority_with_debt(
     let coverage_pct = if func.is_test {
         1.0 // Test functions have 100% coverage by definition
     } else if let Some(cov) = coverage {
+        // get_function_coverage already returns 0-1 fraction, no need to divide again
         cov.get_function_coverage(&func.file, &func.name)
             .unwrap_or(0.0)
-            / 100.0 // Convert to 0-1 range
     } else {
         0.0 // No coverage data - assume worst case
     };
@@ -263,16 +263,8 @@ pub fn calculate_unified_priority_with_debt(
     // Normalize to 0-10 scale with better distribution
     let normalized_score = normalize_final_score(final_score);
 
-    // Debug: Log ALL scores to find where 5.05 comes from
-    if std::env::var("DEBUG_ALL_SCORES").is_ok() {
-        eprintln!(
-            "SCORE DEBUG: {} - raw={:.4}, norm={:.2}, cov={:.2}, cplx={:.2}, deps={}",
-            func.name, final_score, normalized_score, coverage_pct, raw_complexity, upstream_count
-        );
-    }
-
     UnifiedScore {
-        complexity_factor: raw_complexity,
+        complexity_factor,
         coverage_factor: (1.0 - coverage_pct) * 10.0, // Convert gap to 0-10 for display
         dependency_factor: upstream_count as f64,
         role_multiplier,
@@ -350,3 +342,6 @@ pub fn is_dead_code_with_exclusions(
     // Use the enhanced dead code detection with function pointer information
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
+
+#[cfg(test)]
+mod tests;
