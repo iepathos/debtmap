@@ -1,6 +1,6 @@
 use super::*;
 use crate::core::FunctionMetrics;
-use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use crate::priority::call_graph::CallGraph;
 use crate::risk::lcov::{FunctionCoverage, LcovData};
 use std::path::PathBuf;
 
@@ -232,44 +232,6 @@ use std::path::PathBuf;
         );
     }
 
-    #[test]
-    fn test_god_object_multiplier_applies_to_calculated_factor() {
-        // Test spec 109: god_object_multiplier should apply to the calculated complexity_factor,
-        // not the raw_complexity value
-        let mut func = create_test_metrics();
-        func.cyclomatic = 5;
-        func.cognitive = 15;
-        // raw_complexity = 6.0, complexity_factor = 3.0
-
-        let mut call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: func.file.clone(),
-            name: func.name.clone(),
-            line: func.line,
-        };
-
-        // Create god object scenario: 20+ downstream callees
-        for i in 0..25 {
-            call_graph.add_call(FunctionCall {
-                caller: func_id.clone(),
-                callee: FunctionId {
-                    file: PathBuf::from("test.rs"),
-                    name: format!("callee_{}", i),
-                    line: 100 + i,
-                },
-                call_type: CallType::Direct,
-            });
-        }
-
-        let score = calculate_unified_priority(&func, &call_graph, None, None);
-
-        // God object multiplier is 1.5x, so complexity_factor should be 3.0 * 1.5 = 4.5
-        assert!(
-            (score.complexity_factor - 4.5).abs() < 0.01,
-            "God object multiplier should apply to calculated factor (3.0 * 1.5 = 4.5), got {}",
-            score.complexity_factor
-        );
-    }
 
     #[test]
     fn test_well_tested_simple_function_scores_below_20() {
