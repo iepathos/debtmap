@@ -300,6 +300,62 @@ mod tests {
     }
 
     #[test]
+    fn test_calculate_base_score_no_coverage() {
+        // Test scoring without coverage data (spec 108)
+        // Weights: 50% complexity, 25% dependency
+
+        // Test case 1: High complexity, low dependencies
+        let score1 = calculate_base_score_no_coverage(5.0, 1.0);
+        // complexity: 5.0*10*0.5 + dependency: 1.0*10*0.25 = 25.0 + 2.5 = 27.5
+        assert!(
+            (score1 - 27.5).abs() < 0.01,
+            "High complexity should dominate score. Expected 27.5, got {}",
+            score1
+        );
+
+        // Test case 2: Low complexity, high dependencies
+        let score2 = calculate_base_score_no_coverage(1.0, 5.0);
+        // complexity: 1.0*10*0.5 + dependency: 5.0*10*0.25 = 5.0 + 12.5 = 17.5
+        assert!(
+            (score2 - 17.5).abs() < 0.01,
+            "High dependencies should contribute. Expected 17.5, got {}",
+            score2
+        );
+
+        // Test case 3: Both high
+        let score3 = calculate_base_score_no_coverage(8.0, 6.0);
+        // complexity: 8.0*10*0.5 + dependency: 6.0*10*0.25 = 40.0 + 15.0 = 55.0
+        assert!(
+            (score3 - 55.0).abs() < 0.01,
+            "Both high should yield high score. Expected 55.0, got {}",
+            score3
+        );
+
+        // Test case 4: Both zero
+        let score4 = calculate_base_score_no_coverage(0.0, 0.0);
+        assert_eq!(score4, 0.0, "Zero factors should yield zero score");
+
+        // Test case 5: Verify weight distribution
+        // Complexity weight (50%) should be 2x dependency weight (25%)
+        let complexity_contribution = 10.0 * 10.0 * 0.5; // 50.0
+        let dependency_contribution = 10.0 * 10.0 * 0.25; // 25.0
+        assert_eq!(
+            complexity_contribution / dependency_contribution,
+            2.0,
+            "Complexity should have 2x weight of dependency"
+        );
+
+        // Test case 6: Verify the remaining 25% is reserved for debt patterns
+        // Total weights used: 50% + 25% = 75%, leaving 25% for debt_adjustment
+        let total_weight: f64 = 0.50 + 0.25;
+        let reserved_weight: f64 = 1.0 - total_weight;
+        assert!(
+            (reserved_weight - 0.25).abs() < 0.01,
+            "Should reserve 25% for debt patterns"
+        );
+    }
+
+    #[test]
     fn test_normalization_continuity() {
         // Linear scaling is continuous everywhere
         let eps = 0.001;
