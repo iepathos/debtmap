@@ -272,7 +272,7 @@ pub fn calculate_unified_priority_with_debt(
     }
 
     UnifiedScore {
-        complexity_factor: raw_complexity,
+        complexity_factor,
         coverage_factor: (1.0 - coverage_pct) * 10.0, // Convert gap to 0-10 for display
         dependency_factor: upstream_count as f64,
         role_multiplier,
