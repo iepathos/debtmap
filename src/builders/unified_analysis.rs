@@ -385,6 +385,21 @@ fn perform_unified_analysis_computation(
 
     let coverage_data = load_coverage_data(coverage_file.cloned())?;
 
+    // Emit warning if no coverage data provided (spec 108)
+    if coverage_data.is_none() && !quiet_mode {
+        use colored::*;
+        eprintln!();
+        eprintln!(
+            "{} Coverage data not provided. Analysis will focus on complexity and code smells.",
+            "💡 TIP:".bright_yellow()
+        );
+        eprintln!(
+            "   For test gap detection, provide coverage with: {}",
+            "--lcov-file coverage.info".bright_cyan()
+        );
+        eprintln!();
+    }
+
     if !quiet_mode {
         if use_emoji {
             eprintln!(" ✓");
@@ -756,6 +771,9 @@ pub fn create_unified_analysis_with_exclusions(
     let step_start = Instant::now();
     unified.sort_by_priority();
     unified.calculate_total_impact();
+
+    // Set coverage data availability flag (spec 108)
+    unified.has_coverage_data = coverage_data.is_some();
 
     if let Some(lcov) = coverage_data {
         unified.overall_coverage = Some(lcov.get_overall_coverage());

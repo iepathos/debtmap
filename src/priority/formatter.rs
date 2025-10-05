@@ -87,7 +87,14 @@ fn format_default_with_config(
     writeln!(output).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
-        format_mixed_priority_item(&mut output, idx + 1, item, verbosity, config);
+        format_mixed_priority_item(
+            &mut output,
+            idx + 1,
+            item,
+            verbosity,
+            config,
+            analysis.has_coverage_data,
+        );
         writeln!(output).unwrap();
     }
 
@@ -112,14 +119,17 @@ fn format_default_with_config(
     )
     .unwrap();
 
-    if let Some(coverage) = analysis.overall_coverage {
-        writeln!(
-            output,
-            "{} {}",
-            formatter.emoji("📈", "[CHART]"),
-            format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
-        )
-        .unwrap();
+    // Only show overall coverage if coverage data was provided (spec 108)
+    if analysis.has_coverage_data {
+        if let Some(coverage) = analysis.overall_coverage {
+            writeln!(
+                output,
+                "{} {}",
+                formatter.emoji("📈", "[CHART]"),
+                format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
+            )
+            .unwrap();
+        }
     }
 
     output
@@ -166,6 +176,7 @@ fn format_tail_with_config(
             item,
             verbosity,
             config,
+            analysis.has_coverage_data,
         );
         writeln!(output).unwrap();
     }
@@ -317,14 +328,17 @@ fn format_tiered_terminal(
     )
     .unwrap();
 
-    if let Some(coverage) = analysis.overall_coverage {
-        writeln!(
-            output,
-            "{} {}",
-            formatter.emoji("📊", "[COVERAGE]"),
-            format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
-        )
-        .unwrap();
+    // Only show overall coverage if coverage data was provided (spec 108)
+    if analysis.has_coverage_data {
+        if let Some(coverage) = analysis.overall_coverage {
+            writeln!(
+                output,
+                "{} {}",
+                formatter.emoji("📊", "[COVERAGE]"),
+                format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
+            )
+            .unwrap();
+        }
     }
 
     output
@@ -580,16 +594,18 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     )
     .unwrap();
 
-    // Add overall coverage if available
-    if let Some(coverage) = analysis.overall_coverage {
-        writeln!(
-            output,
-            "📈 {}",
-            format!("OVERALL COVERAGE: {coverage:.2}%")
-                .bright_green()
-                .bold()
-        )
-        .unwrap();
+    // Add overall coverage if available and coverage data was provided (spec 108)
+    if analysis.has_coverage_data {
+        if let Some(coverage) = analysis.overall_coverage {
+            writeln!(
+                output,
+                "📈 {}",
+                format!("OVERALL COVERAGE: {coverage:.2}%")
+                    .bright_green()
+                    .bold()
+            )
+            .unwrap();
+        }
     }
 
     output
@@ -626,10 +642,18 @@ fn format_mixed_priority_item(
     item: &priority::DebtItem,
     verbosity: u8,
     config: FormattingConfig,
+    has_coverage_data: bool,
 ) {
     match item {
         priority::DebtItem::Function(func_item) => {
-            verbosity::format_priority_item_with_config(output, rank, func_item, verbosity, config);
+            verbosity::format_priority_item_with_config(
+                output,
+                rank,
+                func_item,
+                verbosity,
+                config,
+                has_coverage_data,
+            );
         }
         priority::DebtItem::File(file_item) => {
             format_file_priority_item(output, rank, file_item, config);

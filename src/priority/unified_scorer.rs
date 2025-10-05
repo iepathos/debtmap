@@ -5,8 +5,8 @@ use crate::priority::{
     coverage_propagation::TransitiveCoverage,
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
     scoring::calculation::{
-        calculate_base_score, calculate_complexity_factor, calculate_coverage_factor,
-        calculate_dependency_factor, normalize_final_score,
+        calculate_base_score, calculate_base_score_no_coverage, calculate_complexity_factor,
+        calculate_coverage_factor, calculate_dependency_factor, normalize_final_score,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
     semantic_classifier::{classify_function_role, FunctionRole},
@@ -72,7 +72,15 @@ pub fn calculate_unified_priority(
     coverage: Option<&LcovData>,
     organization_issues: Option<f64>,
 ) -> UnifiedScore {
-    calculate_unified_priority_with_debt(func, call_graph, coverage, organization_issues, None)
+    let has_coverage_data = coverage.is_some();
+    calculate_unified_priority_with_debt(
+        func,
+        call_graph,
+        coverage,
+        organization_issues,
+        None,
+        has_coverage_data,
+    )
 }
 
 pub fn calculate_unified_score_with_patterns(
@@ -81,7 +89,15 @@ pub fn calculate_unified_score_with_patterns(
     coverage: Option<&LcovData>,
     call_graph: &CallGraph,
 ) -> UnifiedScore {
-    let base_score = calculate_unified_priority_with_debt(func, call_graph, coverage, None, None);
+    let has_coverage_data = coverage.is_some();
+    let base_score = calculate_unified_priority_with_debt(
+        func,
+        call_graph,
+        coverage,
+        None,
+        None,
+        has_coverage_data,
+    );
 
     // Apply god object multiplier
     let god_object_multiplier = if let Some(go) = god_object {
@@ -110,6 +126,7 @@ pub fn calculate_unified_priority_with_debt(
     coverage: Option<&LcovData>,
     _organization_issues: Option<f64>, // Kept for compatibility but no longer used
     debt_aggregator: Option<&DebtAggregator>,
+    has_coverage_data: bool,
 ) -> UnifiedScore {
     let func_id = FunctionId {
         file: func.file.clone(),
@@ -181,11 +198,16 @@ pub fn calculate_unified_priority_with_debt(
 
     // Use pure functions for calculation (easier to test and debug)
     // Use test-aware coverage factor (spec 98)
-    let coverage_factor = if func.is_test {
-        0.1 // Test functions get minimal coverage factor
+    let coverage_factor = if has_coverage_data {
+        if func.is_test {
+            0.1 // Test functions get minimal coverage factor
+        } else {
+            calculate_coverage_factor(coverage_pct)
+        }
     } else {
-        calculate_coverage_factor(coverage_pct)
+        0.0 // No coverage data - use neutral value
     };
+
     let complexity_factor = calculate_complexity_factor(raw_complexity);
     let upstream_count = call_graph.get_callers(&func_id).len();
     let dependency_factor = calculate_dependency_factor(upstream_count);
@@ -201,8 +223,14 @@ pub fn calculate_unified_priority_with_debt(
         _ => 1.0,
     };
 
-    // Calculate weighted sum base score
-    let base_score = calculate_base_score(coverage_factor, complexity_factor, dependency_factor);
+    // Calculate weighted sum base score with conditional weights
+    let base_score = if has_coverage_data {
+        // With coverage: use existing weights (50% coverage, 35% complexity, 15% deps)
+        calculate_base_score(coverage_factor, complexity_factor, dependency_factor)
+    } else {
+        // Without coverage: adjusted weights (50% complexity, 25% deps, 25% debt)
+        calculate_base_score_no_coverage(complexity_factor, dependency_factor)
+    };
 
     // Apply minimal role adjustment (capped to avoid distortion)
     let clamped_role_multiplier = role_multiplier.clamp(0.8, 1.2);

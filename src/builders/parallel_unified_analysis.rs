@@ -872,6 +872,9 @@ impl ParallelUnifiedAnalysisBuilder {
         unified.sort_by_priority();
         unified.calculate_total_impact();
 
+        // Set coverage data availability flag (spec 108)
+        unified.has_coverage_data = coverage_data.is_some();
+
         if let Some(lcov) = coverage_data {
             unified.overall_coverage = Some(lcov.get_overall_coverage());
         }

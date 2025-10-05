@@ -41,6 +41,8 @@ pub struct UnifiedAnalysis {
     pub call_graph: CallGraph,
     pub data_flow_graph: crate::data_flow::DataFlowGraph,
     pub overall_coverage: Option<f64>,
+    #[serde(default)]
+    pub has_coverage_data: bool,
 }
 
 // Single function analysis for evidence-based risk calculation
@@ -407,6 +409,7 @@ impl UnifiedAnalysis {
             call_graph,
             data_flow_graph,
             overall_coverage: None,
+            has_coverage_data: false,
         }
     }
 
