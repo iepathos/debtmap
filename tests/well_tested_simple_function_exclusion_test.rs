@@ -2,7 +2,6 @@
 ///
 /// This test verifies that well-tested simple functions (>80% coverage, cyclomatic < 10)
 /// don't appear in the top 10 technical debt recommendations.
-
 use debtmap::builders::parallel_unified_analysis::{
     ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
 };
@@ -30,7 +29,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             name: format!("simple_well_tested_{}", i),
             line: 10 + i * 10,
             length: 8,
-            cyclomatic: 3,  // Low complexity
+            cyclomatic: 3, // Low complexity
             cognitive: 5,
             nesting: 1,
             is_test: false,
@@ -46,7 +45,9 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
         };
 
         // Add 100% coverage for these functions
-        coverage_data.functions.entry(func.file.clone())
+        coverage_data
+            .functions
+            .entry(func.file.clone())
             .or_insert_with(Vec::new)
             .push(FunctionCoverage {
                 name: func.name.clone(),
@@ -66,7 +67,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             name: format!("complex_untested_{}", i),
             line: 10 + i * 20,
             length: 100,
-            cyclomatic: 15,  // High complexity
+            cyclomatic: 15, // High complexity
             cognitive: 25,
             nesting: 4,
             is_test: false,
@@ -116,30 +117,30 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
     let file_items = builder.execute_phase3_parallel(&functions, Some(&coverage_data), false);
 
     // Build final analysis
-    let (analysis, _timings) = builder.build(
-        data_flow,
-        purity,
-        items,
-        file_items,
-        Some(&coverage_data),
-    );
+    let (analysis, _timings) =
+        builder.build(data_flow, purity, items, file_items, Some(&coverage_data));
 
     // Get top 10 recommendations
     let recommendations = analysis.get_top_priorities(10);
 
     // Verify that none of the well-tested simple functions are in the top 10
-    let simple_in_top_10: Vec<_> = recommendations.iter()
+    let simple_in_top_10: Vec<_> = recommendations
+        .iter()
         .filter(|item| item.location.function.starts_with("simple_well_tested_"))
         .collect();
 
     assert!(
         simple_in_top_10.is_empty(),
         "Well-tested simple functions should not appear in top 10, but found: {:?}",
-        simple_in_top_10.iter().map(|item| &item.location.function).collect::<Vec<_>>()
+        simple_in_top_10
+            .iter()
+            .map(|item| &item.location.function)
+            .collect::<Vec<_>>()
     );
 
     // Verify that complex/untested functions dominate the top 10
-    let complex_in_top_10: Vec<_> = recommendations.iter()
+    let complex_in_top_10: Vec<_> = recommendations
+        .iter()
         .filter(|item| item.location.function.starts_with("complex_untested_"))
         .collect();
 
@@ -217,18 +218,14 @@ fn test_well_tested_simple_function_has_low_score() {
     let file_items = builder.execute_phase3_parallel(&functions, Some(&coverage_data), false);
 
     // Build final analysis
-    let (analysis, _timings) = builder.build(
-        data_flow,
-        purity,
-        items,
-        file_items,
-        Some(&coverage_data),
-    );
+    let (analysis, _timings) =
+        builder.build(data_flow, purity, items, file_items, Some(&coverage_data));
 
     let recommendations = analysis.get_top_priorities(10);
 
     // Should have the function in results
-    let simple_func = recommendations.iter()
+    let simple_func = recommendations
+        .iter()
         .find(|item| item.location.function == "simple_tested");
 
     if let Some(item) = simple_func {
