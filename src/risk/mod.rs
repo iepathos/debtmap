@@ -1,5 +1,6 @@
 pub mod context;
 pub mod correlation;
+pub mod coverage_index;
 pub mod delegation;
 pub mod evidence;
 pub mod evidence_calculator;
