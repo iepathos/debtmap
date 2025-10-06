@@ -104,6 +104,7 @@ fn calculate_base_effort(debt_type: &crate::priority::DebtType) -> u32 {
         crate::priority::DebtType::BlockingIO { .. } => 5,
         crate::priority::DebtType::SuboptimalDataStructure { .. } => 6,
         crate::priority::DebtType::GodObject { .. } => 16,
+        crate::priority::DebtType::GodModule { .. } => 16,
         crate::priority::DebtType::FeatureEnvy { .. } => 8,
         crate::priority::DebtType::PrimitiveObsession { .. } => 4,
         crate::priority::DebtType::MagicValues { .. } => 2,

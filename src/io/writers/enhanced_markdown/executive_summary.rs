@@ -174,6 +174,7 @@ pub fn identify_quick_wins(items: &[UnifiedDebtItem]) -> QuickWins {
             DebtType::Duplication { .. } => "Duplication",
             DebtType::Risk { .. } => "Risk",
             DebtType::GodObject { .. } => "God Object",
+            DebtType::GodModule { .. } => "God Module",
             DebtType::TestComplexityHotspot { .. } => "Test Complexity",
             DebtType::TestTodo { .. } => "Test Todo",
             DebtType::TestDuplication { .. } => "Test Duplication",
@@ -332,12 +333,11 @@ fn generate_business_impact(item: &UnifiedDebtItem) -> String {
             )
         }
         DebtType::GodObject {
-            responsibility_count,
-            ..
+            responsibilities, ..
         } => {
             format!(
                 "Unblocks parallel development on {} related features, reduces merge conflicts",
-                responsibility_count / 3
+                responsibilities / 3
             )
         }
         DebtType::DeadCode { .. } => {
@@ -621,11 +621,10 @@ pub fn estimate_effort_hours(item: &UnifiedDebtItem) -> u32 {
             (instances * 2).min(24)
         }
         DebtType::GodObject {
-            responsibility_count,
-            ..
+            responsibilities, ..
         } => {
             // God object refactoring is complex
-            (responsibility_count * 4).clamp(16, 80)
+            (responsibilities * 4).clamp(16, 80)
         }
         DebtType::BlockingIO { .. } => {
             // Async refactoring

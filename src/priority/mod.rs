@@ -9,6 +9,7 @@ pub mod parallel_call_graph;
 pub mod score_formatter;
 pub mod scoring;
 pub mod semantic_classifier;
+pub mod tiers;
 pub mod unified_scorer;
 
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,7 @@ pub use formatter_markdown::{
     format_priorities_tiered_markdown,
 };
 pub use semantic_classifier::{classify_function_role, FunctionRole};
+pub use tiers::{classify_tier, RecommendationTier, TierConfig};
 pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, UnifiedScore};
 
 use im::Vector;
@@ -144,8 +146,15 @@ pub enum DebtType {
     },
     // Organization debt types
     GodObject {
-        responsibility_count: u32,
-        complexity_score: f64,
+        methods: u32,
+        fields: u32,
+        responsibilities: u32,
+        god_object_score: f64,
+    },
+    GodModule {
+        functions: u32,
+        lines: u32,
+        responsibilities: u32,
     },
     FeatureEnvy {
         external_class: String,
@@ -196,6 +205,7 @@ impl DebtCategory {
         match debt_type {
             // Architecture Issues
             DebtType::GodObject { .. } => DebtCategory::Architecture,
+            DebtType::GodModule { .. } => DebtCategory::Architecture,
             DebtType::FeatureEnvy { .. } => DebtCategory::Architecture,
             DebtType::PrimitiveObsession { .. } => DebtCategory::Architecture,
 
@@ -242,6 +252,17 @@ impl DebtCategory {
             DebtCategory::Testing => "🧪",
             DebtCategory::Performance => "⚡",
             DebtCategory::CodeQuality => "📊",
+        }
+    }
+
+    /// Parse category from string (case-insensitive)
+    pub fn from_string(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "architecture" => Some(DebtCategory::Architecture),
+            "testing" => Some(DebtCategory::Testing),
+            "performance" => Some(DebtCategory::Performance),
+            "codequality" | "code_quality" | "quality" => Some(DebtCategory::CodeQuality),
+            _ => None,
         }
     }
 
@@ -604,24 +625,52 @@ impl UnifiedAnalysis {
     }
 
     pub fn get_top_mixed_priorities(&self, n: usize) -> Vector<DebtItem> {
-        // Combine function and file items, sorted by score
+        self.get_top_mixed_priorities_tiered(n, &TierConfig::default())
+    }
+
+    /// Get top priorities with tiered sorting
+    pub fn get_top_mixed_priorities_tiered(
+        &self,
+        n: usize,
+        tier_config: &TierConfig,
+    ) -> Vector<DebtItem> {
+        // Combine function and file items with tier classification
         let mut all_items: Vec<DebtItem> = Vec::new();
 
-        // Add function items
+        // Add function items with tier classification
         for item in &self.items {
-            all_items.push(DebtItem::Function(Box::new(item.clone())));
+            let mut item_with_tier = item.clone();
+            item_with_tier.tier = Some(classify_tier(item, tier_config));
+            all_items.push(DebtItem::Function(Box::new(item_with_tier)));
         }
 
-        // Add file items
+        // Add file items (files are always T1 if they're god objects)
         for item in &self.file_items {
             all_items.push(DebtItem::File(Box::new(item.clone())));
         }
 
-        // Sort by score descending
+        // Sort by tier first (T1 > T2 > T3 > T4), then by score within tier
         all_items.sort_by(|a, b| {
-            b.score()
-                .partial_cmp(&a.score())
-                .unwrap_or(std::cmp::Ordering::Equal)
+            // Get tier for comparison
+            let tier_a = match a {
+                DebtItem::Function(f) => f.tier.unwrap_or(RecommendationTier::T4Maintenance),
+                DebtItem::File(_) => RecommendationTier::T1CriticalArchitecture, // Files are architectural
+            };
+            let tier_b = match b {
+                DebtItem::Function(f) => f.tier.unwrap_or(RecommendationTier::T4Maintenance),
+                DebtItem::File(_) => RecommendationTier::T1CriticalArchitecture,
+            };
+
+            // Primary sort: by tier (lower enum value = higher priority)
+            match tier_a.cmp(&tier_b) {
+                std::cmp::Ordering::Equal => {
+                    // Secondary sort: by score within tier (higher score = higher priority)
+                    b.score()
+                        .partial_cmp(&a.score())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                }
+                other => other,
+            }
         });
 
         // Return top n items
@@ -634,6 +683,48 @@ impl UnifiedAnalysis {
             self.items.clone()
         } else {
             self.items.iter().skip(total_items - n).cloned().collect()
+        }
+    }
+
+    /// Filter analysis results by debt categories
+    pub fn filter_by_categories(&self, categories: &[DebtCategory]) -> Self {
+        let filtered_items: Vector<UnifiedDebtItem> = self
+            .items
+            .iter()
+            .filter(|item| {
+                let item_category = DebtCategory::from_debt_type(&item.debt_type);
+                categories.contains(&item_category)
+            })
+            .cloned()
+            .collect();
+
+        let filtered_file_items: Vector<FileDebtItem> = self
+            .file_items
+            .iter()
+            .filter(|_item| {
+                // File items (god objects) are architectural
+                categories.contains(&DebtCategory::Architecture)
+            })
+            .cloned()
+            .collect();
+
+        // Recalculate totals for filtered set
+        let total_debt_score: f64 = filtered_items
+            .iter()
+            .map(|item| item.unified_score.final_score)
+            .sum();
+
+        Self {
+            items: filtered_items,
+            file_items: filtered_file_items,
+            total_debt_score,
+            total_impact: self.total_impact.clone(),
+            debt_density: self.debt_density,
+            total_lines_of_code: self.total_lines_of_code,
+            call_graph: self.call_graph.clone(),
+            data_flow_graph: self.data_flow_graph.clone(),
+            overall_coverage: self.overall_coverage,
+            has_coverage_data: self.has_coverage_data,
         }
     }
 

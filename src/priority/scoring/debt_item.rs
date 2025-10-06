@@ -94,6 +94,7 @@ pub fn create_unified_debt_item_enhanced(
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
+        tier: None,
     }
 }
 
@@ -264,6 +265,7 @@ fn build_unified_debt_item(
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
+        tier: None,
     }
 }
 
@@ -400,6 +402,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
+        tier: None,
     }
 }
 
@@ -484,6 +487,7 @@ pub fn create_unified_debt_item_with_data_flow(
         is_pure: func.is_pure,
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
+        tier: None,
     }
 }
 
@@ -1787,6 +1791,7 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         is_pure: Some(context.function_info.is_pure),
         purity_confidence: Some(context.function_info.purity_confidence),
         god_object_indicators: None,
+        tier: None,
     }
 }
 
@@ -1929,9 +1934,26 @@ fn generate_standard_recommendation(
         } => generate_data_structure_recommendation(current_type, recommended_type),
         // Organization debt types
         DebtType::GodObject {
-            responsibility_count,
-            complexity_score,
-        } => generate_god_object_recommendation(*responsibility_count, *complexity_score),
+            responsibilities,
+            god_object_score,
+            ..
+        } => generate_god_object_recommendation(*responsibilities, *god_object_score),
+        DebtType::GodModule {
+            functions,
+            responsibilities,
+            ..
+        } => (
+            "Split module into focused submodules".to_string(),
+            format!(
+                "Module with {} functions across {} responsibilities",
+                functions, responsibilities
+            ),
+            vec![
+                "Identify distinct responsibilities".to_string(),
+                "Create separate modules for each responsibility".to_string(),
+                "Move functions to appropriate modules".to_string(),
+            ],
+        ),
         DebtType::FeatureEnvy {
             external_class,
             usage_ratio,
@@ -1992,6 +2014,7 @@ fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::SuboptimalDataStructure { .. } => 0.2,
         // Organization debt types (maintenance risk)
         DebtType::GodObject { .. } => 0.4,
+        DebtType::GodModule { .. } => 0.4,
         DebtType::FeatureEnvy { .. } => 0.25,
         DebtType::PrimitiveObsession { .. } => 0.2,
         DebtType::MagicValues { .. } => 0.15,
@@ -2049,8 +2072,8 @@ fn calculate_complexity_reduction(debt_type: &DebtType, is_complex: bool) -> f64
         DebtType::TestComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.3,
         // Organization debt types - significant complexity reduction potential
         DebtType::GodObject {
-            complexity_score, ..
-        } => *complexity_score * 0.4,
+            god_object_score, ..
+        } => *god_object_score * 0.4,
         DebtType::NestedLoops { depth, .. } => (*depth as f64).powf(2.0) * 0.3, // Quadratic impact
         DebtType::FeatureEnvy { .. } => 2.0, // Modest improvement
         _ => 0.0,
