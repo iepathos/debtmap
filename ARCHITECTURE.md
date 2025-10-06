@@ -378,6 +378,105 @@ After implementing dependency injection:
 - **Interface segregation** - modules depend only on required traits
 - **Dependency inversion** - high-level modules independent of low-level details
 
+## Scoring Architecture
+
+### Unified Scoring Model
+
+DebtMap uses a sophisticated scoring system to prioritize technical debt items based on multiple factors:
+
+#### Base Score Calculation
+
+The base score uses a **weighted sum model** that combines three primary factors:
+
+- **Coverage Factor (40% weight)**: Measures test coverage gaps
+- **Complexity Factor (40% weight)**: Assesses code complexity
+- **Dependency Factor (20% weight)**: Evaluates impact based on call graph position
+
+**Formula**:
+```
+base_score = (coverage_score × 0.4) + (complexity_score × 0.4) + (dependency_score × 0.2)
+```
+
+#### Role-Based Coverage Weighting
+
+**Design Decision**: Not all functions need the same level of unit test coverage. Entry points (CLI handlers, HTTP routes, main functions) are typically integration tested rather than unit tested, while pure business logic should have comprehensive unit tests.
+
+**Implementation**: Role-based coverage weights adjust the coverage penalty based on function role:
+
+```rust
+// From unified_scorer.rs:236
+let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight_multiplier);
+```
+
+**Default Weights** (configurable in `.debtmap.toml`):
+
+| Function Role    | Coverage Weight | Rationale                                    |
+|------------------|-----------------|----------------------------------------------|
+| Entry Point      | 0.6             | Integration tested, orchestrates other code  |
+| Orchestrator     | 0.8             | Coordinates logic, partially integration tested |
+| Pure Logic       | 1.2             | Should be thoroughly unit tested             |
+| I/O Wrapper      | 0.7             | Often tested via integration tests           |
+| Pattern Match    | 1.0             | Standard weight                              |
+| Unknown          | 1.0             | Default weight                               |
+
+**Example**: An entry point with 0% coverage receives `1.0 - ((1.0 - 0.0) × 0.6) = 0.4` adjusted coverage (40% penalty reduction), while a pure logic function with 0% coverage gets the full penalty.
+
+**Benefits**:
+- Prevents entry points from dominating priority lists due to low unit test coverage
+- Focuses testing efforts on pure business logic where unit tests provide most value
+- Recognizes different testing strategies (unit vs integration) as equally valid
+
+#### Role Multiplier
+
+A minimal role adjustment (clamped to 0.8-1.2x) is applied to the final score to reflect function importance:
+
+```rust
+// From unified_scorer.rs:261-262
+let clamped_role_multiplier = role_multiplier.clamp(0.8, 1.2);
+let role_adjusted_score = base_score * clamped_role_multiplier;
+```
+
+**Key Distinction**: The role multiplier is separate from coverage weight adjustment:
+- **Coverage weight** (applied early): Adjusts coverage expectations by role
+- **Role multiplier** (applied late): Small final adjustment for role importance
+
+This two-stage approach ensures role-based coverage adjustments don't interfere with the role multiplier's impact on final prioritization.
+
+#### Function Role Detection
+
+Function roles are detected automatically through heuristic analysis:
+
+**Entry Point Detection**:
+- Name patterns: `main`, `run_*`, `handle_*`, `execute_*`
+- Attributes: `#[tokio::main]`, `#[actix_web::main]`, CLI command annotations
+- Call graph position: No callers or called only by test harnesses
+
+**Pure Logic Detection**:
+- No file I/O operations
+- No network calls
+- No database access
+- Deterministic (no randomness, no system time)
+- Returns value without side effects
+
+**Orchestrator Detection**:
+- High ratio of function calls to logic statements
+- Coordinates multiple sub-operations
+- Thin logic wrapper over other functions
+
+**I/O Wrapper Detection**:
+- Dominated by I/O operations (file, network, database)
+- Thin abstraction over external resources
+
+### Entropy-Based Complexity Adjustment
+
+Debtmap distinguishes between genuinely complex code and pattern-based repetitive code using information theory:
+
+- **Entropy Score**: Measures randomness/diversity in code patterns
+- **Pattern Repetition**: Detects repeated structures (e.g., 10 similar match arms)
+- **Dampening Factor**: Reduces complexity score for highly repetitive code
+
+This prevents false positives from large but simple pattern-matching code.
+
 ## Dependencies
 
 ### Core Dependencies

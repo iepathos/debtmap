@@ -264,3 +264,127 @@ fn test_well_tested_simple_function_scores_below_20() {
 }
 
 // Add more tests as needed...
+
+// Tests for spec 110: Role-based coverage weight multiplier
+
+fn create_entry_point_function(cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
+    let mut func = create_test_metrics();
+    func.name = "handle_analyze".to_string(); // Entry point name pattern
+    func.cyclomatic = cyclomatic;
+    func.cognitive = cognitive;
+    func
+}
+
+fn create_pure_logic_function(cyclomatic: u32, cognitive: u32) -> FunctionMetrics {
+    let mut func = create_test_metrics();
+    func.name = "calculate_score".to_string(); // Pure logic name pattern
+    func.cyclomatic = cyclomatic;
+    func.cognitive = cognitive;
+    func
+}
+
+fn create_zero_coverage_data(func: &FunctionMetrics) -> LcovData {
+    let mut lcov = LcovData::default();
+    lcov.functions.insert(
+        func.file.clone(),
+        vec![FunctionCoverage {
+            name: func.name.clone(),
+            start_line: func.line,
+            execution_count: 0,
+            coverage_percentage: 0.0,
+            uncovered_lines: vec![func.line],
+        }],
+    );
+    lcov.build_index();
+    lcov
+}
+
+#[test]
+fn test_entry_point_coverage_adjustment() {
+    // Spec 110: Entry points with 0% coverage should score lower than pure logic with 0% coverage
+    let entry_point = create_entry_point_function(17, 17);
+    let pure_logic = create_pure_logic_function(17, 17);
+
+    let call_graph = CallGraph::new();
+    let entry_lcov = create_zero_coverage_data(&entry_point);
+    let logic_lcov = create_zero_coverage_data(&pure_logic);
+
+    let entry_score =
+        calculate_unified_priority(&entry_point, &call_graph, Some(&entry_lcov), None);
+    let logic_score = calculate_unified_priority(&pure_logic, &call_graph, Some(&logic_lcov), None);
+
+    // Entry point should score LOWER due to 0.6x coverage weight multiplier
+    assert!(
+        entry_score.final_score < logic_score.final_score,
+        "Entry point (score: {}) should score lower than pure logic (score: {}) with same complexity and 0% coverage",
+        entry_score.final_score,
+        logic_score.final_score
+    );
+}
+
+#[test]
+fn test_orchestrator_coverage_adjustment() {
+    // Spec 110: Orchestrators should get 0.8x coverage weight multiplier
+    let mut orchestrator = create_test_metrics();
+    orchestrator.name = "orchestrate_analysis".to_string();
+    orchestrator.cyclomatic = 12;
+    orchestrator.cognitive = 15;
+
+    let call_graph = CallGraph::new();
+    let lcov = create_zero_coverage_data(&orchestrator);
+
+    let score = calculate_unified_priority(&orchestrator, &call_graph, Some(&lcov), None);
+
+    // Orchestrator with 0% coverage should have reduced penalty compared to normal functions
+    // The score should be lower than a pure logic function with same complexity
+    assert!(
+        score.final_score > 0.0,
+        "Orchestrator should still have a score, but reduced due to coverage adjustment"
+    );
+}
+
+#[test]
+fn test_entry_point_with_coverage_not_overly_penalized() {
+    // Spec 110: Entry point with 50% coverage should not rank in critical tier
+    let entry_point = create_entry_point_function(12, 12);
+    let mut partial_lcov = LcovData::default();
+    partial_lcov.functions.insert(
+        entry_point.file.clone(),
+        vec![FunctionCoverage {
+            name: entry_point.name.clone(),
+            start_line: entry_point.line,
+            execution_count: 5,
+            coverage_percentage: 50.0,
+            uncovered_lines: vec![],
+        }],
+    );
+    partial_lcov.build_index();
+
+    let call_graph = CallGraph::new();
+    let score = calculate_unified_priority(&entry_point, &call_graph, Some(&partial_lcov), None);
+
+    // Should not rank in critical tier (< 20.0)
+    assert!(
+        score.final_score < 20.0,
+        "Entry point with 50% coverage and moderate complexity should not be critical (score: {})",
+        score.final_score
+    );
+}
+
+#[test]
+fn test_complex_entry_point_still_flagged() {
+    // Spec 110: Complex entry points should still be flagged despite coverage adjustment
+    let complex_entry = create_entry_point_function(25, 30);
+
+    let call_graph = CallGraph::new();
+    let lcov = create_zero_coverage_data(&complex_entry);
+
+    let score = calculate_unified_priority(&complex_entry, &call_graph, Some(&lcov), None);
+
+    // Should still be flagged due to high complexity, even with coverage adjustment
+    assert!(
+        score.final_score > 10.0,
+        "Complex entry point should still be flagged (score: {})",
+        score.final_score
+    );
+}

@@ -1220,6 +1220,48 @@ Debtmap is built with a functional, modular architecture designed for extensibil
   - Multiple output formats (Terminal, JSON, Markdown)
   - Pretty-printing with colored output
 
+## FAQ
+
+### Why don't entry points need 100% unit coverage?
+
+Entry points (like CLI command handlers, HTTP route handlers, or main functions) are typically integration tested rather than unit tested. They orchestrate calls to other functions and handle I/O operations, making isolated unit testing less valuable.
+
+Debtmap's scoring system recognizes this distinction through **role-based coverage weighting**:
+
+- **Entry points** receive reduced coverage weight (default: 0.6x) because they're expected to have lower direct unit test coverage
+- **Pure logic functions** receive increased coverage weight (default: 1.2x) because they should be thoroughly unit tested
+- Other roles (orchestrators, I/O wrappers, etc.) have weights between these extremes
+
+This prevents entry points from dominating your priority list just because they lack direct unit tests, while ensuring core business logic gets proper test coverage.
+
+**Configuration**: You can adjust these weights in `.debtmap.toml`:
+
+```toml
+[scoring.role_coverage_weights]
+entry_point = 0.6      # Lower weight for entry points
+orchestrator = 0.8     # Moderate weight for orchestration
+pure_logic = 1.2       # Higher weight for pure functions
+io_wrapper = 0.7       # Lower weight for I/O operations
+pattern_match = 1.0    # Standard weight for pattern matching
+unknown = 1.0          # Default weight
+```
+
+**Display**: When running with verbose output (`-vv`), entry points show an indicator:
+```
+Coverage Score: 5.0 × 40% = 2.0 (gap: 100%, coverage: 0%) (entry point - integration tested, lower unit coverage expected)
+```
+
+### How does debtmap detect function roles?
+
+Debtmap analyzes function characteristics to automatically classify roles:
+
+- **Entry points**: Detected by name patterns (`main`, `run_*`, `handle_*`), presence of CLI/HTTP attributes, or position in the call graph
+- **Pure logic**: Functions with no I/O operations, minimal side effects, and high testability
+- **Orchestrators**: Functions that primarily call other functions with minimal logic
+- **I/O wrappers**: Functions dominated by file, network, or database operations
+
+This classification happens automatically during analysis and influences prioritization scoring.
+
 ## Contributing
 
 We welcome contributions! This is an early-stage project, so there's plenty of room for improvement.

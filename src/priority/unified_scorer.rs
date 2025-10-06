@@ -215,13 +215,26 @@ pub fn calculate_unified_priority_with_debt(
         _ => 1.0,
     };
 
+    // Get role-based coverage weight multiplier (spec 110)
+    let role_coverage_weights = crate::config::get_role_coverage_weights();
+    let coverage_weight_multiplier = match role {
+        FunctionRole::EntryPoint => role_coverage_weights.entry_point,
+        FunctionRole::Orchestrator => role_coverage_weights.orchestrator,
+        FunctionRole::PureLogic => role_coverage_weights.pure_logic,
+        FunctionRole::IOWrapper => role_coverage_weights.io_wrapper,
+        FunctionRole::PatternMatch => role_coverage_weights.pattern_match,
+        _ => role_coverage_weights.unknown,
+    };
+
     // Calculate base score with coverage as multiplier (spec 122)
     let base_score = if has_coverage_data {
         // With coverage: use multiplier approach (coverage dampens complexity+deps score)
         let coverage_multiplier = if func.is_test {
             0.0 // Test functions get maximum dampening (near-zero score)
         } else {
-            calculate_coverage_multiplier(coverage_pct)
+            // Apply role-based coverage weight adjustment (spec 110)
+            let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight_multiplier);
+            calculate_coverage_multiplier(adjusted_coverage_pct)
         };
         calculate_base_score_with_coverage_multiplier(
             coverage_multiplier,
@@ -245,6 +258,10 @@ pub fn calculate_unified_priority_with_debt(
     };
 
     // Apply minimal role adjustment (capped to avoid distortion)
+    // NOTE: This is separate from role-based coverage weight adjustment (applied earlier at line 236).
+    // Coverage weight adjusts coverage expectations by role (entry points need less unit coverage).
+    // This multiplier provides a small final adjustment for role importance (0.8-1.2x range).
+    // The two-stage approach ensures they don't interfere with each other.
     let clamped_role_multiplier = role_multiplier.clamp(0.8, 1.2);
     let role_adjusted_score = base_score * clamped_role_multiplier;
 
