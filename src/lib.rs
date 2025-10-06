@@ -19,6 +19,7 @@ pub mod example_debt;
 pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;
+pub mod metrics;
 pub mod organization;
 pub mod output;
 pub mod patterns;
