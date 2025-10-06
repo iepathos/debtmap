@@ -203,6 +203,71 @@ fn default_unknown_multiplier() -> f64 {
     1.0 // No adjustment for unknown functions
 }
 
+/// Role-based coverage weight multipliers for scoring adjustment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleCoverageWeights {
+    /// Coverage weight multiplier for EntryPoint functions (default: 0.6)
+    #[serde(default = "default_entry_point_coverage_weight")]
+    pub entry_point: f64,
+
+    /// Coverage weight multiplier for Orchestrator functions (default: 0.8)
+    #[serde(default = "default_orchestrator_coverage_weight")]
+    pub orchestrator: f64,
+
+    /// Coverage weight multiplier for PureLogic functions (default: 1.0)
+    #[serde(default = "default_pure_logic_coverage_weight")]
+    pub pure_logic: f64,
+
+    /// Coverage weight multiplier for IOWrapper functions (default: 1.0)
+    #[serde(default = "default_io_wrapper_coverage_weight")]
+    pub io_wrapper: f64,
+
+    /// Coverage weight multiplier for PatternMatch functions (default: 1.0)
+    #[serde(default = "default_pattern_match_coverage_weight")]
+    pub pattern_match: f64,
+
+    /// Coverage weight multiplier for Unknown functions (default: 1.0)
+    #[serde(default = "default_unknown_coverage_weight")]
+    pub unknown: f64,
+}
+
+impl Default for RoleCoverageWeights {
+    fn default() -> Self {
+        Self {
+            entry_point: default_entry_point_coverage_weight(),
+            orchestrator: default_orchestrator_coverage_weight(),
+            pure_logic: default_pure_logic_coverage_weight(),
+            io_wrapper: default_io_wrapper_coverage_weight(),
+            pattern_match: default_pattern_match_coverage_weight(),
+            unknown: default_unknown_coverage_weight(),
+        }
+    }
+}
+
+fn default_entry_point_coverage_weight() -> f64 {
+    0.6 // Entry points are often integration tested, reduce unit coverage penalty
+}
+
+fn default_orchestrator_coverage_weight() -> f64 {
+    0.8 // Orchestrators are often tested via higher-level tests
+}
+
+fn default_pure_logic_coverage_weight() -> f64 {
+    1.0 // Pure logic should have unit tests, no reduction
+}
+
+fn default_io_wrapper_coverage_weight() -> f64 {
+    1.0 // I/O wrappers should have unit tests, no reduction
+}
+
+fn default_pattern_match_coverage_weight() -> f64 {
+    1.0 // Pattern matching should have unit tests, no reduction
+}
+
+fn default_unknown_coverage_weight() -> f64 {
+    1.0 // Unknown functions get normal coverage expectations
+}
+
 /// Score normalization configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NormalizationConfig {
@@ -560,6 +625,10 @@ pub struct DebtmapConfig {
     /// Tier configuration for prioritization
     #[serde(default)]
     pub tiers: Option<crate::priority::TierConfig>,
+
+    /// Role-based coverage weight multipliers
+    #[serde(default)]
+    pub role_coverage_weights: Option<RoleCoverageWeights>,
 }
 
 impl DebtmapConfig {
@@ -1201,6 +1270,14 @@ pub struct SeverityOverride {
 /// Get error handling configuration
 pub fn get_error_handling_config() -> ErrorHandlingConfig {
     get_config().error_handling.clone().unwrap_or_default()
+}
+
+/// Get role-based coverage weight multipliers
+pub fn get_role_coverage_weights() -> RoleCoverageWeights {
+    get_config()
+        .role_coverage_weights
+        .clone()
+        .unwrap_or_default()
 }
 
 /// Get smart performance configuration
