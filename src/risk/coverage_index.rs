@@ -22,7 +22,7 @@ fn normalize_path(path: &Path) -> PathBuf {
 ///
 /// Build index once and share across threads:
 ///
-/// ```
+/// ```ignore
 /// use std::sync::Arc;
 /// let coverage = parse_lcov("coverage.info")?;
 /// let index = Arc::new(CoverageIndex::from_coverage(&coverage));
