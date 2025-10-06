@@ -1451,7 +1451,7 @@ mod tests {
         ];
 
         let mut output = String::new();
-        format_priority_item_with_verbosity(&mut output, 1, &item, 0);
+        format_priority_item_with_verbosity(&mut output, 1, &item, 2);
 
         // Should show "14 callers" in dependency score line
         assert!(
@@ -1480,7 +1480,7 @@ mod tests {
         item.downstream_callees = vec!["callee1".to_string()]; // Has callees
 
         let mut output = String::new();
-        format_priority_item_with_verbosity(&mut output, 1, &item, 0);
+        format_priority_item_with_verbosity(&mut output, 1, &item, 2);
 
         // Should show "0 callers" in dependency score line
         assert!(
