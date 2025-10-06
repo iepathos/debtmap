@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct FunctionCoverage {
@@ -21,8 +21,8 @@ pub struct LcovData {
     pub lines_hit: usize,
     /// LOC counter instance for consistent line counting across analysis modes
     loc_counter: Option<crate::metrics::LocCounter>,
-    /// Pre-built index for O(1) function coverage lookups
-    coverage_index: CoverageIndex,
+    /// Pre-built index for O(1) function coverage lookups, wrapped in Arc for lock-free sharing across threads
+    coverage_index: Arc<CoverageIndex>,
 }
 
 impl Default for LcovData {
@@ -39,14 +39,14 @@ impl LcovData {
             total_lines: 0,
             lines_hit: 0,
             loc_counter: None,
-            coverage_index: CoverageIndex::empty(),
+            coverage_index: Arc::new(CoverageIndex::empty()),
         }
     }
 
     /// Build the coverage index from current function data
     /// This should be called after modifying the functions HashMap
     pub fn build_index(&mut self) {
-        self.coverage_index = CoverageIndex::from_coverage(self);
+        self.coverage_index = Arc::new(CoverageIndex::from_coverage(self));
     }
 }
 

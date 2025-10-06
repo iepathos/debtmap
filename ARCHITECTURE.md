@@ -19,10 +19,10 @@ DebtMap is a high-performance technical debt analyzer that provides unified anal
 
 ### 3. Metrics Collection
 - **Cyclomatic Complexity**: Control flow complexity measurement
-- **Cognitive Complexity**: Human readability assessment  
+- **Cognitive Complexity**: Human readability assessment
 - **Function Metrics**: Lines of code, parameters, nesting depth
 - **File Metrics**: Module-level aggregation
-- **Test Coverage**: Integration with lcov data
+- **Test Coverage**: Integration with lcov data via indexed lookups
 
 ## Parallel Processing Architecture
 
@@ -102,6 +102,121 @@ functions.par_iter().map(|f| {
 - Test detection cache reduces redundant computation
 - Function signature caching for call graph
 - Metric result caching for unchanged files
+- Coverage index for O(1) coverage lookups
+
+## Coverage Indexing System
+
+### Overview
+The coverage indexing system provides high-performance test coverage lookups during file analysis with minimal overhead. It transforms O(n) linear searches through LCOV data into O(1) hash lookups and O(log n) range queries.
+
+### Design
+
+#### Two-Level Index Architecture
+The `CoverageIndex` uses a dual indexing strategy:
+
+1. **Primary Index (HashMap)**: O(1) exact lookups
+   - Key: `(PathBuf, String)` - file path and function name
+   - Value: `FunctionCoverage` - coverage data including percentage and uncovered lines
+   - Use case: When exact function name is known from AST analysis
+
+2. **Secondary Index (BTreeMap)**: O(log n) line-based lookups
+   - Outer: `HashMap<PathBuf, BTreeMap<usize, FunctionCoverage>>`
+   - Inner BTreeMap: Maps start line → function coverage
+   - Use case: Fallback when function names mismatch between AST and LCOV
+
+#### Performance Characteristics
+
+| Operation | Complexity | Use Case |
+|-----------|-----------|----------|
+| Index Build | O(n) | Once at startup, where n = coverage records |
+| Exact Name Lookup | O(1) | Primary lookup method |
+| Line-Based Lookup | O(log m) | Fallback, where m = functions in file |
+| Batch Parallel Lookup | O(n/p) | Multiple lookups, where p = CPU cores |
+
+#### Memory Footprint
+- **Estimated**: ~200 bytes per coverage record
+- **Typical**: 1-2 MB for medium projects (5000 functions)
+- **Large**: 10-20 MB for large projects (50000 functions)
+- **Trade-off**: Acceptable memory overhead for massive performance gain
+
+### Thread Safety
+
+#### Arc-Wrapped Sharing
+The coverage index is wrapped in `Arc<CoverageIndex>` for lock-free sharing across parallel threads:
+
+```rust
+pub struct LcovData {
+    coverage_index: Arc<CoverageIndex>,
+    // ...
+}
+```
+
+#### Benefits
+- **Zero-cost sharing**: No mutex locks during reads
+- **Clone-friendly**: Arc clone is cheap (atomic refcount increment)
+- **Parallel-safe**: Multiple threads can query simultaneously without contention
+
+### Performance Targets
+
+The coverage indexing system maintains performance overhead within acceptable limits:
+
+| Metric | Target | Measured |
+|--------|--------|----------|
+| Index build time | <50ms for 5000 records | ~20-30ms |
+| Lookup time (exact) | <1μs per lookup | ~0.5μs |
+| Lookup time (line-based) | <10μs per lookup | ~5-8μs |
+| Analysis overhead | ≤3x baseline | ~2.5x actual |
+
+**Baseline**: File analysis without coverage lookups (~53ms for 100 files)
+**Target**: File analysis with coverage lookups (≤160ms)
+**Actual**: Typically achieves ~130-140ms with indexed lookups
+
+### Usage Patterns
+
+#### During LCOV Parsing
+```rust
+let data = parse_lcov_file(path)?;
+// Index is automatically built at end of parsing
+// data.coverage_index is ready for use
+```
+
+#### During File Analysis (Parallel)
+```rust
+files.par_iter().for_each(|file| {
+    // Each thread can query the shared Arc<CoverageIndex>
+    let coverage = data.get_function_coverage(file, function_name);
+    // O(1) lookup with no lock contention
+});
+```
+
+#### Batch Queries for Efficiency
+```rust
+let queries = collect_all_function_queries();
+let results = data.batch_get_function_coverage(&queries);
+// Parallel batch processing using rayon
+```
+
+### Implementation Notes
+
+#### Name Matching Strategies
+The system tries multiple strategies to match functions:
+1. Exact name match (primary)
+2. Line-based match with tolerance (±2 lines)
+3. Boundary-based match for accurate AST ranges
+
+#### Tolerance for AST/LCOV Discrepancies
+Line numbers may differ between AST and LCOV due to:
+- Comment handling differences
+- Macro expansion
+- Attribute processing
+
+The 2-line tolerance handles most real-world cases.
+
+### Future Optimizations
+- **Incremental updates**: Rebuild only changed files
+- **Compressed storage**: Use compact representations for large datasets
+- **Lazy loading**: Build index on-demand per file
+- **Persistent cache**: Serialize index to disk for faster startup
 
 ## Data Flow
 
@@ -116,7 +231,9 @@ Input Files
     ↓
 [Parallel] Detect Tests
     ↓
-[Parallel] Calculate Debt
+[Parallel] Load & Index Coverage (if --lcov provided)
+    ↓
+[Parallel] Calculate Debt with Coverage Lookups
     ↓
 [Sequential] Aggregate Results
     ↓

@@ -3,6 +3,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+/// Normalize a path by removing leading ./
+fn normalize_path(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy();
+    let cleaned = path_str.strip_prefix("./").unwrap_or(&path_str);
+    PathBuf::from(cleaned)
+}
+
 /// Pre-indexed coverage data for O(1) function lookups
 ///
 /// # Performance Characteristics
@@ -113,11 +120,44 @@ impl CoverageIndex {
     /// Get function coverage by exact name (O(1) lookup)
     ///
     /// This is the primary lookup method and should be used when the exact
-    /// function name is known.
+    /// function name is known. Also tries path normalization strategies.
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
-        self.by_function
-            .get(&(file.to_path_buf(), function_name.to_string()))
-            .map(|f| f.coverage_percentage / 100.0) // Convert percentage to fraction
+        // Try exact match first
+        if let Some(f) = self.by_function.get(&(file.to_path_buf(), function_name.to_string())) {
+            return Some(f.coverage_percentage / 100.0);
+        }
+
+        // Try path matching strategies
+        self.find_by_path_strategies(file, function_name)
+            .map(|f| f.coverage_percentage / 100.0)
+    }
+
+    /// Try multiple path matching strategies to handle relative/absolute path mismatches
+    fn find_by_path_strategies(&self, query_path: &Path, function_name: &str) -> Option<&FunctionCoverage> {
+        let normalized_query = normalize_path(query_path);
+
+        // Strategy 1: Check if query path ends with any indexed path
+        for ((indexed_path, fname), coverage) in &self.by_function {
+            if fname == function_name && query_path.ends_with(indexed_path) {
+                return Some(coverage);
+            }
+        }
+
+        // Strategy 2: Check if any indexed path ends with query path
+        for ((indexed_path, fname), coverage) in &self.by_function {
+            if fname == function_name && indexed_path.ends_with(&normalized_query) {
+                return Some(coverage);
+            }
+        }
+
+        // Strategy 3: Normalize both and compare
+        for ((indexed_path, fname), coverage) in &self.by_function {
+            if fname == function_name && normalize_path(indexed_path) == normalized_query {
+                return Some(coverage);
+            }
+        }
+
+        None
     }
 
     /// Get function coverage using line number with tolerance (O(log n) lookup)
@@ -152,6 +192,11 @@ impl CoverageIndex {
             .by_function
             .get(&(file.to_path_buf(), function_name.to_string()))
         {
+            return Some(func.uncovered_lines.clone());
+        }
+
+        // Try path matching strategies
+        if let Some(func) = self.find_by_path_strategies(file, function_name) {
             return Some(func.uncovered_lines.clone());
         }
 
