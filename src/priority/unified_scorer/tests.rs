@@ -105,16 +105,18 @@ fn test_simple_io_wrapper_without_coverage_has_score() {
 }
 
 fn assert_zero_coverage_boost(score: &UnifiedScore) {
+    // Spec 122: With multiplier approach, 0% coverage (multiplier=1.0) keeps full base score
+    // No longer applying 10x boost, but function still gets full complexity+dependency score
     assert!(
-        score.final_score >= 50.0,
-        "Zero coverage functions should score at least 50.0, got {}",
+        score.final_score > 0.0,
+        "Zero coverage functions should have non-zero score, got {}",
         score.final_score
     );
 }
 
 #[test]
 fn test_zero_coverage_prioritization() {
-    // Test spec 98: Functions with 0% coverage get 10x boost
+    // Test spec 122: Functions with 0% coverage get full base score (multiplier=1.0)
     let func = create_test_function_for_coverage();
     let call_graph = CallGraph::new();
 
@@ -152,9 +154,11 @@ fn create_test_function_for_coverage() -> FunctionMetrics {
 }
 
 fn assert_low_coverage_boost(score_low: &UnifiedScore, score_mid: &UnifiedScore) {
+    // Spec 122: With multiplier approach, lower coverage → higher score (monotonicity)
+    // 10% coverage (multiplier=0.9) should score higher than 50% coverage (multiplier=0.5)
     assert!(
-        score_low.final_score > score_mid.final_score * 2.0,
-        "10% coverage ({}) should score much higher than 50% coverage ({})",
+        score_low.final_score > score_mid.final_score,
+        "10% coverage ({}) should score higher than 50% coverage ({})",
         score_low.final_score,
         score_mid.final_score
     );
@@ -162,7 +166,7 @@ fn assert_low_coverage_boost(score_low: &UnifiedScore, score_mid: &UnifiedScore)
 
 #[test]
 fn test_low_coverage_prioritization() {
-    // Test spec 98: Functions with <20% coverage get 5x boost
+    // Test spec 122: Functions with lower coverage score higher (monotonicity)
     let func = create_test_function_for_coverage();
     let call_graph = CallGraph::new();
 

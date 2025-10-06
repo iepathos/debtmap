@@ -7,6 +7,10 @@ use crate::priority::semantic_classifier::{classify_function_role, FunctionRole}
 use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
 use std::collections::HashSet;
 
+// Configuration for untested function thresholds (spec 122)
+const UNTESTED_COMPLEXITY_THRESHOLD: u32 = 15;
+const UNTESTED_DEPENDENCY_THRESHOLD: usize = 10;
+
 /// Determine the primary debt type for a function
 pub fn determine_debt_type(
     func: &FunctionMetrics,
@@ -271,6 +275,32 @@ pub fn classify_test_debt(func: &FunctionMetrics) -> DebtType {
             cognitive: func.cognitive,
         },
     }
+}
+
+/// Check if an untested function should surface in top recommendations (spec 122)
+/// Only surfaces untested functions if they meet complexity or dependency thresholds
+pub fn should_surface_untested_function(
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    func_id: &FunctionId,
+) -> bool {
+    // Always surface if complexity is high
+    if func.cyclomatic >= UNTESTED_COMPLEXITY_THRESHOLD {
+        return true;
+    }
+
+    // Surface if high dependency count
+    let upstream_count = call_graph.get_callers(func_id).len();
+    let downstream_count = call_graph.get_callees(func_id).len();
+    let total_dependencies = upstream_count + downstream_count;
+
+    if total_dependencies >= UNTESTED_DEPENDENCY_THRESHOLD {
+        return true;
+    }
+
+    // Surface if critical role (entry points, public APIs)
+    let role = classify_function_role(func, func_id, call_graph);
+    matches!(role, FunctionRole::EntryPoint)
 }
 
 /// Check if function is a complexity hotspot
