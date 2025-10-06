@@ -427,7 +427,7 @@ fn format_score_calculation_section(
         formatter.emoji("├─", "-"),
         factors.dependency_factor * 10.0, // Convert to 0-100 scale
         factors.dependency_factor * 10.0 * 0.15,
-        item.unified_score.dependency_factor as u32
+        item.upstream_callers.len() // Display actual caller count, not normalized score
     ));
 
     // Calculate weighted sum base score
@@ -1427,6 +1427,76 @@ mod tests {
         assert!(recommendations
             .iter()
             .any(|r| r.contains("Complex function")));
+    }
+
+    #[test]
+    fn test_caller_count_display_consistency() {
+        // Test with 14 callers to match real-world example from spec
+        let mut item = create_test_item();
+        item.upstream_callers = vec![
+            "caller1".to_string(),
+            "caller2".to_string(),
+            "caller3".to_string(),
+            "caller4".to_string(),
+            "caller5".to_string(),
+            "caller6".to_string(),
+            "caller7".to_string(),
+            "caller8".to_string(),
+            "caller9".to_string(),
+            "caller10".to_string(),
+            "caller11".to_string(),
+            "caller12".to_string(),
+            "caller13".to_string(),
+            "caller14".to_string(),
+        ];
+
+        let mut output = String::new();
+        format_priority_item_with_verbosity(&mut output, 1, &item, 0);
+
+        // Should show "14 callers" in dependency score line
+        assert!(
+            output.contains("(14 callers)"),
+            "Dependency score line should show actual caller count (14), got: {}",
+            output
+        );
+
+        // Should also show "14 callers" in CALLS section
+        assert!(
+            output.contains("14 caller"),
+            "CALLS section should show actual caller count (14)"
+        );
+
+        // Should NOT show dead code warning for function with callers
+        assert!(
+            !output.contains("No callers detected"),
+            "Should not show dead code warning when function has callers"
+        );
+    }
+
+    #[test]
+    fn test_dead_code_warning_only_for_zero_callers() {
+        let mut item = create_test_item();
+        item.upstream_callers = vec![]; // 0 callers
+        item.downstream_callees = vec!["callee1".to_string()]; // Has callees
+
+        let mut output = String::new();
+        format_priority_item_with_verbosity(&mut output, 1, &item, 0);
+
+        // Should show "0 callers" in dependency score line
+        assert!(
+            output.contains("(0 callers)"),
+            "Dependency score line should show 0 callers, got: {}",
+            output
+        );
+
+        // If verbosity shows call graph, should show dead code warning
+        // The warning appears when there are no callers but there are callees
+        if output.contains("CALLS:") {
+            assert!(
+                output.contains("No callers detected"),
+                "Should show dead code warning when function has 0 callers but has callees"
+            );
+        }
     }
 
     // Helper function to create a test UnifiedDebtItem
