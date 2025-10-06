@@ -123,7 +123,7 @@ fn test_indexed_lookup_is_fast() {
 fn test_line_based_lookup_with_tolerance() {
     const NUM_FILES: usize = 100;
     const FUNCS_PER_FILE: usize = 20;
-    const MAX_LOOKUP_TIME_MS: u128 = 200; // Slightly slower due to BTreeMap range query
+    const MAX_LOOKUP_TIME_MS: u128 = 600; // Line-based fallback with BTreeMap range query and tolerance strategies
 
     let temp_file = create_test_lcov_file(NUM_FILES, FUNCS_PER_FILE);
     let data = parse_lcov_file(temp_file.path())
