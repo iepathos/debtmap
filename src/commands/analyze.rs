@@ -129,6 +129,22 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         },
     )?;
 
+    // Apply category filtering if specified
+    let filtered_analysis = if let Some(ref filter_cats) = config.filter_categories {
+        let categories: Vec<crate::priority::DebtCategory> = filter_cats
+            .iter()
+            .filter_map(|s| crate::priority::DebtCategory::from_string(s))
+            .collect();
+
+        if !categories.is_empty() {
+            unified_analysis.filter_by_categories(&categories)
+        } else {
+            unified_analysis
+        }
+    } else {
+        unified_analysis
+    };
+
     let output_config = output::OutputConfig {
         top: config.top,
         tail: config.tail,
@@ -140,7 +156,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     };
 
     output::output_unified_priorities_with_config(
-        unified_analysis,
+        filtered_analysis,
         output_config,
         &results,
         config.coverage_file.as_ref(),

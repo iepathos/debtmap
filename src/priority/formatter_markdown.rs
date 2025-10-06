@@ -574,11 +574,14 @@ fn format_file_priority_item_markdown(
         "FILE"
     };
 
-    // Header with rank and score
+    // File items (god objects) are always T1 Critical Architecture
+    let tier_label = "[T1] ";
+
+    // Header with rank, tier, and score
     writeln!(
         output,
-        "### #{} - Score: {:.1} [{}]",
-        rank, item.score, severity
+        "### #{} {}Score: {:.1} [{}]",
+        rank, tier_label, item.score, severity
     )
     .unwrap();
 
@@ -619,6 +622,16 @@ fn format_file_priority_item_markdown(
             item.metrics.god_object_indicators.god_object_score
         )
         .unwrap();
+
+        // Show coverage data if available
+        if item.metrics.coverage_percent > 0.0 {
+            writeln!(
+                output,
+                "- Test Coverage: {:.1}% ({} uncovered lines)",
+                item.metrics.coverage_percent, item.metrics.uncovered_lines
+            )
+            .unwrap();
+        }
     }
 
     writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
@@ -714,11 +727,17 @@ fn format_priority_item_markdown(
 ) {
     let severity = get_severity_label(item.unified_score.final_score);
 
-    // Header with rank and score
+    // Header with rank, tier, and score
+    let tier_label = item
+        .tier
+        .as_ref()
+        .map(|t| format!("[{}] ", t.short_label()))
+        .unwrap_or_default();
+
     writeln!(
         output,
-        "### #{} - Score: {:.1} [{}]",
-        rank, item.unified_score.final_score, severity
+        "### #{} {}Score: {:.1} [{}]",
+        rank, tier_label, item.unified_score.final_score, severity
     )
     .unwrap();
 
@@ -820,6 +839,7 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::SuboptimalDataStructure { .. } => "Suboptimal Data Structure",
         // Organization debt types
         DebtType::GodObject { .. } => "God Object",
+        DebtType::GodModule { .. } => "God Module",
         DebtType::FeatureEnvy { .. } => "Feature Envy",
         DebtType::PrimitiveObsession { .. } => "Primitive Obsession",
         DebtType::MagicValues { .. } => "Magic Values",
@@ -1361,6 +1381,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             god_object_indicators: None,
+            tier: None,
         }
     }
 
@@ -1372,7 +1393,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 1, &item, 0);
 
         // Check basic elements are present
-        assert!(output.contains("#1 - Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #1 Score: 8.5 [HIGH]"));
         assert!(output.contains("**Type:** Complexity"));
         assert!(output.contains("**Location:** `test.rs:100 test_function()`"));
         assert!(output.contains("**Action:** Refactor complex function"));
@@ -1393,7 +1414,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 2, &item, 1);
 
         // Should include main factors but not full breakdown
-        assert!(output.contains("#2 - Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #2 Score: 8.5 [HIGH]"));
         assert!(output.contains("Main factors"));
 
         // Should include dependencies section
@@ -1486,7 +1507,7 @@ mod tests {
 
         format_priority_item_markdown(&mut output, 999, &item, 0);
 
-        assert!(output.contains("#999 - Score:"));
+        assert!(output.contains("### #999 Score:"));
     }
 
     #[test]
@@ -1498,7 +1519,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 1, &item, 2);
 
         // Should still work without transitive coverage
-        assert!(output.contains("#1 - Score: 8.5"));
+        assert!(output.contains("### #1 Score: 8.5"));
         // Coverage information should be omitted in breakdown
     }
 
@@ -1542,7 +1563,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 1, &item, 0);
 
-        assert!(output.contains("### #1 - Score: 45.2"));
+        assert!(output.contains("### #1 [T1] Score: 45.2"));
         assert!(output.contains("**Type:** FILE"));
         assert!(output.contains("src/main.rs"));
         assert!(output.contains("250 lines, 10 functions"));
@@ -1590,7 +1611,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 1, &item, 0);
 
-        assert!(output.contains("### #1 - Score: 125.8"));
+        assert!(output.contains("### #1 [T1] Score: 125.8"));
         assert!(output.contains("**Type:** FILE - GOD OBJECT"));
         assert!(output.contains("**God Object Metrics:**"));
         assert!(output.contains("- Methods: 45"));
@@ -1640,7 +1661,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 2, &item, 0);
 
-        assert!(output.contains("### #2 - Score: 85.3"));
+        assert!(output.contains("### #2 [T1] Score: 85.3"));
         assert!(output.contains("**Type:** FILE - HIGH COMPLEXITY"));
         assert!(output.contains("600 lines"));
         assert!(!output.contains("**God Object Metrics:**"));
@@ -1686,7 +1707,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 3, &item, 1);
 
-        assert!(output.contains("### #3 - Score: 55.7"));
+        assert!(output.contains("### #3 [T1] Score: 55.7"));
         assert!(output.contains("**Scoring Breakdown:**"));
         assert!(output.contains("- File size:"));
         assert!(output.contains("- Functions:"));
@@ -1842,8 +1863,10 @@ mod tests {
                 function: "critical_func".to_string(),
             },
             debt_type: DebtType::GodObject {
-                responsibility_count: 10,
-                complexity_score: 95.0,
+                methods: 10,
+                fields: 5,
+                responsibilities: 10,
+                god_object_score: 95.0,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 10.0,
@@ -1878,6 +1901,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(1.0),
             god_object_indicators: None,
+            tier: None,
         };
 
         let high_item = UnifiedDebtItem {
@@ -1923,6 +1947,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             god_object_indicators: None,
+            tier: None,
         };
 
         let moderate_item = UnifiedDebtItem {
@@ -1969,6 +1994,7 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             god_object_indicators: None,
+            tier: None,
         };
 
         let low_item = UnifiedDebtItem {
@@ -2016,6 +2042,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.5),
             god_object_indicators: None,
+            tier: None,
         };
 
         analysis.add_item(critical_item);

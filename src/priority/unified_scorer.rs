@@ -49,6 +49,8 @@ pub struct UnifiedDebtItem {
     pub is_pure: Option<bool>,                   // Whether the function is pure
     pub purity_confidence: Option<f32>,          // Confidence in purity detection
     pub god_object_indicators: Option<GodObjectAnalysis>, // God object detection results
+    #[serde(skip)]
+    pub tier: Option<crate::priority::RecommendationTier>, // Recommendation tier for prioritization
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

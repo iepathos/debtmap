@@ -82,6 +82,7 @@ fn create_debt_item(
         purity_confidence: Some(0.9),
         entropy_details: None,
         god_object_indicators: None,
+        tier: None,
     }
 }
 
@@ -164,6 +165,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             purity_confidence: Some(0.9),
             entropy_details: None,
             god_object_indicators: None,
+            tier: None,
         };
         analysis_no_coverage.add_item(item);
     }

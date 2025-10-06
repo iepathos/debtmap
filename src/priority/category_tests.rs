@@ -48,6 +48,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             god_object_indicators: None,
+            tier: None,
         }
     }
 
@@ -90,8 +91,10 @@ mod tests {
         // Architecture Issues
         assert_eq!(
             DebtCategory::from_debt_type(&DebtType::GodObject {
-                responsibility_count: 10,
-                complexity_score: 90.0,
+                methods: 10,
+                fields: 5,
+                responsibilities: 10,
+                god_object_score: 90.0,
             }),
             DebtCategory::Architecture
         );
@@ -227,8 +230,10 @@ mod tests {
         analysis.add_item(create_test_function_item(
             "god_func",
             DebtType::GodObject {
-                responsibility_count: 10,
-                complexity_score: 95.0,
+                methods: 10,
+                fields: 5,
+                responsibilities: 10,
+                god_object_score: 95.0,
             },
             95.0,
         ));
@@ -354,8 +359,10 @@ mod tests {
         analysis.add_item(create_test_function_item(
             "god_func",
             DebtType::GodObject {
-                responsibility_count: 10,
-                complexity_score: 95.0,
+                methods: 10,
+                fields: 5,
+                responsibilities: 10,
+                god_object_score: 95.0,
             },
             95.0,
         ));
@@ -391,8 +398,10 @@ mod tests {
         analysis.add_item(create_test_function_item(
             "critical_god",
             DebtType::GodObject {
-                responsibility_count: 15,
-                complexity_score: 95.0,
+                methods: 15,
+                fields: 7,
+                responsibilities: 15,
+                god_object_score: 95.0,
             },
             95.0,
         ));
@@ -447,8 +456,10 @@ mod tests {
         analysis.add_item(create_test_function_item(
             "arch1",
             DebtType::GodObject {
-                responsibility_count: 10,
-                complexity_score: 100.0,
+                methods: 10,
+                fields: 5,
+                responsibilities: 10,
+                god_object_score: 100.0,
             },
             100.0,
         ));
@@ -473,8 +484,10 @@ mod tests {
         analysis.add_item(create_test_function_item(
             "god",
             DebtType::GodObject {
-                responsibility_count: 10,
-                complexity_score: 90.0,
+                methods: 10,
+                fields: 5,
+                responsibilities: 10,
+                god_object_score: 90.0,
             },
             90.0,
         ));

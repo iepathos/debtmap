@@ -1751,6 +1751,7 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::SuboptimalDataStructure { .. } => "DATA STRUCTURE",
         // Organization debt types
         DebtType::GodObject { .. } => "GOD OBJECT",
+        DebtType::GodModule { .. } => "GOD MODULE",
         DebtType::FeatureEnvy { .. } => "FEATURE ENVY",
         DebtType::PrimitiveObsession { .. } => "PRIMITIVE OBSESSION",
         DebtType::MagicValues { .. } => "MAGIC VALUES",
@@ -1924,6 +1925,7 @@ mod tests {
             purity_confidence: None,
             entropy_details: None,
             god_object_indicators: None,
+            tier: None,
         }
     }
 

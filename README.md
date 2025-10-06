@@ -421,34 +421,33 @@ Debtmap offers several specialized analysis modes for focused technical debt ass
 ### Category-Specific Analysis
 Focus on specific aspects of technical debt using the filter option:
 ```bash
-# Security-focused analysis
-debtmap analyze . --filter Security
-debtmap analyze . --security-enhanced  # Includes additional security detectors
+# Architecture-focused analysis (god objects, complexity hotspots)
+debtmap analyze . --filter Architecture
 
-# Code organization analysis
-debtmap analyze . --filter Organization
+# Testing quality analysis (coverage gaps, untested code)
+debtmap analyze . --filter Testing
 
-# Testing quality analysis
-debtmap analyze . --filter TestQuality
+# Performance analysis (resource leaks, inefficient patterns)
+debtmap analyze . --filter Performance
 
-# Resource management analysis
-debtmap analyze . --filter Resource
+# Code quality analysis (code smells, maintainability)
+debtmap analyze . --filter CodeQuality
 
 # Multiple categories at once
-debtmap analyze . --filter Security,Complexity,TestQuality
+debtmap analyze . --filter Architecture,Testing
 ```
 
 ### Combined Filtering
 Combine multiple options for precise analysis:
 ```bash
-# High-priority security issues only
-debtmap analyze . --security-enhanced --min-priority high --top 10
+# High-priority issues only
+debtmap analyze . --min-priority high --top 10
 
 # Group by category with coverage data
 debtmap analyze . --lcov coverage.info --group-by-category
 
 # Filter specific debt categories with coverage
-debtmap analyze . --filter Security,Complexity --lcov coverage.info
+debtmap analyze . --filter Architecture,Testing --lcov coverage.info
 ```
 
 ## How Debtmap Works
@@ -1050,6 +1049,80 @@ organization = 0.05  # Weight for code organization issues (5%)
 # dependency = 0.05
 # organization = 0.05
 ```
+
+### Tiered Prioritization
+
+Debtmap uses a tiered prioritization strategy to surface critical architectural issues above simple testing gaps. This prevents "walls of similar-scored items" and helps you focus on the most impactful work first.
+
+#### Tier Hierarchy
+
+- **Tier 1: Critical Architecture** - God Objects, God Modules, and excessive complexity
+  - Must address before adding new features
+  - High impact on maintainability
+  - Examples: Files with 15+ responsibilities, modules with 50+ methods
+
+- **Tier 2: Complex Untested** - Untested code with high complexity or dependencies
+  - Risk of bugs in critical paths
+  - Should be tested before refactoring
+  - Examples: Functions with cyclomatic complexity > 15 and 0% coverage
+
+- **Tier 3: Testing Gaps** - Untested code with moderate complexity
+  - Improve coverage to prevent future issues
+  - Lower priority than architectural debt
+  - Examples: Functions with cyclomatic complexity 10-15 and low coverage
+
+- **Tier 4: Maintenance** - Low-complexity issues
+  - Address opportunistically
+  - Minimal impact on system health
+  - Examples: Simple functions with minor code quality issues
+
+#### Using Category Filters
+
+You can filter recommendations by category to focus on specific types of debt:
+
+```bash
+# Show only testing-related issues
+debtmap analyze . --filter Testing
+
+# Show only architectural issues (god objects, complexity)
+debtmap analyze . --filter Architecture
+
+# Show multiple categories
+debtmap analyze . --filter Architecture,Testing
+```
+
+Available categories:
+- `Architecture` - God objects, complexity hotspots, dead code
+- `Testing` - Testing gaps, low coverage areas
+- `Performance` - Resource leaks, inefficient patterns
+- `CodeQuality` - Code smells, maintainability issues
+
+#### Configuring Tier Thresholds
+
+Customize tier classification in your `.debtmap.toml`:
+
+```toml
+[tiers]
+# Complexity threshold for Tier 2 (complex untested code)
+t2_complexity_threshold = 15
+
+# Dependency threshold for Tier 2
+t2_dependency_threshold = 10
+
+# Complexity threshold for Tier 3 (testing gaps)
+t3_complexity_threshold = 10
+
+# Show Tier 4 items in main report (default: false)
+show_t4_in_main_report = false
+
+# Tier weights for score adjustment
+t1_weight = 1.5  # Boost architectural issues
+t2_weight = 1.0  # Standard weight for complex untested
+t3_weight = 0.7  # Lower priority for testing gaps
+t4_weight = 0.3  # Minimal priority for maintenance
+```
+
+The tier weights multiply the base scores to ensure higher-tier items appear first in recommendations, even if their raw complexity scores are similar to lower-tier items.
 
 ## Output Examples
 
