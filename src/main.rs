@@ -505,6 +505,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         min_problematic,
         no_god_object,
         max_files,
+        validate_loc,
     } = command
     {
         // Apply side effects first
@@ -558,6 +559,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             min_problematic,
             no_god_object,
             max_files,
+            validate_loc,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -738,6 +740,7 @@ fn build_analyze_config(
     min_problematic: Option<usize>,
     no_god_object: bool,
     max_files: Option<usize>,
+    validate_loc: bool,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -781,6 +784,7 @@ fn build_analyze_config(
         min_problematic,
         no_god_object,
         max_files,
+        validate_loc,
     }
 }
 

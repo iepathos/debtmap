@@ -511,14 +511,19 @@ impl UnifiedAnalysis {
         let mut risk_reduction = 0.0;
         let mut _functions_to_test = 0;
         let mut total_debt_score = 0.0;
-        let mut total_lines_of_code = 0;
+
+        // Track unique files to avoid double-counting LOC
+        // Use a HashMap to store file path -> total lines
+        let mut unique_files: std::collections::HashMap<std::path::PathBuf, usize> =
+            std::collections::HashMap::new();
 
         for item in &self.items {
             // Sum up all final scores as the total debt score
             total_debt_score += item.unified_score.final_score;
 
-            // Track lines of code from function-level items
-            total_lines_of_code += item.function_length;
+            // Track unique file and its line count (will be deduplicated)
+            // We'll use the actual file line count later, not function_length
+            unique_files.entry(item.location.file.clone()).or_insert(0);
 
             // Only count functions that actually need testing
             if item.expected_impact.coverage_improvement > 0.0 {
@@ -535,7 +540,12 @@ impl UnifiedAnalysis {
         // Add file-level impacts
         for file_item in &self.file_items {
             total_debt_score += file_item.score;
-            total_lines_of_code += file_item.metrics.total_lines;
+
+            // Track file and its actual total lines
+            unique_files.insert(
+                file_item.metrics.path.clone(),
+                file_item.metrics.total_lines,
+            );
 
             // File-level impacts are typically larger
             complexity_reduction += file_item.impact.complexity_reduction;
@@ -546,6 +556,23 @@ impl UnifiedAnalysis {
                 coverage_improvement += (0.8 - file_item.metrics.coverage_percent) * 10.0;
             }
         }
+
+        // Calculate total LOC by reading actual file contents for any files
+        // that weren't in file_items (i.e., only appeared in function items)
+        use crate::metrics::LocCounter;
+        let loc_counter = LocCounter::default();
+
+        for (file_path, stored_lines) in unique_files.iter_mut() {
+            // If we don't have a line count yet (value is 0), read the file
+            if *stored_lines == 0 {
+                if let Ok(count) = loc_counter.count_file(file_path) {
+                    *stored_lines = count.physical_lines;
+                }
+            }
+        }
+
+        // Sum up unique file line counts
+        let total_lines_of_code: usize = unique_files.values().sum();
 
         // Coverage improvement is the estimated overall project coverage gain
         // Assuming tested functions represent a portion of the codebase

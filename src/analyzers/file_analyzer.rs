@@ -376,11 +376,10 @@ mod tests {
         ];
         functions.insert(PathBuf::from("test.rs"), function_coverages);
 
-        let coverage_data = LcovData {
-            functions,
-            total_lines: 100,
-            lines_hit: 50,
-        };
+        let mut coverage_data = LcovData::default();
+        coverage_data.functions = functions;
+        coverage_data.total_lines = 100;
+        coverage_data.lines_hit = 50;
 
         let analyzer = UnifiedFileAnalyzer::new(Some(coverage_data));
         let functions = vec![
