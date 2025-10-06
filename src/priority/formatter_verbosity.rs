@@ -401,39 +401,39 @@ fn format_score_calculation_section(
     );
 
     lines.push(format!(
-        "{}  {} Coverage Score: {:.1} × 50% = {:.2}{}",
+        "{}  {} Coverage Score: {:.1} × 40% = {:.2}{}",
         tree_pipe,
         formatter.emoji("├─", "-"),
         factors.coverage_factor * 10.0, // Convert to 0-100 scale
-        factors.coverage_factor * 10.0 * 0.5,
+        factors.coverage_factor * 10.0 * 0.4,
         coverage_detail
     ));
 
     // Show complexity score
     let complexity_detail = format_complexity_detail(&item.entropy_details);
     lines.push(format!(
-        "{}  {} Complexity Score: {:.1} × 35% = {:.2}{}",
+        "{}  {} Complexity Score: {:.1} × 40% = {:.2}{}",
         tree_pipe,
         formatter.emoji("├─", "-"),
         factors.complexity_factor * 10.0, // Convert to 0-100 scale
-        factors.complexity_factor * 10.0 * 0.35,
+        factors.complexity_factor * 10.0 * 0.40,
         complexity_detail
     ));
 
     // Show dependency score
     lines.push(format!(
-        "{}  {} Dependency Score: {:.1} × 15% = {:.2} ({} callers)",
+        "{}  {} Dependency Score: {:.1} × 20% = {:.2} ({} callers)",
         tree_pipe,
         formatter.emoji("├─", "-"),
         factors.dependency_factor * 10.0, // Convert to 0-100 scale
-        factors.dependency_factor * 10.0 * 0.15,
+        factors.dependency_factor * 10.0 * 0.20,
         item.upstream_callers.len() // Display actual caller count, not normalized score
     ));
 
     // Calculate weighted sum base score
-    let coverage_contribution = factors.coverage_factor * 10.0 * 0.5;
-    let complexity_contribution = factors.complexity_factor * 10.0 * 0.35;
-    let dependency_contribution = factors.dependency_factor * 10.0 * 0.15;
+    let coverage_contribution = factors.coverage_factor * 10.0 * 0.4;
+    let complexity_contribution = factors.complexity_factor * 10.0 * 0.4;
+    let dependency_contribution = factors.dependency_factor * 10.0 * 0.2;
     let base_score = coverage_contribution + complexity_contribution + dependency_contribution;
 
     lines.push(format!(

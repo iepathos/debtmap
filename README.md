@@ -490,9 +490,9 @@ graph TD
     U --> V[Unified Scoring]
     V --> W[Calculate Factors]
     
-    W --> X[Complexity Factor: 35%]
+    W --> X[Complexity Factor: 40%]
     W --> Y[Coverage Factor: 40%]
-    W --> Z[Dependency Factor: 25%]
+    W --> Z[Dependency Factor: 20%]
     
     X --> AB[Final Score]
     Y --> AB
@@ -513,12 +513,12 @@ Debtmap uses a sophisticated multi-factor scoring system to prioritize technical
 Each function receives a score from 0-10 based on three weighted factors:
 
 ```
-Base Score = (Complexity × 0.35) + (Coverage × 0.40) + (Dependency × 0.25)
+Base Score = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)
 ```
 
 **Factor Breakdown:**
 
-- **Complexity Factor (35%)**: Combines cyclomatic and cognitive complexity
+- **Complexity Factor (40%)**: Combines cyclomatic and cognitive complexity
   - Normalized using: `min(10, (cyclomatic / 10 + cognitive / 20) × 5)`
   - Higher complexity = higher score = higher priority
 
@@ -528,7 +528,7 @@ Base Score = (Complexity × 0.35) + (Coverage × 0.40) + (Dependency × 0.25)
   - Without coverage data: 10 (assume worst case)
   - Considers transitive coverage through call graph
 
-- **Dependency Factor (25%)**: Impact based on how many functions depend on this code
+- **Dependency Factor (20%)**: Impact based on how many functions depend on this code
   - Based on: upstream dependencies (callers) and downstream impact
   - Normalized to 0-10 scale
   - More dependencies = higher priority
@@ -978,12 +978,9 @@ max_combined_reduction = 0.3          # Maximum combined complexity reduction (3
 
 [scoring]
 # Customize scoring weights (must sum to 1.0)
-coverage = 0.35                       # Weight for coverage factor
-complexity = 0.25                     # Weight for complexity factor
-semantic = 0.15                       # Weight for semantic factor
-dependency = 0.10                     # Weight for dependency criticality
-security = 0.10                       # Weight for security issues
-organization = 0.05                   # Weight for code organization issues
+coverage = 0.40                       # Weight for coverage factor
+complexity = 0.40                     # Weight for complexity factor
+dependency = 0.20                     # Weight for dependency criticality
 
 [ignore]
 # File and directory patterns to ignore during analysis (glob patterns)
@@ -1033,12 +1030,9 @@ You can customize how debtmap prioritizes different aspects of technical debt by
 ```toml
 [scoring]
 # Default weights (must sum to 1.0)
-coverage = 0.35      # Weight for test coverage gaps (35%)
-complexity = 0.25    # Weight for code complexity (25%)
-semantic = 0.15      # Weight for semantic importance (15%)
-dependency = 0.10    # Weight for dependency criticality (10%)
-security = 0.10      # Weight for security issues (10%)
-organization = 0.05  # Weight for code organization issues (5%)
+coverage = 0.40      # Weight for test coverage gaps (40%)
+complexity = 0.40    # Weight for code complexity (40%)
+dependency = 0.20    # Weight for dependency criticality (20%)
 
 # Example: Prioritize security and coverage
 # [scoring]
