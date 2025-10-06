@@ -258,6 +258,10 @@ pub fn calculate_unified_priority_with_debt(
     };
 
     // Apply minimal role adjustment (capped to avoid distortion)
+    // NOTE: This is separate from role-based coverage weight adjustment (applied earlier at line 236).
+    // Coverage weight adjusts coverage expectations by role (entry points need less unit coverage).
+    // This multiplier provides a small final adjustment for role importance (0.8-1.2x range).
+    // The two-stage approach ensures they don't interfere with each other.
     let clamped_role_multiplier = role_multiplier.clamp(0.8, 1.2);
     let role_adjusted_score = base_score * clamped_role_multiplier;
 

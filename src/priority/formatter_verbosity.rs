@@ -400,13 +400,21 @@ fn format_score_calculation_section(
         factors.coverage_pct,
     );
 
+    // Add role-based coverage adjustment indicator for entry points
+    let role_coverage_indicator = if matches!(item.function_role, crate::priority::FunctionRole::EntryPoint) {
+        " (entry point - integration tested, lower unit coverage expected)"
+    } else {
+        ""
+    };
+
     lines.push(format!(
-        "{}  {} Coverage Score: {:.1} × 40% = {:.2}{}",
+        "{}  {} Coverage Score: {:.1} × 40% = {:.2}{}{}",
         tree_pipe,
         formatter.emoji("├─", "-"),
         factors.coverage_factor * 10.0, // Convert to 0-100 scale
         factors.coverage_factor * 10.0 * 0.4,
-        coverage_detail
+        coverage_detail,
+        role_coverage_indicator
     ));
 
     // Show complexity score
