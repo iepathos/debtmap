@@ -124,7 +124,7 @@ fn test_filter_architecture_category() {
     let filtered = analysis.filter_by_categories(&[DebtCategory::Architecture]);
 
     // Should contain architecture items (GodObject + DeadCode)
-    assert!(filtered.items.len() >= 1);
+    assert!(!filtered.items.is_empty());
     assert!(filtered.items.iter().all(|item| {
         matches!(
             DebtCategory::from_debt_type(&item.debt_type),
@@ -152,10 +152,7 @@ fn test_filter_multiple_categories() {
     assert!(filtered.items.len() >= 2);
     assert!(filtered.items.iter().all(|item| {
         let category = DebtCategory::from_debt_type(&item.debt_type);
-        matches!(
-            category,
-            DebtCategory::Architecture | DebtCategory::Testing
-        )
+        matches!(category, DebtCategory::Architecture | DebtCategory::Testing)
     }));
 }
 
