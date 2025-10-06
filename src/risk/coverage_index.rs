@@ -123,7 +123,10 @@ impl CoverageIndex {
     /// function name is known. Also tries path normalization strategies.
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
         // Try exact match first
-        if let Some(f) = self.by_function.get(&(file.to_path_buf(), function_name.to_string())) {
+        if let Some(f) = self
+            .by_function
+            .get(&(file.to_path_buf(), function_name.to_string()))
+        {
             return Some(f.coverage_percentage / 100.0);
         }
 
@@ -133,7 +136,11 @@ impl CoverageIndex {
     }
 
     /// Try multiple path matching strategies to handle relative/absolute path mismatches
-    fn find_by_path_strategies(&self, query_path: &Path, function_name: &str) -> Option<&FunctionCoverage> {
+    fn find_by_path_strategies(
+        &self,
+        query_path: &Path,
+        function_name: &str,
+    ) -> Option<&FunctionCoverage> {
         let normalized_query = normalize_path(query_path);
 
         // Strategy 1: Check if query path ends with any indexed path

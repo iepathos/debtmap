@@ -45,17 +45,13 @@ fn benchmark_index_build(c: &mut Criterion) {
         let temp_file = create_lcov_file(*size, 20);
         let data = parse_lcov_file(temp_file.path()).unwrap();
 
-        group.bench_with_input(
-            BenchmarkId::new("files", size),
-            &data,
-            |b, _| {
-                b.iter(|| {
-                    // The index is built during parse_lcov_file, so we measure full parse
-                    let data = parse_lcov_file(black_box(temp_file.path())).unwrap();
-                    black_box(data);
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("files", size), &data, |b, _| {
+            b.iter(|| {
+                // The index is built during parse_lcov_file, so we measure full parse
+                let data = parse_lcov_file(black_box(temp_file.path())).unwrap();
+                black_box(data);
+            })
+        });
     }
 
     group.finish();
@@ -74,9 +70,11 @@ fn benchmark_lookup_comparison(c: &mut Criterion) {
         b.iter(|| {
             for file_idx in 0..100 {
                 for func_idx in 0..20 {
-                    let file = PathBuf::from(format!("src/module_{}/file_{}.rs", file_idx / 10, file_idx));
+                    let file =
+                        PathBuf::from(format!("src/module_{}/file_{}.rs", file_idx / 10, file_idx));
                     let func_name = format!("function_{}_{}", file_idx, func_idx);
-                    let coverage = data.get_function_coverage(black_box(&file), black_box(&func_name));
+                    let coverage =
+                        data.get_function_coverage(black_box(&file), black_box(&func_name));
                     black_box(coverage);
                 }
             }
@@ -88,7 +86,8 @@ fn benchmark_lookup_comparison(c: &mut Criterion) {
         b.iter(|| {
             for file_idx in 0..100 {
                 for func_idx in 0..20 {
-                    let file = PathBuf::from(format!("src/module_{}/file_{}.rs", file_idx / 10, file_idx));
+                    let file =
+                        PathBuf::from(format!("src/module_{}/file_{}.rs", file_idx / 10, file_idx));
                     let func_name = format!("unknown_name_{}", func_idx);
                     let line = func_idx * 15 + 10;
                     let coverage = data.get_function_coverage_with_line(
@@ -159,7 +158,8 @@ fn benchmark_analysis_overhead(c: &mut Criterion) {
                     black_box(complexity);
 
                     // Add coverage lookup (indexed O(1))
-                    let file = PathBuf::from(format!("src/module_{}/file_{}.rs", file_idx / 10, file_idx));
+                    let file =
+                        PathBuf::from(format!("src/module_{}/file_{}.rs", file_idx / 10, file_idx));
                     let func_name = format!("function_{}_{}", file_idx, func_idx);
                     let coverage = data.get_function_coverage(&file, &func_name);
                     black_box(coverage);
