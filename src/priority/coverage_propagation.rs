@@ -167,6 +167,7 @@ mod tests {
             uncovered_lines: vec![],
         }];
         coverage.functions.insert(PathBuf::from("test.rs"), funcs);
+        coverage.build_index(); // Rebuild index after modifying functions
 
         coverage
     }
@@ -274,6 +275,7 @@ mod tests {
         coverage
             .functions
             .insert(PathBuf::from("gradient_test.rs"), funcs.clone());
+        coverage.build_index(); // Rebuild index after modifying functions
 
         let urgency_25 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         // With 25% coverage and our weighted calculation (0.7 direct weight), this should be around 7.5-9.0
@@ -295,6 +297,7 @@ mod tests {
         coverage
             .functions
             .insert(PathBuf::from("gradient_test.rs"), funcs.clone());
+        coverage.build_index(); // Rebuild index after modifying functions
 
         let urgency_50 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(
@@ -315,6 +318,7 @@ mod tests {
         coverage
             .functions
             .insert(PathBuf::from("gradient_test.rs"), funcs.clone());
+        coverage.build_index(); // Rebuild index after modifying functions
 
         let urgency_75 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(
@@ -335,6 +339,7 @@ mod tests {
         coverage
             .functions
             .insert(PathBuf::from("gradient_test.rs"), funcs.clone());
+        coverage.build_index(); // Rebuild index after modifying functions
 
         let urgency_90 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(
@@ -354,6 +359,7 @@ mod tests {
         coverage
             .functions
             .insert(PathBuf::from("gradient_test.rs"), funcs.clone());
+        coverage.build_index(); // Rebuild index after modifying functions
 
         let urgency_100 = calculate_coverage_urgency(&func_id, &graph, &coverage, complexity);
         assert!(

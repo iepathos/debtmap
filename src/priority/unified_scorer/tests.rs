@@ -60,6 +60,7 @@ fn create_full_coverage_data(func: &FunctionMetrics) -> LcovData {
             uncovered_lines: vec![],
         }],
     );
+    lcov.build_index(); // Rebuild index after modifying functions
     lcov
 }
 
@@ -142,6 +143,7 @@ fn create_coverage_function(
             uncovered_lines: vec![],
         }],
     );
+    lcov.build_index(); // Rebuild index after modifying functions
     lcov
 }
 

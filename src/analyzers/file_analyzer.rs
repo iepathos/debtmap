@@ -380,6 +380,7 @@ mod tests {
         coverage_data.functions = functions;
         coverage_data.total_lines = 100;
         coverage_data.lines_hit = 50;
+        coverage_data.build_index(); // Rebuild index after modifying functions
 
         let analyzer = UnifiedFileAnalyzer::new(Some(coverage_data));
         let functions = vec![

@@ -1,3 +1,4 @@
+use super::coverage_index::CoverageIndex;
 use anyhow::{Context, Result};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -13,13 +14,40 @@ pub struct FunctionCoverage {
     pub uncovered_lines: Vec<usize>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct LcovData {
     pub functions: HashMap<PathBuf, Vec<FunctionCoverage>>,
     pub total_lines: usize,
     pub lines_hit: usize,
     /// LOC counter instance for consistent line counting across analysis modes
     loc_counter: Option<crate::metrics::LocCounter>,
+    /// Pre-built index for O(1) function coverage lookups
+    coverage_index: CoverageIndex,
+}
+
+impl Default for LcovData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LcovData {
+    /// Create a new empty LcovData instance
+    pub fn new() -> Self {
+        Self {
+            functions: HashMap::new(),
+            total_lines: 0,
+            lines_hit: 0,
+            loc_counter: None,
+            coverage_index: CoverageIndex::empty(),
+        }
+    }
+
+    /// Build the coverage index from current function data
+    /// This should be called after modifying the functions HashMap
+    pub fn build_index(&mut self) {
+        self.coverage_index = CoverageIndex::from_coverage(self);
+    }
 }
 
 pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
@@ -124,6 +152,9 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
             data.functions.insert(file, funcs);
         }
     }
+
+    // Build the coverage index once after all data is loaded
+    data.build_index();
 
     Ok(data)
 }
@@ -279,34 +310,27 @@ impl LcovData {
         }
     }
 
+    /// Get function coverage using O(1) indexed lookup
+    ///
+    /// This method uses the pre-built coverage index for fast lookups,
+    /// avoiding the O(n) linear search through function arrays.
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
-        // Try exact match first, then use path normalization
-        self.functions
-            .get(file)
-            .or_else(|| find_functions_by_path(&self.functions, file))
-            .and_then(|funcs| {
-                // Use a functional approach with multiple matching strategies
-                find_function_by_name(funcs, function_name).map(|f| f.coverage_percentage / 100.0)
-                // Convert percentage to fraction
-            })
+        self.coverage_index
+            .get_function_coverage(file, function_name)
     }
 
+    /// Get function coverage with line number fallback using O(log n) indexed lookup
+    ///
+    /// Tries exact function name match first (O(1)), then falls back to
+    /// line-based lookup (O(log n)) if needed.
     pub fn get_function_coverage_with_line(
         &self,
         file: &Path,
         function_name: &str,
         line: usize,
     ) -> Option<f64> {
-        // Try exact match first, then use path normalization
-        self.functions
-            .get(file)
-            .or_else(|| find_functions_by_path(&self.functions, file))
-            .and_then(|funcs| {
-                // Try multiple strategies in order of preference
-                find_function_by_name(funcs, function_name)
-                    .or_else(|| find_function_by_line_with_tolerance(funcs, line, 2))
-                    .map(|f| f.coverage_percentage / 100.0)
-            })
+        self.coverage_index
+            .get_function_coverage_with_line(file, function_name, line)
     }
 
     /// Get function coverage using exact boundaries from AST analysis
@@ -318,16 +342,9 @@ impl LcovData {
         start_line: usize,
         _end_line: usize,
     ) -> Option<f64> {
-        // Try exact match first, then use path normalization
-        self.functions
-            .get(file)
-            .or_else(|| find_functions_by_path(&self.functions, file))
-            .and_then(|funcs| {
-                // Chain multiple matching strategies using functional composition
-                find_function_by_name(funcs, function_name)
-                    .or_else(|| find_function_by_line_with_tolerance(funcs, start_line, 2))
-                    .map(|f| f.coverage_percentage / 100.0)
-            })
+        // Use the same logic as get_function_coverage_with_line
+        self.coverage_index
+            .get_function_coverage_with_line(file, function_name, start_line)
     }
 
     pub fn get_overall_coverage(&self) -> f64 {
@@ -351,22 +368,15 @@ impl LcovData {
     }
 
     /// Get uncovered lines for a specific function
+    /// Get uncovered lines for a function using O(1) indexed lookup
     pub fn get_function_uncovered_lines(
         &self,
         file: &Path,
         function_name: &str,
         line: usize,
     ) -> Option<Vec<usize>> {
-        // Try exact match first, then use path normalization
-        self.functions
-            .get(file)
-            .or_else(|| find_functions_by_path(&self.functions, file))
-            .and_then(|funcs| {
-                // Try multiple matching strategies
-                find_function_by_name(funcs, function_name)
-                    .or_else(|| find_function_by_line_with_tolerance(funcs, line, 2))
-                    .map(|f| f.uncovered_lines.clone())
-            })
+        self.coverage_index
+            .get_function_uncovered_lines(file, function_name, line)
     }
 
     /// Batch process coverage queries for multiple functions in parallel
@@ -405,6 +415,7 @@ impl LcovData {
 /// 1. Exact match
 /// 2. Normalized match (handling generics and special characters)
 /// 3. Suffix match (for module-qualified names)
+#[allow(dead_code)]
 fn find_function_by_name<'a>(
     funcs: &'a [FunctionCoverage],
     target_name: &str,
@@ -452,6 +463,7 @@ fn find_function_by_name<'a>(
 
 /// Find a function by line number with tolerance for AST/LCOV discrepancies
 /// Pure function that searches for functions within a line range
+#[allow(dead_code)]
 fn find_function_by_line_with_tolerance(
     funcs: &[FunctionCoverage],
     target_line: usize,
@@ -469,6 +481,7 @@ fn find_function_by_line_with_tolerance(
 
 /// Normalize function names for matching
 /// This is now a pure function used internally by the matching strategies
+#[allow(dead_code)]
 fn normalize_function_name(name: &str) -> String {
     // Handle Rust function names with generics and impl blocks
     name.replace(['<', '>'], "_")
@@ -479,6 +492,7 @@ fn normalize_function_name(name: &str) -> String {
 
 /// Find functions by normalizing and matching paths
 /// This handles cases where LCOV has relative paths but queries use absolute paths, or vice versa
+#[allow(dead_code)]
 fn find_functions_by_path<'a>(
     functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
     query_path: &Path,
@@ -532,6 +546,7 @@ fn find_functions_by_path<'a>(
 }
 
 /// Normalize a path by removing leading ./ and resolving components
+#[allow(dead_code)]
 fn normalize_path(path: &Path) -> PathBuf {
     // Convert to string, remove leading ./
     let path_str = path.to_string_lossy();
