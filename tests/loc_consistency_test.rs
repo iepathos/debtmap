@@ -234,5 +234,8 @@ fn test_loc_counting_from_file_paths() {
     assert!(!project_count.by_file.contains_key(&test_file));
 
     // Total should be sum of individual file counts
-    assert!(project_count.total.code_lines >= 2, "Should have at least 2 code lines total");
+    assert!(
+        project_count.total.code_lines >= 2,
+        "Should have at least 2 code lines total"
+    );
 }
