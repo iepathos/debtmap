@@ -129,6 +129,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             god_object_indicators: None,
+            tier: None,
         }
     }
 

@@ -747,6 +747,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             god_object_indicators: None,
+            tier: None,
         }
     }
 

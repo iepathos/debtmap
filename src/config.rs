@@ -556,6 +556,10 @@ pub struct DebtmapConfig {
     /// Lines of code counting configuration
     #[serde(default)]
     pub loc: Option<crate::metrics::LocCountingConfig>,
+
+    /// Tier configuration for prioritization
+    #[serde(default)]
+    pub tiers: Option<crate::priority::TierConfig>,
 }
 
 impl DebtmapConfig {

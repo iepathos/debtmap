@@ -367,8 +367,10 @@ mod tests {
         );
         assert_eq!(
             calculate_base_effort(&PriorityDebtType::GodObject {
-                responsibility_count: 50,
-                complexity_score: 100.0
+                methods: 50,
+                fields: 25,
+                responsibilities: 50,
+                god_object_score: 100.0
             }),
             16
         );
@@ -480,6 +482,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             god_object_indicators: None,
+            tier: None,
         };
 
         assert_eq!(estimate_effort(&item), 8); // 4 * 2
@@ -678,6 +681,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             god_object_indicators: None,
+            tier: None,
         }];
 
         let deps = extract_module_dependencies(&items);

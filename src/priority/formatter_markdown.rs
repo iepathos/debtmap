@@ -574,11 +574,14 @@ fn format_file_priority_item_markdown(
         "FILE"
     };
 
-    // Header with rank and score
+    // File items (god objects) are always T1 Critical Architecture
+    let tier_label = "[T1] ";
+
+    // Header with rank, tier, and score
     writeln!(
         output,
-        "### #{} - Score: {:.1} [{}]",
-        rank, item.score, severity
+        "### #{} {}Score: {:.1} [{}]",
+        rank, tier_label, item.score, severity
     )
     .unwrap();
 
@@ -619,6 +622,16 @@ fn format_file_priority_item_markdown(
             item.metrics.god_object_indicators.god_object_score
         )
         .unwrap();
+
+        // Show coverage data if available
+        if item.metrics.coverage_percent > 0.0 {
+            writeln!(
+                output,
+                "- Test Coverage: {:.1}% ({} uncovered lines)",
+                item.metrics.coverage_percent, item.metrics.uncovered_lines
+            )
+            .unwrap();
+        }
     }
 
     writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
@@ -714,11 +727,17 @@ fn format_priority_item_markdown(
 ) {
     let severity = get_severity_label(item.unified_score.final_score);
 
-    // Header with rank and score
+    // Header with rank, tier, and score
+    let tier_label = item
+        .tier
+        .as_ref()
+        .map(|t| format!("[{}] ", t.short_label()))
+        .unwrap_or_default();
+
     writeln!(
         output,
-        "### #{} - Score: {:.1} [{}]",
-        rank, item.unified_score.final_score, severity
+        "### #{} {}Score: {:.1} [{}]",
+        rank, tier_label, item.unified_score.final_score, severity
     )
     .unwrap();
 
@@ -1362,6 +1381,7 @@ mod tests {
             is_pure: None,
             purity_confidence: None,
             god_object_indicators: None,
+            tier: None,
         }
     }
 
@@ -1843,8 +1863,10 @@ mod tests {
                 function: "critical_func".to_string(),
             },
             debt_type: DebtType::GodObject {
-                responsibility_count: 10,
-                complexity_score: 95.0,
+                methods: 10,
+                fields: 5,
+                responsibilities: 10,
+                god_object_score: 95.0,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 10.0,
@@ -1879,6 +1901,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(1.0),
             god_object_indicators: None,
+            tier: None,
         };
 
         let high_item = UnifiedDebtItem {
@@ -1924,6 +1947,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.8),
             god_object_indicators: None,
+            tier: None,
         };
 
         let moderate_item = UnifiedDebtItem {
@@ -1970,6 +1994,7 @@ mod tests {
             is_pure: Some(true),
             purity_confidence: Some(0.9),
             god_object_indicators: None,
+            tier: None,
         };
 
         let low_item = UnifiedDebtItem {
@@ -2017,6 +2042,7 @@ mod tests {
             is_pure: Some(false),
             purity_confidence: Some(0.5),
             god_object_indicators: None,
+            tier: None,
         };
 
         analysis.add_item(critical_item);
