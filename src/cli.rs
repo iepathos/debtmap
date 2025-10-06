@@ -47,7 +47,9 @@ pub enum Commands {
         #[arg(long, value_delimiter = ',')]
         languages: Option<Vec<String>>,
 
-        /// Optional LCOV coverage file for risk analysis
+        /// LCOV coverage file for risk analysis and score dampening.
+        /// Coverage data dampens debt scores for well-tested code (multiplier = 1.0 - coverage),
+        /// surfacing untested complex functions. Total debt score with coverage ≤ score without.
         #[arg(long = "coverage-file", visible_alias = "lcov")]
         coverage_file: Option<PathBuf>,
 
@@ -211,7 +213,9 @@ pub enum Commands {
         #[arg(short, long)]
         config: Option<PathBuf>,
 
-        /// Optional LCOV coverage file for risk analysis
+        /// LCOV coverage file for risk analysis and score dampening.
+        /// Coverage data dampens debt scores for well-tested code (multiplier = 1.0 - coverage),
+        /// surfacing untested complex functions. Total debt score with coverage ≤ score without.
         #[arg(long = "coverage-file", visible_alias = "lcov")]
         coverage_file: Option<PathBuf>,
 

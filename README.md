@@ -734,6 +734,61 @@ Supports LCOV format from popular coverage tools:
 - **Python**: `pytest --cov --cov-report=lcov`
 - **Go**: `go test -coverprofile=coverage.out && gocover-cobertura < coverage.out > coverage.lcov`
 
+#### How Coverage Affects Debt Scores
+
+When you provide coverage data via `--coverage-file` (or `--lcov`), debtmap uses it to **dampen** debt scores for well-tested code, making prioritization more accurate:
+
+**Coverage as a Score Multiplier:**
+```
+Final Score = Base Score × Coverage Multiplier
+where Coverage Multiplier = 1.0 - coverage_percentage
+```
+
+**What This Means:**
+- **100% coverage** → Multiplier = 0.0 → Near-zero debt score (well-tested, low priority)
+- **50% coverage** → Multiplier = 0.5 → Half the base score (moderate priority)
+- **0% coverage** → Multiplier = 1.0 → Full base score (untested, high priority)
+
+**Why Total Scores May Decrease:**
+
+You might notice that adding coverage data **reduces your total debt score**. This is expected and desirable:
+
+1. **Without coverage data**: All functions are assumed untested (worst case), resulting in higher scores
+2. **With coverage data**: Well-tested functions get dampened scores, focusing attention on genuinely risky code
+3. **Invariant guarantee**: Total debt score with coverage ≤ total debt score without coverage
+
+This means coverage data helps you **focus on what actually needs attention** rather than treating all complex code equally.
+
+**Untested Function Surfacing:**
+
+When coverage data is available, debtmap highlights untested functions with the `[UNTESTED]` label:
+- Functions with **0% coverage** and complexity ≥ 10 are marked as critical testing gaps
+- These appear at the top of prioritized lists since they combine risk factors (complexity + no tests)
+- The label only appears when coverage data is provided (avoiding false warnings)
+
+**Interpreting Coverage-Adjusted Scores:**
+
+| Score Range | Interpretation | Typical Cause |
+|-------------|----------------|---------------|
+| 40-100 | Critical priority | High complexity, 0% coverage, many dependencies |
+| 20-39 | High priority | Moderate-high complexity with poor/no coverage |
+| 10-19 | Medium priority | Moderate complexity or partial coverage gaps |
+| 5-9 | Low priority | Well-tested or simple functions |
+| 0-4 | Minimal priority | High coverage or test code |
+
+**Example:**
+```bash
+# Without coverage (assumes worst case for all functions)
+$ debtmap analyze
+Total debt score: 450.5
+
+# With coverage (dampens well-tested code)
+$ debtmap analyze --coverage-file lcov.info
+Total debt score: 285.3  # Lower score = more focused priorities
+```
+
+The reduction in total score indicates that ~37% of your complexity is already well-tested. Focus your efforts on the remaining high-scoring items.
+
 ## Suppressing Technical Debt Detection
 
 Debtmap provides two ways to exclude code from technical debt analysis:
