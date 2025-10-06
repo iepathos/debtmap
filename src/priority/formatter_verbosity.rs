@@ -401,7 +401,10 @@ fn format_score_calculation_section(
     );
 
     // Add role-based coverage adjustment indicator for entry points
-    let role_coverage_indicator = if matches!(item.function_role, crate::priority::FunctionRole::EntryPoint) {
+    let role_coverage_indicator = if matches!(
+        item.function_role,
+        crate::priority::FunctionRole::EntryPoint
+    ) {
         " (entry point - integration tested, lower unit coverage expected)"
     } else {
         ""
