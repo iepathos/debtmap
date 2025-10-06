@@ -313,9 +313,11 @@ mod tests {
             5,
         );
         let config = TierConfig::default();
+        // With 5 upstream + 5 downstream deps = 10 total, meets t2_dependency_threshold (10)
+        // Therefore should classify as T2ComplexUntested, not T3TestingGaps
         assert_eq!(
             classify_tier(&item, &config),
-            RecommendationTier::T3TestingGaps
+            RecommendationTier::T2ComplexUntested
         );
     }
 }
