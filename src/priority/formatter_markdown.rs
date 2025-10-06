@@ -1393,7 +1393,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 1, &item, 0);
 
         // Check basic elements are present
-        assert!(output.contains("#1 - Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #1 Score: 8.5 [HIGH]"));
         assert!(output.contains("**Type:** Complexity"));
         assert!(output.contains("**Location:** `test.rs:100 test_function()`"));
         assert!(output.contains("**Action:** Refactor complex function"));
@@ -1414,7 +1414,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 2, &item, 1);
 
         // Should include main factors but not full breakdown
-        assert!(output.contains("#2 - Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #2 Score: 8.5 [HIGH]"));
         assert!(output.contains("Main factors"));
 
         // Should include dependencies section
@@ -1507,7 +1507,7 @@ mod tests {
 
         format_priority_item_markdown(&mut output, 999, &item, 0);
 
-        assert!(output.contains("#999 - Score:"));
+        assert!(output.contains("### #999 Score:"));
     }
 
     #[test]
@@ -1519,7 +1519,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 1, &item, 2);
 
         // Should still work without transitive coverage
-        assert!(output.contains("#1 - Score: 8.5"));
+        assert!(output.contains("### #1 Score: 8.5"));
         // Coverage information should be omitted in breakdown
     }
 
@@ -1563,7 +1563,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 1, &item, 0);
 
-        assert!(output.contains("### #1 - Score: 45.2"));
+        assert!(output.contains("### #1 [T1] Score: 45.2"));
         assert!(output.contains("**Type:** FILE"));
         assert!(output.contains("src/main.rs"));
         assert!(output.contains("250 lines, 10 functions"));
@@ -1611,7 +1611,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 1, &item, 0);
 
-        assert!(output.contains("### #1 - Score: 125.8"));
+        assert!(output.contains("### #1 [T1] Score: 125.8"));
         assert!(output.contains("**Type:** FILE - GOD OBJECT"));
         assert!(output.contains("**God Object Metrics:**"));
         assert!(output.contains("- Methods: 45"));
@@ -1661,7 +1661,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 2, &item, 0);
 
-        assert!(output.contains("### #2 - Score: 85.3"));
+        assert!(output.contains("### #2 [T1] Score: 85.3"));
         assert!(output.contains("**Type:** FILE - HIGH COMPLEXITY"));
         assert!(output.contains("600 lines"));
         assert!(!output.contains("**God Object Metrics:**"));
@@ -1707,7 +1707,7 @@ mod tests {
         let mut output = String::new();
         format_file_priority_item_markdown(&mut output, 3, &item, 1);
 
-        assert!(output.contains("### #3 - Score: 55.7"));
+        assert!(output.contains("### #3 [T1] Score: 55.7"));
         assert!(output.contains("**Scoring Breakdown:**"));
         assert!(output.contains("- File size:"));
         assert!(output.contains("- Functions:"));
