@@ -193,6 +193,10 @@ pub enum Commands {
         /// Maximum number of files to analyze (0 = no limit, default: no limit)
         #[arg(long = "max-files")]
         max_files: Option<usize>,
+
+        /// Validate LOC consistency across analysis modes (with/without coverage)
+        #[arg(long = "validate-loc")]
+        validate_loc: bool,
     },
 
     /// Initialize configuration file

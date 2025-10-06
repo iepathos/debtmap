@@ -552,6 +552,10 @@ pub struct DebtmapConfig {
     /// Score normalization configuration
     #[serde(default)]
     pub normalization: Option<NormalizationConfig>,
+
+    /// Lines of code counting configuration
+    #[serde(default)]
+    pub loc: Option<crate::metrics::LocCountingConfig>,
 }
 
 impl DebtmapConfig {

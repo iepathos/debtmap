@@ -79,17 +79,21 @@ impl LocCounter {
     /// Determine if file should be included in LOC count
     pub fn should_include(&self, path: &Path) -> bool {
         if !self.config.include_tests && self.is_test_file(path) {
+            log::debug!("Excluding test file: {}", path.display());
             return false;
         }
 
         if !self.config.include_generated && self.is_generated(path) {
+            log::debug!("Excluding generated file: {}", path.display());
             return false;
         }
 
         if self.is_excluded_by_pattern(path) {
+            log::debug!("Excluding file by pattern: {}", path.display());
             return false;
         }
 
+        log::debug!("Including file in LOC count: {}", path.display());
         true
     }
 
@@ -208,22 +212,22 @@ pub struct ProjectLocCount {
 }
 
 /// Configuration for LOC counting
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct LocCountingConfig {
     /// Include test files in LOC count (default: false)
-    #[allow(dead_code)]
+    #[serde(default)]
     pub include_tests: bool,
     /// Include generated files in LOC count (default: false)
-    #[allow(dead_code)]
+    #[serde(default)]
     pub include_generated: bool,
     /// Count comments as code lines (default: false)
-    #[allow(dead_code)]
+    #[serde(default)]
     pub count_comments: bool,
     /// Count blank lines as code lines (default: false)
-    #[allow(dead_code)]
+    #[serde(default)]
     pub count_blanks: bool,
     /// Additional exclusion patterns
-    #[allow(dead_code)]
+    #[serde(default)]
     pub exclude_patterns: Vec<String>,
 }
 

@@ -18,6 +18,8 @@ pub struct LcovData {
     pub functions: HashMap<PathBuf, Vec<FunctionCoverage>>,
     pub total_lines: usize,
     pub lines_hit: usize,
+    /// LOC counter instance for consistent line counting across analysis modes
+    loc_counter: Option<crate::metrics::LocCounter>,
 }
 
 pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
@@ -237,6 +239,46 @@ fn calculate_function_coverage_data(
 }
 
 impl LcovData {
+    /// Set the LOC counter to use for consistent line counting
+    pub fn with_loc_counter(mut self, loc_counter: crate::metrics::LocCounter) -> Self {
+        self.loc_counter = Some(loc_counter);
+        self
+    }
+
+    /// Get the LOC counter instance if set
+    pub fn loc_counter(&self) -> Option<&crate::metrics::LocCounter> {
+        self.loc_counter.as_ref()
+    }
+
+    /// Recalculate total lines using LOC counter for consistency
+    /// This ensures coverage denominator matches the LOC count used elsewhere
+    pub fn recalculate_with_loc_counter(&mut self) {
+        if let Some(counter) = &self.loc_counter {
+            let files: Vec<PathBuf> = self.functions.keys().cloned().collect();
+            let mut total_code_lines = 0;
+
+            for file in &files {
+                if counter.should_include(file) {
+                    if let Ok(count) = counter.count_file(file) {
+                        total_code_lines += count.code_lines;
+                        log::debug!(
+                            "LOC counter: {} has {} code lines",
+                            file.display(),
+                            count.code_lines
+                        );
+                    }
+                }
+            }
+
+            log::debug!(
+                "Recalculated total_lines using LocCounter: {} (was {})",
+                total_code_lines,
+                self.total_lines
+            );
+            self.total_lines = total_code_lines;
+        }
+    }
+
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
         // Try exact match first, then use path normalization
         self.functions

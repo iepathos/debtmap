@@ -56,6 +56,7 @@ pub struct AnalyzeConfig {
     pub min_problematic: Option<usize>,
     pub no_god_object: bool,
     pub max_files: Option<usize>,
+    pub validate_loc: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
