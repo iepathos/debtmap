@@ -5,8 +5,9 @@ use crate::priority::{
     coverage_propagation::TransitiveCoverage,
     debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
     scoring::calculation::{
-        calculate_base_score, calculate_base_score_no_coverage, calculate_complexity_factor,
-        calculate_coverage_factor, calculate_dependency_factor, normalize_final_score,
+        calculate_base_score_no_coverage, calculate_base_score_with_coverage_multiplier,
+        calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
+        calculate_dependency_factor, normalize_final_score,
     },
     scoring::debt_item::{determine_visibility, is_dead_code},
     semantic_classifier::{classify_function_role, FunctionRole},
@@ -196,18 +197,7 @@ pub fn calculate_unified_priority_with_debt(
         0.0 // No coverage data - assume worst case
     };
 
-    // Use pure functions for calculation (easier to test and debug)
-    // Use test-aware coverage factor (spec 98)
-    let coverage_factor = if has_coverage_data {
-        if func.is_test {
-            0.1 // Test functions get minimal coverage factor
-        } else {
-            calculate_coverage_factor(coverage_pct)
-        }
-    } else {
-        0.0 // No coverage data - use neutral value
-    };
-
+    // Calculate complexity and dependency factors
     let complexity_factor = calculate_complexity_factor(raw_complexity);
     let upstream_count = call_graph.get_callers(&func_id).len();
     let dependency_factor = calculate_dependency_factor(upstream_count);
@@ -223,13 +213,33 @@ pub fn calculate_unified_priority_with_debt(
         _ => 1.0,
     };
 
-    // Calculate weighted sum base score with conditional weights
+    // Calculate base score with coverage as multiplier (spec 122)
     let base_score = if has_coverage_data {
-        // With coverage: use existing weights (50% coverage, 35% complexity, 15% deps)
-        calculate_base_score(coverage_factor, complexity_factor, dependency_factor)
+        // With coverage: use multiplier approach (coverage dampens complexity+deps score)
+        let coverage_multiplier = if func.is_test {
+            0.0 // Test functions get maximum dampening (near-zero score)
+        } else {
+            calculate_coverage_multiplier(coverage_pct)
+        };
+        calculate_base_score_with_coverage_multiplier(
+            coverage_multiplier,
+            complexity_factor,
+            dependency_factor,
+        )
     } else {
         // Without coverage: adjusted weights (50% complexity, 25% deps, 25% debt)
         calculate_base_score_no_coverage(complexity_factor, dependency_factor)
+    };
+
+    // Store coverage_factor for display purposes (kept for backward compatibility)
+    let _coverage_factor = if has_coverage_data {
+        if func.is_test {
+            0.1
+        } else {
+            calculate_coverage_factor(coverage_pct)
+        }
+    } else {
+        0.0
     };
 
     // Apply minimal role adjustment (capped to avoid distortion)

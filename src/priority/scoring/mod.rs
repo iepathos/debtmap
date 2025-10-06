@@ -9,14 +9,16 @@ pub mod rust_recommendations;
 
 // Re-export commonly used items
 pub use calculation::{
-    calculate_base_score, calculate_complexity_factor, calculate_coverage_factor,
-    calculate_dependency_factor, denormalize_score, generate_normalization_curve,
-    normalize_complexity, normalize_final_score, normalize_final_score_with_metadata,
-    NormalizedScore, ScalingMethod,
+    calculate_base_score, calculate_base_score_with_coverage_multiplier,
+    calculate_complexity_factor, calculate_coverage_factor, calculate_coverage_multiplier,
+    calculate_coverage_multiplier_with_test_flag, calculate_dependency_factor, denormalize_score,
+    generate_normalization_curve, normalize_complexity, normalize_final_score,
+    normalize_final_score_with_metadata, NormalizedScore, ScalingMethod,
 };
 
 pub use classification::{
     classify_risk_based_debt, classify_test_debt, determine_debt_type, is_complexity_hotspot,
+    should_surface_untested_function,
 };
 
 pub use recommendation::{

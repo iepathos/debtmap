@@ -2,11 +2,31 @@
 
 use std::fmt;
 
+/// Calculate coverage multiplier from coverage percentage (spec 122)
+/// Returns a value between 0.0 (100% coverage) and 1.0 (0% coverage)
+/// This multiplier dampens the base score for well-tested code
+pub fn calculate_coverage_multiplier(coverage_pct: f64) -> f64 {
+    calculate_coverage_multiplier_with_test_flag(coverage_pct, false)
+}
+
+/// Calculate coverage multiplier with test code awareness (spec 122)
+pub fn calculate_coverage_multiplier_with_test_flag(coverage_pct: f64, is_test_code: bool) -> f64 {
+    // Don't penalize test code for coverage
+    if is_test_code {
+        return 0.0; // Test code gets maximum dampening (near-zero score)
+    }
+
+    // Coverage acts as a dampener: higher coverage → lower multiplier → lower score
+    1.0 - coverage_pct
+}
+
+/// DEPRECATED: Use calculate_coverage_multiplier instead (spec 122)
 /// Calculate coverage factor from coverage percentage
 pub fn calculate_coverage_factor(coverage_pct: f64) -> f64 {
     calculate_coverage_factor_with_test_flag(coverage_pct, false)
 }
 
+/// DEPRECATED: Use calculate_coverage_multiplier_with_test_flag instead (spec 122)
 /// Calculate coverage factor with test code awareness
 pub fn calculate_coverage_factor_with_test_flag(coverage_pct: f64, is_test_code: bool) -> f64 {
     // Don't penalize test code for coverage
@@ -45,6 +65,23 @@ pub fn calculate_dependency_factor(upstream_count: usize) -> f64 {
     ((upstream_count as f64) / 2.0).min(10.0)
 }
 
+/// Calculate base score with coverage as multiplier (spec 122)
+/// Coverage dampens the complexity+dependency base score instead of adding to it
+pub fn calculate_base_score_with_coverage_multiplier(
+    coverage_multiplier: f64,
+    complexity_factor: f64,
+    dependency_factor: f64,
+) -> f64 {
+    // Calculate base score from complexity and dependencies
+    let base = calculate_base_score_no_coverage(complexity_factor, dependency_factor);
+
+    // Apply coverage as a dampening multiplier
+    // 100% coverage (multiplier=0.0) → near-zero score
+    // 0% coverage (multiplier=1.0) → full base score
+    base * coverage_multiplier
+}
+
+/// DEPRECATED: Use calculate_base_score_with_coverage_multiplier instead (spec 122)
 /// Calculate weighted sum base score
 /// Uses additive model for clear, predictable scoring
 pub fn calculate_base_score(
@@ -242,6 +279,111 @@ pub fn generate_normalization_curve() -> Vec<(f64, f64, &'static str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_calculate_coverage_multiplier() {
+        // Test coverage multiplier (spec 122)
+        assert_eq!(calculate_coverage_multiplier(0.0), 1.0); // 0% coverage: full score
+        assert_eq!(calculate_coverage_multiplier(0.5), 0.5); // 50% coverage: half score
+        assert!((calculate_coverage_multiplier(0.8) - 0.2).abs() < 0.01); // 80% coverage: 20% of score
+        assert_eq!(calculate_coverage_multiplier(1.0), 0.0); // 100% coverage: near-zero score
+    }
+
+    #[test]
+    fn test_coverage_multiplier_with_test_flag() {
+        // Test code should get maximum dampening regardless of coverage
+        assert_eq!(calculate_coverage_multiplier_with_test_flag(0.0, true), 0.0);
+        assert_eq!(calculate_coverage_multiplier_with_test_flag(0.5, true), 0.0);
+        assert_eq!(calculate_coverage_multiplier_with_test_flag(1.0, true), 0.0);
+
+        // Non-test code follows normal multiplier
+        assert_eq!(
+            calculate_coverage_multiplier_with_test_flag(0.0, false),
+            1.0
+        );
+        assert_eq!(
+            calculate_coverage_multiplier_with_test_flag(0.5, false),
+            0.5
+        );
+        assert_eq!(
+            calculate_coverage_multiplier_with_test_flag(1.0, false),
+            0.0
+        );
+    }
+
+    #[test]
+    fn test_base_score_with_coverage_multiplier() {
+        // Test that coverage acts as dampener (spec 122)
+        let complexity_factor = 5.0;
+        let dependency_factor = 2.0;
+
+        // No coverage (multiplier = 1.0) should yield full base score
+        let score_no_coverage = calculate_base_score_with_coverage_multiplier(
+            1.0,
+            complexity_factor,
+            dependency_factor,
+        );
+        let base = calculate_base_score_no_coverage(complexity_factor, dependency_factor);
+        assert_eq!(score_no_coverage, base);
+
+        // 50% coverage should yield half the base score
+        let score_half_coverage = calculate_base_score_with_coverage_multiplier(
+            0.5,
+            complexity_factor,
+            dependency_factor,
+        );
+        assert!((score_half_coverage - base * 0.5).abs() < 0.01);
+
+        // 80% coverage should yield 20% of base score
+        let score_high_coverage = calculate_base_score_with_coverage_multiplier(
+            0.2,
+            complexity_factor,
+            dependency_factor,
+        );
+        assert!((score_high_coverage - base * 0.2).abs() < 0.01);
+
+        // 100% coverage should yield near-zero score
+        let score_full_coverage = calculate_base_score_with_coverage_multiplier(
+            0.0,
+            complexity_factor,
+            dependency_factor,
+        );
+        assert_eq!(score_full_coverage, 0.0);
+    }
+
+    #[test]
+    fn test_coverage_reduces_score_monotonicity() {
+        // Test score monotonicity property (spec 122)
+        let complexity_factor = 8.0;
+        let dependency_factor = 3.0;
+
+        let score_0_coverage = calculate_base_score_with_coverage_multiplier(
+            1.0,
+            complexity_factor,
+            dependency_factor,
+        );
+        let score_50_coverage = calculate_base_score_with_coverage_multiplier(
+            0.5,
+            complexity_factor,
+            dependency_factor,
+        );
+        let score_80_coverage = calculate_base_score_with_coverage_multiplier(
+            0.2,
+            complexity_factor,
+            dependency_factor,
+        );
+        let score_100_coverage = calculate_base_score_with_coverage_multiplier(
+            0.0,
+            complexity_factor,
+            dependency_factor,
+        );
+
+        // Scores should decrease as coverage increases
+        assert!(score_0_coverage > score_50_coverage);
+        assert!(score_50_coverage > score_80_coverage);
+        assert!(score_80_coverage > score_100_coverage);
+        assert_eq!(score_100_coverage, 0.0);
+    }
 
     #[test]
     fn test_calculate_coverage_factor() {
