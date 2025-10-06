@@ -5,7 +5,6 @@
 ///
 /// Coverage data should REDUCE total debt scores by dampening well-tested functions,
 /// never increase them. This ensures coverage encourages better testing practices.
-
 use debtmap::priority::coverage_propagation::TransitiveCoverage;
 use debtmap::priority::scoring::calculation::{
     calculate_base_score_no_coverage, calculate_base_score_with_coverage_multiplier,
