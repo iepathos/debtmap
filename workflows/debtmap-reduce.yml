@@ -11,7 +11,7 @@ setup:
 map:
   # Input configuration - debtmap.json contains items array
   input: debtmap.json
-  json_path: "$.items[*]"
+  json_path: "$.items[*].File"
 
   # Commands to execute for each debt item
   agent_template:
@@ -33,8 +33,8 @@ map:
   max_parallel: 5  # Run up to 5 agents in parallel
 
   # Process high-score items first
-  filter: "unified_score.final_score >= 5"  # Only process items with score >= 5
-  sort_by: "unified_score.final_score DESC"  # Process highest score items first
+  filter: "score >= 100"  # Only process items with score >= 100
+  sort_by: "score DESC"  # Process highest score items first
   max_items: 10  # Limit to 10 items per run
 
 # Reduce phase: Aggregate results and finalize
