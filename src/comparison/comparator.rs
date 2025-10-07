@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 
+use crate::comparison::location_matcher::LocationMatcher;
 use crate::comparison::types::*;
 use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 
@@ -48,24 +49,37 @@ impl Comparator {
 
     /// Compare specific target item
     fn compare_target_item(&self, location: &str) -> Result<TargetComparison> {
-        let before_item = self.find_item_by_location(&self.before, location);
-        let after_item = self.find_item_by_location(&self.after, location);
+        let matcher = LocationMatcher::new();
 
-        let status = match (&before_item, &after_item) {
-            (None, _) => TargetStatus::NotFoundBefore,
-            (Some(_), None) => TargetStatus::Resolved,
-            (Some(before), Some(after)) => self.classify_target_status(before, after),
+        let before_result = matcher.find_matches(&self.before, location);
+        let after_result = matcher.find_matches(&self.after, location);
+
+        let (match_strategy, match_confidence, matched_items_count) = match &before_result {
+            Ok(result) => (
+                Some(format!("{:?}", result.strategy)),
+                Some(result.confidence),
+                Some(result.items.len()),
+            ),
+            Err(_) => (None, None, None),
         };
 
-        let (before_metrics, after_metrics, improvements) = match (&before_item, &after_item) {
-            (Some(before), Some(after)) => {
-                let before_m = self.extract_metrics(before);
-                let after_m = self.extract_metrics(after);
+        let status = match (&before_result, &after_result) {
+            (Err(_), _) => TargetStatus::NotFoundBefore,
+            (Ok(_), Err(_)) => TargetStatus::Resolved,
+            (Ok(before), Ok(after)) => {
+                self.classify_target_status_multi(&before.items, &after.items)
+            }
+        };
+
+        let (before_metrics, after_metrics, improvements) = match (&before_result, &after_result) {
+            (Ok(before), Ok(after)) => {
+                let before_m = self.aggregate_metrics(&before.items);
+                let after_m = self.aggregate_metrics(&after.items);
                 let improvements = self.calculate_improvements(&before_m, &after_m);
                 (before_m, Some(after_m), improvements)
             }
-            (Some(before), None) => {
-                let before_m = self.extract_metrics(before);
+            (Ok(before), Err(_)) => {
+                let before_m = self.aggregate_metrics(&before.items);
                 let improvements = ImprovementMetrics {
                     score_reduction_pct: 100.0,
                     complexity_reduction_pct: 100.0,
@@ -73,7 +87,7 @@ impl Comparator {
                 };
                 (before_m, None, improvements)
             }
-            (None, _) => {
+            (Err(_), _) => {
                 return Err(anyhow::anyhow!(
                     "Target item not found in before analysis at location: {}",
                     location
@@ -83,6 +97,9 @@ impl Comparator {
 
         Ok(TargetComparison {
             location: location.to_string(),
+            match_strategy,
+            match_confidence,
+            matched_items_count,
             before: before_metrics,
             after: after_metrics,
             improvements,
@@ -188,34 +205,69 @@ impl Comparator {
 
     // Helper methods
 
-    fn find_item_by_location<'a>(
-        &self,
-        analysis: &'a UnifiedAnalysis,
-        location: &str,
-    ) -> Option<&'a UnifiedDebtItem> {
-        let parts: Vec<&str> = location.split(':').collect();
-        if parts.len() != 3 {
-            return None;
+    /// Aggregate metrics from multiple items
+    fn aggregate_metrics(&self, items: &[&UnifiedDebtItem]) -> TargetMetrics {
+        if items.is_empty() {
+            return TargetMetrics {
+                score: 0.0,
+                cyclomatic_complexity: 0,
+                cognitive_complexity: 0,
+                coverage: 0.0,
+                function_length: 0,
+                nesting_depth: 0,
+            };
         }
 
-        let (file, function, line_str) = (parts[0], parts[1], parts[2]);
-        let line: usize = line_str.parse().ok()?;
+        if items.len() == 1 {
+            return self.extract_metrics(items[0]);
+        }
 
-        analysis.items.iter().find(|item| {
-            // Normalize paths for comparison (strip leading ./)
-            let item_file = item
-                .location
-                .file
-                .to_string_lossy()
-                .strip_prefix("./")
-                .unwrap_or(&item.location.file.to_string_lossy())
-                .to_string();
-            let target_file = file.strip_prefix("./").unwrap_or(file);
+        // For multiple items, sum scores and average complexities
+        let total_score: f64 = items.iter().map(|i| self.get_score(i)).sum();
 
-            item_file == target_file
-                && item.location.function == function
-                && item.location.line == line
-        })
+        let total_cyclomatic: u32 = items.iter().map(|i| i.cyclomatic_complexity).sum();
+        let total_cognitive: u32 = items.iter().map(|i| i.cognitive_complexity).sum();
+
+        let avg_coverage = items
+            .iter()
+            .filter_map(|i| i.transitive_coverage.as_ref())
+            .map(|tc| tc.transitive)
+            .sum::<f64>()
+            / items.len() as f64;
+
+        let total_length: usize = items.iter().map(|i| i.function_length).sum();
+        let max_nesting = items.iter().map(|i| i.nesting_depth).max().unwrap_or(0);
+
+        TargetMetrics {
+            score: total_score,
+            cyclomatic_complexity: total_cyclomatic,
+            cognitive_complexity: total_cognitive,
+            coverage: avg_coverage,
+            function_length: total_length,
+            nesting_depth: max_nesting,
+        }
+    }
+
+    /// Classify status for multiple items
+    fn classify_target_status_multi(
+        &self,
+        before_items: &[&UnifiedDebtItem],
+        after_items: &[&UnifiedDebtItem],
+    ) -> TargetStatus {
+        let before_score: f64 = before_items.iter().map(|i| self.get_score(i)).sum();
+        let after_score: f64 = after_items.iter().map(|i| self.get_score(i)).sum();
+
+        if before_score == 0.0 {
+            return TargetStatus::Unchanged;
+        }
+
+        if after_score < before_score * 0.7 {
+            TargetStatus::Improved
+        } else if after_score > before_score * 1.1 {
+            TargetStatus::Regressed
+        } else {
+            TargetStatus::Unchanged
+        }
     }
 
     fn item_key(&self, item: &UnifiedDebtItem) -> String {
@@ -278,23 +330,6 @@ impl Comparator {
             score_reduction_pct,
             complexity_reduction_pct,
             coverage_improvement_pct,
-        }
-    }
-
-    fn classify_target_status(
-        &self,
-        before: &UnifiedDebtItem,
-        after: &UnifiedDebtItem,
-    ) -> TargetStatus {
-        let before_score = self.get_score(before);
-        let after_score = self.get_score(after);
-
-        if after_score < before_score * 0.7 {
-            TargetStatus::Improved
-        } else if after_score > before_score * 1.1 {
-            TargetStatus::Regressed
-        } else {
-            TargetStatus::Unchanged
         }
     }
 
@@ -501,6 +536,9 @@ mod tests {
         let target = result.target_item.unwrap();
         assert_eq!(target.status, TargetStatus::Improved);
         assert!(target.improvements.score_reduction_pct > 80.0);
+        assert_eq!(target.match_strategy, Some("Exact".to_string()));
+        assert_eq!(target.match_confidence, Some(1.0));
+        assert_eq!(target.matched_items_count, Some(1));
     }
 
     #[test]
@@ -518,6 +556,8 @@ mod tests {
         assert_eq!(target.status, TargetStatus::Resolved);
         assert_eq!(target.after, None);
         assert_eq!(target.improvements.score_reduction_pct, 100.0);
+        assert!(target.match_strategy.is_some());
+        assert!(target.match_confidence.is_some());
     }
 
     #[test]

@@ -32,6 +32,12 @@ pub struct ComparisonMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetComparison {
     pub location: String,
+    #[serde(default)]
+    pub match_strategy: Option<String>,
+    #[serde(default)]
+    pub match_confidence: Option<f64>,
+    #[serde(default)]
+    pub matched_items_count: Option<usize>,
     pub before: TargetMetrics,
     pub after: Option<TargetMetrics>,
     pub improvements: ImprovementMetrics,
