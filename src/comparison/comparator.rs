@@ -318,8 +318,8 @@ impl Comparator {
         let before_complexity = before.cyclomatic_complexity + before.cognitive_complexity;
         let after_complexity = after.cyclomatic_complexity + after.cognitive_complexity;
         let complexity_reduction_pct = if before_complexity > 0 {
-            ((before_complexity - after_complexity) as f64 / before_complexity as f64 * 100.0)
-                .max(0.0)
+            let reduction = before_complexity.saturating_sub(after_complexity) as f64;
+            (reduction / before_complexity as f64 * 100.0).max(0.0)
         } else {
             0.0
         };
@@ -604,5 +604,27 @@ mod tests {
 
         assert_eq!(result.project_health.changes.debt_score_change, -60.0);
         assert_eq!(result.summary.overall_debt_trend, DebtTrend::Improving);
+    }
+
+    #[test]
+    fn test_complexity_increase_no_overflow() {
+        let mut before_item = create_test_item("src/main.rs", "test_func", 42, 50.0);
+        before_item.cyclomatic_complexity = 5;
+        before_item.cognitive_complexity = 5;
+
+        let mut after_item = create_test_item("src/main.rs", "test_func", 42, 60.0);
+        after_item.cyclomatic_complexity = 15;
+        after_item.cognitive_complexity = 15;
+
+        let before = create_test_analysis(vec![before_item], 50.0);
+        let after = create_test_analysis(vec![after_item], 60.0);
+
+        let comparator = Comparator::new(before, after, Some("src/main.rs:test_func:42".to_string()));
+        let result = comparator.compare();
+
+        // Should not panic and should show 0% reduction when complexity increases
+        assert!(result.is_ok());
+        let target = result.unwrap().target_item.unwrap();
+        assert_eq!(target.improvements.complexity_reduction_pct, 0.0);
     }
 }
