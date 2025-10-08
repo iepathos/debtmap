@@ -1,6 +1,9 @@
+pub mod atomic_io;
 pub mod auto_pruner;
 pub mod cache_location;
 pub mod call_graph_cache;
+pub mod index_manager;
+pub mod pruning;
 pub mod shared_cache;
 pub mod unified_analysis_cache;
 
@@ -9,6 +12,7 @@ pub use auto_pruner::{
 };
 pub use cache_location::{CacheLocation, CacheStrategy};
 pub use call_graph_cache::{CacheEntry, CacheKey, CallGraphCache};
+pub use index_manager::{CacheIndex, CacheMetadata, IndexManager, IndexStats};
 pub use shared_cache::{CacheStats, SharedCache};
 pub use unified_analysis_cache::{
     UnifiedAnalysisCache, UnifiedAnalysisCacheEntry, UnifiedAnalysisCacheKey,

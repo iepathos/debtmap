@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use super::shared_cache::{CacheIndex, CacheMetadata};
+use super::index_manager::{CacheIndex, CacheMetadata};
 
 /// Pruning strategy configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,178 +1,21 @@
+use crate::cache::atomic_io::RetryStrategy;
 use crate::cache::auto_pruner::{AutoPruner, BackgroundPruner, PruneStats, PruneStrategy};
 use crate::cache::cache_location::{CacheLocation, CacheStrategy};
+use crate::cache::index_manager::{CacheMetadata, IndexManager};
+use crate::cache::pruning::{InternalCacheStats, PruningConfig, PruningStrategyType};
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc, RwLock,
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// Metadata for cache management
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheMetadata {
-    pub version: String,
-    pub created_at: SystemTime,
-    pub last_accessed: SystemTime,
-    pub access_count: u64,
-    pub size_bytes: u64,
-    #[serde(default = "default_debtmap_version")]
-    pub debtmap_version: String,
-}
-
-/// Default function for debtmap_version field when deserializing old cache entries
-fn default_debtmap_version() -> String {
-    // Return empty string for old entries that don't have version info
-    String::new()
-}
-
-/// Index for tracking cache entries
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CacheIndex {
-    pub entries: HashMap<String, CacheMetadata>,
-    pub total_size: u64,
-    pub last_cleanup: Option<SystemTime>,
-}
-
-/// Configuration for pruning behavior
-#[derive(Debug, Clone)]
-struct PruningConfig {
-    auto_prune_enabled: bool,
-    use_sync_pruning: bool,
-    is_test_environment: bool,
-}
-
-/// Pruning strategy selection
-#[derive(Debug, Clone, PartialEq)]
-enum PruningStrategyType {
-    NoAutoPruner,      // No auto pruner configured
-    SyncPruning,       // Use synchronous pruning
-    BackgroundPruning, // Use background pruning
-}
-
-/// Internal cache statistics for pruning decisions
-#[derive(Debug, Clone)]
-struct InternalCacheStats {
-    total_size: u64,
-    entry_count: usize,
-}
-
-/// Retry strategy for handling transient failures with exponential backoff
-struct RetryStrategy {
-    max_attempts: usize,
-    base_delay_ms: u64,
-}
-
-impl RetryStrategy {
-    fn new(max_attempts: usize, base_delay_ms: u64) -> Self {
-        Self {
-            max_attempts,
-            base_delay_ms,
-        }
-    }
-
-    /// Execute operation with retry logic - functional approach
-    fn execute<T, F>(&self, mut operation: F, operation_name: &str) -> Result<T>
-    where
-        F: FnMut() -> Result<T>,
-    {
-        let mut last_error = None;
-
-        for attempt in 0..self.max_attempts {
-            match self.try_operation(&mut operation, attempt) {
-                Ok(value) => return Ok(value),
-                Err(e) => {
-                    if self.should_retry(&e, attempt) {
-                        self.apply_backoff(attempt);
-                        last_error = Some(e);
-                    } else {
-                        return Err(e.context(format!(
-                            "Operation '{}' failed after {} attempts",
-                            operation_name,
-                            attempt + 1
-                        )));
-                    }
-                }
-            }
-        }
-
-        Err(last_error.unwrap_or_else(|| {
-            anyhow::anyhow!(
-                "Operation '{}' failed after {} attempts",
-                operation_name,
-                self.max_attempts
-            )
-        }))
-    }
-
-    /// Try the operation once
-    fn try_operation<T, F>(&self, operation: &mut F, attempt: usize) -> Result<T>
-    where
-        F: FnMut() -> Result<T>,
-    {
-        operation().map_err(|e| {
-            if attempt == self.max_attempts - 1 {
-                e.context(format!("Final attempt {} failed", attempt + 1))
-            } else {
-                e
-            }
-        })
-    }
-
-    /// Check if error is retryable
-    fn should_retry(&self, error: &anyhow::Error, attempt: usize) -> bool {
-        // Don't retry on last attempt
-        if attempt >= self.max_attempts - 1 {
-            return false;
-        }
-
-        // Check if error is transient
-        self.is_transient_error(error)
-    }
-
-    /// Determine if an error is transient and worth retrying
-    fn is_transient_error(&self, error: &anyhow::Error) -> bool {
-        error.chain().any(|err| {
-            err.downcast_ref::<std::io::Error>()
-                .map(|io_err| Self::is_retryable_io_error(io_err.kind()))
-                .unwrap_or(false)
-        })
-    }
-
-    /// Check if IO error kind is retryable
-    fn is_retryable_io_error(kind: std::io::ErrorKind) -> bool {
-        use std::io::ErrorKind;
-
-        matches!(
-            kind,
-            ErrorKind::AlreadyExists
-                | ErrorKind::NotFound
-                | ErrorKind::Interrupted
-                | ErrorKind::PermissionDenied // May be transient due to file locks
-        )
-    }
-
-    /// Apply exponential backoff with jitter
-    fn apply_backoff(&self, attempt: usize) {
-        let delay = self.calculate_delay(attempt);
-        std::thread::sleep(delay);
-    }
-
-    /// Calculate delay with exponential backoff and jitter
-    fn calculate_delay(&self, attempt: usize) -> Duration {
-        let base_delay_ms = self.base_delay_ms * (1 << attempt);
-        let jitter_ms = base_delay_ms / 4; // 25% jitter
-        Duration::from_millis(base_delay_ms + jitter_ms)
-    }
-}
+// Types now imported from other modules
 
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
     pub location: CacheLocation,
-    index: Arc<RwLock<CacheIndex>>,
+    index_manager: IndexManager,
     max_cache_size: u64,
     cleanup_threshold: f64,
     auto_pruner: Option<AutoPruner>,
@@ -213,7 +56,7 @@ impl SharedCache {
     fn new_with_location(location: CacheLocation) -> Result<Self> {
         location.ensure_directories()?;
 
-        let index = Self::load_or_create_index(&location)?;
+        let index_manager = IndexManager::load_or_create(&location)?;
 
         // Create auto-pruner from environment or defaults
         let auto_pruner = if std::env::var("DEBTMAP_CACHE_AUTO_PRUNE")
@@ -238,7 +81,7 @@ impl SharedCache {
 
         Ok(Self {
             location,
-            index: Arc::new(RwLock::new(index)),
+            index_manager,
             max_cache_size,
             cleanup_threshold: 0.9, // Cleanup when 90% full
             auto_pruner,
@@ -246,40 +89,7 @@ impl SharedCache {
         })
     }
 
-    /// Load existing index or create new one
-    fn load_or_create_index(location: &CacheLocation) -> Result<CacheIndex> {
-        let index_path = location.get_component_path("metadata").join("index.json");
-
-        if index_path.exists() {
-            let content = fs::read_to_string(&index_path)
-                .with_context(|| format!("Failed to read index from {:?}", index_path))?;
-
-            serde_json::from_str(&content)
-                .with_context(|| "Failed to deserialize cache index")
-                .or_else(|_| {
-                    // If deserialization fails, start with a new index
-                    log::warn!("Cache index corrupted, creating new index");
-                    Ok(CacheIndex {
-                        last_cleanup: Some(SystemTime::now()),
-                        ..Default::default()
-                    })
-                })
-        } else {
-            Ok(CacheIndex {
-                last_cleanup: Some(SystemTime::now()),
-                ..Default::default()
-            })
-        }
-    }
-
     // Pure functions for path operations and atomic file handling
-
-    /// Resolve the index file path based on cache location
-    fn resolve_index_paths(location: &CacheLocation) -> (PathBuf, PathBuf) {
-        let index_path = location.get_component_path("metadata").join("index.json");
-        let temp_path = Self::create_safe_temp_path(&index_path);
-        (index_path, temp_path)
-    }
 
     /// Create a safe temporary file path that avoids collisions
     fn create_safe_temp_path(target_path: &Path) -> PathBuf {
@@ -402,16 +212,6 @@ impl SharedCache {
         Ok(())
     }
 
-    /// Serialize cache index to JSON string
-    fn serialize_index_to_json(index: &CacheIndex) -> Result<String> {
-        serde_json::to_string_pretty(index).context("Failed to serialize cache index")
-    }
-
-    /// Write content atomically using temporary file and rename
-    fn write_file_atomically(target_path: &Path, temp_path: &Path, content: &str) -> Result<()> {
-        Self::write_bytes_atomically(target_path, temp_path, content.as_bytes())
-    }
-
     /// Write data to a temporary file with proper error context and retries
     fn write_temp_file(temp_path: &Path, data: &[u8]) -> Result<()> {
         let temp_path_clone = temp_path.to_path_buf();
@@ -488,22 +288,7 @@ impl SharedCache {
 
     /// Save the current index to disk with comprehensive error handling
     pub fn save_index(&self) -> Result<()> {
-        let (index_path, temp_path) = Self::resolve_index_paths(&self.location);
-
-        // Ensure directories exist before any file operations
-        Self::ensure_atomic_write_directories(&index_path, &temp_path)?;
-
-        let index = self
-            .index
-            .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-
-        let content = Self::serialize_index_to_json(&index)?;
-
-        Self::write_file_atomically(&index_path, &temp_path, &content)
-            .with_context(|| format!("Failed to save cache index to {:?}", index_path))?;
-
-        Ok(())
+        self.index_manager.save(&self.location)
     }
 
     /// Get a cache entry
@@ -515,17 +300,7 @@ impl SharedCache {
         }
 
         // Update access metadata
-        {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-            if let Some(metadata) = index.entries.get_mut(key) {
-                metadata.last_accessed = SystemTime::now();
-                metadata.access_count += 1;
-            }
-        }
+        self.index_manager.update_access_metadata(key)?;
 
         fs::read(&cache_path)
             .with_context(|| format!("Failed to read cache file: {:?}", cache_path))
@@ -551,8 +326,8 @@ impl SharedCache {
     }
 
     /// Determine if an entry already exists in the index
-    fn is_existing_entry(index: &CacheIndex, key: &str) -> bool {
-        index.entries.contains_key(key)
+    fn is_existing_entry(&self, key: &str) -> bool {
+        self.index_manager.is_existing_entry(key)
     }
 
     /// Determine if pruning is needed after insertion
@@ -574,12 +349,6 @@ impl SharedCache {
         }
     }
 
-    /// Update index with new entry and recalculate total size
-    fn update_index_with_entry(index: &mut CacheIndex, key: String, metadata: CacheMetadata) {
-        index.entries.insert(key, metadata);
-        index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
-    }
-
     /// Write cache file atomically to disk
     fn write_cache_file_atomically(cache_path: &Path, data: &[u8]) -> Result<()> {
         let temp_path = Self::create_safe_temp_path(cache_path);
@@ -589,11 +358,7 @@ impl SharedCache {
 
     /// Check if key represents a new entry
     fn is_new_entry(&self, key: &str) -> Result<bool> {
-        let index = self
-            .index
-            .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-        Ok(!Self::is_existing_entry(&index, key))
+        Ok(!self.is_existing_entry(key))
     }
 
     /// Execute synchronous pruning based on entry status
@@ -640,7 +405,7 @@ impl SharedCache {
             PruningStrategyType::BackgroundPruning => {
                 if let Some(bg_pruner) = &self.background_pruner {
                     if !bg_pruner.is_running() {
-                        bg_pruner.start_if_needed(self.index.clone());
+                        bg_pruner.start_if_needed(self.index_manager.get_index_arc());
                     }
                 }
                 Ok(())
@@ -721,13 +486,8 @@ impl SharedCache {
 
     /// Execute index update operation with proper lock management
     fn execute_index_update(&self, key: &str, data_len: usize) -> Result<()> {
-        let mut index = self
-            .index
-            .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
         let metadata = Self::create_cache_metadata(data_len);
-        Self::update_index_with_entry(&mut index, key.to_string(), metadata);
-        Ok(())
+        self.index_manager.add_entry(key.to_string(), metadata)
     }
 
     /// Execute the core cache storage operation - coordinates all steps
@@ -806,15 +566,7 @@ impl SharedCache {
         }
 
         // Update index
-        {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-            index.entries.remove(key);
-            index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
-        }
+        self.index_manager.remove_entry(key)?;
 
         self.save_index()?;
         Ok(())
@@ -832,14 +584,8 @@ impl SharedCache {
 
     /// Perform cleanup if cache is too large
     fn maybe_cleanup(&self) -> Result<()> {
-        let should_cleanup = {
-            let index = self
-                .index
-                .read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-
-            index.total_size > (self.max_cache_size as f64 * self.cleanup_threshold) as u64
-        };
+        let threshold = (self.max_cache_size as f64 * self.cleanup_threshold) as u64;
+        let should_cleanup = self.index_manager.check_total_size_exceeds(threshold);
 
         if should_cleanup {
             self.cleanup()?;
@@ -858,30 +604,12 @@ impl SharedCache {
 
     /// Determine which cache keys should be removed based on size and age
     fn determine_keys_to_remove(&self) -> Result<Vec<String>> {
-        let mut index = self
-            .index
-            .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-        let sorted_entries = Self::sort_entries_by_access_time(&index.entries);
+        let (sorted_entries, total_size) = self.index_manager.get_sorted_entries_and_stats();
         let target_size = self.max_cache_size / 2;
-        let keys_to_remove =
-            Self::select_keys_for_removal(sorted_entries, target_size, index.total_size);
+        let keys_to_remove = Self::select_keys_for_removal(sorted_entries, target_size, total_size);
 
-        Self::update_index_after_removal(&mut index, &keys_to_remove);
+        self.index_manager.remove_entries(&keys_to_remove)?;
         Ok(keys_to_remove)
-    }
-
-    /// Sort cache entries by last access time (oldest first)
-    fn sort_entries_by_access_time(
-        entries: &HashMap<String, CacheMetadata>,
-    ) -> Vec<(String, CacheMetadata)> {
-        let mut sorted_entries: Vec<_> = entries
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        sorted_entries.sort_by_key(|(_, metadata)| metadata.last_accessed);
-        sorted_entries
     }
 
     /// Select keys for removal until target size is reached
@@ -998,24 +726,7 @@ impl SharedCache {
     pub fn validate_version(&self) -> Result<bool> {
         let current_version = env!("CARGO_PKG_VERSION");
 
-        // Check if we need to validate version by looking at any existing entry
-        let needs_clear = {
-            let index = self
-                .index
-                .read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-
-            // If cache is empty, no need to clear
-            if index.entries.is_empty() {
-                false
-            } else {
-                // Check if any entry has a different version
-                index.entries.values().any(|metadata| {
-                    !metadata.debtmap_version.is_empty()
-                        && metadata.debtmap_version != current_version
-                })
-            }
-        };
+        let needs_clear = self.index_manager.check_version_mismatch(current_version);
 
         if needs_clear {
             log::info!(
@@ -1049,15 +760,7 @@ impl SharedCache {
         }
 
         // Clear index
-        {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-            index.entries.clear();
-            index.total_size = 0;
-            index.last_cleanup = Some(SystemTime::now());
-        }
+        self.index_manager.clear_all_entries()?;
 
         self.save_index()?;
         log::info!("Cache cleared successfully");
@@ -1080,15 +783,7 @@ impl SharedCache {
         }
 
         // Clear index
-        {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-            index.entries.clear();
-            index.total_size = 0;
-            index.last_cleanup = Some(SystemTime::now());
-        }
+        self.index_manager.clear_all_entries()?;
 
         self.save_index()?;
         Ok(())
@@ -1127,26 +822,20 @@ impl SharedCache {
     }
 
     pub fn get_stats(&self) -> CacheStats {
-        let index = self.index.read().unwrap_or_else(|e| {
-            log::warn!("Failed to acquire read lock for stats: {}", e);
-            e.into_inner()
-        });
+        let stats = self.index_manager.get_stats();
 
         CacheStats {
-            entry_count: index.entries.len(),
-            total_size: index.total_size,
+            entry_count: stats.entry_count,
+            total_size: stats.total_size,
         }
     }
 
     pub fn get_full_stats(&self) -> Result<FullCacheStats> {
-        let index = self
-            .index
-            .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+        let (total_entries, total_size) = self.index_manager.get_full_stats();
 
         Ok(FullCacheStats {
-            total_entries: index.entries.len(),
-            total_size: index.total_size,
+            total_entries,
+            total_size,
             cache_location: self.location.get_cache_path().to_path_buf(),
             strategy: self.location.strategy.clone(),
             project_id: self.location.project_id.clone(),
@@ -1157,13 +846,13 @@ impl SharedCache {
     pub fn with_auto_pruning(repo_path: Option<&Path>, pruner: AutoPruner) -> Result<Self> {
         let location = CacheLocation::resolve(repo_path)?;
         location.ensure_directories()?;
-        let index = Self::load_or_create_index(&location)?;
+        let index_manager = IndexManager::load_or_create(&location)?;
 
         let background_pruner = BackgroundPruner::new(pruner.clone());
 
         Ok(Self {
             location,
-            index: Arc::new(RwLock::new(index)),
+            index_manager,
             max_cache_size: pruner.max_size_bytes as u64,
             cleanup_threshold: 0.9,
             auto_pruner: Some(pruner),
@@ -1261,21 +950,6 @@ impl SharedCache {
             .collect()
     }
 
-    /// Update index by removing entries and recalculating total size
-    fn update_index_after_removal(index: &mut CacheIndex, entries_to_remove: &[String]) -> usize {
-        let mut removed_count = 0;
-
-        for key in entries_to_remove {
-            if let Some(metadata) = index.entries.remove(key) {
-                index.total_size -= metadata.size_bytes;
-                removed_count += 1;
-            }
-        }
-
-        index.last_cleanup = Some(SystemTime::now());
-        removed_count
-    }
-
     /// Delete cache files for the given keys and components
     fn delete_cache_files_for_keys(
         cache: &SharedCache,
@@ -1317,19 +991,29 @@ impl SharedCache {
         // Step 2: Check if pruning is needed (pure decision logic)
         let should_prune = match &self.auto_pruner {
             Some(pruner) => {
-                let index = self
-                    .index
-                    .read()
-                    .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+                let (entry_count, total_size) = self.index_manager.get_full_stats();
 
-                Self::calculate_pruning_decision(
-                    index.total_size,
-                    index.entries.len(),
+                // Calculate pruning decision without lock
+                let basic_decision = Self::calculate_pruning_decision(
+                    total_size,
+                    entry_count,
                     new_entry_size,
                     pruner.max_size_bytes,
                     pruner.max_entries,
-                    pruner.should_prune(&index),
-                )
+                    false,
+                );
+
+                // If basic check says prune, we're done
+                if basic_decision {
+                    true
+                } else {
+                    // Otherwise check the more complex pruner logic
+                    let index_arc = self.index_manager.get_index_arc();
+                    let index = index_arc
+                        .read()
+                        .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+                    pruner.should_prune(&index)
+                }
             }
             None => false,
         };
@@ -1400,8 +1084,8 @@ impl SharedCache {
         &self,
         pruner: &AutoPruner,
     ) -> Result<Vec<(String, CacheMetadata)>> {
-        let index = self
-            .index
+        let index_arc = self.index_manager.get_index_arc();
+        let index = index_arc
             .read()
             .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
         Ok(pruner.calculate_entries_to_remove(&index))
@@ -1412,18 +1096,14 @@ impl SharedCache {
         &self,
         entries_to_remove: &[(String, CacheMetadata)],
     ) -> Result<u64> {
-        let mut index = self
-            .index
-            .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+        let keys: Vec<String> = entries_to_remove.iter().map(|(k, _)| k.clone()).collect();
 
-        let bytes_freed = entries_to_remove
+        let bytes_freed: u64 = entries_to_remove
             .iter()
-            .filter_map(|(key, metadata)| index.entries.remove(key).map(|_| metadata.size_bytes))
+            .map(|(_, metadata)| metadata.size_bytes)
             .sum();
 
-        index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
-        index.last_cleanup = Some(SystemTime::now());
+        self.index_manager.remove_entries(&keys)?;
 
         Ok(bytes_freed)
     }
@@ -1513,9 +1193,9 @@ impl SharedCache {
         };
 
         let start = SystemTime::now();
+        let index_arc = self.index_manager.get_index_arc();
         let entries_to_remove = {
-            let index = self
-                .index
+            let index = index_arc
                 .read()
                 .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
             temp_pruner.calculate_entries_to_remove(&index)
@@ -1533,25 +1213,12 @@ impl SharedCache {
             });
         }
 
-        let mut bytes_freed = 0u64;
+        let bytes_freed: u64 = entries_to_remove.iter().map(|(_, m)| m.size_bytes).sum();
         let mut files_deleted = 0usize;
 
         // Remove from index
-        {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-            for (key, metadata) in &entries_to_remove {
-                if index.entries.remove(key).is_some() {
-                    bytes_freed += metadata.size_bytes;
-                }
-            }
-
-            index.total_size = index.entries.values().map(|m| m.size_bytes).sum();
-            index.last_cleanup = Some(SystemTime::now());
-        }
+        let keys: Vec<String> = entries_to_remove.iter().map(|(k, _)| k.clone()).collect();
+        self.index_manager.remove_entries(&keys)?;
 
         // Delete files
         for (key, _) in &entries_to_remove {
@@ -1589,13 +1256,7 @@ impl SharedCache {
     /// Clean up orphaned index entries where files no longer exist
     pub fn clean_orphaned_entries(&self) -> Result<usize> {
         let mut removed_count = 0;
-        let entries_to_check = {
-            let index = self
-                .index
-                .read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-            index.entries.keys().cloned().collect::<Vec<_>>()
-        };
+        let entries_to_check = self.index_manager.get_all_entry_keys();
 
         let mut orphaned_entries = Vec::new();
 
@@ -1624,17 +1285,9 @@ impl SharedCache {
 
         // Remove orphaned entries from index
         if !orphaned_entries.is_empty() {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-            for key in orphaned_entries {
-                if let Some(metadata) = index.entries.remove(&key) {
-                    index.total_size = index.total_size.saturating_sub(metadata.size_bytes);
-                    removed_count += 1;
-                    log::debug!("Removed orphaned cache entry: {}", key);
-                }
+            removed_count = self.index_manager.remove_entries(&orphaned_entries)? as usize;
+            for key in &orphaned_entries {
+                log::debug!("Removed orphaned cache entry: {}", key);
             }
         }
 
@@ -1653,24 +1306,11 @@ impl SharedCache {
         let now = SystemTime::now();
 
         // Step 2: Identify entries to remove (pure logic)
-        let entries_to_remove = {
-            let index = self
-                .index
-                .read()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-
-            Self::filter_entries_by_age(&index.entries, now, max_age)
-        };
+        let entries_snapshot = self.index_manager.get_entries_snapshot();
+        let entries_to_remove = Self::filter_entries_by_age(&entries_snapshot, now, max_age);
 
         // Step 3: Update index (side effect - but isolated)
-        let removed_count = {
-            let mut index = self
-                .index
-                .write()
-                .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
-
-            Self::update_index_after_removal(&mut index, &entries_to_remove)
-        };
+        let removed_count = self.index_manager.remove_entries(&entries_to_remove)?;
 
         // Step 4: Delete files (side effect - but isolated)
         Self::delete_cache_files_for_keys(self, &entries_to_remove)
@@ -1679,7 +1319,7 @@ impl SharedCache {
         // Step 5: Persist changes (side effect - but isolated)
         self.save_index()?;
 
-        Ok(removed_count)
+        Ok(removed_count as usize)
     }
 }
 
@@ -2330,7 +1970,8 @@ mod tests {
 
         // Force cache size to be large enough to trigger cleanup
         {
-            let mut index = cache.index.write().unwrap();
+            let index_arc = cache.index_manager.get_index_arc();
+            let mut index = index_arc.write().unwrap();
             index.total_size = cache.max_cache_size + 1;
         }
 
@@ -2394,7 +2035,8 @@ mod tests {
 
         // Verify last_cleanup is set
         {
-            let index = cache.index.read().unwrap();
+            let index_arc = cache.index_manager.get_index_arc();
+            let index = index_arc.read().unwrap();
             assert!(index.last_cleanup.is_some());
         }
 
@@ -2503,7 +2145,9 @@ mod tests {
             },
         );
 
-        let sorted = SharedCache::sort_entries_by_access_time(&entries);
+        // Sort entries by access time (oldest first)
+        let mut sorted: Vec<(String, CacheMetadata)> = entries.into_iter().collect();
+        sorted.sort_by_key(|(_, metadata)| metadata.last_accessed);
 
         // Should be sorted with oldest first
         assert_eq!(sorted.len(), 3);
