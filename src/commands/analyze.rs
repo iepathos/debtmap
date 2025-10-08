@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex};
 pub struct AnalyzeConfig {
     pub path: PathBuf,
     pub format: crate::cli::OutputFormat,
+    pub json_format: crate::cli::JsonFormat,
     pub output: Option<PathBuf>,
     pub threshold_complexity: u32,
     pub threshold_duplication: usize,
@@ -152,6 +153,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         verbosity: config.verbosity,
         output_file: config.output,
         output_format: Some(config.format),
+        json_format: config.json_format,
         formatting_config: config.formatting_config,
     };
 

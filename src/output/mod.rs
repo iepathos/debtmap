@@ -2,6 +2,7 @@ pub mod formatters;
 pub mod json;
 pub mod markdown;
 pub mod terminal;
+pub mod unified;
 
 use crate::{core::AnalysisResults, formatting::FormattingConfig, io, priority, risk};
 use anyhow::Result;
@@ -14,6 +15,7 @@ pub struct OutputConfig {
     pub verbosity: u8,
     pub output_file: Option<PathBuf>,
     pub output_format: Option<crate::cli::OutputFormat>,
+    pub json_format: crate::cli::JsonFormat,
     pub formatting_config: FormattingConfig,
 }
 
@@ -21,6 +23,7 @@ pub use formatters::*;
 pub use json::*;
 pub use markdown::*;
 pub use terminal::*;
+pub use unified::*;
 
 pub fn output_results_with_risk(
     results: AnalysisResults,
@@ -58,6 +61,7 @@ pub fn output_unified_priorities_with_config(
         config.verbosity,
         config.output_file,
         config.output_format,
+        config.json_format,
         config.formatting_config,
     )
 }
@@ -79,6 +83,7 @@ pub fn output_unified_priorities(
         verbosity,
         output_file,
         output_format,
+        crate::cli::JsonFormat::Legacy, // default to legacy for backward compatibility
         formatting_config,
     )
 }
@@ -92,11 +97,20 @@ pub fn output_unified_priorities_with_summary(
     verbosity: u8,
     output_file: Option<PathBuf>,
     output_format: Option<crate::cli::OutputFormat>,
+    json_format: crate::cli::JsonFormat,
     formatting_config: FormattingConfig,
 ) -> Result<()> {
     match output_format {
         Some(crate::cli::OutputFormat::Json) => {
-            json::output_json_with_filters(&analysis, top, tail, output_file)
+            let include_scoring_details = verbosity >= 2;
+            json::output_json_with_format(
+                &analysis,
+                top,
+                tail,
+                output_file,
+                json_format,
+                include_scoring_details,
+            )
         }
         Some(crate::cli::OutputFormat::Markdown) => {
             markdown::output_markdown(&analysis, top, tail, verbosity, output_file)

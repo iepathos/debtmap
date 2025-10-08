@@ -465,6 +465,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
     if let Commands::Analyze {
         path,
         format,
+        json_format,
         output,
         threshold_complexity,
         threshold_duplication,
@@ -522,6 +523,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         let config = build_analyze_config(
             path,
             format,
+            json_format,
             output,
             threshold_complexity,
             threshold_duplication,
@@ -703,6 +705,7 @@ fn create_formatting_config(plain: bool) -> FormattingConfig {
 fn build_analyze_config(
     path: std::path::PathBuf,
     format: debtmap::cli::OutputFormat,
+    json_format: debtmap::cli::JsonFormat,
     output: Option<std::path::PathBuf>,
     threshold_complexity: u32,
     threshold_duplication: usize,
@@ -745,6 +748,7 @@ fn build_analyze_config(
     debtmap::commands::analyze::AnalyzeConfig {
         path,
         format: convert_output_format(format),
+        json_format,
         output,
         threshold_complexity,
         threshold_duplication,
