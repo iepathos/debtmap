@@ -11,8 +11,8 @@ fn test_cli_output_format_unified_produces_valid_structure() {
     let output_path = temp_dir.path().join("unified_output.json");
 
     // Use the sample codebase fixture for analysis
-    let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data/fixtures/sample_codebase");
+    let test_codebase =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run debtmap analyze with --format json and --output-format unified
     let output = Command::new("cargo")
@@ -42,11 +42,9 @@ fn test_cli_output_format_unified_produces_valid_structure() {
     }
 
     // Read and parse the output file
-    let output_content = fs::read_to_string(&output_path)
-        .expect("Failed to read output file");
+    let output_content = fs::read_to_string(&output_path).expect("Failed to read output file");
 
-    let json: Value = serde_json::from_str(&output_content)
-        .expect("Output is not valid JSON");
+    let json: Value = serde_json::from_str(&output_content).expect("Output is not valid JSON");
 
     // Validate top-level structure
     assert!(json.get("metadata").is_some(), "Missing metadata section");
@@ -55,9 +53,18 @@ fn test_cli_output_format_unified_produces_valid_structure() {
 
     // Validate metadata structure
     let metadata = json.get("metadata").unwrap();
-    assert!(metadata.get("debtmap_version").is_some(), "Missing metadata.debtmap_version");
-    assert!(metadata.get("generated_at").is_some(), "Missing metadata.generated_at");
-    assert!(metadata.get("analysis_type").is_some(), "Missing metadata.analysis_type");
+    assert!(
+        metadata.get("debtmap_version").is_some(),
+        "Missing metadata.debtmap_version"
+    );
+    assert!(
+        metadata.get("generated_at").is_some(),
+        "Missing metadata.generated_at"
+    );
+    assert!(
+        metadata.get("analysis_type").is_some(),
+        "Missing metadata.analysis_type"
+    );
 
     // Validate items is an array
     let items = json.get("items").unwrap();
@@ -69,11 +76,26 @@ fn test_cli_output_format_unified_produces_valid_structure() {
             let first_item = &item_array[0];
 
             // Check required fields per spec 108
-            assert!(first_item.get("type").is_some(), "Debt item missing 'type' field");
-            assert!(first_item.get("location").is_some(), "Debt item missing 'location' field");
-            assert!(first_item.get("category").is_some(), "Debt item missing 'category' field");
-            assert!(first_item.get("priority").is_some(), "Debt item missing 'priority' field");
-            assert!(first_item.get("score").is_some(), "Debt item missing 'score' field");
+            assert!(
+                first_item.get("type").is_some(),
+                "Debt item missing 'type' field"
+            );
+            assert!(
+                first_item.get("location").is_some(),
+                "Debt item missing 'location' field"
+            );
+            assert!(
+                first_item.get("category").is_some(),
+                "Debt item missing 'category' field"
+            );
+            assert!(
+                first_item.get("priority").is_some(),
+                "Debt item missing 'priority' field"
+            );
+            assert!(
+                first_item.get("score").is_some(),
+                "Debt item missing 'score' field"
+            );
 
             // Validate type is either "File" or "Function"
             let item_type = first_item.get("type").unwrap().as_str().unwrap();
@@ -96,20 +118,32 @@ fn test_cli_output_format_unified_produces_valid_structure() {
             );
 
             // Validate score is a number
-            assert!(first_item.get("score").unwrap().is_number(), "Score should be a number");
+            assert!(
+                first_item.get("score").unwrap().is_number(),
+                "Score should be a number"
+            );
         }
     }
 
     // Validate summary structure
     let summary = json.get("summary").unwrap();
-    assert!(summary.get("total_items").is_some(), "Summary missing 'total_items'");
+    assert!(
+        summary.get("total_items").is_some(),
+        "Summary missing 'total_items'"
+    );
 
     if summary.get("by_category").is_some() {
-        assert!(summary.get("by_category").unwrap().is_object(), "by_category should be an object");
+        assert!(
+            summary.get("by_category").unwrap().is_object(),
+            "by_category should be an object"
+        );
     }
 
     if summary.get("by_severity").is_some() {
-        assert!(summary.get("by_severity").unwrap().is_object(), "by_severity should be an object");
+        assert!(
+            summary.get("by_severity").unwrap().is_object(),
+            "by_severity should be an object"
+        );
     }
 }
 
@@ -119,8 +153,8 @@ fn test_cli_unified_format_scope_filtering() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("unified_output.json");
 
-    let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data/fixtures/sample_codebase");
+    let test_codebase =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run analysis
     let output = Command::new("cargo")
@@ -175,8 +209,8 @@ fn test_cli_unified_format_metrics_presence() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("unified_output.json");
 
-    let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data/fixtures/sample_codebase");
+    let test_codebase =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run analysis
     let output = Command::new("cargo")
@@ -223,8 +257,8 @@ fn test_cli_default_output_format_is_legacy() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("default_output.json");
 
-    let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data/fixtures/sample_codebase");
+    let test_codebase =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
     // Run with --format json but without explicit --output-format flag (should default to legacy)
     let output = Command::new("cargo")

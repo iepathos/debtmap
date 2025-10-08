@@ -71,7 +71,10 @@ fn func_{}_{}(data: Vec<i32>, threshold: i32) -> i32 {{
     sum
 }}
 "#,
-                i, j, i + j, i * j * 10
+                i,
+                j,
+                i + j,
+                i * j * 10
             ));
         }
 
@@ -297,22 +300,17 @@ fn benchmark_scaling_by_debt_items(c: &mut Criterion) {
 
     // Test with different complexity thresholds to vary debt item count
     let thresholds = vec![
-        (2, "high_debt"),    // Lower threshold = more debt items
-        (5, "medium_debt"),  // Medium threshold
-        (10, "low_debt"),    // Higher threshold = fewer debt items
+        (2, "high_debt"),   // Lower threshold = more debt items
+        (5, "medium_debt"), // Medium threshold
+        (10, "low_debt"),   // Higher threshold = fewer debt items
     ];
 
     let (_temp_dir, project_path) = create_test_project(15, 10);
     let languages = vec![Language::Rust];
 
     for (threshold, label) in thresholds {
-        let results = analyze_project(
-            project_path.clone(),
-            languages.clone(),
-            threshold,
-            50,
-        )
-        .unwrap();
+        let results =
+            analyze_project(project_path.clone(), languages.clone(), threshold, 50).unwrap();
 
         let analysis_results = unified_analysis::perform_unified_analysis_with_options(
             unified_analysis::UnifiedAnalysisOptions {
