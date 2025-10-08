@@ -135,3 +135,6 @@ harness = false
 name = "python_type_inference_bench"
 harness = false
 
+[[bench]]
+name = "unified_output_format_bench"
+harness = false

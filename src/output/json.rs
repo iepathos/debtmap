@@ -29,10 +29,43 @@ pub fn output_json_with_filters(
     tail: Option<usize>,
     output_file: Option<PathBuf>,
 ) -> Result<()> {
-    // Create unified output with merged items
-    let output = apply_filters_unified(analysis, top, tail);
+    output_json_with_format(
+        analysis,
+        top,
+        tail,
+        output_file,
+        crate::cli::JsonFormat::Legacy,
+        false,
+    )
+}
 
-    let json = serde_json::to_string_pretty(&output)?;
+pub fn output_json_with_format(
+    analysis: &priority::UnifiedAnalysis,
+    top: Option<usize>,
+    tail: Option<usize>,
+    output_file: Option<PathBuf>,
+    format: crate::cli::JsonFormat,
+    include_scoring_details: bool,
+) -> Result<()> {
+    let json = match format {
+        crate::cli::JsonFormat::Legacy => {
+            // Use existing legacy format
+            let output = apply_filters_unified(analysis, top, tail);
+            serde_json::to_string_pretty(&output)?
+        }
+        crate::cli::JsonFormat::Unified => {
+            // Use new unified format
+            let unified_output = crate::output::unified::convert_to_unified_format(
+                analysis,
+                include_scoring_details,
+            );
+
+            // Apply filtering to unified output
+            let filtered = apply_filters_to_unified_output(unified_output, top, tail);
+            serde_json::to_string_pretty(&filtered)?
+        }
+    };
+
     if let Some(path) = output_file {
         if let Some(parent) = path.parent() {
             crate::io::ensure_dir(parent)?;
@@ -43,6 +76,24 @@ pub fn output_json_with_filters(
         println!("{json}");
     }
     Ok(())
+}
+
+fn apply_filters_to_unified_output(
+    mut output: crate::output::unified::UnifiedOutput,
+    top: Option<usize>,
+    tail: Option<usize>,
+) -> crate::output::unified::UnifiedOutput {
+    if let Some(n) = top {
+        output.items.truncate(n);
+    } else if let Some(n) = tail {
+        let total = output.items.len();
+        let skip = total.saturating_sub(n);
+        output.items = output.items.into_iter().skip(skip).collect();
+    }
+
+    // Update summary to reflect filtered items
+    output.summary.total_items = output.items.len();
+    output
 }
 
 fn apply_filters_unified(

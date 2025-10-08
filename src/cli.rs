@@ -31,6 +31,12 @@ pub enum Commands {
         #[arg(short, long, value_enum, default_value = "terminal")]
         format: OutputFormat,
 
+        /// JSON output structure format (legacy or unified)
+        /// 'legacy': Current format with {File: {...}} and {Function: {...}} wrappers
+        /// 'unified': New format with consistent structure and 'type' field (spec 108)
+        #[arg(long = "output-format", value_enum, default_value = "legacy")]
+        json_format: JsonFormat,
+
         /// Output file (defaults to stdout)
         #[arg(short, long)]
         output: Option<PathBuf>,
@@ -309,6 +315,14 @@ pub enum OutputFormat {
     Json,
     Markdown,
     Terminal,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum JsonFormat {
+    /// Legacy format with {File: {...}} and {Function: {...}} wrappers
+    Legacy,
+    /// Unified format with consistent structure (spec 108)
+    Unified,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
