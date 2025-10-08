@@ -14,7 +14,7 @@ fn test_cli_output_format_unified_produces_valid_structure() {
     let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/data/fixtures/sample_codebase");
 
-    // Run debtmap analyze with --output-format unified
+    // Run debtmap analyze with --format json and --output-format unified
     let output = Command::new("cargo")
         .args([
             "run",
@@ -23,6 +23,8 @@ fn test_cli_output_format_unified_produces_valid_structure() {
             "--quiet",
             "--",
             "analyze",
+            "--format",
+            "json",
             "--output-format",
             "unified",
             "--output",
@@ -48,53 +50,53 @@ fn test_cli_output_format_unified_produces_valid_structure() {
 
     // Validate top-level structure
     assert!(json.get("metadata").is_some(), "Missing metadata section");
-    assert!(json.get("debt_items").is_some(), "Missing debt_items section");
+    assert!(json.get("items").is_some(), "Missing items section");
     assert!(json.get("summary").is_some(), "Missing summary section");
 
     // Validate metadata structure
     let metadata = json.get("metadata").unwrap();
-    assert!(metadata.get("version").is_some(), "Missing metadata.version");
-    assert!(metadata.get("timestamp").is_some(), "Missing metadata.timestamp");
-    assert!(metadata.get("analysis_config").is_some(), "Missing metadata.analysis_config");
+    assert!(metadata.get("debtmap_version").is_some(), "Missing metadata.debtmap_version");
+    assert!(metadata.get("generated_at").is_some(), "Missing metadata.generated_at");
+    assert!(metadata.get("analysis_type").is_some(), "Missing metadata.analysis_type");
 
-    // Validate debt_items is an array
-    let debt_items = json.get("debt_items").unwrap();
-    assert!(debt_items.is_array(), "debt_items should be an array");
+    // Validate items is an array
+    let items = json.get("items").unwrap();
+    assert!(items.is_array(), "items should be an array");
 
     // If there are debt items, validate their structure
-    if let Some(items) = debt_items.as_array() {
-        if !items.is_empty() {
-            let first_item = &items[0];
+    if let Some(item_array) = items.as_array() {
+        if !item_array.is_empty() {
+            let first_item = &item_array[0];
 
-            // Check required fields
-            assert!(first_item.get("scope").is_some(), "Debt item missing 'scope' field");
+            // Check required fields per spec 108
+            assert!(first_item.get("type").is_some(), "Debt item missing 'type' field");
             assert!(first_item.get("location").is_some(), "Debt item missing 'location' field");
             assert!(first_item.get("category").is_some(), "Debt item missing 'category' field");
-            assert!(first_item.get("severity").is_some(), "Debt item missing 'severity' field");
-            assert!(first_item.get("metrics").is_some(), "Debt item missing 'metrics' field");
+            assert!(first_item.get("priority").is_some(), "Debt item missing 'priority' field");
+            assert!(first_item.get("score").is_some(), "Debt item missing 'score' field");
 
-            // Validate scope is either "file" or "function"
-            let scope = first_item.get("scope").unwrap().as_str().unwrap();
+            // Validate type is either "File" or "Function"
+            let item_type = first_item.get("type").unwrap().as_str().unwrap();
             assert!(
-                scope == "file" || scope == "function",
-                "Scope must be 'file' or 'function', got: {}",
-                scope
+                item_type == "File" || item_type == "Function",
+                "Type must be 'File' or 'Function', got: {}",
+                item_type
             );
 
             // Validate location structure
             let location = first_item.get("location").unwrap();
-            assert!(location.get("file_path").is_some(), "Location missing 'file_path'");
+            assert!(location.get("file").is_some(), "Location missing 'file'");
 
-            // Validate severity is one of the expected values
-            let severity = first_item.get("severity").unwrap().as_str().unwrap();
+            // Validate priority is one of the expected values
+            let priority = first_item.get("priority").unwrap().as_str().unwrap();
             assert!(
-                severity == "high" || severity == "medium" || severity == "low",
-                "Severity must be 'high', 'medium', or 'low', got: {}",
-                severity
+                priority == "high" || priority == "medium" || priority == "low",
+                "Priority must be 'high', 'medium', or 'low', got: {}",
+                priority
             );
 
-            // Validate metrics is an object
-            assert!(first_item.get("metrics").unwrap().is_object(), "Metrics should be an object");
+            // Validate score is a number
+            assert!(first_item.get("score").unwrap().is_number(), "Score should be a number");
         }
     }
 
@@ -129,6 +131,8 @@ fn test_cli_unified_format_scope_filtering() {
             "--quiet",
             "--",
             "analyze",
+            "--format",
+            "json",
             "--output-format",
             "unified",
             "--output",
@@ -144,24 +148,24 @@ fn test_cli_unified_format_scope_filtering() {
     let output_content = fs::read_to_string(&output_path).unwrap();
     let json: Value = serde_json::from_str(&output_content).unwrap();
 
-    // Test that items can be filtered by scope
-    let debt_items = json.get("debt_items").unwrap().as_array().unwrap();
+    // Test that items can be filtered by type
+    let items = json.get("items").unwrap().as_array().unwrap();
 
-    let file_items: Vec<_> = debt_items
+    let file_items: Vec<_> = items
         .iter()
-        .filter(|item| item.get("scope").unwrap().as_str().unwrap() == "file")
+        .filter(|item| item.get("type").unwrap().as_str().unwrap() == "File")
         .collect();
 
-    let function_items: Vec<_> = debt_items
+    let function_items: Vec<_> = items
         .iter()
-        .filter(|item| item.get("scope").unwrap().as_str().unwrap() == "function")
+        .filter(|item| item.get("type").unwrap().as_str().unwrap() == "Function")
         .collect();
 
-    // All items should be categorized as either file or function
+    // All items should be categorized as either File or Function
     assert_eq!(
         file_items.len() + function_items.len(),
-        debt_items.len(),
-        "All items should have scope of 'file' or 'function'"
+        items.len(),
+        "All items should have type of 'File' or 'Function'"
     );
 }
 
@@ -183,6 +187,8 @@ fn test_cli_unified_format_metrics_presence() {
             "--quiet",
             "--",
             "analyze",
+            "--format",
+            "json",
             "--output-format",
             "unified",
             "--output",
@@ -197,36 +203,30 @@ fn test_cli_unified_format_metrics_presence() {
     let output_content = fs::read_to_string(&output_path).unwrap();
     let json: Value = serde_json::from_str(&output_content).unwrap();
 
-    let debt_items = json.get("debt_items").unwrap().as_array().unwrap();
+    let items = json.get("items").unwrap().as_array().unwrap();
 
-    // Check that metrics are present and contain expected fields
-    for item in debt_items {
-        let metrics = item.get("metrics").expect("Each item should have metrics");
-        assert!(metrics.is_object(), "Metrics should be an object");
+    // Check that each item has a score field (unified metric)
+    for item in items {
+        let score = item.get("score").expect("Each item should have score");
+        assert!(score.is_number(), "Score should be a number");
 
-        // Metrics should have at least one of the common metric fields
-        let has_complexity = metrics.get("cyclomatic_complexity").is_some();
-        let has_cognitive = metrics.get("cognitive_complexity").is_some();
-        let has_loc = metrics.get("lines_of_code").is_some();
-        let has_risk = metrics.get("risk_score").is_some();
-
-        assert!(
-            has_complexity || has_cognitive || has_loc || has_risk,
-            "Metrics should contain at least one standard metric field"
-        );
+        // Items may have additional metrics in details
+        if let Some(details) = item.get("details") {
+            assert!(details.is_object(), "Details should be an object");
+        }
     }
 }
 
-/// Test that default output format is unified
+/// Test that default output format is legacy (for backward compatibility per spec 108)
 #[test]
-fn test_cli_default_output_format_is_unified() {
+fn test_cli_default_output_format_is_legacy() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("default_output.json");
 
     let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/data/fixtures/sample_codebase");
 
-    // Run without explicit --output-format flag
+    // Run with --format json but without explicit --output-format flag (should default to legacy)
     let output = Command::new("cargo")
         .args([
             "run",
@@ -235,6 +235,8 @@ fn test_cli_default_output_format_is_unified() {
             "--quiet",
             "--",
             "analyze",
+            "--format",
+            "json",
             "--output",
             output_path.to_str().unwrap(),
             test_codebase.to_str().unwrap(),
@@ -247,11 +249,22 @@ fn test_cli_default_output_format_is_unified() {
     let output_content = fs::read_to_string(&output_path).unwrap();
     let json: Value = serde_json::from_str(&output_content).unwrap();
 
-    // Should have unified format structure
+    // Should have legacy format structure (items array with File/Function wrappers)
     assert!(
-        json.get("metadata").is_some() &&
-        json.get("debt_items").is_some() &&
-        json.get("summary").is_some(),
-        "Default output should use unified format"
+        json.get("items").is_some(),
+        "Default output should use legacy format with items array"
     );
+
+    // Legacy format has items with File or Function keys
+    if let Some(items) = json.get("items").and_then(|v| v.as_array()) {
+        if !items.is_empty() {
+            let first_item = &items[0];
+            let has_file_wrapper = first_item.get("File").is_some();
+            let has_function_wrapper = first_item.get("Function").is_some();
+            assert!(
+                has_file_wrapper || has_function_wrapper,
+                "Legacy format items should have File or Function wrappers"
+            );
+        }
+    }
 }

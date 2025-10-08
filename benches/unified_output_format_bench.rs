@@ -1,8 +1,9 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::builders::unified_analysis;
+use debtmap::cli::JsonFormat;
 use debtmap::core::Language;
+use debtmap::output::json::output_json_with_format;
 use debtmap::utils::analyze_project;
-use debtmap::OutputFormat;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -102,11 +103,16 @@ fn benchmark_unified_format_serialization(c: &mut Criterion) {
             &analysis_results,
             |b, results| {
                 b.iter(|| {
-                    let mut output = Vec::new();
-                    let mut writer = debtmap::create_writer(OutputFormat::UnifiedJson);
-                    writer
-                        .write_results_to_writer(results, &mut output)
-                        .expect("Serialization should succeed");
+                    let temp_output = tempfile::NamedTempFile::new().unwrap();
+                    output_json_with_format(
+                        results,
+                        None,
+                        None,
+                        Some(temp_output.path().to_path_buf()),
+                        JsonFormat::Unified,
+                        false,
+                    )
+                    .expect("Serialization should succeed");
                 });
             },
         );
@@ -166,11 +172,16 @@ fn benchmark_legacy_format_serialization(c: &mut Criterion) {
             &analysis_results,
             |b, results| {
                 b.iter(|| {
-                    let mut output = Vec::new();
-                    let mut writer = debtmap::create_writer(OutputFormat::Json);
-                    writer
-                        .write_results_to_writer(results, &mut output)
-                        .expect("Serialization should succeed");
+                    let temp_output = tempfile::NamedTempFile::new().unwrap();
+                    output_json_with_format(
+                        results,
+                        None,
+                        None,
+                        Some(temp_output.path().to_path_buf()),
+                        JsonFormat::Legacy,
+                        false,
+                    )
+                    .expect("Serialization should succeed");
                 });
             },
         );
@@ -219,21 +230,31 @@ fn benchmark_format_comparison(c: &mut Criterion) {
 
     group.bench_function("unified_json", |b| {
         b.iter(|| {
-            let mut output = Vec::new();
-            let mut writer = debtmap::create_writer(OutputFormat::UnifiedJson);
-            writer
-                .write_results_to_writer(&analysis_results, &mut output)
-                .expect("Serialization should succeed");
+            let temp_output = tempfile::NamedTempFile::new().unwrap();
+            output_json_with_format(
+                &analysis_results,
+                None,
+                None,
+                Some(temp_output.path().to_path_buf()),
+                JsonFormat::Unified,
+                false,
+            )
+            .expect("Serialization should succeed");
         });
     });
 
     group.bench_function("legacy_json", |b| {
         b.iter(|| {
-            let mut output = Vec::new();
-            let mut writer = debtmap::create_writer(OutputFormat::Json);
-            writer
-                .write_results_to_writer(&analysis_results, &mut output)
-                .expect("Serialization should succeed");
+            let temp_output = tempfile::NamedTempFile::new().unwrap();
+            output_json_with_format(
+                &analysis_results,
+                None,
+                None,
+                Some(temp_output.path().to_path_buf()),
+                JsonFormat::Legacy,
+                false,
+            )
+            .expect("Serialization should succeed");
         });
     });
 
@@ -291,11 +312,16 @@ fn benchmark_scaling_by_debt_items(c: &mut Criterion) {
             &analysis_results,
             |b, results| {
                 b.iter(|| {
-                    let mut output = Vec::new();
-                    let mut writer = debtmap::create_writer(OutputFormat::UnifiedJson);
-                    writer
-                        .write_results_to_writer(results, &mut output)
-                        .expect("Serialization should succeed");
+                    let temp_output = tempfile::NamedTempFile::new().unwrap();
+                    output_json_with_format(
+                        results,
+                        None,
+                        None,
+                        Some(temp_output.path().to_path_buf()),
+                        JsonFormat::Unified,
+                        false,
+                    )
+                    .expect("Serialization should succeed");
                 });
             },
         );
