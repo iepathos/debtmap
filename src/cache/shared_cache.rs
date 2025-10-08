@@ -860,6 +860,29 @@ impl SharedCache {
         })
     }
 
+    /// Create a new shared cache with auto-pruning enabled and explicit cache directory (for testing)
+    pub fn with_auto_pruning_and_cache_dir(
+        repo_path: Option<&Path>,
+        cache_dir: PathBuf,
+        pruner: AutoPruner,
+    ) -> Result<Self> {
+        let strategy = CacheStrategy::Custom(cache_dir);
+        let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
+        location.ensure_directories()?;
+        let index_manager = IndexManager::load_or_create(&location)?;
+
+        let background_pruner = BackgroundPruner::new(pruner.clone());
+
+        Ok(Self {
+            location,
+            index_manager,
+            max_cache_size: pruner.max_size_bytes as u64,
+            cleanup_threshold: 0.9,
+            auto_pruner: Some(pruner),
+            background_pruner: Some(background_pruner),
+        })
+    }
+
     // Pure function to calculate projected cache state after adding a new entry
     fn calculate_cache_projections(
         current_size: u64,
