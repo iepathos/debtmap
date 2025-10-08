@@ -191,12 +191,9 @@ fn test_manual_pruning_trigger() {
         strategy: PruneStrategy::Lru,
     };
 
-    let cache = SharedCache::with_auto_pruning_and_cache_dir(
-        None,
-        temp_dir.path().to_path_buf(),
-        pruner,
-    )
-    .unwrap();
+    let cache =
+        SharedCache::with_auto_pruning_and_cache_dir(None, temp_dir.path().to_path_buf(), pruner)
+            .unwrap();
 
     // Add entries
     for i in 0..10 {
