@@ -619,7 +619,8 @@ mod tests {
         let before = create_test_analysis(vec![before_item], 50.0);
         let after = create_test_analysis(vec![after_item], 60.0);
 
-        let comparator = Comparator::new(before, after, Some("src/main.rs:test_func:42".to_string()));
+        let comparator =
+            Comparator::new(before, after, Some("src/main.rs:test_func:42".to_string()));
         let result = comparator.compare();
 
         // Should not panic and should show 0% reduction when complexity increases
