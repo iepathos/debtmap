@@ -1,0 +1,97 @@
+{
+  "chapter_id": "getting-started",
+  "chapter_title": "Getting Started",
+  "chapter_file": "book/src/getting-started.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely empty - only contains TODO markers. All essential content is missing that would enable users to install and use debtmap.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Installation",
+      "description": "Installation section is completely empty with only a TODO marker",
+      "current_content": "## Installation\n\nTODO: Add installation instructions",
+      "should_add": "Complete installation instructions covering all three methods: quick install script (curl/wget), cargo install, and building from source",
+      "fix_suggestion": "Copy installation content from README.md lines 65-101. Include:\n1. Quick install script with curl/wget examples\n2. cargo install debtmap method\n3. Building from source with git clone and cargo install --path\n4. Brief explanation of what each method does",
+      "source_reference": "README.md:65-101, Cargo.toml:1-8 (package metadata)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Quick Start",
+      "description": "Quick Start section is completely empty with only a TODO marker",
+      "current_content": "## Quick Start\n\nTODO: Add quick start guide with basic commands",
+      "should_add": "Basic commands showing the three core workflows: analyze current directory, analyze with coverage data, and output formats",
+      "fix_suggestion": "Add essential quick start commands from README.md lines 104-139:\n1. Basic analysis: debtmap analyze .\n2. Analysis with coverage: debtmap analyze . --lcov target/coverage/lcov.info\n3. Generating coverage first: cargo tarpaulin --out lcov --output-dir target/coverage\n4. Output formats: --format json --output report.json\n5. Custom thresholds: --threshold-complexity 15 --threshold-duplication 50\n6. Show top N results: --top 10\n7. Initialize config: debtmap init",
+      "source_reference": "README.md:104-139, src/cli.rs (Commands enum)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "First Analysis",
+      "description": "First Analysis section is completely empty with only a TODO marker",
+      "current_content": "## First Analysis\n\nTODO: Add example of running first analysis",
+      "should_add": "Step-by-step walkthrough of running first analysis with expected output examples",
+      "fix_suggestion": "Create a complete first analysis workflow:\n1. Start with simplest command: debtmap analyze .\n2. Explain what happens during analysis (file discovery, parsing, metrics calculation)\n3. Show realistic terminal output example (similar to README.md lines 311-365)\n4. Explain the output sections: priority recommendations, complexity metrics, debt scores\n5. Add note about analysis speed and supported languages (Rust, Python, JavaScript, TypeScript)\n6. Mention that first run may be slower due to cache building",
+      "source_reference": "README.md:311-365 (example output), src/main.rs (analyze command flow), src/analyzers/ (language support)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Understanding the Output",
+      "description": "Understanding the Output section is completely empty with only a TODO marker",
+      "current_content": "## Understanding the Output\n\nTODO: Explain basic output format and interpretation",
+      "should_add": "Explanation of output formats, key metrics, and how to interpret results",
+      "fix_suggestion": "Add comprehensive output explanation:\n1. Terminal format (default) - explain the priority table and what each column means\n2. Key metrics explained:\n   - Unified score (0-10 scale) and what it represents\n   - Debt type (TestGap, Complexity, etc.)\n   - Priority levels (CRITICAL, HIGH, MEDIUM, LOW)\n   - Complexity metrics (cyclomatic, cognitive, nesting)\n   - Coverage percentage and why it matters\n3. How to read recommendations (ACTION, IMPACT, WHY sections)\n4. What the summary statistics mean (total debt score, overall coverage)\n5. Brief mention of other formats (JSON for CI/CD, Markdown for reports)\n6. Next steps: point to advanced chapters for coverage integration, filtering, etc.",
+      "source_reference": "README.md:311-415 (output examples), README.md:627-663 (metrics explained), src/output/ (formatters)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Prerequisites",
+      "description": "No mention of prerequisites or system requirements",
+      "should_add": "Prerequisites section explaining what users need before installing",
+      "fix_suggestion": "Add prerequisites subsection before Installation:\n1. Rust toolchain if building from source (rustc, cargo)\n2. Supported platforms (Linux, macOS, Windows)\n3. Minimum Rust version if applicable\n4. Note that pre-built binaries don't require Rust installation\n5. Optional: coverage tools for risk analysis (cargo-tarpaulin for Rust, jest for JS, pytest for Python)",
+      "source_reference": "Cargo.toml:3 (edition = 2021), README.md:112-114 (coverage tool examples)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Verification",
+      "description": "No guidance on verifying installation was successful",
+      "should_add": "Section on verifying installation and troubleshooting common issues",
+      "fix_suggestion": "Add verification steps after installation:\n1. Run 'debtmap --version' to verify installation\n2. Run 'debtmap --help' to see available commands\n3. Common installation issues and solutions:\n   - Binary not in PATH (how to add ~/.cargo/bin or ~/.local/bin to PATH)\n   - Permission issues with install script\n   - Cargo not found when building from source\n4. Link to troubleshooting chapter if it exists",
+      "source_reference": "src/cli.rs (CLI structure with --version and --help)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Next Steps",
+      "description": "No guidance on what to do after getting started",
+      "should_add": "Next steps section pointing to relevant chapters",
+      "fix_suggestion": "Add 'What's Next?' section at the end:\n1. Link to 'Basic Usage' chapter for more command options\n2. Link to 'Understanding Metrics' for deeper metric explanations\n3. Link to 'Configuration' for customizing thresholds\n4. Link to 'Coverage Integration' for risk-based analysis\n5. Link to 'CI/CD Integration' for automating analysis\n6. Encourage users to run 'debtmap init' to create project config",
+      "source_reference": "README.md structure (sections that should have corresponding chapters)"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter structure is well-organized with logical section headings",
+    "Section titles are clear and user-focused",
+    "Follows a natural progression: install → quick start → first use → understanding output"
+  ],
+  "improvement_suggestions": [
+    "Add a brief introduction paragraph explaining what debtmap does and why users would want it (pull from README 'Why Debtmap?' section)",
+    "Include a simple diagram showing the analysis workflow (file discovery → parsing → analysis → output)",
+    "Add a 'Common First-Run Issues' subsection in the First Analysis section",
+    "Include expected timing information (e.g., 'analyzing a 10k LOC project typically takes 2-5 seconds')",
+    "Add a note about language support and partial vs full support (Rust is fully supported, Python/JS/TS have partial support)",
+    "Consider adding a 'Minimal Example' showing the absolute simplest use case with a toy project",
+    "Link to the GitHub repository for issues and questions"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-09",
+    "feature_inventory": "Derived from README.md, Cargo.toml, and src/ implementation",
+    "topics_covered": [],
+    "validation_focus": "Check installation instructions and quick start examples are current"
+  }
+}
