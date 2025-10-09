@@ -1,0 +1,111 @@
+{
+  "chapter_id": "examples",
+  "chapter_title": "Examples",
+  "chapter_file": "book/src/examples.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely empty - only contains TODO placeholders. All content needs to be written from scratch based on current CLI capabilities.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Analyzing Rust Projects",
+      "description": "Section is empty (only TODO marker)",
+      "should_add": "Provide complete examples of analyzing Rust projects including: basic analysis, coverage integration with cargo-tarpaulin, threshold configuration, god object detection, and multi-pass analysis",
+      "fix_suggestion": "Add comprehensive Rust examples covering:\n1. Basic analysis: debtmap analyze ./src\n2. With coverage: cargo tarpaulin --out lcov && debtmap analyze . --lcov target/coverage/lcov.info\n3. Custom thresholds: debtmap analyze . --threshold-complexity 15 --threshold-duplication 50\n4. Filtering: debtmap analyze . --languages rust --filter Architecture,Testing\n5. Output formats: debtmap analyze . --format json --output report.json\n6. CI integration example from .github/workflows/debtmap.yml",
+      "source_reference": "src/cli.rs:Commands::Analyze, .github/workflows/debtmap.yml, README.md:103-139"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Python Analysis",
+      "description": "Section is empty (only TODO marker)",
+      "should_add": "Provide complete examples of analyzing Python projects including coverage integration with pytest",
+      "fix_suggestion": "Add Python-specific examples:\n1. Basic Python analysis: debtmap analyze . --languages python\n2. With pytest coverage: pytest --cov --cov-report=lcov && debtmap analyze . --lcov coverage.lcov\n3. Filtering Python files: debtmap analyze src --languages python --filter Testing\n4. Common patterns in Python codebases (god objects, code smells)\n5. Example .debtmap.toml configuration for Python projects",
+      "source_reference": "src/analyzers/python.rs, README.md:733 (LCOV integration)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "JavaScript/TypeScript",
+      "description": "Section is empty (only TODO marker)",
+      "should_add": "Provide complete examples of analyzing JavaScript/TypeScript projects including Jest coverage integration",
+      "fix_suggestion": "Add JS/TS-specific examples:\n1. Analyzing JS/TS projects: debtmap analyze . --languages javascript,typescript\n2. With Jest coverage: jest --coverage --coverageReporters=lcov && debtmap analyze . --lcov coverage/lcov.info\n3. Node.js project patterns: excluding node_modules, package patterns\n4. TypeScript-specific patterns and best practices\n5. Example configuration for monorepos",
+      "source_reference": "README.md:733 (Jest integration), src/cli.rs:53-54 (languages option)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "CI Integration",
+      "description": "Section is empty (only TODO marker)",
+      "should_add": "Provide complete CI/CD integration examples for GitHub Actions, GitLab CI, and other platforms",
+      "fix_suggestion": "Add comprehensive CI integration examples:\n1. Complete GitHub Actions workflow (based on .github/workflows/debtmap.yml)\n2. GitLab CI example with artifacts\n3. CircleCI integration\n4. Using debtmap validate for PR gates\n5. Artifact upload and retention strategies\n6. Setting thresholds and failing builds\n7. Integration with coverage generation (cargo-tarpaulin, pytest, jest)\n8. Example of comparing before/after with debtmap compare",
+      "source_reference": ".github/workflows/debtmap.yml (complete working example), src/cli.rs:217-282 (validate command), src/cli.rs:284-310 (compare command)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "General Examples",
+      "description": "No overview or introduction to examples",
+      "should_add": "Add chapter introduction explaining what examples are provided and how to use them",
+      "fix_suggestion": "Add introductory section explaining:\n1. Purpose of examples chapter\n2. How to adapt examples to your project\n3. Overview of available examples\n4. Link to CLI reference for full options\n5. Common patterns across all languages",
+      "source_reference": "book/src/SUMMARY.md"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Output Format Examples",
+      "description": "No examples showing different output formats and how to interpret them",
+      "should_add": "Show example output for terminal, JSON, and markdown formats with interpretation",
+      "fix_suggestion": "Add section showing:\n1. Terminal output example with color-coded priorities\n2. JSON output structure with field descriptions\n3. Markdown report example\n4. How to interpret scores and priorities\n5. Understanding unified vs legacy JSON formats (--output-format option)",
+      "source_reference": "src/cli.rs:34-38 (json_format option), src/cli.rs:313-326 (OutputFormat and JsonFormat enums), README.md:311-415 (example output)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Advanced Usage Examples",
+      "description": "No examples of advanced features like context providers, multi-pass analysis, or cache management",
+      "should_add": "Show examples of advanced debtmap features",
+      "fix_suggestion": "Add advanced examples:\n1. Context-aware analysis: --context --context-providers critical_path,dependency,git_history\n2. Multi-pass analysis: --multi-pass --attribution\n3. Cache management: --cache-stats, --clear-cache\n4. Aggregation methods: --aggregation-method logarithmic_sum\n5. Filtering and grouping: --group-by-category --min-priority high\n6. Verbosity levels: -v, -vv, -vvv for debugging\n7. Parallel processing: --jobs 8 --no-parallel",
+      "source_reference": "src/cli.rs:62-68 (context options), src/cli.rs:169-175 (multi-pass), src/cli.rs:157-167 (cache options), src/cli.rs:94-99 (verbosity)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration Examples",
+      "description": "No examples showing .debtmap.toml configuration for different project types",
+      "should_add": "Provide example configurations for common project scenarios",
+      "fix_suggestion": "Add configuration examples:\n1. Basic configuration with thresholds\n2. Entropy-based complexity configuration\n3. Ignore patterns for different project types\n4. Scoring weight customization\n5. God object detection tuning\n6. External API configuration for libraries vs CLI tools",
+      "source_reference": "README.md:952-1024 (complete configuration reference)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Compare Command Examples",
+      "description": "No examples showing how to use the compare command for tracking improvements",
+      "should_add": "Show practical examples of using debtmap compare to validate refactoring",
+      "fix_suggestion": "Add compare command examples:\n1. Basic before/after comparison workflow\n2. Using --plan to extract target from implementation plan\n3. Using --target to focus on specific location\n4. Interpreting comparison results (Resolved, Improved, Regressed)\n5. CI integration for regression detection",
+      "source_reference": "src/cli.rs:284-310 (compare command), README.md:242-289 (compare documentation)"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter structure follows logical organization (language-specific then CI integration)",
+    "Section headings clearly indicate what content should be added"
+  ],
+  "improvement_suggestions": [
+    "Start with simplest examples first (basic analysis) then progress to advanced features",
+    "Include actual command output showing what users should expect to see",
+    "Cross-reference to CLI Reference chapter for detailed option explanations",
+    "Add troubleshooting section for common issues in examples",
+    "Include links to working GitHub Actions workflow as reference",
+    "Consider adding a 'Quick Start' section at the beginning",
+    "Show examples of .debtmap.toml configuration alongside CLI examples",
+    "Include examples of interpreting results and making decisions based on output"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-09",
+    "feature_inventory": "N/A (features.json not available, analysis based on CLI source code and README)",
+    "topics_covered": [],
+    "validation_focus": "Ensure examples use current CLI syntax and options"
+  }
+}
