@@ -114,9 +114,14 @@ Uses information theory to distinguish genuinely complex code from pattern-based
    - Variables, methods, literals weighted differently
    - Focuses on structural complexity over superficial differences
 
-**Dampening threshold:** When entropy score > 0.1, complexity is reduced:
+**Dampening logic:** Dampening is applied when multiple factors indicate repetitive patterns:
+- Low token entropy (< 0.4) indicates simple, repetitive patterns
+- High pattern repetition (> 0.6) shows similar code blocks
+- High branch similarity (> 0.7) indicates consistent branching logic
+
+When these conditions are met:
 ```
-effective_complexity = base_complexity × (1 - dampening_factor)
+effective_complexity = entropy × pattern_factor × similarity_factor
 ```
 
 **Example:**
@@ -144,6 +149,11 @@ entropy_threshold = 0.4       # Entropy below this triggers dampening
 branch_threshold = 0.8        # Branch similarity threshold
 max_combined_reduction = 0.3  # Maximum 30% reduction
 ```
+
+**Output fields in EntropyScore:**
+- `unique_variables`: Count of distinct variables in the function (measures variable diversity)
+- `max_nesting`: Maximum nesting depth detected (contributes to dampening calculation)
+- `dampening_applied`: Actual dampening factor applied to the complexity score
 
 ### Nesting Depth
 
@@ -487,9 +497,7 @@ Functions are classified into five risk categories:
 - Well-managed code
 - **Action**: Monitor, low priority
 
-**WellTested** (score < 5 with high coverage)
-- High complexity but thoroughly tested
-- **Action**: Good example! Learn from this approach
+**Note**: The risk categorization is based on the RiskLevel enum which includes Low, Medium, High, and Critical levels. Well-tested complex code will typically fall into the Low risk category due to coverage dampening.
 
 ### Risk Calculation
 
@@ -683,8 +691,11 @@ debtmap analyze . --format markdown --output report.md
 - `cognitive`: Understanding difficulty - guides refactoring priority
 - `nesting`: Indentation depth - signals need for extraction
 - `length`: Lines of code - signals SRP violations
-- `is_pure`: No side effects - easier to test
-- `purity_confidence`: How certain we are about purity (0.0-1.0)
+- `is_pure`: No side effects - easier to test (Option type, may be None)
+- `purity_confidence`: How certain we are about purity 0.0-1.0 (Option type, may be None)
+- `is_trait_method`: Whether this function implements a trait method
+- `in_test_module`: Whether function is inside a `#[cfg(test)]` module
+- `detected_patterns`: Complexity adjustment patterns identified (e.g., "validation_pattern")
 - `entropy_score`: Pattern analysis for false positive reduction
 - `upstream_callers`: Impact radius if this function breaks
 - `downstream_callees`: Functions this depends on
@@ -829,6 +840,11 @@ Debtmap supports multiple programming languages with varying levels of analysis 
   - Basic complexity metrics
   - Limited pattern detection
 
+**Unknown** (Unsupported)
+- Files with unsupported extensions are classified as `Language::Unknown`
+- These files are skipped during analysis
+- No metrics or debt patterns are extracted
+
 ### Language Detection
 
 Automatic detection by file extension:
@@ -880,7 +896,12 @@ Debtmap detects pure functions - those without side effects that always return t
 - No system calls
 - Deterministic output
 
-**Confidence scoring:**
+**Purity detection is optional:**
+- Both `is_pure` and `purity_confidence` are `Option` types
+- May be `None` for some functions or languages where detection is not available
+- Rust has the most comprehensive purity detection support
+
+**Confidence scoring (when available):**
 - **0.9-1.0**: Very confident (no side effects detected)
 - **0.7-0.8**: Likely pure (minimal suspicious patterns)
 - **0.5-0.6**: Uncertain (some suspicious patterns)

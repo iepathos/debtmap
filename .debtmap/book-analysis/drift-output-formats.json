@@ -3,114 +3,139 @@
   "chapter_title": "Output Formats",
   "chapter_file": "book/src/output-formats.md",
   "drift_detected": true,
-  "severity": "critical",
-  "quality_assessment": "Chapter is completely empty with only TODO placeholders. All documentation is missing for a critical user-facing feature. Users have no guidance on output formats, JSON schema, text reports, tool integration, or custom formatting.",
+  "severity": "medium",
+  "quality_assessment": "Chapter is now comprehensive and well-written with extensive examples. Major improvement from previous empty state. Some minor drift exists where chapter documents features that don't appear to be implemented in CLI (filtering options like --top, --tail, --filter, etc.) and missing documentation of --plain flag which exists in code. Overall high quality with good structure and practical examples.",
   "issues": [
     {
       "type": "missing_content",
+      "severity": "medium",
+      "section": "Plain Terminal Mode",
+      "description": "Chapter documents --plain flag for ASCII-only output (line 136), but this flag doesn't appear in src/cli.rs analyze command",
+      "current_content": "debtmap analyze . --plain",
+      "should_be": "The plain mode is controlled via FormattingConfig, not a CLI flag. Document how to use NO_COLOR environment variable instead, or if --plain flag should be added to CLI",
+      "fix_suggestion": "Either: (1) Add --plain flag to CLI to set FormattingConfig::plain(), or (2) Update documentation to explain NO_COLOR environment variable and TERM=dumb for plain output instead of --plain flag",
+      "source_reference": "src/cli.rs lines 29-100 (analyze command has no --plain flag), src/formatting/mod.rs:103 (FormattingConfig::plain() exists but not exposed via CLI)"
+    },
+    {
+      "type": "outdated_information",
       "severity": "high",
-      "section": "JSON Output",
-      "description": "Chapter has TODO placeholder for JSON output documentation. No JSON schema documented.",
-      "current_content": "TODO: Document JSON output schema",
-      "should_add": "Document the complete JSON schema for AnalysisResults structure, including all fields in ComplexityReport, TechnicalDebtReport, DependencyReport, FunctionMetrics, and DebtItem. Document the two JSON formats: legacy (with {File: {...}} wrappers) and unified (with consistent structure and 'type' field).",
-      "fix_suggestion": "Add comprehensive JSON schema documentation with examples:\n1. Document --output-format flag (legacy vs unified)\n2. Show example JSON output for both formats\n3. Document all top-level fields: project_path, timestamp, complexity, technical_debt, dependencies, duplications\n4. Document nested structures with field descriptions\n5. Include example showing how to parse and use JSON output\n6. Document serde serialization format (pretty-printed by default)",
-      "source_reference": "src/io/writers/json.rs:JsonWriter, src/core/mod.rs:AnalysisResults, src/cli.rs:JsonFormat (lines 320-326)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Text Reports",
-      "description": "Chapter has TODO placeholder for text report documentation. Terminal output format completely undocumented.",
-      "current_content": "TODO: Document text report format",
-      "should_add": "Document the terminal output format with color coding, emoji indicators, and structured sections",
-      "fix_suggestion": "Add terminal output format documentation:\n1. Document --format terminal flag (default)\n2. Show example terminal output with sections: header, summary, complexity hotspots, technical debt, pass/fail status\n3. Document color coding: green (✅ good), yellow (⚠️ medium), red (❌ high)\n4. Explain status indicators and what they mean\n5. Document complexity classification levels (Low ≤5, Moderate 5-10, Medium 10-15, High >15)\n6. Document debt status thresholds (Low ≤10, Moderate 10-20, Medium 20-50, High >50)\n7. Explain refactoring guidance messages for complex functions\n8. Document plain output mode (--plain flag for ASCII-only, no colors, no emoji)",
-      "source_reference": "src/io/writers/terminal.rs:TerminalWriter, src/io/output.rs:complexity_status, debt_status functions (lines 27-59)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Markdown Output",
-      "description": "Markdown output format is completely undocumented, including both standard and enhanced variants",
-      "should_add": "Document markdown output format and enhanced markdown features",
-      "fix_suggestion": "Add markdown output documentation:\n1. Document --format markdown flag\n2. Show example markdown structure: Executive Summary, Complexity Analysis, Technical Debt, Dependencies\n3. Document enhanced markdown writer features (src/io/writers/enhanced_markdown/):\n   - Executive summary with health dashboard\n   - Quick wins section\n   - Strategic priorities\n   - Team guidance\n   - Success metrics\n   - Visualizations (complexity distribution, risk heat maps, dependency graphs)\n   - Risk analysis section\n   - Priority matrix\n   - Actionable items\n4. Document configuration options for enhanced markdown (DetailLevel, include_visualizations, include_statistics)\n5. Show how markdown can be rendered to HTML or PDF",
-      "source_reference": "src/io/writers/markdown/mod.rs, src/io/writers/enhanced_markdown/mod.rs:EnhancedMarkdownWriter"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Output File Handling",
-      "description": "No documentation on how to write output to files vs stdout",
-      "should_add": "Document the --output flag for writing results to files",
-      "fix_suggestion": "Add section on output file handling:\n1. Document -o, --output <FILE> flag\n2. Explain default behavior (stdout)\n3. Show examples of writing to files: debtmap analyze . --format json -o report.json\n4. Note that all formats can be redirected to files\n5. Explain how output path affects relative paths in reports",
-      "source_reference": "src/cli.rs lines 40-42 (analyze command output parameter)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Integration with Tools",
-      "description": "Chapter has TODO placeholder for tool integration documentation. No guidance on CI/CD, editors, or other tools.",
-      "current_content": "TODO: How to integrate with other tools",
-      "should_add": "Document how to integrate debtmap output with CI/CD pipelines, editors, and other tools",
-      "fix_suggestion": "Add integration examples:\n1. CI/CD Integration:\n   - GitHub Actions example using JSON output\n   - GitLab CI example with thresholds\n   - Jenkins pipeline integration\n   - Exit codes for validation failures\n2. Editor Integration:\n   - VSCode task configuration\n   - Parsing JSON for problem matcher\n   - Using markdown reports in documentation\n3. Tool Chaining:\n   - Using with coverage tools (--coverage-file flag)\n   - Combining with linters\n   - Feeding into dashboards\n4. Parsing Examples:\n   - jq commands for JSON filtering\n   - Python script to parse JSON\n   - Shell script to check thresholds",
-      "source_reference": "src/cli.rs (coverage_file, validate command), src/commands/validate.rs"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Custom Formatting",
-      "description": "Chapter has TODO placeholder for custom formatting. No information on how to extend or customize output.",
-      "current_content": "TODO: Creating custom output formats",
-      "should_add": "Document how to create custom output formats or customize existing ones",
-      "fix_suggestion": "Add custom formatting documentation:\n1. Explain OutputWriter trait (src/io/output.rs lines 13-16)\n2. Show how to implement custom writer:\n   - Implement write_results method\n   - Implement write_risk_insights method\n   - Register with create_writer factory\n3. Document existing helper functions for custom formatters:\n   - complexity_status, debt_status, high_complexity_status\n   - get_recommendation, get_top_complex_functions\n   - build_summary_rows\n4. Show example of custom writer (e.g., CSV, HTML, XML)\n5. Explain how to use JSON output as basis for custom tools\n6. Document FormattingConfig for terminal output customization",
-      "source_reference": "src/io/output.rs:OutputWriter trait, create_writer function (lines 13-24)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Format Selection",
-      "description": "No documentation on how to select output formats via CLI",
-      "should_add": "Document the -f, --format flag and available format options",
-      "fix_suggestion": "Add format selection documentation:\n1. Document -f, --format <FORMAT> flag\n2. List available formats: json, markdown, terminal (default)\n3. Show examples:\n   - debtmap analyze . --format json\n   - debtmap analyze . --format markdown -o report.md\n   - debtmap analyze . (uses terminal by default)\n4. Document format-specific options:\n   - JSON: --output-format (legacy vs unified)\n   - Terminal: --plain (ASCII-only mode)\n   - Markdown: detail levels, visualizations\n5. Explain when to use each format",
-      "source_reference": "src/cli.rs:OutputFormat enum (lines 314-318), analyze command format parameter (line 32)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Risk Analysis Output",
-      "description": "Risk analysis output format not documented",
-      "should_add": "Document risk insights output format and fields",
-      "fix_suggestion": "Add risk analysis output documentation:\n1. Explain RiskInsight structure in JSON output\n2. Document terminal risk output sections:\n   - Risk summary with codebase risk score\n   - Risk distribution (critical, high, medium, low, well tested)\n   - Critical risks section\n   - Recommendations with ROI\n3. Document risk level classification (LOW <30, MEDIUM 30-60, HIGH >60)\n4. Explain complexity-coverage correlation\n5. Show example of risk-focused output",
-      "source_reference": "src/io/writers/terminal.rs:write_risk_insights (lines 46-74), src/risk/insights.rs"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
       "section": "Output Filtering",
-      "description": "Output filtering and limiting options not documented",
-      "should_add": "Document filtering and limiting output options",
-      "fix_suggestion": "Add filtering documentation:\n1. Document --top N flag (show only top N priority items)\n2. Document --tail N flag (show bottom N lowest priority items)\n3. Document --summary flag (compact tiered priority display)\n4. Document --min-priority flag (filter by minimum priority level)\n5. Document --filter flag (filter by debt categories)\n6. Document --group-by-category flag\n7. Show examples of combining filters",
-      "source_reference": "src/cli.rs analyze command (lines 74-119), src/output/formatters.rs:determine_priority_output_format"
+      "description": "Chapter extensively documents filtering options (lines 896-943) including --top, --tail, --min-priority, --filter, --summary, --group-by-category flags, but these don't exist in src/cli.rs",
+      "current_content": "# Show only top 10 priority items\ndebtmap analyze . --top 10\n\n# Show bottom 5 lowest priority items\ndebtmap analyze . --tail 5\n\n# Show only high and critical priority items\ndebtmap analyze . --min-priority high\n\n# Filter by specific debt categories\ndebtmap analyze . --filter Architecture,Testing",
+      "should_be": "Either remove this section entirely or mark as 'Planned Features' if these flags are intended for future implementation",
+      "fix_suggestion": "Remove the entire 'Output Filtering' section (lines 894-943) as these features are not implemented. The CLI only has: format, output, json_format, verbosity, and coverage-related flags.",
+      "source_reference": "src/cli.rs lines 29-100 (analyze command struct) - no filtering flags present"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "JSON Format Variants",
+      "description": "Chapter shows '--output-format' flag usage (lines 407-412), which is correct, but the parameter name in CLI is 'json_format' not mentioned",
+      "current_content": "debtmap analyze . --format json --output-format legacy\ndebtmap analyze . --format json --output-format unified",
+      "should_be": "Examples are correct for command line usage. Just clarify that --output-format only applies when --format json is used",
+      "fix_suggestion": "Add note: '--output-format only applies when using --format json. It has no effect with markdown or terminal formats.'",
+      "source_reference": "src/cli.rs lines 34-38 (json_format parameter only in analyze command)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Verbosity Levels",
+      "description": "Chapter documents verbosity levels -v, -vv, -vvv (lines 145-167) but doesn't explain what each level actually shows in detail",
+      "current_content": "**Verbosity features:**\n- `-v`: Score factor breakdown (complexity, coverage, dependency)\n- `-vv`: Detailed calculations with formulas\n- `-vvv`: Debug info including entropy metrics, role detection, cache hits",
+      "should_be": "Verbosity documentation should match CLI help text exactly",
+      "fix_suggestion": "Update verbosity descriptions to match src/cli.rs lines 94-99:\n- `-v`: Show main score factors\n- `-vv`: Show detailed calculations\n- `-vvv`: Show all debug information\n\nAdd specific examples of what output changes at each level.",
+      "source_reference": "src/cli.rs lines 94-99 (verbosity flag documentation)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Complexity Classification Thresholds",
+      "description": "Chapter documents complexity thresholds (lines 102-107) but doesn't match src/io/output.rs implementation exactly",
+      "current_content": "**Complexity Classification:**\n- **LOW** (≤5): Green - Simple, easy to maintain\n- **MODERATE** (6-10): Yellow - Consider refactoring\n- **MEDIUM** (11-15): Orange - Should refactor\n- **HIGH** (>15): Red - Urgent refactoring needed",
+      "should_be": "Complexity thresholds in src/io/output.rs complexity_status() use: Low ≤5, Moderate >5 to ≤10, Medium >10 to ≤15, High >15. But these are for status display, not necessarily colors shown.",
+      "fix_suggestion": "Verify the exact thresholds and color mappings used in terminal output. The chapter's thresholds appear correct but 'MEDIUM' vs 'Moderate' terminology is inconsistent. Use consistent terminology.",
+      "source_reference": "src/io/output.rs lines 27-34 (complexity_status function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Refactoring Guidance Thresholds",
+      "description": "Chapter shows refactoring guidance for complexity > 5 (line 115), matches terminal.rs implementation",
+      "current_content": "For complex functions (cyclomatic complexity > 5), the terminal output provides actionable refactoring recommendations",
+      "should_be": "This is accurate. Guidance starts at cyclomatic > 5 per src/io/writers/terminal.rs:257",
+      "fix_suggestion": "No change needed. Documentation matches implementation.",
+      "source_reference": "src/io/writers/terminal.rs lines 257-271 (refactoring guidance trigger)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Debt Score Thresholds",
+      "description": "Chapter documents debt score thresholds (lines 108-112) but uses different values than implementation",
+      "current_content": "**Debt Score Thresholds:**\n- **Below threshold/2**: Green - Healthy\n- **Above threshold/2**: Yellow - Attention needed\n- **Above threshold**: Red - Action required",
+      "should_be": "Implementation in terminal.rs line 153 uses debt_threshold = 100. The formula matches but specific value should be mentioned.",
+      "fix_suggestion": "Add: 'Default debt threshold is 100. Scores are colored: Green (≤50), Yellow (51-100), Red (>100)' to make it concrete.",
+      "source_reference": "src/io/writers/terminal.rs line 153 (debt_threshold = 100), src/io/output.rs lines 53-59 (debt_score_status function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Exit Codes",
+      "description": "Chapter documents exit codes (lines 1023-1029) but there's no verification these are actually implemented",
+      "current_content": "Debtmap uses standard exit codes:\n- `0`: Success, all checks passed\n- `1`: Analysis completed, but validation thresholds exceeded\n- `2`: Error during analysis (invalid path, parsing error, etc.)",
+      "should_be": "Verify exit codes are actually implemented as documented or mark as speculative",
+      "fix_suggestion": "Verify exit codes in main.rs or commands/analyze.rs. If not implemented, either remove or mark as 'Planned behavior'.",
+      "source_reference": "Would need to check src/main.rs and src/commands/analyze.rs for actual exit code handling"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "low",
+      "section": "Terminal Output Structure",
+      "description": "Chapter lists 5 sections in terminal output (lines 46-52) but implementation may vary",
+      "current_content": "Terminal output is organized into five main sections:\n1. **Header** - Analysis report title\n2. **Codebase Summary** - High-level metrics and debt score\n3. **Complexity Hotspots** - Top 5 most complex functions with refactoring guidance\n4. **Technical Debt** - High-priority debt items requiring attention\n5. **Pass/Fail Status** - Overall quality assessment",
+      "should_be": "Verify this matches the printers vector in terminal.rs:34-40",
+      "fix_suggestion": "Documentation matches implementation (print_header, print_summary, print_complexity_hotspots, print_technical_debt, print_pass_fail_status). No change needed.",
+      "source_reference": "src/io/writers/terminal.rs lines 34-40 (printers vector)"
     }
   ],
   "positive_aspects": [
-    "Chapter exists in table of contents with clear title",
-    "Topics list is comprehensive and covers all major aspects",
-    "Structure uses logical sections matching user needs"
+    "Chapter is now comprehensive and extremely well-written (major improvement from previous empty state)",
+    "Excellent structure with clear progression from basic to advanced usage",
+    "Rich examples including CI/CD integration (GitHub Actions, GitLab CI, Jenkins)",
+    "Comprehensive JSON schema documentation with detailed field descriptions",
+    "Great tool integration examples (jq queries, Python scripts, VS Code tasks)",
+    "Risk analysis output thoroughly documented",
+    "Markdown output format well explained",
+    "Real-world examples and best practices included",
+    "Troubleshooting section helpful",
+    "Quick reference table comparing formats is very useful",
+    "Terminal output color coding and symbols clearly explained"
   ],
   "improvement_suggestions": [
-    "Prioritize JSON schema documentation first as it's most commonly used for programmatic integration",
-    "Include visual examples (screenshots) of terminal output showing color coding and structure",
-    "Add a quick reference table comparing format features (JSON: machine-readable, Markdown: reports, Terminal: interactive)",
-    "Include real-world examples from actual project analysis",
-    "Add troubleshooting section for common output issues (encoding, terminal color support, file permissions)",
-    "Consider adding a 'Best Practices' section on when to use each format",
-    "Link to related chapters on validation and configuration",
-    "Add examples of using different formats in CI/CD pipelines"
+    "Remove or mark as 'Future Features': Output Filtering section (lines 894-943) since flags don't exist",
+    "Clarify --plain flag: either add to CLI or document environment variable approach instead",
+    "Add more specific examples of verbosity level output differences",
+    "Verify and document actual exit codes implementation",
+    "Add note that --output-format only applies to JSON format",
+    "Consider adding a 'Feature Availability' or 'Version' indicator for documented features",
+    "Add examples showing the difference between legacy and unified JSON formats side-by-side",
+    "Include performance benchmarks for large codebases (as mentioned but not detailed)",
+    "Add troubleshooting for common jq parsing patterns",
+    "Consider adding a migration guide from legacy to unified JSON format"
   ],
   "metadata": {
     "analyzed_at": "2025-10-09",
-    "feature_inventory": "src/io/output.rs, src/io/writers/*, src/cli.rs",
-    "topics_covered": [],
+    "feature_inventory": "src/io/output.rs, src/io/writers/*, src/cli.rs, src/formatting/mod.rs",
+    "topics_covered": [
+      "JSON output",
+      "Text reports",
+      "Markdown output",
+      "Integration with tools",
+      "Format selection",
+      "Output filtering (partially documented but not implemented)",
+      "Risk analysis output",
+      "Verbosity levels",
+      "CI/CD examples"
+    ],
     "validation_focus": "Verify output format documentation matches src/io/ implementation"
   }
 }

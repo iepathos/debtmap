@@ -3,95 +3,132 @@
   "chapter_title": "Getting Started",
   "chapter_file": "book/src/getting-started.md",
   "drift_detected": true,
-  "severity": "critical",
-  "quality_assessment": "Chapter is completely empty - only contains TODO markers. All essential content is missing that would enable users to install and use debtmap.",
+  "severity": "medium",
+  "quality_assessment": "Chapter is comprehensive and well-written, but contains some outdated or missing advanced features. Installation instructions and basic examples are accurate and current. Output examples match actual implementation.",
   "issues": [
     {
       "type": "missing_content",
-      "severity": "critical",
-      "section": "Installation",
-      "description": "Installation section is completely empty with only a TODO marker",
-      "current_content": "## Installation\n\nTODO: Add installation instructions",
-      "should_add": "Complete installation instructions covering all three methods: quick install script (curl/wget), cargo install, and building from source",
-      "fix_suggestion": "Copy installation content from README.md lines 65-101. Include:\n1. Quick install script with curl/wget examples\n2. cargo install debtmap method\n3. Building from source with git clone and cargo install --path\n4. Brief explanation of what each method does",
-      "source_reference": "README.md:65-101, Cargo.toml:1-8 (package metadata)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "critical",
+      "severity": "medium",
       "section": "Quick Start",
-      "description": "Quick Start section is completely empty with only a TODO marker",
-      "current_content": "## Quick Start\n\nTODO: Add quick start guide with basic commands",
-      "should_add": "Basic commands showing the three core workflows: analyze current directory, analyze with coverage data, and output formats",
-      "fix_suggestion": "Add essential quick start commands from README.md lines 104-139:\n1. Basic analysis: debtmap analyze .\n2. Analysis with coverage: debtmap analyze . --lcov target/coverage/lcov.info\n3. Generating coverage first: cargo tarpaulin --out lcov --output-dir target/coverage\n4. Output formats: --format json --output report.json\n5. Custom thresholds: --threshold-complexity 15 --threshold-duplication 50\n6. Show top N results: --top 10\n7. Initialize config: debtmap init",
-      "source_reference": "README.md:104-139, src/cli.rs (Commands enum)"
+      "description": "Missing advanced CLI flags that are available in the tool",
+      "current_content": "Quick Start section shows basic commands but omits many useful flags",
+      "should_add": "Document advanced features: --security-enhanced, --group-by-category, --min-priority, --filter, --verbose levels (-v, -vv, -vvv), --plain, --no-cache, --cache-stats, --multi-pass, --attribution, etc.",
+      "fix_suggestion": "Add 'Advanced Options' subsection after basic commands showing:\n1. Verbosity levels: -v (show main factors), -vv (detailed calculations), -vvv (all debug info)\n2. Filtering: --min-priority, --filter, --group-by-category\n3. Security focus: --security-enhanced\n4. Cache management: --no-cache, --clear-cache, --cache-stats\n5. Performance: --jobs, --no-parallel\n6. Output control: --plain, --summary",
+      "source_reference": "src/cli.rs:94-208 (Analyze command flags)"
     },
     {
       "type": "missing_content",
-      "severity": "critical",
-      "section": "First Analysis",
-      "description": "First Analysis section is completely empty with only a TODO marker",
-      "current_content": "## First Analysis\n\nTODO: Add example of running first analysis",
-      "should_add": "Step-by-step walkthrough of running first analysis with expected output examples",
-      "fix_suggestion": "Create a complete first analysis workflow:\n1. Start with simplest command: debtmap analyze .\n2. Explain what happens during analysis (file discovery, parsing, metrics calculation)\n3. Show realistic terminal output example (similar to README.md lines 311-365)\n4. Explain the output sections: priority recommendations, complexity metrics, debt scores\n5. Add note about analysis speed and supported languages (Rust, Python, JavaScript, TypeScript)\n6. Mention that first run may be slower due to cache building",
-      "source_reference": "README.md:311-365 (example output), src/main.rs (analyze command flow), src/analyzers/ (language support)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
+      "severity": "medium",
       "section": "Understanding the Output",
-      "description": "Understanding the Output section is completely empty with only a TODO marker",
-      "current_content": "## Understanding the Output\n\nTODO: Explain basic output format and interpretation",
-      "should_add": "Explanation of output formats, key metrics, and how to interpret results",
-      "fix_suggestion": "Add comprehensive output explanation:\n1. Terminal format (default) - explain the priority table and what each column means\n2. Key metrics explained:\n   - Unified score (0-10 scale) and what it represents\n   - Debt type (TestGap, Complexity, etc.)\n   - Priority levels (CRITICAL, HIGH, MEDIUM, LOW)\n   - Complexity metrics (cyclomatic, cognitive, nesting)\n   - Coverage percentage and why it matters\n3. How to read recommendations (ACTION, IMPACT, WHY sections)\n4. What the summary statistics mean (total debt score, overall coverage)\n5. Brief mention of other formats (JSON for CI/CD, Markdown for reports)\n6. Next steps: point to advanced chapters for coverage integration, filtering, etc.",
-      "source_reference": "README.md:311-415 (output examples), README.md:627-663 (metrics explained), src/output/ (formatters)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Prerequisites",
-      "description": "No mention of prerequisites or system requirements",
-      "should_add": "Prerequisites section explaining what users need before installing",
-      "fix_suggestion": "Add prerequisites subsection before Installation:\n1. Rust toolchain if building from source (rustc, cargo)\n2. Supported platforms (Linux, macOS, Windows)\n3. Minimum Rust version if applicable\n4. Note that pre-built binaries don't require Rust installation\n5. Optional: coverage tools for risk analysis (cargo-tarpaulin for Rust, jest for JS, pytest for Python)",
-      "source_reference": "Cargo.toml:3 (edition = 2021), README.md:112-114 (coverage tool examples)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Verification",
-      "description": "No guidance on verifying installation was successful",
-      "should_add": "Section on verifying installation and troubleshooting common issues",
-      "fix_suggestion": "Add verification steps after installation:\n1. Run 'debtmap --version' to verify installation\n2. Run 'debtmap --help' to see available commands\n3. Common installation issues and solutions:\n   - Binary not in PATH (how to add ~/.cargo/bin or ~/.local/bin to PATH)\n   - Permission issues with install script\n   - Cargo not found when building from source\n4. Link to troubleshooting chapter if it exists",
-      "source_reference": "src/cli.rs (CLI structure with --version and --help)"
+      "description": "No mention of output grouping and filtering capabilities",
+      "current_content": "Section explains metrics and output formats but doesn't mention grouping or filtering",
+      "should_add": "Document --group-by-category and --filter options to organize output by debt type",
+      "fix_suggestion": "Add subsection 'Organizing Results':\n1. Group by category: --group-by-category\n2. Filter by priority: --min-priority high\n3. Filter by category: --filter Architecture,Testing\n4. Available categories: Architecture, Testing, Performance, CodeQuality\n5. Show how these help focus on specific types of technical debt",
+      "source_reference": "src/cli.rs:110-120 (filter flags), README.md:422-451 (category filtering examples)"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Next Steps",
-      "description": "No guidance on what to do after getting started",
-      "should_add": "Next steps section pointing to relevant chapters",
-      "fix_suggestion": "Add 'What's Next?' section at the end:\n1. Link to 'Basic Usage' chapter for more command options\n2. Link to 'Understanding Metrics' for deeper metric explanations\n3. Link to 'Configuration' for customizing thresholds\n4. Link to 'Coverage Integration' for risk-based analysis\n5. Link to 'CI/CD Integration' for automating analysis\n6. Encourage users to run 'debtmap init' to create project config",
-      "source_reference": "README.md structure (sections that should have corresponding chapters)"
+      "section": "What's Next?",
+      "description": "Chapter mentions Configuration but doesn't explain .debtmap.toml customization options",
+      "current_content": "References 'Configuration' and '.debtmap.toml' but provides minimal detail",
+      "should_add": "Brief overview of key configuration options available in .debtmap.toml",
+      "fix_suggestion": "Add configuration preview subsection:\n1. Threshold customization (complexity, duplication, file size)\n2. Scoring weights (coverage, complexity, dependency)\n3. Language selection\n4. Ignore patterns for test files\n5. God object thresholds\n6. Entropy analysis settings\n7. Point to full configuration chapter for details",
+      "source_reference": "README.md:950-1024 (configuration examples)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "First Analysis",
+      "description": "No mention of cache behavior on first run vs subsequent runs",
+      "current_content": "Mentions 'The first run may be slightly slower as Debtmap builds its cache' but doesn't explain cache benefits",
+      "should_add": "Brief explanation of caching and how it speeds up subsequent analyses",
+      "fix_suggestion": "Expand cache explanation:\n1. Cache location (XDG_CACHE_HOME/debtmap on Linux, ~/Library/Caches/debtmap on macOS)\n2. What gets cached (parsed ASTs, computed metrics)\n3. When cache is invalidated (file modifications)\n4. How to clear cache: --clear-cache or --no-cache\n5. View cache stats: --cache-stats",
+      "source_reference": "README.md:888-948 (cache management), src/cli.rs:141-167 (cache flags)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Quick Start",
+      "description": "Missing validate and compare commands which are important workflows",
+      "current_content": "Shows analyze and init commands but not validate or compare",
+      "should_add": "Brief mention of validate (for CI/CD) and compare (for tracking improvements) commands",
+      "fix_suggestion": "Add two more examples to Quick Start:\n```bash\n# Validate against thresholds (CI/CD integration)\ndebtmap validate ./src --max-debt-density 5.0\n\n# Compare before/after to track improvements\ndebtmap analyze . --format json --output before.json\n# ... make improvements ...\ndebtmap analyze . --format json --output after.json\ndebtmap compare --before before.json --after after.json\n```\nNote these are covered in detail in other chapters",
+      "source_reference": "src/cli.rs:210-310 (Validate and Compare commands), README.md:215-289 (compare examples)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Quick Start",
+      "description": "Example uses visible_alias 'lcov' but chapter doesn't mention this convenient shorthand",
+      "current_content": "Examples consistently use --lcov which is correct",
+      "should_be": "Mention that both --coverage-file and --lcov work (lcov is the shorter alias)",
+      "fix_suggestion": "In first coverage example, add note: '(You can use --lcov as a shorthand for --coverage-file)'",
+      "source_reference": "src/cli.rs:56-60 (visible_alias definition)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Output Formats",
+      "description": "No mention of --output-format flag for JSON structure selection",
+      "current_content": "Mentions JSON and Markdown output but not the JSON format variants",
+      "should_add": "Document --output-format legacy vs unified for JSON schema selection",
+      "fix_suggestion": "Add note to JSON output example:\n'By default, JSON uses legacy format. For the new unified format (with consistent structure and type field), use: --output-format unified'",
+      "source_reference": "src/cli.rs:34-38 (json_format parameter)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Understanding the Output",
+      "description": "Priority levels explanation doesn't match exact implementation thresholds",
+      "current_content": "Shows CRITICAL (9.0-10.0), HIGH (7.0-8.9), MEDIUM (5.0-6.9), LOW (3.0-4.9)",
+      "should_be": "Verify these thresholds match implementation or note they're configurable",
+      "fix_suggestion": "Add note: 'These are default priority thresholds. You can customize them in .debtmap.toml under [tiers] section to match your team's standards.'",
+      "source_reference": "README.md:569-576 (priority classification), README.md:1096-1120 (tier configuration)"
     }
   ],
   "positive_aspects": [
-    "Chapter structure is well-organized with logical section headings",
-    "Section titles are clear and user-focused",
-    "Follows a natural progression: install → quick start → first use → understanding output"
+    "Installation instructions are accurate and comprehensive - covers all three methods (curl install, cargo, source)",
+    "Install script details match actual implementation (auto-detects OS, installs to ~/.cargo/bin or ~/.local/bin, offers PATH setup)",
+    "Prerequisites section correctly identifies Rust edition 2021 requirement and optional coverage tools",
+    "Quick Start examples are syntactically correct and use current command syntax",
+    "Example output matches actual terminal output format from debtmap (unified priority display)",
+    "Metrics explanation is clear and accurate (cyclomatic, cognitive, nesting, dependencies)",
+    "Coverage integration workflow is correct (cargo tarpaulin → lcov → debtmap analyze --lcov)",
+    "Language support statement is accurate (Rust full, Python/JS/TS partial)",
+    "Verification steps are practical (--version, --help checks)",
+    "Output format examples (terminal, JSON, markdown) match actual implementation",
+    "Chapter flow is logical: prerequisites → install → verify → first analysis → understand output → next steps",
+    "Troubleshooting tips for installation are helpful and accurate (PATH setup, permission issues)",
+    "What's Next section provides good navigation to other chapters"
   ],
   "improvement_suggestions": [
-    "Add a brief introduction paragraph explaining what debtmap does and why users would want it (pull from README 'Why Debtmap?' section)",
-    "Include a simple diagram showing the analysis workflow (file discovery → parsing → analysis → output)",
-    "Add a 'Common First-Run Issues' subsection in the First Analysis section",
-    "Include expected timing information (e.g., 'analyzing a 10k LOC project typically takes 2-5 seconds')",
-    "Add a note about language support and partial vs full support (Rust is fully supported, Python/JS/TS have partial support)",
-    "Consider adding a 'Minimal Example' showing the absolute simplest use case with a toy project",
-    "Link to the GitHub repository for issues and questions"
+    "Add 'Advanced Usage' subsection showing powerful but less common flags (verbosity, filtering, grouping)",
+    "Include brief mention of entropy-based complexity analysis which is a unique debtmap feature",
+    "Show example of using --plain flag for CI/CD integration (no colors, no emoji, machine-parseable)",
+    "Add note about parallel processing defaults (enabled by default, can control with --jobs)",
+    "Mention that context-aware false positive reduction is enabled by default (can disable with --no-context-aware)",
+    "Include example of --summary flag for compact output in constrained environments",
+    "Add callout box highlighting the unique coverage-risk correlation feature that distinguishes debtmap",
+    "Show example output with verbosity levels (-v, -vv, -vvv) to demonstrate progressive detail",
+    "Include quick example of filtering by priority: --min-priority high --top 10",
+    "Add note about god object detection capability which is mentioned in README but not in Getting Started",
+    "Consider adding a 'Common Workflows' section showing typical usage patterns (first analysis, with coverage, CI/CD validation, tracking improvements)",
+    "Link to specific sections of other chapters rather than just chapter names (e.g., 'Analysis Guide - Coverage Integration' instead of just 'Analysis Guide')"
   ],
   "metadata": {
     "analyzed_at": "2025-10-09",
-    "feature_inventory": "Derived from README.md, Cargo.toml, and src/ implementation",
-    "topics_covered": [],
+    "feature_inventory": "Derived from src/cli.rs Commands enum, README.md examples, and implementation files",
+    "topics_covered": [
+      "Installation (curl/wget, cargo, source)",
+      "Prerequisites (Rust toolchain, coverage tools)",
+      "Verification (version, help)",
+      "Quick start (basic commands)",
+      "First analysis (workflow and output)",
+      "Understanding output (metrics, priorities)",
+      "Output formats (terminal, JSON, markdown)",
+      "Next steps"
+    ],
     "validation_focus": "Check installation instructions and quick start examples are current"
   }
 }
