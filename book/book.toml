@@ -1,0 +1,31 @@
+[book]
+authors = ["Glen Baker"]
+language = "en"
+src = "src"
+title = "Debtmap Documentation"
+description = "Comprehensive guide to Debtmap code complexity and technical debt analyzer"
+
+[build]
+create-missing = false
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "navy"
+smart-punctuation = true
+git-repository-url = "https://github.com/iepathos/debtmap"
+git-repository-icon = "fa-github"
+
+[output.html.search]
+enable = true
+limit-results = 30
+use-boolean-and = true
+boost-title = 2
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.playground]
+editable = false
+copyable = true
+line-numbers = true
