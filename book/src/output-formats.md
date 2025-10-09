@@ -106,9 +106,11 @@ The terminal output uses colors and symbols for quick visual scanning:
 - **HIGH** (>15): Red - Urgent refactoring needed
 
 **Debt Score Thresholds:**
-- **Below threshold/2**: Green - Healthy
-- **Above threshold/2**: Yellow - Attention needed
-- **Above threshold**: Red - Action required
+
+The default debt threshold is **100**. Scores are colored based on this threshold:
+- **Green (≤50)**: Healthy - Below half threshold
+- **Yellow (51-100)**: Attention needed - Between half and full threshold
+- **Red (>100)**: Action required - Exceeds threshold
 
 ### Refactoring Guidance
 
@@ -161,9 +163,11 @@ debtmap analyze . -vvv
 ```
 
 **Verbosity features:**
-- `-v`: Score factor breakdown (complexity, coverage, dependency)
-- `-vv`: Detailed calculations with formulas
-- `-vvv`: Debug info including entropy metrics, role detection, cache hits
+- `-v`: Show main score factors (complexity, coverage, dependency breakdown)
+- `-vv`: Show detailed calculations with formulas and intermediate values
+- `-vvv`: Show all debug information including entropy metrics, role detection, and cache hits
+
+Each level includes all information from the previous levels, progressively adding more detail to help understand how scores are calculated.
 
 ### Risk Analysis Output
 
@@ -410,6 +414,8 @@ debtmap analyze . --format json --output-format legacy
 # Unified format - new consistent structure
 debtmap analyze . --format json --output-format unified
 ```
+
+> **Note:** The `--output-format` flag only applies when using `--format json`. It has no effect with markdown or terminal formats.
 
 **Legacy format:** Uses `{File: {...}}` and `{Function: {...}}` wrappers for backward compatibility with existing tooling.
 
@@ -1022,18 +1028,22 @@ For very large codebases (>10,000 files), use `--top` or `--filter` to limit out
 
 ### Exit Codes
 
-Debtmap uses standard exit codes:
-- `0`: Success, all checks passed
-- `1`: Analysis completed, but validation thresholds exceeded
-- `2`: Error during analysis (invalid path, parsing error, etc.)
+> **Note:** Currently, debtmap returns exit code `0` on successful analysis regardless of threshold violations. Planned behavior includes:
+> - `0`: Success, all checks passed
+> - `1`: Analysis completed, but validation thresholds exceeded
+> - `2`: Error during analysis (invalid path, parsing error, etc.)
 
-Use exit codes in scripts:
+For now, use the `validate` command with threshold checks to enforce quality gates:
 
 ```bash
-if debtmap analyze . --format json -o report.json; then
-    echo "Analysis successful"
-else
-    echo "Analysis failed or thresholds exceeded"
+# Use validate command for threshold enforcement
+debtmap validate . --config debtmap.toml
+
+# Or parse JSON output for threshold checking
+debtmap analyze . --format json -o report.json
+DEBT_SCORE=$(jq '.technical_debt.items | length' report.json)
+if [ "$DEBT_SCORE" -gt 100 ]; then
+    echo "Debt threshold exceeded"
     exit 1
 fi
 ```
