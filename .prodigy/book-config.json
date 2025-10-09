@@ -1,0 +1,48 @@
+{
+  "project_name": "Debtmap",
+  "project_type": "cli_tool",
+  "book_dir": "book",
+  "book_src": "book/src",
+  "book_build_dir": "book",
+  "analysis_targets": [
+    {
+      "area": "cli_commands",
+      "source_files": ["src/cli/", "src/main.rs"],
+      "feature_categories": ["commands", "arguments", "options", "subcommands"]
+    },
+    {
+      "area": "core_analysis",
+      "source_files": ["src/analyzers/", "src/analysis/"],
+      "feature_categories": ["analyzers", "metrics", "algorithms", "complexity_calculations"]
+    },
+    {
+      "area": "debt_detection",
+      "source_files": ["src/debt/", "src/patterns/"],
+      "feature_categories": ["debt_patterns", "detection_rules", "recommendations"]
+    },
+    {
+      "area": "risk_assessment",
+      "source_files": ["src/risk/"],
+      "feature_categories": ["risk_scoring", "prioritization", "impact_analysis"]
+    },
+    {
+      "area": "output_formats",
+      "source_files": ["src/io/", "src/formatters/"],
+      "feature_categories": ["output_formats", "reports", "visualization"]
+    },
+    {
+      "area": "configuration",
+      "source_files": ["src/config/"],
+      "feature_categories": ["config_options", "file_formats", "defaults"]
+    }
+  ],
+  "chapter_file": "workflows/data/debtmap-chapters.json",
+  "custom_analysis": {
+    "include_examples": true,
+    "include_best_practices": true,
+    "include_troubleshooting": true,
+    "analyze_dependencies": false,
+    "extract_code_comments": true,
+    "include_performance_notes": true
+  }
+}

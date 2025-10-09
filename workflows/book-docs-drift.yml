@@ -1,0 +1,73 @@
+# Workflow to detect and fix documentation drift in the Prodigy book
+# This workflow analyzes the codebase and updates book/src/*.md files
+# to reflect the latest supported features and syntax.
+
+name: prodigy-book-docs-drift-detection
+mode: mapreduce
+
+# Environment variables for parameterization
+env:
+  # Project configuration
+  PROJECT_NAME: "Debtmap"
+  PROJECT_CONFIG: ".prodigy/book-config.json"
+  FEATURES_PATH: ".prodigy/book-analysis/features.json"
+
+  # Book-specific settings
+  BOOK_DIR: "book"
+  ANALYSIS_DIR: ".prodigy/book-analysis"
+  CHAPTERS_FILE: "workflows/data/debtmap-chapters.json"
+
+  # Workflow settings
+  MAX_PARALLEL: "3"
+
+# Setup phase: Analyze codebase for feature coverage
+setup:
+  - shell: "mkdir -p $ANALYSIS_DIR"
+
+  # Analyze codebase for workflow features, command types, and configuration
+  - claude: "/prodigy-analyze-features-for-book --project $PROJECT_NAME --config $PROJECT_CONFIG"
+
+# Map phase: Analyze each book chapter for drift
+map:
+  input: "${CHAPTERS_FILE}"
+  json_path: "$.chapters[*]"
+
+  agent_template:
+    - claude: "/prodigy-analyze-book-chapter-drift --project $PROJECT_NAME --json '${item}' --features $FEATURES_PATH"
+      commit_required: true
+
+  max_parallel: ${MAX_PARALLEL}
+
+# Reduce phase: Aggregate drift findings and update documentation
+reduce:
+  - claude: "/prodigy-fix-book-drift --project $PROJECT_NAME --config $PROJECT_CONFIG"
+    commit_required: true
+
+  # Rebuild the book to ensure it compiles correctly
+  - shell: "cd $BOOK_DIR && mdbook build"
+    on_failure:
+      claude: "/prodigy-fix-book-build-errors --project $PROJECT_NAME"
+
+# Error handling
+error_policy:
+  on_item_failure: dlq
+  continue_on_failure: true
+  max_failures: 2
+  error_collection: aggregate
+
+# Custom merge workflow - cleanup and validation before merging
+merge:
+  commands:
+    # Step 1: Clean up temporary analysis files
+    - shell: "rm -rf ${ANALYSIS_DIR}"
+    - shell: "git add -A && git commit -m 'chore: remove temporary book analysis files for ${PROJECT_NAME}' || true"
+
+    # Step 2: Validate book builds successfully
+    - shell: "cd ${BOOK_DIR} && mdbook build"
+
+    # Step 3: Fetch latest changes and merge master into worktree
+    - shell: "git fetch origin"
+    - claude: "/prodigy-merge-master --project ${PROJECT_NAME}"
+
+    # Step 4: Merge worktree back to master
+    - claude: "/prodigy-merge-worktree ${merge.source_branch}"

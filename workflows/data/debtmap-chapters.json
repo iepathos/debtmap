@@ -1,0 +1,60 @@
+{
+  "chapters": [
+    {
+      "id": "introduction",
+      "title": "Introduction",
+      "file": "book/src/introduction.md",
+      "topics": ["What is Debtmap", "Why use it", "Key features", "Target audience"],
+      "validation": "Ensure introduction covers project purpose and main features"
+    },
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "file": "book/src/getting-started.md",
+      "topics": ["Installation", "Quick start", "First analysis", "Basic usage"],
+      "validation": "Check installation instructions and quick start examples are current"
+    },
+    {
+      "id": "cli-reference",
+      "title": "CLI Reference",
+      "file": "book/src/cli-reference.md",
+      "topics": ["Commands", "Arguments", "Options", "Configuration"],
+      "validation": "Verify all CLI commands from src/cli/ are documented with current options"
+    },
+    {
+      "id": "analysis-guide",
+      "title": "Analysis Guide",
+      "file": "book/src/analysis-guide.md",
+      "topics": ["Complexity metrics", "Debt patterns", "Risk scoring", "Interpreting results"],
+      "validation": "Ensure all analyzer types and metrics are explained"
+    },
+    {
+      "id": "configuration",
+      "title": "Configuration",
+      "file": "book/src/configuration.md",
+      "topics": ["Config files", "Options reference", "Exclusion patterns", "Customization"],
+      "validation": "Check config options match implementation in src/config/"
+    },
+    {
+      "id": "output-formats",
+      "title": "Output Formats",
+      "file": "book/src/output-formats.md",
+      "topics": ["JSON output", "Text reports", "Integration with tools", "Custom formatting"],
+      "validation": "Verify output format documentation matches src/io/ implementation"
+    },
+    {
+      "id": "examples",
+      "title": "Examples",
+      "file": "book/src/examples.md",
+      "topics": ["Analyzing Rust projects", "Python analysis", "JavaScript/TypeScript", "CI integration"],
+      "validation": "Ensure examples use current CLI syntax and options"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "file": "book/src/troubleshooting.md",
+      "topics": ["Common issues", "Debug mode", "Performance tips", "FAQ"],
+      "validation": "Check troubleshooting covers common user issues"
+    }
+  ]
+}
