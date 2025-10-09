@@ -10,7 +10,7 @@ Unlike traditional static analysis tools that simply flag complex code, Debtmap 
 1. **"What should I refactor to reduce cognitive burden?"** - Identifies overly complex code that slows down development
 2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
 
-Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It supports multiple programming languages including Rust (full support), Python, JavaScript, and TypeScript (partial support).
+Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It fully supports Rust, Python, JavaScript, and TypeScript.
 
 **What Makes Debtmap Different:**
 - **Entropy-Based Complexity Analysis**: Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%
@@ -32,10 +32,10 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 ## Key Features
 
 ### Analysis Capabilities
-- **Multi-language support** - Fully supports Rust. Partial support for Python, JavaScript, and TypeScript
+- **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript
 - **Entropy-based complexity analysis** - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory
 - **Token classification system** - Advanced token categorization with weighted entropy for accurate complexity assessment
-- **Comprehensive debt detection** - Identifies 13 different technical debt types across security, organization, testing, and resource management
+- **Comprehensive debt detection** - Identifies 20+ technical debt patterns across security, organization, testing, and resource management
 - **Security vulnerability detection** - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns
 - **Resource management analysis** - Identifies inefficient allocations, nested loops, and blocking I/O patterns
 - **Code organization analysis** - Detects god objects, feature envy, primitive obsession, and magic values
@@ -51,7 +51,7 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 
 ### Performance & Output
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
-- **Multiple output formats** - JSON, Markdown, and human-readable terminal formats
+- **Multiple output formats** - JSON (legacy or unified structure), Markdown, and human-readable terminal formats
 - **Configurable thresholds** - Customize complexity and duplication thresholds to match your standards
 - **Incremental analysis** - Smart caching system for analyzing only changed files
 - **Verbosity controls** - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail
@@ -80,6 +80,7 @@ Debtmap is designed for:
 ## Getting Started
 
 Ready to analyze your codebase? Check out:
+- [Installation](./installation.md) - Installing Debtmap on your system
 - [Getting Started](./getting-started.md) - Installation and first analysis
 - [Analysis Guide](./analysis-guide.md) - Understanding the metrics and output
 - [Output Formats](./output-formats.md) - JSON, Markdown, and terminal formats
