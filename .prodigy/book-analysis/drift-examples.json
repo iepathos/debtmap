@@ -1,0 +1,115 @@
+{
+  "chapter_id": "examples",
+  "chapter_title": "Examples",
+  "chapter_file": "book/src/examples.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is entirely empty with only TODOs, despite full implementation of all documented features. This represents complete documentation debt - users have no practical examples despite production-ready functionality.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Analyzing Rust Projects",
+      "description": "Section contains only 'TODO: Rust project analysis examples' but Rust analysis is fully implemented and production-ready",
+      "current_content": "## Analyzing Rust Projects\n\nTODO: Rust project analysis examples",
+      "should_be": "Complete examples showing:\n- Basic Rust project analysis with debtmap analyze\n- Using coverage data from cargo-tarpaulin\n- Analyzing specific modules with --languages rust\n- Integration with cargo workspace projects\n- Using entropy analysis for Rust macros\n- Handling macro expansion with --verbose-macro-warnings",
+      "fix_suggestion": "Add comprehensive Rust examples covering:\n1. Simple cargo project: debtmap analyze . --format json\n2. With coverage: cargo tarpaulin --out lcov && debtmap analyze . --lcov target/coverage/lcov.info\n3. Macro-heavy projects: debtmap analyze . --show-macro-stats --verbose-macro-warnings\n4. CI integration with GitHub Actions\n5. Workspace analysis\n6. Using --top to focus on high-priority items",
+      "source_reference": "src/analyzers/rust.rs, src/cli.rs:26-208, .github/workflows/debtmap.yml"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Python Analysis",
+      "description": "Section contains only 'TODO: Python project examples' but Python analysis is fully implemented",
+      "current_content": "## Python Analysis\n\nTODO: Python project examples",
+      "should_be": "Complete examples showing:\n- Python project analysis with debtmap\n- Integration with pytest coverage (pytest --cov --cov-report=lcov)\n- Analyzing specific Python modules\n- Python-specific debt patterns\n- Using entropy analysis for repetitive validation code",
+      "fix_suggestion": "Add Python examples covering:\n1. Basic analysis: debtmap analyze . --languages python\n2. With pytest coverage: pytest --cov --cov-report=lcov && debtmap analyze . --lcov coverage.lcov\n3. Focusing on high-complexity functions: debtmap analyze . --threshold-complexity 15 --top 10\n4. Filtering by category: debtmap analyze . --filter CodeQuality,Testing\n5. Virtual environment handling (already ignored by default)\n6. Django/Flask project examples",
+      "source_reference": "src/analyzers/python.rs, src/analyzers/python_purity.rs, README.md:1002-1003"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "JavaScript/TypeScript",
+      "description": "Section contains only 'TODO: JS/TS project examples' but JavaScript/TypeScript analysis is fully implemented via tree-sitter",
+      "current_content": "## JavaScript/TypeScript\n\nTODO: JS/TS project examples",
+      "should_be": "Complete examples showing:\n- JavaScript and TypeScript project analysis\n- Integration with Jest coverage (jest --coverage --coverageReporters=lcov)\n- Analyzing React/Vue/Angular projects\n- Node.js backend analysis\n- Handling TypeScript-specific patterns\n- Monorepo analysis",
+      "fix_suggestion": "Add JS/TS examples covering:\n1. React project: debtmap analyze src/ --languages javascript,typescript\n2. With Jest coverage: npm test -- --coverage && debtmap analyze . --lcov coverage/lcov.info\n3. Node.js backend: debtmap analyze . --filter Performance,Security\n4. Monorepo: debtmap analyze packages/app --threshold-complexity 10\n5. TypeScript strict mode validation\n6. Integration with ESLint results",
+      "source_reference": "src/analyzers/javascript/mod.rs, src/analyzers/javascript/complexity.rs, src/analyzers/mod.rs:85-90"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "CI Integration",
+      "description": "Section contains only 'TODO: Examples of using Debtmap in CI/CD pipelines' but production CI workflow exists and is used in the project itself",
+      "current_content": "## CI Integration\n\nTODO: Examples of using Debtmap in CI/CD pipelines",
+      "should_be": "Complete examples showing:\n- GitHub Actions integration with debtmap validate\n- GitLab CI integration\n- Jenkins pipeline integration\n- Coverage-aware validation in CI\n- Failing builds on threshold violations\n- Artifact upload for tracking trends",
+      "fix_suggestion": "Add CI integration examples covering:\n1. GitHub Actions workflow (based on actual .github/workflows/debtmap.yml):\n   - Building debtmap\n   - Running validation with coverage\n   - Uploading artifacts\n   - Failing on threshold violations\n2. GitLab CI example\n3. Jenkins pipeline example\n4. Pre-commit hook integration\n5. PR comment integration\n6. Trend tracking across builds",
+      "source_reference": ".github/workflows/debtmap.yml, src/cli.rs:217-282 (validate command), README.md:57-74"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "General Examples Structure",
+      "description": "Chapter lacks basic structure like introduction, prerequisites, and cross-references",
+      "current_content": "# Examples\n\nReal-world usage examples for different project types.",
+      "should_be": "Structured chapter with:\n- Introduction explaining example organization\n- Prerequisites (installation, basic usage)\n- Links to CLI Reference chapter\n- Links to relevant configuration sections\n- Common patterns across all languages\n- Troubleshooting section",
+      "fix_suggestion": "Add chapter structure:\n1. Introduction: Overview of example categories\n2. Prerequisites: Link to installation, basic analyze command\n3. Common patterns section (--lcov, --top, --filter, etc.)\n4. Language-specific sections (as listed above)\n5. CI/CD integration section\n6. Advanced examples (multi-language projects, custom thresholds)\n7. Troubleshooting common issues\n8. See Also: Links to other chapters",
+      "source_reference": "book/src structure, other chapters for reference"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Real-World Use Cases",
+      "description": "Chapter should include practical use cases and workflows",
+      "current_content": "None",
+      "should_be": "Practical workflow examples:\n- Daily development workflow\n- Pre-commit validation\n- PR review integration\n- Sprint planning with debt scores\n- Legacy codebase assessment\n- Before/after refactoring with compare command",
+      "fix_suggestion": "Add workflow examples:\n1. Developer workflow: analyze → identify → fix → validate\n2. Team workflow: weekly debt tracking, sprint planning\n3. Migration workflow: baseline → incremental improvements\n4. Refactoring workflow: using compare command to validate improvements\n5. Security workflow: filtering for security issues\n6. Performance workflow: filtering for performance issues",
+      "source_reference": "src/cli.rs:284-310 (compare command), README.md:257-276"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Output Format Examples",
+      "description": "Chapter should show what the actual output looks like for different formats",
+      "current_content": "None",
+      "should_be": "Examples of debtmap output:\n- Terminal format (default)\n- JSON format\n- Markdown format\n- Verbose output levels (-v, -vv, -vvv)\n- Summary format (--summary)\n- Grouped output (--group-by-category)",
+      "fix_suggestion": "Add output format examples:\n1. Show terminal output with annotations\n2. Show JSON structure with field explanations\n3. Show markdown format for documentation\n4. Compare output at different verbosity levels\n5. Show summary vs detailed output\n6. Show category grouping example",
+      "source_reference": "README.md:311-365 (example output), src/cli.rs:31-32, src/io/output.rs"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter title is clear and descriptive",
+    "Section headings match the documented functionality",
+    "Chapter is well-positioned in the book structure"
+  ],
+  "improvement_suggestions": [
+    "Leverage the extensive README examples - many can be adapted directly",
+    "Include actual terminal output screenshots or formatted text blocks",
+    "Add 'copy-paste ready' command examples for each use case",
+    "Include common pitfalls and solutions for each language",
+    "Add cross-references to CLI Reference chapter for option details",
+    "Consider adding a 'Quick Start' section at the beginning",
+    "Add a comparison table showing which features work with which languages",
+    "Include resource links (cargo-tarpaulin, pytest-cov, jest docs)",
+    "Add troubleshooting section for common issues (missing parsers, coverage format issues)",
+    "Consider adding performance tips (parallel processing, caching)",
+    "Include examples of configuration file usage alongside CLI flags",
+    "Add examples showing progression from basic to advanced usage"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-09",
+    "feature_inventory": "Extracted directly from src/cli.rs and README.md",
+    "topics_covered": [],
+    "validation_focus": "Ensure examples use current CLI syntax and options",
+    "implementation_status": {
+      "rust_analysis": "fully_implemented",
+      "python_analysis": "fully_implemented",
+      "javascript_analysis": "fully_implemented",
+      "typescript_analysis": "fully_implemented",
+      "ci_integration": "fully_implemented_and_dogfooded"
+    },
+    "cli_version_analyzed": "Based on src/cli.rs with 200+ options across analyze/init/validate/compare commands",
+    "documentation_completeness": "0% - all sections are TODO placeholders",
+    "urgency": "CRITICAL - users have no practical guidance despite production-ready features"
+  }
+}
