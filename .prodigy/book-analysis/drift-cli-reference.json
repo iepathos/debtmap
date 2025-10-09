@@ -1,0 +1,224 @@
+{
+  "chapter_id": "cli-reference",
+  "chapter_title": "CLI Reference",
+  "chapter_file": "book/src/cli-reference.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is entirely missing documentation - only contains TODO placeholders. The CLI has 4 major commands (analyze, init, validate, compare) with extensive options, none of which are documented.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Commands",
+      "description": "All CLI commands are missing from documentation - only has TODO placeholder",
+      "should_add": "Document all 4 commands: analyze, init, validate, compare with descriptions and usage",
+      "fix_suggestion": "Add comprehensive command reference with: 1) `debtmap analyze` - analyze code for complexity and debt (primary command), 2) `debtmap init` - initialize configuration file, 3) `debtmap validate` - validate code against thresholds, 4) `debtmap compare` - compare two analysis results and generate diff",
+      "source_reference": "src/cli.rs:23-311 (Commands enum)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Arguments - analyze command",
+      "description": "The analyze command has 50+ arguments/options but none are documented",
+      "should_add": "Document all analyze command arguments including positional path argument and all flags",
+      "fix_suggestion": "Add table or detailed list covering key arguments: path (required), --format (json/markdown/terminal), --output-format (legacy/unified for JSON structure), --output (file path), --threshold-complexity, --threshold-duplication, --languages, --coverage-file/--lcov, --context/--enable-context, --context-providers, --top/--head, --tail, --summary, -v/--verbose (with levels), --plain (ASCII-only output), --jobs/-j (parallel threads), --cache/--no-cache/--clear-cache, --multi-pass, --attribution, and many more",
+      "source_reference": "src/cli.rs:26-208 (Analyze command struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Arguments - init command",
+      "description": "The init command has --force option but no documentation",
+      "should_add": "Document init command with --force/-f flag to overwrite existing config",
+      "fix_suggestion": "Add init command section explaining it creates a configuration file, with --force option to overwrite existing files",
+      "source_reference": "src/cli.rs:210-215 (Init command)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Arguments - validate command",
+      "description": "The validate command has 20+ options for validating against thresholds",
+      "should_add": "Document validate command arguments: path, --config, --coverage-file, --format, --output, --enable-context, --context-providers, --max-debt-density, --top, --tail, --summary, --semantic-off, -v/--verbose",
+      "fix_suggestion": "Add validate command reference explaining it validates code against configured thresholds (from config file or defaults), returning exit code based on pass/fail. Include all relevant options especially --config and --max-debt-density",
+      "source_reference": "src/cli.rs:217-282 (Validate command)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Arguments - compare command",
+      "description": "The compare command compares before/after analysis results but is not documented",
+      "should_add": "Document compare command with --before, --after, --plan, --target-location, --format, --output options",
+      "fix_suggestion": "Add compare command section explaining it generates a diff between two analysis JSON outputs, optionally focusing on a specific target location from an implementation plan. Include all options and explain the plan vs target-location choice",
+      "source_reference": "src/cli.rs:284-310 (Compare command)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options - Output Formats",
+      "description": "The --format option supports json/markdown/terminal but is not documented",
+      "should_add": "Document OutputFormat enum values and when to use each format",
+      "fix_suggestion": "Add section explaining output format options: json (machine-readable, for CI/CD), markdown (readable reports), terminal (interactive display with colors). Also document --output-format for JSON structure choice (legacy vs unified)",
+      "source_reference": "src/cli.rs:313-318 (OutputFormat enum)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options - JSON Format",
+      "description": "The --output-format option controls JSON structure (legacy vs unified) but is not explained",
+      "should_add": "Document JsonFormat enum: legacy (current format with File/Function wrappers), unified (new format with type field per spec 108)",
+      "fix_suggestion": "Add subsection explaining --output-format flag for analyze command: 'legacy' maintains backward compatibility with {File: {...}} wrappers, 'unified' uses new consistent structure with type discriminator field. Default is legacy to avoid breaking existing tooling",
+      "source_reference": "src/cli.rs:320-326 (JsonFormat enum), src/cli.rs:34-38 (documentation comments)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options - Threshold Preset",
+      "description": "The --threshold-preset option (strict/balanced/lenient) is undocumented",
+      "should_add": "Document ThresholdPreset enum with explanation of each preset's use case",
+      "fix_suggestion": "Add section on threshold presets: 'strict' for high quality standards, 'balanced' for typical projects (default), 'lenient' for legacy or complex domains. Explain these provide quick configuration without manually setting individual thresholds",
+      "source_reference": "src/cli.rs:4-12 (ThresholdPreset enum)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options - Coverage Integration",
+      "description": "Coverage file integration (--coverage-file/--lcov) dampens debt scores but mechanism is not explained",
+      "should_add": "Document coverage integration feature and how it affects scoring",
+      "fix_suggestion": "Add section explaining --coverage-file/--lcov option: Accepts LCOV format coverage data to dampen debt scores for well-tested code (multiplier = 1.0 - coverage). This surfaces untested complex functions as higher priority. Total debt score with coverage ≤ score without coverage",
+      "source_reference": "src/cli.rs:56-60 and 226-230 (coverage_file arguments with detailed comments)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options - Context-Aware Analysis",
+      "description": "Context-aware features (--context, --context-providers, --disable-context) are not documented",
+      "should_add": "Document context-aware risk analysis options and available providers",
+      "fix_suggestion": "Add section on context-aware analysis: --context/--enable-context flag enables advanced risk analysis. --context-providers accepts comma-separated list (critical_path, dependency, git_history). --disable-context allows excluding specific providers. Explain what each provider analyzes",
+      "source_reference": "src/cli.rs:62-72 and 241-250 (context arguments)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options - Verbosity Levels",
+      "description": "The -v/--verbose flag has 3 levels (v, vv, vvv) with different detail, not explained",
+      "should_add": "Document verbosity levels and what information each reveals",
+      "fix_suggestion": "Add section on verbosity: -v shows main score factors, -vv shows detailed calculations, -vvv shows all debug information. Note that --explain-score is deprecated in favor of -v",
+      "source_reference": "src/cli.rs:94-99 (verbosity argument with inline docs)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options - Filtering and Display",
+      "description": "Various filtering options (--top, --tail, --summary, --min-priority, --filter) are not documented",
+      "should_add": "Document display filtering and output control options",
+      "fix_suggestion": "Add section on output control: --top/--head limits to top N priority items, --tail shows bottom N items, --summary uses compact tiered priority display, --min-priority filters by priority level (low/medium/high/critical), --filter filters by debt categories (comma-separated), --group-by-category groups output by category",
+      "source_reference": "src/cli.rs:74-119 (various filtering arguments)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options - Performance and Caching",
+      "description": "Caching and parallel processing options are extensive but undocumented",
+      "should_add": "Document caching system and parallel processing controls",
+      "fix_suggestion": "Add section on performance options: Caching is enabled by default. --no-cache disables, --clear-cache/--force-cache-rebuild clears before run, --cache-stats shows statistics, --migrate-cache moves to shared location, --cache-location sets custom path (or use DEBTMAP_CACHE_DIR env var). --no-parallel disables parallel processing, --jobs/-j sets thread count (0 = all cores)",
+      "source_reference": "src/cli.rs:133-167 (caching and parallel arguments)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options - Advanced Analysis",
+      "description": "Advanced analysis features (multi-pass, attribution, aggregation) are not explained",
+      "should_add": "Document advanced analysis options like multi-pass, attribution, aggregation methods",
+      "fix_suggestion": "Add section on advanced features: --multi-pass enables multi-pass analysis with attribution, --attribution shows complexity attribution details, --detail-level controls diagnostic depth (summary/standard/comprehensive/debug), --aggregation-method sets file-level aggregation (sum/weighted_sum/logarithmic_sum/max_plus_average), --aggregate-only shows only file scores, --no-aggregation disables file aggregation",
+      "source_reference": "src/cli.rs:169-195 (advanced analysis options)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration - Environment Variables",
+      "description": "Environment variables like DEBTMAP_CACHE_DIR are used but not documented",
+      "should_add": "Document supported environment variables",
+      "fix_suggestion": "Add section listing environment variables: DEBTMAP_CACHE_DIR sets cache location (can also use --cache-location), DEBTMAP_CONTEXT_AWARE enables context-aware analysis (set internally when --context used). Explain precedence of env vars vs CLI flags",
+      "source_reference": "src/cli.rs:166 (cache_location with env attribute), src/main.rs:623-636 (environment setup)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Semantic Analysis",
+      "description": "The --semantic-off flag disables semantic analysis (fallback mode) but is not explained",
+      "should_add": "Document semantic analysis toggle and what it affects",
+      "fix_suggestion": "Add note about --semantic-off flag: Disables semantic analysis and uses fallback mode. Explain when this might be needed (parsing errors, unsupported language features, debugging)",
+      "source_reference": "src/cli.rs:86-88 and 268-270 (semantic_off flag)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - Plain Mode",
+      "description": "The --plain flag provides ASCII-only, no-color, machine-parseable output but is not explained",
+      "should_add": "Document plain output mode for CI/CD and scripting",
+      "fix_suggestion": "Add note about --plain flag: Enables plain output mode with ASCII-only characters, no colors, no emoji, designed for machine parsing and CI/CD environments where ANSI codes cause issues",
+      "source_reference": "src/cli.rs:129-131 (plain flag)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Options - God Object Detection",
+      "description": "The --no-god-object flag disables god object detection but feature is not documented",
+      "should_add": "Document god object detection and how to disable it",
+      "fix_suggestion": "Add note about god object detection: Enabled by default, detects files/classes with too many responsibilities. Use --no-god-object to disable this analysis",
+      "source_reference": "src/cli.rs:197-199 (no_god_object flag)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Examples",
+      "description": "No usage examples provided for any commands",
+      "should_add": "Add practical examples showing common usage patterns",
+      "fix_suggestion": "Add Examples section with: 1) Basic analysis: `debtmap analyze .`, 2) JSON output: `debtmap analyze . --format json --output results.json`, 3) With coverage: `debtmap analyze . --lcov coverage/lcov.info`, 4) CI validation: `debtmap validate . --config .debtmap.toml`, 5) Compare results: `debtmap compare --before before.json --after after.json`, 6) Top issues: `debtmap analyze . --top 10 --summary`",
+      "source_reference": "src/cli.rs (all command definitions)"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter file structure exists with clear sections",
+    "Section headings align with expected content (Commands, Arguments, Options, Configuration)",
+    "Placeholder TODOs clearly indicate missing content rather than outdated information"
+  ],
+  "improvement_suggestions": [
+    "Start with analyze command as it's the primary use case",
+    "Group related options together (e.g., all coverage-related, all context-related, all caching)",
+    "Include a quick reference table at the top for experienced users",
+    "Add a 'Common Workflows' section showing command combinations",
+    "Cross-reference to Configuration chapter for .debtmap.toml file format",
+    "Include exit codes and their meanings for CI/CD integration",
+    "Add troubleshooting section for common CLI issues (e.g., cache problems, permission errors)",
+    "Consider splitting into sub-pages if content becomes too long (e.g., separate page per command)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-09",
+    "feature_inventory": "Direct from src/cli.rs and src/main.rs",
+    "topics_covered": [],
+    "validation_focus": "Verify all CLI commands from src/cli/ are documented with current options",
+    "commands_found": {
+      "analyze": {
+        "positional_args": 1,
+        "flags_and_options": 50,
+        "complexity": "high"
+      },
+      "init": {
+        "positional_args": 0,
+        "flags_and_options": 1,
+        "complexity": "low"
+      },
+      "validate": {
+        "positional_args": 1,
+        "flags_and_options": 13,
+        "complexity": "medium"
+      },
+      "compare": {
+        "positional_args": 0,
+        "flags_and_options": 6,
+        "complexity": "medium"
+      }
+    }
+  }
+}
