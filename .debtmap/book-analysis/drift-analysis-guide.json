@@ -1,0 +1,107 @@
+{
+  "chapter_id": "analysis-guide",
+  "chapter_title": "Analysis Guide",
+  "chapter_file": "book/src/analysis-guide.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely empty - all TODOs with no actual content. This is critical drift as users cannot learn how to interpret Debtmap's analysis output.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Complexity Metrics",
+      "description": "No documentation of complexity calculation methods. Chapter only has TODO placeholder.",
+      "should_add": "Document cyclomatic complexity, cognitive complexity, entropy-based analysis, nesting depth, and function length metrics",
+      "fix_suggestion": "Add comprehensive section explaining:\n- Cyclomatic complexity: Measures decision points (branches, loops, conditionals)\n- Cognitive complexity: Measures how difficult code is to understand (nesting increases weight)\n- Entropy analysis: Pattern detection to identify repetitive vs genuine complexity\n- Nesting depth: Maximum nesting level in function\n- Function length: Number of lines in function\n- ComplexityCalculator: Thresholds and scoring (cyclo_threshold, cognitive_threshold)\n- Entropy scoring: token_entropy, pattern_repetition, branch_similarity, effective_complexity\n- Include examples of each metric with code samples",
+      "source_reference": "src/complexity/mod.rs:ComplexityCalculator, src/core/mod.rs:FunctionMetrics (lines 42-60), src/complexity/cognitive.rs, src/complexity/cyclomatic.rs, src/complexity/entropy_core.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Debt Patterns",
+      "description": "No documentation of technical debt patterns detected. Chapter only has TODO placeholder.",
+      "should_add": "Document all 13 DebtType variants with detection patterns and examples",
+      "fix_suggestion": "Add comprehensive section covering all debt types:\n\n**Basic Markers (weight=1):**\n- Todo: TODO comments in code\n- TestTodo: TODO comments in test code\n\n**Fixable Issues (weight=2):**\n- Fixme: FIXME comments\n- TestComplexity: Complex test functions\n- TestDuplication: Duplicated test code\n\n**Code Quality (weight=3):**\n- CodeSmell: Anti-patterns and bad practices\n- Dependency: Problematic dependencies\n- CodeOrganization: Poor structure\n- TestQuality: Low-quality tests\n\n**Serious Issues (weight=4):**\n- Duplication: Duplicated code blocks\n- ErrorSwallowing: Errors caught but ignored\n- ResourceManagement: Resource leaks or improper cleanup\n\n**High Severity (weight=5):**\n- Complexity: Functions exceeding complexity thresholds\n\n**Scoring Formula:**\ndebt_score = priority_weight × type_weight\n- Priority weights: Low=1, Medium=3, High=5, Critical=10\n- Type weights: Listed above\n\nInclude detection patterns for each type and code examples.",
+      "source_reference": "src/core/mod.rs:DebtType (lines 173-188), src/debt/mod.rs:type_weight (lines 68-79), src/debt/patterns.rs, src/debt/error_swallowing.rs, src/debt/duplication.rs, src/debt/smells.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Risk Scoring",
+      "description": "No explanation of risk assessment methodology. Chapter only has TODO placeholder.",
+      "should_add": "Document risk scoring system including FunctionRisk, RiskCategory, TestEffort, and risk calculation strategies",
+      "fix_suggestion": "Add comprehensive section explaining:\n\n**Risk Categories:**\n- Critical: High complexity (>15) + low coverage (<30%)\n- High: High complexity (>10) + moderate coverage (<60%)\n- Medium: Moderate complexity (>5) + low coverage (<50%)\n- Low: Low complexity or high coverage\n- WellTested: High complexity with high coverage (examples to learn from)\n\n**Risk Calculation Inputs:**\n- Cyclomatic complexity\n- Cognitive complexity\n- Coverage percentage (optional)\n- Debt score (optional)\n- Is test function\n\n**Test Effort Assessment:**\n- Difficulty levels: Trivial (<5 cognitive), Simple (5-10), Moderate (10-20), Complex (20-40), VeryComplex (>40)\n- Cognitive load\n- Branch count\n- Recommended test cases\n\n**Risk Distribution:**\n- Counts by category across codebase\n- Codebase-wide risk score\n- Complexity-coverage correlation\n\n**Testing Recommendations:**\n- Prioritized list of functions to test\n- ROI calculation for testing effort\n- Dependency analysis (upstream callers, downstream callees)\n- Risk reduction potential\n\nInclude examples showing how risk scores are calculated and interpreted.",
+      "source_reference": "src/risk/mod.rs:FunctionRisk (lines 20-31), RiskCategory (lines 34-40), TestEffort (lines 43-48), Difficulty (lines 51-57), RiskAnalyzer (lines 95-235), src/risk/strategy.rs, src/risk/priority.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Interpreting Results",
+      "description": "No guide for interpreting analysis output. Chapter only has TODO placeholder.",
+      "should_add": "Comprehensive guide on reading and acting on Debtmap analysis results",
+      "fix_suggestion": "Add section covering:\n\n**Understanding Output Formats:**\n- JSON structure of analysis results\n- Fields in FunctionMetrics\n- Fields in DebtItem\n- Fields in FunctionRisk\n\n**Reading Function Metrics:**\n- Interpreting cyclomatic vs cognitive complexity\n- When entropy dampening is applied\n- Understanding purity detection (is_pure, purity_confidence)\n- Visibility and test indicators\n- Call graph information (upstream_callers, downstream_callees)\n\n**Prioritizing Work:**\n- Using priority levels (Low, Medium, High, Critical)\n- Interpreting debt scores\n- Risk-based prioritization\n- ROI analysis for test writing\n\n**Actionable Insights:**\n- Functions to refactor first (high complexity, critical risk)\n- Testing priorities (high risk, low coverage)\n- Debt items to fix (by priority and type)\n- Code duplication to eliminate\n- Error handling to improve\n\n**Common Patterns to Recognize:**\n- Well-tested complex code (learn from these)\n- High complexity with no tests (immediate risk)\n- Repeated debt patterns (systematic issues)\n- Circular dependencies (architectural problems)\n\n**Working with Analysis Results:**\n- Filtering by priority, type, or file\n- Grouping by file or module\n- Tracking progress over time\n- Setting thresholds and goals\n\nInclude real-world examples with screenshots/code snippets showing good vs problematic patterns.",
+      "source_reference": "src/core/mod.rs:AnalysisResults (lines 18-25), FunctionMetrics (lines 42-60), src/debt/mod.rs:categorize_debt, prioritize_debt, filter_by_priority (lines 19-52), src/risk/insights.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Analyzer Types",
+      "description": "No documentation of which languages and analysis types are supported",
+      "should_add": "Document supported languages and their analyzer capabilities",
+      "fix_suggestion": "Add section explaining:\n\n**Supported Languages:**\n- Rust (RustAnalyzer) - Full support with trait detection, purity analysis, call graphs\n- Python (PythonAnalyzer) - Full support with Python-specific patterns and error handling\n- JavaScript (JavaScriptAnalyzer) - Support for .js, .jsx, .mjs, .cjs files\n- TypeScript (TypeScriptAnalyzer) - Support for .ts, .tsx, .mts, .cts files\n\n**Analysis Capabilities by Language:**\n- All languages: Cyclomatic complexity, cognitive complexity, function metrics\n- Rust: Trait implementation tracking, purity detection, call graph analysis, pattern adjustments\n- Python: Python-specific error handling patterns, purity detection\n- JavaScript/TypeScript: ECMAScript complexity patterns\n\n**Analyzer Components:**\n- Parser: Language-specific AST generation\n- Complexity calculators: Cyclomatic, cognitive, entropy\n- Debt detectors: Pattern matching for each debt type\n- Risk assessors: Coverage integration, risk scoring\n- Context-aware analysis: Call graphs, dependency tracking\n\n**Extensibility:**\n- Adding new languages\n- Custom debt patterns\n- Configurable thresholds\n\nInclude examples of analysis output for each language.",
+      "source_reference": "src/analyzers/mod.rs:get_analyzer (lines 77-98), Analyzer trait (lines 30-34), src/analyzers/rust.rs, src/analyzers/python.rs, src/analyzers/javascript.rs, src/core/mod.rs:Language (lines 318-348)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Advanced Features",
+      "description": "No documentation of advanced analysis features like purity detection, call graphs, and entropy analysis",
+      "should_add": "Document advanced analysis capabilities that go beyond basic metrics",
+      "fix_suggestion": "Add section covering:\n\n**Purity Detection:**\n- What makes a function pure (no side effects, referentially transparent)\n- Detection confidence levels (0.0 to 1.0)\n- Language-specific purity rules\n- Benefits of pure functions for testing and reasoning\n\n**Call Graph Analysis:**\n- Upstream callers tracking\n- Downstream callees tracking\n- Dependency impact analysis\n- Finding cascade effects of changes\n\n**Entropy-Based Complexity:**\n- Token entropy: Variety in code tokens\n- Pattern repetition: Detecting boilerplate\n- Branch similarity: Similar conditional structures\n- Effective complexity: Adjusted score after dampening\n- When dampening is applied (>0.1 threshold)\n- Reasoning explanations in output\n\n**Context-Aware Analysis:**\n- Trait method detection\n- Test module detection\n- Visibility tracking\n- Pattern-based adjustments\n\n**Coverage Integration:**\n- LCOV file parsing\n- Coverage percentage per function\n- Risk scoring with coverage data\n- Testing recommendations based on coverage gaps\n\nInclude examples showing how advanced features provide deeper insights.",
+      "source_reference": "src/core/mod.rs:FunctionMetrics.entropy_score, is_pure, purity_confidence (lines 54-56), get_entropy_details (lines 102-149), src/analyzers/purity_detector.rs, src/analyzers/call_graph_integration.rs, src/complexity/entropy_analysis.rs, src/risk/lcov.rs, src/risk/coverage_index.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Example Outputs",
+      "description": "No example analysis outputs to help users understand what to expect",
+      "should_add": "Real-world examples of Debtmap analysis output with annotations",
+      "fix_suggestion": "Add section with:\n- Example JSON output for a function with high complexity\n- Example of a well-tested complex function\n- Example of debt items with different priorities\n- Example of risk assessment output\n- Example of testing recommendations\n- Annotated explanations of what each field means\n- Before/after examples showing improvement",
+      "source_reference": "Integration tests in tests/ directory for realistic examples"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter structure is clear with logical topic breakdown",
+    "Topics align well with Debtmap's core capabilities",
+    "Validation focus ensures comprehensive coverage"
+  ],
+  "improvement_suggestions": [
+    "Start with a high-level overview of Debtmap's analysis philosophy",
+    "Add a quick-start guide for interpreting the most important metrics",
+    "Include troubleshooting section for common interpretation questions",
+    "Add cross-references to other chapters (e.g., link to configuration for setting thresholds)",
+    "Include visual diagrams explaining risk categories and debt severity levels",
+    "Add comparison section showing how Debtmap metrics differ from other tools",
+    "Include best practices for using analysis results to drive refactoring decisions",
+    "Add section on integrating analysis into CI/CD pipelines",
+    "Include examples of tracking metrics over time to measure improvement"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-09",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [],
+    "validation_focus": "Ensure all analyzer types and metrics are explained",
+    "codebase_modules_analyzed": [
+      "src/complexity/",
+      "src/debt/",
+      "src/risk/",
+      "src/analyzers/",
+      "src/core/"
+    ],
+    "total_issues": 7,
+    "critical_issues": 4,
+    "high_issues": 1,
+    "medium_issues": 1,
+    "low_issues": 1
+  }
+}
