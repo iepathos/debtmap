@@ -1,0 +1,173 @@
+{
+  "chapter_id": "troubleshooting",
+  "chapter_title": "Troubleshooting",
+  "chapter_file": "book/src/troubleshooting.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely empty (only TODOs). No troubleshooting guidance exists for users despite a mature codebase with rich error handling, debug capabilities, and performance features.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Common Issues",
+      "description": "No documentation of common user issues and their solutions",
+      "should_add": "Document common issues users face: parse errors, file not found, unsupported languages, configuration errors, cache issues, out of memory, permission errors, performance problems, LCOV parsing errors, invalid glob patterns, git history analysis failures.",
+      "fix_suggestion": "Create comprehensive common issues section with specific error messages, causes, and solutions. Include examples from src/core/errors.rs error types: FileSystem, Parse, Analysis, Configuration, Cache, Validation, Dependency, Concurrency errors.",
+      "source_reference": "src/core/errors.rs:8-74 (Error enum with all error types)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Debug Mode",
+      "description": "No documentation on how to enable and use debug/verbose modes",
+      "should_add": "Document verbosity levels: -v (main score factors), -vv (detailed calculations), -vvv (all debug info). Document --verbose-macro-warnings and --show-macro-stats flags. Explain how to use verbosity for troubleshooting analysis issues.",
+      "fix_suggestion": "Add debug mode section explaining the three verbosity levels with examples. Show how verbose output helps diagnose scoring issues, coverage problems, and complexity calculation questions. Include examples of verbose output at each level.",
+      "source_reference": "src/cli.rs:94-99 (verbosity flag), src/cli.rs:102-107 (macro debugging flags)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Performance Tips",
+      "description": "No performance optimization guidance for users",
+      "should_add": "Document performance tuning options: --jobs N, --no-parallel, --cache/--no-cache, --clear-cache, --cache-stats, --cache-location. Explain when to use each option, parallel vs sequential processing, cache management, batch processing.",
+      "fix_suggestion": "Add performance tips section based on docs/PERFORMANCE_TUNING.md content. Include guidance for different system sizes (low-end, mid-range, high-end), troubleshooting slow analysis, out of memory errors, cache issues. Provide benchmark examples.",
+      "source_reference": "src/cli.rs:133-167 (parallel and cache flags), docs/PERFORMANCE_TUNING.md:1-284"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "FAQ",
+      "description": "No frequently asked questions section",
+      "should_add": "Document common user questions: How to interpret scores? Why is my total score lower with coverage? What does [UNTESTED] mean? Why are entry points low priority? How to exclude test files? How to suppress false positives? How to configure thresholds? How to generate coverage files?",
+      "fix_suggestion": "Create FAQ section addressing common confusion points. Include questions from README.md FAQ section about entry point coverage, role detection, score interpretation. Add questions about configuration, suppression, and coverage integration.",
+      "source_reference": "README.md:1223-1263 (existing FAQ content)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Error Messages",
+      "description": "No explanation of common error messages and how to fix them",
+      "should_add": "Document error messages users encounter: 'File system error', 'Parse error in file:line:column', 'Configuration error', 'Cache error', 'Validation error', 'Pattern error'. Provide common causes and solutions for each.",
+      "fix_suggestion": "Add error messages reference explaining each error type from src/core/errors.rs. Include examples of actual error messages, what triggers them, and how to resolve them. Cover parse errors with line/column info, file system permission issues, invalid config TOML, cache corruption, and pattern syntax errors.",
+      "source_reference": "src/core/errors.rs:8-74 (Error enum variants with display messages)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Coverage Integration Issues",
+      "description": "No troubleshooting for LCOV coverage file issues",
+      "should_add": "Document common LCOV problems: file not found, invalid format, path mismatches between coverage and source, coverage not showing up, performance impact of coverage analysis, coverage dampening explanation.",
+      "fix_suggestion": "Add LCOV troubleshooting section explaining how to verify coverage files, debug path mismatches (use absolute vs relative paths), understand coverage dampening (multiplier = 1.0 - coverage), optimize coverage performance (indexed lookups ~0.5μs).",
+      "source_reference": "README.md:713-806 (coverage integration and dampening), README.md:736-751 (coverage performance)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration Troubleshooting",
+      "description": "No guidance on diagnosing configuration problems",
+      "should_add": "Document config file discovery process (.debtmap.toml searched up 10 parent directories), TOML syntax validation, common config mistakes (weights not summing to 1.0, invalid glob patterns, unknown fields), how to verify config is loaded.",
+      "fix_suggestion": "Add configuration troubleshooting section explaining config file discovery (searches up directory tree max 10 levels), TOML syntax errors, weight validation (scoring weights must sum to 1.0), pattern errors, and how to validate config with debtmap init.",
+      "source_reference": "src/config.rs:1028-1054 (load_config and directory_ancestors_impl)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Cache Problems",
+      "description": "No documentation on cache troubleshooting and management",
+      "should_add": "Document cache location (DEBTMAP_CACHE_DIR, XDG_CACHE_HOME, platform defaults), cache corruption signs (weird results, crashes), cache clearing (--clear-cache), cache statistics (--cache-stats), migration (--migrate-cache), auto-pruning behavior.",
+      "fix_suggestion": "Add cache troubleshooting section explaining cache location hierarchy, how to clear cache when results seem stale, cache statistics to diagnose issues, migration from local to shared cache, and auto-pruning configuration via environment variables.",
+      "source_reference": "src/cli.rs:141-167 (cache flags), README.md:887-948 (cache management section)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Parallel Processing Issues",
+      "description": "No troubleshooting for parallel execution problems",
+      "should_add": "Document when to use --no-parallel (debugging, memory-constrained, deterministic order), --jobs N (control thread count), RAYON_NUM_THREADS environment variable, symptoms of parallel issues (inconsistent results, crashes, memory pressure).",
+      "fix_suggestion": "Add parallel processing troubleshooting explaining when to disable parallel processing, how to control job count, memory issues from too many threads, and debugging race conditions with sequential execution.",
+      "source_reference": "src/cli.rs:133-139 (parallel flags), docs/PERFORMANCE_TUNING.md:50-75"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Language-Specific Issues",
+      "description": "No troubleshooting for language parser problems",
+      "should_add": "Document language-specific parse issues: Rust macro expansion problems, Python import resolution, JavaScript/TypeScript tree-sitter issues. Explain --languages flag to limit analysis, parser error messages.",
+      "fix_suggestion": "Add language troubleshooting section for common parse errors in Rust (macro expansion with --verbose-macro-warnings), Python (import resolution), JS/TS (tree-sitter grammar issues). Explain how to isolate language-specific problems.",
+      "source_reference": "src/cli.rs:53-54 (languages flag), src/cli.rs:102-107 (macro debugging)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Output Format Issues",
+      "description": "No troubleshooting for output formatting problems",
+      "should_add": "Document output format issues: --plain for ASCII-only output (no colors, no emoji), --format json/markdown/terminal, --output file writing, handling large output, summary vs detailed output.",
+      "fix_suggestion": "Add output troubleshooting section explaining format options, plain mode for CI/CD or ASCII-only terminals, output file permissions, truncated output, and summary vs detailed views.",
+      "source_reference": "src/cli.rs:30-42 (format and output flags), src/cli.rs:129-131 (plain mode)"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter structure is logical with appropriate sections (Common Issues, Debug Mode, Performance Tips, FAQ)",
+    "Section headings match user needs for troubleshooting guidance"
+  ],
+  "improvement_suggestions": [
+    "Start with a quick troubleshooting flowchart: parse error → config error → cache error → performance issue → contact support",
+    "Include real error message examples with exact text users see in terminal",
+    "Add troubleshooting by symptom (analysis too slow, wrong results, crashes, out of memory)",
+    "Create troubleshooting checklist: update to latest version, clear cache, verify config, check file permissions, try --no-parallel",
+    "Link to GitHub issues for reporting new problems not covered in chapter",
+    "Add platform-specific troubleshooting (macOS, Linux, Windows differences)",
+    "Include example commands for common troubleshooting scenarios",
+    "Cross-reference configuration and CLI reference chapters for detailed option explanations",
+    "Add debug workflow example: reproduce with minimal example → enable verbose → check cache → disable parallel → file issue",
+    "Include contact/support information (GitHub issues, discussions) for problems not covered"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-09",
+    "feature_inventory": "Analyzed from src/core/errors.rs, src/cli.rs, README.md, docs/PERFORMANCE_TUNING.md",
+    "topics_covered": [],
+    "validation_focus": "Check troubleshooting covers common user issues",
+    "implementation_analysis": {
+      "error_types": [
+        "FileSystem (with path and source)",
+        "Parse (file, line, column, message)",
+        "Analysis",
+        "Configuration",
+        "Cache",
+        "Unsupported",
+        "Validation",
+        "Dependency",
+        "Concurrency",
+        "WithContext"
+      ],
+      "debug_features": [
+        "Verbosity levels: -v, -vv, -vvv (3 levels)",
+        "Macro debugging: --verbose-macro-warnings, --show-macro-stats",
+        "Cache stats: --cache-stats",
+        "Plain output: --plain (ASCII-only, no colors)"
+      ],
+      "performance_options": [
+        "--jobs N (control parallelism)",
+        "--no-parallel (sequential execution)",
+        "--cache / --no-cache (caching control)",
+        "--clear-cache / --force-cache-rebuild",
+        "--cache-location (override cache dir)",
+        "RAYON_NUM_THREADS env var",
+        "DEBTMAP_CACHE_DIR env var"
+      ],
+      "common_issues_to_document": [
+        "Parse errors (file:line:column format)",
+        "File not found / permission denied",
+        "Invalid config TOML syntax",
+        "Weights not summing to 1.0",
+        "LCOV file not found or invalid",
+        "Path mismatches in coverage",
+        "Cache corruption",
+        "Out of memory",
+        "Analysis too slow",
+        "Glob pattern errors",
+        "Unsupported language"
+      ]
+    }
+  }
+}
