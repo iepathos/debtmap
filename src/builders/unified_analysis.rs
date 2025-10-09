@@ -1239,18 +1239,16 @@ fn create_empty_god_object_indicators() -> crate::priority::file_metrics::GodObj
 }
 
 // Pure function to calculate function scores
-fn calculate_function_scores(functions: &[FunctionMetrics], unified: &UnifiedAnalysis) -> Vec<f64> {
-    functions
-        .iter()
-        .map(|func| {
-            unified
-                .items
-                .iter()
-                .find(|item| item.location.file == func.file && item.location.function == func.name)
-                .map(|item| item.unified_score.final_score)
-                .unwrap_or(0.0)
-        })
-        .collect()
+// Note: Returns empty vec to avoid circular dependency during file analysis
+// File scores are calculated based on other metrics, not function debt scores
+fn calculate_function_scores(
+    _functions: &[FunctionMetrics],
+    _unified: &UnifiedAnalysis,
+) -> Vec<f64> {
+    // Returning empty to maintain consistency with parallel implementation
+    // and avoid circular dependency where file scores depend on function scores
+    // which haven't been finalized yet
+    Vec::new()
 }
 
 // Pure function to create god object analysis

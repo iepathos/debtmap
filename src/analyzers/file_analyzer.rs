@@ -122,6 +122,24 @@ impl UnifiedFileAnalyzer {
         }
     }
 
+    /// Calculate individual function scores based on complexity
+    /// This provides a basic score based solely on function metrics
+    fn calculate_function_scores(functions: &[FunctionMetrics]) -> Vec<f64> {
+        functions
+            .iter()
+            .map(|func| {
+                // Calculate a basic score based on complexity (0-10 scale)
+                let complexity_score = (func.cyclomatic + func.cognitive) as f64 / 2.0;
+                let length_penalty = if func.length > 50 { 2.0 } else { 1.0 };
+                let nesting_penalty = if func.nesting > 3 { 1.5 } else { 1.0 };
+
+                // Basic scoring: complexity * length_penalty * nesting_penalty
+                // Clamped to 0-10 range
+                (complexity_score * length_penalty * nesting_penalty).min(10.0)
+            })
+            .collect()
+    }
+
     /// Estimate class count using simple heuristics
     fn estimate_class_count(functions: &[FunctionMetrics]) -> usize {
         functions
@@ -240,6 +258,9 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
         let god_object_indicators =
             Self::detect_god_object(function_count, line_metrics.total_lines);
 
+        // Calculate individual function scores based on complexity
+        let function_scores = Self::calculate_function_scores(functions);
+
         FileDebtMetrics {
             path,
             total_lines: line_metrics.total_lines,
@@ -251,7 +272,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             coverage_percent: coverage_metrics.coverage_percent,
             uncovered_lines: line_metrics.uncovered_lines,
             god_object_indicators,
-            function_scores: vec![0.0; function_count], // Placeholder scores
+            function_scores,
         }
     }
 }
@@ -466,5 +487,38 @@ mod tests {
         assert_eq!(result.uncovered_lines, 75); // All uncovered
         assert!(!result.god_object_indicators.is_god_object);
         assert_eq!(result.function_scores.len(), 3);
+
+        // Verify function scores are not all zeros
+        assert!(
+            result.function_scores.iter().any(|&score| score > 0.0),
+            "Function scores should not all be zero"
+        );
+    }
+
+    #[test]
+    fn test_function_scores_calculation() {
+        let functions = vec![
+            create_test_function_metrics("simple_func", 2, 10), // Low complexity, short
+            create_test_function_metrics("complex_func", 10, 100), // High complexity, long
+            create_test_function_metrics("nested_func", 5, 30), // Medium complexity, medium length
+        ];
+
+        let scores = UnifiedFileAnalyzer::calculate_function_scores(&functions);
+
+        assert_eq!(scores.len(), 3);
+
+        // Simple function should have lower score
+        assert!(scores[0] > 0.0);
+        assert!(scores[0] < 5.0);
+
+        // Complex function should have highest score (gets length penalty)
+        assert!(scores[1] > scores[0]);
+        assert!(scores[1] > scores[2]);
+
+        // All scores should be in 0-10 range
+        for score in scores {
+            assert!(score >= 0.0);
+            assert!(score <= 10.0);
+        }
     }
 }

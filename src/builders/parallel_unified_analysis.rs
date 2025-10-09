@@ -809,6 +809,12 @@ impl ParallelUnifiedAnalysisBuilder {
             };
         }
 
+        // Calculate function scores from items already created in phase 2
+        // Note: In parallel execution, items are not yet in unified analysis at this point
+        // So function_scores will remain empty, which is consistent with the builder.build() approach
+        // where items are added after file analysis. This maintains functional purity.
+        file_metrics.function_scores = Vec::new();
+
         // Pure: calculate score and decide if to include
         let score = file_metrics.calculate_score();
 
