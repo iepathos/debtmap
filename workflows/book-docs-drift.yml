@@ -27,26 +27,30 @@ setup:
   # Analyze codebase for workflow features, command types, and configuration
   - claude: "/prodigy-analyze-features-for-book --project $PROJECT_NAME --config $PROJECT_CONFIG"
 
-# Map phase: Analyze each book chapter for drift
+# Map phase: Analyze and fix each book chapter for drift
 map:
   input: "${CHAPTERS_FILE}"
   json_path: "$.chapters[*]"
 
   agent_template:
+    # Step 1: Analyze the chapter for drift
     - claude: "/prodigy-analyze-book-chapter-drift --project $PROJECT_NAME --json '${item}' --features $FEATURES_PATH"
+      commit_required: true
+
+    # Step 2: Fix the drift in this chapter
+    - claude: "/prodigy-fix-chapter-drift --project $PROJECT_NAME --chapter-id ${item.id}"
       commit_required: true
 
   max_parallel: ${MAX_PARALLEL}
 
-# Reduce phase: Aggregate drift findings and update documentation
+# Reduce phase: Validate and handle any merge conflicts
 reduce:
-  - claude: "/prodigy-fix-book-drift --project $PROJECT_NAME --config $PROJECT_CONFIG"
-    commit_required: true
-
-  # Rebuild the book to ensure it compiles correctly
+  # Rebuild the book to ensure all chapters compile together
   - shell: "cd $BOOK_DIR && mdbook build"
     on_failure:
+      # Only needed if there are build errors (broken links, etc)
       claude: "/prodigy-fix-book-build-errors --project $PROJECT_NAME"
+      commit_required: true
 
 # Error handling
 error_policy:
