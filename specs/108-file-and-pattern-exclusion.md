@@ -17,25 +17,20 @@ created: 2025-10-09
 
 ## Context
 
-Debtmap currently analyzes all files in the specified path without the ability to exclude specific patterns or directories. This creates challenges for users who want to:
+Debtmap has existing ignore patterns in `.debtmap.toml` for file-level exclusions, but lacks CLI override capability and AST-level filtering for inline test modules.
 
-1. **Exclude test code** from production debt analysis
-2. **Skip generated code** (e.g., protobuf, thrift, code generation outputs)
-3. **Ignore vendored dependencies** (e.g., `vendor/`, `third_party/`)
-4. **Filter out build artifacts** that shouldn't be analyzed
-5. **Exclude specific modules** during focused analysis
+**Current state**:
+- `.debtmap.toml` has `[ignore]` section with glob patterns
+- File walker respects these patterns
+- Works for excluding entire test directories
 
-Current workarounds are insufficient:
-- Users must manually filter JSON output post-analysis
-- No way to prevent test code from inflating file-level complexity scores
-- Full codebase analysis wastes time on irrelevant files
-- MapReduce workflows cannot efficiently exclude test-heavy files
+**Key limitation**: Cannot exclude `#[cfg(test)]` modules within production files, causing test code to inflate file-level complexity scores.
 
-**Real-world impact**: In the Prodigy project analysis, fixing TestingGap items by adding tests caused overall debt scores to increase because test code (with `#[cfg(test)]` modules) contributed to file-level complexity metrics. Users expect production code analysis separate from test code analysis.
+**Real-world impact**: In the Prodigy project analysis, fixing TestingGap items by adding tests caused overall debt scores to increase because test code (with `#[cfg(test)]` modules) contributed to file-level complexity metrics. Users need to separate production code analysis from test code analysis.
 
 ## Objective
 
-Implement a flexible file and pattern exclusion system that allows users to filter files during analysis based on glob patterns, path segments, and AST-level attributes (like `#[cfg(test)]` in Rust), preventing excluded code from contributing to debt scores while maintaining backward compatibility.
+Add CLI exclusion flags and AST-level test module filtering to complement existing config-based ignore patterns, allowing users to override config patterns and exclude inline test modules from file-level complexity scores.
 
 ## Requirements
 
@@ -45,35 +40,16 @@ Implement a flexible file and pattern exclusion system that allows users to filt
    - Add `--exclude <PATTERN>` flag accepting glob patterns
    - Support multiple exclusions: `--exclude tests --exclude vendor`
    - Value delimiter for comma-separated patterns: `--exclude tests,vendor,generated`
+   - CLI patterns **override** (not merge with) config file patterns
 
-2. **Pattern matching capabilities**:
-   - Glob patterns: `**/*_test.rs`, `**/tests/**`, `vendor/**`
-   - Path segments: `tests/`, `/generated/`, `third_party/`
-   - File suffixes: `_test.rs`, `_generated.py`, `.pb.go`
-   - Directory names: `tests`, `vendor`, `node_modules`
-
-3. **AST-level exclusions** (Rust-specific):
-   - Detect and optionally exclude `#[cfg(test)]` modules
+2. **AST-level exclusions** (Rust-specific):
    - Add `--exclude-test-modules` flag for Rust test code
+   - Detect and exclude `#[cfg(test)]` modules from file-level scores
    - Skip test functions marked with `#[test]` attribute
    - Handle nested test modules correctly
+   - Preserve non-test code in mixed files
 
-4. **Configuration file support**:
-   - Add `exclude_patterns` field to `.debtmap.toml`:
-     ```toml
-     [analysis]
-     exclude_patterns = ["tests/**", "vendor/**", "**/*_generated.rs"]
-     exclude_test_modules = true
-     ```
-   - CLI flags override config file settings
-
-5. **Preset exclusion profiles**:
-   - `--exclude-preset common`: tests, vendor, node_modules, target, build
-   - `--exclude-preset tests`: all test-related patterns
-   - `--exclude-preset generated`: generated code patterns
-   - Allow combining presets with custom patterns
-
-6. **Output and reporting**:
+3. **Output and reporting**:
    - Log excluded file count and patterns used (with `-v`)
    - Include exclusion summary in analysis metadata
    - Preserve original file count vs analyzed file count in JSON output
@@ -91,15 +67,14 @@ Implement a flexible file and pattern exclusion system that allows users to filt
 - [ ] `--exclude` flag accepts glob patterns and filters files before analysis
 - [ ] Multiple `--exclude` flags can be specified
 - [ ] Comma-separated exclusion patterns work correctly
+- [ ] CLI `--exclude` patterns override config file `[ignore]` patterns
 - [ ] `--exclude-test-modules` flag excludes Rust `#[cfg(test)]` modules from file-level scores
-- [ ] Configuration file `exclude_patterns` field is respected
-- [ ] CLI exclusions override config file exclusions
-- [ ] `--exclude-preset` flag provides common exclusion profiles
-- [ ] Excluded files don't contribute to total debt score
+- [ ] Test modules don't contribute to file complexity when flag is used
+- [ ] Non-test code in mixed files is still analyzed
 - [ ] Excluded files don't appear in JSON output items
 - [ ] Analysis metadata includes exclusion summary
-- [ ] Verbose mode logs excluded file paths
-- [ ] Tests cover all exclusion pattern types
+- [ ] Verbose mode logs excluded file paths and test module count
+- [ ] Tests cover CLI override and AST-level filtering
 - [ ] Documentation includes exclusion examples
 - [ ] Performance impact < 5% for large codebases
 - [ ] Works correctly on Windows paths
@@ -108,29 +83,23 @@ Implement a flexible file and pattern exclusion system that allows users to filt
 
 ### Implementation Approach
 
-**Phase 1: Basic Pattern Exclusion**
+**Phase 1: CLI Exclusion Override**
 1. Add `--exclude` CLI argument to `Analyze` command in `src/cli.rs`
-2. Create `ExclusionMatcher` struct in `src/filters/exclusion.rs`
-3. Integrate exclusion into file discovery pipeline
-4. Add tests for glob pattern matching
+2. Modify file walker to accept CLI exclusions that override config
+3. Test CLI override behavior with existing config patterns
 
 **Phase 2: AST-Level Rust Test Exclusion**
-1. Add `--exclude-test-modules` flag
+1. Add `--exclude-test-modules` flag to CLI
 2. Create `TestModuleDetector` in `src/analyzers/rust/test_detector.rs`
 3. Filter out `#[cfg(test)]` modules during Rust AST traversal
-4. Update file-level score aggregation to skip test functions
+4. Update file-level score aggregation to skip test module complexity
+5. Preserve non-test code analysis in mixed files
 
-**Phase 3: Configuration and Presets**
-1. Add `exclude_patterns` to `.debtmap.toml` schema
-2. Implement preset profiles in `src/filters/presets.rs`
-3. Add config file parsing for exclusions
-4. Merge CLI and config exclusions
-
-**Phase 4: Reporting and Documentation**
+**Phase 3: Reporting and Documentation**
 1. Add exclusion summary to analysis metadata
-2. Implement verbose exclusion logging
+2. Implement verbose exclusion logging (file paths, test module count)
 3. Update user documentation with examples
-4. Add integration tests for complete workflows
+4. Add integration tests for CLI override and AST filtering
 
 ### Architecture Changes
 
