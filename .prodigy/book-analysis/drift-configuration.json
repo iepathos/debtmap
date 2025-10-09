@@ -1,0 +1,243 @@
+{
+  "chapter_id": "configuration",
+  "chapter_title": "Configuration",
+  "chapter_file": "book/src/configuration.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely empty (only TODOs). The implementation has a comprehensive configuration system with extensive options, but zero documentation exists for users.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Config Files",
+      "description": "No documentation on config file format, location, or naming conventions",
+      "should_add": "Document that config file is .debtmap.toml, searched up directory hierarchy (max 10 levels), using TOML format. Explain directory traversal behavior.",
+      "fix_suggestion": "Add section explaining config file discovery: starts in current directory, searches up to 10 parent directories for .debtmap.toml. Provide basic TOML structure example with [scoring], [thresholds], [languages], etc.",
+      "source_reference": "src/config.rs:1028-1054 (load_config and directory_ancestors_impl)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Options Reference",
+      "description": "No documentation of any configuration options despite ~50+ configurable settings",
+      "should_add": "Complete reference of all config sections: scoring, thresholds, languages, ignore, output, external_api, entropy, patterns, god_object, context, error_handling, normalization, loc, tiers, role_multipliers, role_coverage_weights, complexity_thresholds",
+      "fix_suggestion": "Create comprehensive options reference organized by config section. For each option, document: field name, type, default value, valid range/values, and purpose. Use actual config structs as source of truth.",
+      "source_reference": "src/config.rs:563-632 (DebtmapConfig struct with all sections)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Scoring Configuration",
+      "description": "Scoring weights system not documented - users don't know how to customize prioritization",
+      "should_add": "Document [scoring] section with coverage (default 0.50), complexity (0.35), dependency (0.15), semantic (0.00), security (0.00), organization (0.00). Explain weights must sum to 1.0 for active weights. Describe validation and normalization behavior.",
+      "fix_suggestion": "Add scoring section explaining weighted sum model. Show example config, explain that only coverage/complexity/dependency are currently used (semantic/security/organization reserved for future). Document auto-normalization if sum != 1.0.",
+      "source_reference": "src/config.rs:7-139 (ScoringWeights struct and validation logic)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Thresholds Configuration",
+      "description": "Threshold options not documented - complexity, duplication, file/function length limits, minimum scores",
+      "should_add": "Document [thresholds] section: complexity, duplication, max_file_length, max_function_length, minimum_debt_score, minimum_cyclomatic_complexity, minimum_cognitive_complexity, minimum_risk_score. Include validation thresholds subsection.",
+      "fix_suggestion": "Create thresholds reference table with all threshold options, defaults, and purpose. Include [thresholds.validation] subsection for validate command thresholds.",
+      "source_reference": "src/config.rs:656-758 (ThresholdsConfig and ValidationThresholds)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Exclusion Patterns",
+      "description": "No documentation on how to exclude files/directories from analysis",
+      "should_add": "Document [ignore] section with patterns array supporting glob patterns. Explain that patterns like 'tests/**/*', '*.test.rs', 'target/**' can exclude files. Also document function name exclusion patterns if implemented.",
+      "fix_suggestion": "Add section showing [ignore] configuration with examples. Show common patterns for test files, build artifacts, dependencies. Reference actual .debtmap.toml for comprehensive examples.",
+      "source_reference": "src/config.rs:926-929 (IgnoreConfig) and .debtmap.toml:36-81 (comprehensive example patterns)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Language Configuration",
+      "description": "Language-specific settings not documented",
+      "should_add": "Document [languages] section with enabled array and per-language feature flags: detect_dead_code, detect_complexity, detect_duplication. Explain language-specific subsections [languages.rust], [languages.python], etc.",
+      "fix_suggestion": "Add language configuration section showing how to enable/disable languages and customize per-language detection features. Note that Rust has detect_dead_code disabled by default.",
+      "source_reference": "src/config.rs:760-818 (LanguagesConfig and LanguageFeatures)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Display Configuration",
+      "description": "Display/output formatting options not documented",
+      "should_add": "Document [display] section with tiered (bool) and items_per_tier (usize) options. Also [output] section with default_format option.",
+      "fix_suggestion": "Add display configuration section explaining tiered priority display and how to control items shown per tier.",
+      "source_reference": "src/config.rs:533-560 (DisplayConfig) and src/config.rs:931-934 (OutputConfig)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "God Object Detection",
+      "description": "God object detection configuration not documented",
+      "should_add": "Document [god_object_detection] section with enabled flag and language-specific thresholds (max_methods, max_fields, max_traits, max_lines, max_complexity)",
+      "fix_suggestion": "Add god object section showing how to configure detection thresholds per language. Show Rust defaults (20 methods, 15 fields, 5 traits, 1000 lines, 200 complexity).",
+      "source_reference": "src/config.rs:423-531 (GodObjectConfig and GodObjectThresholds)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Entropy Configuration",
+      "description": "Entropy-based complexity scoring not documented",
+      "should_add": "Document [entropy] section with enabled, weight, min_tokens, pattern_threshold, entropy_threshold, use_classification, branch_threshold, and various max reduction settings.",
+      "fix_suggestion": "Add entropy configuration section explaining how entropy analysis reduces false positives for repetitive code patterns. Show defaults and explain each threshold.",
+      "source_reference": "src/config.rs:820-924 (EntropyConfig with detailed field comments)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Context-Aware Detection",
+      "description": "Context configuration for false positive reduction not documented",
+      "should_add": "Document [context] section with enabled flag, rules array, and function_patterns. Explain ContextRuleConfig structure and ContextMatcherConfig for role/file_type matching.",
+      "fix_suggestion": "Add context-aware detection section explaining how to define custom rules to reduce false positives based on function role, file type, async status, framework patterns, etc.",
+      "source_reference": "src/config.rs:327-421 (ContextConfig, ContextRuleConfig, ContextMatcherConfig, FunctionPatternConfig)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Error Handling Configuration",
+      "description": "Error handling detection options not documented",
+      "should_add": "Document [error_handling] section with detect_async_errors, detect_context_loss, detect_propagation, detect_panic_patterns, detect_swallowing flags. Also custom_patterns and severity_overrides.",
+      "fix_suggestion": "Add error handling section showing how to configure which error patterns to detect and how to customize severity for specific contexts (e.g., test files).",
+      "source_reference": "src/config.rs:1169-1268 (ErrorHandlingConfig, ErrorPatternConfig, SeverityOverride)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Role Multipliers",
+      "description": "Semantic role-based scoring adjustments not documented",
+      "should_add": "Document [role_multipliers] section with pure_logic (1.2), orchestrator (0.8), io_wrapper (0.7), entry_point (0.9), pattern_match (0.6), unknown (1.0) multipliers.",
+      "fix_suggestion": "Add role multipliers section explaining how different function roles get priority adjustments. Pure logic functions get higher priority, orchestrators lower priority.",
+      "source_reference": "src/config.rs:141-204 (RoleMultipliers with default values)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Normalization Configuration",
+      "description": "Score normalization settings not documented",
+      "should_add": "Document [normalization] section with linear_threshold, logarithmic_threshold, sqrt_multiplier, log_multiplier, show_raw_scores options.",
+      "fix_suggestion": "Add normalization section explaining how scores are normalized to 0-10 scale using different algorithms based on magnitude.",
+      "source_reference": "src/config.rs:271-325 (NormalizationConfig)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "CLI Integration",
+      "description": "Relationship between CLI flags and config file not explained",
+      "should_add": "Explain that config file provides defaults, CLI flags override config. Document which CLI options correspond to config settings.",
+      "fix_suggestion": "Add section explaining precedence: CLI args > config file > built-in defaults. Show examples of common CLI options and their config equivalents.",
+      "source_reference": "src/cli.rs:1-511 (CLI argument definitions)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Environment Variables",
+      "description": "DEBTMAP_CACHE_DIR environment variable not documented",
+      "should_add": "Document environment variables: DEBTMAP_CACHE_DIR for cache location override.",
+      "fix_suggestion": "Add environment variables section listing supported env vars and their purpose.",
+      "source_reference": "src/cli.rs:166 (cache_location with env annotation)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Example Configurations",
+      "description": "No example configs shown for common use cases",
+      "should_add": "Provide example configurations for common scenarios: library project, strict quality standards, legacy codebase, polyglot project.",
+      "fix_suggestion": "Add examples section with 3-4 complete example configs from examples/ directory, explaining the use case for each.",
+      "source_reference": "examples/library_config.toml, examples/orchestration-config.toml, .debtmap.toml"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Config Files",
+      "description": "Section is marked TODO with no content",
+      "current_content": "TODO: Document configuration file format",
+      "should_be": "Detailed explanation of .debtmap.toml format, location discovery, TOML syntax overview, and basic structure",
+      "fix_suggestion": "Replace TODO with actual documentation showing config file format and examples",
+      "source_reference": "book/src/configuration.md:7"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Options Reference",
+      "description": "Section is marked TODO with no content",
+      "current_content": "TODO: Complete list of configuration options",
+      "should_be": "Comprehensive reference table of all config options organized by section",
+      "fix_suggestion": "Replace TODO with complete options reference derived from DebtmapConfig struct",
+      "source_reference": "book/src/configuration.md:11"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Exclusion Patterns",
+      "description": "Section is marked TODO with no content",
+      "current_content": "TODO: How to exclude files and directories",
+      "should_be": "Explanation of [ignore] section with glob patterns and examples",
+      "fix_suggestion": "Replace TODO with exclusion patterns documentation and examples from .debtmap.toml",
+      "source_reference": "book/src/configuration.md:15"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Customization",
+      "description": "Section is marked TODO with no content",
+      "current_content": "TODO: Advanced customization options",
+      "should_be": "Documentation of advanced features: patterns, context rules, entropy tuning, role multipliers",
+      "fix_suggestion": "Replace TODO with advanced customization guide covering context-aware detection, custom patterns, and semantic tuning",
+      "source_reference": "book/src/configuration.md:19"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter structure provides good organization (Config Files, Options Reference, Exclusion Patterns, Customization)",
+    "Section headings are logical and cover the main configuration topics users need",
+    "Clear separation between basic and advanced configuration topics"
+  ],
+  "improvement_suggestions": [
+    "Start with quick start section showing minimal working config",
+    "Organize options reference by common use cases (reducing false positives, strict quality gates, library projects)",
+    "Add visual diagram showing config file discovery process (directory traversal)",
+    "Include validation section explaining config validation and error messages",
+    "Add troubleshooting section for common config mistakes (weights not summing to 1.0, invalid patterns)",
+    "Cross-reference CLI options chapter - explain how CLI flags override config",
+    "Provide interactive examples showing before/after analysis with different configs",
+    "Add migration guide for users moving from command-line-only to config files",
+    "Document performance implications of different settings (e.g., context-aware detection overhead)",
+    "Include best practices section recommending configs for different project types"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-09",
+    "feature_inventory": "Analyzed from src/config.rs, src/cli.rs, and example configs",
+    "topics_covered": [],
+    "validation_focus": "Check config options match implementation in src/config/",
+    "implementation_analysis": {
+      "config_file": ".debtmap.toml (TOML format)",
+      "discovery_mechanism": "Directory traversal up to 10 levels",
+      "total_config_sections": 15,
+      "total_configurable_fields": "50+",
+      "validation_features": "Weight normalization, range validation, sum validation for scoring weights",
+      "key_config_sections": [
+        "scoring (6 weights)",
+        "thresholds (8 options + validation subsection with 8 more)",
+        "languages (enabled array + per-language features)",
+        "ignore (glob patterns)",
+        "external_api",
+        "god_object_detection",
+        "context",
+        "entropy",
+        "error_handling",
+        "normalization",
+        "role_multipliers",
+        "role_coverage_weights",
+        "complexity_thresholds",
+        "loc",
+        "tiers",
+        "display",
+        "output"
+      ]
+    }
+  }
+}
