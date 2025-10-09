@@ -3,61 +3,115 @@ mode: mapreduce
 
 # Setup phase: Analyze the codebase and generate debt items
 setup:
-  - shell: "just coverage-lcov"
-    
-  - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output debtmap.json --format json"
+  timeout: 900  # 15 minutes for coverage generation
+  commands:
+    # Generate coverage data with tarpaulin
+    - shell: "just coverage-lcov"
 
-# Map phase: Process each debt item in parallel
+    # Run debtmap with coverage data to establish baseline
+    - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
+
+# Map phase: Process each debt item in parallel with planning and validation
 map:
-  # Input configuration - debtmap.json contains items array
-  input: debtmap.json
-  json_path: "$.items[*].File"
+  # Input configuration - debtmap-before.json contains items array
+  input: .prodigy/debtmap-before.json
+  json_path: "$.items[*]"
 
-  # Commands to execute for each debt item
+  # Commands to execute for each debt item with planning and validation
   agent_template:
-    - claude: |
-        /fix-debt-item --json '${item}'
-      commit_required: true
+    # Phase 1: Create implementation plan
+    - claude: "/prodigy-debtmap-plan --item '${item}' --output .prodigy/plan-${item_id}.md"
+      capture_output: true
+      validate:
+        commands:
+          - claude: "/prodigy-validate-debtmap-plan --item '${item}' --plan .prodigy/plan-${item_id}.md --output .prodigy/validation-${item_id}.json"
+        result_file: ".prodigy/validation-${item_id}.json"
+        threshold: 75
+        on_incomplete:
+          commands:
+            - claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/plan-${item_id}.md"
+          max_attempts: 3
+          fail_workflow: false
 
-    # Run tests to verify the fix
+    # Phase 2: Execute the plan
+    - claude: "/prodigy-debtmap-implement --plan .prodigy/plan-${item_id}.md"
+      commit_required: true
+      validate:
+        commands:
+          - shell: "just coverage-lcov"
+          - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
+          - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
+          - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison-${item_id}.json --previous-validation .prodigy/debtmap-validation-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json"
+        result_file: ".prodigy/debtmap-validation-${item_id}.json"
+        threshold: 75
+        on_incomplete:
+          commands:
+            - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/plan-${item_id}.md --validation .prodigy/debtmap-validation-${item_id}.json --attempt ${validation.attempt_number}"
+              commit_required: true
+            - shell: "just coverage-lcov"
+            - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
+            - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
+          max_attempts: 5
+          fail_workflow: true
+
+    # Phase 3: Verify tests pass
     - shell: "just test"
       on_failure:
-        claude: "/prodigy-debug-test-failure --output '${shell.output}'"
+        claude: "/prodigy-debug-test-failure --output ${shell.output}"
+        max_attempts: 5
+        fail_workflow: true
 
-    # Check formatting and linting
+    # Phase 4: Check formatting and linting
     - shell: "just fmt-check && just lint"
       on_failure:
-        claude: "/prodigy-lint '${shell.output}'"
+        claude: "/prodigy-lint ${shell.output}"
+        max_attempts: 5
+        fail_workflow: true
 
   # Parallelization settings
   max_parallel: 5  # Run up to 5 agents in parallel
 
   # Process high-score items first
-  filter: "score >= 100"  # Only process items with score >= 100
-  sort_by: "score DESC"  # Process highest score items first
+  # Note: Items are wrapped in either File or Function enums
+  # File items: item.File.score
+  # Function items: item.Function.unified_score.final_score
+  filter: "File.score >= 10 OR Function.unified_score.final_score >= 10"
+  sort_by: "File.score DESC, Function.unified_score.final_score DESC"  # Process highest score items first
   max_items: 10  # Limit to 10 items per run
 
-# Reduce phase: Aggregate results and finalize
+# Reduce phase: Aggregate results and verify overall improvements
 reduce:
+  # Phase 1: Run final tests across all changes
   - shell: "just test"
     on_failure:
-      claude: "/prodigy-debug-test-failure --output '${shell.output}'"
+      claude: "/prodigy-debug-test-failure --output ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true
 
+  # Phase 2: Check formatting and linting
   - shell: "just fmt-check && just lint"
     on_failure:
       claude: "/prodigy-lint ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true
 
-  # Re-run debtmap to measure improvements
+  # Phase 3: Re-run debtmap to measure cumulative improvements
   - shell: "just coverage-lcov"
 
-  - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output debtmap-after.json --format json"
+  - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
 
-  # Compare debt metrics and create final commit with summary
+  # Phase 4: Compare debt metrics and create final commit with summary
+  - write_file:
+      path: ".prodigy/map-results.json"
+      content: "${map.results}"
+      format: json
+      create_dirs: true
+
   - claude: |
       /prodigy-compare-debt-results \
-        --before debtmap.json \
-        --after debtmap-after.json \
-        --map-results '${map.results}' \
+        --before .prodigy/debtmap-before.json \
+        --after .prodigy/debtmap-after.json \
+        --map-results-file .prodigy/map-results.json \
         --successful ${map.successful} \
         --failed ${map.failed} \
         --total ${map.total}
