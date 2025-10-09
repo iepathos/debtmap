@@ -1043,4 +1043,3 @@ fi
 - [Getting Started](./getting-started.md) - Basic usage and examples
 - [Analysis Guide](./analysis-guide.md) - Understanding metrics and scores
 - [Configuration](./configuration.md) - Customizing analysis behavior
-- [CI/CD Integration](./ci-cd.md) - Advanced CI/CD patterns

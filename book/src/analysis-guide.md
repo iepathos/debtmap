@@ -1227,6 +1227,5 @@ Impact:
 
 - **[Output Formats](./output-formats.md)** - Detailed JSON schema and integration patterns
 - **[Configuration](./configuration.md)** - Customize thresholds and analysis behavior
-- **[CI/CD Integration](./ci-cd.md)** - Automate quality gates and tracking
 
 For questions or issues, visit [GitHub Issues](https://github.com/iepathos/debtmap/issues).
