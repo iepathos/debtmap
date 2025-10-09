@@ -61,7 +61,7 @@ temp/
 # Documentation build artifacts
 docs/_build/
 docs/build/
-book/
+book/book/
 
 # Test artifacts
 *.profraw
