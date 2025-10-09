@@ -1643,9 +1643,12 @@ fn generate_recommendation_with_coverage_and_data_flow(
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> ActionableRecommendation {
+    // Determine if we have actual coverage data (not just a None value)
+    let has_coverage_data = coverage.is_some();
+
     // Create recommendation context using pure functions
     let recommendation_context =
-        create_recommendation_context(func, debt_type, role, _score, coverage);
+        create_recommendation_context(func, debt_type, role, _score, coverage, has_coverage_data);
 
     // Generate recommendation using functional composition
     let (primary_action, rationale, steps) =
@@ -1661,6 +1664,7 @@ fn create_recommendation_context(
     role: FunctionRole,
     score: &UnifiedScore,
     coverage: &Option<TransitiveCoverage>,
+    has_coverage_data: bool,
 ) -> RecommendationContext {
     RecommendationContext {
         function_info: FunctionInfo::from_metrics(func),
@@ -1670,6 +1674,7 @@ fn create_recommendation_context(
         coverage: coverage.clone(),
         is_rust_file: is_rust_file(&func.file),
         coverage_percent: extract_coverage_percent(coverage),
+        has_coverage_data,
     }
 }
 
@@ -1682,6 +1687,7 @@ struct RecommendationContext {
     coverage: Option<TransitiveCoverage>,
     is_rust_file: bool,
     coverage_percent: f64,
+    has_coverage_data: bool,
 }
 
 // Pure data structure for function information
@@ -1752,7 +1758,12 @@ fn generate_rust_complexity_recommendation(
     cyclomatic: u32,
 ) -> (String, String, Vec<String>) {
     let temp_item = create_temporary_debt_item(context);
-    generate_rust_refactoring_recommendation(&temp_item, cyclomatic, context.coverage_percent)
+    generate_rust_refactoring_recommendation(
+        &temp_item,
+        cyclomatic,
+        context.coverage_percent,
+        context.has_coverage_data,
+    )
 }
 
 // Pure function to create temporary debt item for Rust recommendations
@@ -2950,12 +2961,14 @@ mod tests {
             FunctionRole::PureLogic,
             &score,
             &Some(coverage.clone()),
+            true, // has_coverage_data
         );
 
         assert_eq!(context.function_info.name, "test_func");
         assert_eq!(context.function_info.line, 10);
         assert!(context.is_rust_file);
         assert_eq!(context.coverage_percent, 0.6);
+        assert!(context.has_coverage_data);
         assert_eq!(context.role, FunctionRole::PureLogic);
     }
 

@@ -5,6 +5,7 @@ pub fn generate_rust_refactoring_recommendation(
     item: &UnifiedDebtItem,
     cyclo: u32,
     coverage_percent: f64,
+    has_coverage_data: bool,
 ) -> (String, String, Vec<String>) {
     let function_name = &item.location.function;
     let is_async = function_name.contains("async") || function_name.contains("poll");
@@ -14,17 +15,27 @@ pub fn generate_rust_refactoring_recommendation(
 
     // Determine refactoring strategy based on function characteristics
     if cyclo > 30 {
-        generate_extreme_complexity_rust_recommendation(cyclo, coverage_percent, is_async)
+        generate_extreme_complexity_rust_recommendation(
+            cyclo,
+            coverage_percent,
+            is_async,
+            has_coverage_data,
+        )
     } else if is_parser || function_name.contains("extract") || function_name.contains("analyze") {
-        generate_parser_pattern_recommendation(cyclo, coverage_percent)
+        generate_parser_pattern_recommendation(cyclo, coverage_percent, has_coverage_data)
     } else if is_builder {
         generate_builder_pattern_recommendation(cyclo, coverage_percent)
     } else if is_async {
-        generate_async_refactoring_recommendation(cyclo, coverage_percent)
+        generate_async_refactoring_recommendation(cyclo, coverage_percent, has_coverage_data)
     } else if cyclo > 15 {
-        generate_functional_decomposition_recommendation(cyclo, coverage_percent)
+        generate_functional_decomposition_recommendation(cyclo, coverage_percent, has_coverage_data)
     } else {
-        generate_simple_extraction_recommendation(cyclo, coverage_percent, nesting_depth)
+        generate_simple_extraction_recommendation(
+            cyclo,
+            coverage_percent,
+            nesting_depth,
+            has_coverage_data,
+        )
     }
 }
 
@@ -32,6 +43,7 @@ fn generate_extreme_complexity_rust_recommendation(
     cyclo: u32,
     coverage_percent: f64,
     is_async: bool,
+    has_coverage_data: bool,
 ) -> (String, String, Vec<String>) {
     let estimated_functions = (cyclo as f64 / 3.0).ceil() as usize;
     let test_gap = ((1.0 - coverage_percent) * 100.0) as usize;
@@ -50,7 +62,7 @@ fn generate_extreme_complexity_rust_recommendation(
         "  • Side effects → perform_side_effects(output) -> Result<(), Error>".to_string(),
     ];
 
-    if coverage_percent < 0.8 {
+    if has_coverage_data && coverage_percent < 0.8 {
         steps.push(format!(
             "Add property-based tests using proptest or quickcheck for {}% coverage gap",
             test_gap
@@ -81,6 +93,7 @@ fn generate_extreme_complexity_rust_recommendation(
 fn generate_parser_pattern_recommendation(
     cyclo: u32,
     coverage_percent: f64,
+    has_coverage_data: bool,
 ) -> (String, String, Vec<String>) {
     let action = "Refactor using nom or pest parser combinators".to_string();
 
@@ -99,7 +112,7 @@ fn generate_parser_pattern_recommendation(
         ]);
     }
 
-    if coverage_percent < 0.8 {
+    if has_coverage_data && coverage_percent < 0.8 {
         steps.push("Add fuzz testing with cargo-fuzz for parser robustness".to_string());
     }
 
@@ -135,6 +148,7 @@ fn generate_builder_pattern_recommendation(
 fn generate_async_refactoring_recommendation(
     cyclo: u32,
     coverage_percent: f64,
+    has_coverage_data: bool,
 ) -> (String, String, Vec<String>) {
     let action = "Refactor using async/await patterns and futures combinators".to_string();
 
@@ -153,7 +167,7 @@ fn generate_async_refactoring_recommendation(
         ]);
     }
 
-    if coverage_percent < 0.8 {
+    if has_coverage_data && coverage_percent < 0.8 {
         steps.push("Add async tests with #[tokio::test] or #[async_std::test]".to_string());
     }
 
@@ -167,6 +181,7 @@ fn generate_async_refactoring_recommendation(
 fn generate_functional_decomposition_recommendation(
     cyclo: u32,
     coverage_percent: f64,
+    has_coverage_data: bool,
 ) -> (String, String, Vec<String>) {
     let functions_needed = (cyclo as f64 / 5.0).ceil() as usize;
 
@@ -187,7 +202,7 @@ fn generate_functional_decomposition_recommendation(
         "  • partition() for splitting collections".to_string(),
     ];
 
-    if coverage_percent < 0.8 {
+    if has_coverage_data && coverage_percent < 0.8 {
         steps.push("Use property-based testing to verify function invariants".to_string());
     }
 
@@ -205,41 +220,65 @@ fn generate_simple_extraction_recommendation(
     cyclo: u32,
     coverage_percent: f64,
     nesting_depth: u32,
+    has_coverage_data: bool,
 ) -> (String, String, Vec<String>) {
     let coverage_gap = ((1.0 - coverage_percent) * 100.0) as u32;
     let tests_needed = ((cyclo as f64) * (1.0 - coverage_percent)).ceil() as u32;
 
     // Generate specific action based on actual metrics
-    let action = if coverage_gap > 40 {
+    let action = if has_coverage_data && coverage_gap > 40 {
         format!("Add {} tests for {}% coverage gap. NO refactoring needed (complexity {} is acceptable)",
                 tests_needed, coverage_gap, cyclo)
     } else if cyclo > 10 && nesting_depth > 3 {
-        format!("Reduce nesting from {} levels using early returns. Add {} tests for uncovered branches",
-                nesting_depth, tests_needed)
+        if has_coverage_data {
+            format!("Reduce nesting from {} levels using early returns. Add {} tests for uncovered branches",
+                    nesting_depth, tests_needed)
+        } else {
+            format!(
+                "Reduce nesting from {} levels using early returns",
+                nesting_depth
+            )
+        }
     } else if cyclo > 10 {
-        format!(
-            "Apply early returns to simplify control flow. Add {} tests for uncovered branches",
-            tests_needed
-        )
-    } else if coverage_gap > 0 {
+        if has_coverage_data {
+            format!(
+                "Apply early returns to simplify control flow. Add {} tests for uncovered branches",
+                tests_needed
+            )
+        } else {
+            "Apply early returns to simplify control flow".to_string()
+        }
+    } else if has_coverage_data && coverage_gap > 0 {
         format!(
             "Maintain current structure. Add {} tests for {}% coverage gap",
             tests_needed.max(1),
             coverage_gap
         )
-    } else {
+    } else if has_coverage_data {
         "Function is well-tested and simple. No action required".to_string()
+    } else {
+        // No coverage data - focus on complexity only
+        format!(
+            "Complexity {} is manageable. Consider refactoring if complexity increases",
+            cyclo
+        )
     };
 
-    let why = if coverage_gap > 0 {
+    let why = if has_coverage_data && coverage_gap > 0 {
         format!(
             "Complexity {} is manageable. Coverage at {:.0}%. Focus on test coverage, not refactoring",
             cyclo,
             coverage_percent * 100.0
         )
-    } else {
+    } else if has_coverage_data {
         format!(
             "Complexity {} with full coverage. Well-maintained function",
+            cyclo
+        )
+    } else {
+        // No coverage data provided - don't mention coverage
+        format!(
+            "Complexity {} is manageable. Focus on maintaining simplicity",
             cyclo
         )
     };
@@ -247,7 +286,7 @@ fn generate_simple_extraction_recommendation(
     // Generate specific steps based on actual values, no conditional "IF" statements
     let mut steps = vec![];
 
-    if coverage_gap > 20 {
+    if has_coverage_data && coverage_gap > 20 {
         steps.push(format!(
             "Write {} focused tests for uncovered branches",
             tests_needed
@@ -288,7 +327,7 @@ fn generate_simple_extraction_recommendation(
         }
     } else {
         steps.push("Current structure is clean and simple".to_string());
-        if coverage_gap > 0 {
+        if has_coverage_data && coverage_gap > 0 {
             steps.push(format!(
                 "Focus on adding the {} missing tests",
                 tests_needed
