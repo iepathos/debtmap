@@ -1,0 +1,122 @@
+{
+  "chapter_id": "troubleshooting",
+  "chapter_title": "Troubleshooting",
+  "chapter_file": "book/src/troubleshooting.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is entirely missing - contains only TODO placeholders. This is critical as users will encounter issues and have no guidance on resolving them.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Common Issues",
+      "description": "No common issues documented - users will have no troubleshooting guidance",
+      "should_add": "Document common issues users encounter:\n1. Parse errors for unsupported languages or syntax\n2. Out of memory errors on large codebases\n3. Performance issues with --no-cache or --no-parallel\n4. Cache corruption requiring --clear-cache\n5. File permission errors\n6. Git history context errors when not in a git repo\n7. Coverage file format issues (non-LCOV format)\n8. Threshold preset misunderstandings\n9. JSON format confusion (legacy vs unified)\n10. Context provider errors (critical_path, dependency, git_history)",
+      "fix_suggestion": "Add Common Issues section with problem/solution pairs for each issue listed above",
+      "source_reference": "src/core/errors.rs - Error enum shows FileSystem, Parse, Analysis, Configuration, Cache, Validation, Dependency errors"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Debug Mode",
+      "description": "No debug mode documentation - users cannot troubleshoot analysis issues",
+      "should_add": "Document debug and verbosity options:\n- Use -v, -vv, -vvv for increasing verbosity levels\n- -v: Show main score factors\n- -vv: Show detailed calculations\n- -vvv: Show all debug information\n- --verbose-macro-warnings: Show macro parsing warnings\n- --show-macro-stats: Show macro expansion statistics\n- --semantic-off: Disable semantic analysis (fallback mode)\n- --explain-score: Show score breakdown (deprecated, use -v instead)\n- --validate-loc: Validate LOC consistency",
+      "fix_suggestion": "Add Debug Mode section explaining all verbosity flags and diagnostic options",
+      "source_reference": "src/cli.rs:94-107 - verbosity, verbose_macro_warnings, show_macro_stats, semantic_off flags"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Performance Tips",
+      "description": "No performance optimization guidance - users may experience slow analysis",
+      "should_add": "Document performance optimization strategies:\n1. Enable parallel processing (default, disable with --no-parallel)\n2. Control thread count with --jobs/-j (0 = all cores)\n3. Use caching (enabled by default, --no-cache to disable)\n4. Clear cache if corrupted: --clear-cache or --force-cache-rebuild\n5. Check cache stats: --cache-stats\n6. Use cache location wisely: --cache-location\n7. Migrate cache to shared location: --migrate-cache\n8. Limit file count for testing: --max-files N\n9. Use --semantic-off for faster but less accurate analysis\n10. Use --plain for faster terminal output (no colors/emojis)",
+      "fix_suggestion": "Add Performance Tips section with optimization strategies and when to use each flag",
+      "source_reference": "src/cli.rs:133-167 - no_parallel, jobs, caching flags, cache_location"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "FAQ",
+      "description": "No FAQ section - common questions will go unanswered",
+      "should_add": "Document frequently asked questions:\n1. Q: Why is analysis slow? A: Try --cache-stats, ensure caching is enabled, use -j to control threads\n2. Q: What does 'Parse error' mean? A: File contains syntax debtmap cannot parse, may need semantic_off or file exclusion\n3. Q: Why do scores differ between runs? A: Check if coverage file changed, context providers enabled, or cache was cleared\n4. Q: How do I reduce noise? A: Use --min-priority, --filter categories, --top N, --threshold-preset\n5. Q: What's the difference between legacy and unified JSON? A: Legacy uses {File: {...}}, unified uses consistent structure with 'type' field\n6. Q: Can I analyze partial codebases? A: Yes, use --max-files or specify subdirectory path\n7. Q: How does coverage affect scores? A: Coverage dampens scores (multiplier = 1.0 - coverage), surfacing untested code\n8. Q: What are context providers? A: critical_path, dependency, git_history - enable with --context --context-providers\n9. Q: Why no output? A: Check verbosity level, may need -v or adjust --min-priority\n10. Q: How to compare results? A: Use 'compare' command with --before and --after JSON files",
+      "fix_suggestion": "Add FAQ section addressing common user questions with clear answers",
+      "source_reference": "src/cli.rs - various flags and options, src/commands/compare_debtmap.rs - comparison functionality"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Error Messages",
+      "description": "No error message reference - users won't understand error output",
+      "should_add": "Document common error messages and their meanings:\n1. 'File system error' - Permission issues or missing files\n2. 'Parse error in file:line:column' - Syntax debtmap cannot parse\n3. 'Analysis error' - Internal analysis failure, try --semantic-off\n4. 'Configuration error' - Invalid config file or CLI arguments\n5. 'Cache error' - Cache corruption, use --clear-cache\n6. 'Validation error' - Threshold validation failed\n7. 'Dependency error' - Cannot resolve dependency graph\n8. 'Concurrency error' - Parallel processing issue, try --no-parallel\n9. 'Unsupported' - Feature not available for language/construct\n10. 'Pattern error' - Invalid glob pattern in configuration",
+      "fix_suggestion": "Add Error Messages Reference section explaining each error type and resolution steps",
+      "source_reference": "src/core/errors.rs:8-74 - Error enum with all error types"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Cache Troubleshooting",
+      "description": "No cache troubleshooting guidance - cache issues are common",
+      "should_add": "Document cache-specific troubleshooting:\n1. Check cache location: --cache-stats shows path and statistics\n2. Clear corrupted cache: --clear-cache or --force-cache-rebuild\n3. Migrate cache: --migrate-cache for shared location\n4. Set cache location: --cache-location or DEBTMAP_CACHE_DIR env var\n5. Disable cache temporarily: --no-cache\n6. Cache strategies: local (per-project) vs shared (global)\n7. Cache size monitoring: use --cache-stats regularly\n8. Cache invalidation: automatic on code changes via file hashes\n9. Manual cache management: delete .debtmap/cache or shared location\n10. Cache consistency: use --validate-loc to check LOC consistency",
+      "fix_suggestion": "Add Cache Troubleshooting subsection explaining cache management and common issues",
+      "source_reference": "src/cache/ modules - SharedCache, CacheLocation, cache strategies"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Context Provider Troubleshooting",
+      "description": "No guidance on context provider issues",
+      "should_add": "Document context provider troubleshooting:\n1. Enable context: --context or --enable-context\n2. Specify providers: --context-providers critical_path,dependency,git_history\n3. Disable specific providers: --disable-context git_history\n4. Disable context-aware filtering: --no-context-aware\n5. Git history errors: ensure running in git repository\n6. Dependency errors: may occur with complex import structures\n7. Critical path analysis: requires valid call graph\n8. Context affects scoring: provides additional risk factors\n9. Performance impact: context analysis adds overhead\n10. Debugging context: use -vvv to see context provider details",
+      "fix_suggestion": "Add Context Provider Troubleshooting section explaining how to diagnose and fix context issues",
+      "source_reference": "src/cli.rs:62-72 - enable_context, context_providers, disable_context flags; src/risk/context/ - context provider implementations"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Output Formatting Issues",
+      "description": "No guidance on output formatting problems",
+      "should_add": "Document output formatting troubleshooting:\n1. Choose format: --format json|markdown|terminal (default: terminal)\n2. JSON formats: --output-format legacy|unified (default: legacy)\n3. Plain output: --plain for ASCII-only, no colors, no emoji\n4. Write to file: --output path/to/file\n5. Terminal colors not working: check TERM env var or use --plain\n6. Emoji issues: use --plain or set NO_EMOJI env var\n7. Markdown rendering: ensure viewer supports GitHub-flavored markdown\n8. JSON parsing errors: validate with jq or json parser\n9. Summary mode: --summary/-s for compact output\n10. Limit output: --top N or --tail N for focused results",
+      "fix_suggestion": "Add Output Formatting section explaining format options and common issues",
+      "source_reference": "src/cli.rs:30-42 - format, json_format, output, plain flags"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Language-Specific Issues",
+      "description": "No language-specific troubleshooting guidance",
+      "should_add": "Document language-specific issues:\n1. Rust: Macro expansion issues, use --verbose-macro-warnings and --show-macro-stats\n2. Python: Type inference limitations, may need --semantic-off\n3. JavaScript: JSX/TSX parsing, ensure .jsx/.tsx extensions recognized\n4. TypeScript: Type resolution in complex projects\n5. Unsupported language constructs: will show 'Unsupported' error\n6. Mixed language projects: use --languages to filter\n7. Parse errors: may indicate unsupported syntax or language version\n8. False positives: use --no-context-aware or adjust thresholds\n9. Missing detections: ensure semantic analysis enabled (no --semantic-off)\n10. Custom syntax: may require fallback mode with --semantic-off",
+      "fix_suggestion": "Add Language-Specific Troubleshooting section addressing per-language issues",
+      "source_reference": "src/analyzers/ - rust.rs, python.rs, javascript/mod.rs implementations"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter structure is logical (Common Issues, Debug Mode, Performance Tips, FAQ)",
+    "Section organization follows user's mental model for troubleshooting",
+    "Chapter is correctly linked in book structure"
+  ],
+  "improvement_suggestions": [
+    "Add real-world examples for each troubleshooting scenario",
+    "Include command-line examples showing exact flags to use",
+    "Add links to related configuration and CLI reference chapters",
+    "Include visual indicators (emoji/icons) for severity levels",
+    "Add troubleshooting flowchart or decision tree",
+    "Include 'Quick Fixes' section for most common issues",
+    "Add section on when to file bug reports vs user error",
+    "Include performance benchmarks and optimization results",
+    "Add links to error types in API documentation",
+    "Create troubleshooting checklist for systematic debugging"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-09",
+    "feature_inventory": "Analyzed from codebase directly - no features.json available",
+    "topics_covered": [],
+    "validation_focus": "Check troubleshooting covers common user issues",
+    "codebase_analysis": {
+      "error_types_found": 11,
+      "cli_flags_analyzed": 50,
+      "verbosity_levels": 4,
+      "cache_operations": 6,
+      "context_providers": 3,
+      "output_formats": 3
+    }
+  }
+}
