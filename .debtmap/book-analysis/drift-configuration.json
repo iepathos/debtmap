@@ -1,0 +1,267 @@
+{
+  "chapter_id": "configuration",
+  "chapter_title": "Configuration",
+  "chapter_file": "book/src/configuration.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely empty - contains only TODOs. This is critical documentation drift as extensive configuration functionality exists in the codebase but is entirely undocumented.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Config Files",
+      "description": "No documentation of .debtmap.toml configuration file format",
+      "should_add": "Document the .debtmap.toml configuration file structure with TOML format examples",
+      "fix_suggestion": "Add section explaining configuration file search (current directory up to 10 levels), file name (.debtmap.toml), and how to create initial config with 'debtmap init'",
+      "source_reference": "src/config.rs:940-1054 (load_config function and directory traversal)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Options Reference - Scoring Weights",
+      "description": "No documentation of [scoring] section and weights configuration",
+      "should_add": "Document all scoring weight options: coverage (0.50 default), complexity (0.35 default), semantic (0.00 unused), dependency (0.15 default), security (0.00 unused), organization (0.00 unused). Must sum to 1.0.",
+      "fix_suggestion": "Add comprehensive section on [scoring] configuration with examples showing default weighted sum model. Explain that weights must sum to 1.0 with tolerance of 0.001. Note that semantic, security, and organization are unused in current weighted sum model.",
+      "source_reference": "src/config.rs:7-139 (ScoringWeights struct and validation)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Options Reference - Thresholds",
+      "description": "No documentation of [thresholds] section and threshold configuration",
+      "should_add": "Document threshold options: complexity (u32), duplication (u32), max_file_length (usize), max_function_length (usize), minimum_debt_score (f64), minimum_cyclomatic_complexity (u32), minimum_cognitive_complexity (u32), minimum_risk_score (f64)",
+      "fix_suggestion": "Add detailed section on [thresholds] configuration explaining basic thresholds (complexity, duplication, file/function length) and minimum thresholds for filtering (minimum_debt_score, minimum complexity thresholds). Include examples from .debtmap.toml.",
+      "source_reference": "src/config.rs:657-680 (ThresholdsConfig struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Options Reference - Validation Thresholds",
+      "description": "No documentation of [thresholds.validation] subsection for 'debtmap validate' command",
+      "should_add": "Document validation threshold options: max_average_complexity (10.0 default), max_high_complexity_count (100 default), max_debt_items (2000 default), max_total_debt_score (1000 default), max_codebase_risk_score (7.0 default), max_high_risk_functions (50 default), min_coverage_percentage (0.0 default), max_debt_density (50.0 default)",
+      "fix_suggestion": "Add subsection under thresholds explaining [thresholds.validation] for use with 'debtmap validate' command. Include all validation threshold fields with defaults and explanations.",
+      "source_reference": "src/config.rs:683-758 (ValidationThresholds struct and defaults)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Language Configuration",
+      "description": "No documentation of [languages] section for language-specific settings",
+      "should_add": "Document [languages] configuration: enabled (list of languages), and language-specific subsections [languages.rust], [languages.python], [languages.javascript], [languages.typescript] with detect_dead_code, detect_complexity, detect_duplication flags",
+      "fix_suggestion": "Add section on language configuration showing how to enable/disable languages and configure language-specific features. Note that Rust has detect_dead_code disabled by default.",
+      "source_reference": "src/config.rs:760-819 (LanguagesConfig and LanguageFeatures structs)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Exclusion Patterns",
+      "description": "No documentation of [ignore] section for file and directory exclusion",
+      "should_add": "Document [ignore.patterns] configuration with glob pattern support for excluding files and directories from analysis",
+      "fix_suggestion": "Add comprehensive section on exclusion patterns explaining [ignore] section with patterns array. Show examples of common exclusions (target/**, node_modules/**, tests/**, etc.) and glob pattern syntax. Also document [ignore.functions.patterns] for excluding specific function name patterns.",
+      "source_reference": "src/config.rs:927-929 (IgnoreConfig struct) and .debtmap.toml:36-81"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Display Configuration",
+      "description": "No documentation of [display] section for output formatting",
+      "should_add": "Document [display] options: tiered (bool, default true) and items_per_tier (usize, default 5) for controlling tiered priority display",
+      "fix_suggestion": "Add section on display configuration explaining tiered output format and items per tier setting.",
+      "source_reference": "src/config.rs:534-560 (DisplayConfig struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Output Configuration",
+      "description": "No documentation of [output] section",
+      "should_add": "Document [output.default_format] option (terminal, json, markdown)",
+      "fix_suggestion": "Add section on output configuration explaining default format setting.",
+      "source_reference": "src/config.rs:931-934 (OutputConfig struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Entropy Configuration",
+      "description": "No documentation of [entropy] section for entropy-based complexity scoring",
+      "should_add": "Document [entropy] options: enabled (bool), weight (f64), min_tokens (usize), pattern_threshold (f64), entropy_threshold (f64), use_classification (bool), branch_threshold (f64), max_repetition_reduction (f64), max_entropy_reduction (f64), max_branch_reduction (f64), max_combined_reduction (f64)",
+      "fix_suggestion": "Add section explaining entropy-based complexity scoring configuration with all tunable parameters and their defaults. Explain how entropy scoring helps with pattern matching functions.",
+      "source_reference": "src/config.rs:820-924 (EntropyConfig struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Role Multipliers",
+      "description": "No documentation of [role_multipliers] section for semantic classification",
+      "should_add": "Document [role_multipliers] options: pure_logic (1.2), orchestrator (0.8), io_wrapper (0.7), entry_point (0.9), pattern_match (0.6), unknown (1.0)",
+      "fix_suggestion": "Add section explaining role-based scoring multipliers for different function types (pure logic, orchestrator, I/O wrapper, entry point, pattern match, unknown).",
+      "source_reference": "src/config.rs:141-204 (RoleMultipliers struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Role Coverage Weights",
+      "description": "No documentation of [role_coverage_weights] section",
+      "should_add": "Document [role_coverage_weights] options for coverage weight multipliers by function role: entry_point (0.6), orchestrator (0.8), pure_logic (1.0), io_wrapper (1.0), pattern_match (1.0), unknown (1.0)",
+      "fix_suggestion": "Add section explaining how coverage weight multipliers adjust scoring based on function role. Entry points and orchestrators get reduced coverage penalty since they're often integration tested.",
+      "source_reference": "src/config.rs:206-269 (RoleCoverageWeights struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Context Configuration",
+      "description": "No documentation of [context] section for context-aware detection",
+      "should_add": "Document [context] options: enabled (bool), rules (array of ContextRuleConfig), function_patterns (FunctionPatternConfig)",
+      "fix_suggestion": "Add section on context-aware detection configuration including custom context rules and function pattern configuration for enhanced detection.",
+      "source_reference": "src/config.rs:327-421 (ContextConfig and related structs)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - God Object Detection",
+      "description": "No documentation of [god_object] or [god_object_detection] section",
+      "should_add": "Document [god_object_detection] options: enabled (bool), and language-specific thresholds for rust, python, javascript with max_methods, max_fields, max_traits, max_lines, max_complexity",
+      "fix_suggestion": "Add section on god object detection configuration with language-specific threshold customization. Explain defaults for Rust (20 methods, 15 fields), Python (15 methods, 10 fields), JavaScript (15 methods, 20 fields).",
+      "source_reference": "src/config.rs:423-531 (GodObjectConfig and GodObjectThresholds structs)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Normalization",
+      "description": "No documentation of [normalization] section for score normalization",
+      "should_add": "Document [normalization] options: linear_threshold (10.0), logarithmic_threshold (100.0), sqrt_multiplier (3.33), log_multiplier (10.0), show_raw_scores (bool)",
+      "fix_suggestion": "Add section explaining score normalization configuration for controlling how raw scores are normalized to 0-10 scale.",
+      "source_reference": "src/config.rs:271-325 (NormalizationConfig struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - Error Handling",
+      "description": "No documentation of [error_handling] section",
+      "should_add": "Document [error_handling] options: detect_async_errors, detect_context_loss, detect_propagation, detect_panic_patterns, detect_swallowing (all bool), custom_patterns, severity_overrides",
+      "fix_suggestion": "Add section on error handling pattern detection configuration with all detection flags and custom pattern support.",
+      "source_reference": "src/config.rs:1169-1268 (ErrorHandlingConfig struct)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Options Reference - External API",
+      "description": "No documentation of [external_api] section",
+      "should_add": "Document [external_api] configuration for marking public API functions",
+      "fix_suggestion": "Add section explaining external API detection configuration for identifying public API boundaries.",
+      "source_reference": "src/config.rs:575 (external_api field in DebtmapConfig)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options Reference - Complexity Thresholds",
+      "description": "No documentation of [complexity_thresholds] section for enhanced detection",
+      "should_add": "Document [complexity_thresholds] configuration for enhanced complexity threshold management",
+      "fix_suggestion": "Add section on complexity threshold configuration referring to complexity threshold manager.",
+      "source_reference": "src/config.rs:610-611 (complexity_thresholds field)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options Reference - LOC Configuration",
+      "description": "No documentation of [loc] section for lines of code counting",
+      "should_add": "Document [loc] configuration for LOC counting customization",
+      "fix_suggestion": "Add section on LOC counting configuration options.",
+      "source_reference": "src/config.rs:622-623 (loc field)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Options Reference - Tier Configuration",
+      "description": "No documentation of [tiers] section for prioritization tiers",
+      "should_add": "Document [tiers] configuration for customizing priority tier boundaries",
+      "fix_suggestion": "Add section explaining tier configuration for priority classification.",
+      "source_reference": "src/config.rs:626-627 (tiers field)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Customization - Pattern-Based Adjustments",
+      "description": "No documentation of [patterns] section for pattern-specific complexity adjustments",
+      "should_add": "Document [patterns] configuration for reducing false positives through pattern recognition (detectors, builders, matching, error_handling, configuration, visitors)",
+      "fix_suggestion": "Add comprehensive section on pattern-based customization showing how to configure complexity adjustments for specific function patterns. Include examples from .debtmap.toml showing [patterns.detectors], [patterns.builders], etc.",
+      "source_reference": ".debtmap.toml:102-137 (patterns configuration)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "CLI Integration",
+      "description": "No documentation of how CLI flags override config file settings",
+      "should_add": "Document relationship between .debtmap.toml configuration and CLI flags (--threshold-complexity, --coverage-file, --context, etc.)",
+      "fix_suggestion": "Add section explaining how CLI flags can override config file settings, with examples of common overrides.",
+      "source_reference": "src/cli.rs:26-208 (Analyze command flags)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Config File Examples",
+      "description": "No examples of complete configuration files",
+      "should_add": "Provide complete, working examples of .debtmap.toml files for different use cases (strict, balanced, lenient projects)",
+      "fix_suggestion": "Add section with multiple complete configuration examples: minimal config, recommended config, strict quality standards config, legacy codebase config. Reference the actual .debtmap.toml in the repository as a comprehensive example.",
+      "source_reference": ".debtmap.toml (complete working example)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration Validation",
+      "description": "No documentation of configuration validation rules",
+      "should_add": "Document that scoring weights must sum to 1.0 (with 0.001 tolerance), weights must be 0.0-1.0, and other validation rules",
+      "fix_suggestion": "Add section on configuration validation explaining automatic normalization and error handling for invalid configurations.",
+      "source_reference": "src/config.rs:92-118 (ScoringWeights::validate and normalize methods)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration File Discovery",
+      "description": "No documentation of configuration file search behavior",
+      "should_add": "Document that debtmap searches for .debtmap.toml starting in current directory and traversing up to 10 parent directories",
+      "fix_suggestion": "Add section explaining configuration file discovery mechanism with directory traversal depth limit.",
+      "source_reference": "src/config.rs:1028-1054 (load_config function with MAX_TRAVERSAL_DEPTH = 10)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Configuration Debugging",
+      "description": "No documentation of how to debug configuration issues",
+      "should_add": "Document log::debug messages and how to verify which config file is being loaded",
+      "fix_suggestion": "Add troubleshooting section on configuration debugging, including how to verify which config file is loaded and common configuration mistakes.",
+      "source_reference": "src/config.rs:985-990 (debug logging in config loading)"
+    }
+  ],
+  "positive_aspects": [
+    "Chapter outline structure is logical with clear sections identified",
+    "Section names are appropriate and cover the key topics needed"
+  ],
+  "improvement_suggestions": [
+    "Start with a simple getting started example showing minimal .debtmap.toml",
+    "Organize configuration options by frequency of use (most common first)",
+    "Include visual examples of how different configurations affect output",
+    "Add a quick reference table of all configuration options",
+    "Include migration guide for upgrading configurations when defaults change",
+    "Add links to related chapters (Analysis Guide for scoring explanation, etc.)",
+    "Consider adding a configuration generator or interactive init command documentation",
+    "Include best practices for different project types (open source library vs internal service)",
+    "Add troubleshooting section for common configuration issues",
+    "Document the 'debtmap init' command for creating initial configuration"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-09",
+    "feature_inventory": "src/config.rs (DebtmapConfig struct and related types)",
+    "topics_covered": [],
+    "validation_focus": "Check config options match implementation in src/config/",
+    "implementation_files": [
+      "src/config.rs",
+      "src/cli.rs",
+      ".debtmap.toml"
+    ],
+    "total_issues": 26,
+    "critical_issues": 6,
+    "high_issues": 14,
+    "medium_issues": 5,
+    "low_issues": 1
+  }
+}
