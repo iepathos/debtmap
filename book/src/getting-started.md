@@ -89,6 +89,7 @@ Here are the most common commands to get you started:
 debtmap analyze .
 
 # Analyze with coverage data for risk scoring (recommended)
+# Note: --lcov is a shorthand alias for --coverage-file
 debtmap analyze . --lcov target/coverage/lcov.info
 
 # Generate coverage first (for Rust projects)
@@ -106,6 +107,79 @@ debtmap analyze . --top 10
 
 # Initialize configuration file for project-specific settings
 debtmap init
+
+# Validate against thresholds (CI/CD integration)
+debtmap validate ./src --max-debt-density 5.0
+
+# Compare before/after to track improvements
+debtmap analyze . --format json --output before.json
+# ... make improvements ...
+debtmap analyze . --format json --output after.json
+debtmap compare --before before.json --after after.json
+```
+
+### Advanced Options
+
+Debtmap provides many powerful options to customize your analysis:
+
+**Verbosity Levels:**
+```bash
+# Show main factors contributing to scores
+debtmap analyze . -v
+
+# Show detailed calculations
+debtmap analyze . -vv
+
+# Show all debug information
+debtmap analyze . -vvv
+```
+
+**Filtering and Prioritization:**
+```bash
+# Only show high-priority items
+debtmap analyze . --min-priority high
+
+# Filter by specific categories
+debtmap analyze . --filter Architecture,Testing
+
+# Group results by debt category
+debtmap analyze . --group-by-category
+```
+
+**Security Focus:**
+```bash
+# Emphasize security-relevant patterns
+debtmap analyze . --security-enhanced
+```
+
+**Cache Management:**
+```bash
+# Skip cache for fresh analysis
+debtmap analyze . --no-cache
+
+# Clear cache and rebuild
+debtmap analyze . --clear-cache
+
+# View cache statistics
+debtmap analyze . --cache-stats
+```
+
+**Performance Control:**
+```bash
+# Limit parallel jobs
+debtmap analyze . --jobs 4
+
+# Disable parallel processing
+debtmap analyze . --no-parallel
+```
+
+**Output Control:**
+```bash
+# Plain output (no colors/emoji, for CI/CD)
+debtmap analyze . --plain
+
+# Compact summary output
+debtmap analyze . --summary
 ```
 
 ## First Analysis
@@ -125,6 +199,13 @@ debtmap analyze .
 5. **Output** - Results are displayed in your chosen format
 
 **Expected timing**: Analyzing a 10,000 LOC project typically takes 2-5 seconds. The first run may be slightly slower as Debtmap builds its cache.
+
+**About Caching:**
+Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
+- **Cache location**: `XDG_CACHE_HOME/debtmap` on Linux, `~/Library/Caches/debtmap` on macOS
+- **What's cached**: Parsed ASTs and computed metrics for each file
+- **Invalidation**: Cache is automatically invalidated when files are modified
+- **Management**: Use `--clear-cache` to clear, `--no-cache` to skip, or `--cache-stats` to view statistics
 
 **Language support**:
 - **Rust**: Full support with advanced features (trait detection, purity analysis, call graphs)
@@ -182,6 +263,8 @@ Let's break down what this output means:
 - **MEDIUM** (5.0-6.9): Plan for next sprint - moderate complexity or partial coverage gaps
 - **LOW** (3.0-4.9): Nice to have - well-tested or simple functions
 
+**Note:** These are default priority thresholds. You can customize them in `.debtmap.toml` under the `[tiers]` section to match your team's standards.
+
 ### Key Metrics
 
 - **Unified Score** (0-10 scale): Overall priority combining complexity, coverage, and dependencies
@@ -213,6 +296,36 @@ Each recommendation shows:
 - **IMPACT**: Expected improvement (e.g., "Full test coverage, -3.7 risk")
 - **WHY**: The reasoning behind this recommendation
 
+### Organizing Results
+
+When analyzing large codebases, you can organize and filter results to focus on specific areas:
+
+**Group by Debt Category:**
+```bash
+debtmap analyze . --group-by-category
+```
+
+This organizes results by type: Architecture, Testing, Performance, CodeQuality
+
+**Filter by Priority:**
+```bash
+# Show only high and critical priority items
+debtmap analyze . --min-priority high
+
+# Combine with --top to limit results
+debtmap analyze . --min-priority high --top 10
+```
+
+**Filter by Category:**
+```bash
+# Focus on specific debt types
+debtmap analyze . --filter Architecture,Testing
+
+# Available categories: Architecture, Testing, Performance, CodeQuality
+```
+
+These filtering options help you focus on specific types of technical debt, making it easier to plan targeted improvements.
+
 ### Summary Statistics
 
 - **Total Debt Score**: Sum of all debt scores across your codebase
@@ -232,7 +345,11 @@ Debtmap supports multiple output formats:
 
 Example JSON output:
 ```bash
+# By default, JSON uses legacy format
 debtmap analyze . --format json --output report.json
+
+# For the new unified format (with consistent structure and type field):
+debtmap analyze . --format json --output-format unified --output report.json
 ```
 
 Example Markdown output:
@@ -258,6 +375,19 @@ debtmap init
 ```
 
 This creates a `.debtmap.toml` file with sensible defaults that you can customize for your project.
+
+**Key Configuration Options:**
+
+The configuration file allows you to customize:
+- **Threshold customization** - Adjust complexity, duplication, and file size thresholds
+- **Scoring weights** - Fine-tune how coverage, complexity, and dependencies are weighted
+- **Language selection** - Enable/disable specific language analyzers
+- **Ignore patterns** - Exclude test files or generated code from analysis
+- **God object thresholds** - Configure what constitutes a "god object" anti-pattern
+- **Entropy analysis** - Control entropy-based complexity detection
+- **Priority tiers** - Customize CRITICAL/HIGH/MEDIUM/LOW threshold ranges
+
+See the Configuration chapter for complete documentation of all available options.
 
 ### Try Analysis with Coverage
 
