@@ -13,6 +13,8 @@
 
 A fast code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.
 
+📚 **[Read the full documentation](https://iepathos.github.io/debtmap/)** for detailed guides, examples, and API reference.
+
 ## Why Debtmap?
 
 ### 🎯 What Makes Debtmap Different
@@ -36,6 +38,18 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - Written in Rust for 10-100x faster analysis than Java/Python-based competitors
 - Parallel processing with Rayon for analyzing massive codebases in seconds
 - Incremental analysis caches results for lightning-fast re-runs
+
+## Documentation
+
+📚 **[Full Documentation](https://iepathos.github.io/debtmap/)** - Complete guides, tutorials, and API reference
+
+### Quick Links
+- [Installation Guide](https://iepathos.github.io/debtmap/installation.html)
+- [Quick Start Tutorial](https://iepathos.github.io/debtmap/quick-start.html)
+- [Configuration Reference](https://iepathos.github.io/debtmap/configuration.html)
+- [Metrics & Scoring](https://iepathos.github.io/debtmap/metrics.html)
+- [Coverage & Risk Analysis](https://iepathos.github.io/debtmap/coverage-risk.html)
+- [Contributing Guide](https://iepathos.github.io/debtmap/contributing.html)
 
 ## Features
 
@@ -61,6 +75,8 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - **Incremental analysis** - Smart caching system for analyzing only changed files
 - **Flexible suppression** - Inline comment-based suppression for specific code sections and configuration-based ignore patterns
 - **Test-friendly** - Easily exclude test fixtures and example code from debt analysis
+
+📖 **See the [Features Guide](https://iepathos.github.io/debtmap/features.html)** for detailed explanations and examples of each capability.
 
 ## Installation
 
@@ -452,6 +468,8 @@ debtmap analyze . --filter Architecture,Testing --lcov coverage.info
 
 ## How Debtmap Works
 
+📖 **For detailed architecture documentation, see the [Architecture Guide](https://iepathos.github.io/debtmap/architecture.html)**.
+
 ### Analysis Workflow
 
 ```mermaid
@@ -626,6 +644,8 @@ File Score = Size × Complexity × Coverage × Density × GodObject × FunctionS
 
 ## Metrics Explained
 
+📖 **For in-depth metric explanations and scoring algorithms, see the [Metrics Guide](https://iepathos.github.io/debtmap/metrics.html)**.
+
 ### Cyclomatic Complexity
 Measures the number of linearly independent paths through code. Higher values indicate more complex, harder-to-test code.
 
@@ -651,6 +671,8 @@ This significantly reduces false positives for:
 - Dispatcher/command patterns with similar handlers
 - Configuration parsers with uniform processing
 - Switch statements with consistent case handling
+
+📖 **See the [Entropy Analysis Guide](https://iepathos.github.io/debtmap/entropy.html)** for complete details on configuration and tuning.
 
 Enable in `.debtmap.toml`:
 ```toml
@@ -711,6 +733,8 @@ Identifies similar code blocks that could be refactored into shared functions.
 - **Collection inefficiencies**: Suboptimal use of data collections
 
 ### Risk Analysis (With Coverage Data)
+
+📖 **See the [Coverage & Risk Analysis Guide](https://iepathos.github.io/debtmap/coverage-risk.html)** for detailed explanations of risk scoring and coverage integration.
 
 When LCOV coverage data is provided via `--lcov`, debtmap performs sophisticated risk analysis:
 
@@ -948,6 +972,8 @@ debtmap cache prune --max-age-days 7
 ```
 
 ## Configuration
+
+📖 **See the [Configuration Guide](https://iepathos.github.io/debtmap/configuration.html)** for complete configuration options and examples.
 
 Create a `.debtmap.toml` file in your project root:
 
@@ -1264,6 +1290,8 @@ This classification happens automatically during analysis and influences priorit
 
 ## Contributing
 
+📖 **See the [Contributing Guide](https://iepathos.github.io/debtmap/contributing.html)** for detailed development setup and contribution guidelines.
+
 We welcome contributions! This is an early-stage project, so there's plenty of room for improvement.
 
 ### Areas for Contribution
@@ -1301,6 +1329,8 @@ For detailed documentation on specific features:
 - [Entropy-Based Complexity Scoring](docs/entropy.md) - Complete guide to entropy analysis and configuration
 
 ### Automated Technical Debt Reduction
+
+📖 **See the [Automated Workflows Guide](https://iepathos.github.io/debtmap/workflows.html)** for detailed information on using Prodigy and Claude Code for automated debt reduction.
 
 We use [prodigy](https://github.com/iepathos/prodigy) for automated technical debt reduction through AI-driven workflows. This allows us to continuously improve code quality without manual intervention. It also enables map reduce workflows where we run parallel agents to reduce many tech debt items at once in codebases.
 
@@ -1409,4 +1439,4 @@ Built with excellent Rust crates including:
 
 ---
 
-**Note**: This is a prototype tool under active development. Please report issues and feedback on [GitHub](https://github.com/iepathos/debtmap/issues).
+**Note**: This is a prototype tool under active development. Please report issues and feedback on [GitHub](https://github.com/iepathos/debtmap/issues). For detailed documentation, visit [iepathos.github.io/debtmap](https://iepathos.github.io/debtmap/).
