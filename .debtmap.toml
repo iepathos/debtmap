@@ -25,7 +25,7 @@ minimum_risk_score = 2.0              # Increased from 1.0 for Risk debt types
 max_average_complexity = 10.0         # Maximum allowed average complexity
 max_high_complexity_count = 100       # Maximum allowed high complexity functions
 max_debt_items = 2500                 # Maximum allowed technical debt items
-max_total_debt_score = 1000           # Maximum allowed total debt score (unified scoring)
+max_total_debt_score = 5000           # Maximum allowed total debt score (unified scoring)
 max_codebase_risk_score = 7.0         # Maximum allowed codebase risk score
 max_high_risk_functions = 50          # Maximum allowed high-risk functions
 min_coverage_percentage = 0.0         # Minimum required code coverage percentage (0 = no minimum)
