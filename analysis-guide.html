@@ -1,0 +1,1414 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Analysis Guide - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="analysis-guide"><a class="header" href="#analysis-guide">Analysis Guide</a></h1>
+<p>This guide explains Debtmap’s analysis capabilities, metrics, and methodologies in depth. Use this to understand what Debtmap measures, how it scores technical debt, and how to interpret analysis results for maximum impact.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Debtmap analyzes code through multiple lenses to provide a comprehensive view of technical health:</p>
+<ul>
+<li><strong>Complexity Metrics</strong> - Quantifies how difficult code is to understand and test</li>
+<li><strong>Debt Patterns</strong> - Identifies 13 types of technical debt requiring attention</li>
+<li><strong>Risk Scoring</strong> - Correlates complexity with test coverage to find truly risky code</li>
+<li><strong>Prioritization</strong> - Ranks findings by impact to guide refactoring efforts</li>
+</ul>
+<p>The goal is to move beyond simple “here are your problems” to “here’s what to fix first and why.”</p>
+<h2 id="complexity-metrics"><a class="header" href="#complexity-metrics">Complexity Metrics</a></h2>
+<p>Debtmap measures complexity using multiple complementary approaches. Each metric captures a different aspect of code difficulty.</p>
+<h3 id="cyclomatic-complexity"><a class="header" href="#cyclomatic-complexity">Cyclomatic Complexity</a></h3>
+<p>Measures the number of linearly independent paths through code - essentially counting decision points.</p>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Start with a base complexity of 1</li>
+<li>Add 1 for each: <code>if</code>, <code>else if</code>, <code>match</code> arm, <code>while</code>, <code>for</code>, <code>&amp;&amp;</code>, <code>||</code>, <code>?</code> operator</li>
+<li>Does NOT increase for <code>else</code> (it’s the alternate path, not a new decision)</li>
+</ul>
+<p><strong>Thresholds:</strong></p>
+<ul>
+<li><strong>1-5</strong>: Simple, easy to test - typically needs 1-3 test cases</li>
+<li><strong>6-10</strong>: Moderate complexity - needs 4-8 test cases</li>
+<li><strong>11-20</strong>: Complex, consider refactoring - needs 9+ test cases</li>
+<li><strong>20+</strong>: Very complex, high risk - difficult to test thoroughly</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn validate_user(age: u32, has_license: bool, country: &amp;str) -&gt; bool {
+    // Complexity: 4
+    // Base (1) + if (1) + &amp;&amp; (1) + match (1) = 4
+    if age &gt;= 18 &amp;&amp; has_license {
+        match country {
+            "US" | "CA" =&gt; true,
+            _ =&gt; false,
+        }
+    } else {
+        false
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="cognitive-complexity"><a class="header" href="#cognitive-complexity">Cognitive Complexity</a></h3>
+<p>Measures how difficult code is to understand by considering nesting depth and control flow interruptions.</p>
+<p><strong>How it differs from cyclomatic:</strong></p>
+<ul>
+<li>Nesting increases weight (deeply nested code is harder to understand)</li>
+<li>Linear sequences don’t increase complexity (easier to follow)</li>
+<li>Breaks and continues add complexity (interrupt normal flow)</li>
+</ul>
+<p><strong>Calculation:</strong></p>
+<ul>
+<li>Each structure (if, loop, match) gets a base score</li>
+<li>Nesting multiplies the weight (nested structures = harder to understand)</li>
+<li>Break/continue/return in middle of function adds cognitive load</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Cyclomatic: 5, Cognitive: 8
+fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
+    let mut results = vec![];
+
+    for item in items {                    // +1 cognitive
+        if item.is_valid() {               // +2 (nested in loop)
+            match item.type {              // +3 (nested 2 levels)
+                Type::A =&gt; results.push(process_a(item)),
+                Type::B =&gt; {
+                    if item.priority &gt; 5 { // +4 (nested 3 levels)
+                        results.push(process_b_priority(item));
+                    }
+                }
+                _ =&gt; continue,             // +1 (control flow interruption)
+            }
+        }
+    }
+
+    results
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Thresholds:</strong></p>
+<ul>
+<li><strong>0-5</strong>: Trivial - anyone can understand</li>
+<li><strong>6-10</strong>: Simple - straightforward logic</li>
+<li><strong>11-20</strong>: Moderate - requires careful reading</li>
+<li><strong>21-40</strong>: Complex - difficult to understand</li>
+<li><strong>40+</strong>: Very complex - needs refactoring</li>
+</ul>
+<h3 id="entropy-based-complexity-analysis"><a class="header" href="#entropy-based-complexity-analysis">Entropy-Based Complexity Analysis</a></h3>
+<p>Uses information theory to distinguish genuinely complex code from pattern-based repetitive code. This dramatically reduces false positives for validation functions, dispatchers, and configuration parsers.</p>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>
+<p><strong>Token Entropy</strong> (0.0-1.0): Measures variety in code tokens</p>
+<ul>
+<li>High entropy (0.7+): Diverse logic, genuinely complex</li>
+<li>Low entropy (0.0-0.4): Repetitive patterns, less complex than it appears</li>
+</ul>
+</li>
+<li>
+<p><strong>Pattern Repetition</strong> (0.0-1.0): Detects repetitive structures in AST</p>
+<ul>
+<li>High repetition (0.7+): Similar blocks repeated (validation checks, case handlers)</li>
+<li>Low repetition: Unique logic throughout</li>
+</ul>
+</li>
+<li>
+<p><strong>Branch Similarity</strong> (0.0-1.0): Analyzes similarity between conditional branches</p>
+<ul>
+<li>High similarity (0.8+): Branches do similar things (consistent handling)</li>
+<li>Low similarity: Each branch has unique logic</li>
+</ul>
+</li>
+<li>
+<p><strong>Token Classification</strong>: Categorizes tokens by type with weighted importance</p>
+<ul>
+<li>Variables, methods, literals weighted differently</li>
+<li>Focuses on structural complexity over superficial differences</li>
+</ul>
+</li>
+</ol>
+<p><strong>Dampening logic:</strong> Dampening is applied when multiple factors indicate repetitive patterns:</p>
+<ul>
+<li>Low token entropy (&lt; 0.4) indicates simple, repetitive patterns</li>
+<li>High pattern repetition (&gt; 0.6) shows similar code blocks</li>
+<li>High branch similarity (&gt; 0.7) indicates consistent branching logic</li>
+</ul>
+<p>When these conditions are met:</p>
+<pre><code>effective_complexity = entropy × pattern_factor × similarity_factor
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Without entropy: Cyclomatic = 15 (appears very complex)
+// With entropy: Effective = 5 (pattern-based, dampened 67%)
+fn validate_config(config: &amp;Config) -&gt; Result&lt;(), ValidationError&gt; {
+    if config.name.is_empty() { return Err(ValidationError::EmptyName); }
+    if config.port == 0 { return Err(ValidationError::InvalidPort); }
+    if config.host.is_empty() { return Err(ValidationError::EmptyHost); }
+    if config.timeout == 0 { return Err(ValidationError::InvalidTimeout); }
+    // ... 11 more similar checks
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Enable in <code>.debtmap.toml</code>:</strong></p>
+<pre><code class="language-toml">[entropy]
+enabled = true                 # Enable entropy analysis (default: true)
+weight = 0.5                  # Weight in adjustment (0.0-1.0)
+use_classification = true     # Advanced token classification
+pattern_threshold = 0.7       # Pattern detection threshold
+entropy_threshold = 0.4       # Entropy below this triggers dampening
+branch_threshold = 0.8        # Branch similarity threshold
+max_combined_reduction = 0.3  # Maximum 30% reduction
+</code></pre>
+<p><strong>Output fields in EntropyScore:</strong></p>
+<ul>
+<li><code>unique_variables</code>: Count of distinct variables in the function (measures variable diversity)</li>
+<li><code>max_nesting</code>: Maximum nesting depth detected (contributes to dampening calculation)</li>
+<li><code>dampening_applied</code>: Actual dampening factor applied to the complexity score</li>
+</ul>
+<h3 id="nesting-depth"><a class="header" href="#nesting-depth">Nesting Depth</a></h3>
+<p>Maximum level of indentation in a function. Deep nesting makes code hard to follow.</p>
+<p><strong>Thresholds:</strong></p>
+<ul>
+<li><strong>1-2</strong>: Flat, easy to read</li>
+<li><strong>3-4</strong>: Moderate nesting</li>
+<li><strong>5+</strong>: Deep nesting, consider extracting functions</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Nesting depth: 4 (difficult to follow)
+fn process(data: Data) -&gt; Result&lt;Output&gt; {
+    if data.is_valid() {                    // Level 1
+        for item in data.items {            // Level 2
+            if item.active {                // Level 3
+                match item.type {           // Level 4
+                    Type::A =&gt; { /* ... */ }
+                    Type::B =&gt; { /* ... */ }
+                }
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Refactored:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Nesting depth: 2 (much clearer)
+fn process(data: Data) -&gt; Result&lt;Output&gt; {
+    if !data.is_valid() {
+        return Err(Error::Invalid);
+    }
+
+    data.items
+        .iter()
+        .filter(|item| item.active)
+        .map(|item| process_item(item))     // Extract to separate function
+        .collect()
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="function-length"><a class="header" href="#function-length">Function Length</a></h3>
+<p>Number of lines in a function. Long functions often violate single responsibility principle.</p>
+<p><strong>Thresholds:</strong></p>
+<ul>
+<li><strong>1-20 lines</strong>: Good - focused, single purpose</li>
+<li><strong>21-50 lines</strong>: Acceptable - may have multiple steps</li>
+<li><strong>51-100 lines</strong>: Long - consider breaking up</li>
+<li><strong>100+ lines</strong>: Very long - definitely needs refactoring</li>
+</ul>
+<p><strong>Why length matters:</strong></p>
+<ul>
+<li>Harder to understand and remember</li>
+<li>Harder to test thoroughly</li>
+<li>Often violates single responsibility</li>
+<li>Difficult to reuse</li>
+</ul>
+<h2 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h2>
+<p>Debtmap detects 13 types of technical debt, each with a severity weight that affects scoring.</p>
+<h3 id="basic-markers-weight--1"><a class="header" href="#basic-markers-weight--1">Basic Markers (Weight = 1)</a></h3>
+<p><strong>Todo</strong>: TODO comments in production code</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// TODO: Add error handling here
+fn process() { /* ... */ }
+<span class="boring">}</span></code></pre></pre>
+<p><strong>TestTodo</strong>: TODO comments in test code</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_feature() {
+    // TODO: Add edge case testing
+    assert_eq!(process(), expected);
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>When detected</strong>: Comment lines containing <code>TODO:</code> or <code>todo!</code> macro (Rust)
+<strong>Impact</strong>: Low - markers for future work, not immediate problems
+<strong>Action</strong>: Plan when to address or document why it’s deferred</p>
+<h3 id="fixable-issues-weight--2"><a class="header" href="#fixable-issues-weight--2">Fixable Issues (Weight = 2)</a></h3>
+<p><strong>Fixme</strong>: FIXME comments indicating known problems</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// FIXME: This breaks with negative numbers
+fn calculate(value: i32) -&gt; i32 { /* ... */ }
+<span class="boring">}</span></code></pre></pre>
+<p><strong>TestComplexity</strong>: Test functions exceeding complexity thresholds</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn complex_test() {
+    // Cyclomatic: 12 (too complex for a test)
+    for input in test_cases {
+        if input.is_special() {
+            match input.type {
+                /* complex test logic */
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>TestDuplication</strong>: Duplicated code in test files</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_a() {
+    let setup = create_test_data();  // Duplicated
+    let result = process(setup);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_b() {
+    let setup = create_test_data();  // Same setup duplicated
+    let result = process_different(setup);
+    assert!(result.is_ok());
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>When detected</strong>:</p>
+<ul>
+<li>Comments with <code>FIXME:</code> or <code>fixme!</code> macro</li>
+<li>Test functions with cyclomatic &gt; 10 or cognitive &gt; 15</li>
+<li>Similar code blocks &gt; 10 lines in test files</li>
+</ul>
+<p><strong>Impact</strong>: Medium - affects test quality and maintainability
+<strong>Action</strong>: Refactor tests to be simpler, extract common test utilities</p>
+<h3 id="code-quality-weight--3"><a class="header" href="#code-quality-weight--3">Code Quality (Weight = 3)</a></h3>
+<p><strong>CodeSmell</strong>: Anti-patterns and bad practices</p>
+<ul>
+<li>God objects (classes with too many responsibilities)</li>
+<li>Long parameter lists (&gt; 5 parameters)</li>
+<li>Feature envy (using more data from other objects than own)</li>
+<li>Primitive obsession (overusing basic types instead of domain objects)</li>
+<li>Magic numbers/strings (unexplained literal values)</li>
+</ul>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Code smell: Magic numbers
+fn calculate_price(quantity: u32) -&gt; f64 {
+    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+}
+
+// Better: Named constants
+const UNIT_PRICE: f64 = 19.99;
+const SHIPPING_COST: f64 = 5.0;
+
+fn calculate_price(quantity: u32) -&gt; f64 {
+    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Dependency</strong>: Problematic dependencies</p>
+<ul>
+<li>Circular dependencies between modules</li>
+<li>High coupling (too many dependencies)</li>
+<li>Deprecated dependencies</li>
+</ul>
+<p><strong>CodeOrganization</strong>: Poor structure</p>
+<ul>
+<li>Files too large (&gt; 500 lines)</li>
+<li>Modules with unclear responsibilities</li>
+<li>Inconsistent naming patterns</li>
+</ul>
+<p><strong>TestQuality</strong>: Low-quality tests</p>
+<ul>
+<li>Tests with complex assertions</li>
+<li>Flaky test patterns (non-deterministic behavior)</li>
+<li>Tests that test implementation instead of behavior</li>
+</ul>
+<p><strong>When detected</strong>: Pattern analysis, heuristics for each smell type
+<strong>Impact</strong>: Medium-High - affects maintainability and evolution
+<strong>Action</strong>: Refactor to follow better patterns, extract responsibilities</p>
+<h3 id="serious-issues-weight--4"><a class="header" href="#serious-issues-weight--4">Serious Issues (Weight = 4)</a></h3>
+<p><strong>Duplication</strong>: Duplicated code blocks</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// File A:
+fn process_user(user: User) -&gt; Result&lt;()&gt; {
+    validate_email(&amp;user.email)?;
+    validate_age(user.age)?;
+    save_to_database(&amp;user)?;
+    send_welcome_email(&amp;user.email)?;
+    Ok(())
+}
+
+// File B:
+fn process_admin(admin: Admin) -&gt; Result&lt;()&gt; {
+    validate_email(&amp;admin.email)?;  // Duplicated
+    validate_age(admin.age)?;       // Duplicated
+    save_to_database(&amp;admin)?;
+    grant_admin_privileges(&amp;admin)?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>ErrorSwallowing</strong>: Errors caught but ignored</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Error swallowed, no context
+match risky_operation() {
+    Ok(result) =&gt; process(result),
+    Err(_) =&gt; {}, // Silent failure!
+}
+
+// Good: Error handled with context
+match risky_operation() {
+    Ok(result) =&gt; process(result),
+    Err(e) =&gt; {
+        log::error!("Risky operation failed: {}", e);
+        return Err(e.into());
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>ResourceManagement</strong>: Resource leaks or improper cleanup</p>
+<ul>
+<li>Files not closed</li>
+<li>Connections not released</li>
+<li>Memory leaks</li>
+<li>Inefficient allocations in hot paths</li>
+<li>Blocking I/O in async contexts</li>
+</ul>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: File might not be closed on error
+fn read_config() -&gt; Result&lt;Config&gt; {
+    let file = File::open("config.toml")?;
+    let config = parse_toml(file)?;  // If this fails, file not closed
+    Ok(config)
+}
+
+// Good: RAII ensures cleanup
+fn read_config() -&gt; Result&lt;Config&gt; {
+    let file = File::open("config.toml")?;
+    let config = parse_toml(file)?;
+    Ok(config)
+    // File automatically closed when dropped
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>When detected</strong>:</p>
+<ul>
+<li>Duplication: Similar code blocks &gt; 50 lines (configurable)</li>
+<li>Error swallowing: Empty catch blocks, ignored Results</li>
+<li>Resource management: Pattern analysis for leaks, async/await misuse</li>
+</ul>
+<p><strong>Impact</strong>: High - can cause bugs, performance issues, data loss
+<strong>Action</strong>: Extract shared code, add proper error handling, fix resource cleanup</p>
+<h3 id="high-severity-weight--5"><a class="header" href="#high-severity-weight--5">High Severity (Weight = 5)</a></h3>
+<p><strong>Complexity</strong>: Functions exceeding complexity thresholds</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Cyclomatic: 22, Cognitive: 35
+fn process_transaction(tx: Transaction, account: &amp;mut Account) -&gt; Result&lt;Receipt&gt; {
+    if tx.amount &lt;= 0 {
+        return Err(Error::InvalidAmount);
+    }
+
+    if account.balance &lt; tx.amount {
+        if account.overdraft_enabled {
+            if account.overdraft_limit &gt;= tx.amount - account.balance {
+                // Process with overdraft
+                match tx.type {
+                    TransactionType::Debit =&gt; { /* complex logic */ }
+                    TransactionType::Credit =&gt; { /* complex logic */ }
+                    TransactionType::Transfer =&gt; { /* complex logic */ }
+                }
+            } else {
+                return Err(Error::OverdraftLimitExceeded);
+            }
+        } else {
+            return Err(Error::InsufficientFunds);
+        }
+    } else {
+        // Regular processing
+        match tx.type {
+            TransactionType::Debit =&gt; { /* complex logic */ }
+            TransactionType::Credit =&gt; { /* complex logic */ }
+            TransactionType::Transfer =&gt; { /* complex logic */ }
+        }
+    }
+
+    // More complex validation and processing...
+    Ok(receipt)
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>When detected</strong>: Cyclomatic &gt; 10 OR Cognitive &gt; 15 (configurable)
+<strong>Impact</strong>: Very High - hard to test, likely has bugs, difficult to modify
+<strong>Action</strong>: Break into smaller functions, extract validation, simplify control flow</p>
+<h3 id="debt-scoring-formula"><a class="header" href="#debt-scoring-formula">Debt Scoring Formula</a></h3>
+<p>Each debt item gets a score based on priority and type:</p>
+<pre><code>debt_score = priority_weight × type_weight
+</code></pre>
+<p><strong>Priority weights:</strong></p>
+<ul>
+<li>Low = 1</li>
+<li>Medium = 3</li>
+<li>High = 5</li>
+<li>Critical = 10</li>
+</ul>
+<p><strong>Combined examples:</strong></p>
+<ul>
+<li>Low Todo = 1 × 1 = 1</li>
+<li>Medium Fixme = 3 × 2 = 6</li>
+<li>High Complexity = 5 × 5 = 25</li>
+<li>Critical Complexity = 10 × 5 = 50</li>
+</ul>
+<p><strong>Total debt score</strong> = Sum of all debt item scores</p>
+<p>Lower is better. Track over time to measure improvement.</p>
+<h2 id="risk-scoring"><a class="header" href="#risk-scoring">Risk Scoring</a></h2>
+<p>Debtmap’s risk scoring identifies code that is both complex AND poorly tested - the true risk hotspots.</p>
+<h3 id="risk-categories"><a class="header" href="#risk-categories">Risk Categories</a></h3>
+<p>Functions are classified into five risk categories:</p>
+<p><strong>Critical</strong> (score ≥ 50)</p>
+<ul>
+<li>High complexity (cyclomatic &gt; 15) AND low coverage (&lt; 30%)</li>
+<li>Untested code that’s likely to break and hard to fix</li>
+<li><strong>Action</strong>: Immediate attention required - add tests or refactor</li>
+</ul>
+<p><strong>High</strong> (score 25-49)</p>
+<ul>
+<li>High complexity (cyclomatic &gt; 10) AND moderate coverage (&lt; 60%)</li>
+<li>Risky code with incomplete testing</li>
+<li><strong>Action</strong>: Should be addressed soon</li>
+</ul>
+<p><strong>Medium</strong> (score 10-24)</p>
+<ul>
+<li>Moderate complexity (cyclomatic &gt; 5) AND low coverage (&lt; 50%)</li>
+<li>OR: High complexity with good coverage</li>
+<li><strong>Action</strong>: Plan for next sprint</li>
+</ul>
+<p><strong>Low</strong> (score 5-9)</p>
+<ul>
+<li>Low complexity OR high coverage</li>
+<li>Well-managed code</li>
+<li><strong>Action</strong>: Monitor, low priority</li>
+</ul>
+<p><strong>Note</strong>: The risk categorization is based on the RiskLevel enum which includes Low, Medium, High, and Critical levels. Well-tested complex code will typically fall into the Low risk category due to coverage dampening.</p>
+<h3 id="risk-calculation"><a class="header" href="#risk-calculation">Risk Calculation</a></h3>
+<p>Risk score combines multiple factors:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>risk_score = complexity_factor + coverage_factor + debt_factor
+
+where:
+  complexity_factor = (cyclomatic / 5) + (cognitive / 10)
+  coverage_factor = (1 - coverage_percentage) × 50
+  debt_factor = debt_score / 10  // If debt data available
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Example:</strong></p>
+<pre><code>Function: process_payment
+  - Cyclomatic complexity: 18
+  - Cognitive complexity: 25
+  - Coverage: 20%
+  - Debt score: 15
+
+Calculation:
+  complexity_factor = (18 / 5) + (25 / 10) = 3.6 + 2.5 = 6.1
+  coverage_factor = (1 - 0.20) × 50 = 40
+  debt_factor = 15 / 10 = 1.5
+
+  risk_score = 6.1 + 40 + 1.5 = 47.6 (HIGH RISK)
+</code></pre>
+<h3 id="test-effort-assessment"><a class="header" href="#test-effort-assessment">Test Effort Assessment</a></h3>
+<p>Debtmap estimates testing difficulty based on cognitive complexity:</p>
+<p><strong>Difficulty Levels:</strong></p>
+<ul>
+<li><strong>Trivial</strong> (cognitive &lt; 5): 1-2 test cases, &lt; 1 hour</li>
+<li><strong>Simple</strong> (cognitive 5-10): 3-5 test cases, 1-2 hours</li>
+<li><strong>Moderate</strong> (cognitive 10-20): 6-10 test cases, 2-4 hours</li>
+<li><strong>Complex</strong> (cognitive 20-40): 11-20 test cases, 4-8 hours</li>
+<li><strong>VeryComplex</strong> (cognitive &gt; 40): 20+ test cases, 8+ hours</li>
+</ul>
+<p><strong>Test Effort includes:</strong></p>
+<ul>
+<li><strong>Cognitive load</strong>: How hard to understand the function</li>
+<li><strong>Branch count</strong>: Number of paths to test</li>
+<li><strong>Recommended test cases</strong>: Suggested number of tests</li>
+</ul>
+<h3 id="risk-distribution"><a class="header" href="#risk-distribution">Risk Distribution</a></h3>
+<p>Debtmap provides codebase-wide risk metrics:</p>
+<pre><code class="language-json">{
+  "risk_distribution": {
+    "critical_count": 12,
+    "high_count": 45,
+    "medium_count": 123,
+    "low_count": 456,
+    "well_tested_count": 234,
+    "total_functions": 870
+  },
+  "codebase_risk_score": 1247.5
+}
+</code></pre>
+<p><strong>Interpreting distribution:</strong></p>
+<ul>
+<li><strong>Healthy codebase</strong>: Most functions in Low/WellTested</li>
+<li><strong>Needs attention</strong>: Many Critical/High risk functions</li>
+<li><strong>Technical debt</strong>: High codebase risk score</li>
+</ul>
+<h3 id="testing-recommendations"><a class="header" href="#testing-recommendations">Testing Recommendations</a></h3>
+<p>When coverage data is provided, Debtmap generates prioritized testing recommendations with ROI analysis:</p>
+<pre><code class="language-json">{
+  "function": "process_transaction",
+  "file": "src/payments.rs",
+  "line": 145,
+  "current_risk": 47.6,
+  "potential_risk_reduction": 35.2,
+  "test_effort_estimate": {
+    "estimated_difficulty": "Complex",
+    "cognitive_load": 25,
+    "branch_count": 18,
+    "recommended_test_cases": 12
+  },
+  "roi": 4.4,
+  "rationale": "High complexity with low coverage (20%) and 3 downstream dependencies. Testing will reduce risk by 74%.",
+  "dependencies": {
+    "upstream_callers": ["handle_payment_request"],
+    "downstream_callees": ["validate_amount", "check_balance", "record_transaction"]
+  }
+}
+</code></pre>
+<p><strong>ROI calculation:</strong></p>
+<pre><code>roi = potential_risk_reduction / estimated_effort_hours
+</code></pre>
+<p>Higher ROI = better return on testing investment</p>
+<h2 id="interpreting-results"><a class="header" href="#interpreting-results">Interpreting Results</a></h2>
+<h3 id="understanding-output-formats"><a class="header" href="#understanding-output-formats">Understanding Output Formats</a></h3>
+<p>Debtmap provides three output formats:</p>
+<p><strong>Terminal</strong> (default): Human-readable with colors and tables</p>
+<pre><code class="language-bash">debtmap analyze .
+</code></pre>
+<p><strong>JSON</strong>: Machine-readable for CI/CD integration</p>
+<pre><code class="language-bash">debtmap analyze . --format json --output report.json
+</code></pre>
+<p><strong>Markdown</strong>: Documentation-friendly</p>
+<pre><code class="language-bash">debtmap analyze . --format markdown --output report.md
+</code></pre>
+<h3 id="json-structure"><a class="header" href="#json-structure">JSON Structure</a></h3>
+<pre><code class="language-json">{
+  "timestamp": "2025-10-09T12:00:00Z",
+  "project_path": "/path/to/project",
+  "complexity": {
+    "metrics": [
+      {
+        "name": "process_data",
+        "file": "src/main.rs",
+        "line": 42,
+        "cyclomatic": 15,
+        "cognitive": 22,
+        "nesting": 4,
+        "length": 68,
+        "is_test": false,
+        "visibility": "pub",
+        "is_trait_method": false,
+        "in_test_module": false,
+        "entropy_score": {
+          "token_entropy": 0.65,
+          "pattern_repetition": 0.25,
+          "branch_similarity": 0.30,
+          "effective_complexity": 0.85
+        },
+        "is_pure": false,
+        "purity_confidence": 0.8,
+        "detected_patterns": ["validation_pattern"],
+        "upstream_callers": ["main", "process_request"],
+        "downstream_callees": ["validate", "save", "notify"]
+      }
+    ],
+    "summary": {
+      "total_functions": 150,
+      "average_complexity": 5.3,
+      "max_complexity": 22,
+      "high_complexity_count": 8
+    }
+  },
+  "technical_debt": {
+    "items": [
+      {
+        "id": "complexity_src_main_rs_42",
+        "debt_type": "Complexity",
+        "priority": "High",
+        "file": "src/main.rs",
+        "line": 42,
+        "column": 1,
+        "message": "Function exceeds complexity threshold",
+        "context": "Cyclomatic: 15, Cognitive: 22"
+      }
+    ],
+    "by_type": {
+      "Complexity": [...],
+      "Duplication": [...],
+      "Todo": [...]
+    }
+  }
+}
+</code></pre>
+<h3 id="reading-function-metrics"><a class="header" href="#reading-function-metrics">Reading Function Metrics</a></h3>
+<p><strong>Key fields:</strong></p>
+<ul>
+<li><code>cyclomatic</code>: Decision points - guides test case count</li>
+<li><code>cognitive</code>: Understanding difficulty - guides refactoring priority</li>
+<li><code>nesting</code>: Indentation depth - signals need for extraction</li>
+<li><code>length</code>: Lines of code - signals SRP violations</li>
+<li><code>is_pure</code>: No side effects - easier to test (Option type, may be None)</li>
+<li><code>purity_confidence</code>: How certain we are about purity 0.0-1.0 (Option type, may be None)</li>
+<li><code>is_trait_method</code>: Whether this function implements a trait method</li>
+<li><code>in_test_module</code>: Whether function is inside a <code>#[cfg(test)]</code> module</li>
+<li><code>detected_patterns</code>: Complexity adjustment patterns identified (e.g., “validation_pattern”)</li>
+<li><code>entropy_score</code>: Pattern analysis for false positive reduction</li>
+<li><code>upstream_callers</code>: Impact radius if this function breaks</li>
+<li><code>downstream_callees</code>: Functions this depends on</li>
+</ul>
+<p><strong>Entropy interpretation:</strong></p>
+<ul>
+<li><code>token_entropy &lt; 0.4</code>: Repetitive code, likely pattern-based</li>
+<li><code>pattern_repetition &gt; 0.7</code>: High similarity between blocks</li>
+<li><code>branch_similarity &gt; 0.8</code>: Similar conditional branches</li>
+<li><code>effective_complexity &lt; 1.0</code>: Dampening applied</li>
+</ul>
+<h3 id="prioritizing-work"><a class="header" href="#prioritizing-work">Prioritizing Work</a></h3>
+<p>Debtmap provides multiple prioritization strategies:</p>
+<p><strong>1. By Unified Score (default)</strong></p>
+<pre><code class="language-bash">debtmap analyze . --top 10
+</code></pre>
+<p>Shows top 10 items by combined complexity, coverage, and dependency factors.</p>
+<p><strong>2. By Risk Category</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority high
+</code></pre>
+<p>Shows only HIGH and CRITICAL priority items.</p>
+<p><strong>3. By Debt Type</strong></p>
+<pre><code class="language-bash">debtmap analyze . --filter Architecture,Testing
+</code></pre>
+<p>Focuses on specific categories:</p>
+<ul>
+<li><code>Architecture</code>: God objects, complexity, dead code</li>
+<li><code>Testing</code>: Coverage gaps, test quality</li>
+<li><code>Performance</code>: Resource leaks, inefficiencies</li>
+<li><code>CodeQuality</code>: Code smells, maintainability</li>
+</ul>
+<p><strong>4. By ROI (with coverage)</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.lcov --top 20
+</code></pre>
+<p>Prioritizes by return on investment for testing/refactoring.</p>
+<h3 id="actionable-insights"><a class="header" href="#actionable-insights">Actionable Insights</a></h3>
+<p>Each recommendation includes:</p>
+<p><strong>ACTION</strong>: What to do</p>
+<ul>
+<li>“Add 6 unit tests for full coverage”</li>
+<li>“Refactor into 3 smaller functions”</li>
+<li>“Extract validation to separate function”</li>
+</ul>
+<p><strong>IMPACT</strong>: Expected improvement</p>
+<ul>
+<li>“Full test coverage, -3.7 risk”</li>
+<li>“Reduce complexity from 22 to 8”</li>
+<li>“Eliminate 120 lines of duplication”</li>
+</ul>
+<p><strong>WHY</strong>: Rationale</p>
+<ul>
+<li>“Business logic with 0% coverage, manageable complexity”</li>
+<li>“High complexity with low coverage threatens stability”</li>
+<li>“Repeated validation pattern across 5 files”</li>
+</ul>
+<p><strong>Example workflow:</strong></p>
+<ol>
+<li>Run analysis with coverage: <code>debtmap analyze . --lcov coverage.lcov</code></li>
+<li>Filter to CRITICAL items: <code>--min-priority critical</code></li>
+<li>Review top 5 recommendations</li>
+<li>Start with highest ROI items</li>
+<li>Rerun analysis to track progress</li>
+</ol>
+<h3 id="common-patterns-to-recognize"><a class="header" href="#common-patterns-to-recognize">Common Patterns to Recognize</a></h3>
+<p><strong>Pattern 1: High Complexity, Well Tested</strong></p>
+<pre><code>Complexity: 25, Coverage: 95%, Risk: LOW
+</code></pre>
+<p>This is actually good! Complex but thoroughly tested code. Learn from this approach.</p>
+<p><strong>Pattern 2: Moderate Complexity, No Tests</strong></p>
+<pre><code>Complexity: 12, Coverage: 0%, Risk: CRITICAL
+</code></pre>
+<p>Highest priority - manageable complexity, should be easy to test.</p>
+<p><strong>Pattern 3: Low Complexity, No Tests</strong></p>
+<pre><code>Complexity: 3, Coverage: 0%, Risk: LOW
+</code></pre>
+<p>Low priority - simple code, less risky without tests.</p>
+<p><strong>Pattern 4: Repetitive High Complexity (Dampened)</strong></p>
+<pre><code>Cyclomatic: 20, Effective: 7 (65% dampened), Risk: LOW
+</code></pre>
+<p>Validation or dispatch pattern - looks complex but is repetitive. Lower priority.</p>
+<p><strong>Pattern 5: God Object</strong></p>
+<pre><code>File: services.rs, Functions: 50+, Responsibilities: 15+
+</code></pre>
+<p>Architectural issue - split before adding features.</p>
+<h2 id="analyzer-types"><a class="header" href="#analyzer-types">Analyzer Types</a></h2>
+<p>Debtmap supports multiple programming languages with varying levels of analysis capability.</p>
+<h3 id="supported-languages"><a class="header" href="#supported-languages">Supported Languages</a></h3>
+<p><strong>Rust</strong> (Full Support)</p>
+<ul>
+<li><strong>Parser</strong>: syn (native Rust AST)</li>
+<li><strong>Capabilities</strong>:
+<ul>
+<li>Full complexity metrics (cyclomatic, cognitive, entropy)</li>
+<li>Trait implementation tracking</li>
+<li>Purity detection with confidence scoring</li>
+<li>Call graph analysis (upstream callers, downstream callees)</li>
+<li>Pattern-based adjustments for macros</li>
+<li>Visibility tracking (pub, pub(crate), private)</li>
+<li>Test module detection (#[cfg(test)])</li>
+</ul>
+</li>
+</ul>
+<p><strong>Python</strong> (Partial Support)</p>
+<ul>
+<li><strong>Parser</strong>: rustpython-parser</li>
+<li><strong>Capabilities</strong>:
+<ul>
+<li>Complexity metrics (cyclomatic, cognitive)</li>
+<li>Python-specific error handling patterns</li>
+<li>Purity detection for pure functions</li>
+<li>Basic debt pattern detection</li>
+<li>Limited call graph support</li>
+</ul>
+</li>
+</ul>
+<p><strong>JavaScript</strong> (Partial Support)</p>
+<ul>
+<li><strong>Parser</strong>: tree-sitter (JavaScript grammar)</li>
+<li><strong>File extensions</strong>: .js, .jsx, .mjs, .cjs</li>
+<li><strong>Capabilities</strong>:
+<ul>
+<li>ECMAScript complexity patterns</li>
+<li>Basic complexity metrics</li>
+<li>Function extraction</li>
+<li>Limited pattern detection</li>
+</ul>
+</li>
+</ul>
+<p><strong>TypeScript</strong> (Partial Support)</p>
+<ul>
+<li><strong>Parser</strong>: tree-sitter (TypeScript grammar)</li>
+<li><strong>File extensions</strong>: .ts, .tsx, .mts, .cts</li>
+<li><strong>Capabilities</strong>:
+<ul>
+<li>Similar to JavaScript support</li>
+<li>Type information currently not utilized</li>
+<li>Basic complexity metrics</li>
+<li>Limited pattern detection</li>
+</ul>
+</li>
+</ul>
+<p><strong>Unknown</strong> (Unsupported)</p>
+<ul>
+<li>Files with unsupported extensions are classified as <code>Language::Unknown</code></li>
+<li>These files are skipped during analysis</li>
+<li>No metrics or debt patterns are extracted</li>
+</ul>
+<h3 id="language-detection"><a class="header" href="#language-detection">Language Detection</a></h3>
+<p>Automatic detection by file extension:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let language = Language::from_path(&amp;path);
+<span class="boring">}</span></code></pre></pre>
+<p>Explicit language selection:</p>
+<pre><code class="language-bash">debtmap analyze . --languages rust,python
+</code></pre>
+<h3 id="extensibility"><a class="header" href="#extensibility">Extensibility</a></h3>
+<p>Debtmap’s architecture allows adding new languages:</p>
+<ol>
+<li><strong>Implement Analyzer trait:</strong></li>
+</ol>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait Analyzer: Send + Sync {
+    fn parse(&amp;self, content: &amp;str, path: PathBuf) -&gt; Result&lt;Ast&gt;;
+    fn analyze(&amp;self, ast: &amp;Ast) -&gt; FileMetrics;
+    fn language(&amp;self) -&gt; Language;
+}
+<span class="boring">}</span></code></pre></pre>
+<ol start="2">
+<li><strong>Register in get_analyzer():</strong></li>
+</ol>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get_analyzer(language: Language) -&gt; Box&lt;dyn Analyzer&gt; {
+    match language {
+        Language::Rust =&gt; Box::new(RustAnalyzer::new()),
+        Language::YourLanguage =&gt; Box::new(YourAnalyzer::new()),
+        // ...
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>See <code>src/analyzers/rust.rs</code> for a complete implementation example.</p>
+<h2 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h2>
+<h3 id="purity-detection"><a class="header" href="#purity-detection">Purity Detection</a></h3>
+<p>Debtmap detects pure functions - those without side effects that always return the same output for the same input.</p>
+<p><strong>What makes a function pure:</strong></p>
+<ul>
+<li>No I/O operations (file, network, database)</li>
+<li>No mutable global state</li>
+<li>No random number generation</li>
+<li>No system calls</li>
+<li>Deterministic output</li>
+</ul>
+<p><strong>Purity detection is optional:</strong></p>
+<ul>
+<li>Both <code>is_pure</code> and <code>purity_confidence</code> are <code>Option</code> types</li>
+<li>May be <code>None</code> for some functions or languages where detection is not available</li>
+<li>Rust has the most comprehensive purity detection support</li>
+</ul>
+<p><strong>Confidence scoring (when available):</strong></p>
+<ul>
+<li><strong>0.9-1.0</strong>: Very confident (no side effects detected)</li>
+<li><strong>0.7-0.8</strong>: Likely pure (minimal suspicious patterns)</li>
+<li><strong>0.5-0.6</strong>: Uncertain (some suspicious patterns)</li>
+<li><strong>0.0-0.4</strong>: Likely impure (side effects detected)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Pure: confidence = 0.95
+fn calculate_total(items: &amp;[Item]) -&gt; f64 {
+    items.iter().map(|i| i.price).sum()
+}
+
+// Impure: confidence = 0.1 (I/O detected)
+fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
+    let total = items.iter().map(|i| i.price).sum();
+    write_to_file(total)  // Side effect!
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Pure functions are easier to test</li>
+<li>Can be safely cached or memoized</li>
+<li>Safe to parallelize</li>
+<li>Easier to reason about</li>
+</ul>
+<h3 id="call-graph-analysis"><a class="header" href="#call-graph-analysis">Call Graph Analysis</a></h3>
+<p>Debtmap builds a call graph showing function relationships:</p>
+<p><strong>Upstream callers</strong> - Who calls this function</p>
+<ul>
+<li>Indicates impact radius</li>
+<li>More callers = higher impact if it breaks</li>
+</ul>
+<p><strong>Downstream callees</strong> - What this function calls</p>
+<ul>
+<li>Indicates dependencies</li>
+<li>More callees = more integration testing needed</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-json">{
+  "name": "process_payment",
+  "upstream_callers": [
+    "handle_checkout",
+    "process_subscription",
+    "handle_refund"
+  ],
+  "downstream_callees": [
+    "validate_payment_method",
+    "calculate_fees",
+    "record_transaction",
+    "send_receipt"
+  ]
+}
+</code></pre>
+<p><strong>Impact analysis:</strong></p>
+<ul>
+<li><strong>Entry points</strong>: Functions with no upstream callers (main, handlers)</li>
+<li><strong>Critical paths</strong>: Functions with many upstream callers</li>
+<li><strong>Integration complexity</strong>: Functions with many downstream callees</li>
+</ul>
+<h3 id="entropy-based-complexity"><a class="header" href="#entropy-based-complexity">Entropy-Based Complexity</a></h3>
+<p>Advanced pattern detection to reduce false positives.</p>
+<p><strong>Token Classification:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum TokenType {
+    Variable,     // Weight: 1.0
+    Method,       // Weight: 1.5 (more important)
+    Literal,      // Weight: 0.5 (less important)
+    Keyword,      // Weight: 0.8
+    Operator,     // Weight: 0.6
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Shannon Entropy Calculation:</strong></p>
+<pre><code>H(X) = -Σ p(x) × log₂(p(x))
+</code></pre>
+<p>where p(x) is the probability of each token type.</p>
+<p><strong>Dampening Decision:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if entropy_score.token_entropy &lt; 0.4
+   &amp;&amp; entropy_score.pattern_repetition &gt; 0.6
+   &amp;&amp; entropy_score.branch_similarity &gt; 0.7
+{
+    // Apply dampening
+    effective_complexity = base_complexity × (1 - dampening_factor);
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Output explanation:</strong></p>
+<pre><code>Function: validate_input
+  Cyclomatic: 15 → Effective: 5
+  Reasoning:
+    - High pattern repetition detected (85%)
+    - Low token entropy indicates simple patterns (0.32)
+    - Similar branch structures found (92% similarity)
+    - Complexity reduced by 67% due to pattern-based code
+</code></pre>
+<h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
+<p>Debtmap adjusts analysis based on code context:</p>
+<p><strong>Pattern Recognition:</strong></p>
+<ul>
+<li>Validation patterns (repetitive checks)</li>
+<li>Dispatcher patterns (routing logic)</li>
+<li>Builder patterns (fluent APIs)</li>
+<li>Configuration parsers (key-value processing)</li>
+</ul>
+<p><strong>Adjustment Strategies:</strong></p>
+<ul>
+<li>Reduce false positives for recognized patterns</li>
+<li>Apply appropriate thresholds by pattern type</li>
+<li>Consider pattern confidence in scoring</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Recognized as "validation_pattern"
+// Complexity dampening applied
+fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
+    if input.name.is_empty() { return Err(Error::EmptyName); }
+    if input.email.is_empty() { return Err(Error::EmptyEmail); }
+    if input.age &lt; 13 { return Err(Error::TooYoung); }
+    // ... more similar validations
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h3>
+<p>Debtmap parses LCOV coverage data for risk analysis:</p>
+<p><strong>LCOV Support:</strong></p>
+<ul>
+<li>Standard format from most coverage tools</li>
+<li>Line-level coverage tracking</li>
+<li>Function-level aggregation</li>
+</ul>
+<p><strong>Coverage Index:</strong></p>
+<ul>
+<li>O(1) exact name lookups (~0.5μs)</li>
+<li>O(log n) line-based fallback (~5-8μs)</li>
+<li>~200 bytes per function</li>
+<li>Thread-safe (Arc<CoverageIndex>)</li>
+</ul>
+<p><strong>Performance:</strong></p>
+<ul>
+<li>Index build: ~20-30ms for 5,000 functions</li>
+<li>Analysis overhead: ~2.5x baseline (target: ≤3x)</li>
+<li>Example: 53ms → 130ms for 100 files</li>
+</ul>
+<p><strong>Generating coverage:</strong></p>
+<pre><code class="language-bash"># Rust
+cargo tarpaulin --out lcov --output-dir target/coverage
+
+# Python
+pytest --cov --cov-report=lcov
+
+# JavaScript/TypeScript
+jest --coverage --coverageReporters=lcov
+
+# Go
+go test -coverprofile=coverage.out
+gocover-cobertura &lt; coverage.out &gt; coverage.lcov
+</code></pre>
+<p><strong>Using with Debtmap:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov target/coverage/lcov.info
+</code></pre>
+<p><strong>Coverage dampening:</strong>
+When coverage data is provided, debt scores are dampened for well-tested code:</p>
+<pre><code>final_score = base_score × (1 - coverage_percentage)
+</code></pre>
+<p>This ensures well-tested complex code gets lower priority than untested simple code.</p>
+<h2 id="example-outputs"><a class="header" href="#example-outputs">Example Outputs</a></h2>
+<h3 id="high-complexity-function-needs-refactoring"><a class="header" href="#high-complexity-function-needs-refactoring">High Complexity Function (Needs Refactoring)</a></h3>
+<p><strong>Terminal Output:</strong></p>
+<pre><code>#1 SCORE: 9.2 [CRITICAL]
+├─ COMPLEXITY: ./src/payments/processor.rs:145 process_transaction()
+├─ ACTION: Refactor into 4 smaller functions
+├─ IMPACT: Reduce complexity from 25 to 8, improve testability
+├─ COMPLEXITY: cyclomatic=25, branches=25, cognitive=38, nesting=5, lines=120
+├─ DEPENDENCIES: 3 upstream, 8 downstream
+└─ WHY: Exceeds all complexity thresholds, difficult to test and maintain
+</code></pre>
+<p><strong>JSON Output:</strong></p>
+<pre><code class="language-json">{
+  "id": "complexity_src_payments_processor_rs_145",
+  "debt_type": "Complexity",
+  "priority": "Critical",
+  "file": "src/payments/processor.rs",
+  "line": 145,
+  "message": "Function exceeds complexity threshold",
+  "context": "Cyclomatic: 25, Cognitive: 38, Nesting: 5",
+  "function_metrics": {
+    "name": "process_transaction",
+    "cyclomatic": 25,
+    "cognitive": 38,
+    "nesting": 5,
+    "length": 120,
+    "is_pure": false,
+    "purity_confidence": 0.15,
+    "upstream_callers": ["handle_payment", "handle_subscription", "handle_refund"],
+    "downstream_callees": ["validate", "calculate_fees", "record_transaction", "send_receipt", "update_balance", "log_transaction", "check_fraud", "notify_user"]
+  }
+}
+</code></pre>
+<h3 id="well-tested-complex-function-good-example"><a class="header" href="#well-tested-complex-function-good-example">Well-Tested Complex Function (Good Example)</a></h3>
+<p><strong>Terminal Output:</strong></p>
+<pre><code>Function: calculate_tax (WELL TESTED - Good Example!)
+  File: src/tax/calculator.rs:78
+  Complexity: Cyclomatic=18, Cognitive=22
+  Coverage: 98%
+  Risk: LOW
+
+  Why this is good:
+  - High complexity is necessary (tax rules are complex)
+  - Thoroughly tested with 45 test cases
+  - Clear documentation of edge cases
+  - Good example to follow for other complex logic
+</code></pre>
+<h3 id="test-gap-needs-testing"><a class="header" href="#test-gap-needs-testing">Test Gap (Needs Testing)</a></h3>
+<p><strong>Terminal Output:</strong></p>
+<pre><code>#2 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/analyzers/rust_call_graph.rs:38 add_function_to_graph()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.7 risk reduction
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=8, nesting=2, lines=32
+├─ DEPENDENCIES: 0 upstream, 11 downstream
+├─ TEST EFFORT: Simple (2-3 hours)
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=8)
+    High impact - 11 functions depend on this
+</code></pre>
+<p><strong>JSON Output:</strong></p>
+<pre><code class="language-json">{
+  "function": "add_function_to_graph",
+  "file": "src/analyzers/rust_call_graph.rs",
+  "line": 38,
+  "current_risk": 8.9,
+  "potential_risk_reduction": 3.7,
+  "recommendation": {
+    "action": "Add unit tests",
+    "details": "Add 6 unit tests for full coverage",
+    "effort_estimate": "2-3 hours"
+  },
+  "test_effort": {
+    "estimated_difficulty": "Simple",
+    "cognitive_load": 8,
+    "branch_count": 6,
+    "recommended_test_cases": 6
+  },
+  "complexity": {
+    "cyclomatic": 6,
+    "cognitive": 8,
+    "nesting": 2,
+    "length": 32
+  },
+  "dependencies": {
+    "upstream_callers": [],
+    "downstream_callees": [
+      "get_function_name", "extract_parameters", "parse_return_type",
+      "add_to_registry", "update_call_sites", "resolve_types",
+      "track_visibility", "record_location", "increment_counter",
+      "validate_signature", "log_registration"
+    ]
+  },
+  "roi": 4.5
+}
+</code></pre>
+<h3 id="entropy-dampened-validation-function"><a class="header" href="#entropy-dampened-validation-function">Entropy-Dampened Validation Function</a></h3>
+<p><strong>Terminal Output:</strong></p>
+<pre><code>Function: validate_config
+  File: src/config/validator.rs:23
+  Cyclomatic: 20 → Effective: 7 (65% dampened)
+  Risk: LOW
+
+  Entropy Analysis:
+    ├─ Token Entropy: 0.28 (low variety - repetitive patterns)
+    ├─ Pattern Repetition: 0.88 (high similarity between checks)
+    ├─ Branch Similarity: 0.91 (consistent validation structure)
+    └─ Reasoning: Complexity reduced by 65% due to pattern-based code
+
+  This appears complex but is actually a repetitive validation pattern.
+  Lower priority for refactoring.
+</code></pre>
+<h3 id="beforeafter-refactoring-comparison"><a class="header" href="#beforeafter-refactoring-comparison">Before/After Refactoring Comparison</a></h3>
+<p><strong>Before:</strong></p>
+<pre><code>Function: process_order
+  Cyclomatic: 22
+  Cognitive: 35
+  Coverage: 15%
+  Risk Score: 52.3 (CRITICAL)
+  Debt Score: 50 (Critical Complexity)
+</code></pre>
+<p><strong>After:</strong></p>
+<pre><code>Function: process_order (refactored)
+  Cyclomatic: 5
+  Cognitive: 6
+  Coverage: 92%
+  Risk Score: 2.1 (LOW)
+  Debt Score: 0 (no debt)
+
+Extracted functions:
+  - validate_order (Cyclomatic: 4, Coverage: 100%)
+  - calculate_totals (Cyclomatic: 3, Coverage: 95%)
+  - apply_discounts (Cyclomatic: 6, Coverage: 88%)
+  - finalize_order (Cyclomatic: 4, Coverage: 90%)
+
+Impact:
+  ✓ Complexity reduced by 77%
+  ✓ Coverage improved by 513%
+  ✓ Risk reduced by 96%
+  ✓ Created 4 focused, testable functions
+</code></pre>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li><strong><a href="./output-formats.html">Output Formats</a></strong> - Detailed JSON schema and integration patterns</li>
+<li><strong><a href="./configuration.html">Configuration</a></strong> - Customize thresholds and analysis behavior</li>
+</ul>
+<p>For questions or issues, visit <a href="https://github.com/iepathos/debtmap/issues">GitHub Issues</a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="cli-reference.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="configuration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="cli-reference.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="configuration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

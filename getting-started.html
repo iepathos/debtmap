@@ -1,0 +1,593 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Getting Started - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<p>This guide will help you install Debtmap and run your first analysis in just a few minutes.</p>
+<h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
+<p>Before installing Debtmap, you’ll need:</p>
+<ul>
+<li><strong>For pre-built binaries</strong>: No prerequisites! The install script handles everything.</li>
+<li><strong>For cargo install or building from source</strong>:
+<ul>
+<li>Rust toolchain (rustc and cargo)</li>
+<li>Supported platforms: Linux, macOS, Windows</li>
+<li>Rust edition 2021 or later</li>
+</ul>
+</li>
+</ul>
+<p><strong>Optional</strong> (for coverage-based risk analysis):</p>
+<ul>
+<li><strong>Rust projects</strong>: <code>cargo-tarpaulin</code> for coverage data</li>
+<li><strong>JavaScript/TypeScript</strong>: Jest or other tools generating LCOV format</li>
+<li><strong>Python</strong>: pytest with coverage plugin</li>
+</ul>
+<h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
+<h3 id="quick-install-recommended"><a class="header" href="#quick-install-recommended">Quick Install (Recommended)</a></h3>
+<p>Install the latest release with a single command:</p>
+<pre><code class="language-bash">curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+</code></pre>
+<p>Or with wget:</p>
+<pre><code class="language-bash">wget -qO- https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+</code></pre>
+<p>This will:</p>
+<ul>
+<li>Automatically detect your OS and architecture</li>
+<li>Download the appropriate pre-built binary from the latest GitHub release</li>
+<li>Install debtmap to <code>~/.cargo/bin</code> if it exists, otherwise <code>~/.local/bin</code></li>
+<li>Offer to automatically add the install directory to your PATH if needed</li>
+</ul>
+<h3 id="using-cargo"><a class="header" href="#using-cargo">Using Cargo</a></h3>
+<p>If you have Rust installed:</p>
+<pre><code class="language-bash">cargo install debtmap
+</code></pre>
+<h3 id="from-source"><a class="header" href="#from-source">From Source</a></h3>
+<p>For the latest development version:</p>
+<pre><code class="language-bash"># Clone the repository
+git clone https://github.com/iepathos/debtmap.git
+cd debtmap
+
+# Build and install
+cargo install --path .
+</code></pre>
+<h3 id="verify-installation"><a class="header" href="#verify-installation">Verify Installation</a></h3>
+<p>After installation, verify Debtmap is working:</p>
+<pre><code class="language-bash"># Check version
+debtmap --version
+
+# See available commands
+debtmap --help
+</code></pre>
+<p><strong>Common installation issues:</strong></p>
+<ul>
+<li><strong>Binary not in PATH</strong>: Add <code>~/.cargo/bin</code> or <code>~/.local/bin</code> to your PATH
+<pre><code class="language-bash">export PATH="$HOME/.cargo/bin:$PATH"  # Add to ~/.bashrc or ~/.zshrc
+</code></pre>
+</li>
+<li><strong>Permission issues</strong>: Run the install script with your current user (don’t use sudo)</li>
+<li><strong>Cargo not found</strong>: Install Rust from https://rustup.rs</li>
+</ul>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<p>Here are the most common commands to get you started:</p>
+<pre><code class="language-bash"># Analyze current directory (simplest command)
+debtmap analyze .
+
+# Analyze with coverage data for risk scoring (recommended)
+# Note: --lcov is a shorthand alias for --coverage-file
+debtmap analyze . --lcov target/coverage/lcov.info
+
+# Generate coverage first (for Rust projects)
+cargo tarpaulin --out lcov --output-dir target/coverage
+debtmap analyze . --lcov target/coverage/lcov.info
+
+# Analyze with custom thresholds
+debtmap analyze ./src --threshold-complexity 15 --threshold-duplication 50
+
+# Output as JSON (for CI/CD integration)
+debtmap analyze ./src --format json --output report.json
+
+# Show only top 10 high-priority issues
+debtmap analyze . --top 10
+
+# Initialize configuration file for project-specific settings
+debtmap init
+
+# Validate against thresholds (CI/CD integration)
+debtmap validate ./src --max-debt-density 5.0
+
+# Compare before/after to track improvements
+debtmap analyze . --format json --output before.json
+# ... make improvements ...
+debtmap analyze . --format json --output after.json
+debtmap compare --before before.json --after after.json
+</code></pre>
+<h3 id="advanced-options"><a class="header" href="#advanced-options">Advanced Options</a></h3>
+<p>Debtmap provides many powerful options to customize your analysis:</p>
+<p><strong>Verbosity Levels:</strong></p>
+<pre><code class="language-bash"># Show main factors contributing to scores
+debtmap analyze . -v
+
+# Show detailed calculations
+debtmap analyze . -vv
+
+# Show all debug information
+debtmap analyze . -vvv
+</code></pre>
+<p><strong>Filtering and Prioritization:</strong></p>
+<pre><code class="language-bash"># Only show high-priority items
+debtmap analyze . --min-priority high
+
+# Filter by specific categories
+debtmap analyze . --filter Architecture,Testing
+
+# Group results by debt category
+debtmap analyze . --group-by-category
+</code></pre>
+<p><strong>Security Focus:</strong></p>
+<pre><code class="language-bash"># Emphasize security-relevant patterns
+debtmap analyze . --security-enhanced
+</code></pre>
+<p><strong>Cache Management:</strong></p>
+<pre><code class="language-bash"># Skip cache for fresh analysis
+debtmap analyze . --no-cache
+
+# Clear cache and rebuild
+debtmap analyze . --clear-cache
+
+# View cache statistics
+debtmap analyze . --cache-stats
+</code></pre>
+<p><strong>Performance Control:</strong></p>
+<pre><code class="language-bash"># Limit parallel jobs
+debtmap analyze . --jobs 4
+
+# Disable parallel processing
+debtmap analyze . --no-parallel
+</code></pre>
+<p><strong>Output Control:</strong></p>
+<pre><code class="language-bash"># Plain output (no colors/emoji, for CI/CD)
+debtmap analyze . --plain
+
+# Compact summary output
+debtmap analyze . --summary
+</code></pre>
+<h2 id="first-analysis"><a class="header" href="#first-analysis">First Analysis</a></h2>
+<p>Let’s run your first analysis! Navigate to a project directory and run:</p>
+<pre><code class="language-bash">debtmap analyze .
+</code></pre>
+<p><strong>What happens during analysis:</strong></p>
+<ol>
+<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust, Python, JavaScript, TypeScript)</li>
+<li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
+<li><strong>Metrics Calculation</strong> - Complexity, debt patterns, and risk scores are computed</li>
+<li><strong>Prioritization</strong> - Results are ranked by priority (CRITICAL, HIGH, MEDIUM, LOW)</li>
+<li><strong>Output</strong> - Results are displayed in your chosen format</li>
+</ol>
+<p><strong>Expected timing</strong>: Analyzing a 10,000 LOC project typically takes 2-5 seconds. The first run may be slightly slower as Debtmap builds its cache.</p>
+<p><strong>About Caching:</strong>
+Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:</p>
+<ul>
+<li><strong>Cache location</strong>: <code>XDG_CACHE_HOME/debtmap</code> on Linux, <code>~/Library/Caches/debtmap</code> on macOS</li>
+<li><strong>What’s cached</strong>: Parsed ASTs and computed metrics for each file</li>
+<li><strong>Invalidation</strong>: Cache is automatically invalidated when files are modified</li>
+<li><strong>Management</strong>: Use <code>--clear-cache</code> to clear, <code>--no-cache</code> to skip, or <code>--cache-stats</code> to view statistics</li>
+</ul>
+<p><strong>Language support</strong>:</p>
+<ul>
+<li><strong>Rust</strong>: Full support with advanced features (trait detection, purity analysis, call graphs)</li>
+<li><strong>Python</strong>: Partial support (complexity metrics, basic debt detection)</li>
+<li><strong>JavaScript/TypeScript</strong>: Partial support (complexity metrics, basic debt detection)</li>
+</ul>
+<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
+<p>When you run <code>debtmap analyze .</code>, you’ll see output like this:</p>
+<pre><code>════════════════════════════════════════════
+    PRIORITY TECHNICAL DEBT FIXES
+════════════════════════════════════════════
+
+🎯 TOP 3 RECOMMENDATIONS (by unified priority)
+
+#1 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/analyzers/rust_call_graph.rs:38 add_function_to_graph()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.7 risk
+├─ COMPLEXITY: cyclomatic=6, branches=6, cognitive=8, nesting=2, lines=32
+├─ DEPENDENCIES: 0 upstream, 11 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=6, cog=8)
+
+#2 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/debt/smells.rs:196 detect_data_clumps()
+├─ ACTION: Add 5 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.7 risk
+├─ COMPLEXITY: cyclomatic=5, branches=5, cognitive=11, nesting=5, lines=31
+├─ DEPENDENCIES: 0 upstream, 4 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=5, cog=11)
+
+#3 SCORE: 8.6 [CRITICAL]
+├─ TEST GAP: ./src/risk/context/dependency.rs:247 explain()
+├─ ACTION: Add 5 unit tests for full coverage
+├─ IMPACT: Full test coverage, -3.6 risk
+├─ COMPLEXITY: cyclomatic=5, branches=5, cognitive=9, nesting=1, lines=24
+├─ DEPENDENCIES: 0 upstream, 1 downstream
+└─ WHY: Business logic with 0% coverage, manageable complexity (cyclo=5, cog=9)
+
+
+📊 TOTAL DEBT SCORE: 4907
+📈 OVERALL COVERAGE: 67.12%
+</code></pre>
+<h2 id="understanding-the-output"><a class="header" href="#understanding-the-output">Understanding the Output</a></h2>
+<p>Let’s break down what this output means:</p>
+<h3 id="priority-levels"><a class="header" href="#priority-levels">Priority Levels</a></h3>
+<ul>
+<li><strong>CRITICAL</strong> (9.0-10.0): Immediate action required - high complexity with no test coverage</li>
+<li><strong>HIGH</strong> (7.0-8.9): Should be addressed soon - moderate-high complexity with poor coverage</li>
+<li><strong>MEDIUM</strong> (5.0-6.9): Plan for next sprint - moderate complexity or partial coverage gaps</li>
+<li><strong>LOW</strong> (3.0-4.9): Nice to have - well-tested or simple functions</li>
+</ul>
+<p><strong>Note:</strong> These are default priority thresholds. You can customize them in <code>.debtmap.toml</code> under the <code>[tiers]</code> section to match your team’s standards.</p>
+<h3 id="key-metrics"><a class="header" href="#key-metrics">Key Metrics</a></h3>
+<ul>
+<li>
+<p><strong>Unified Score</strong> (0-10 scale): Overall priority combining complexity, coverage, and dependencies</p>
+<ul>
+<li>Higher score = higher priority</li>
+<li>Takes into account multiple risk factors</li>
+</ul>
+</li>
+<li>
+<p><strong>Debt Type</strong>: Category of the issue</p>
+<ul>
+<li><code>TestGap</code>: Missing test coverage</li>
+<li><code>Complexity</code>: Exceeds complexity thresholds</li>
+<li><code>Duplication</code>: Repeated code blocks</li>
+<li><code>CodeSmell</code>: Anti-patterns and bad practices</li>
+</ul>
+</li>
+<li>
+<p><strong>Complexity Metrics</strong>:</p>
+<ul>
+<li><strong>Cyclomatic</strong>: Number of decision points (branches, loops)</li>
+<li><strong>Cognitive</strong>: How difficult the code is to understand</li>
+<li><strong>Nesting</strong>: Maximum indentation depth</li>
+<li><strong>Lines</strong>: Function length</li>
+</ul>
+</li>
+<li>
+<p><strong>Dependencies</strong>:</p>
+<ul>
+<li><strong>Upstream callers</strong>: Functions that call this function</li>
+<li><strong>Downstream callees</strong>: Functions this function calls</li>
+<li>More dependencies = higher impact when this code breaks</li>
+</ul>
+</li>
+</ul>
+<h3 id="recommendation-structure"><a class="header" href="#recommendation-structure">Recommendation Structure</a></h3>
+<p>Each recommendation shows:</p>
+<ul>
+<li><strong>ACTION</strong>: What you should do (e.g., “Add 6 unit tests”)</li>
+<li><strong>IMPACT</strong>: Expected improvement (e.g., “Full test coverage, -3.7 risk”)</li>
+<li><strong>WHY</strong>: The reasoning behind this recommendation</li>
+</ul>
+<h3 id="organizing-results"><a class="header" href="#organizing-results">Organizing Results</a></h3>
+<p>When analyzing large codebases, you can organize and filter results to focus on specific areas:</p>
+<p><strong>Group by Debt Category:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --group-by-category
+</code></pre>
+<p>This organizes results by type: Architecture, Testing, Performance, CodeQuality</p>
+<p><strong>Filter by Priority:</strong></p>
+<pre><code class="language-bash"># Show only high and critical priority items
+debtmap analyze . --min-priority high
+
+# Combine with --top to limit results
+debtmap analyze . --min-priority high --top 10
+</code></pre>
+<p><strong>Filter by Category:</strong></p>
+<pre><code class="language-bash"># Focus on specific debt types
+debtmap analyze . --filter Architecture,Testing
+
+# Available categories: Architecture, Testing, Performance, CodeQuality
+</code></pre>
+<p>These filtering options help you focus on specific types of technical debt, making it easier to plan targeted improvements.</p>
+<h3 id="summary-statistics"><a class="header" href="#summary-statistics">Summary Statistics</a></h3>
+<ul>
+<li>
+<p><strong>Total Debt Score</strong>: Sum of all debt scores across your codebase</p>
+<ul>
+<li>Lower is better</li>
+<li>Track over time to measure improvement</li>
+</ul>
+</li>
+<li>
+<p><strong>Overall Coverage</strong>: Percentage of code covered by tests</p>
+<ul>
+<li>Only shown when coverage data is provided</li>
+</ul>
+</li>
+</ul>
+<h3 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h3>
+<p>Debtmap supports multiple output formats:</p>
+<ul>
+<li><strong>Terminal</strong> (default): Human-readable colored output with tables</li>
+<li><strong>JSON</strong>: Machine-readable format for CI/CD integration</li>
+<li><strong>Markdown</strong>: Documentation-friendly format for reports</li>
+</ul>
+<p>Example JSON output:</p>
+<pre><code class="language-bash"># By default, JSON uses legacy format
+debtmap analyze . --format json --output report.json
+
+# For the new unified format (with consistent structure and type field):
+debtmap analyze . --format json --output-format unified --output report.json
+</code></pre>
+<p>Example Markdown output:</p>
+<pre><code class="language-bash">debtmap analyze . --format markdown --output report.md
+</code></pre>
+<h2 id="whats-next"><a class="header" href="#whats-next">What’s Next?</a></h2>
+<p>Now that you’ve run your first analysis, explore these topics:</p>
+<ul>
+<li><strong><a href="./analysis-guide.html">Analysis Guide</a></strong> - Deep dive into complexity metrics, debt patterns, and risk scoring</li>
+<li><strong><a href="./output-formats.html">Output Formats</a></strong> - Detailed guide to JSON schema and integration options</li>
+<li><strong>Configuration</strong> - Customize thresholds and filters with <code>.debtmap.toml</code></li>
+<li><strong>CI/CD Integration</strong> - Use the <code>validate</code> command to enforce quality gates</li>
+</ul>
+<h3 id="generate-a-configuration-file"><a class="header" href="#generate-a-configuration-file">Generate a Configuration File</a></h3>
+<p>Create a project-specific configuration:</p>
+<pre><code class="language-bash">debtmap init
+</code></pre>
+<p>This creates a <code>.debtmap.toml</code> file with sensible defaults that you can customize for your project.</p>
+<p><strong>Key Configuration Options:</strong></p>
+<p>The configuration file allows you to customize:</p>
+<ul>
+<li><strong>Threshold customization</strong> - Adjust complexity, duplication, and file size thresholds</li>
+<li><strong>Scoring weights</strong> - Fine-tune how coverage, complexity, and dependencies are weighted</li>
+<li><strong>Language selection</strong> - Enable/disable specific language analyzers</li>
+<li><strong>Ignore patterns</strong> - Exclude test files or generated code from analysis</li>
+<li><strong>God object thresholds</strong> - Configure what constitutes a “god object” anti-pattern</li>
+<li><strong>Entropy analysis</strong> - Control entropy-based complexity detection</li>
+<li><strong>Priority tiers</strong> - Customize CRITICAL/HIGH/MEDIUM/LOW threshold ranges</li>
+</ul>
+<p>See the Configuration chapter for complete documentation of all available options.</p>
+<h3 id="try-analysis-with-coverage"><a class="header" href="#try-analysis-with-coverage">Try Analysis with Coverage</a></h3>
+<p>For more accurate risk assessment, run analysis with coverage data:</p>
+<pre><code class="language-bash"># For Rust projects
+cargo tarpaulin --out lcov --output-dir target/coverage
+debtmap analyze . --lcov target/coverage/lcov.info
+
+# For Python projects
+pytest --cov --cov-report=lcov
+debtmap analyze . --lcov coverage.lcov
+
+# For JavaScript/TypeScript projects
+jest --coverage --coverageReporters=lcov
+debtmap analyze . --lcov coverage/lcov.info
+</code></pre>
+<p>Coverage data helps Debtmap identify <strong>truly risky code</strong> - functions that are both complex AND untested.</p>
+<hr />
+<p><strong>Need help?</strong> Report issues at https://github.com/iepathos/debtmap/issues</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="introduction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="cli-reference.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="introduction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="cli-reference.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

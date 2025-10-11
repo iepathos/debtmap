@@ -1,0 +1,1172 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Output Formats - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h1>
+<p>Debtmap provides multiple output formats to suit different workflows, from interactive terminal reports to machine-readable JSON for CI/CD integration. This chapter covers all available formats and how to use them effectively.</p>
+<h2 id="format-selection"><a class="header" href="#format-selection">Format Selection</a></h2>
+<p>Select the output format using the <code>-f</code> or <code>--format</code> flag:</p>
+<pre><code class="language-bash"># Terminal output (default) - human-readable with colors
+debtmap analyze .
+
+# JSON output - machine-readable for tooling
+debtmap analyze . --format json
+
+# Markdown output - documentation and reports
+debtmap analyze . --format markdown
+</code></pre>
+<p>Available formats:</p>
+<ul>
+<li><strong>terminal</strong> (default): Interactive output with colors, emoji, and formatting</li>
+<li><strong>json</strong>: Structured data for programmatic processing</li>
+<li><strong>markdown</strong>: Reports suitable for documentation and PR comments</li>
+</ul>
+<h3 id="writing-to-files"><a class="header" href="#writing-to-files">Writing to Files</a></h3>
+<p>By default, output goes to stdout. Use <code>-o</code> or <code>--output</code> to write to a file:</p>
+<pre><code class="language-bash"># Write JSON to file
+debtmap analyze . --format json -o report.json
+
+# Write markdown report
+debtmap analyze . --format markdown -o DEBT_REPORT.md
+
+# Terminal output to file (preserves colors)
+debtmap analyze . -o analysis.txt
+</code></pre>
+<h2 id="terminal-output"><a class="header" href="#terminal-output">Terminal Output</a></h2>
+<p>The terminal format provides an interactive, color-coded report designed for developer workflows. It’s the default format and optimized for readability.</p>
+<h3 id="output-structure"><a class="header" href="#output-structure">Output Structure</a></h3>
+<p>Terminal output is organized into five main sections:</p>
+<ol>
+<li><strong>Header</strong> - Analysis report title</li>
+<li><strong>Codebase Summary</strong> - High-level metrics and debt score</li>
+<li><strong>Complexity Hotspots</strong> - Top 5 most complex functions with refactoring guidance</li>
+<li><strong>Technical Debt</strong> - High-priority debt items requiring attention</li>
+<li><strong>Pass/Fail Status</strong> - Overall quality assessment</li>
+</ol>
+<h3 id="example-terminal-output"><a class="header" href="#example-terminal-output">Example Terminal Output</a></h3>
+<pre><code>═══════════════════════════════════════════
+           DEBTMAP ANALYSIS REPORT
+═══════════════════════════════════════════
+
+📊 CODEBASE Summary
+───────────────────────────────────────────
+  Files analyzed:      42
+  Total functions:     287
+  Average complexity:  6.3
+  Debt items:          15
+  Total debt score:    156 (threshold: 100)
+
+⚠️  COMPLEXITY HOTSPOTS (Top 5)
+───────────────────────────────────────────
+  1. src/analyzers/rust.rs:245 parse_function() - Cyclomatic: 18, Cognitive: 24
+     ACTION: Extract 3-5 pure functions using decompose-then-transform strategy
+     PATTERNS: Decompose into logical units, then apply functional patterns
+     BENEFIT: Pure functions are easily testable and composable
+
+  2. src/debt/smells.rs:196 detect_data_clumps() - Cyclomatic: 15, Cognitive: 20
+     ↓ Entropy: 0.32, Repetition: 85%, Effective: 0.6x
+       High pattern repetition detected (85%)
+
+🔧 TECHNICAL DEBT (15 items)
+───────────────────────────────────────────
+  High Priority (5):
+    - src/risk/scoring.rs:142 - TODO: Implement caching for score calculations
+    - src/core/metrics.rs:89 - High complexity: cyclomatic=16
+    - src/debt/patterns.rs:201 - Code duplication: 65 lines duplicated
+
+✓ Pass/Fail: PASS
+</code></pre>
+<h3 id="color-coding-and-symbols"><a class="header" href="#color-coding-and-symbols">Color Coding and Symbols</a></h3>
+<p>The terminal output uses colors and symbols for quick visual scanning:</p>
+<p><strong>Status Indicators:</strong></p>
+<ul>
+<li>✓ Green: Passing, good, well-tested</li>
+<li>⚠️  Yellow: Warning, moderate complexity</li>
+<li>✗ Red: Failing, critical, high complexity</li>
+<li>📊 Blue: Information, metrics</li>
+<li>🔧 Orange: Technical debt items</li>
+<li>🎯 Cyan: Recommendations</li>
+</ul>
+<p><strong>Complexity Classification:</strong></p>
+<ul>
+<li><strong>LOW</strong> (≤5): Green - Simple, easy to maintain</li>
+<li><strong>MODERATE</strong> (6-10): Yellow - Consider refactoring</li>
+<li><strong>MEDIUM</strong> (11-15): Orange - Should refactor</li>
+<li><strong>HIGH</strong> (&gt;15): Red - Urgent refactoring needed</li>
+</ul>
+<p><strong>Debt Score Thresholds:</strong></p>
+<p>The default debt threshold is <strong>100</strong>. Scores are colored based on this threshold:</p>
+<ul>
+<li><strong>Green (≤50)</strong>: Healthy - Below half threshold</li>
+<li><strong>Yellow (51-100)</strong>: Attention needed - Between half and full threshold</li>
+<li><strong>Red (&gt;100)</strong>: Action required - Exceeds threshold</li>
+</ul>
+<h3 id="refactoring-guidance"><a class="header" href="#refactoring-guidance">Refactoring Guidance</a></h3>
+<p>For complex functions (cyclomatic complexity &gt; 5), the terminal output provides actionable refactoring recommendations:</p>
+<pre><code>ACTION: Extract 3-5 pure functions using decompose-then-transform strategy
+PATTERNS: Decompose into logical units, then apply functional patterns
+BENEFIT: Pure functions are easily testable and composable
+</code></pre>
+<p>Guidance levels:</p>
+<ul>
+<li><strong>Moderate</strong> (6-10): Extract 2-3 pure functions with direct transformation</li>
+<li><strong>High</strong> (11-15): Extract 3-5 pure functions with decomposition strategy</li>
+<li><strong>Severe</strong> (&gt;15): Extract 5+ functions into modules with functional core/imperative shell</li>
+</ul>
+<p>See the <a href="./analysis-guide.html">Analysis Guide</a> for metric explanations.</p>
+<h3 id="plain-terminal-mode"><a class="header" href="#plain-terminal-mode">Plain Terminal Mode</a></h3>
+<p>For environments without color support or when piping to tools, use <code>--plain</code>:</p>
+<pre><code class="language-bash"># ASCII-only output, no colors, no emoji
+debtmap analyze . --plain
+</code></pre>
+<p>Plain mode:</p>
+<ul>
+<li>Removes ANSI color codes</li>
+<li>Replaces emoji with text labels</li>
+<li>Uses ASCII box-drawing characters</li>
+<li>Machine-parseable structure</li>
+</ul>
+<h3 id="verbosity-levels"><a class="header" href="#verbosity-levels">Verbosity Levels</a></h3>
+<p>Control detail level with <code>-v</code> flags (can be repeated):</p>
+<pre><code class="language-bash"># Standard output
+debtmap analyze .
+
+# Level 1: Show main score factors
+debtmap analyze . -v
+
+# Level 2: Show detailed calculations
+debtmap analyze . -vv
+
+# Level 3: Show all debug information
+debtmap analyze . -vvv
+</code></pre>
+<p><strong>Verbosity features:</strong></p>
+<ul>
+<li><code>-v</code>: Show main score factors (complexity, coverage, dependency breakdown)</li>
+<li><code>-vv</code>: Show detailed calculations with formulas and intermediate values</li>
+<li><code>-vvv</code>: Show all debug information including entropy metrics, role detection, and cache hits</li>
+</ul>
+<p>Each level includes all information from the previous levels, progressively adding more detail to help understand how scores are calculated.</p>
+<h3 id="risk-analysis-output"><a class="header" href="#risk-analysis-output">Risk Analysis Output</a></h3>
+<p>When coverage data is provided via <code>--lcov</code>, terminal output includes a dedicated risk analysis section:</p>
+<pre><code>═══════════════════════════════════════════
+           RISK ANALYSIS REPORT
+═══════════════════════════════════════════
+
+📈 RISK Summary
+───────────────────────────────────────────
+Codebase Risk Score: 45.5 (MEDIUM)
+Complexity-Coverage Correlation: -0.65
+
+Risk Distribution:
+  Critical: 2 functions
+  High: 5 functions
+  Medium: 10 functions
+  Low: 15 functions
+  Well Tested: 20 functions
+
+🎯 CRITICAL RISKS
+───────────────────────────────────────────
+1. src/core/parser.rs:142 parse_complex_ast()
+   Risk: 85.0 | Complexity: 15 | Coverage: 0%
+   Recommendation: Add 5 unit tests (est: 2-3 hours)
+   Impact: -40 risk reduction
+
+💡 RECOMMENDATIONS (by ROI)
+───────────────────────────────────────────
+1. test_me() - ROI: 5.0x
+   Current Risk: 75 | Reduction: 40 | Effort: Moderate
+   Rationale: High risk function with low coverage
+</code></pre>
+<p><strong>Risk Level Classification:</strong></p>
+<ul>
+<li><strong>LOW</strong> (&lt;30): Green</li>
+<li><strong>MEDIUM</strong> (30-60): Yellow</li>
+<li><strong>HIGH</strong> (&gt;60): Red</li>
+</ul>
+<h2 id="json-output"><a class="header" href="#json-output">JSON Output</a></h2>
+<p>JSON output provides complete analysis results in a machine-readable format, ideal for CI/CD pipelines, custom tooling, and programmatic analysis.</p>
+<h3 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h3>
+<pre><code class="language-bash"># Generate JSON output
+debtmap analyze . --format json
+
+# Save to file
+debtmap analyze . --format json -o report.json
+
+# Pretty-printed by default
+debtmap analyze . --format json | jq .
+</code></pre>
+<h3 id="json-schema-structure"><a class="header" href="#json-schema-structure">JSON Schema Structure</a></h3>
+<p>Debtmap outputs a structured JSON document with the following top-level fields:</p>
+<pre><code class="language-json">{
+  "project_path": "/path/to/project",
+  "timestamp": "2025-01-09T12:00:00Z",
+  "complexity": { ... },
+  "technical_debt": { ... },
+  "dependencies": { ... },
+  "duplications": [ ... ]
+}
+</code></pre>
+<h3 id="full-schema-example"><a class="header" href="#full-schema-example">Full Schema Example</a></h3>
+<p>Here’s a complete annotated JSON output example:</p>
+<pre><code class="language-json">{
+  // Project metadata
+  "project_path": "/Users/dev/myproject",
+  "timestamp": "2025-01-09T15:30:00Z",
+
+  // Complexity analysis results
+  "complexity": {
+    "metrics": [
+      {
+        "name": "calculate_risk_score",
+        "file": "src/risk/scoring.rs",
+        "line": 142,
+        "cyclomatic": 12,
+        "cognitive": 18,
+        "nesting": 4,
+        "length": 85,
+        "is_test": false,
+        "visibility": "pub",
+        "is_trait_method": false,
+        "in_test_module": false,
+        "entropy_score": {
+          "token_entropy": 0.65,
+          "pattern_repetition": 0.30,
+          "branch_similarity": 0.45,
+          "effective_complexity": 0.85
+        },
+        "is_pure": false,
+        "purity_confidence": 0.75,
+        "detected_patterns": ["nested_loops", "complex_conditionals"],
+        "upstream_callers": ["analyze_codebase", "generate_report"],
+        "downstream_callees": ["get_metrics", "apply_weights"]
+      }
+    ],
+    "summary": {
+      "total_functions": 287,
+      "average_complexity": 6.3,
+      "max_complexity": 24,
+      "high_complexity_count": 12
+    }
+  },
+
+  // Technical debt items
+  "technical_debt": {
+    "items": [
+      {
+        "id": "debt_001",
+        "debt_type": "Complexity",
+        "priority": "High",
+        "file": "src/analyzers/rust.rs",
+        "line": 245,
+        "column": 5,
+        "message": "High cyclomatic complexity: 18",
+        "context": "Function parse_function has excessive branching"
+      },
+      {
+        "id": "debt_002",
+        "debt_type": "Todo",
+        "priority": "Medium",
+        "file": "src/core/cache.rs",
+        "line": 89,
+        "column": null,
+        "message": "TODO: Implement LRU eviction policy",
+        "context": null
+      }
+    ],
+    "by_type": {
+      "Complexity": [ /* same structure as items */ ],
+      "Todo": [ /* ... */ ],
+      "Duplication": [ /* ... */ ]
+    },
+    "priorities": ["Low", "Medium", "High", "Critical"]
+  },
+
+  // Dependency analysis
+  "dependencies": {
+    "modules": [
+      {
+        "module": "risk::scoring",
+        "dependencies": ["core::metrics", "debt::patterns"],
+        "dependents": ["commands::analyze", "io::output"]
+      }
+    ],
+    "circular": [
+      {
+        "cycle": ["module_a", "module_b", "module_c", "module_a"]
+      }
+    ]
+  },
+
+  // Code duplication blocks
+  "duplications": [
+    {
+      "hash": "abc123def456",
+      "lines": 15,
+      "locations": [
+        {
+          "file": "src/parser/rust.rs",
+          "start_line": 42,
+          "end_line": 57
+        },
+        {
+          "file": "src/parser/python.rs",
+          "start_line": 89,
+          "end_line": 104
+        }
+      ]
+    }
+  ]
+}
+</code></pre>
+<h3 id="field-descriptions"><a class="header" href="#field-descriptions">Field Descriptions</a></h3>
+<p><strong>FunctionMetrics Fields:</strong></p>
+<ul>
+<li><code>name</code>: Function name</li>
+<li><code>file</code>: Path to source file</li>
+<li><code>line</code>: Line number where function is defined</li>
+<li><code>cyclomatic</code>: Cyclomatic complexity score</li>
+<li><code>cognitive</code>: Cognitive complexity score</li>
+<li><code>nesting</code>: Maximum nesting depth</li>
+<li><code>length</code>: Lines of code in function</li>
+<li><code>is_test</code>: Whether this is a test function</li>
+<li><code>visibility</code>: Rust visibility modifier (pub, pub(crate), or null)</li>
+<li><code>is_trait_method</code>: Whether this implements a trait</li>
+<li><code>in_test_module</code>: Whether inside #[cfg(test)]</li>
+<li><code>entropy_score</code>: Optional entropy analysis results</li>
+<li><code>is_pure</code>: Whether function is pure (no side effects)</li>
+<li><code>purity_confidence</code>: Confidence level (0.0-1.0)</li>
+<li><code>detected_patterns</code>: List of detected code patterns</li>
+<li><code>upstream_callers</code>: Functions that call this one</li>
+<li><code>downstream_callees</code>: Functions this one calls</li>
+</ul>
+<p><strong>DebtItem Fields:</strong></p>
+<ul>
+<li><code>id</code>: Unique identifier</li>
+<li><code>debt_type</code>: Type of debt (see DebtType enum below)</li>
+<li><code>priority</code>: Priority level (Low, Medium, High, Critical)</li>
+<li><code>file</code>: Path to file containing debt</li>
+<li><code>line</code>: Line number</li>
+<li><code>column</code>: Optional column number</li>
+<li><code>message</code>: Human-readable description</li>
+<li><code>context</code>: Optional additional context</li>
+</ul>
+<p><strong>DebtType Enum:</strong></p>
+<ul>
+<li><code>Todo</code>: TODO markers</li>
+<li><code>Fixme</code>: FIXME markers</li>
+<li><code>CodeSmell</code>: Code smell patterns</li>
+<li><code>Duplication</code>: Duplicated code</li>
+<li><code>Complexity</code>: Excessive complexity</li>
+<li><code>Dependency</code>: Dependency issues</li>
+<li><code>ErrorSwallowing</code>: Suppressed errors</li>
+<li><code>ResourceManagement</code>: Resource management issues</li>
+<li><code>CodeOrganization</code>: Organizational problems</li>
+<li><code>TestComplexity</code>: Complex test code</li>
+<li><code>TestTodo</code>: TODOs in tests</li>
+<li><code>TestDuplication</code>: Duplicated test code</li>
+<li><code>TestQuality</code>: Test quality issues</li>
+</ul>
+<h3 id="json-format-variants"><a class="header" href="#json-format-variants">JSON Format Variants</a></h3>
+<p>Debtmap supports two JSON output formats:</p>
+<pre><code class="language-bash"># Legacy format (default) - backward compatible
+debtmap analyze . --format json --output-format legacy
+
+# Unified format - new consistent structure
+debtmap analyze . --format json --output-format unified
+</code></pre>
+<blockquote>
+<p><strong>Note:</strong> The <code>--output-format</code> flag only applies when using <code>--format json</code>. It has no effect with markdown or terminal formats.</p>
+</blockquote>
+<p><strong>Legacy format:</strong> Uses <code>{File: {...}}</code> and <code>{Function: {...}}</code> wrappers for backward compatibility with existing tooling.</p>
+<p><strong>Unified format:</strong> Consistent structure with a <code>type</code> field, making parsing simpler and more predictable. Recommended for new integrations.</p>
+<h3 id="risk-insights-json"><a class="header" href="#risk-insights-json">Risk Insights JSON</a></h3>
+<p>When using <code>--lcov</code>, debtmap also outputs risk analysis in JSON:</p>
+<pre><code class="language-json">{
+  "items": [
+    {
+      "location": {
+        "file": "src/risk/scoring.rs",
+        "function": "calculate_priority",
+        "line": 66
+      },
+      "debt_type": "TestGap",
+      "unified_score": {
+        "complexity_factor": 3.2,
+        "coverage_factor": 10.0,
+        "dependency_factor": 2.5,
+        "role_multiplier": 1.2,
+        "final_score": 9.4
+      },
+      "function_role": "BusinessLogic",
+      "recommendation": {
+        "action": "Add unit tests",
+        "details": "Add 6 unit tests for full coverage",
+        "effort_estimate": "2-3 hours"
+      },
+      "expected_impact": {
+        "risk_reduction": 3.9,
+        "complexity_reduction": 0,
+        "coverage_improvement": 100
+      },
+      "upstream_dependencies": 0,
+      "downstream_dependencies": 3,
+      "nesting_depth": 1,
+      "function_length": 13
+    }
+  ],
+  "call_graph": {
+    "total_functions": 1523,
+    "entry_points": 12,
+    "test_functions": 456,
+    "max_depth": 8
+  },
+  "overall_coverage": 82.3,
+  "total_impact": {
+    "risk_reduction": 45.2,
+    "complexity_reduction": 12.3,
+    "coverage_improvement": 18.5
+  }
+}
+</code></pre>
+<h2 id="markdown-output"><a class="header" href="#markdown-output">Markdown Output</a></h2>
+<p>Markdown format generates documentation-friendly reports suitable for README files, PR comments, and technical documentation.</p>
+<h3 id="basic-usage-1"><a class="header" href="#basic-usage-1">Basic Usage</a></h3>
+<pre><code class="language-bash"># Generate markdown report
+debtmap analyze . --format markdown
+
+# Save to documentation
+debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
+</code></pre>
+<h3 id="markdown-structure"><a class="header" href="#markdown-structure">Markdown Structure</a></h3>
+<p>Markdown output includes:</p>
+<ol>
+<li><strong>Executive Summary</strong> - High-level metrics and health dashboard</li>
+<li><strong>Complexity Analysis</strong> - Detailed complexity breakdown by file</li>
+<li><strong>Technical Debt</strong> - Categorized debt items with priorities</li>
+<li><strong>Dependencies</strong> - Module dependencies and circular references</li>
+<li><strong>Recommendations</strong> - Prioritized action items</li>
+</ol>
+<h3 id="example-markdown-output"><a class="header" href="#example-markdown-output">Example Markdown Output</a></h3>
+<pre><code class="language-markdown"># Debtmap Analysis Report
+
+**Generated:** 2025-01-09 15:30:00 UTC
+**Project:** /Users/dev/myproject
+
+## Executive Summary
+
+- **Files Analyzed:** 42
+- **Total Functions:** 287
+- **Average Complexity:** 6.3
+- **Total Debt Items:** 15
+- **Debt Score:** 156/100 ⚠️
+
+### Health Dashboard
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| Complexity | 6.3 avg | ✅ Good |
+| Debt Score | 156 | ⚠️ Attention |
+| High Priority Items | 5 | ⚠️ Action Needed |
+
+## Complexity Analysis
+
+### Top 5 Complex Functions
+
+| Function | File | Cyclomatic | Cognitive | Priority |
+|----------|------|-----------|-----------|----------|
+| parse_function | src/analyzers/rust.rs:245 | 18 | 24 | High |
+| detect_data_clumps | src/debt/smells.rs:196 | 15 | 20 | Medium |
+| analyze_dependencies | src/core/deps.rs:89 | 14 | 18 | Medium |
+
+### Refactoring Recommendations
+
+**src/analyzers/rust.rs:245** - `parse_function()`
+- **Complexity:** Cyclomatic: 18, Cognitive: 24
+- **Action:** Extract 3-5 pure functions using decompose-then-transform strategy
+- **Patterns:** Decompose into logical units, then apply functional patterns
+- **Benefit:** Improved testability and maintainability
+
+## Technical Debt
+
+### High Priority (5 items)
+
+- **src/risk/scoring.rs:142** - TODO: Implement caching for score calculations
+- **src/core/metrics.rs:89** - High complexity: cyclomatic=16
+- **src/debt/patterns.rs:201** - Code duplication: 65 lines duplicated
+
+### Medium Priority (8 items)
+
+...
+
+## Dependencies
+
+### Circular Dependencies
+
+- `risk::scoring` → `core::metrics` → `risk::scoring`
+
+## Recommendations
+
+1. **Refactor parse_function** (High Priority)
+   - Reduce complexity from 18 to &lt;10
+   - Extract helper functions
+   - Estimated effort: 4-6 hours
+
+2. **Add tests for scoring module** (High Priority)
+   - Current coverage: 35%
+   - Target coverage: 80%
+   - Estimated effort: 2-3 hours
+</code></pre>
+<h3 id="enhanced-markdown-features"><a class="header" href="#enhanced-markdown-features">Enhanced Markdown Features</a></h3>
+<p>Debtmap can generate enhanced markdown reports with additional visualizations and insights:</p>
+<ul>
+<li><strong>Complexity distribution charts</strong> - Visual representation of complexity across codebase</li>
+<li><strong>Risk heat maps</strong> - Color-coded risk matrices</li>
+<li><strong>Dependency graphs</strong> - Module relationship diagrams</li>
+<li><strong>Quick wins section</strong> - Low-effort, high-impact improvements</li>
+<li><strong>Strategic priorities</strong> - Long-term architectural improvements</li>
+<li><strong>Team guidance</strong> - Role-specific recommendations</li>
+</ul>
+<p>Enhanced markdown is generated when using specific analysis flags (see source code for configuration options).</p>
+<h3 id="rendering-to-htmlpdf"><a class="header" href="#rendering-to-htmlpdf">Rendering to HTML/PDF</a></h3>
+<p>Markdown reports can be converted to other formats:</p>
+<pre><code class="language-bash"># Generate markdown
+debtmap analyze . --format markdown -o report.md
+
+# Convert to HTML with pandoc
+pandoc report.md -o report.html --standalone --css style.css
+
+# Convert to PDF
+pandoc report.md -o report.pdf --pdf-engine=xelatex
+</code></pre>
+<h2 id="tool-integration"><a class="header" href="#tool-integration">Tool Integration</a></h2>
+<h3 id="cicd-pipelines"><a class="header" href="#cicd-pipelines">CI/CD Pipelines</a></h3>
+<p>Debtmap JSON output integrates seamlessly with CI/CD systems.</p>
+<h4 id="github-actions"><a class="header" href="#github-actions">GitHub Actions</a></h4>
+<pre><code class="language-yaml">name: Code Quality
+
+on: [pull_request]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install debtmap
+        run: cargo install debtmap
+
+      - name: Run analysis
+        run: |
+          debtmap analyze . \
+            --format json \
+            --output analysis.json \
+            --lcov coverage/lcov.info
+
+      - name: Check thresholds
+        run: |
+          DEBT_SCORE=$(jq '.technical_debt.items | length' analysis.json)
+          if [ "$DEBT_SCORE" -gt 100 ]; then
+            echo "❌ Debt score too high: $DEBT_SCORE"
+            exit 1
+          fi
+
+      - name: Comment on PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const analysis = JSON.parse(fs.readFileSync('analysis.json'));
+            const summary = `## Debtmap Analysis
+
+            - **Debt Items:** ${analysis.technical_debt.items.length}
+            - **Average Complexity:** ${analysis.complexity.summary.average_complexity}
+            - **High Complexity Functions:** ${analysis.complexity.summary.high_complexity_count}
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+</code></pre>
+<h4 id="gitlab-ci"><a class="header" href="#gitlab-ci">GitLab CI</a></h4>
+<pre><code class="language-yaml">code_quality:
+  stage: test
+  script:
+    - cargo install debtmap
+    - debtmap analyze . --format json --output gl-code-quality.json
+    - |
+      DEBT=$(jq '.technical_debt.items | length' gl-code-quality.json)
+      if [ "$DEBT" -gt 50 ]; then
+        echo "Debt threshold exceeded"
+        exit 1
+      fi
+  artifacts:
+    reports:
+      codequality: gl-code-quality.json
+</code></pre>
+<h4 id="jenkins-pipeline"><a class="header" href="#jenkins-pipeline">Jenkins Pipeline</a></h4>
+<pre><code class="language-groovy">pipeline {
+    agent any
+
+    stages {
+        stage('Analyze') {
+            steps {
+                sh 'debtmap analyze . --format json -o report.json'
+
+                script {
+                    def json = readJSON file: 'report.json'
+                    def debtScore = json.technical_debt.items.size()
+
+                    if (debtScore &gt; 100) {
+                        error("Debt score ${debtScore} exceeds threshold")
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'report.json'
+        }
+    }
+}
+</code></pre>
+<h3 id="querying-json-with-jq"><a class="header" href="#querying-json-with-jq">Querying JSON with jq</a></h3>
+<p>Common jq queries for analyzing debtmap output:</p>
+<pre><code class="language-bash"># Get total debt items
+jq '.technical_debt.items | length' report.json
+
+# Get high-priority items only
+jq '.technical_debt.items[] | select(.priority == "High")' report.json
+
+# Get functions with complexity &gt; 10
+jq '.complexity.metrics[] | select(.cyclomatic &gt; 10)' report.json
+
+# Calculate average complexity
+jq '.complexity.summary.average_complexity' report.json
+
+# Get all TODO items
+jq '.technical_debt.items[] | select(.debt_type == "Todo")' report.json
+
+# Get top 5 complex functions
+jq '.complexity.metrics | sort_by(-.cyclomatic) | .[0:5] | .[] | {name, file, cyclomatic}' report.json
+
+# Get files with circular dependencies
+jq '.dependencies.circular[] | .cycle' report.json
+
+# Count debt items by type
+jq '.technical_debt.items | group_by(.debt_type) | map({type: .[0].debt_type, count: length})' report.json
+
+# Get functions with 0% coverage (when using --lcov)
+jq '.complexity.metrics[] | select(.coverage == 0)' report.json
+
+# Extract file paths with high debt
+jq '.technical_debt.items[] | select(.priority == "High" or .priority == "Critical") | .file' report.json | sort -u
+</code></pre>
+<h3 id="filtering-and-transformation-examples"><a class="header" href="#filtering-and-transformation-examples">Filtering and Transformation Examples</a></h3>
+<h4 id="python-script-to-parse-json"><a class="header" href="#python-script-to-parse-json">Python Script to Parse JSON</a></h4>
+<pre><code class="language-python">#!/usr/bin/env python3
+import json
+import sys
+
+def analyze_debtmap_output(json_file):
+    with open(json_file) as f:
+        data = json.load(f)
+
+    # Get high-priority items
+    high_priority = [
+        item for item in data['technical_debt']['items']
+        if item['priority'] in ['High', 'Critical']
+    ]
+
+    # Group by file
+    by_file = {}
+    for item in high_priority:
+        file = item['file']
+        if file not in by_file:
+            by_file[file] = []
+        by_file[file].append(item)
+
+    # Print summary
+    print(f"High-priority debt items: {len(high_priority)}")
+    print(f"Files affected: {len(by_file)}")
+    print("\nBy file:")
+    for file, items in sorted(by_file.items(), key=lambda x: -len(x[1])):
+        print(f"  {file}: {len(items)} items")
+
+    return by_file
+
+if __name__ == '__main__':
+    analyze_debtmap_output(sys.argv[1])
+</code></pre>
+<h4 id="shell-script-for-threshold-checking"><a class="header" href="#shell-script-for-threshold-checking">Shell Script for Threshold Checking</a></h4>
+<pre><code class="language-bash">#!/bin/bash
+set -e
+
+REPORT="$1"
+DEBT_THRESHOLD=100
+COMPLEXITY_THRESHOLD=10
+
+# Check debt score
+DEBT_SCORE=$(jq '.technical_debt.items | length' "$REPORT")
+if [ "$DEBT_SCORE" -gt "$DEBT_THRESHOLD" ]; then
+    echo "❌ Debt score $DEBT_SCORE exceeds threshold $DEBT_THRESHOLD"
+    exit 1
+fi
+
+# Check average complexity
+AVG_COMPLEXITY=$(jq '.complexity.summary.average_complexity' "$REPORT")
+if (( $(echo "$AVG_COMPLEXITY &gt; $COMPLEXITY_THRESHOLD" | bc -l) )); then
+    echo "❌ Average complexity $AVG_COMPLEXITY exceeds threshold $COMPLEXITY_THRESHOLD"
+    exit 1
+fi
+
+echo "✅ All quality checks passed"
+echo "   Debt score: $DEBT_SCORE/$DEBT_THRESHOLD"
+echo "   Avg complexity: $AVG_COMPLEXITY"
+</code></pre>
+<h3 id="editor-integration"><a class="header" href="#editor-integration">Editor Integration</a></h3>
+<h4 id="vs-code-tasks"><a class="header" href="#vs-code-tasks">VS Code Tasks</a></h4>
+<p>Create <code>.vscode/tasks.json</code>:</p>
+<pre><code class="language-json">{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Debtmap: Analyze",
+      "type": "shell",
+      "command": "debtmap",
+      "args": [
+        "analyze",
+        ".",
+        "--format",
+        "terminal"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Debtmap: Generate Report",
+      "type": "shell",
+      "command": "debtmap",
+      "args": [
+        "analyze",
+        ".",
+        "--format",
+        "markdown",
+        "-o",
+        "DEBT_REPORT.md"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
+</code></pre>
+<h4 id="problem-matcher-for-vs-code"><a class="header" href="#problem-matcher-for-vs-code">Problem Matcher for VS Code</a></h4>
+<p>Parse debtmap output in VS Code’s Problems panel:</p>
+<pre><code class="language-json">{
+  "problemMatcher": {
+    "owner": "debtmap",
+    "fileLocation": "absolute",
+    "pattern": {
+      "regexp": "^(.+?):(\\d+):(\\d+)?\\s*-\\s*(.+)$",
+      "file": 1,
+      "line": 2,
+      "column": 3,
+      "message": 4
+    }
+  }
+}
+</code></pre>
+<h3 id="webhook-integration"><a class="header" href="#webhook-integration">Webhook Integration</a></h3>
+<p>Send debtmap results to webhooks for notifications:</p>
+<pre><code class="language-bash">#!/bin/bash
+
+# Run analysis
+debtmap analyze . --format json -o report.json
+
+# Send to Slack
+DEBT_SCORE=$(jq '.technical_debt.items | length' report.json)
+curl -X POST "$SLACK_WEBHOOK_URL" \
+  -H 'Content-Type: application/json' \
+  -d "{\"text\": \"Debtmap Analysis Complete\n• Debt Score: $DEBT_SCORE\n• High Priority: $(jq '[.technical_debt.items[] | select(.priority == "High")] | length' report.json)\"}"
+
+# Send to custom webhook
+curl -X POST "$CUSTOM_WEBHOOK_URL" \
+  -H 'Content-Type: application/json' \
+  -d @report.json
+</code></pre>
+<h2 id="output-filtering"><a class="header" href="#output-filtering">Output Filtering</a></h2>
+<p>Debtmap provides several flags to filter and limit output:</p>
+<h3 id="limiting-results"><a class="header" href="#limiting-results">Limiting Results</a></h3>
+<pre><code class="language-bash"># Show only top 10 priority items
+debtmap analyze . --top 10
+
+# Show bottom 5 lowest priority items
+debtmap analyze . --tail 5
+</code></pre>
+<h3 id="priority-filtering"><a class="header" href="#priority-filtering">Priority Filtering</a></h3>
+<pre><code class="language-bash"># Show only high and critical priority items
+debtmap analyze . --min-priority high
+
+# Filter by specific debt categories
+debtmap analyze . --filter Architecture,Testing
+</code></pre>
+<p>Available categories:</p>
+<ul>
+<li><code>Architecture</code>: God objects, complexity hotspots, dead code</li>
+<li><code>Testing</code>: Testing gaps, coverage issues</li>
+<li><code>Performance</code>: Resource leaks, inefficient patterns</li>
+<li><code>CodeQuality</code>: Code smells, maintainability</li>
+</ul>
+<h3 id="grouping-output"><a class="header" href="#grouping-output">Grouping Output</a></h3>
+<pre><code class="language-bash"># Group results by debt category
+debtmap analyze . --group-by-category
+
+# Combine filters for focused analysis
+debtmap analyze . --filter Architecture --min-priority high --top 5
+</code></pre>
+<h3 id="summary-mode"><a class="header" href="#summary-mode">Summary Mode</a></h3>
+<pre><code class="language-bash"># Compact tiered priority display
+debtmap analyze . --summary
+
+# Combines well with filtering
+debtmap analyze . --summary --min-priority medium
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="when-to-use-each-format"><a class="header" href="#when-to-use-each-format">When to Use Each Format</a></h3>
+<p><strong>Use Terminal Format When:</strong></p>
+<ul>
+<li>Developing locally and reviewing code</li>
+<li>Getting quick feedback on changes</li>
+<li>Presenting results to team members</li>
+<li>Exploring complexity hotspots interactively</li>
+</ul>
+<p><strong>Use JSON Format When:</strong></p>
+<ul>
+<li>Integrating with CI/CD pipelines</li>
+<li>Building custom analysis tools</li>
+<li>Tracking metrics over time</li>
+<li>Programmatically processing results</li>
+<li>Feeding into dashboards or monitoring systems</li>
+</ul>
+<p><strong>Use Markdown Format When:</strong></p>
+<ul>
+<li>Generating documentation</li>
+<li>Creating PR comments</li>
+<li>Sharing reports with stakeholders</li>
+<li>Archiving analysis results</li>
+<li>Producing executive summaries</li>
+</ul>
+<h3 id="quick-reference-table"><a class="header" href="#quick-reference-table">Quick Reference Table</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Format</th><th>Best For</th><th>Machine Readable</th><th>Human Readable</th><th>File Extension</th></tr></thead><tbody>
+<tr><td>Terminal</td><td>Development</td><td>No</td><td>Yes</td><td>.txt</td></tr>
+<tr><td>JSON</td><td>Automation</td><td>Yes</td><td>No</td><td>.json</td></tr>
+<tr><td>Markdown</td><td>Documentation</td><td>Partially</td><td>Yes</td><td>.md</td></tr>
+</tbody></table>
+</div>
+<h3 id="combining-formats"><a class="header" href="#combining-formats">Combining Formats</a></h3>
+<p>Use multiple formats for comprehensive workflows:</p>
+<pre><code class="language-bash"># Generate terminal output for review
+debtmap analyze .
+
+# Generate JSON for automation
+debtmap analyze . --format json -o ci-report.json
+
+# Generate markdown for documentation
+debtmap analyze . --format markdown -o docs/DEBT.md
+</code></pre>
+<h3 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h3>
+<ul>
+<li><strong>Terminal format</strong>: Fastest, minimal overhead</li>
+<li><strong>JSON format</strong>: Fast serialization, efficient for large codebases</li>
+<li><strong>Markdown format</strong>: Slightly slower due to formatting, but still performant</li>
+</ul>
+<p>For very large codebases (&gt;10,000 files), use <code>--top</code> or <code>--filter</code> to limit output size.</p>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h3>
+<p><strong>Colors not showing in terminal:</strong></p>
+<ul>
+<li>Check if terminal supports ANSI colors</li>
+<li>Use <code>--plain</code> flag for ASCII-only output</li>
+<li>Some CI systems may not support color codes</li>
+</ul>
+<p><strong>JSON parsing errors:</strong></p>
+<ul>
+<li>Ensure output is complete (check for errors during analysis)</li>
+<li>Validate JSON with <code>jq</code> or online validators</li>
+<li>Check for special characters in file paths</li>
+</ul>
+<p><strong>Markdown rendering issues:</strong></p>
+<ul>
+<li>Some markdown renderers don’t support all features</li>
+<li>Use standard markdown for maximum compatibility</li>
+<li>Test with pandoc or GitHub/GitLab preview</li>
+</ul>
+<p><strong>File encoding problems:</strong></p>
+<ul>
+<li>Ensure UTF-8 encoding for all output files</li>
+<li>Use <code>--plain</code> for pure ASCII output</li>
+<li>Check locale settings (LC_ALL, LANG environment variables)</li>
+</ul>
+<h3 id="exit-codes"><a class="header" href="#exit-codes">Exit Codes</a></h3>
+<blockquote>
+<p><strong>Note:</strong> Currently, debtmap returns exit code <code>0</code> on successful analysis regardless of threshold violations. Planned behavior includes:</p>
+<ul>
+<li><code>0</code>: Success, all checks passed</li>
+<li><code>1</code>: Analysis completed, but validation thresholds exceeded</li>
+<li><code>2</code>: Error during analysis (invalid path, parsing error, etc.)</li>
+</ul>
+</blockquote>
+<p>For now, use the <code>validate</code> command with threshold checks to enforce quality gates:</p>
+<pre><code class="language-bash"># Use validate command for threshold enforcement
+debtmap validate . --config debtmap.toml
+
+# Or parse JSON output for threshold checking
+debtmap analyze . --format json -o report.json
+DEBT_SCORE=$(jq '.technical_debt.items | length' report.json)
+if [ "$DEBT_SCORE" -gt 100 ]; then
+    echo "Debt threshold exceeded"
+    exit 1
+fi
+</code></pre>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="./getting-started.html">Getting Started</a> - Basic usage and examples</li>
+<li><a href="./analysis-guide.html">Analysis Guide</a> - Understanding metrics and scores</li>
+<li><a href="./configuration.html">Configuration</a> - Customizing analysis behavior</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="examples.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="examples.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
