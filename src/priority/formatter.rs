@@ -859,10 +859,10 @@ fn format_god_object_steps(
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} DO NOT: Try to refactor everything at once",
+        "{}  {}  {} Refactor incrementally: 10-20 methods at a time",
         formatter.emoji("│", ""),
         formatter.emoji("└─", "-"),
-        formatter.emoji("⚠️", "[!]")
+        formatter.emoji("✅", "[4]")
     )
     .unwrap();
 }
