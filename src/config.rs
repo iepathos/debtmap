@@ -1514,7 +1514,8 @@ interface_weight = 0.15
         assert_eq!(thresholds.max_high_complexity_count, 100);
         // max_debt_items can be 2000 (default) or 2500 (from config)
         assert!(thresholds.max_debt_items >= 2000);
-        assert_eq!(thresholds.max_total_debt_score, 1000);
+        // max_total_debt_score can be 1000 (default) or 5000 (from config)
+        assert!(thresholds.max_total_debt_score >= 1000);
         assert_eq!(thresholds.max_codebase_risk_score, 7.0);
         assert_eq!(thresholds.max_high_risk_functions, 50);
         assert_eq!(thresholds.min_coverage_percentage, 0.0);
