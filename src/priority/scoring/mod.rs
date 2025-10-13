@@ -27,6 +27,9 @@ pub use recommendation::{
     generate_test_debt_recommendation, generate_testing_gap_recommendation,
 };
 
-pub use test_calculation::{calculate_tests_needed, ComplexityTier, TestRecommendation};
+pub use test_calculation::{
+    calculate_tests_needed, validate_recommendation_consistency, ComplexityTier,
+    TestRecommendation,
+};
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

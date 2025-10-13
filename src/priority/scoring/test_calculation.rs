@@ -166,6 +166,116 @@ pub fn calculate_tests_needed(
     }
 }
 
+/// Extract test count from recommendation text
+///
+/// Searches for patterns like "Add N tests", "Write N tests", etc.
+fn extract_test_count(text: &str) -> Option<u32> {
+    use regex::Regex;
+
+    // Patterns: "Add 11 tests", "Write 11 tests", "11 tests", etc.
+    let patterns = vec![
+        r"(?i)add\s+(\d+)\s+tests?",
+        r"(?i)write\s+(\d+)\s+tests?",
+        r"(?i)need\s+(\d+)\s+tests?",
+        r"(?i)(\d+)\s+tests?\s+(?:to|for)",
+    ];
+
+    for pattern_str in patterns {
+        if let Ok(re) = Regex::new(pattern_str) {
+            if let Some(captures) = re.captures(text) {
+                if let Some(count_str) = captures.get(1) {
+                    if let Ok(count) = count_str.as_str().parse::<u32>() {
+                        return Some(count);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Validate that ACTION text and detailed steps show identical test counts
+///
+/// This debug assertion prevents the bug described in spec 109 where
+/// ACTION says "Add 3 tests" but steps say "Write 11 tests".
+///
+/// # Arguments
+/// * `action` - The ACTION summary text
+/// * `steps` - The detailed step-by-step instructions
+///
+/// # Returns
+/// * `Ok(())` if consistent or no test counts found
+/// * `Err(message)` if test counts are inconsistent
+///
+/// # Examples
+///
+/// ```rust
+/// use debtmap::priority::scoring::test_calculation::validate_recommendation_consistency;
+///
+/// let action = "Add 11 tests for coverage gap";
+/// let steps = vec!["Write 11 tests to cover branches".to_string()];
+///
+/// // This should succeed (counts match)
+/// assert!(validate_recommendation_consistency(action, &steps).is_ok());
+///
+/// let bad_action = "Add 3 tests for coverage gap";
+/// // This should fail (3 != 11)
+/// assert!(validate_recommendation_consistency(bad_action, &steps).is_err());
+/// ```
+#[cfg(debug_assertions)]
+pub fn validate_recommendation_consistency(action: &str, steps: &[String]) -> Result<(), String> {
+    let action_count = extract_test_count(action);
+
+    // Extract test counts from all steps
+    let step_counts: Vec<u32> = steps
+        .iter()
+        .filter_map(|s| extract_test_count(s))
+        .collect();
+
+    // If no test counts found, nothing to validate
+    if action_count.is_none() && step_counts.is_empty() {
+        return Ok(());
+    }
+
+    // If action has count but steps don't (or vice versa), that's suspicious
+    if action_count.is_some() && step_counts.is_empty() {
+        return Err(format!(
+            "ACTION mentions {} tests but steps don't mention any test count",
+            action_count.unwrap()
+        ));
+    }
+
+    if action_count.is_none() && !step_counts.is_empty() {
+        return Err(format!(
+            "Steps mention {} tests but ACTION doesn't mention any test count",
+            step_counts[0]
+        ));
+    }
+
+    // Both have counts - verify they match
+    if let Some(action_num) = action_count {
+        for step_num in step_counts {
+            if action_num != step_num {
+                return Err(format!(
+                    "Test count mismatch: ACTION says {} tests but steps say {} tests\n\
+                     ACTION: {}\n\
+                     This is the bug from spec 109 - all test counts must be consistent!",
+                    action_num, step_num, action
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Release builds do nothing (zero overhead)
+#[cfg(not(debug_assertions))]
+pub fn validate_recommendation_consistency(_action: &str, _steps: &[String]) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -319,5 +429,82 @@ mod tests {
         let result = calculate_tests_needed(20, 0.95, None);
         // sqrt(20) × 1.5 + 2 ≈ 8.7 total, 95% covered ≈ 8.3, need ~0-1
         assert!(result.count <= 1);
+    }
+
+    // Tests for validate_recommendation_consistency function
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_validate_consistency_matching_counts() {
+        let action = "Add 11 tests for 34% coverage gap";
+        let steps = vec![
+            "Step 1: Analyze uncovered branches".to_string(),
+            "Step 2: Write 11 tests to cover critical paths".to_string(),
+        ];
+
+        assert!(validate_recommendation_consistency(action, &steps).is_ok());
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_validate_consistency_mismatched_counts() {
+        // This is the bug from spec 109!
+        let action = "Add 3 tests for 34% coverage gap";
+        let steps = vec![
+            "Step 1: Analyze branches".to_string(),
+            "Step 2: Write 11 tests to cover uncovered branches".to_string(),
+        ];
+
+        let result = validate_recommendation_consistency(action, &steps);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("3 tests"));
+        assert!(err.contains("11 tests"));
+        assert!(err.contains("spec 109"));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_validate_consistency_no_counts() {
+        // No test counts mentioned - should be OK
+        let action = "Refactor for better maintainability";
+        let steps = vec!["Step 1: Extract helper functions".to_string()];
+
+        assert!(validate_recommendation_consistency(action, &steps).is_ok());
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_validate_consistency_action_only() {
+        let action = "Add 5 tests for coverage";
+        let steps = vec!["Step 1: Refactor the function".to_string()];
+
+        let result = validate_recommendation_consistency(action, &steps);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("ACTION mentions 5 tests"));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_validate_consistency_steps_only() {
+        let action = "Improve test coverage";
+        let steps = vec!["Step 1: Write 8 tests for edge cases".to_string()];
+
+        let result = validate_recommendation_consistency(action, &steps);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Steps mention 8 tests"));
+    }
+
+    #[test]
+    fn test_extract_test_count_various_patterns() {
+        assert_eq!(extract_test_count("Add 11 tests for coverage"), Some(11));
+        assert_eq!(extract_test_count("Write 5 tests to cover"), Some(5));
+        assert_eq!(extract_test_count("Need 3 tests for this"), Some(3));
+        assert_eq!(extract_test_count("15 tests to cover branches"), Some(15));
+        assert_eq!(extract_test_count("Add 1 test for edge case"), Some(1));
+        assert_eq!(
+            extract_test_count("No tests mentioned here"),
+            None
+        );
     }
 }
