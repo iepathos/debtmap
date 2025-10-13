@@ -22,6 +22,7 @@ use crate::priority::{
         generate_string_concat_recommendation, generate_usage_hints,
     },
     scoring::rust_recommendations::generate_rust_refactoring_recommendation,
+    scoring::test_calculation::{calculate_tests_needed, ComplexityTier},
     semantic_classifier::classify_function_role,
     ActionableRecommendation, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
     TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
@@ -1309,31 +1310,28 @@ fn get_role_display_name(role: FunctionRole) -> &'static str {
     }
 }
 
+// Legacy wrapper functions for backward compatibility
+// These now delegate to the unified test_calculation module
+
 /// Calculate test cases needed based on complexity and current coverage
-/// A more realistic estimate: not every branch needs a separate test case
+/// Delegates to unified test_calculation module (Moderate/High tier)
 fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
-    if coverage_pct >= 1.0 {
-        return 0;
-    }
-
-    // More realistic: sqrt of cyclomatic complexity + 2 for edge cases
-    // This accounts for the fact that tests often cover multiple paths
-    let ideal_test_cases = ((cyclomatic as f64).sqrt() * 1.5 + 2.0).ceil() as u32;
-
-    let current_test_cases = if coverage_pct > 0.0 {
-        (ideal_test_cases as f64 * coverage_pct).ceil() as u32
+    // Use appropriate tier based on complexity
+    let tier = if cyclomatic > 30 {
+        ComplexityTier::High
+    } else if cyclomatic > 10 {
+        ComplexityTier::Moderate
     } else {
-        0
+        ComplexityTier::Simple
     };
 
-    ideal_test_cases
-        .saturating_sub(current_test_cases)
-        .min(cyclomatic)
+    calculate_tests_needed(cyclomatic, coverage_pct, Some(tier)).count
 }
 
 /// Calculate approximate test cases for simple functions
+/// Delegates to unified test_calculation module (Simple tier)
 fn calculate_simple_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
-    ((cyclomatic.max(2) as f64 * (1.0 - coverage_pct)).ceil() as u32).max(2)
+    calculate_tests_needed(cyclomatic, coverage_pct, Some(ComplexityTier::Simple)).count
 }
 
 /// Add uncovered lines recommendations to steps
@@ -2171,9 +2169,9 @@ mod tests {
 
     #[test]
     fn test_calculate_needed_test_cases_no_coverage() {
-        // When coverage is 0%, we use sqrt formula: sqrt(10) * 1.5 + 2 ≈ 7
-        assert_eq!(calculate_needed_test_cases(10, 0.0), 7);
-        // sqrt(25) * 1.5 + 2 = 5 * 1.5 + 2 = 9.5 ≈ 10
+        // Cyclo=10 uses Simple tier (linear): 10 × 1.0 = 10
+        assert_eq!(calculate_needed_test_cases(10, 0.0), 10);
+        // Cyclo=25 uses Moderate tier (sqrt): sqrt(25) * 1.5 + 2 = 5 * 1.5 + 2 = 9.5 → ceil = 10
         assert_eq!(calculate_needed_test_cases(25, 0.0), 10);
     }
 
@@ -2310,12 +2308,13 @@ mod tests {
 
     #[test]
     fn test_calculate_needed_test_cases_partial_coverage() {
-        // When 50% covered, ideal is 7, current is 3.5 ≈ 4, needed is 3
-        assert_eq!(calculate_needed_test_cases(10, 0.5), 3);
-        // When 80% covered, ideal is 7, current is 5.6 ≈ 6, needed is 1
-        assert_eq!(calculate_needed_test_cases(10, 0.8), 1);
-        // When 25% covered, ideal is 7, current is 1.75 ≈ 2, needed is 5
-        assert_eq!(calculate_needed_test_cases(10, 0.25), 5);
+        // Cyclo=10 uses Simple tier (linear formula)
+        // When 50% covered: 10 × 0.5 = 5
+        assert_eq!(calculate_needed_test_cases(10, 0.5), 5);
+        // When 80% covered: 10 × 0.2 = 2
+        assert_eq!(calculate_needed_test_cases(10, 0.8), 2);
+        // When 25% covered: 10 × 0.75 = 7.5 → ceil = 8
+        assert_eq!(calculate_needed_test_cases(10, 0.25), 8);
     }
 
     #[test]
