@@ -80,8 +80,18 @@ fn test_all_complexity_tiers_generate_consistent_recommendations() {
     let test_cases = vec![
         (5, 0.6, ComplexityTier::Simple, "simple function"),
         (15, 0.5, ComplexityTier::Moderate, "moderate complexity"),
-        (33, 0.661, ComplexityTier::High, "high complexity (spec 109 case)"),
-        (45, 0.4, ComplexityTier::High, "high complexity near boundary"),
+        (
+            33,
+            0.661,
+            ComplexityTier::High,
+            "high complexity (spec 109 case)",
+        ),
+        (
+            45,
+            0.4,
+            ComplexityTier::High,
+            "high complexity near boundary",
+        ),
         (60, 0.5, ComplexityTier::Extreme, "extreme complexity"),
     ];
 
@@ -89,10 +99,7 @@ fn test_all_complexity_tiers_generate_consistent_recommendations() {
         let test_rec = calculate_tests_needed(cyclo, coverage, Some(tier));
 
         // Generate ACTION and steps using the same test count
-        let action = format!(
-            "Add {} tests for coverage improvement",
-            test_rec.count
-        );
+        let action = format!("Add {} tests for coverage improvement", test_rec.count);
 
         let steps = vec![
             format!("Step 1: Analyze {} branches", cyclo),

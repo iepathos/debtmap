@@ -28,8 +28,7 @@ pub use recommendation::{
 };
 
 pub use test_calculation::{
-    calculate_tests_needed, validate_recommendation_consistency, ComplexityTier,
-    TestRecommendation,
+    calculate_tests_needed, validate_recommendation_consistency, ComplexityTier, TestRecommendation,
 };
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

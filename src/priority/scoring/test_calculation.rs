@@ -228,10 +228,7 @@ pub fn validate_recommendation_consistency(action: &str, steps: &[String]) -> Re
     let action_count = extract_test_count(action);
 
     // Extract test counts from all steps
-    let step_counts: Vec<u32> = steps
-        .iter()
-        .filter_map(|s| extract_test_count(s))
-        .collect();
+    let step_counts: Vec<u32> = steps.iter().filter_map(|s| extract_test_count(s)).collect();
 
     // If no test counts found, nothing to validate
     if action_count.is_none() && step_counts.is_empty() {
@@ -502,9 +499,6 @@ mod tests {
         assert_eq!(extract_test_count("Need 3 tests for this"), Some(3));
         assert_eq!(extract_test_count("15 tests to cover branches"), Some(15));
         assert_eq!(extract_test_count("Add 1 test for edge case"), Some(1));
-        assert_eq!(
-            extract_test_count("No tests mentioned here"),
-            None
-        );
+        assert_eq!(extract_test_count("No tests mentioned here"), None);
     }
 }
