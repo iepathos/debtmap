@@ -6,6 +6,7 @@ pub mod debt_item;
 pub mod recommendation;
 pub mod recommendation_extended;
 pub mod rust_recommendations;
+pub mod test_calculation;
 
 // Re-export commonly used items
 pub use calculation::{
@@ -24,6 +25,10 @@ pub use classification::{
 pub use recommendation::{
     generate_dead_code_recommendation, generate_error_swallowing_recommendation,
     generate_test_debt_recommendation, generate_testing_gap_recommendation,
+};
+
+pub use test_calculation::{
+    calculate_tests_needed, validate_recommendation_consistency, ComplexityTier, TestRecommendation,
 };
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

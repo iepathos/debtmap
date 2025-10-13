@@ -1,5 +1,7 @@
 use crate::priority::UnifiedDebtItem;
 
+use super::test_calculation::calculate_tests_needed;
+
 /// Generate Rust-idiomatic refactoring recommendations based on complexity patterns
 pub fn generate_rust_refactoring_recommendation(
     item: &UnifiedDebtItem,
@@ -223,7 +225,10 @@ fn generate_simple_extraction_recommendation(
     has_coverage_data: bool,
 ) -> (String, String, Vec<String>) {
     let coverage_gap = ((1.0 - coverage_percent) * 100.0) as u32;
-    let tests_needed = ((cyclo as f64) * (1.0 - coverage_percent)).ceil() as u32;
+
+    // Use unified test calculation module for consistency (spec 109)
+    let test_rec = calculate_tests_needed(cyclo, coverage_percent, None);
+    let tests_needed = test_rec.count;
 
     // Generate specific action based on actual metrics
     let action = if has_coverage_data && coverage_gap > 40 {

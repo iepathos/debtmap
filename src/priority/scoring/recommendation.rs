@@ -4,6 +4,8 @@ use crate::core::FunctionMetrics;
 use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::{DebtType, FunctionVisibility, TransitiveCoverage};
 
+use super::test_calculation::{calculate_tests_needed, ComplexityTier};
+
 /// Get display name for a function role
 fn get_role_display_name(role: FunctionRole) -> &'static str {
     match role {
@@ -16,34 +18,28 @@ fn get_role_display_name(role: FunctionRole) -> &'static str {
     }
 }
 
+// Legacy wrapper functions for backward compatibility
+// These now delegate to the unified test_calculation module
+
 /// Calculate test cases needed based on complexity and current coverage
-/// A more realistic estimate: not every branch needs a separate test case
+/// Delegates to unified test_calculation module (Moderate/High tier)
 fn calculate_needed_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
-    if coverage_pct >= 1.0 {
-        return 0;
-    }
-
-    // More realistic: sqrt of cyclomatic complexity + 2 for edge cases
-    // This accounts for the fact that tests often cover multiple paths
-    let ideal_test_cases = ((cyclomatic as f64).sqrt() * 1.5 + 2.0).ceil() as u32;
-
-    let current_test_cases = if coverage_pct > 0.0 {
-        (ideal_test_cases as f64 * coverage_pct).ceil() as u32
+    // Use appropriate tier based on complexity
+    let tier = if cyclomatic > 30 {
+        ComplexityTier::High
+    } else if cyclomatic > 10 {
+        ComplexityTier::Moderate
     } else {
-        0
+        ComplexityTier::Simple
     };
 
-    // For zero coverage, ensure minimum recommendation
-    if coverage_pct == 0.0 {
-        ideal_test_cases.max(3).min(cyclomatic) // Cap at cyclomatic for very complex functions
-    } else {
-        ideal_test_cases.saturating_sub(current_test_cases)
-    }
+    calculate_tests_needed(cyclomatic, coverage_pct, Some(tier)).count
 }
 
 /// Calculate approximate test cases for simple functions
+/// Delegates to unified test_calculation module (Simple tier)
 fn calculate_simple_test_cases(cyclomatic: u32, coverage_pct: f64) -> u32 {
-    ((cyclomatic.max(2) as f64 * (1.0 - coverage_pct)).ceil() as u32).max(2)
+    calculate_tests_needed(cyclomatic, coverage_pct, Some(ComplexityTier::Simple)).count
 }
 
 /// Add uncovered lines recommendations to steps
@@ -589,17 +585,17 @@ mod tests {
         // Full coverage
         assert_eq!(calculate_needed_test_cases(10, 1.0), 0);
 
-        // No coverage - sqrt(10) * 1.5 + 2 ≈ 7
-        assert_eq!(calculate_needed_test_cases(10, 0.0), 7);
+        // No coverage - cyclo=10 uses Simple tier (linear): 10 × 1.0 = 10
+        assert_eq!(calculate_needed_test_cases(10, 0.0), 10);
 
-        // Partial coverage (50%) - ideal is 7, current is 3.5 ≈ 4, needed is 3
-        assert_eq!(calculate_needed_test_cases(10, 0.5), 3);
+        // Partial coverage (50%) - linear: 10 × 0.5 = 5
+        assert_eq!(calculate_needed_test_cases(10, 0.5), 5);
 
-        // Partial coverage (75%) - ideal is 7, current is 5.25 ≈ 6, needed is 1
-        assert_eq!(calculate_needed_test_cases(10, 0.75), 1);
+        // Partial coverage (75%) - linear: 10 × 0.25 = 2.5 → ceil = 3
+        assert_eq!(calculate_needed_test_cases(10, 0.75), 3);
 
-        // Almost full coverage - ideal is 7, current is 6.3 ≈ 7, needed is 0
-        assert_eq!(calculate_needed_test_cases(10, 0.9), 0);
+        // Almost full coverage - linear: 10 × 0.1 = 1, but minimum is 2
+        assert_eq!(calculate_needed_test_cases(10, 0.9), 2);
     }
 
     #[test]
@@ -613,8 +609,8 @@ mod tests {
         // Low complexity, no coverage - minimum 2 tests
         assert_eq!(calculate_simple_test_cases(1, 0.0), 2);
 
-        // Full coverage
-        assert_eq!(calculate_simple_test_cases(5, 1.0), 2);
+        // Full coverage - returns 0 now (fully covered)
+        assert_eq!(calculate_simple_test_cases(5, 1.0), 0);
     }
 
     #[test]
