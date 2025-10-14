@@ -10,7 +10,7 @@ Unlike traditional static analysis tools that simply flag complex code, Debtmap 
 1. **"What should I refactor to reduce cognitive burden?"** - Identifies overly complex code that slows down development
 2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
 
-Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It fully supports Rust, Python, JavaScript, and TypeScript.
+Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It fully supports Rust, with partial support for Python, JavaScript, and TypeScript.
 
 **What Makes Debtmap Different:**
 - **Entropy-Based Complexity Analysis**: Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%
@@ -26,13 +26,13 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 - **Identify Complexity** - Find complex functions and modules that need refactoring, with concrete metrics showing which changes will have the most impact
 - **Detect Technical Debt** - Discover 20+ debt patterns including code smells, security vulnerabilities, resource management issues, and architectural problems
 - **Assess Risk** - Prioritize improvements based on sophisticated risk scoring that combines complexity, test coverage, and dependency impact
-- **Track Quality** - Monitor code quality metrics over time with the `compare` command to verify that refactoring efforts achieved their goals
+- **Track Quality** - Monitor code quality metrics over time with the `compare` command (which can track improvements against implementation plan targets) to verify that refactoring efforts achieved their goals
 - **Get Actionable Recommendations** - Receive specific guidance like "refactoring this will reduce complexity by 60%" or "testing this will reduce risk by 5%"
 
 ## Key Features
 
 ### Analysis Capabilities
-- **Multi-language support** - Fully supports Rust, Python, JavaScript, and TypeScript
+- **Multi-language support** - Fully supports Rust, with partial support for Python, JavaScript, and TypeScript
 - **Entropy-based complexity analysis** - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory
 - **Token classification system** - Advanced token categorization with weighted entropy for accurate complexity assessment
 - **Comprehensive debt detection** - Identifies 20+ technical debt patterns across security, organization, testing, and resource management
@@ -51,7 +51,7 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 
 ### Performance & Output
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
-- **Multiple output formats** - JSON (legacy or unified structure), Markdown, and human-readable terminal formats
+- **Multiple output formats** - JSON, Markdown, and human-readable terminal formats
 - **Configurable thresholds** - Customize complexity and duplication thresholds to match your standards
 - **Incremental analysis** - Smart caching system for analyzing only changed files
 - **Verbosity controls** - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail
