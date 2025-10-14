@@ -1,0 +1,143 @@
+{
+  "chapter_id": "examples",
+  "chapter_title": "Examples",
+  "chapter_file": "book/src/examples.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter has several critical issues with incorrect command syntax and non-existent cache subcommands. Many newer CLI options are not documented.",
+  "issues": [
+    {
+      "type": "incorrect_example",
+      "severity": "critical",
+      "section": "Cache Management (lines 597-604)",
+      "description": "Examples show cache as a subcommand (debtmap cache stats/clear/prune) but cache is not a subcommand in the CLI",
+      "current_content": "# Show cache statistics\ndebtmap cache stats\n\n# Clear cache for current project\ndebtmap cache clear\n\n# Prune old cache entries\ndebtmap cache prune --max-age-days 7",
+      "should_be": "# Show cache statistics\ndebtmap analyze . --cache-stats\n\n# Clear cache before analysis\ndebtmap analyze . --clear-cache\n\n# Migrate cache to shared location\ndebtmap analyze . --migrate-cache",
+      "fix_suggestion": "Replace cache subcommand examples with the actual analyze flags. Remove the prune example as there is no --max-age-days or prune functionality.",
+      "source_reference": "src/cli.rs:158-167 (cache flags on analyze command)"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Understanding Output Formats (line 561)",
+      "description": "Example uses --json-format flag but the actual CLI flag is --output-format",
+      "current_content": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --json-format legacy",
+      "should_be": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --output-format legacy",
+      "fix_suggestion": "Update all references from --json-format to --output-format to match actual CLI",
+      "source_reference": "src/cli.rs:37 (json_format field with long = 'output-format')"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Filtering and Focusing",
+      "description": "Chapter does not document the --threshold-preset option which provides convenient preset configurations",
+      "should_add": "Document --threshold-preset with values: strict, balanced (default), lenient. This provides quick threshold configuration without setting individual values.",
+      "fix_suggestion": "Add a subsection showing threshold-preset usage:\n```bash\n# Use strict thresholds for high quality standards\ndebtmap analyze . --threshold-preset strict\n\n# Use lenient thresholds for legacy codebases\ndebtmap analyze . --threshold-preset lenient\n```",
+      "source_reference": "src/cli.rs:126-127 (threshold_preset option)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Output Formats",
+      "description": "Chapter does not document the --plain flag for ASCII-only, machine-parseable output",
+      "should_add": "Document --plain flag: 'Plain output mode: ASCII-only, no colors, no emoji, machine-parseable'",
+      "fix_suggestion": "Add to output formats section:\n```bash\n# Plain ASCII output without colors or emoji\ndebtmap analyze . --plain\n```",
+      "source_reference": "src/cli.rs:129-131 (plain flag)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Advanced Usage - Aggregation Methods",
+      "description": "Chapter shows aggregation-method examples but doesn't document all available methods",
+      "current_content": "# Use logarithmic sum for aggregation\ndebtmap analyze . --aggregation-method logarithmic_sum\n\n# Standard sum (default)\ndebtmap analyze . --aggregation-method sum",
+      "should_be": "Default is 'weighted_sum', not 'sum'. Available methods: sum, weighted_sum, logarithmic_sum, max_plus_average",
+      "fix_suggestion": "Update default and list all four aggregation methods with brief explanations of when to use each",
+      "source_reference": "src/cli.rs:189-191 (aggregation_method with default 'weighted_sum')"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Advanced Usage",
+      "description": "Several advanced analyze options are not documented",
+      "should_add": "Missing options: --validate-loc (LOC consistency validation), --max-files (limit analysis scope), --aggregate-only (show only file-level scores), --no-aggregation (disable file aggregation), --min-problematic (minimum functions for aggregation), --detail-level (diagnostic detail level)",
+      "fix_suggestion": "Add subsection for analysis control options with examples for validate-loc, max-files, and aggregation control flags",
+      "source_reference": "src/cli.rs:177-207 (various advanced flags)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Advanced Usage - Cache",
+      "description": "Chapter doesn't document all cache-related flags on analyze command",
+      "should_add": "Document --cache-location flag and DEBTMAP_CACHE_DIR environment variable, --force-cache-rebuild, --migrate-cache functionality",
+      "fix_suggestion": "Add cache configuration subsection:\n```bash\n# Set custom cache location\ndebtmap analyze . --cache-location /path/to/cache\n\n# Or use environment variable\nexport DEBTMAP_CACHE_DIR=/path/to/cache\ndebtmap analyze .\n\n# Force cache rebuild\ndebtmap analyze . --force-cache-rebuild\n```",
+      "source_reference": "src/cli.rs:150-167 (cache-related flags)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Basic Commands",
+      "description": "Init command is mentioned in CLI but not documented in examples chapter",
+      "should_add": "Document 'debtmap init' command with --force flag to create .debtmap.toml configuration file",
+      "fix_suggestion": "Add to configuration examples section:\n```bash\n# Initialize configuration file\ndebtmap init\n\n# Force overwrite existing config\ndebtmap init --force\n```",
+      "source_reference": "src/cli.rs:210-215 (Init command)"
+    },
+    {
+      "type": "potentially_incorrect",
+      "severity": "low",
+      "section": "Compare Command (line 815)",
+      "description": "Example uses --target but CLI defines --target-location (need to verify if target is a short alias)",
+      "current_content": "debtmap compare \\\n  --before before.json \\\n  --after after.json \\\n  --target src/main.rs:process_data:100",
+      "should_be": "Verify the flag name. CLI shows 'target_location' with flag '--target-location', but there may be a short form --target",
+      "fix_suggestion": "If no short alias exists, update to use --target-location. Otherwise document both forms.",
+      "source_reference": "src/cli.rs:298-301 (target_location field)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Analyze command defaults",
+      "description": "Some default values in examples may not match actual CLI defaults",
+      "current_content": "Example shows default values but doesn't always match CLI",
+      "should_be": "Verify: format default is 'terminal', output-format default is 'legacy', threshold-complexity is 10, threshold-duplication is 50, aggregation-method is 'weighted_sum', detail-level is 'standard', jobs is 0 (all cores)",
+      "fix_suggestion": "Add a defaults reference table or ensure inline documentation matches these values",
+      "source_reference": "src/cli.rs:31,37,45,49,138,178,190 (various default values)"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of major commands (analyze, validate, compare)",
+    "Good progression from simple to advanced usage patterns",
+    "Excellent real-world CI integration examples from actual .github/workflows",
+    "Coverage integration well explained across multiple language ecosystems",
+    "Multi-language examples (Rust, Python, JS/TS) are helpful",
+    "Configuration examples are detailed and practical",
+    "Compare command workflow is clearly explained",
+    "Output format examples show actual expected output"
+  ],
+  "improvement_suggestions": [
+    "Add a CLI quick reference table showing all commands and their key flags",
+    "Include init command examples in a 'Getting Started' subsection",
+    "Add troubleshooting section for common cache-related issues",
+    "Show examples of combining multiple advanced flags",
+    "Add performance tuning section with --jobs and --no-parallel examples",
+    "Include examples of using DEBTMAP_CACHE_DIR environment variable",
+    "Add section on when to use different aggregation methods",
+    "Show examples of --threshold-preset usage for different project types",
+    "Document the difference between --semantic-off fallback mode",
+    "Add examples showing --plain output for CI parsing"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-13",
+    "feature_inventory": "Analyzed directly from src/cli.rs",
+    "topics_covered": [
+      "Analyzing Rust projects",
+      "Python analysis",
+      "JavaScript/TypeScript",
+      "CI integration",
+      "Output formats",
+      "Advanced usage",
+      "Configuration examples",
+      "Compare command"
+    ],
+    "validation_focus": "Ensure examples use current CLI syntax and options",
+    "cli_source": "src/cli.rs (analyzed lines 1-512)"
+  }
+}
