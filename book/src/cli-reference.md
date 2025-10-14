@@ -71,12 +71,36 @@ debtmap validate <PATH> [OPTIONS]
 - `<PATH>` - Path to analyze
 
 **Options:**
+
+*Configuration & Output:*
 - `-c, --config <CONFIG>` - Configuration file path
+- `-f, --format <FORMAT>` - Output format: json, markdown, terminal
+- `-o, --output <OUTPUT>` - Output file path (defaults to stdout)
+
+*Coverage & Context:*
+- `--coverage-file <PATH>` / `--lcov <PATH>` - LCOV coverage file for risk analysis
+- `--context` / `--enable-context` - Enable context-aware risk analysis
+- `--context-providers <PROVIDERS>` - Context providers to use (comma-separated)
+- `--disable-context <PROVIDERS>` - Disable specific context providers
+
+*Thresholds & Validation:*
 - `--max-debt-density <N>` - Maximum debt density allowed (per 1000 LOC)
-- All analysis, coverage, context, display, and verbosity options from `analyze` command
+
+*Display Filtering:*
+- `--top <N>` / `--head <N>` - Show only top N priority items
+- `--tail <N>` - Show only bottom N priority items
+- `-s, --summary` - Use summary format with tiered priority display
+
+*Analysis Control:*
+- `--semantic-off` - Disable semantic analysis (fallback mode)
+
+*Debugging & Verbosity:*
+- `-v, --verbose` - Increase verbosity level (can be repeated: -v, -vv, -vvv)
 
 **Description:**
 Similar to `analyze` but enforces thresholds defined in configuration file. Returns non-zero exit code if thresholds are exceeded, making it suitable for CI/CD integration.
+
+The `validate` command supports a focused subset of `analyze` options, primarily for output control, coverage integration, context-aware analysis, and display filtering. Analysis thresholds (complexity, duplication, presets) are typically configured via the `--config` file rather than command-line flags.
 
 **Exit Codes:**
 - `0` - Success (no errors, all thresholds passed)
@@ -98,7 +122,8 @@ debtmap compare --before <FILE> --after <FILE> [OPTIONS]
 **Optional Target Location:**
 - `--plan <FILE>` - Path to implementation plan (to extract target location)
 - `--target-location <LOCATION>` - Target location in format `file:function:line`
-  - Conflicts with `--plan` (cannot use both)
+
+**Note:** `--plan` and `--target-location` are mutually exclusive options; use one or the other to specify the target location.
 
 **Output Options:**
 - `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: json)
@@ -137,13 +162,15 @@ Control how analysis results are formatted and displayed.
 Configure analysis behavior, thresholds, and language selection.
 
 **Thresholds:**
-- `--threshold-complexity <N>` - Complexity threshold (default: 10)
-- `--threshold-duplication <N>` - Duplication threshold in lines (default: 50)
-- `--threshold-preset <PRESET>` - Complexity threshold preset: strict, balanced, lenient
+- `--threshold-complexity <N>` - Complexity threshold (default: 10) [analyze command]
+- `--threshold-duplication <N>` - Duplication threshold in lines (default: 50) [analyze command]
+- `--threshold-preset <PRESET>` - Complexity threshold preset: strict, balanced, lenient [analyze command]
   - `strict` - Strict thresholds for high code quality standards
   - `balanced` - Balanced thresholds for typical projects (default)
   - `lenient` - Lenient thresholds for legacy or complex domains
-- `--max-debt-density <N>` - Maximum debt density allowed per 1000 LOC (validate command)
+- `--max-debt-density <N>` - Maximum debt density allowed per 1000 LOC [validate command]
+
+**Note:** Threshold options (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are command-line options for the `analyze` command. For the `validate` command, these thresholds are configured via the `--config` file (`debtmap.toml`) rather than as command-line flags.
 
 **Language Selection:**
 - `--languages <LANGS>` - Comma-separated list of languages to analyze
@@ -243,7 +270,7 @@ Common option shortcuts and aliases for convenience:
 
 The following options are deprecated and should be migrated:
 
-- `--use-cache` (hidden) - **Deprecated:** caching is now enabled by default
+- `--cache` (hidden) - **Deprecated:** caching is now enabled by default
   - **Migration:** Remove this flag, use `--no-cache` to disable if needed
 - `--explain-score` (hidden) - **Deprecated:** use `-v` instead
   - **Migration:** Use `-v`, `-vv`, or `-vvv` for increasing verbosity levels
@@ -583,14 +610,16 @@ debtmap analyze . --format json --plain --output report.json
 | `--output` | ✓ | ✓ | ✓ | ✗ |
 | `--coverage-file` | ✓ | ✓ | ✗ | ✗ |
 | `--context` | ✓ | ✓ | ✗ | ✗ |
-| `--threshold-*` | ✓ | ✓ | ✗ | ✗ |
+| `--threshold-*` | ✓ | ✗ | ✗ | ✗ |
 | `--top / --tail` | ✓ | ✓ | ✗ | ✗ |
-| `--cache-*` | ✓ | ✓ | ✗ | ✗ |
-| `--jobs` | ✓ | ✓ | ✗ | ✗ |
+| `--cache-*` | ✓ | ✗ | ✗ | ✗ |
+| `--jobs` | ✓ | ✗ | ✗ | ✗ |
 | `--verbose` | ✓ | ✓ | ✗ | ✗ |
 | `--config` | ✗ | ✓ | ✗ | ✗ |
 | `--before / --after` | ✗ | ✗ | ✓ | ✗ |
 | `--force` | ✗ | ✗ | ✗ | ✓ |
+
+**Note:** The `validate` command supports output control (`--format`, `--output`), coverage integration (`--coverage-file`), context-aware analysis (`--context`), display filtering (`--top`, `--tail`, `--summary`), and verbosity options (`--verbose`) from the `analyze` command. Analysis thresholds (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are configured via the `--config` file rather than as command-line options. Performance options like `--cache-*` and `--jobs` are specific to the `analyze` command.
 
 ## Troubleshooting
 
