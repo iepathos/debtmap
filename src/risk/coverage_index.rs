@@ -177,13 +177,24 @@ impl CoverageIndex {
         function_name: &str,
         line: usize,
     ) -> Option<f64> {
-        // Try exact name match first (O(1))
-        if let Some(coverage) = self.get_function_coverage(file, function_name) {
+        // Try exact name match with direct file path first (O(1))
+        if let Some(f) = self
+            .by_function
+            .get(&(file.to_path_buf(), function_name.to_string()))
+        {
+            return Some(f.coverage_percentage / 100.0);
+        }
+
+        // Try line-based lookup first (O(log n)) - faster than path matching strategies
+        if let Some(coverage) = self
+            .find_function_by_line(file, line, 2)
+            .map(|f| f.coverage_percentage / 100.0)
+        {
             return Some(coverage);
         }
 
-        // Fallback to line-based lookup (O(log n))
-        self.find_function_by_line(file, line, 2)
+        // Only fall back to expensive path matching strategies if line lookup fails
+        self.find_by_path_strategies(file, function_name)
             .map(|f| f.coverage_percentage / 100.0)
     }
 
