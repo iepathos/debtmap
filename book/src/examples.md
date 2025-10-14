@@ -2,7 +2,21 @@
 
 This chapter provides practical, real-world examples of using Debtmap across different project types and workflows. All examples use current CLI syntax verified against the source code.
 
+> **Quick Start**: New to Debtmap? Start with [Basic Rust Analysis](#basic-rust-analysis) for the simplest introduction, then explore [Coverage Integration](#coverage-integration-with-cargo-tarpaulin) for risk-based prioritization.
+
 > **Quick Navigation**: For detailed explanations of all CLI options, see the [CLI Reference](cli-reference.md) chapter.
+
+## Overview
+
+This chapter demonstrates:
+- **Language-specific analysis**: Rust, Python, JavaScript/TypeScript with their respective testing tools
+- **CI/CD integration**: GitHub Actions, GitLab CI, CircleCI with validation gates
+- **Output formats**: Terminal, JSON, and Markdown with interpretation guidance
+- **Advanced features**: Context-aware analysis, multi-pass processing, cache management
+- **Configuration patterns**: Tailored settings for different project types
+- **Progress tracking**: Using the `compare` command to validate refactoring improvements
+
+All examples are copy-paste ready and tested against the current Debtmap implementation.
 
 ## Table of Contents
 
@@ -299,6 +313,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -330,11 +345,15 @@ jobs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
 
     - name: Install cargo-tarpaulin
       run: |
         if ! command -v cargo-tarpaulin &> /dev/null; then
           cargo install cargo-tarpaulin
+        else
+          echo "cargo-tarpaulin already installed"
         fi
 
     - name: Build debtmap
@@ -346,18 +365,13 @@ jobs:
     - name: Run debtmap validation with coverage
       run: |
         if [ -f "target/coverage/lcov.info" ]; then
-          ./target/release/debtmap validate . \
-            --coverage-file target/coverage/lcov.info \
-            --format json \
-            --output debtmap-report.json
+          ./target/release/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
         else
-          echo "Warning: LCOV file not found, running without coverage"
-          ./target/release/debtmap validate . \
-            --format json \
-            --output debtmap-report.json
+          echo "Warning: LCOV file not found, running validation without coverage data"
+          ./target/release/debtmap validate . --format json --output debtmap-report.json
         fi
 
-    - name: Upload debtmap report
+    - name: Upload debtmap report and coverage
       if: always()
       uses: actions/upload-artifact@v4
       with:
