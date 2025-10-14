@@ -508,9 +508,182 @@ Lower is better. Track over time to measure improvement.
 
 Debtmap's risk scoring identifies code that is both complex AND poorly tested - the true risk hotspots.
 
+### Unified Scoring System
+
+Debtmap uses a **unified scoring system** (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.
+
+#### Score Scale and Priority Classifications
+
+Functions receive scores from 0 (minimal risk) to 10 (critical risk):
+
+| Score Range | Priority | Description | Action |
+|-------------|----------|-------------|--------|
+| **9.0-10.0** | Critical | Severe risk requiring immediate attention | Address immediately |
+| **7.0-8.9** | High | Significant risk, should be addressed soon | Plan for this sprint |
+| **5.0-6.9** | Medium | Moderate risk, plan for future work | Schedule for next sprint |
+| **3.0-4.9** | Low | Minor risk, lower priority | Monitor and address as time permits |
+| **0.0-2.9** | Minimal | Well-managed code | Continue monitoring |
+
+#### Scoring Formula
+
+The unified score combines three weighted factors:
+
+```
+Base Score = (Complexity Factor × 0.40) + (Coverage Factor × 0.40) + (Dependency Factor × 0.20)
+
+Final Score = Base Score × Role Multiplier
+```
+
+**Factor Calculations:**
+
+**Complexity Factor** (0-10 scale):
+```
+Complexity Factor = min(10, ((cyclomatic / 10) + (cognitive / 20)) × 5)
+```
+Normalized to 0-10 range based on cyclomatic and cognitive complexity.
+
+**Coverage Factor** (0-10 scale):
+```
+Coverage Factor = 10 × (1 - coverage_percentage) × complexity_weight
+```
+Uncovered complex code scores higher than uncovered simple code. Coverage dampens the score - well-tested code gets lower scores.
+
+**Dependency Factor** (0-10 scale):
+Based on call graph analysis:
+- High upstream caller count (many functions depend on this): 8-10
+- On critical paths from entry points: 7-9
+- Moderate dependencies: 4-6
+- Isolated utilities: 1-3
+
+#### Default Weights
+
+The scoring formula uses configurable weights (default values shown):
+
+- **Complexity: 40%** - How difficult the code is to understand and test
+- **Coverage: 40%** - How well the code is tested
+- **Dependency: 20%** - How many other functions depend on this code
+
+These weights can be adjusted in `.debtmap.toml` to match your team's priorities.
+
+#### Role-Based Prioritization
+
+The unified score is multiplied by a **role multiplier** based on the function's semantic classification:
+
+| Role | Multiplier | Description | Example |
+|------|-----------|-------------|---------|
+| **Entry Points** | 1.5× | main(), HTTP handlers, API endpoints | User-facing code where bugs have immediate impact |
+| **Business Logic** | 1.2× | Core domain functions, algorithms | Critical functionality |
+| **Data Access** | 1.0× | Database queries, file I/O | Baseline importance |
+| **Infrastructure** | 0.8× | Logging, configuration, monitoring | Supporting code |
+| **Utilities** | 0.5× | Helpers, formatters, converters | Lower impact |
+| **Test Code** | 0.1× | Test functions, fixtures, mocks | Internal quality |
+
+**How role classification works:**
+
+Debtmap identifies function roles through pattern analysis:
+- **Entry points**: Functions named `main`, handlers with routing decorators, public API functions
+- **Business logic**: Core domain operations, calculation functions, decision-making code
+- **Data access**: Database queries, file operations, network calls
+- **Infrastructure**: Logging, config parsing, monitoring, error handling
+- **Utilities**: Helper functions, formatters, type converters, validators
+- **Test code**: Functions in test modules, test functions, fixtures
+
+**Example: Same complexity, different priorities**
+
+Consider a function with base score 8.0:
+
+```
+If classified as Entry Point:
+  Final Score = 8.0 × 1.5 = 12.0 (capped at 10.0) → CRITICAL priority
+
+If classified as Business Logic:
+  Final Score = 8.0 × 1.2 = 9.6 → CRITICAL priority
+
+If classified as Data Access:
+  Final Score = 8.0 × 1.0 = 8.0 → HIGH priority
+
+If classified as Utility:
+  Final Score = 8.0 × 0.5 = 4.0 → LOW priority
+```
+
+This ensures that complex code in critical paths gets higher priority than equally complex utility code.
+
+#### Coverage Propagation
+
+Coverage impact flows through the call graph using **transitive coverage**:
+
+```
+Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)
+```
+
+**How it works:**
+
+Functions called by well-tested code inherit some coverage benefit, reducing their urgency. This helps identify which untested functions are on critical paths versus safely isolated utilities.
+
+**Example scenarios:**
+
+**Scenario 1: Untested function with well-tested callers**
+```
+Function A: 0% direct coverage
+  Called by:
+    - handle_request (95% coverage)
+    - process_payment (90% coverage)
+    - validate_order (88% coverage)
+
+Transitive coverage: ~40% (inherits coverage benefit from callers)
+Final priority: Lower than isolated 0% coverage function
+```
+
+**Scenario 2: Untested function on critical path**
+```
+Function B: 0% direct coverage
+  Called by:
+    - main (0% coverage)
+    - startup (10% coverage)
+
+Transitive coverage: ~5% (minimal coverage benefit)
+Final priority: Higher - on critical path with no safety net
+```
+
+Coverage propagation prevents false alarms about utility functions called only by well-tested code, while highlighting genuinely risky untested code on critical paths.
+
+#### Unified Score Example
+
+```
+Function: process_payment
+  Location: src/payments.rs:145
+
+Metrics:
+  - Cyclomatic complexity: 18
+  - Cognitive complexity: 25
+  - Test coverage: 20%
+  - Upstream callers: 3 (high dependency)
+  - Role: Business Logic
+
+Calculation:
+  Complexity Factor = min(10, ((18/10) + (25/20)) × 5) = min(10, 8.75) = 8.75
+  Coverage Factor = 10 × (1 - 0.20) × 1.0 = 8.0
+  Dependency Factor = 7.5 (3 upstream callers, moderate impact)
+
+  Base Score = (8.75 × 0.40) + (8.0 × 0.40) + (7.5 × 0.20)
+             = 3.5 + 3.2 + 1.5
+             = 8.2
+
+  Final Score = 8.2 × 1.2 (Business Logic multiplier)
+              = 9.84 → CRITICAL priority
+```
+
+### Legacy Risk Scoring (Pre-0.2.x)
+
+Prior to the unified scoring system, Debtmap used a simpler additive risk formula. This is still available for compatibility but unified scoring is now the default and provides better prioritization.
+
 ### Risk Categories
 
-Debtmap classifies functions into **four risk levels** based on the `RiskLevel` enum: Low, Medium, High, and Critical.
+**Note:** The `RiskLevel` enum (Low, Medium, High, Critical) is used for **legacy risk scoring compatibility**. When using **unified scoring** (0-10 scale), refer to the priority classifications shown in the Unified Scoring System section above.
+
+#### Legacy RiskLevel Enum
+
+For legacy risk scoring, Debtmap classifies functions into four risk levels:
 
 ```rust
 pub enum RiskLevel {
@@ -521,35 +694,48 @@ pub enum RiskLevel {
 }
 ```
 
-**Critical** (score ≥ 50)
+**Critical** (legacy score ≥ 50)
 - High complexity (cyclomatic > 15) AND low coverage (< 30%)
 - Untested code that's likely to break and hard to fix
 - **Action**: Immediate attention required - add tests or refactor
 
-**High** (score 25-49)
+**High** (legacy score 25-49)
 - High complexity (cyclomatic > 10) AND moderate coverage (< 60%)
 - Risky code with incomplete testing
 - **Action**: Should be addressed soon
 
-**Medium** (score 10-24)
+**Medium** (legacy score 10-24)
 - Moderate complexity (cyclomatic > 5) AND low coverage (< 50%)
 - OR: High complexity with good coverage
 - **Action**: Plan for next sprint
 
-**Low** (score < 10)
+**Low** (legacy score < 10)
 - Low complexity OR high coverage
 - Well-managed code
 - **Action**: Monitor, low priority
 
-**Well-tested complex code** is an **outcome**, not a separate category:
+#### Unified Scoring Priority Levels
+
+When using unified scoring (default), functions are classified using the 0-10 scale:
+
+- **Critical** (9.0-10.0): Immediate attention
+- **High** (7.0-8.9): Address this sprint
+- **Medium** (5.0-6.9): Plan for next sprint
+- **Low** (3.0-4.9): Monitor and address as time permits
+- **Minimal** (0.0-2.9): Well-managed code
+
+**Well-tested complex code** is an **outcome** in both systems, not a separate category:
 - Complex function (cyclomatic 18, cognitive 25) with 95% coverage
-- Risk score calculated: ~8 (Low risk due to coverage dampening)
-- Falls into **Low** category because good testing mitigates complexity
+- Unified score: ~2.5 (Minimal priority due to coverage dampening)
+- Legacy risk score: ~8 (Low risk)
+- Falls into low-priority categories because good testing mitigates complexity
 - This is the desired state for inherently complex business logic
 
-### Risk Calculation
+### Legacy Risk Calculation
 
-Risk score combines multiple factors:
+**Note:** The legacy risk calculation is still supported for compatibility but has been superseded by the unified scoring system (see above). Unified scoring provides better prioritization through its multi-factor, weighted approach with role-based adjustments.
+
+The legacy risk score uses a simpler additive formula:
 
 ```rust
 risk_score = complexity_factor + coverage_factor + debt_factor
@@ -560,7 +746,7 @@ where:
   debt_factor = debt_score / 10  // If debt data available
 ```
 
-**Example:**
+**Example (legacy scoring):**
 ```
 Function: process_payment
   - Cyclomatic complexity: 18
@@ -575,6 +761,17 @@ Calculation:
 
   risk_score = 6.1 + 40 + 1.5 = 47.6 (HIGH RISK)
 ```
+
+**When to use legacy scoring:**
+- Comparing with historical data from older Debtmap versions
+- Teams with existing workflows built around the old scale
+- Gradual migration to unified scoring
+
+**Why unified scoring is better:**
+- Normalized 0-10 scale is more intuitive
+- Weighted factors (40% complexity, 40% coverage, 20% dependency) provide better balance
+- Role multipliers adjust priority based on function importance
+- Coverage propagation reduces false positives for utility functions
 
 ### Test Effort Assessment
 
@@ -603,7 +800,7 @@ Debtmap provides codebase-wide risk metrics:
     "high_count": 45,
     "medium_count": 123,
     "low_count": 456,
-    "well_tested_count": 234,
+    "minimal_count": 234,
     "total_functions": 870
   },
   "codebase_risk_score": 1247.5
@@ -611,9 +808,12 @@ Debtmap provides codebase-wide risk metrics:
 ```
 
 **Interpreting distribution:**
-- **Healthy codebase**: Most functions in Low/WellTested
-- **Needs attention**: Many Critical/High risk functions
+- **Healthy codebase**: Most functions in Low/Minimal priority (unified scoring) or Low/WellTested (legacy)
+- **Needs attention**: Many Critical/High priority functions
 - **Technical debt**: High codebase risk score
+
+**Note on well-tested functions:**
+In unified scoring, well-tested complex code simply scores low (0-2.9 Minimal or 3-4.9 Low) due to coverage dampening - it's not a separate category. The `minimal_count` in the distribution represents functions with unified scores 0-2.9, which includes well-tested complex code.
 
 ### Testing Recommendations
 
@@ -757,19 +957,37 @@ debtmap analyze . --format markdown --output report.md
 
 ### Prioritizing Work
 
-Debtmap provides multiple prioritization strategies:
+Debtmap provides multiple prioritization strategies, with **unified scoring (0-10 scale)** as the recommended default for most workflows:
 
-**1. By Unified Score (default)**
+**1. By Unified Score (default - recommended)**
 ```bash
 debtmap analyze . --top 10
 ```
-Shows top 10 items by combined complexity, coverage, and dependency factors.
+Shows top 10 items by **combined complexity, coverage, and dependency factors**, weighted and adjusted by function role.
 
-**2. By Risk Category**
+**Why use unified scoring:**
+- Balances complexity (40%), coverage (40%), and dependency impact (20%)
+- Adjusts for function importance (entry points prioritized over utilities)
+- Normalized 0-10 scale is intuitive and consistent
+- Reduces false positives through coverage propagation
+- Best for **sprint planning** and **function-level refactoring decisions**
+
+**Example:**
+```bash
+# Show top 20 critical items
+debtmap analyze . --min-priority 7.0 --top 20
+
+# Focus on high-impact functions (score >= 7.0)
+debtmap analyze . --format json | jq '.functions[] | select(.unified_score >= 7.0)'
+```
+
+**2. By Risk Category (legacy compatibility)**
 ```bash
 debtmap analyze . --min-priority high
 ```
-Shows only HIGH and CRITICAL priority items.
+Shows only HIGH and CRITICAL priority items using legacy risk scoring.
+
+**Note:** Legacy risk scoring uses additive formulas and unbounded scales. Prefer unified scoring for new workflows.
 
 **3. By Debt Type**
 ```bash
@@ -785,9 +1003,24 @@ Focuses on specific categories:
 ```bash
 debtmap analyze . --lcov coverage.lcov --top 20
 ```
-Prioritizes by return on investment for testing/refactoring.
+Prioritizes by return on investment for testing/refactoring. Combines unified scoring with test effort estimates to identify high-value work.
+
+**Choosing the right strategy:**
+
+- **Sprint planning for developers**: Use unified scoring (`--top N`)
+- **Architectural review**: Use tiered prioritization (`--summary`)
+- **Category-focused work**: Use debt type filtering (`--filter`)
+- **Testing priorities**: Use ROI analysis with coverage data (`--lcov`)
+- **Historical comparisons**: Use legacy risk scoring (for consistency with old reports)
 
 ### Tiered Prioritization
+
+**Note:** Tiered prioritization uses **traditional debt scoring** (additive, higher = worse) and is complementary to the unified scoring system (0-10 scale). Both systems can be used together:
+
+- **Unified scoring** (0-10 scale): Best for **function-level prioritization** and sprint planning
+- **Tiered prioritization** (debt tiers): Best for **architectural focus** and strategic debt planning
+
+Use `--summary` for tiered view focusing on architectural issues, or default output for function-level unified scores.
 
 Debtmap uses a tier-based system to map debt scores to actionable priority levels. Each tier includes effort estimates and strategic guidance for efficient debt remediation.
 
@@ -1344,9 +1577,25 @@ Debtmap supports multiple programming languages with varying levels of analysis 
   - Trait implementation tracking
   - Purity detection with confidence scoring
   - Call graph analysis (upstream callers, downstream callees)
-  - Pattern-based adjustments for macros
+  - Semantic function classification (entry points, business logic, data access, infrastructure, utilities, test code)
+  - Enhanced call graph with transitive relationships
+  - Macro expansion support for accurate complexity analysis
+  - Pattern-based adjustments for macros and code generation
   - Visibility tracking (pub, pub(crate), private)
   - Test module detection (#[cfg(test)])
+
+**Semantic Classification:**
+
+Debtmap automatically identifies function roles in Rust code to apply appropriate role multipliers in unified scoring:
+
+- **Entry Points**: Functions named `main`, `start`, or public functions in `bin/` modules
+- **Business Logic**: Core domain functions with complex logic, algorithms, business rules
+- **Data Access**: Functions performing database queries, file I/O, network operations
+- **Infrastructure**: Logging, configuration, monitoring, error handling utilities
+- **Utilities**: Helper functions, formatters, type converters, validation functions
+- **Test Code**: Functions in `#[cfg(test)]` modules, functions with `#[test]` attribute
+
+This classification feeds directly into the unified scoring system's role multiplier (see Risk Scoring section).
 
 **Python** (Partial Support)
 - **Parser**: rustpython-parser
@@ -1730,6 +1979,31 @@ pub fn find_functions_with_side_effects(&self) -> Vec<String>
 4. Modification impact calculated for each function
 5. Results used in prioritization and risk scoring
 
+**Connection to Unified Scoring:**
+
+The dependency analysis from DataFlowGraph directly feeds into the **unified scoring system's dependency factor** (20% weight):
+
+- **Dependency Factor Calculation**: Functions with high upstream caller count or on critical paths from entry points receive higher dependency scores (8-10)
+- **Isolated Utilities**: Functions with few or no callers score lower (1-3) on dependency factor
+- **Impact Prioritization**: This helps prioritize functions where bugs have wider impact across the codebase
+- **Modification Risk**: The modification impact analysis uses dependency data to calculate blast radius when changes are made
+
+**Example:**
+```
+Function: validate_payment_method
+  Upstream callers: 4 (high impact)
+  → Dependency Factor: 8.0
+
+Function: format_currency_string
+  Upstream callers: 0 (utility)
+  → Dependency Factor: 1.5
+
+Both have same complexity, but validate_payment_method gets higher unified score
+due to its critical role in the call graph.
+```
+
+This integration ensures that the unified scoring system considers not just internal function complexity and test coverage, but also the function's importance in the broader codebase architecture.
+
 ### Entropy-Based Complexity
 
 Advanced pattern detection to reduce false positives.
@@ -1910,10 +2184,43 @@ Debtmap parses LCOV coverage data for risk analysis:
 - ~200 bytes per function
 - Thread-safe (Arc<CoverageIndex>)
 
-**Performance:**
-- Index build: ~20-30ms for 5,000 functions
-- Analysis overhead: ~2.5x baseline (target: ≤3x)
-- Example: 53ms → 130ms for 100 files
+#### Performance Characteristics
+
+**Index Build Performance:**
+- Index construction: O(n), approximately 20-30ms for 5,000 functions
+- Memory usage: ~200 bytes per record (~2MB for 5,000 functions)
+- Scales linearly with function count
+
+**Lookup Performance:**
+- Exact match (function name): O(1) average, ~0.5μs per lookup
+- Line-based fallback: O(log n), ~5-8μs per lookup
+- Cache-friendly data structure for hot paths
+
+**Analysis Overhead:**
+- Coverage integration overhead: ~2.5x baseline analysis time
+- Target overhead: ≤3x (maintained through optimizations)
+- Example timing: 53ms baseline → 130ms with coverage (2.45x overhead)
+- Overhead includes index build + lookups + coverage propagation
+
+**Thread Safety:**
+- Coverage index wrapped in `Arc<CoverageIndex>` for lock-free parallel access
+- Multiple analyzer threads can query coverage simultaneously
+- No contention on reads, suitable for parallel analysis pipelines
+
+**Memory Footprint:**
+```
+Total memory = (function_count × 200 bytes) + index overhead
+
+Examples:
+- 1,000 functions: ~200 KB
+- 5,000 functions: ~2 MB
+- 10,000 functions: ~4 MB
+```
+
+**Scalability:**
+- Tested with codebases up to 10,000 functions
+- Performance remains predictable and acceptable
+- Memory usage stays bounded and reasonable
 
 **Generating coverage:**
 ```bash
