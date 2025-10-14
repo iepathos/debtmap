@@ -187,7 +187,42 @@ debtmap analyze . --plain
 
 # Compact summary output
 debtmap analyze . --summary
+
+# Control aggregation behavior
+debtmap analyze . --aggregate-only          # Show only aggregated results
+debtmap analyze . --no-aggregation          # Skip aggregation entirely
+debtmap analyze . --aggregation-method sum  # Choose aggregation method
+
+# Adjust detail level in output
+debtmap analyze . --detail-level high       # More detailed output
 ```
+
+**Expert Options:**
+
+These advanced options are available for power users and specialized use cases:
+
+```bash
+# Analysis behavior
+--semantic-off              # Disable semantic analysis
+--no-context-aware          # Disable context-aware analysis
+--multi-pass                # Enable multi-pass analysis for deeper insights
+--validate-loc              # Validate lines of code calculations
+
+# Rust-specific options
+--verbose-macro-warnings    # Show detailed macro expansion warnings
+--show-macro-stats          # Display macro usage statistics
+
+# Filtering and thresholds
+--threshold-preset <name>   # Use predefined threshold preset
+--min-problematic <count>   # Minimum problematic items to report
+--max-files <count>         # Limit analysis to N files
+--no-god-object             # Disable god object detection
+
+# Advanced reporting
+--attribution               # Include code attribution information
+```
+
+For detailed documentation of these options, run `debtmap analyze --help`.
 
 ## First Analysis
 

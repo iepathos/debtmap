@@ -3,141 +3,110 @@
   "chapter_title": "Examples",
   "chapter_file": "book/src/examples.md",
   "drift_detected": true,
-  "severity": "high",
-  "quality_assessment": "Chapter has several critical issues with incorrect command syntax and non-existent cache subcommands. Many newer CLI options are not documented.",
+  "severity": "medium",
+  "quality_assessment": "Chapter has excellent comprehensive content but contains several CLI option name errors that will cause commands to fail. Flag names need updating to match actual implementation.",
   "issues": [
     {
       "type": "incorrect_example",
-      "severity": "critical",
-      "section": "Cache Management (lines 597-604)",
-      "description": "Examples show cache as a subcommand (debtmap cache stats/clear/prune) but cache is not a subcommand in the CLI",
-      "current_content": "# Show cache statistics\ndebtmap cache stats\n\n# Clear cache for current project\ndebtmap cache clear\n\n# Prune old cache entries\ndebtmap cache prune --max-age-days 7",
-      "should_be": "# Show cache statistics\ndebtmap analyze . --cache-stats\n\n# Clear cache before analysis\ndebtmap analyze . --clear-cache\n\n# Migrate cache to shared location\ndebtmap analyze . --migrate-cache",
-      "fix_suggestion": "Replace cache subcommand examples with the actual analyze flags. Remove the prune example as there is no --max-age-days or prune functionality.",
-      "source_reference": "src/cli.rs:158-167 (cache flags on analyze command)"
+      "severity": "high",
+      "section": "Output Formats - Understanding Output Formats",
+      "description": "Chapter uses '--json-format' flag but the actual CLI uses '--output-format'",
+      "current_content": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --json-format legacy\n\n# Output format options: terminal, json, markdown\ndebtmap analyze . --format terminal",
+      "should_be": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --output-format legacy\n\n# Unified JSON format (default)\ndebtmap analyze . --format json --output-format unified",
+      "fix_suggestion": "Replace '--json-format' with '--output-format' throughout chapter (appears in line 575). Note that the default is 'legacy' not 'unified'.",
+      "source_reference": "src/cli.rs:37 - #[arg(long = \"output-format\", value_enum, default_value = \"legacy\")]"
     },
     {
       "type": "incorrect_example",
       "severity": "high",
-      "section": "Understanding Output Formats (line 561)",
-      "description": "Example uses --json-format flag but the actual CLI flag is --output-format",
-      "current_content": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --json-format legacy",
-      "should_be": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --output-format legacy",
-      "fix_suggestion": "Update all references from --json-format to --output-format to match actual CLI",
-      "source_reference": "src/cli.rs:37 (json_format field with long = 'output-format')"
+      "section": "Compare Command - Target-Specific Comparison",
+      "description": "Chapter shows '--target' option but CLI uses '--target-location'",
+      "current_content": "# Target format: file:function:line\ndebtmap compare \\\n  --before before.json \\\n  --after after.json \\\n  --target src/main.rs:process_data:100",
+      "should_be": "# Target format: file:function:line\ndebtmap compare \\\n  --before before.json \\\n  --after after.json \\\n  --target-location src/main.rs:process_data:100",
+      "fix_suggestion": "Replace '--target' with '--target-location' in line 829",
+      "source_reference": "src/cli.rs:298-301 - target_location: Option<String>"
     },
     {
-      "type": "missing_content",
-      "severity": "high",
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Compare Command - Output Formats (line 849)",
+      "description": "Chapter comment says terminal output is default, but CLI default for compare is json",
+      "current_content": "# Terminal output (default)\ndebtmap compare --before before.json --after after.json",
+      "should_be": "# JSON output (default)\ndebtmap compare --before before.json --after after.json\n\n# Terminal output (explicit)\ndebtmap compare --before before.json --after after.json --format terminal",
+      "fix_suggestion": "Update comment to indicate json is default, and show explicit --format terminal for terminal output",
+      "source_reference": "src/cli.rs:304 - format: OutputFormat with default_value = \"json\""
+    },
+    {
+      "type": "unclear_content",
+      "severity": "medium",
       "section": "Filtering and Focusing",
-      "description": "Chapter does not document the --threshold-preset option which provides convenient preset configurations",
-      "should_add": "Document --threshold-preset with values: strict, balanced (default), lenient. This provides quick threshold configuration without setting individual values.",
-      "fix_suggestion": "Add a subsection showing threshold-preset usage:\n```bash\n# Use strict thresholds for high quality standards\ndebtmap analyze . --threshold-preset strict\n\n# Use lenient thresholds for legacy codebases\ndebtmap analyze . --threshold-preset lenient\n```",
-      "source_reference": "src/cli.rs:126-127 (threshold_preset option)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Output Formats",
-      "description": "Chapter does not document the --plain flag for ASCII-only, machine-parseable output",
-      "should_add": "Document --plain flag: 'Plain output mode: ASCII-only, no colors, no emoji, machine-parseable'",
-      "fix_suggestion": "Add to output formats section:\n```bash\n# Plain ASCII output without colors or emoji\ndebtmap analyze . --plain\n```",
-      "source_reference": "src/cli.rs:129-131 (plain flag)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Advanced Usage - Aggregation Methods",
-      "description": "Chapter shows aggregation-method examples but doesn't document all available methods",
-      "current_content": "# Use logarithmic sum for aggregation\ndebtmap analyze . --aggregation-method logarithmic_sum\n\n# Standard sum (default)\ndebtmap analyze . --aggregation-method sum",
-      "should_be": "Default is 'weighted_sum', not 'sum'. Available methods: sum, weighted_sum, logarithmic_sum, max_plus_average",
-      "fix_suggestion": "Update default and list all four aggregation methods with brief explanations of when to use each",
-      "source_reference": "src/cli.rs:189-191 (aggregation_method with default 'weighted_sum')"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Advanced Usage",
-      "description": "Several advanced analyze options are not documented",
-      "should_add": "Missing options: --validate-loc (LOC consistency validation), --max-files (limit analysis scope), --aggregate-only (show only file-level scores), --no-aggregation (disable file aggregation), --min-problematic (minimum functions for aggregation), --detail-level (diagnostic detail level)",
-      "fix_suggestion": "Add subsection for analysis control options with examples for validate-loc, max-files, and aggregation control flags",
-      "source_reference": "src/cli.rs:177-207 (various advanced flags)"
+      "description": "Examples show filtering by category names (Architecture, Testing) but don't document what valid category names are",
+      "current_content": "# Focus on architecture issues (god objects, complexity)\ndebtmap analyze . --filter Architecture\n\n# Focus on testing gaps\ndebtmap analyze . --filter Testing\n\n# Show only top 10 issues\ndebtmap analyze . --top 10",
+      "should_be": "Should verify category names are correct and document the complete list of valid categories",
+      "fix_suggestion": "Add a note or list documenting valid category names that can be passed to --filter. Cross-reference with debt detection types in the codebase.",
+      "source_reference": "src/cli.rs:118-119 - filter_categories accepts Vec<String>, need to verify against debt::DebtType or similar"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Advanced Usage - Cache",
-      "description": "Chapter doesn't document all cache-related flags on analyze command",
-      "should_add": "Document --cache-location flag and DEBTMAP_CACHE_DIR environment variable, --force-cache-rebuild, --migrate-cache functionality",
-      "fix_suggestion": "Add cache configuration subsection:\n```bash\n# Set custom cache location\ndebtmap analyze . --cache-location /path/to/cache\n\n# Or use environment variable\nexport DEBTMAP_CACHE_DIR=/path/to/cache\ndebtmap analyze .\n\n# Force cache rebuild\ndebtmap analyze . --force-cache-rebuild\n```",
-      "source_reference": "src/cli.rs:150-167 (cache-related flags)"
+      "section": "Advanced Usage - Verbosity Levels",
+      "description": "Chapter shows -v/-vv/-vvv but doesn't mention --verbose long form is also available",
+      "current_content": "# Level 1: Show main score factors\ndebtmap analyze . -v\n\n# Level 2: Show detailed calculations\ndebtmap analyze . -vv",
+      "should_be": "Examples are correct. Optional: note that --verbose is the long form",
+      "fix_suggestion": "Optional: Add note that -v is short for --verbose",
+      "source_reference": "src/cli.rs:94-99 - #[arg(short = 'v', long = \"verbose\")]"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Basic Commands",
-      "description": "Init command is mentioned in CLI but not documented in examples chapter",
-      "should_add": "Document 'debtmap init' command with --force flag to create .debtmap.toml configuration file",
-      "fix_suggestion": "Add to configuration examples section:\n```bash\n# Initialize configuration file\ndebtmap init\n\n# Force overwrite existing config\ndebtmap init --force\n```",
-      "source_reference": "src/cli.rs:210-215 (Init command)"
-    },
-    {
-      "type": "potentially_incorrect",
-      "severity": "low",
-      "section": "Compare Command (line 815)",
-      "description": "Example uses --target but CLI defines --target-location (need to verify if target is a short alias)",
-      "current_content": "debtmap compare \\\n  --before before.json \\\n  --after after.json \\\n  --target src/main.rs:process_data:100",
-      "should_be": "Verify the flag name. CLI shows 'target_location' with flag '--target-location', but there may be a short form --target",
-      "fix_suggestion": "If no short alias exists, update to use --target-location. Otherwise document both forms.",
-      "source_reference": "src/cli.rs:298-301 (target_location field)"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "low",
-      "section": "Analyze command defaults",
-      "description": "Some default values in examples may not match actual CLI defaults",
-      "current_content": "Example shows default values but doesn't always match CLI",
-      "should_be": "Verify: format default is 'terminal', output-format default is 'legacy', threshold-complexity is 10, threshold-duplication is 50, aggregation-method is 'weighted_sum', detail-level is 'standard', jobs is 0 (all cores)",
-      "fix_suggestion": "Add a defaults reference table or ensure inline documentation matches these values",
-      "source_reference": "src/cli.rs:31,37,45,49,138,178,190 (various default values)"
+      "section": "Custom Thresholds",
+      "description": "Chapter doesn't mention --threshold-preset option for quick configuration",
+      "current_content": "# Set both complexity and duplication thresholds\ndebtmap analyze . \\\n  --threshold-complexity 15 \\\n  --threshold-duplication 50",
+      "should_be": "Could also show the preset option as an alternative",
+      "fix_suggestion": "Add example: debtmap analyze . --threshold-preset strict (options: strict, balanced, lenient)",
+      "source_reference": "src/cli.rs:125-127 - threshold_preset option with ThresholdPreset enum"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of major commands (analyze, validate, compare)",
-    "Good progression from simple to advanced usage patterns",
-    "Excellent real-world CI integration examples from actual .github/workflows",
-    "Coverage integration well explained across multiple language ecosystems",
-    "Multi-language examples (Rust, Python, JS/TS) are helpful",
-    "Configuration examples are detailed and practical",
-    "Compare command workflow is clearly explained",
-    "Output format examples show actual expected output"
+    "Comprehensive coverage of all major use cases (Rust, Python, JS/TS analysis)",
+    "Excellent real-world CI integration examples for GitHub Actions, GitLab CI, and CircleCI",
+    "Very well-structured progression from basic to advanced usage",
+    "Good use of actual examples from Debtmap's own workflows (.github/workflows/debtmap.yml)",
+    "Clear explanations of what each option does and expected results",
+    "Helpful interpretation guidance for output formats with example JSON structure",
+    "Practical configuration examples (.debtmap.toml) for different project types",
+    "Comprehensive compare command section with workflow and interpretation",
+    "Examples are mostly syntactically valid (except for the flag name issues)",
+    "Excellent 'Tips and Best Practices' section",
+    "Good cross-references to other chapters",
+    "Coverage integration examples for all supported languages (tarpaulin, pytest, jest)",
+    "Monorepo analysis example",
+    "Cache management examples",
+    "Practical CI validation gates and regression detection examples"
   ],
   "improvement_suggestions": [
-    "Add a CLI quick reference table showing all commands and their key flags",
-    "Include init command examples in a 'Getting Started' subsection",
-    "Add troubleshooting section for common cache-related issues",
-    "Show examples of combining multiple advanced flags",
-    "Add performance tuning section with --jobs and --no-parallel examples",
-    "Include examples of using DEBTMAP_CACHE_DIR environment variable",
-    "Add section on when to use different aggregation methods",
-    "Show examples of --threshold-preset usage for different project types",
-    "Document the difference between --semantic-off fallback mode",
-    "Add examples showing --plain output for CI parsing"
+    "Add a quick reference table of valid category names for --filter option",
+    "Include more examples of combining multiple advanced options together",
+    "Add example showing how to read and use JSON output programmatically (jq examples)",
+    "Show examples of setting environment variables mentioned in cache section",
+    "Add section on interpreting exit codes in CI scripts",
+    "Include performance benchmarks or tips for very large codebases",
+    "Add example of using --max-files for limiting analysis scope",
+    "Consider adding animated terminal recordings or screenshots of actual output"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-13",
-    "feature_inventory": "Analyzed directly from src/cli.rs",
+    "analyzed_at": "2025-10-14",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Analyzing Rust projects",
       "Python analysis",
       "JavaScript/TypeScript",
-      "CI integration",
-      "Output formats",
-      "Advanced usage",
-      "Configuration examples",
-      "Compare command"
+      "CI integration (GitHub Actions, GitLab CI, CircleCI)",
+      "Output formats (terminal, JSON, markdown)",
+      "Advanced usage (context providers, multi-pass, cache, filtering)",
+      "Configuration examples (.debtmap.toml)",
+      "Compare command workflow"
     ],
-    "validation_focus": "Ensure examples use current CLI syntax and options",
-    "cli_source": "src/cli.rs (analyzed lines 1-512)"
+    "validation_focus": "Ensure examples use current CLI syntax and options"
   }
 }

@@ -75,6 +75,11 @@ Configure thresholds to match your project standards:
 debtmap analyze . \
   --threshold-complexity 15 \
   --threshold-duplication 50
+
+# Use preset configurations for quick setup
+debtmap analyze . --threshold-preset strict    # Strict standards
+debtmap analyze . --threshold-preset balanced  # Default balanced
+debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 ```
 
 ### God Object Detection
@@ -107,12 +112,21 @@ debtmap analyze . --filter Architecture
 # Focus on testing gaps
 debtmap analyze . --filter Testing
 
+# Filter by multiple categories
+debtmap analyze . --filter Architecture,Testing
+
 # Show only top 10 issues
 debtmap analyze . --top 10
 
 # Show only high-priority items
 debtmap analyze . --min-priority high
 ```
+
+**Valid filter categories:**
+- `Architecture` - God objects, high complexity, structural issues
+- `Testing` - Test coverage gaps, untested critical code
+- `Duplication` - Code duplication and similar patterns
+- `Maintainability` - Long functions, deep nesting, readability issues
 
 ### Output Formats
 
@@ -521,6 +535,22 @@ Machine-readable format for CI/CD integration:
 debtmap analyze . --format json --output report.json
 ```
 
+**Using JSON output programmatically:**
+
+```bash
+# Extract total debt score
+debtmap analyze . --format json | jq '.total_debt_score'
+
+# Count critical items
+debtmap analyze . --format json | jq '[.items[] | select(.unified_score.final_score >= 8)] | length'
+
+# Get top 5 functions by score
+debtmap analyze . --format json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5] | .[].location'
+
+# Extract all test gap items
+debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap")]'
+```
+
 Structure:
 ```json
 {
@@ -568,11 +598,14 @@ Great for documentation or PR comments.
 ### Understanding Output Formats
 
 ```bash
-# Unified JSON format (default)
+# JSON output (default is legacy format)
 debtmap analyze . --format json
 
-# Legacy JSON format for backward compatibility
-debtmap analyze . --format json --json-format legacy
+# Unified JSON format (alternative to legacy)
+debtmap analyze . --format json --output-format unified
+
+# Legacy JSON format (default, for backward compatibility)
+debtmap analyze . --format json --output-format legacy
 
 # Output format options: terminal, json, markdown
 debtmap analyze . --format terminal
@@ -652,6 +685,9 @@ debtmap analyze . -vv
 
 # Level 3: Show all debug information
 debtmap analyze . -vvv
+
+# Long form also available
+debtmap analyze . --verbose
 
 # Show macro expansion details (Rust)
 debtmap analyze . --verbose-macro-warnings --show-macro-stats
@@ -826,7 +862,7 @@ Focus on whether a specific function improved:
 debtmap compare \
   --before before.json \
   --after after.json \
-  --target src/main.rs:process_data:100
+  --target-location src/main.rs:process_data:100
 ```
 
 ### Using with Implementation Plans
@@ -846,10 +882,16 @@ debtmap compare \
 ### Output Formats
 
 ```bash
-# Terminal output (default)
+# JSON output (default)
 debtmap compare --before before.json --after after.json
 
-# JSON for CI integration
+# Terminal output (explicit)
+debtmap compare \
+  --before before.json \
+  --after after.json \
+  --format terminal
+
+# JSON for CI integration (explicit output file)
 debtmap compare \
   --before before.json \
   --after after.json \

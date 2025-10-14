@@ -3,162 +3,178 @@
   "chapter_title": "Analysis Guide",
   "chapter_file": "book/src/analysis-guide.md",
   "drift_detected": true,
-  "severity": "medium",
-  "quality_assessment": "Chapter is comprehensive and generally accurate, with some areas needing updates to reflect actual implementation details. Major drift involves debt type categorization system, tier-based prioritization, and missing DataFlowGraph capabilities.",
+  "severity": "high",
+  "quality_assessment": "Chapter is comprehensive but needs significant updates to reflect unified scoring system (0-10 scale) and recent enhancements. The risk scoring section uses outdated formulas and doesn't explain the new multi-factor prioritization system. Debt patterns section is generally accurate but misses some newer debt types.",
   "issues": [
     {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Risk Scoring",
+      "description": "Chapter doesn't document the unified scoring system (0-10 scale) which is now the primary prioritization mechanism",
+      "current_content": "risk_score = complexity_factor + coverage_factor + debt_factor",
+      "should_be": "Unified Score (0-10) = Base Score × Role Multiplier\nBase Score = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)",
+      "fix_suggestion": "Add new major section 'Unified Scoring System' explaining:\n- 0-10 scale with priority classifications (Critical: 9-10, High: 7-8.9, Medium: 5-6.9, Low: 3-4.9, Minimal: 0-2.9)\n- Three-factor formula with configurable weights (default: complexity 40%, coverage 40%, dependency 20%)\n- How each factor is calculated and normalized to 0-10 range\n- Role multiplier adjustments (entry_points: 1.5x, business_logic: 1.2x, data_access: 1.0x, infrastructure: 0.8x, utilities: 0.5x, test_code: 0.1x)\n- Transitive coverage propagation through call graph\n- Examples showing how same function gets different scores based on role",
+      "source_reference": "features.json:risk_assessment.unified_scoring"
+    },
+    {
       "type": "outdated_information",
       "severity": "high",
-      "section": "Debt Patterns - Categorization System",
-      "description": "Chapter describes 13 named types with numeric weights (1-5) but implementation uses different enum-based structure",
-      "current_content": "Weight = 1 for Basic Markers (Todo, TestTodo), Weight = 2 for Fixable Issues (Fixme, TestComplexity, TestDuplication), Weight = 3 for Code Quality (CodeSmell, Dependency, CodeOrganization, TestQuality), Weight = 4 for Serious Issues (Duplication, ErrorSwallowing, ResourceManagement), Weight = 5 for High Severity (Complexity)",
-      "should_be": "DebtType enum with specific variants: TestingGap, ComplexityHotspot, DeadCode, Duplication, Risk, TestComplexityHotspot, TestTodo, TestDuplication, ErrorSwallowing, AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues, AssertionComplexity, FlakyTestPattern. DebtCategory enum groups these into Architecture/Testing/Performance/CodeQuality",
-      "fix_suggestion": "Restructure debt patterns section to explain DebtType enum variants first, then show how they map to DebtCategory (Architecture, Testing, Performance, CodeQuality). Remove numeric weight system, replace with category-based strategic guidance",
-      "source_reference": "src/priority/mod.rs:83-297 (DebtType enum, DebtCategory enum and mapping)"
+      "section": "Risk Scoring > Risk Calculation",
+      "description": "Risk calculation formula shown is the older approach, doesn't reflect unified scoring",
+      "current_content": "risk_score = complexity_factor + coverage_factor + debt_factor\nwhere:\n  complexity_factor = (cyclomatic / 5) + (cognitive / 10)\n  coverage_factor = (1 - coverage_percentage) × 50\n  debt_factor = debt_score / 10",
+      "should_be": "Base Score = (Complexity Factor × 0.40) + (Coverage Factor × 0.40) + (Dependency Factor × 0.20)\n\nComplexity Factor = min(10, (cyclomatic / 10 + cognitive / 20) × 5)\nCoverage Factor = 10 × (1 - coverage_percentage) × complexity_weight\nDependency Factor = Based on upstream/downstream dependencies, normalized to 0-10\n\nFinal Score = Base Score × Role Multiplier",
+      "fix_suggestion": "Replace Risk Calculation section with Unified Scoring formula. Move old formula to 'Legacy Risk Scoring (Pre-0.2.x)' subsection for historical reference. Explain that unified scoring is now default and provides better prioritization across different function types.",
+      "source_reference": "features.json:risk_assessment.unified_scoring.formula and features.json:risk_assessment.unified_scoring.factors"
     },
     {
       "type": "missing_content",
       "severity": "high",
-      "section": "Interpreting Results - Prioritization",
-      "description": "Missing entire tier-based prioritization system that's core to the output",
-      "should_add": "Tier system maps scores to priority levels: Critical (≥90), High (70-89.9), Moderate (50-69.9), Low (<50). Each tier has effort estimates and strategic guidance. TieredDisplay groups similar items for batch actions.",
-      "fix_suggestion": "Add major new section 'Tiered Prioritization' explaining: Tier enum, score-to-tier mapping, effort estimates per tier (Critical: 1-2 days, High: 2-4 hours, Moderate: 1-2 hours, Low: 30 min), batch action recommendations, and tiered display grouping that prevents grouping of god objects/critical items",
-      "source_reference": "src/priority/mod.rs:360-879 (Tier enum, TieredDisplay, get_tiered_display)"
+      "section": "Risk Scoring",
+      "description": "Missing explanation of role-based multipliers that adjust final scores based on function importance",
+      "should_add": "Role Multiplier adjusts scores based on semantic function classification:\n- Entry Points (main, handlers, API endpoints): 1.5x - Most critical for user-facing issues\n- Business Logic (core domain functions): 1.2x - Important functionality\n- Data Access (database, file I/O): 1.0x - Baseline importance\n- Infrastructure (logging, config): 0.8x - Supporting code\n- Utilities (helpers, formatters): 0.5x - Lower impact\n- Test Code (test functions, fixtures): 0.1x - Internal quality\n\nExample: Function with base score 8.0:\n- If entry point: 8.0 × 1.5 = 12.0 (capped at 10.0) → CRITICAL\n- If utility: 8.0 × 0.5 = 4.0 → LOW",
+      "fix_suggestion": "Add 'Role-Based Prioritization' subsection explaining semantic classification system, how Debtmap identifies function roles, and how multipliers adjust final scores. Include comparison table showing same complexity function getting different priorities based on role.",
+      "source_reference": "features.json:risk_assessment.unified_scoring.role_multiplier and features.json:core_analysis.call_graph_analysis.classifications"
     },
     {
       "type": "missing_content",
       "severity": "high",
-      "section": "Advanced Features - Data Flow Analysis",
-      "description": "Chapter only mentions CallGraph but implementation has comprehensive DataFlowGraph",
-      "current_content": "Call Graph Analysis section explains upstream_callers and downstream_callees",
-      "should_be": "DataFlowGraph extends CallGraph with: variable dependencies (function_id -> set of variables), data transformations between functions (input_vars, output_vars, transformation_type), I/O operations per function, purity analysis integration, modification impact analysis (affected functions, dependency count, side effects, risk level)",
-      "fix_suggestion": "Expand 'Call Graph Analysis' section to 'Data Flow Analysis' covering DataFlowGraph capabilities: variable dependency tracking, data transformation patterns (map/filter/reduce), I/O operation detection, side effect analysis through purity info, modification impact calculation with risk assessment",
-      "source_reference": "src/data_flow.rs:108-324 (DataFlowGraph struct and comprehensive methods)"
+      "section": "Risk Scoring",
+      "description": "Missing explanation of transitive coverage propagation through call graph",
+      "should_add": "Coverage Propagation: Coverage impact flows through call graph using formula:\n\nTransitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)\n\nFunctions called by well-tested code inherit some coverage benefit, reducing their urgency. This helps identify which untested functions are actually on critical paths vs. safely isolated utility functions.\n\nExample:\n- Function A: 0% direct coverage, called by 3 well-tested functions (90% coverage)\n  → Transitive coverage ~40% → Lower priority than isolated 0% coverage function\n- Function B: 0% direct coverage, on critical path from main\n  → No coverage benefit from callers → Higher priority",
+      "fix_suggestion": "Add 'Coverage Propagation' subsection under Unified Scoring System. Explain how coverage analysis considers not just direct line coverage but also coverage of calling functions. Show examples of how this affects prioritization.",
+      "source_reference": "features.json:risk_assessment.unified_scoring.coverage_propagation"
     },
     {
       "type": "missing_content",
       "severity": "high",
-      "section": "Interpreting Results - Categorized View",
-      "description": "Missing categorized debt analysis feature with cross-category dependencies",
-      "should_add": "CategorizedDebt provides debt grouped by category with CategorySummary (total score, item count, estimated effort hours, average severity, top items per category). CrossCategoryDependency tracks blocking relationships (e.g., god objects block testing, async issues need architecture changes)",
-      "fix_suggestion": "Add new section 'Categorized Debt Analysis' explaining: how items are grouped into Architecture/Testing/Performance/CodeQuality categories, CategorySummary with effort estimation formulas, cross-category dependency detection (architecture blocking testing, performance requiring architecture changes, complexity affecting testability), impact levels (Critical/High/Medium/Low)",
-      "source_reference": "src/priority/mod.rs:300-330, 936-1105 (CategorizedDebt struct, get_categorized_debt, identify_cross_category_dependencies methods)"
+      "section": "Risk Scoring > Risk Categories",
+      "description": "Priority thresholds shown don't match unified scoring system",
+      "current_content": "Critical (≥50), High (25-49), Medium (10-24), Low (<10), plus mentions WellTested",
+      "should_be": "Critical (9.0-10.0), High (7.0-8.9), Medium (5.0-6.9), Low (3.0-4.9), Minimal (0.0-2.9)\n\nNote: RiskLevel enum has 4 variants (Low, Medium, High, Critical) - used for legacy risk scoring. Unified scoring uses different thresholds.",
+      "fix_suggestion": "Update priority classification to match unified scoring thresholds (0-10 scale). Clarify that 'well-tested complex code' is not a separate category but simply scores low (0-2.9) due to coverage dampening. Add note about RiskLevel enum being used for legacy compatibility.",
+      "source_reference": "features.json:risk_assessment.unified_scoring.priority_classification"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Debt Patterns > Debt Type Enum",
+      "description": "Chapter mentions 24 debt types but doesn't match exact DebtType enum from features.json",
+      "current_content": "Lists 24 debt types organized into Testing, Architecture, Performance, and Code Quality categories",
+      "should_be": "Verify all debt types from features.json are documented:\nTesting: TestingGap, TestTodo, TestComplexity, TestDuplication, TestComplexityHotspot, AssertionComplexity, FlakyTestPattern\nArchitecture: ComplexityHotspot, DeadCode, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues\nPerformance: AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency\nCode Quality: Risk, Duplication, ErrorSwallowing",
+      "fix_suggestion": "Cross-reference debt type list with features.json. Ensure all types are documented with examples. Consider adding security patterns section (hardcoded_secrets, weak_cryptography, sql_injection, unsafe_code, input_validation) mentioned in features.json.",
+      "source_reference": "features.json:debt_detection"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Advanced Features > Data Flow Analysis",
+      "description": "Data flow section is good but doesn't explain integration with unified scoring's dependency factor",
+      "current_content": "Explains upstream callers, downstream callees, variable dependencies, transformation patterns, I/O detection, modification impact",
+      "should_be": "Include explanation: The dependency analysis from DataFlowGraph feeds directly into unified scoring's dependency factor (20% weight). Functions with many upstream callers or on critical paths score higher. Modification impact analysis uses this data to calculate blast radius.",
+      "fix_suggestion": "Add paragraph at end of Data Flow Analysis section connecting it to unified scoring: 'The dependency analysis from DataFlowGraph directly feeds into the unified scoring system's dependency factor (20% weight). Functions with high upstream caller count or critical path importance receive higher dependency scores (8-10), while isolated utilities score lower (1-3). This helps prioritize functions where bugs have wider impact.'",
+      "source_reference": "features.json:risk_assessment.unified_scoring.factors.dependency_factor"
     },
     {
       "type": "missing_content",
       "severity": "medium",
-      "section": "Interpreting Results - Debt Density",
-      "description": "Missing debt density metric which normalizes debt across project sizes",
-      "should_add": "debt_density = (total_debt_score / total_lines_of_code) × 1000, providing per-1000-LOC metric for comparing projects of different sizes",
-      "fix_suggestion": "Add subsection 'Debt Density Metric' with formula, interpretation guidelines (e.g., 50 = clean, 100 = moderate, 150+ = high debt), and examples showing how same density indicates proportional debt regardless of project size",
-      "source_reference": "src/priority/mod.rs:606-610 (debt_density calculation in calculate_total_impact)"
+      "section": "Analyzer Types > Supported Languages > Rust",
+      "description": "Doesn't document semantic classification and enhanced analysis capabilities",
+      "current_content": "Lists basic Rust capabilities: Full AST parsing, complexity metrics, call graph, trait tracking, purity detection",
+      "should_add": "- Macro expansion support for accurate complexity analysis\n- Semantic function classification (entry_points, business_logic, data_access, infrastructure, utilities, test_code)\n- Enhanced call graph with transitive relationships\n- Pattern-based adjustments for macros and code generation",
+      "fix_suggestion": "Add to Rust capabilities list:\n- 'Macro expansion support' - Analyzes expanded macro code\n- 'Semantic classification' - Identifies function roles for weighted prioritization\n- 'Call graph analysis' - Upstream callers, downstream callees for dependency tracking\n\nAdd new subsection 'Semantic Classification' explaining how Debtmap identifies function roles across all languages and uses this for role-based multipliers in unified scoring.",
+      "source_reference": "features.json:core_analysis.language_support.rust.capabilities and features.json:core_analysis.semantic_analysis"
     },
     {
-      "type": "outdated_information",
+      "type": "missing_content",
       "severity": "medium",
-      "section": "Risk Scoring - Risk Categories",
-      "description": "Chapter mentions 5 risk categories including 'WellTested' but implementation has 4-level RiskLevel enum",
-      "current_content": "Functions are classified into five risk categories: Critical, High, Medium, Low, and mentions WellTested",
-      "should_be": "RiskLevel enum has exactly 4 variants: Low, Medium, High, Critical. Well-tested code falls into Low risk category due to coverage dampening",
-      "fix_suggestion": "Update to 4 risk levels: Low, Medium, High, Critical. Explain that well-tested complex code gets Low risk rating due to coverage factor dampening. Remove 'WellTested' as separate category, clarify it's an outcome not a category",
-      "source_reference": "src/data_flow.rs:311-317 (RiskLevel enum with 4 variants)"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "low",
-      "section": "Analyzer Types - Language Support",
-      "description": "Chapter lists 'Unknown' language type but it's not in current Language enum",
-      "current_content": "**Unknown** (Unsupported) - Files with unsupported extensions are classified as Language::Unknown",
-      "should_be": "Language enum only contains: Rust, Python, JavaScript, TypeScript. Unsupported files are simply skipped during file discovery",
-      "fix_suggestion": "Remove 'Unknown' language section. Explain that Language enum supports only Rust/Python/JavaScript/TypeScript, and files with other extensions are filtered out during discovery phase",
-      "source_reference": "src/core/types.rs:7-36 (Language enum with only 4 variants)"
-    },
-    {
-      "type": "incomplete_explanation",
-      "severity": "low",
-      "section": "Entropy-Based Complexity - Dampening Cap",
-      "description": "Chapter explains dampening but doesn't mention the 0.7 minimum cap (30% max reduction)",
-      "current_content": "Explains dampening formula and factors but no mention of floor",
-      "should_be": "Dampening factor is capped at minimum 0.7, ensuring maximum 30% complexity reduction even for highly repetitive code",
-      "fix_suggestion": "Add note after dampening formula: 'The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores, preventing over-correction of pattern-based code'",
-      "source_reference": "src/complexity/entropy.rs:195 (dampening_factor.max(0.7) in compute_dampening_factor)"
+      "section": "Tiered Prioritization",
+      "description": "Chapter has good tiered prioritization section but doesn't connect it to unified scoring",
+      "current_content": "Explains Tier 1-4 system with score thresholds (Critical ≥90, High 70-89.9, Moderate 50-69.9, Low <50)",
+      "should_be": "Clarify relationship: Tiered prioritization uses traditional debt scoring (additive), while unified scoring uses 0-10 scale. Both systems can be used together - tiers for architectural focus, unified for function-level prioritization.",
+      "fix_suggestion": "Add note at beginning of Tiered Prioritization section: 'Note: Tiered prioritization uses traditional debt scoring (higher = worse) complementary to unified scoring (0-10 scale). Use --summary for tiered view focusing on architectural issues, or default output for function-level unified scores.'",
+      "source_reference": "features.json:tiered_prioritization (mentions both systems coexist)"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Advanced Features - Entropy Caching",
-      "description": "Missing information about entropy analyzer caching for performance",
-      "should_add": "EntropyAnalyzer includes LRU-style cache with configurable size (default 1000 entries), cache statistics (hit rate, miss rate, memory usage), automatic eviction when full, ~128 bytes per entry",
-      "fix_suggestion": "Add subsection 'Entropy Analysis Caching': explain cache entries include score + timestamp + hit count, LRU eviction policy, cache statistics tracking, memory estimation (~128 bytes/entry), performance benefits for repeated analysis of same functions",
-      "source_reference": "src/complexity/entropy.rs:10-286 (CacheEntry, CacheStats, caching methods, memory estimation)"
-    },
-    {
-      "type": "incorrect_example",
-      "severity": "low",
-      "section": "Interpreting Results - JSON Structure",
-      "description": "JSON example shows visibility as string but it's a FunctionVisibility enum",
-      "current_content": "\"visibility\": \"pub\"",
-      "should_be": "\"visibility\": \"Public\" or \"Private\" or \"Crate\" (FunctionVisibility enum variants)",
-      "fix_suggestion": "Update JSON examples to use exact enum variant names: 'Private', 'Crate', 'Public' instead of Rust syntax like 'pub' or 'pub(crate)'",
-      "source_reference": "src/priority/mod.rs:331-336 (FunctionVisibility enum: Private, Crate, Public)"
+      "section": "Advanced Features > Coverage Integration",
+      "description": "Missing specific performance characteristics of coverage index",
+      "current_content": "Mentions O(1) lookups and basic performance info",
+      "should_add": "Coverage Index Performance:\n- Index build: O(n), ~20-30ms for 5,000 functions\n- Lookup time: O(1) exact match (~0.5μs), O(log n) fallback (~5-8μs)\n- Memory: ~200 bytes per record (~2MB for 5,000 functions)\n- Analysis overhead: ~2.5x baseline (target: ≤3x)\n- Thread safety: Arc<CoverageIndex> for lock-free parallel access",
+      "fix_suggestion": "Add 'Performance Characteristics' subsection to Coverage Integration with detailed metrics from features.json.",
+      "source_reference": "features.json:risk_assessment.coverage_integration.performance"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Advanced Features - Purity Detection",
+      "section": "Advanced Features > Purity Detection",
       "description": "Doesn't clarify that purity detection is optional (Option types)",
       "current_content": "Explains purity confidence scoring with examples",
-      "should_add": "Note that is_pure and purity_confidence are Option<bool> and Option<f32>, may be None for some functions or languages where detection unavailable",
-      "fix_suggestion": "Add paragraph: 'Purity detection is optional: Both is_pure and purity_confidence are Option types - May be None for some functions or languages where detection is not available - Rust has the most comprehensive purity detection support'",
-      "source_reference": "src/priority/mod.rs:59-60 (is_pure: Option<bool>, purity_confidence: Option<f32> in FunctionAnalysis)"
+      "should_add": "Purity detection is optional: Both is_pure and purity_confidence are Option types. May be None for some functions or languages where detection is not available. Rust has the most comprehensive purity detection support.",
+      "fix_suggestion": "Add paragraph at start of Purity Detection section: 'Purity detection is optional:\n- Both is_pure and purity_confidence are Option types\n- May be None for some functions or languages where detection is not available\n- Rust has the most comprehensive purity detection support\n- Python and JavaScript have basic purity detection'",
+      "source_reference": "Implied from features.json language support differences"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Risk Scoring > Well-tested complex code",
+      "description": "Section mentions 'well_tested_count' in risk_distribution but this may be confusing given unified scoring",
+      "current_content": "Shows 'well_tested_count' in example risk_distribution JSON",
+      "should_be": "In unified scoring, well-tested complex code simply scores low (0-2.9) due to coverage dampening. It's not a separate category.",
+      "fix_suggestion": "Either remove 'well_tested_count' from example JSON if it's not actually in output, or add clarification: 'Well-tested functions (high coverage) receive low scores (0-2.9) due to coverage dampening, falling into the Minimal or Low priority range.' Emphasize it's an outcome of scoring, not a separate category.",
+      "source_reference": "Inferred from unified scoring design"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Interpreting Results - Output Fields",
-      "description": "JSON structure example doesn't document all FunctionAnalysis fields",
-      "current_content": "Shows main fields but missing some from actual struct",
-      "should_add": "is_trait_method (bool): whether function implements a trait method, in_test_module (bool): whether inside #[cfg(test)] module (not just is_test for test functions), detected_patterns (Vec<String>): complexity adjustment patterns identified",
-      "fix_suggestion": "Add these fields to JSON structure documentation with explanations of their purpose in analysis and filtering",
-      "source_reference": "Book documents these fields but should emphasize in_test_module vs is_test distinction"
+      "section": "Interpreting Results > Prioritizing Work",
+      "description": "Missing reference to unified scoring as primary prioritization strategy",
+      "current_content": "Lists prioritization strategies starting with 'By Unified Score (default)'",
+      "should_add": "Expand explanation of unified score prioritization - it's not just default but specifically designed to balance complexity, coverage, and impact. Explain when to use unified scores (function-level work) vs tiers (architectural planning).",
+      "fix_suggestion": "Enhance 'By Unified Score (default)' explanation: 'Unified scoring (0-10) provides the most balanced prioritization by combining complexity (40%), coverage (40%), and dependency impact (20%), adjusted by function role. Use this for sprint planning and individual function refactoring. Use --top N to focus on highest-priority items. For architectural planning, consider --summary for tiered view.'",
+      "source_reference": "features.json:risk_assessment.unified_scoring"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of complexity metrics (cyclomatic, cognitive, entropy, nesting, length) with clear thresholds",
-    "Excellent examples throughout showing before/after refactoring with actual metrics",
-    "Entropy-based analysis is exceptionally well explained with formulas and decision logic",
-    "Good progression from basic concepts to advanced features",
-    "Coverage integration section is detailed and practical with tool commands",
-    "JSON output structure examples are helpful for CI/CD integration",
-    "Clear explanation of how different metrics complement each other",
-    "Practical actionable recommendations format is well documented",
-    "Good balance of theory (Shannon entropy formulas) and practice (validation examples)"
+    "Comprehensive coverage of complexity metrics with clear thresholds and examples",
+    "Excellent explanation of entropy-based analysis including Shannon entropy formulas",
+    "Strong before/after refactoring examples showing real metric improvements",
+    "Well-structured progression from basic metrics to advanced features",
+    "Good coverage of data flow analysis capabilities (variable tracking, I/O detection, transformation patterns)",
+    "Tiered prioritization section is thorough with effort estimates and strategic guidance",
+    "Debt density metric section is practical and well-explained",
+    "Categorized debt analysis section is comprehensive",
+    "Output examples are realistic and helpful for integration",
+    "Entropy analysis caching is well-documented",
+    "Coverage integration section provides practical tool commands"
   ],
   "improvement_suggestions": [
-    "Add major section on Tiered Prioritization system (Tier enum, effort estimates, batch actions)",
-    "Restructure Debt Patterns to match actual DebtType enum and DebtCategory grouping",
-    "Expand Call Graph Analysis to cover full DataFlowGraph capabilities",
-    "Add Categorized Debt Analysis section with cross-category dependencies",
-    "Document debt density metric formula and interpretation",
-    "Update risk categories from 5 to 4 levels, clarify WellTested is outcome not category",
-    "Add entropy caching subsection for performance features",
-    "Remove Unknown language type, explain file filtering instead",
-    "Add quick reference table: DebtType → DebtCategory → Strategic Guidance",
-    "Include decision tree flowchart for 'What should I fix first?' using tier system",
-    "Add troubleshooting section for entropy analysis questions",
-    "Document modification impact analysis from DataFlowGraph"
+    "Add major new section 'Unified Scoring System' as primary prioritization mechanism before legacy risk scoring",
+    "Create visual diagram showing how complexity, coverage, and dependency factors combine into unified score",
+    "Add comparison table: Legacy Risk Scoring vs Unified Scoring (side-by-side with examples)",
+    "Include decision tree flowchart: 'When to use unified scores vs tiered prioritization vs risk categories'",
+    "Add troubleshooting subsection: 'Understanding Your Score - Why is this function scored higher/lower than expected?'",
+    "Cross-link related sections more explicitly (DataFlowGraph → Dependency Factor → Unified Scoring → Final Priority)",
+    "Add 'Scoring System Evolution' section explaining the transition from simple risk scores to multi-factor unified scoring",
+    "Include more examples showing role multiplier impact (same complexity function, different roles, different final scores)",
+    "Add quick reference table: Function Role → Multiplier → Example Use Cases",
+    "Enhance semantic classification explanation with examples of how Debtmap identifies each role type"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-13",
-    "feature_inventory": "Direct codebase analysis of src/priority/mod.rs, src/data_flow.rs, src/complexity/entropy.rs, src/core/types.rs",
+    "analyzed_at": "2025-10-14",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Complexity metrics",
       "Debt patterns",
       "Risk scoring",
+      "Unified scoring system",
       "Interpreting results",
-      "Analyzer types",
-      "Advanced features"
+      "Entropy analysis",
+      "Data flow analysis",
+      "Coverage integration",
+      "Tiered prioritization",
+      "Semantic classification"
     ],
-    "validation_focus": "Ensure all analyzer types and metrics are explained"
+    "validation_focus": "Ensure all analyzer types and metrics are explained, with emphasis on unified scoring as primary prioritization system"
   }
 }

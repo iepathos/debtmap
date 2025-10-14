@@ -1,88 +1,42 @@
 {
-  "analysis_date": "2025-10-13T04:00:00Z",
-  "features_analyzed": 45,
-  "documented_topics": 8,
-  "gaps_found": 3,
-  "gaps": [
-    {
-      "severity": "medium",
-      "type": "incomplete_chapter",
-      "feature_category": "tiered_prioritization",
-      "feature_description": "Surfaces critical architectural issues above simple testing gaps with tier-based scoring",
-      "recommended_chapter_id": "tiered-prioritization",
-      "recommended_title": "Tiered Prioritization",
-      "recommended_location": "book/src/tiered-prioritization.md",
-      "reason": "Feature mentioned in analysis-guide.md but lacks dedicated deep-dive chapter explaining tier strategy, weights, and configuration"
-    },
-    {
-      "severity": "medium",
-      "type": "incomplete_chapter",
-      "feature_category": "scoring_comparison",
-      "feature_description": "File-level vs function-level scoring for different refactoring granularities",
-      "recommended_chapter_id": "scoring-strategies",
-      "recommended_title": "Scoring Strategies",
-      "recommended_location": "book/src/scoring-strategies.md",
-      "reason": "File-level and function-level scoring mentioned but lacks dedicated chapter on when to use each approach"
-    },
-    {
-      "severity": "high",
-      "type": "missing_chapter",
-      "feature_category": "prodigy_workflows",
-      "feature_description": "Automated technical debt reduction through AI-driven workflows with map-reduce parallel agent processing",
-      "recommended_chapter_id": "prodigy-integration",
-      "recommended_title": "Prodigy Integration",
-      "recommended_location": "book/src/prodigy-integration.md",
-      "reason": "Prodigy workflow integration mentioned in features.json and automation section but has no documentation chapter"
-    }
-  ],
-  "actions_taken": [
-    {
-      "action": "created_chapter_definition",
-      "chapter_id": "tiered-prioritization",
-      "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_chapter_definition",
-      "chapter_id": "scoring-strategies",
-      "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_chapter_definition",
-      "chapter_id": "prodigy-integration",
-      "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/tiered-prioritization.md"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/scoring-strategies.md"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/prodigy-integration.md"
-    },
-    {
-      "action": "updated_summary",
-      "file_path": "book/src/SUMMARY.md"
-    }
-  ],
-  "false_positives": [],
-  "documentation_quality": {
-    "coverage_percentage": 93.3,
-    "strengths": [
-      "Excellent CLI reference documentation",
-      "Comprehensive analysis guide with metrics",
-      "Well-documented configuration options",
-      "Good examples for common workflows",
-      "Thorough troubleshooting guide"
+  "analysis_date": "2025-10-14T21:26:50Z",
+  "project": "Debtmap",
+  "features_analyzed": 21,
+  "documented_topics": 11,
+  "gaps_found": 0,
+  "gaps": [],
+  "actions_taken": [],
+  "summary": {
+    "documented_feature_areas": [
+      "CLI commands (analyze, init, validate, compare)",
+      "Core analysis capabilities (complexity metrics, debt patterns)",
+      "Risk assessment and scoring",
+      "Output formats (terminal, JSON, markdown)",
+      "Configuration options and customization",
+      "Tiered prioritization system",
+      "File-level and function-level scoring strategies",
+      "Prodigy workflow integration",
+      "Troubleshooting and FAQ",
+      "Comprehensive examples"
     ],
-    "improvements_needed": [
-      "Add dedicated chapter on tiered prioritization strategy",
-      "Add chapter explaining scoring strategies (file vs function level)",
-      "Document Prodigy workflow integration"
-    ]
+    "coverage_analysis": {
+      "cli_commands": "Fully documented in cli-reference.md and examples.md",
+      "core_analysis": "Fully documented in analysis-guide.md with detailed metrics",
+      "debt_detection": "Comprehensive coverage in analysis-guide.md",
+      "risk_assessment": "Extensive documentation in analysis-guide.md",
+      "output_formats": "Complete chapter dedicated to output-formats.md",
+      "configuration": "Dedicated configuration.md chapter with all options",
+      "tiered_prioritization": "Dedicated tiered-prioritization.md chapter",
+      "scoring_strategies": "Dedicated scoring-strategies.md chapter",
+      "prodigy_workflows": "Documented in prodigy-integration.md",
+      "troubleshooting": "Comprehensive troubleshooting.md chapter",
+      "examples": "Extensive examples.md with real-world usage"
+    }
   },
-  "notes": "Overall documentation quality is excellent. The identified gaps are relatively minor and focus on advanced features that would benefit from dedicated chapters rather than scattered mentions."
+  "conclusion": "All major feature areas from features.json are comprehensively documented across the 11 existing chapters. No documentation gaps detected.",
+  "recommendations": [
+    "Continue to validate documentation accuracy during map phase",
+    "Ensure examples use current CLI syntax",
+    "Keep documentation synchronized with code changes"
+  ]
 }
