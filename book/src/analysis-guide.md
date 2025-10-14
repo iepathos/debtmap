@@ -124,6 +124,8 @@ When these conditions are met:
 effective_complexity = entropy × pattern_factor × similarity_factor
 ```
 
+**Dampening cap:** The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores. This prevents over-correction of pattern-based code and maintains a baseline complexity floor for functions that still require understanding and maintenance.
+
 **Example:**
 ```rust
 // Without entropy: Cyclomatic = 15 (appears very complex)
@@ -215,38 +217,129 @@ Number of lines in a function. Long functions often violate single responsibilit
 
 ## Debt Patterns
 
-Debtmap detects 13 types of technical debt, each with a severity weight that affects scoring.
+Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
 
-### Basic Markers (Weight = 1)
+### Debt Type Enum
 
-**Todo**: TODO comments in production code
+The `DebtType` enum defines all specific debt patterns that Debtmap can detect:
+
+**Testing Debt:**
+- `TestingGap` - Functions with insufficient test coverage
+- `TestTodo` - TODO comments in test code
+- `TestComplexity` - Test functions exceeding complexity thresholds
+- `TestDuplication` - Duplicated code in test files
+- `TestComplexityHotspot` - Complex test logic that's hard to maintain
+- `AssertionComplexity` - Complex test assertions
+- `FlakyTestPattern` - Non-deterministic test behavior
+
+**Architecture Debt:**
+- `ComplexityHotspot` - Functions exceeding complexity thresholds
+- `DeadCode` - Unreachable or unused code
+- `GodObject` - Classes with too many responsibilities
+- `GodModule` - Modules with too many responsibilities
+- `FeatureEnvy` - Using more data from other objects than own
+- `PrimitiveObsession` - Overusing basic types instead of domain objects
+- `MagicValues` - Unexplained literal values
+
+**Performance Debt:**
+- `AllocationInefficiency` - Inefficient memory allocations
+- `StringConcatenation` - Inefficient string building in loops
+- `NestedLoops` - Multiple nested iterations (O(n²) or worse)
+- `BlockingIO` - Blocking I/O in async contexts
+- `SuboptimalDataStructure` - Wrong data structure for access pattern
+- `AsyncMisuse` - Improper async/await usage
+- `ResourceLeak` - Resources not properly released
+- `CollectionInefficiency` - Inefficient collection operations
+
+**Code Quality Debt:**
+- `Risk` - High-risk code (complex + poorly tested)
+- `Duplication` - Duplicated code blocks
+- `ErrorSwallowing` - Errors caught but ignored
+
+### Debt Categories
+
+The `DebtCategory` enum groups debt types into strategic categories:
+
 ```rust
-// TODO: Add error handling here
-fn process() { /* ... */ }
-```
-
-**TestTodo**: TODO comments in test code
-```rust
-#[test]
-fn test_feature() {
-    // TODO: Add edge case testing
-    assert_eq!(process(), expected);
+pub enum DebtCategory {
+    Architecture,  // Structure, design, complexity
+    Testing,       // Coverage, test quality
+    Performance,   // Speed, memory, efficiency
+    CodeQuality,   // Maintainability, readability
 }
 ```
 
-**When detected**: Comment lines containing `TODO:` or `todo!` macro (Rust)
-**Impact**: Low - markers for future work, not immediate problems
-**Action**: Plan when to address or document why it's deferred
+**Category Mapping:**
 
-### Fixable Issues (Weight = 2)
+| Debt Type | Category | Strategic Focus |
+|-----------|----------|-----------------|
+| ComplexityHotspot, DeadCode, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues | Architecture | Structural improvements, design patterns |
+| TestingGap, TestTodo, TestComplexity, TestDuplication, TestComplexityHotspot, AssertionComplexity, FlakyTestPattern | Testing | Test coverage, test quality |
+| AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency | Performance | Runtime efficiency, resource usage |
+| Risk, Duplication, ErrorSwallowing | CodeQuality | Maintainability, reliability |
 
-**Fixme**: FIXME comments indicating known problems
+### Examples by Category
+
+#### Architecture Debt
+
+**ComplexityHotspot**: Functions exceeding complexity thresholds
 ```rust
-// FIXME: This breaks with negative numbers
-fn calculate(value: i32) -> i32 { /* ... */ }
+// Cyclomatic: 22, Cognitive: 35
+fn process_transaction(tx: Transaction, account: &mut Account) -> Result<Receipt> {
+    if tx.amount <= 0 {
+        return Err(Error::InvalidAmount);
+    }
+    // ... deeply nested logic with many branches
+    Ok(receipt)
+}
+```
+**When detected**: Cyclomatic > 10 OR Cognitive > 15 (configurable)
+**Action**: Break into smaller functions, extract validation, simplify control flow
+
+**GodObject / GodModule**: Too many responsibilities
+```rust
+// God module: handles parsing, validation, storage, notifications
+mod user_service {
+    fn parse_user() { /* ... */ }
+    fn validate_user() { /* ... */ }
+    fn save_user() { /* ... */ }
+    fn send_email() { /* ... */ }
+    fn log_activity() { /* ... */ }
+    // ... 20+ more functions
+}
+```
+**When detected**: Pattern analysis for responsibility clustering
+**Action**: Split into focused modules (parser, validator, repository, notifier)
+
+**MagicValues**: Unexplained literals
+```rust
+// Bad: Magic numbers
+fn calculate_price(quantity: u32) -> f64 {
+    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+}
+
+// Good: Named constants
+const UNIT_PRICE: f64 = 19.99;
+const SHIPPING_COST: f64 = 5.0;
+fn calculate_price(quantity: u32) -> f64 {
+    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+}
 ```
 
-**TestComplexity**: Test functions exceeding complexity thresholds
+#### Testing Debt
+
+**TestingGap**: Functions with insufficient test coverage
+```rust
+// 0% coverage - critical business logic untested
+fn calculate_tax(amount: f64, region: &str) -> f64 {
+    // Complex tax calculation logic
+    // No tests exist for this function!
+}
+```
+**When detected**: Coverage data shows function has < 80% line coverage
+**Action**: Add unit tests to cover all branches and edge cases
+
+**TestComplexity**: Test functions too complex
 ```rust
 #[test]
 fn complex_test() {
@@ -260,76 +353,78 @@ fn complex_test() {
     }
 }
 ```
+**When detected**: Test functions with cyclomatic > 10 or cognitive > 15
+**Action**: Split into multiple focused tests, use test fixtures
 
-**TestDuplication**: Duplicated code in test files
+**FlakyTestPattern**: Non-deterministic tests
 ```rust
 #[test]
-fn test_a() {
-    let setup = create_test_data();  // Duplicated
-    let result = process(setup);
-    assert!(result.is_ok());
+fn flaky_test() {
+    let result = async_operation().await;  // Timing-dependent
+    thread::sleep(Duration::from_millis(100));  // Race condition!
+    assert_eq!(result.status, "complete");
+}
+```
+**When detected**: Pattern analysis for timing dependencies, random values
+**Action**: Use mocks, deterministic test data, proper async test utilities
+
+#### Performance Debt
+
+**AllocationInefficiency**: Excessive allocations
+```rust
+// Bad: Allocates on every iteration
+fn process_items(items: &[Item]) -> Vec<String> {
+    let mut results = Vec::new();
+    for item in items {
+        results.push(item.name.clone());  // Unnecessary clone
+    }
+    results
 }
 
-#[test]
-fn test_b() {
-    let setup = create_test_data();  // Same setup duplicated
-    let result = process_different(setup);
-    assert!(result.is_ok());
+// Good: Pre-allocate, avoid clones
+fn process_items(items: &[Item]) -> Vec<&str> {
+    items.iter().map(|item| item.name.as_str()).collect()
 }
 ```
 
-**When detected**:
-- Comments with `FIXME:` or `fixme!` macro
-- Test functions with cyclomatic > 10 or cognitive > 15
-- Similar code blocks > 10 lines in test files
-
-**Impact**: Medium - affects test quality and maintainability
-**Action**: Refactor tests to be simpler, extract common test utilities
-
-### Code Quality (Weight = 3)
-
-**CodeSmell**: Anti-patterns and bad practices
-- God objects (classes with too many responsibilities)
-- Long parameter lists (> 5 parameters)
-- Feature envy (using more data from other objects than own)
-- Primitive obsession (overusing basic types instead of domain objects)
-- Magic numbers/strings (unexplained literal values)
-
+**BlockingIO**: Blocking operations in async contexts
 ```rust
-// Code smell: Magic numbers
-fn calculate_price(quantity: u32) -> f64 {
-    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+// Bad: Blocks async runtime
+async fn load_data() -> Result<Data> {
+    let file = std::fs::read_to_string("data.json")?;  // Blocking!
+    parse_json(&file)
 }
 
-// Better: Named constants
-const UNIT_PRICE: f64 = 19.99;
-const SHIPPING_COST: f64 = 5.0;
-
-fn calculate_price(quantity: u32) -> f64 {
-    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+// Good: Async I/O
+async fn load_data() -> Result<Data> {
+    let file = tokio::fs::read_to_string("data.json").await?;
+    parse_json(&file)
 }
 ```
 
-**Dependency**: Problematic dependencies
-- Circular dependencies between modules
-- High coupling (too many dependencies)
-- Deprecated dependencies
+**NestedLoops**: O(n²) or worse complexity
+```rust
+// Bad: O(n²) nested loops
+fn find_duplicates(items: &[Item]) -> Vec<(Item, Item)> {
+    let mut dupes = vec![];
+    for i in 0..items.len() {
+        for j in i+1..items.len() {
+            if items[i] == items[j] {
+                dupes.push((items[i].clone(), items[j].clone()));
+            }
+        }
+    }
+    dupes
+}
 
-**CodeOrganization**: Poor structure
-- Files too large (> 500 lines)
-- Modules with unclear responsibilities
-- Inconsistent naming patterns
+// Good: O(n) with HashSet
+fn find_duplicates(items: &[Item]) -> Vec<Item> {
+    let mut seen = HashSet::new();
+    items.iter().filter(|item| !seen.insert(item)).cloned().collect()
+}
+```
 
-**TestQuality**: Low-quality tests
-- Tests with complex assertions
-- Flaky test patterns (non-deterministic behavior)
-- Tests that test implementation instead of behavior
-
-**When detected**: Pattern analysis, heuristics for each smell type
-**Impact**: Medium-High - affects maintainability and evolution
-**Action**: Refactor to follow better patterns, extract responsibilities
-
-### Serious Issues (Weight = 4)
+#### Code Quality Debt
 
 **Duplication**: Duplicated code blocks
 ```rust
@@ -342,7 +437,7 @@ fn process_user(user: User) -> Result<()> {
     Ok(())
 }
 
-// File B:
+// File B: Duplicated validation
 fn process_admin(admin: Admin) -> Result<()> {
     validate_email(&admin.email)?;  // Duplicated
     validate_age(admin.age)?;       // Duplicated
@@ -351,6 +446,8 @@ fn process_admin(admin: Admin) -> Result<()> {
     Ok(())
 }
 ```
+**When detected**: Similar code blocks > 50 lines (configurable)
+**Action**: Extract shared code into reusable functions
 
 **ErrorSwallowing**: Errors caught but ignored
 ```rust
@@ -369,81 +466,19 @@ match risky_operation() {
     }
 }
 ```
+**When detected**: Empty catch blocks, ignored Results
+**Action**: Add proper error logging and propagation
 
-**ResourceManagement**: Resource leaks or improper cleanup
-- Files not closed
-- Connections not released
-- Memory leaks
-- Inefficient allocations in hot paths
-- Blocking I/O in async contexts
-
+**Risk**: High-risk code (complex + poorly tested)
 ```rust
-// Bad: File might not be closed on error
-fn read_config() -> Result<Config> {
-    let file = File::open("config.toml")?;
-    let config = parse_toml(file)?;  // If this fails, file not closed
-    Ok(config)
-}
-
-// Good: RAII ensures cleanup
-fn read_config() -> Result<Config> {
-    let file = File::open("config.toml")?;
-    let config = parse_toml(file)?;
-    Ok(config)
-    // File automatically closed when dropped
+// Cyclomatic: 18, Coverage: 20%, Risk Score: 47.6 (HIGH)
+fn process_payment(tx: Transaction) -> Result<Receipt> {
+    // Complex payment logic with minimal testing
+    // High risk of bugs in production
 }
 ```
-
-**When detected**:
-- Duplication: Similar code blocks > 50 lines (configurable)
-- Error swallowing: Empty catch blocks, ignored Results
-- Resource management: Pattern analysis for leaks, async/await misuse
-
-**Impact**: High - can cause bugs, performance issues, data loss
-**Action**: Extract shared code, add proper error handling, fix resource cleanup
-
-### High Severity (Weight = 5)
-
-**Complexity**: Functions exceeding complexity thresholds
-```rust
-// Cyclomatic: 22, Cognitive: 35
-fn process_transaction(tx: Transaction, account: &mut Account) -> Result<Receipt> {
-    if tx.amount <= 0 {
-        return Err(Error::InvalidAmount);
-    }
-
-    if account.balance < tx.amount {
-        if account.overdraft_enabled {
-            if account.overdraft_limit >= tx.amount - account.balance {
-                // Process with overdraft
-                match tx.type {
-                    TransactionType::Debit => { /* complex logic */ }
-                    TransactionType::Credit => { /* complex logic */ }
-                    TransactionType::Transfer => { /* complex logic */ }
-                }
-            } else {
-                return Err(Error::OverdraftLimitExceeded);
-            }
-        } else {
-            return Err(Error::InsufficientFunds);
-        }
-    } else {
-        // Regular processing
-        match tx.type {
-            TransactionType::Debit => { /* complex logic */ }
-            TransactionType::Credit => { /* complex logic */ }
-            TransactionType::Transfer => { /* complex logic */ }
-        }
-    }
-
-    // More complex validation and processing...
-    Ok(receipt)
-}
-```
-
-**When detected**: Cyclomatic > 10 OR Cognitive > 15 (configurable)
-**Impact**: Very High - hard to test, likely has bugs, difficult to modify
-**Action**: Break into smaller functions, extract validation, simplify control flow
+**When detected**: Combines complexity metrics with coverage data
+**Action**: Either add comprehensive tests OR refactor to reduce complexity
 
 ### Debt Scoring Formula
 
@@ -475,7 +510,16 @@ Debtmap's risk scoring identifies code that is both complex AND poorly tested - 
 
 ### Risk Categories
 
-Functions are classified into five risk categories:
+Debtmap classifies functions into **four risk levels** based on the `RiskLevel` enum: Low, Medium, High, and Critical.
+
+```rust
+pub enum RiskLevel {
+    Low,       // Score < 10
+    Medium,    // Score 10-24
+    High,      // Score 25-49
+    Critical,  // Score ≥ 50
+}
+```
 
 **Critical** (score ≥ 50)
 - High complexity (cyclomatic > 15) AND low coverage (< 30%)
@@ -492,12 +536,16 @@ Functions are classified into five risk categories:
 - OR: High complexity with good coverage
 - **Action**: Plan for next sprint
 
-**Low** (score 5-9)
+**Low** (score < 10)
 - Low complexity OR high coverage
 - Well-managed code
 - **Action**: Monitor, low priority
 
-**Note**: The risk categorization is based on the RiskLevel enum which includes Low, Medium, High, and Critical levels. Well-tested complex code will typically fall into the Low risk category due to coverage dampening.
+**Well-tested complex code** is an **outcome**, not a separate category:
+- Complex function (cyclomatic 18, cognitive 25) with 95% coverage
+- Risk score calculated: ~8 (Low risk due to coverage dampening)
+- Falls into **Low** category because good testing mitigates complexity
+- This is the desired state for inherently complex business logic
 
 ### Risk Calculation
 
@@ -638,7 +686,7 @@ debtmap analyze . --format markdown --output report.md
         "nesting": 4,
         "length": 68,
         "is_test": false,
-        "visibility": "pub",
+        "visibility": "Public",
         "is_trait_method": false,
         "in_test_module": false,
         "entropy_score": {
@@ -691,6 +739,7 @@ debtmap analyze . --format markdown --output report.md
 - `cognitive`: Understanding difficulty - guides refactoring priority
 - `nesting`: Indentation depth - signals need for extraction
 - `length`: Lines of code - signals SRP violations
+- `visibility`: Function visibility (`"Private"`, `"Crate"`, or `"Public"` from FunctionVisibility enum)
 - `is_pure`: No side effects - easier to test (Option type, may be None)
 - `purity_confidence`: How certain we are about purity 0.0-1.0 (Option type, may be None)
 - `is_trait_method`: Whether this function implements a trait method
@@ -737,6 +786,492 @@ Focuses on specific categories:
 debtmap analyze . --lcov coverage.lcov --top 20
 ```
 Prioritizes by return on investment for testing/refactoring.
+
+### Tiered Prioritization
+
+Debtmap uses a tier-based system to map debt scores to actionable priority levels. Each tier includes effort estimates and strategic guidance for efficient debt remediation.
+
+#### Tier Levels
+
+The `Tier` enum defines four priority levels based on score thresholds:
+
+```rust
+pub enum Tier {
+    Critical,  // Score ≥ 90
+    High,      // Score 70-89.9
+    Moderate,  // Score 50-69.9
+    Low,       // Score < 50
+}
+```
+
+**Score-to-Tier Mapping:**
+- **Critical** (≥ 90): Immediate action required - blocks progress
+- **High** (70-89.9): Should be addressed this sprint
+- **Moderate** (50-69.9): Plan for next sprint
+- **Low** (< 50): Background maintenance work
+
+#### Effort Estimates Per Tier
+
+Each tier includes estimated effort based on typical remediation patterns:
+
+| Tier | Estimated Effort | Typical Work |
+|------|------------------|--------------|
+| **Critical** | 1-2 days | Major refactoring, comprehensive testing, architectural changes |
+| **High** | 2-4 hours | Extract functions, add test coverage, fix resource leaks |
+| **Moderate** | 1-2 hours | Simplify logic, reduce duplication, improve error handling |
+| **Low** | 30 minutes | Address TODOs, minor cleanup, documentation |
+
+**Effort calculation considers:**
+- Complexity metrics (cyclomatic, cognitive)
+- Test coverage gaps
+- Number of dependencies (upstream/downstream)
+- Debt category (Architecture debt takes longer than CodeQuality)
+
+#### Tiered Display Grouping
+
+`TieredDisplay` groups similar debt items for batch action recommendations:
+
+```rust
+pub struct TieredDisplay {
+    pub tier: Tier,
+    pub items: Vec<DebtItem>,
+    pub total_score: f64,
+    pub estimated_total_effort_hours: f64,
+    pub batch_recommendations: Vec<String>,
+}
+```
+
+**Grouping strategy:**
+- Groups items by tier and similarity pattern
+- Prevents grouping of god objects (always show individually)
+- Prevents grouping of Critical items (each needs individual attention)
+- Suggests batch actions for similar Low/Moderate items
+
+**Example batch recommendations:**
+```json
+{
+  "tier": "Moderate",
+  "total_score": 245.8,
+  "estimated_total_effort_hours": 12.5,
+  "batch_recommendations": [
+    "Extract 5 validation functions from similar patterns",
+    "Add test coverage for 8 moderately complex functions (grouped by module)",
+    "Refactor 3 functions with similar nested loop patterns"
+  ]
+}
+```
+
+#### Using Tiered Prioritization
+
+**1. Start with Critical tier:**
+```bash
+debtmap analyze . --min-priority critical
+```
+Focus on items with score ≥ 90. These typically represent:
+- Complex functions with 0% coverage
+- God objects blocking feature development
+- Critical resource leaks or security issues
+
+**2. Plan High tier work:**
+```bash
+debtmap analyze . --min-priority high --format json > sprint-plan.json
+```
+Schedule 2-4 hours per item for this sprint. Look for:
+- Functions approaching complexity thresholds
+- Moderate coverage gaps on important code paths
+- Performance bottlenecks with clear solutions
+
+**3. Batch Moderate tier items:**
+```bash
+debtmap analyze . --min-priority moderate
+```
+Review batch recommendations. Examples:
+- "10 validation functions detected - extract common pattern"
+- "5 similar test files with duplication - create shared fixtures"
+- "8 functions with magic values - create constants module"
+
+**4. Schedule Low tier background work:**
+Address during slack time or as warm-up tasks for new contributors.
+
+#### Strategic Guidance by Tier
+
+**Critical Tier Strategy:**
+- **Block new features** until addressed
+- **Pair programming** recommended for complex items
+- **Architectural review** before major refactoring
+- **Comprehensive testing** after changes
+
+**High Tier Strategy:**
+- **Sprint planning priority**
+- **Impact analysis** before changes
+- **Code review** from senior developers
+- **Integration testing** after changes
+
+**Moderate Tier Strategy:**
+- **Batch similar items** for efficiency
+- **Extract patterns** across multiple files
+- **Incremental improvement** over multiple PRs
+- **Regression testing** for affected areas
+
+**Low Tier Strategy:**
+- **Good first issues** for new contributors
+- **Documentation improvements**
+- **Code cleanup** during refactoring nearby code
+- **Technical debt gardening** sessions
+
+### Categorized Debt Analysis
+
+Debtmap provides `CategorizedDebt` analysis that groups debt items by category and identifies cross-category dependencies. This helps teams understand strategic relationships between different types of technical debt.
+
+#### CategorySummary
+
+Each category gets a summary with metrics for planning:
+
+```rust
+pub struct CategorySummary {
+    pub category: DebtCategory,
+    pub total_score: f64,
+    pub item_count: usize,
+    pub estimated_effort_hours: f64,
+    pub average_severity: f64,
+    pub top_items: Vec<DebtItem>,  // Up to 5 highest priority
+}
+```
+
+**Effort estimation formulas:**
+- **Architecture debt**: `complexity_score / 10 × 2` hours (structural changes take longer)
+- **Testing debt**: `complexity_score / 10 × 1.5` hours (writing tests)
+- **Performance debt**: `complexity_score / 10 × 1.8` hours (profiling + optimization)
+- **CodeQuality debt**: `complexity_score / 10 × 1.2` hours (refactoring)
+
+**Example category summary:**
+```json
+{
+  "category": "Architecture",
+  "total_score": 487.5,
+  "item_count": 15,
+  "estimated_effort_hours": 97.5,
+  "average_severity": 32.5,
+  "top_items": [
+    {
+      "debt_type": "GodObject",
+      "file": "src/services/user_service.rs",
+      "score": 95.0,
+      "estimated_effort_hours": 16.0
+    },
+    {
+      "debt_type": "ComplexityHotspot",
+      "file": "src/payments/processor.rs",
+      "score": 87.3,
+      "estimated_effort_hours": 14.0
+    }
+  ]
+}
+```
+
+#### Cross-Category Dependencies
+
+`CrossCategoryDependency` identifies blocking relationships between different debt categories:
+
+```rust
+pub struct CrossCategoryDependency {
+    pub from_category: DebtCategory,
+    pub to_category: DebtCategory,
+    pub blocking_items: Vec<(DebtItem, DebtItem)>,
+    pub impact_level: ImpactLevel,  // Critical, High, Medium, Low
+    pub recommendation: String,
+}
+```
+
+**Common dependency patterns:**
+
+**1. Architecture blocks Testing:**
+- **Pattern**: God objects are too complex to test effectively
+- **Example**: `UserService` has 50+ functions, making comprehensive testing impractical
+- **Impact**: Critical - cannot improve test coverage without refactoring
+- **Recommendation**: "Split god object into 4-5 focused modules before adding tests"
+
+**2. Async issues require Architecture changes:**
+- **Pattern**: Blocking I/O in async contexts requires architectural redesign
+- **Example**: Sync database calls in async handlers
+- **Impact**: High - performance problems require design changes
+- **Recommendation**: "Introduce async database layer before optimizing handlers"
+
+**3. Complexity affects Testability:**
+- **Pattern**: High cyclomatic complexity makes thorough testing difficult
+- **Example**: Function with 22 branches needs 22+ test cases
+- **Impact**: High - testing effort grows exponentially with complexity
+- **Recommendation**: "Reduce complexity to < 10 before writing comprehensive tests"
+
+**4. Performance requires Architecture:**
+- **Pattern**: O(n²) nested loops need different data structures
+- **Example**: Linear search in loops should use HashMap
+- **Impact**: Medium - optimization requires structural changes
+- **Recommendation**: "Refactor data structure before micro-optimizations"
+
+**Example cross-category dependency:**
+```json
+{
+  "from_category": "Architecture",
+  "to_category": "Testing",
+  "impact_level": "Critical",
+  "blocking_items": [
+    {
+      "blocker": {
+        "debt_type": "GodObject",
+        "file": "src/services/user_service.rs",
+        "functions": 52,
+        "score": 95.0
+      },
+      "blocked": {
+        "debt_type": "TestingGap",
+        "file": "src/services/user_service.rs",
+        "coverage": 15,
+        "score": 78.0
+      }
+    }
+  ],
+  "recommendation": "Split UserService into focused modules (auth, profile, settings, notifications) before attempting to improve test coverage. Current structure makes comprehensive testing impractical.",
+  "estimated_unblock_effort_hours": 16.0
+}
+```
+
+#### Using Categorized Debt Analysis
+
+**View all category summaries:**
+```bash
+debtmap analyze . --format json | jq '.categorized_debt.summaries'
+```
+
+**Focus on specific category:**
+```bash
+debtmap analyze . --filter Architecture --top 10
+```
+
+**Identify blocking relationships:**
+```bash
+debtmap analyze . --format json | jq '.categorized_debt.cross_category_dependencies[] | select(.impact_level == "Critical")'
+```
+
+**Strategic planning workflow:**
+
+1. **Review category summaries:**
+   - Identify which category has highest total score
+   - Check estimated effort hours per category
+   - Note average severity to gauge urgency
+
+2. **Check cross-category dependencies:**
+   - Find Critical and High impact blockers
+   - Prioritize blockers before blocked items
+   - Plan architectural changes before optimization
+
+3. **Plan remediation order:**
+   ```
+   Example decision tree:
+   - Architecture score > 400? → Address god objects first
+   - Testing gap with low complexity? → Quick wins, add tests
+   - Performance issues + architecture debt? → Refactor structure first
+   - High code quality debt but good architecture? → Incremental cleanup
+   ```
+
+4. **Use category-specific strategies:**
+   - **Architecture**: Pair programming, design reviews, incremental refactoring
+   - **Testing**: TDD for new code, characterization tests for legacy
+   - **Performance**: Profiling first, optimize hot paths, avoid premature optimization
+   - **CodeQuality**: Code review focus, linting rules, consistent patterns
+
+#### CategorizedDebt Output Structure
+
+```json
+{
+  "categorized_debt": {
+    "summaries": [
+      {
+        "category": "Architecture",
+        "total_score": 487.5,
+        "item_count": 15,
+        "estimated_effort_hours": 97.5,
+        "average_severity": 32.5,
+        "top_items": [...]
+      },
+      {
+        "category": "Testing",
+        "total_score": 356.2,
+        "item_count": 23,
+        "estimated_effort_hours": 53.4,
+        "average_severity": 15.5,
+        "top_items": [...]
+      },
+      {
+        "category": "Performance",
+        "total_score": 234.8,
+        "item_count": 12,
+        "estimated_effort_hours": 42.3,
+        "average_severity": 19.6,
+        "top_items": [...]
+      },
+      {
+        "category": "CodeQuality",
+        "total_score": 189.3,
+        "item_count": 31,
+        "estimated_effort_hours": 22.7,
+        "average_severity": 6.1,
+        "top_items": [...]
+      }
+    ],
+    "cross_category_dependencies": [
+      {
+        "from_category": "Architecture",
+        "to_category": "Testing",
+        "impact_level": "Critical",
+        "blocking_items": [...],
+        "recommendation": "..."
+      }
+    ]
+  }
+}
+```
+
+### Debt Density Metric
+
+Debt density normalizes technical debt scores across projects of different sizes, providing a per-1000-lines-of-code metric for fair comparison.
+
+#### Formula
+
+```
+debt_density = (total_debt_score / total_lines_of_code) × 1000
+```
+
+**Example calculation:**
+```
+Project A:
+  - Total debt score: 1,250
+  - Total lines of code: 25,000
+  - Debt density: (1,250 / 25,000) × 1000 = 50
+
+Project B:
+  - Total debt score: 2,500
+  - Total lines of code: 50,000
+  - Debt density: (2,500 / 50,000) × 1000 = 50
+```
+
+Projects A and B have **equal debt density** (50) despite B having twice the absolute debt, because B is also twice as large. They have proportionally similar technical debt.
+
+#### Interpretation Guidelines
+
+Use these thresholds to assess codebase health:
+
+| Debt Density | Assessment | Description |
+|-------------|-----------|-------------|
+| **0-50** | Clean | Well-maintained codebase, minimal debt |
+| **51-100** | Moderate | Typical technical debt, manageable |
+| **101-150** | High | Significant debt, prioritize remediation |
+| **150+** | Critical | Severe debt burden, may impede development |
+
+**Context matters:**
+- **Early-stage projects**: Often have higher density (rapid iteration)
+- **Mature projects**: Should trend toward lower density over time
+- **Legacy systems**: May have high density, track trend over time
+- **Greenfield rewrites**: Aim for density < 50
+
+#### Using Debt Density
+
+**1. Compare projects fairly:**
+```bash
+# Small microservice (5,000 LOC, debt = 250)
+# Debt density: 50
+
+# Large monolith (100,000 LOC, debt = 5,000)
+# Debt density: 50
+
+# Equal health despite size difference
+```
+
+**2. Track improvement over time:**
+```
+Sprint 1: 50,000 LOC, debt = 7,500, density = 150 (High)
+Sprint 5: 52,000 LOC, debt = 6,500, density = 125 (Improving)
+Sprint 10: 54,000 LOC, debt = 4,860, density = 90 (Moderate)
+```
+
+**3. Set team goals:**
+```
+Current density: 120
+Target density: < 80 (by Q4)
+Reduction needed: 40 points
+
+Strategy:
+- Fix 2-3 Critical items per sprint
+- Prevent new debt (enforce thresholds)
+- Refactor before adding features in high-debt modules
+```
+
+**4. Benchmark across teams/projects:**
+```json
+{
+  "team_metrics": [
+    {
+      "project": "auth-service",
+      "debt_density": 45,
+      "assessment": "Clean",
+      "trend": "stable"
+    },
+    {
+      "project": "billing-service",
+      "debt_density": 95,
+      "assessment": "Moderate",
+      "trend": "improving"
+    },
+    {
+      "project": "legacy-api",
+      "debt_density": 165,
+      "assessment": "Critical",
+      "trend": "worsening"
+    }
+  ]
+}
+```
+
+#### Limitations
+
+**Debt density doesn't account for:**
+- **Code importance**: 100 LOC in payment logic ≠ 100 LOC in logging utils
+- **Complexity distribution**: One 1000-line god object vs. 1000 simple functions
+- **Test coverage**: 50% coverage on critical paths vs. low-priority features
+- **Team familiarity**: New codebase vs. well-understood legacy system
+
+**Best practices:**
+- Use density as **one metric among many**
+- Combine with category analysis and tiered prioritization
+- Focus on **trend** (improving/stable/worsening) over absolute number
+- Consider **debt per module** for more granular insights
+
+#### Debt Density in CI/CD
+
+**Track density over time:**
+```bash
+# Generate report with density
+debtmap analyze . --format json --output debt-report.json
+
+# Extract density for trending
+DENSITY=$(jq '.debt_density' debt-report.json)
+
+# Store in metrics database
+echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
+```
+
+**Set threshold gates:**
+```yaml
+# .github/workflows/debt-check.yml
+- name: Check debt density
+  run: |
+    DENSITY=$(debtmap analyze . --format json | jq '.debt_density')
+    if (( $(echo "$DENSITY > 150" | bc -l) )); then
+      echo "❌ Debt density too high: $DENSITY (limit: 150)"
+      exit 1
+    fi
+    echo "✅ Debt density acceptable: $DENSITY"
+```
 
 ### Actionable Insights
 
@@ -840,10 +1375,24 @@ Debtmap supports multiple programming languages with varying levels of analysis 
   - Basic complexity metrics
   - Limited pattern detection
 
-**Unknown** (Unsupported)
-- Files with unsupported extensions are classified as `Language::Unknown`
-- These files are skipped during analysis
-- No metrics or debt patterns are extracted
+**Unsupported Languages:**
+
+Debtmap's `Language` enum contains only the four supported languages: Rust, Python, JavaScript, and TypeScript. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.
+
+**File filtering behavior:**
+- Discovery scans project for files matching supported extensions
+- Unsupported files (`.cpp`, `.java`, `.go`, etc.) are skipped silently
+- No analysis, metrics, or debt patterns are generated for filtered files
+- Use `--languages` flag to explicitly control which languages to analyze
+
+**Example:**
+```bash
+# Only analyze Rust files (skip Python/JS/TS)
+debtmap analyze . --languages rust
+
+# Analyze Rust and Python only
+debtmap analyze . --languages rust,python
+```
 
 ### Language Detection
 
@@ -927,9 +1476,11 @@ fn save_total(items: &[Item]) -> Result<()> {
 - Safe to parallelize
 - Easier to reason about
 
-### Call Graph Analysis
+### Data Flow Analysis
 
-Debtmap builds a call graph showing function relationships:
+Debtmap builds a comprehensive `DataFlowGraph` that extends basic call graph analysis with variable dependencies, data transformations, I/O operations, and purity tracking.
+
+#### Call Graph Foundation
 
 **Upstream callers** - Who calls this function
 - Indicates impact radius
@@ -957,10 +1508,227 @@ Debtmap builds a call graph showing function relationships:
 }
 ```
 
-**Impact analysis:**
-- **Entry points**: Functions with no upstream callers (main, handlers)
-- **Critical paths**: Functions with many upstream callers
-- **Integration complexity**: Functions with many downstream callees
+#### Variable Dependency Tracking
+
+`DataFlowGraph` tracks which variables each function depends on:
+
+```rust
+pub struct DataFlowGraph {
+    // Maps function_id -> set of variable names used
+    variable_dependencies: HashMap<String, HashSet<String>>,
+    // ...
+}
+```
+
+**What it tracks:**
+- Local variables accessed in function body
+- Function parameters
+- Captured variables (closures)
+- Mutable vs immutable references
+
+**Benefits:**
+- Identify functions coupled through shared state
+- Detect potential side effect chains
+- Guide refactoring to reduce coupling
+
+**Example output:**
+```json
+{
+  "function": "calculate_total",
+  "variable_dependencies": ["items", "tax_rate", "discount", "total"],
+  "parameter_count": 3,
+  "local_var_count": 1
+}
+```
+
+#### Data Transformation Patterns
+
+`DataFlowGraph` identifies common functional programming patterns:
+
+```rust
+pub enum TransformationType {
+    Map,        // Transform each element
+    Filter,     // Select subset of elements
+    Reduce,     // Aggregate to single value
+    FlatMap,    // Transform and flatten
+    Unknown,    // Other transformations
+}
+```
+
+**Pattern detection:**
+- Recognizes iterator chains (`.map()`, `.filter()`, `.fold()`)
+- Identifies functional vs imperative data flow
+- Tracks input/output variable relationships
+
+**Example:**
+```rust
+// Detected as: Filter → Map → Reduce pattern
+fn total_active_users(users: &[User]) -> f64 {
+    users.iter()
+        .filter(|u| u.active)      // Filter transformation
+        .map(|u| u.balance)        // Map transformation
+        .sum()                      // Reduce transformation
+}
+```
+
+**Transformation metadata:**
+```json
+{
+  "function": "total_active_users",
+  "input_vars": ["users"],
+  "output_vars": ["sum_result"],
+  "transformation_type": "Reduce",
+  "is_functional_style": true,
+  "pipeline_length": 3
+}
+```
+
+#### I/O Operation Detection
+
+Tracks functions performing I/O operations for purity and performance analysis:
+
+**I/O categories tracked:**
+- **File I/O**: `std::fs`, `File::open`, `read_to_string`
+- **Network I/O**: HTTP requests, socket operations
+- **Database I/O**: SQL queries, ORM operations
+- **System calls**: Process spawning, environment access
+- **Blocking operations**: `thread::sleep`, synchronous I/O in async
+
+**Example detection:**
+```rust
+// Detected I/O operations: FileRead, FileWrite
+fn save_config(config: &Config, path: &Path) -> Result<()> {
+    let json = serde_json::to_string(config)?;  // No I/O
+    std::fs::write(path, json)?;                 // FileWrite detected
+    Ok(())
+}
+```
+
+**I/O metadata:**
+```json
+{
+  "function": "save_config",
+  "io_operations": ["FileWrite"],
+  "is_blocking": true,
+  "affects_purity": true,
+  "async_safe": false
+}
+```
+
+#### Purity Analysis Integration
+
+`DataFlowGraph` integrates with purity detection to provide comprehensive side effect analysis:
+
+**Side effect tracking:**
+- I/O operations (file, network, console)
+- Global state mutations
+- Random number generation
+- System time access
+- Non-deterministic behavior
+
+**Purity confidence factors:**
+- **1.0**: Pure mathematical function, no side effects
+- **0.8**: Pure with deterministic data transformations
+- **0.5**: Mixed - some suspicious patterns
+- **0.2**: Likely impure - I/O detected
+- **0.0**: Definitely impure - multiple side effects
+
+**Example analysis:**
+```json
+{
+  "function": "calculate_discount",
+  "is_pure": true,
+  "purity_confidence": 0.95,
+  "side_effects": [],
+  "deterministic": true,
+  "safe_to_parallelize": true,
+  "safe_to_cache": true
+}
+```
+
+#### Modification Impact Analysis
+
+`DataFlowGraph` calculates the impact of modifying a function:
+
+```rust
+pub struct ModificationImpact {
+    pub function_name: String,
+    pub affected_functions: Vec<String>,  // Upstream callers
+    pub dependency_count: usize,          // Downstream callees
+    pub has_side_effects: bool,
+    pub risk_level: RiskLevel,
+}
+```
+
+**Risk level calculation:**
+- **Critical**: Many upstream callers + side effects + low test coverage
+- **High**: Many callers OR side effects with moderate coverage
+- **Medium**: Few callers with side effects OR many callers with good coverage
+- **Low**: Few callers, no side effects, or well-tested
+
+**Example impact analysis:**
+```json
+{
+  "function": "validate_payment_method",
+  "modification_impact": {
+    "affected_functions": [
+      "process_payment",
+      "refund_payment",
+      "update_payment_method",
+      "validate_subscription"
+    ],
+    "affected_count": 4,
+    "dependency_count": 8,
+    "has_side_effects": true,
+    "io_operations": ["DatabaseRead", "NetworkCall"],
+    "risk_level": "High",
+    "recommendation": "Comprehensive testing required - 4 functions depend on this, performs I/O"
+  }
+}
+```
+
+**Using modification impact:**
+```bash
+# Analyze impact before refactoring
+debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_payment_method") | .modification_impact'
+```
+
+**Impact analysis uses:**
+- **Refactoring planning**: Understand blast radius before changes
+- **Test prioritization**: Focus tests on high-impact functions
+- **Code review**: Flag high-risk changes for extra scrutiny
+- **Dependency management**: Identify tightly coupled components
+
+#### DataFlowGraph Methods
+
+Key methods for data flow analysis:
+
+```rust
+// Add function with its dependencies
+pub fn add_function(&mut self, function_id: String, callees: Vec<String>)
+
+// Track variable dependencies
+pub fn add_variable_dependency(&mut self, function_id: String, var_name: String)
+
+// Record I/O operations
+pub fn add_io_operation(&mut self, function_id: String, io_type: IoType)
+
+// Calculate modification impact
+pub fn calculate_modification_impact(&self, function_id: &str) -> ModificationImpact
+
+// Get all functions affected by a change
+pub fn get_affected_functions(&self, function_id: &str) -> Vec<String>
+
+// Find functions with side effects
+pub fn find_functions_with_side_effects(&self) -> Vec<String>
+```
+
+**Integration in analysis pipeline:**
+1. Parser builds initial call graph
+2. DataFlowGraph extends with variable/I/O tracking
+3. Purity analyzer adds side effect information
+4. Modification impact calculated for each function
+5. Results used in prioritization and risk scoring
 
 ### Entropy-Based Complexity
 
@@ -1003,6 +1771,100 @@ Function: validate_input
     - Low token entropy indicates simple patterns (0.32)
     - Similar branch structures found (92% similarity)
     - Complexity reduced by 67% due to pattern-based code
+```
+
+### Entropy Analysis Caching
+
+`EntropyAnalyzer` includes an LRU-style cache for performance optimization when analyzing large codebases or performing repeated analysis.
+
+#### Cache Structure
+
+```rust
+struct CacheEntry {
+    score: EntropyScore,
+    timestamp: Instant,
+    hit_count: usize,
+}
+```
+
+**Cache configuration:**
+- **Default size**: 1000 entries
+- **Eviction policy**: LRU (Least Recently Used)
+- **Memory per entry**: ~128 bytes
+- **Total memory overhead**: ~128 KB for default size
+
+#### Cache Statistics
+
+The analyzer tracks cache performance:
+
+```rust
+pub struct CacheStats {
+    pub hits: usize,
+    pub misses: usize,
+    pub evictions: usize,
+    pub hit_rate: f64,
+    pub memory_bytes: usize,
+}
+```
+
+**Example stats output:**
+```json
+{
+  "entropy_cache_stats": {
+    "hits": 3427,
+    "misses": 1573,
+    "evictions": 573,
+    "hit_rate": 0.685,
+    "memory_bytes": 128000
+  }
+}
+```
+
+**Hit rate interpretation:**
+- **> 0.7**: Excellent - many repeated analyses, cache is effective
+- **0.4-0.7**: Good - moderate reuse, typical for incremental analysis
+- **< 0.4**: Low - mostly unique functions, cache less helpful
+
+#### Performance Benefits
+
+**Typical performance gains:**
+- **Cold analysis**: 100ms baseline (no cache benefit)
+- **Incremental analysis**: 30-40ms (~60-70% faster) for unchanged functions
+- **Re-analysis**: 15-20ms (~80-85% faster) for recently analyzed functions
+
+**Best for:**
+- **Watch mode**: Analyzing on file save (repeated analysis of same files)
+- **CI/CD**: Comparing feature branch to main (overlap in functions)
+- **Large codebases**: Many similar functions benefit from pattern caching
+
+**Memory estimation:**
+```
+Total cache memory = entry_count × 128 bytes
+
+Examples:
+- 1,000 entries: ~128 KB (default)
+- 5,000 entries: ~640 KB (large projects)
+- 10,000 entries: ~1.25 MB (very large)
+```
+
+#### Cache Management
+
+**Automatic eviction:**
+- When cache reaches size limit, oldest entries evicted
+- Hit count influences retention (frequently accessed stay longer)
+- Timestamp used for LRU ordering
+
+**Cache invalidation:**
+- Function source changes invalidate entry
+- Cache cleared between major analysis runs
+- No manual invalidation needed
+
+**Configuration (if exposed in future):**
+```toml
+[entropy.cache]
+enabled = true
+size = 1000           # Number of entries
+ttl_seconds = 3600    # Optional: expire after 1 hour
 ```
 
 ### Context-Aware Analysis
