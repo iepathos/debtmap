@@ -100,10 +100,10 @@ The terminal output uses colors and symbols for quick visual scanning:
 - 🎯 Cyan: Recommendations
 
 **Complexity Classification:**
-- **LOW** (≤5): Green - Simple, easy to maintain
+- **LOW** (0-5): Green - Simple, easy to maintain
 - **MODERATE** (6-10): Yellow - Consider refactoring
-- **MEDIUM** (11-15): Orange - Should refactor
-- **HIGH** (>15): Red - Urgent refactoring needed
+- **HIGH** (11-15): Orange - Should refactor
+- **SEVERE** (>15): Red - Urgent refactoring needed
 
 **Debt Score Thresholds:**
 
@@ -123,9 +123,9 @@ BENEFIT: Pure functions are easily testable and composable
 ```
 
 Guidance levels:
-- **Moderate** (6-10): Extract 2-3 pure functions with direct transformation
-- **High** (11-15): Extract 3-5 pure functions with decomposition strategy
-- **Severe** (>15): Extract 5+ functions into modules with functional core/imperative shell
+- **Moderate** (6-10): Extract 2-3 pure functions using direct functional transformation
+- **High** (11-15): Extract 3-5 pure functions using decompose-then-transform strategy
+- **Severe** (>15): Extract 5+ pure functions into modules with functional core/imperative shell
 
 See the [Analysis Guide](./analysis-guide.md) for metric explanations.
 
@@ -169,6 +169,43 @@ debtmap analyze . -vvv
 
 Each level includes all information from the previous levels, progressively adding more detail to help understand how scores are calculated.
 
+**Example Output Differences:**
+
+Standard output shows basic metrics:
+```
+Total debt score: 156 (threshold: 100)
+```
+
+Level 1 (`-v`) adds score breakdowns:
+```
+Total debt score: 156 (threshold: 100)
+  Complexity contribution: 85 (54%)
+  Coverage gaps: 45 (29%)
+  Dependency issues: 26 (17%)
+```
+
+Level 2 (`-vv`) adds detailed calculations:
+```
+Total debt score: 156 (threshold: 100)
+  Complexity contribution: 85 (54%)
+    Formula: sum(cyclomatic_weight * severity_multiplier)
+    High complexity functions: 5 × 12 = 60
+    Medium complexity: 8 × 3 = 24
+    Base penalty: 1
+  Coverage gaps: 45 (29%)
+    Uncovered complex functions: 3 × 15 = 45
+```
+
+Level 3 (`-vvv`) adds all internal details:
+```
+Total debt score: 156 (threshold: 100)
+  ... (all level 2 output) ...
+  Debug info:
+    Entropy metrics cached: 42/50 functions
+    Function role detection: BusinessLogic=12, Utility=8, TestHelper=5
+    Cache hit rate: 84%
+```
+
 ### Risk Analysis Output
 
 When coverage data is provided via `--lcov`, terminal output includes a dedicated risk analysis section:
@@ -206,8 +243,8 @@ Risk Distribution:
 
 **Risk Level Classification:**
 - **LOW** (<30): Green
-- **MEDIUM** (30-60): Yellow
-- **HIGH** (>60): Red
+- **MEDIUM** (30-59): Yellow
+- **HIGH** (≥60): Red
 
 ## JSON Output
 
@@ -371,7 +408,15 @@ Here's a complete annotated JSON output example:
 - `visibility`: Rust visibility modifier (pub, pub(crate), or null)
 - `is_trait_method`: Whether this implements a trait
 - `in_test_module`: Whether inside #[cfg(test)]
-- `entropy_score`: Optional entropy analysis results
+- `entropy_score`: Optional entropy analysis with structure:
+  ```json
+  {
+    "token_entropy": 0.65,        // Token distribution entropy (0-1)
+    "pattern_repetition": 0.30,   // Pattern repetition score (0-1)
+    "branch_similarity": 0.45,    // Branch similarity metric (0-1)
+    "effective_complexity": 0.85  // Adjusted complexity multiplier
+  }
+  ```
 - `is_pure`: Whether function is pure (no side effects)
 - `purity_confidence`: Confidence level (0.0-1.0)
 - `detected_patterns`: List of detected code patterns
