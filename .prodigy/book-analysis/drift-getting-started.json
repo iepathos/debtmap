@@ -1,0 +1,74 @@
+{
+  "chapter_id": "getting-started",
+  "chapter_title": "Getting Started",
+  "chapter_file": "book/src/getting-started.md",
+  "drift_detected": false,
+  "severity": "low",
+  "quality_assessment": "Excellent chapter with accurate, comprehensive content that matches current implementation",
+  "issues": [
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Quick Start - Compare Command Examples",
+      "description": "Chapter shows advanced compare usage with --plan and --target-location but doesn't explain the full compare command capabilities",
+      "current_content": "# Advanced comparison: focus on specific function\ndebtmap compare --before before.json --after after.json --target-location src/main.rs:main:10\n\n# Extract target from implementation plan\ndebtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md",
+      "should_be": "The compare command implementation (src/commands/compare_debtmap.rs) performs validation analysis comparing before/after states, but the CLI (src/cli.rs:284-310) shows --plan and --target-location options that might not be fully utilized in comparison output",
+      "fix_suggestion": "Add a brief note explaining what the compare command validates (improvements, regressions, resolved items) and link to a more detailed comparison chapter if one exists",
+      "source_reference": "src/cli.rs:284-310, src/commands/compare_debtmap.rs"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Output Formats - JSON Format Options",
+      "description": "Chapter explains legacy vs unified JSON formats but could provide more context about when to use each",
+      "current_content": "Recommendation: Use `unified` for new integrations, `legacy` only for compatibility with existing tooling.",
+      "should_add": "Explain that the legacy format wraps items in {File: {...}} and {Function: {...}} while unified uses a consistent structure with 'type' field. The unified format (spec 108) is cleaner for programmatic consumption.",
+      "fix_suggestion": "Expand the explanation slightly to mention specific advantages of unified format (consistent structure, type discrimination, easier parsing)",
+      "source_reference": "src/cli.rs:33-36, features.json:438-441"
+    }
+  ],
+  "positive_aspects": [
+    "Installation instructions are 100% accurate and match install.sh implementation",
+    "All CLI commands and options documented match actual implementation in src/cli.rs",
+    "Coverage options correctly explain --lcov as alias for --coverage-file",
+    "Threshold options accurately describe default values (complexity=10, duplication=50)",
+    "Verbosity levels (-v, -vv, -vvv) correctly documented",
+    "Cache management options comprehensively covered and accurate",
+    "Priority levels (CRITICAL, HIGH, MEDIUM, LOW) correctly explained with accurate score ranges",
+    "Example outputs show realistic debtmap results",
+    "Prerequisites section correctly identifies optional cargo-tarpaulin for Rust coverage",
+    "Quick start examples use current, valid syntax for all commands",
+    "Advanced options section covers filtering, grouping, and performance controls accurately",
+    "Installation troubleshooting section provides helpful, accurate guidance",
+    "The validate command example correctly shows --max-debt-density option (verified in src/cli.rs:254)",
+    "Output format descriptions match implementation (terminal, json, markdown)",
+    "Context-aware analysis options accurately documented",
+    "File-level vs function-level scoring distinction well explained",
+    "Clear progression from simple to advanced usage",
+    "Good balance of examples and explanations"
+  ],
+  "improvement_suggestions": [
+    "Consider adding a brief explanation of what the compare command validation results include (completion percentage, improvements, remaining issues, gaps)",
+    "Could mention that the compare command is primarily used for automated validation workflows (as seen in src/commands/compare_debtmap.rs with PRODIGY_AUTOMATION env var)",
+    "Might add a note about the --output-format unified vs legacy choice being relevant for CI/CD integrations that parse JSON programmatically",
+    "Consider adding a troubleshooting entry about ensuring coverage LCOV files are in the correct format for correlation"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-14",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Installation",
+      "Quick start",
+      "First analysis",
+      "Basic usage",
+      "Advanced options",
+      "Output formats",
+      "Understanding output",
+      "Priority levels",
+      "Metrics explanation",
+      "Configuration",
+      "CI/CD integration"
+    ],
+    "validation_focus": "Check installation instructions and quick start examples are current"
+  }
+}
