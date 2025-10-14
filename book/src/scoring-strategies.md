@@ -20,6 +20,14 @@ File-level scoring aggregates metrics across all functions in a file to identify
 File Score = Size × Complexity × Coverage × Density × GodObject × FunctionScores
 ```
 
+Where each factor is calculated as:
+- **Size** = `sqrt(total_lines / 100)`
+- **Complexity** = `(avg_complexity / 5.0) × sqrt(total_complexity / 50.0)`
+- **Coverage** = `(1 - coverage_percent) × 2 + 1`
+- **Density** = `max(1.0, function_count / 50)` if function_count > 50
+- **GodObject** = `2.0 + god_object_score` if detected
+- **FunctionScores** = `sum(function_scores) / 10`
+
 ### Factors
 
 **Size Factor**: `sqrt(total_lines / 100)`
@@ -66,6 +74,8 @@ Use when:
 - Prioritizing architectural improvements
 - Allocating team resources
 
+**Note**: File-level scoring is enabled with the `--aggregate-only` flag, which changes output to show only file-level metrics instead of function-level details.
+
 **2. Identifying Architectural Issues**
 
 File-level scoring excels at finding:
@@ -95,9 +105,14 @@ debtmap analyze . --aggregate-only --format markdown -o report.md
 
 ### Aggregation Methods
 
-Debtmap supports multiple aggregation methods for file-level scores:
+Debtmap supports multiple aggregation methods for file-level scores, configurable via CLI or configuration file.
 
 **Weighted Sum (Default)**
+```bash
+debtmap analyze . --aggregation-method weighted_sum
+```
+
+Or via configuration:
 ```toml
 [aggregation]
 method = "weighted_sum"
@@ -154,9 +169,11 @@ Function-level scoring identifies specific functions needing attention for targe
 ### Formula
 
 ```
-Function Score = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)
+Function Score = (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15)
 Final Score = Base Score × Role Multiplier
 ```
+
+**Note**: These weights are configurable via the `[scoring]` section in `.debtmap.toml`. See [Configuration](#configuration) below.
 
 ### Metrics
 
@@ -177,9 +194,17 @@ Final Score = Base Score × Role Multiplier
 - Higher dependencies = higher impact
 
 **Role Multiplier**
-- Entry points: 1.5x
-- Business logic: 1.2x
-- Utilities: 0.5x
+
+Functions are classified by role, and each role receives a multiplier based on its architectural importance:
+
+- **Entry points**: 1.5x - Public APIs, main functions, HTTP handlers
+- **Pure logic / Business logic**: 1.2x-1.3x - Core business rules and algorithms (multiplier increases with complexity)
+- **Orchestrator**: 0.8x - Functions that coordinate other functions
+- **IO wrapper**: 0.5x - Simple file/network I/O wrappers
+- **Pattern match**: 0.6x - Functions primarily doing pattern matching
+- **Utility**: 0.5x - Helper functions and utilities
+
+**Note**: Role multipliers are configurable via the `[role_multipliers]` section in `.debtmap.toml`.
 
 ### Use Cases
 
@@ -221,9 +246,9 @@ debtmap analyze . --filter Performance --context --top 10
 
 ```toml
 [scoring]
-coverage = 0.40              # Weight for coverage gaps
-complexity = 0.40            # Weight for complexity
-dependency = 0.20            # Weight for dependency impact
+coverage = 0.50              # Weight for coverage gaps (default)
+complexity = 0.35            # Weight for complexity (default)
+dependency = 0.15            # Weight for dependency impact (default)
 
 [role_multipliers]
 entry_point = 1.5
@@ -356,12 +381,19 @@ score_normalized = if raw_score < 10.0 {
 
 ```toml
 [normalization]
-linear_threshold = 10.0
-logarithmic_threshold = 100.0
-sqrt_multiplier = 3.33
-log_multiplier = 10.0
-show_raw_scores = true       # Show both raw and normalized
+linear_threshold = 10.0       # Scores below this use linear scaling (1:1 mapping)
+logarithmic_threshold = 100.0 # Scores above this use logarithmic dampening
+sqrt_multiplier = 3.33        # Applied to scores between linear and log thresholds
+log_multiplier = 10.0         # Applied to scores above logarithmic threshold
+show_raw_scores = true        # Display both normalized (0-10) and raw scores in output
 ```
+
+**Explanation**:
+- **linear_threshold**: Scores below this value are mapped 1:1 (no scaling)
+- **logarithmic_threshold**: Scores above this value are dampened logarithmically to prevent extreme values
+- **sqrt_multiplier**: Square root scaling applied to mid-range scores (between linear and logarithmic thresholds)
+- **log_multiplier**: Logarithmic dampening factor for very high scores
+- **show_raw_scores**: When enabled, output includes both the normalized 0-10 score and the raw calculated score
 
 ## Best Practices
 
@@ -413,12 +445,12 @@ method = "logarithmic_sum"  # Dampen scores
 
 **Issue**: Function-level scores all similar
 
-**Solution**: Adjust scoring weights:
+**Solution**: Adjust scoring weights to emphasize different factors:
 ```toml
 [scoring]
-coverage = 0.50    # Emphasize testing gaps
-complexity = 0.35
-dependency = 0.15
+coverage = 0.60    # Emphasize testing gaps more
+complexity = 0.30
+dependency = 0.10
 ```
 
 **Issue**: Too many low-priority items
