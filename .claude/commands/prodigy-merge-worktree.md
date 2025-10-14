@@ -1,6 +1,6 @@
-# PRODIGY Merge Worktree Command
+# MMM Merge Worktree Command
 
-Intelligently merges PRODIGY worktree branches with automatic conflict resolution into the repository's default branch (main or master).
+Intelligently merges MMM worktree branches with automatic conflict resolution into the repository's default branch (main or master).
 
 Arguments: $ARGUMENTS
 
@@ -27,7 +27,8 @@ Examples:
 
 3. **Attempt Standard Merge**
    - Execute `git merge --no-ff $ARGUMENTS` to preserve commit history
-   - If successful, create merge commit and exit
+   - If successful (no conflicts), the merge commit is automatically created - verify with `git status` and exit
+   - If conflicts occur, proceed to step 4
 
 4. **Handle Merge Conflicts** (if any)
    - Detect and analyze all conflicted files
@@ -44,6 +45,8 @@ Examples:
    - Run basic validation (syntax checks, etc.)
    - Ensure no conflict markers remain
    - Commit the merge with comprehensive message
+   - **CRITICAL**: Verify working directory is clean with `git status --porcelain`
+   - If any uncommitted changes remain, stage and commit them with message: "chore: finalize merge cleanup"
 
 ## Conflict Resolution Strategy
 
@@ -97,6 +100,8 @@ Original commits from worktree:
 <List of commits being merged>
 ```
 
+**IMPORTANT**: Do NOT add any attribution text like "🤖 Generated with [Claude Code]" or "Co-Authored-By: Claude <noreply@anthropic.com>" to merge commit messages. Keep commits clean and focused on the merge itself to avoid bloating git history.
+
 ## Error Handling
 
 **If merge cannot be completed**:
@@ -123,7 +128,7 @@ Original commits from worktree:
 ```bash
 # Check what needs merging
 $ prodigy worktree ls
-Active PRODIGY worktrees:
+Active MMM worktrees:
   prodigy-performance-1234567890 - /path/to/.prodigy/worktrees/... (focus: performance)
   prodigy-security-1234567891 - /path/to/.prodigy/worktrees/... (focus: security)
 
@@ -149,7 +154,7 @@ Found 3 conflicts...
 
 ## Automation Support
 
-When `PRODIGY_AUTOMATION=true` is set:
+When `MMM_AUTOMATION=true` is set:
 - No interactive prompts should be shown
 - If branch name is missing or invalid, fail with clear error message
 - Always merges to the default branch (main or master)
