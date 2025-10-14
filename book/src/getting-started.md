@@ -97,6 +97,7 @@ cargo tarpaulin --out lcov --output-dir target/coverage
 debtmap analyze . --lcov target/coverage/lcov.info
 
 # Analyze with custom thresholds
+# Note: threshold-duplication specifies minimum lines of duplicated code to detect
 debtmap analyze ./src --threshold-complexity 15 --threshold-duplication 50
 
 # Output as JSON (for CI/CD integration)
@@ -116,6 +117,12 @@ debtmap analyze . --format json --output before.json
 # ... make improvements ...
 debtmap analyze . --format json --output after.json
 debtmap compare --before before.json --after after.json
+
+# Advanced comparison: focus on specific function
+debtmap compare --before before.json --after after.json --target-location src/main.rs:main:10
+
+# Extract target from implementation plan
+debtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md
 ```
 
 ### Advanced Options
@@ -146,12 +153,6 @@ debtmap analyze . --filter Architecture,Testing
 debtmap analyze . --group-by-category
 ```
 
-**Security Focus:**
-```bash
-# Emphasize security-relevant patterns
-debtmap analyze . --security-enhanced
-```
-
 **Cache Management:**
 ```bash
 # Skip cache for fresh analysis
@@ -162,6 +163,12 @@ debtmap analyze . --clear-cache
 
 # View cache statistics
 debtmap analyze . --cache-stats
+
+# Specify custom cache location
+debtmap analyze . --cache-location /custom/path
+
+# Migrate cache from local to shared location
+debtmap analyze . --migrate-cache
 ```
 
 **Performance Control:**
@@ -202,7 +209,7 @@ debtmap analyze .
 
 **About Caching:**
 Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
-- **Cache location**: `XDG_CACHE_HOME/debtmap` on Linux, `~/Library/Caches/debtmap` on macOS
+- **Cache location**: `XDG_CACHE_HOME/debtmap` on Linux, `~/Library/Caches/debtmap` on macOS, `%LOCALAPPDATA%/debtmap` on Windows
 - **What's cached**: Parsed ASTs and computed metrics for each file
 - **Invalidation**: Cache is automatically invalidated when files are modified
 - **Management**: Use `--clear-cache` to clear, `--no-cache` to skip, or `--cache-stats` to view statistics
@@ -351,6 +358,12 @@ debtmap analyze . --format json --output report.json
 # For the new unified format (with consistent structure and type field):
 debtmap analyze . --format json --output-format unified --output report.json
 ```
+
+**JSON Format Options:**
+- **legacy** (default): Uses `{File: {...}}` and `{Function: {...}}` wrappers for backward compatibility with existing tools
+- **unified**: New format (spec 108) with consistent structure and `type` field for all items
+
+Recommendation: Use `unified` for new integrations, `legacy` only for compatibility with existing tooling.
 
 Example Markdown output:
 ```bash

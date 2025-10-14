@@ -1,0 +1,157 @@
+{
+  "chapters": [
+    {
+      "id": "introduction",
+      "title": "Introduction",
+      "file": "book/src/introduction.md",
+      "topics": [
+        "What is Debtmap",
+        "Why use it",
+        "Key features",
+        "Target audience"
+      ],
+      "validation": "Ensure introduction covers project purpose and main features",
+      "auto_generated": false
+    },
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "file": "book/src/getting-started.md",
+      "topics": [
+        "Installation",
+        "Quick start",
+        "First analysis",
+        "Basic usage"
+      ],
+      "validation": "Check installation instructions and quick start examples are current",
+      "auto_generated": false
+    },
+    {
+      "id": "cli-reference",
+      "title": "CLI Reference",
+      "file": "book/src/cli-reference.md",
+      "topics": [
+        "Commands",
+        "Arguments",
+        "Options",
+        "Configuration"
+      ],
+      "validation": "Verify all CLI commands from src/cli/ are documented with current options",
+      "auto_generated": false
+    },
+    {
+      "id": "analysis-guide",
+      "title": "Analysis Guide",
+      "file": "book/src/analysis-guide.md",
+      "topics": [
+        "Complexity metrics",
+        "Debt patterns",
+        "Risk scoring",
+        "Interpreting results"
+      ],
+      "validation": "Ensure all analyzer types and metrics are explained",
+      "auto_generated": false
+    },
+    {
+      "id": "configuration",
+      "title": "Configuration",
+      "file": "book/src/configuration.md",
+      "topics": [
+        "Config files",
+        "Options reference",
+        "Exclusion patterns",
+        "Customization"
+      ],
+      "validation": "Check config options match implementation in src/config/",
+      "auto_generated": false
+    },
+    {
+      "id": "output-formats",
+      "title": "Output Formats",
+      "file": "book/src/output-formats.md",
+      "topics": [
+        "JSON output",
+        "Text reports",
+        "Integration with tools",
+        "Custom formatting"
+      ],
+      "validation": "Verify output format documentation matches src/io/ implementation",
+      "auto_generated": false
+    },
+    {
+      "id": "examples",
+      "title": "Examples",
+      "file": "book/src/examples.md",
+      "topics": [
+        "Analyzing Rust projects",
+        "Python analysis",
+        "JavaScript/TypeScript",
+        "CI integration"
+      ],
+      "validation": "Ensure examples use current CLI syntax and options",
+      "auto_generated": false
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting",
+      "file": "book/src/troubleshooting.md",
+      "topics": [
+        "Common issues",
+        "Debug mode",
+        "Performance tips",
+        "FAQ"
+      ],
+      "validation": "Check troubleshooting covers common user issues",
+      "auto_generated": false
+    },
+    {
+      "id": "tiered-prioritization",
+      "title": "Tiered Prioritization",
+      "file": "book/src/tiered-prioritization.md",
+      "topics": [
+        "Tier 1: Critical Architecture",
+        "Tier 2: Complex Untested",
+        "Tier 3: Testing Gaps",
+        "Tier 4: Maintenance",
+        "Tier weights and configuration",
+        "Customizing tier thresholds"
+      ],
+      "validation": "Check that tier strategy, weights, and configuration options are documented with examples",
+      "auto_generated": true,
+      "source_feature": "tiered_prioritization"
+    },
+    {
+      "id": "scoring-strategies",
+      "title": "Scoring Strategies",
+      "file": "book/src/scoring-strategies.md",
+      "topics": [
+        "File-level scoring",
+        "Function-level scoring",
+        "When to use each approach",
+        "Aggregation methods",
+        "Score normalization",
+        "Use case comparison"
+      ],
+      "validation": "Check that file-level and function-level scoring differences are explained with use cases",
+      "auto_generated": true,
+      "source_feature": "scoring_comparison"
+    },
+    {
+      "id": "prodigy-integration",
+      "title": "Prodigy Integration",
+      "file": "book/src/prodigy-integration.md",
+      "topics": [
+        "What is Prodigy",
+        "Automated debt reduction",
+        "Map-reduce workflows",
+        "Setting up Prodigy",
+        "Running debtmap workflows",
+        "Iterative improvement",
+        "Validation and testing"
+      ],
+      "validation": "Check that Prodigy workflow integration is documented with workflow file examples",
+      "auto_generated": true,
+      "source_feature": "prodigy_workflows"
+    }
+  ]
+}

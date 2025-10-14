@@ -81,13 +81,15 @@ Role multipliers adjust complexity scores based on a function's semantic role:
 
 ```toml
 [role_multipliers]
-pure_logic = 1.2        # Prioritize pure computation (default: 1.2)
-orchestrator = 0.8      # Reduce for delegation functions (default: 0.8)
-io_wrapper = 0.7        # Reduce for I/O wrappers (default: 0.7)
-entry_point = 0.9       # Slight reduction for main/CLI (default: 0.9)
-pattern_match = 0.6     # Reduce for pattern matching (default: 0.6)
-unknown = 1.0           # No adjustment (default: 1.0)
+pure_logic = 1.2        # Prioritize pure computation
+orchestrator = 0.8      # Reduce for delegation functions
+io_wrapper = 0.7        # Reduce for I/O wrappers
+entry_point = 0.9       # Slight reduction for main/CLI
+pattern_match = 0.6     # Reduce for pattern matching
+unknown = 1.0           # No adjustment
 ```
+
+**Default values:** pure_logic=1.2, orchestrator=0.8, io_wrapper=0.7, entry_point=0.9, pattern_match=0.6, unknown=1.0
 
 These multipliers help reduce false positives by recognizing that different function types have naturally different complexity levels.
 
@@ -228,38 +230,6 @@ patterns = [
 - `?` - Matches a single character
 - `[abc]` - Matches any character in the set
 
-### Function Name Exclusion
-
-Exclude specific function patterns that are intentionally complex:
-
-```toml
-[ignore.functions]
-patterns = [
-    # Test setup/teardown
-    "setup_test_*",
-    "teardown_test_*",
-    "create_test_*",
-    "mock_*",
-
-    # Generated code
-    "derive_*",
-    "__*",              # Python dunder methods
-
-    # CLI argument parsing (naturally complex)
-    "parse_args",
-    "parse_cli",
-    "build_cli",
-
-    # Serialization (naturally complex pattern matching)
-    "serialize_*",
-    "deserialize_*",
-    "to_json",
-    "from_json",
-    "to_*_format",
-    "from_*_format",
-]
-```
-
 ## Display Configuration
 
 Control how results are displayed:
@@ -311,8 +281,8 @@ Entropy analysis helps identify repetitive code patterns (like large match state
 ```toml
 [entropy]
 enabled = true                      # Enable entropy analysis (default: true)
-weight = 0.5                        # Weight in complexity adjustment (0.0-1.0)
-min_tokens = 10                     # Minimum tokens for analysis
+weight = 1.0                        # Weight in complexity adjustment (0.0-1.0) (default: 1.0)
+min_tokens = 20                     # Minimum tokens for analysis (default: 20)
 pattern_threshold = 0.7             # Pattern similarity threshold (0.0-1.0)
 entropy_threshold = 0.4             # Low entropy threshold (0.0-1.0)
 branch_threshold = 0.8              # Branch similarity threshold (0.0-1.0)
@@ -326,49 +296,6 @@ max_combined_reduction = 0.30       # Max 30% total reduction (cap)
 ```
 
 Entropy scoring reduces false positives from functions like parsers and state machines that have high cyclomatic complexity but are actually simple and maintainable.
-
-### Pattern-Based Adjustments
-
-Customize complexity scoring for specific function patterns:
-
-```toml
-# Detector functions
-[patterns.detectors]
-name_patterns = ["detect_*", "check_*", "validate_*", "verify_*"]
-complexity_adjustment = 0.7      # Reduce score by 30%
-cognitive_adjustment = 0.8       # Reduce cognitive complexity by 20%
-
-# Builder patterns
-[patterns.builders]
-name_patterns = ["*Builder", "builder", "with_*", "set_*"]
-orchestration_threshold = 5      # Need ≥5 delegations for orchestration
-complexity_adjustment = 0.8      # Reduce score by 20%
-
-# Pattern matching functions
-[patterns.matching]
-name_patterns = ["match_*", "classify_*", "categorize_*", "determine_*"]
-complexity_adjustment = 0.6      # Reduce score by 40%
-cognitive_adjustment = 0.7       # Reduce cognitive complexity by 30%
-
-# Error handling
-[patterns.error_handling]
-name_patterns = ["handle_error", "process_error", "map_error", "convert_error"]
-complexity_adjustment = 0.7      # Reduce score by 30%
-
-# Configuration loading
-[patterns.configuration]
-name_patterns = ["load_config", "parse_config", "init_*", "setup_*"]
-complexity_adjustment = 0.8      # Reduce score by 20%
-minimum_complexity = 15          # Only flag if complexity > 15
-
-# Visitor patterns
-[patterns.visitors]
-name_patterns = ["visit_*", "walk_*", "traverse_*"]
-orchestration_threshold = 6      # Need ≥6 delegations
-complexity_adjustment = 0.7      # Reduce score by 30%
-```
-
-These pattern adjustments recognize that certain code patterns (detectors, builders, pattern matching) have inherently higher complexity but are still maintainable and idiomatic.
 
 ### God Object Detection
 
@@ -474,6 +401,18 @@ api_files = []                      # Explicitly mark API files
 ```
 
 When enabled, public API functions receive higher priority for test coverage.
+
+### Additional Advanced Options
+
+Debtmap supports additional advanced configuration options:
+
+- **`[loc]`** - Lines of code counting configuration. Controls whether to include tests (`include_tests`), generated files (`include_generated`), comments (`count_comments`), and blank lines (`count_blank_lines`) in LOC counts. All default to false.
+
+- **`[tiers]`** - Tier threshold configuration for prioritization. Allows customization of complexity and dependency thresholds for different priority tiers (T2, T3, T4). Used internally for tiered reporting.
+
+- **`[complexity_thresholds]`** - Enhanced complexity detection thresholds. Configures minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions. Supplements the basic `[thresholds]` section with more granular control.
+
+These options are advanced features with sensible defaults. Most users won't need to configure them explicitly.
 
 ## CLI Integration
 
@@ -586,13 +525,6 @@ patterns = [
     "**/*_test.rs",
 ]
 
-[ignore.functions]
-patterns = [
-    "test_*",
-    "mock_*",
-    "parse_args",
-]
-
 # Display configuration
 [display]
 tiered = true
@@ -605,13 +537,8 @@ default_format = "terminal"
 # Entropy configuration
 [entropy]
 enabled = true
-weight = 0.5
-min_tokens = 10
-
-# Pattern adjustments
-[patterns.detectors]
-name_patterns = ["detect_*", "check_*"]
-complexity_adjustment = 0.7
+weight = 1.0
+min_tokens = 20
 
 # God object detection
 [god_object_detection]

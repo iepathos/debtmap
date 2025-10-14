@@ -4,101 +4,153 @@
   "chapter_file": "book/src/analysis-guide.md",
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Chapter is comprehensive and well-structured with good explanations of all major analysis features. Has some minor inconsistencies in risk scoring terminology and missing details about entropy configuration fields.",
+  "quality_assessment": "Chapter is comprehensive and generally accurate, with some areas needing updates to reflect actual implementation details. Major drift involves debt type categorization system, tier-based prioritization, and missing DataFlowGraph capabilities.",
   "issues": [
     {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Debt Patterns - Categorization System",
+      "description": "Chapter describes 13 named types with numeric weights (1-5) but implementation uses different enum-based structure",
+      "current_content": "Weight = 1 for Basic Markers (Todo, TestTodo), Weight = 2 for Fixable Issues (Fixme, TestComplexity, TestDuplication), Weight = 3 for Code Quality (CodeSmell, Dependency, CodeOrganization, TestQuality), Weight = 4 for Serious Issues (Duplication, ErrorSwallowing, ResourceManagement), Weight = 5 for High Severity (Complexity)",
+      "should_be": "DebtType enum with specific variants: TestingGap, ComplexityHotspot, DeadCode, Duplication, Risk, TestComplexityHotspot, TestTodo, TestDuplication, ErrorSwallowing, AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues, AssertionComplexity, FlakyTestPattern. DebtCategory enum groups these into Architecture/Testing/Performance/CodeQuality",
+      "fix_suggestion": "Restructure debt patterns section to explain DebtType enum variants first, then show how they map to DebtCategory (Architecture, Testing, Performance, CodeQuality). Remove numeric weight system, replace with category-based strategic guidance",
+      "source_reference": "src/priority/mod.rs:83-297 (DebtType enum, DebtCategory enum and mapping)"
+    },
+    {
       "type": "missing_content",
-      "severity": "low",
+      "severity": "high",
+      "section": "Interpreting Results - Prioritization",
+      "description": "Missing entire tier-based prioritization system that's core to the output",
+      "should_add": "Tier system maps scores to priority levels: Critical (≥90), High (70-89.9), Moderate (50-69.9), Low (<50). Each tier has effort estimates and strategic guidance. TieredDisplay groups similar items for batch actions.",
+      "fix_suggestion": "Add major new section 'Tiered Prioritization' explaining: Tier enum, score-to-tier mapping, effort estimates per tier (Critical: 1-2 days, High: 2-4 hours, Moderate: 1-2 hours, Low: 30 min), batch action recommendations, and tiered display grouping that prevents grouping of god objects/critical items",
+      "source_reference": "src/priority/mod.rs:360-879 (Tier enum, TieredDisplay, get_tiered_display)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Advanced Features - Data Flow Analysis",
+      "description": "Chapter only mentions CallGraph but implementation has comprehensive DataFlowGraph",
+      "current_content": "Call Graph Analysis section explains upstream_callers and downstream_callees",
+      "should_be": "DataFlowGraph extends CallGraph with: variable dependencies (function_id -> set of variables), data transformations between functions (input_vars, output_vars, transformation_type), I/O operations per function, purity analysis integration, modification impact analysis (affected functions, dependency count, side effects, risk level)",
+      "fix_suggestion": "Expand 'Call Graph Analysis' section to 'Data Flow Analysis' covering DataFlowGraph capabilities: variable dependency tracking, data transformation patterns (map/filter/reduce), I/O operation detection, side effect analysis through purity info, modification impact calculation with risk assessment",
+      "source_reference": "src/data_flow.rs:108-324 (DataFlowGraph struct and comprehensive methods)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Interpreting Results - Categorized View",
+      "description": "Missing categorized debt analysis feature with cross-category dependencies",
+      "should_add": "CategorizedDebt provides debt grouped by category with CategorySummary (total score, item count, estimated effort hours, average severity, top items per category). CrossCategoryDependency tracks blocking relationships (e.g., god objects block testing, async issues need architecture changes)",
+      "fix_suggestion": "Add new section 'Categorized Debt Analysis' explaining: how items are grouped into Architecture/Testing/Performance/CodeQuality categories, CategorySummary with effort estimation formulas, cross-category dependency detection (architecture blocking testing, performance requiring architecture changes, complexity affecting testability), impact levels (Critical/High/Medium/Low)",
+      "source_reference": "src/priority/mod.rs:300-330, 936-1105 (CategorizedDebt struct, get_categorized_debt, identify_cross_category_dependencies methods)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Interpreting Results - Debt Density",
+      "description": "Missing debt density metric which normalizes debt across project sizes",
+      "should_add": "debt_density = (total_debt_score / total_lines_of_code) × 1000, providing per-1000-LOC metric for comparing projects of different sizes",
+      "fix_suggestion": "Add subsection 'Debt Density Metric' with formula, interpretation guidelines (e.g., 50 = clean, 100 = moderate, 150+ = high debt), and examples showing how same density indicates proportional debt regardless of project size",
+      "source_reference": "src/priority/mod.rs:606-610 (debt_density calculation in calculate_total_impact)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
       "section": "Risk Scoring - Risk Categories",
-      "description": "Chapter mentions 'WellTested' category but actual implementation may use different naming",
-      "current_content": "**WellTested** (score < 5 with high coverage)",
-      "should_verify": "Check if RiskLevel enum includes WellTested variant or uses different naming (Low, Medium, High, Critical found in code)",
-      "fix_suggestion": "Verify the actual RiskLevel enum values and update the risk categories section to match implementation exactly",
-      "source_reference": "src/data_flow.rs:312 and src/io/writers/enhanced_markdown/executive_summary.rs:106"
+      "description": "Chapter mentions 5 risk categories including 'WellTested' but implementation has 4-level RiskLevel enum",
+      "current_content": "Functions are classified into five risk categories: Critical, High, Medium, Low, and mentions WellTested",
+      "should_be": "RiskLevel enum has exactly 4 variants: Low, Medium, High, Critical. Well-tested code falls into Low risk category due to coverage dampening",
+      "fix_suggestion": "Update to 4 risk levels: Low, Medium, High, Critical. Explain that well-tested complex code gets Low risk rating due to coverage factor dampening. Remove 'WellTested' as separate category, clarify it's an outcome not a category",
+      "source_reference": "src/data_flow.rs:311-317 (RiskLevel enum with 4 variants)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Analyzer Types - Language Support",
+      "description": "Chapter lists 'Unknown' language type but it's not in current Language enum",
+      "current_content": "**Unknown** (Unsupported) - Files with unsupported extensions are classified as Language::Unknown",
+      "should_be": "Language enum only contains: Rust, Python, JavaScript, TypeScript. Unsupported files are simply skipped during file discovery",
+      "fix_suggestion": "Remove 'Unknown' language section. Explain that Language enum supports only Rust/Python/JavaScript/TypeScript, and files with other extensions are filtered out during discovery phase",
+      "source_reference": "src/core/types.rs:7-36 (Language enum with only 4 variants)"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Entropy-Based Complexity Analysis - Configuration",
-      "description": "Chapter shows entropy configuration but doesn't explain all fields found in EntropyScore struct",
-      "current_content": "Shows config fields: enabled, weight, use_classification, pattern_threshold, entropy_threshold, branch_threshold, max_combined_reduction",
-      "should_add": "Document the additional entropy output fields: unique_variables, max_nesting, dampening_applied",
-      "fix_suggestion": "Add explanation of what unique_variables and max_nesting contribute to the entropy analysis, and clarify dampening_applied vs dampening_factor",
-      "source_reference": "src/complexity/entropy_core.rs:7 EntropyScore struct"
-    },
-    {
-      "type": "unclear_content",
-      "severity": "low",
-      "section": "Entropy-Based Complexity - Dampening threshold",
-      "description": "Chapter states 'When entropy score > 0.1' but the logic is complex and may not be accurately represented",
-      "current_content": "**Dampening threshold:** When entropy score > 0.1, complexity is reduced",
-      "should_be": "Clarify the actual dampening decision logic based on multiple factors (token_entropy, pattern_repetition, branch_similarity)",
-      "fix_suggestion": "Explain that dampening is applied when a combination of factors indicates repetitive patterns, not just a single threshold. Reference the actual decision logic.",
-      "source_reference": "src/complexity/entropy_core.rs and dampening logic in analyzers"
+      "section": "Entropy-Based Complexity - Dampening Cap",
+      "description": "Chapter explains dampening but doesn't mention the 0.7 minimum cap (30% max reduction)",
+      "current_content": "Explains dampening formula and factors but no mention of floor",
+      "should_be": "Dampening factor is capped at minimum 0.7, ensuring maximum 30% complexity reduction even for highly repetitive code",
+      "fix_suggestion": "Add note after dampening formula: 'The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores, preventing over-correction of pattern-based code'",
+      "source_reference": "src/complexity/entropy.rs:195 (dampening_factor.max(0.7) in compute_dampening_factor)"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Analyzer Types - Language Support",
-      "description": "Chapter doesn't mention Language::Unknown variant",
-      "current_content": "Lists Rust, Python, JavaScript, TypeScript",
-      "should_add": "Mention that there's an Unknown language variant for unsupported file types",
-      "fix_suggestion": "Add brief note that files with unsupported extensions are classified as Language::Unknown",
-      "source_reference": "src/core/mod.rs:318 Language enum with Unknown variant"
+      "section": "Advanced Features - Entropy Caching",
+      "description": "Missing information about entropy analyzer caching for performance",
+      "should_add": "EntropyAnalyzer includes LRU-style cache with configurable size (default 1000 entries), cache statistics (hit rate, miss rate, memory usage), automatic eviction when full, ~128 bytes per entry",
+      "fix_suggestion": "Add subsection 'Entropy Analysis Caching': explain cache entries include score + timestamp + hit count, LRU eviction policy, cache statistics tracking, memory estimation (~128 bytes/entry), performance benefits for repeated analysis of same functions",
+      "source_reference": "src/complexity/entropy.rs:10-286 (CacheEntry, CacheStats, caching methods, memory estimation)"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "low",
+      "section": "Interpreting Results - JSON Structure",
+      "description": "JSON example shows visibility as string but it's a FunctionVisibility enum",
+      "current_content": "\"visibility\": \"pub\"",
+      "should_be": "\"visibility\": \"Public\" or \"Private\" or \"Crate\" (FunctionVisibility enum variants)",
+      "fix_suggestion": "Update JSON examples to use exact enum variant names: 'Private', 'Crate', 'Public' instead of Rust syntax like 'pub' or 'pub(crate)'",
+      "source_reference": "src/priority/mod.rs:331-336 (FunctionVisibility enum: Private, Crate, Public)"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
       "section": "Advanced Features - Purity Detection",
-      "description": "Purity detection explanation is good but doesn't mention it's optional (Option<bool>)",
-      "current_content": "Shows purity confidence scoring and examples",
-      "should_add": "Clarify that purity detection is optional and may not be available for all functions/languages",
-      "fix_suggestion": "Add note that is_pure and purity_confidence are Option types and may be None for some functions",
-      "source_reference": "src/core/mod.rs:55-56 FunctionMetrics struct"
+      "description": "Doesn't clarify that purity detection is optional (Option types)",
+      "current_content": "Explains purity confidence scoring with examples",
+      "should_add": "Note that is_pure and purity_confidence are Option<bool> and Option<f32>, may be None for some functions or languages where detection unavailable",
+      "fix_suggestion": "Add paragraph: 'Purity detection is optional: Both is_pure and purity_confidence are Option types - May be None for some functions or languages where detection is not available - Rust has the most comprehensive purity detection support'",
+      "source_reference": "src/priority/mod.rs:59-60 (is_pure: Option<bool>, purity_confidence: Option<f32> in FunctionAnalysis)"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Function Metrics - Fields",
-      "description": "JSON example doesn't include all fields from actual FunctionMetrics struct",
-      "current_content": "Shows main fields but missing: is_trait_method, in_test_module, detected_patterns",
-      "should_add": "Document is_trait_method (whether function implements a trait), in_test_module (whether inside #[cfg(test)]), and detected_patterns (patterns identified for complexity adjustment)",
-      "fix_suggestion": "Add these fields to the JSON structure section with explanations of their purpose",
-      "source_reference": "src/core/mod.rs:42 FunctionMetrics struct definition"
-    },
-    {
-      "type": "verification",
-      "severity": "low",
-      "section": "Debt Patterns - Count",
-      "description": "Chapter claims '13 types of technical debt' - verified accurate",
-      "current_content": "Identifies 13 types of technical debt",
-      "verification": "Verified: Todo, Fixme, CodeSmell, Duplication, Complexity, Dependency, ErrorSwallowing, ResourceManagement, CodeOrganization, TestComplexity, TestTodo, TestDuplication, TestQuality = 13 types",
-      "fix_suggestion": "Count is accurate, no change needed",
-      "source_reference": "src/core/mod.rs:173 DebtType enum"
+      "section": "Interpreting Results - Output Fields",
+      "description": "JSON structure example doesn't document all FunctionAnalysis fields",
+      "current_content": "Shows main fields but missing some from actual struct",
+      "should_add": "is_trait_method (bool): whether function implements a trait method, in_test_module (bool): whether inside #[cfg(test)] module (not just is_test for test functions), detected_patterns (Vec<String>): complexity adjustment patterns identified",
+      "fix_suggestion": "Add these fields to JSON structure documentation with explanations of their purpose in analysis and filtering",
+      "source_reference": "Book documents these fields but should emphasize in_test_module vs is_test distinction"
     }
   ],
   "positive_aspects": [
-    "Excellent comprehensive coverage of complexity metrics with clear explanations and thresholds",
-    "Very detailed explanation of entropy-based complexity analysis with concrete examples",
-    "Great progression from basic concepts to advanced features",
-    "Strong practical examples showing before/after refactoring impacts",
-    "Clear categorization of debt patterns by severity weight",
-    "Good explanation of risk scoring formula and categories",
-    "Helpful terminal and JSON output examples that match actual usage",
-    "Well-structured sections that build on each other logically"
+    "Comprehensive coverage of complexity metrics (cyclomatic, cognitive, entropy, nesting, length) with clear thresholds",
+    "Excellent examples throughout showing before/after refactoring with actual metrics",
+    "Entropy-based analysis is exceptionally well explained with formulas and decision logic",
+    "Good progression from basic concepts to advanced features",
+    "Coverage integration section is detailed and practical with tool commands",
+    "JSON output structure examples are helpful for CI/CD integration",
+    "Clear explanation of how different metrics complement each other",
+    "Practical actionable recommendations format is well documented",
+    "Good balance of theory (Shannon entropy formulas) and practice (validation examples)"
   ],
   "improvement_suggestions": [
-    "Add a quick reference table mapping DebtType variants to their weights",
-    "Include a troubleshooting section for common entropy analysis questions (e.g., 'Why isn't dampening being applied?')",
-    "Add cross-references between related sections (e.g., link from Complexity section to Risk Scoring)",
-    "Consider adding a decision tree flowchart for 'What should I fix first?'",
-    "Add examples of how different languages (Python vs Rust vs JS) might produce different analysis results",
-    "Include performance tips for analyzing very large codebases",
-    "Add section on interpreting the differences between cyclomatic and cognitive complexity in practice"
+    "Add major section on Tiered Prioritization system (Tier enum, effort estimates, batch actions)",
+    "Restructure Debt Patterns to match actual DebtType enum and DebtCategory grouping",
+    "Expand Call Graph Analysis to cover full DataFlowGraph capabilities",
+    "Add Categorized Debt Analysis section with cross-category dependencies",
+    "Document debt density metric formula and interpretation",
+    "Update risk categories from 5 to 4 levels, clarify WellTested is outcome not category",
+    "Add entropy caching subsection for performance features",
+    "Remove Unknown language type, explain file filtering instead",
+    "Add quick reference table: DebtType → DebtCategory → Strategic Guidance",
+    "Include decision tree flowchart for 'What should I fix first?' using tier system",
+    "Add troubleshooting section for entropy analysis questions",
+    "Document modification impact analysis from DataFlowGraph"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-09",
-    "feature_inventory": "Generated from source code analysis",
+    "analyzed_at": "2025-10-13",
+    "feature_inventory": "Direct codebase analysis of src/priority/mod.rs, src/data_flow.rs, src/complexity/entropy.rs, src/core/types.rs",
     "topics_covered": [
       "Complexity metrics",
       "Debt patterns",

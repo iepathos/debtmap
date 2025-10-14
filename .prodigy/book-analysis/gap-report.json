@@ -1,0 +1,88 @@
+{
+  "analysis_date": "2025-10-13T04:00:00Z",
+  "features_analyzed": 45,
+  "documented_topics": 8,
+  "gaps_found": 3,
+  "gaps": [
+    {
+      "severity": "medium",
+      "type": "incomplete_chapter",
+      "feature_category": "tiered_prioritization",
+      "feature_description": "Surfaces critical architectural issues above simple testing gaps with tier-based scoring",
+      "recommended_chapter_id": "tiered-prioritization",
+      "recommended_title": "Tiered Prioritization",
+      "recommended_location": "book/src/tiered-prioritization.md",
+      "reason": "Feature mentioned in analysis-guide.md but lacks dedicated deep-dive chapter explaining tier strategy, weights, and configuration"
+    },
+    {
+      "severity": "medium",
+      "type": "incomplete_chapter",
+      "feature_category": "scoring_comparison",
+      "feature_description": "File-level vs function-level scoring for different refactoring granularities",
+      "recommended_chapter_id": "scoring-strategies",
+      "recommended_title": "Scoring Strategies",
+      "recommended_location": "book/src/scoring-strategies.md",
+      "reason": "File-level and function-level scoring mentioned but lacks dedicated chapter on when to use each approach"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "prodigy_workflows",
+      "feature_description": "Automated technical debt reduction through AI-driven workflows with map-reduce parallel agent processing",
+      "recommended_chapter_id": "prodigy-integration",
+      "recommended_title": "Prodigy Integration",
+      "recommended_location": "book/src/prodigy-integration.md",
+      "reason": "Prodigy workflow integration mentioned in features.json and automation section but has no documentation chapter"
+    }
+  ],
+  "actions_taken": [
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "tiered-prioritization",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "scoring-strategies",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "prodigy-integration",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/tiered-prioritization.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/scoring-strategies.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/prodigy-integration.md"
+    },
+    {
+      "action": "updated_summary",
+      "file_path": "book/src/SUMMARY.md"
+    }
+  ],
+  "false_positives": [],
+  "documentation_quality": {
+    "coverage_percentage": 93.3,
+    "strengths": [
+      "Excellent CLI reference documentation",
+      "Comprehensive analysis guide with metrics",
+      "Well-documented configuration options",
+      "Good examples for common workflows",
+      "Thorough troubleshooting guide"
+    ],
+    "improvements_needed": [
+      "Add dedicated chapter on tiered prioritization strategy",
+      "Add chapter explaining scoring strategies (file vs function level)",
+      "Document Prodigy workflow integration"
+    ]
+  },
+  "notes": "Overall documentation quality is excellent. The identified gaps are relatively minor and focus on advanced features that would benefit from dedicated chapters rather than scattered mentions."
+}
