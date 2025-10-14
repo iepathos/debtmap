@@ -95,7 +95,7 @@ debtmap analyze . --lcov coverage.lcov --filter Testing
 [tiers]
 # Tier 2 thresholds (Complex Untested)
 t2_complexity_threshold = 15         # Cyclomatic complexity cutoff
-t2_dependency_threshold = 5          # Dependency count cutoff
+t2_dependency_threshold = 10         # Dependency count cutoff
 
 # Tier 3 thresholds (Testing Gaps)
 t3_complexity_threshold = 10         # Lower complexity threshold
