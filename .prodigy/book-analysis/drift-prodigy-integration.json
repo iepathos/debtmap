@@ -1,0 +1,170 @@
+{
+  "chapter_id": "prodigy-integration",
+  "chapter_title": "Prodigy Integration",
+  "chapter_file": "book/src/prodigy-integration.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter contains significant drift from actual implementation. Many examples use incorrect syntax and fictional features. Core concepts are accurate but details need complete rewrite.",
+  "issues": [
+    {
+      "type": "incorrect_example",
+      "severity": "critical",
+      "section": "Quick Start - Installation",
+      "description": "Chapter shows 'cargo install prodigy-cli' but the actual package name is different",
+      "current_content": "cargo install prodigy-cli",
+      "should_be": "Check actual Prodigy installation method - may be 'cargo install prodigy' or different approach",
+      "fix_suggestion": "Verify correct installation command and update. Prodigy exists (version 0.2.2) but installation method may differ.",
+      "source_reference": "prodigy --version shows 0.2.2"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Quick Start - Run Workflow",
+      "description": "Chapter uses 'prodigy run' command but docs/PRODIGY_WORKFLOW.md shows 'prodigy cook' as the actual command",
+      "current_content": "prodigy run workflows/debtmap.yml",
+      "should_be": "prodigy cook workflows/debtmap.yml -wyn 5",
+      "fix_suggestion": "Update all command examples to use 'prodigy cook' with correct flags (-w for worktree, -y for auto-confirm, -n for iterations)",
+      "source_reference": "docs/PRODIGY_WORKFLOW.md:14"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Workflow Configuration - Basic Configuration",
+      "description": "Chapter shows extensive config section with analysis_command, validation_command, iterations, etc. but actual workflows/debtmap.yml uses shell and claude commands directly",
+      "current_content": "config:\n  analysis_command: \"debtmap analyze . --format json --output debtmap-report.json\"\n  validation_command: \"cargo test && cargo clippy\"\n  iterations: 5",
+      "should_be": "Workflow steps use direct shell and claude commands:\n- shell: \"debtmap analyze ...\"\n- claude: \"/prodigy-debtmap-plan ...\"\n- claude: \"/prodigy-debtmap-implement ...\"",
+      "fix_suggestion": "Remove fictional 'config' section and document actual workflow step syntax with shell and claude commands",
+      "source_reference": "workflows/debtmap.yml:1-55"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Workflow Structure",
+      "description": "Chapter doesn't document the actual workflow structure used in debtmap.yml with validation, on_failure, and capture_output",
+      "should_add": "Document actual workflow features:\n- validate: with commands, result_file, threshold, on_incomplete\n- on_failure: with claude commands and max_attempts\n- capture_output: for using step outputs in later steps\n- commit_required: to ensure changes are committed",
+      "fix_suggestion": "Add section showing real workflow step structure with validation and error handling",
+      "source_reference": "workflows/debtmap.yml:12-41"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Workflow Configuration - Advanced Configuration",
+      "description": "Chapter shows fictional config options that don't exist in actual workflow format",
+      "current_content": "config:\n  parallel_agents: 3\n  retry_failed: true\n  max_retries: 2\n  validation:\n    run_tests: true\n    run_linting: true\n  create_pr: true",
+      "should_be": "Use actual workflow syntax:\n- shell: \"command\"\n  on_failure:\n    claude: \"command\"\n    max_attempts: 3\n    fail_workflow: true",
+      "fix_suggestion": "Replace fictional config with examples of actual workflow step options (on_failure, max_attempts, fail_workflow, validate)",
+      "source_reference": "workflows/debtmap.yml:43-54"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Workflow Targets",
+      "description": "Chapter shows 'targets' configuration with filter, min_score, max_count that doesn't match actual workflow structure",
+      "current_content": "targets:\n  filter: \"debt_type == 'Complexity'\"\n  min_score: 8.0\n  max_count: 5",
+      "should_be": "Actual workflow uses debtmap analyze command with flags and slash commands handle target selection",
+      "fix_suggestion": "Explain that target selection happens via debtmap analyze flags and slash command logic, not workflow config",
+      "source_reference": "workflows/debtmap.yml and .claude/commands/*.md"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Map-Reduce Workflows",
+      "description": "Chapter shows map-reduce workflow syntax that doesn't match actual Prodigy workflow format",
+      "current_content": "map:\n  agent: refactor-assistant\n  parallel: 5\n  targets:\n    filter: \"unified_score.final_score >= 7.0\"\n  task: \"Refactor this function\"",
+      "should_be": "Need to check actual map-reduce workflow syntax in Prodigy - likely different structure",
+      "fix_suggestion": "Research actual Prodigy map-reduce syntax (check workflows/*.yml for examples) and update section",
+      "source_reference": "Prodigy supports map-reduce but syntax needs verification"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Slash Commands",
+      "description": "Chapter doesn't document the Claude slash commands that power the workflow",
+      "should_add": "Document key slash commands:\n- /prodigy-debtmap-plan - Creates implementation plan from debtmap analysis\n- /prodigy-debtmap-implement - Executes the plan\n- /prodigy-validate-debtmap-improvement - Validates the fix\n- /prodigy-complete-debtmap-fix - Completes partial fixes\n- /prodigy-debug-test-failure - Fixes failing tests\n- /prodigy-lint - Handles formatting and linting",
+      "fix_suggestion": "Add section explaining the Claude slash commands and how they work together",
+      "source_reference": "workflows/debtmap.yml:10-53 and .claude/commands/"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Iteration Strategy",
+      "description": "Chapter shows iteration configuration that doesn't match actual -n flag behavior",
+      "current_content": "config:\n  iterations: 5\n  targets_per_iteration: 3\n  early_stop: true",
+      "should_be": "Iterations controlled by -n flag: 'prodigy cook workflows/debtmap.yml -n 5' runs workflow up to 5 times",
+      "fix_suggestion": "Explain that iterations are controlled by CLI flag, not workflow config. Each iteration runs full workflow sequence.",
+      "source_reference": "docs/PRODIGY_WORKFLOW.md:20"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Validation",
+      "description": "Chapter shows validation as standalone config but it's actually per-step in workflow",
+      "current_content": "validation:\n  commands:\n    - \"cargo test\"\n    - \"cargo clippy\"",
+      "should_be": "- claude: \"command\"\n  validate:\n    commands:\n      - shell: \"cargo test\"\n    result_file: \"validation.json\"\n    threshold: 75",
+      "fix_suggestion": "Show validation as step-level configuration with result_file and threshold",
+      "source_reference": "workflows/debtmap.yml:12-21"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Output and Metrics",
+      "description": "Chapter shows workflow report format that may not match actual Prodigy output",
+      "current_content": "JSON report with workflow, iterations, items_processed fields",
+      "should_be": "Actual output format needs verification - may differ from what's shown",
+      "fix_suggestion": "Verify actual Prodigy output format and update example JSON structure",
+      "source_reference": "Run actual workflow and capture output"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Integration with CI/CD - GitHub Actions",
+      "description": "Chapter shows installation and run commands that may not work in CI",
+      "current_content": "cargo install prodigy-cli\nprodigy run workflows/debtmap.yml -n 5",
+      "should_be": "Verify correct installation method and use 'prodigy cook' command",
+      "fix_suggestion": "Update CI examples with correct commands and installation steps",
+      "source_reference": "docs/PRODIGY_WORKFLOW.md and actual prodigy commands"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Prerequisites - Prodigy Link",
+      "description": "Chapter links to https://github.com/iepathos/prodigy but this URL should be verified",
+      "should_add": "Verify correct Prodigy repository URL and update link if different",
+      "fix_suggestion": "Check if iepathos/prodigy is correct GitHub repo or if it's a different organization",
+      "source_reference": "Line 3 of chapter"
+    }
+  ],
+  "positive_aspects": [
+    "Clear introduction and motivation for Prodigy integration",
+    "Good explanation of benefits (isolated worktrees, iterative improvement)",
+    "Comprehensive coverage of use cases",
+    "Well-structured with logical progression",
+    "Good troubleshooting section",
+    "Explains safety features well"
+  ],
+  "improvement_suggestions": [
+    "Replace ALL workflow configuration examples with actual workflow step syntax from workflows/debtmap.yml",
+    "Update command examples to use 'prodigy cook' instead of 'prodigy run'",
+    "Document the actual slash commands that power the workflow",
+    "Show real workflow validation and error handling patterns",
+    "Add examples from actual workflows/*.yml files",
+    "Verify and update Prodigy installation instructions",
+    "Check and correct GitHub repository link",
+    "Add section on workflow step types (shell, claude) with real examples",
+    "Document workflow flags: -w (worktree), -y (auto-confirm), -n (iterations)",
+    "Remove fictional configuration options that don't exist in Prodigy"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-14",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "What is Prodigy",
+      "Automated debt reduction",
+      "Workflow configuration (mostly fictional)",
+      "Validation",
+      "CI/CD integration"
+    ],
+    "validation_focus": "Check that Prodigy workflow integration is documented with workflow file examples",
+    "validation_result": "FAILED - Many workflow examples are fictional and don't match actual implementation"
+  }
+}
