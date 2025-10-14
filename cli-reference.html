@@ -232,13 +232,40 @@ Creates a <code>debtmap.toml</code> configuration file in the current directory 
 <li><code>&lt;PATH&gt;</code> - Path to analyze</li>
 </ul>
 <p><strong>Options:</strong></p>
+<p><em>Configuration &amp; Output:</em></p>
 <ul>
 <li><code>-c, --config &lt;CONFIG&gt;</code> - Configuration file path</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal</li>
+<li><code>-o, --output &lt;OUTPUT&gt;</code> - Output file path (defaults to stdout)</li>
+</ul>
+<p><em>Coverage &amp; Context:</em></p>
+<ul>
+<li><code>--coverage-file &lt;PATH&gt;</code> / <code>--lcov &lt;PATH&gt;</code> - LCOV coverage file for risk analysis</li>
+<li><code>--context</code> / <code>--enable-context</code> - Enable context-aware risk analysis</li>
+<li><code>--context-providers &lt;PROVIDERS&gt;</code> - Context providers to use (comma-separated)</li>
+<li><code>--disable-context &lt;PROVIDERS&gt;</code> - Disable specific context providers</li>
+</ul>
+<p><em>Thresholds &amp; Validation:</em></p>
+<ul>
 <li><code>--max-debt-density &lt;N&gt;</code> - Maximum debt density allowed (per 1000 LOC)</li>
-<li>All analysis, coverage, context, display, and verbosity options from <code>analyze</code> command</li>
+</ul>
+<p><em>Display Filtering:</em></p>
+<ul>
+<li><code>--top &lt;N&gt;</code> / <code>--head &lt;N&gt;</code> - Show only top N priority items</li>
+<li><code>--tail &lt;N&gt;</code> - Show only bottom N priority items</li>
+<li><code>-s, --summary</code> - Use summary format with tiered priority display</li>
+</ul>
+<p><em>Analysis Control:</em></p>
+<ul>
+<li><code>--semantic-off</code> - Disable semantic analysis (fallback mode)</li>
+</ul>
+<p><em>Debugging &amp; Verbosity:</em></p>
+<ul>
+<li><code>-v, --verbose</code> - Increase verbosity level (can be repeated: -v, -vv, -vvv)</li>
 </ul>
 <p><strong>Description:</strong>
 Similar to <code>analyze</code> but enforces thresholds defined in configuration file. Returns non-zero exit code if thresholds are exceeded, making it suitable for CI/CD integration.</p>
+<p>The <code>validate</code> command supports a focused subset of <code>analyze</code> options, primarily for output control, coverage integration, context-aware analysis, and display filtering. The validate command does not support <code>--threshold-complexity</code>, <code>--threshold-duplication</code>, or <code>--threshold-preset</code> flags (these are analyze-only). Instead, configure thresholds in the <code>.debtmap.toml</code> config file. Performance options like <code>--jobs</code>, <code>--cache-*</code>, and <code>--languages</code> are also not available in validate.</p>
 <p><strong>Exit Codes:</strong></p>
 <ul>
 <li><code>0</code> - Success (no errors, all thresholds passed)</li>
@@ -257,12 +284,9 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 <p><strong>Optional Target Location:</strong></p>
 <ul>
 <li><code>--plan &lt;FILE&gt;</code> - Path to implementation plan (to extract target location)</li>
-<li><code>--target-location &lt;LOCATION&gt;</code> - Target location in format <code>file:function:line</code>
-<ul>
-<li>Conflicts with <code>--plan</code> (cannot use both)</li>
+<li><code>--target-location &lt;LOCATION&gt;</code> - Target location in format <code>file:function:line</code></li>
 </ul>
-</li>
-</ul>
+<p><strong>Note:</strong> <code>--plan</code> and <code>--target-location</code> are mutually exclusive options. Using both together will cause a CLI error. Use one or the other to specify the target location.</p>
 <p><strong>Output Options:</strong></p>
 <ul>
 <li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
@@ -300,17 +324,18 @@ Compares two analysis results and generates a diff showing improvements or regre
 <p>Configure analysis behavior, thresholds, and language selection.</p>
 <p><strong>Thresholds:</strong></p>
 <ul>
-<li><code>--threshold-complexity &lt;N&gt;</code> - Complexity threshold (default: 10)</li>
-<li><code>--threshold-duplication &lt;N&gt;</code> - Duplication threshold in lines (default: 50)</li>
-<li><code>--threshold-preset &lt;PRESET&gt;</code> - Complexity threshold preset: strict, balanced, lenient
+<li><code>--threshold-complexity &lt;N&gt;</code> - Complexity threshold (default: 10) [analyze command]</li>
+<li><code>--threshold-duplication &lt;N&gt;</code> - Duplication threshold in lines (default: 50) [analyze command]</li>
+<li><code>--threshold-preset &lt;PRESET&gt;</code> - Complexity threshold preset: strict, balanced, lenient [analyze command]
 <ul>
 <li><code>strict</code> - Strict thresholds for high code quality standards</li>
 <li><code>balanced</code> - Balanced thresholds for typical projects (default)</li>
 <li><code>lenient</code> - Lenient thresholds for legacy or complex domains</li>
 </ul>
 </li>
-<li><code>--max-debt-density &lt;N&gt;</code> - Maximum debt density allowed per 1000 LOC (validate command)</li>
+<li><code>--max-debt-density &lt;N&gt;</code> - Maximum debt density allowed per 1000 LOC [validate command]</li>
 </ul>
+<p><strong>Note:</strong> Threshold options (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are command-line options for the <code>analyze</code> command. For the <code>validate</code> command, these thresholds are configured via the <code>--config</code> file (<code>debtmap.toml</code>) rather than as command-line flags.</p>
 <p><strong>Language Selection:</strong></p>
 <ul>
 <li><code>--languages &lt;LANGS&gt;</code> - Comma-separated list of languages to analyze
@@ -433,7 +458,7 @@ Compares two analysis results and generates a diff showing improvements or regre
 <h3 id="deprecated-options"><a class="header" href="#deprecated-options">Deprecated Options</a></h3>
 <p>The following options are deprecated and should be migrated:</p>
 <ul>
-<li><code>--use-cache</code> (hidden) - <strong>Deprecated:</strong> caching is now enabled by default
+<li><code>--cache</code> (hidden) - <strong>Deprecated:</strong> caching is now enabled by default
 <ul>
 <li><strong>Migration:</strong> Remove this flag, use <code>--no-cache</code> to disable if needed</li>
 </ul>
@@ -705,16 +730,17 @@ debtmap analyze . --format json --plain --output report.json
 <tr><td><code>--output</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td></tr>
 <tr><td><code>--coverage-file</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--context</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--threshold-*</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--threshold-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--top / --tail</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--cache-*</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--jobs</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--cache-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--jobs</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--verbose</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--config</code></td><td>✗</td><td>✓</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--before / --after</code></td><td>✗</td><td>✗</td><td>✓</td><td>✗</td></tr>
 <tr><td><code>--force</code></td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
 </tbody></table>
 </div>
+<p><strong>Note:</strong> The <code>validate</code> command supports output control (<code>--format</code>, <code>--output</code>), coverage integration (<code>--coverage-file</code>), context-aware analysis (<code>--context</code>), display filtering (<code>--top</code>, <code>--tail</code>, <code>--summary</code>), and verbosity options (<code>--verbose</code>) from the <code>analyze</code> command. Analysis thresholds (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are configured via the <code>--config</code> file rather than as command-line options. Performance options like <code>--cache-*</code> and <code>--jobs</code> are specific to the <code>analyze</code> command.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="performance-issues"><a class="header" href="#performance-issues">Performance Issues</a></h3>
 <p><strong>Problem:</strong> Analysis is slow on large codebases</p>

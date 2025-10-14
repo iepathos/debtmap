@@ -336,7 +336,7 @@ patterns = [
     "**/*_test.rs",           # Test files (suffix)
     "**/fixtures/**",         # Test fixtures
     "**/mocks/**",            # Mock implementations
-    "**/ stubs/**",           # Stub implementations
+    "**/stubs/**",            # Stub implementations
     "**/examples/**",         # Example code
     "**/demo/**",             # Demo code
 ]
@@ -348,34 +348,7 @@ patterns = [
 <li><code>?</code> - Matches a single character</li>
 <li><code>[abc]</code> - Matches any character in the set</li>
 </ul>
-<h3 id="function-name-exclusion"><a class="header" href="#function-name-exclusion">Function Name Exclusion</a></h3>
-<p>Exclude specific function patterns that are intentionally complex:</p>
-<pre><code class="language-toml">[ignore.functions]
-patterns = [
-    # Test setup/teardown
-    "setup_test_*",
-    "teardown_test_*",
-    "create_test_*",
-    "mock_*",
-
-    # Generated code
-    "derive_*",
-    "__*",              # Python dunder methods
-
-    # CLI argument parsing (naturally complex)
-    "parse_args",
-    "parse_cli",
-    "build_cli",
-
-    # Serialization (naturally complex pattern matching)
-    "serialize_*",
-    "deserialize_*",
-    "to_json",
-    "from_json",
-    "to_*_format",
-    "from_*_format",
-]
-</code></pre>
+<p><strong>Note:</strong> Function-level filtering (e.g., ignoring specific function name patterns) is handled by role detection and context-aware analysis rather than explicit ignore patterns. See the Context-Aware Detection section for function-level filtering options.</p>
 <h2 id="display-configuration"><a class="header" href="#display-configuration">Display Configuration</a></h2>
 <p>Control how results are displayed:</p>
 <pre><code class="language-toml">[display]
@@ -388,8 +361,15 @@ items_per_tier = 5      # Show 5 items per tier (default: 5)
 <pre><code class="language-toml">[output]
 default_format = "terminal"    # Options: "terminal", "json", "markdown"
 </code></pre>
+<p><strong>Supported formats:</strong></p>
+<ul>
+<li><code>"terminal"</code> - Human-readable colored output for the terminal (default)</li>
+<li><code>"json"</code> - Machine-readable JSON for integration with other tools</li>
+<li><code>"markdown"</code> - Markdown format for documentation and reports</li>
+</ul>
 <p>This can be overridden with the <code>--format</code> CLI flag:</p>
-<pre><code class="language-bash">debtmap analyze --format json
+<pre><code class="language-bash">debtmap analyze --format json      # JSON output
+debtmap analyze --format markdown  # Markdown output
 </code></pre>
 <h2 id="normalization-configuration"><a class="header" href="#normalization-configuration">Normalization Configuration</a></h2>
 <p>Control how raw scores are normalized to a 0-10 scale:</p>
@@ -406,58 +386,20 @@ show_raw_scores = true          # Show both raw and normalized scores
 <p>Entropy analysis helps identify repetitive code patterns (like large match statements) that inflate complexity metrics:</p>
 <pre><code class="language-toml">[entropy]
 enabled = true                      # Enable entropy analysis (default: true)
-weight = 0.5                        # Weight in complexity adjustment (0.0-1.0)
-min_tokens = 10                     # Minimum tokens for analysis
-pattern_threshold = 0.7             # Pattern similarity threshold (0.0-1.0)
-entropy_threshold = 0.4             # Low entropy threshold (0.0-1.0)
-branch_threshold = 0.8              # Branch similarity threshold (0.0-1.0)
-use_classification = false          # Use smarter token classification
+weight = 1.0                        # Weight in complexity adjustment (default: 1.0)
+min_tokens = 20                     # Minimum tokens for analysis (default: 20)
+pattern_threshold = 0.7             # Pattern similarity threshold (default: 0.7)
+entropy_threshold = 0.4             # Low entropy threshold (default: 0.4)
+branch_threshold = 0.8              # Branch similarity threshold (default: 0.8)
+use_classification = false          # Use smarter token classification (default: false)
 
 # Maximum reductions to prevent over-correction
-max_repetition_reduction = 0.20     # Max 20% reduction for repetition
-max_entropy_reduction = 0.15        # Max 15% reduction for low entropy
-max_branch_reduction = 0.25         # Max 25% reduction for similar branches
-max_combined_reduction = 0.30       # Max 30% total reduction (cap)
+max_repetition_reduction = 0.20     # Max 20% reduction for repetition (default: 0.20)
+max_entropy_reduction = 0.15        # Max 15% reduction for low entropy (default: 0.15)
+max_branch_reduction = 0.25         # Max 25% reduction for similar branches (default: 0.25)
+max_combined_reduction = 0.30       # Max 30% total reduction (default: 0.30)
 </code></pre>
 <p>Entropy scoring reduces false positives from functions like parsers and state machines that have high cyclomatic complexity but are actually simple and maintainable.</p>
-<h3 id="pattern-based-adjustments"><a class="header" href="#pattern-based-adjustments">Pattern-Based Adjustments</a></h3>
-<p>Customize complexity scoring for specific function patterns:</p>
-<pre><code class="language-toml"># Detector functions
-[patterns.detectors]
-name_patterns = ["detect_*", "check_*", "validate_*", "verify_*"]
-complexity_adjustment = 0.7      # Reduce score by 30%
-cognitive_adjustment = 0.8       # Reduce cognitive complexity by 20%
-
-# Builder patterns
-[patterns.builders]
-name_patterns = ["*Builder", "builder", "with_*", "set_*"]
-orchestration_threshold = 5      # Need ≥5 delegations for orchestration
-complexity_adjustment = 0.8      # Reduce score by 20%
-
-# Pattern matching functions
-[patterns.matching]
-name_patterns = ["match_*", "classify_*", "categorize_*", "determine_*"]
-complexity_adjustment = 0.6      # Reduce score by 40%
-cognitive_adjustment = 0.7       # Reduce cognitive complexity by 30%
-
-# Error handling
-[patterns.error_handling]
-name_patterns = ["handle_error", "process_error", "map_error", "convert_error"]
-complexity_adjustment = 0.7      # Reduce score by 30%
-
-# Configuration loading
-[patterns.configuration]
-name_patterns = ["load_config", "parse_config", "init_*", "setup_*"]
-complexity_adjustment = 0.8      # Reduce score by 20%
-minimum_complexity = 15          # Only flag if complexity &gt; 15
-
-# Visitor patterns
-[patterns.visitors]
-name_patterns = ["visit_*", "walk_*", "traverse_*"]
-orchestration_threshold = 6      # Need ≥6 delegations
-complexity_adjustment = 0.7      # Reduce score by 30%
-</code></pre>
-<p>These pattern adjustments recognize that certain code patterns (detectors, builders, pattern matching) have inherently higher complexity but are still maintainable and idiomatic.</p>
 <h3 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h3>
 <p>Configure detection of classes/structs with too many responsibilities:</p>
 <pre><code class="language-toml">[god_object_detection]
@@ -544,6 +486,20 @@ api_functions = []                  # Explicitly mark API functions
 api_files = []                      # Explicitly mark API files
 </code></pre>
 <p>When enabled, public API functions receive higher priority for test coverage.</p>
+<h3 id="additional-advanced-options"><a class="header" href="#additional-advanced-options">Additional Advanced Options</a></h3>
+<p>Debtmap supports additional advanced configuration options:</p>
+<ul>
+<li>
+<p><strong><code>[loc]</code></strong> - Lines of code counting configuration. Controls whether to include tests (<code>include_tests</code>), generated files (<code>include_generated</code>), comments (<code>count_comments</code>), and blank lines (<code>count_blank_lines</code>) in LOC counts. All default to false.</p>
+</li>
+<li>
+<p><strong><code>[tiers]</code></strong> - Tier threshold configuration for prioritization. Allows customization of complexity and dependency thresholds for different priority tiers (T2, T3, T4). Used internally for tiered reporting.</p>
+</li>
+<li>
+<p><strong><code>[complexity_thresholds]</code></strong> - Enhanced complexity detection thresholds. Configures minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions. Supplements the basic <code>[thresholds]</code> section with more granular control.</p>
+</li>
+</ul>
+<p>These options are advanced features with sensible defaults. Most users won’t need to configure them explicitly.</p>
 <h2 id="cli-integration"><a class="header" href="#cli-integration">CLI Integration</a></h2>
 <p>CLI flags can override configuration file settings:</p>
 <pre><code class="language-bash"># Override complexity threshold
@@ -635,13 +591,6 @@ patterns = [
     "**/*_test.rs",
 ]
 
-[ignore.functions]
-patterns = [
-    "test_*",
-    "mock_*",
-    "parse_args",
-]
-
 # Display configuration
 [display]
 tiered = true
@@ -654,13 +603,8 @@ default_format = "terminal"
 # Entropy configuration
 [entropy]
 enabled = true
-weight = 0.5
-min_tokens = 10
-
-# Pattern adjustments
-[patterns.detectors]
-name_patterns = ["detect_*", "check_*"]
-complexity_adjustment = 0.7
+weight = 1.0
+min_tokens = 20
 
 # God object detection
 [god_object_detection]

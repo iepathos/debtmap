@@ -385,10 +385,7 @@ debtmap --validate-loc
 debtmap --cache-stats
 </code></pre>
 <h3 id="debugging-score-calculations"><a class="header" href="#debugging-score-calculations">Debugging Score Calculations</a></h3>
-<pre><code class="language-bash"># Show score breakdown (deprecated, use -v instead)
-debtmap --explain-score
-
-# Better: use verbosity levels
+<pre><code class="language-bash"># Use verbosity levels to see score breakdown
 debtmap -v    # Shows score factors
 
 # See how coverage affects scores
@@ -423,6 +420,7 @@ debtmap --jobs 0
 debtmap --jobs 4
 
 # Disable parallel processing (debugging)
+# Note: --no-parallel is equivalent to --jobs 1 (single-threaded)
 debtmap --no-parallel
 </code></pre>
 <p><strong>When to adjust parallelism</strong>:</p>
@@ -433,6 +431,7 @@ debtmap --no-parallel
 </ul>
 <h3 id="caching-strategies"><a class="header" href="#caching-strategies">Caching Strategies</a></h3>
 <p>Caching is <strong>enabled by default</strong> and provides the biggest performance improvement.</p>
+<p><strong>Note</strong>: The <code>--cache</code> flag (to enable caching) is deprecated and hidden. Caching is now always enabled by default; use <code>--no-cache</code> to disable it.</p>
 <pre><code class="language-bash"># Check cache effectiveness
 debtmap --cache-stats
 
@@ -543,16 +542,13 @@ debtmap --migrate-cache
 <h3 id="cache-strategies"><a class="header" href="#cache-strategies">Cache Strategies</a></h3>
 <p><strong>Local cache</strong> (<code>.debtmap/cache</code>):</p>
 <ul>
-<li>✅ Isolated per project</li>
-<li>✅ Automatically managed</li>
-<li>❌ Duplicates across projects</li>
+<li><strong>Pros</strong>: Isolated per project, automatically managed</li>
+<li><strong>Cons</strong>: Duplicates across projects</li>
 </ul>
 <p><strong>Shared cache</strong> (<code>~/.cache/debtmap</code>):</p>
 <ul>
-<li>✅ Shared across projects</li>
-<li>✅ Saves disk space</li>
-<li>❌ Requires manual management</li>
-<li>❌ May mix unrelated projects</li>
+<li><strong>Pros</strong>: Shared across projects, saves disk space</li>
+<li><strong>Cons</strong>: Requires manual management, may mix unrelated projects</li>
 </ul>
 <h3 id="cache-consistency"><a class="header" href="#cache-consistency">Cache Consistency</a></h3>
 <pre><code class="language-bash"># Validate LOC consistency
@@ -675,6 +671,133 @@ debtmap --context -vvv
 
 # Check which providers are active
 debtmap --context -v | grep "context provider"
+</code></pre>
+<h2 id="advanced-analysis-troubleshooting"><a class="header" href="#advanced-analysis-troubleshooting">Advanced Analysis Troubleshooting</a></h2>
+<p>Advanced CLI flags for specialized analysis scenarios.</p>
+<h3 id="multi-pass-analysis"><a class="header" href="#multi-pass-analysis">Multi-Pass Analysis</a></h3>
+<p><strong>Flag</strong>: <code>--multi-pass</code></p>
+<p>Multi-pass analysis performs multiple iterations to refine results.</p>
+<pre><code class="language-bash"># Enable multi-pass analysis
+debtmap --multi-pass
+
+# Useful for complex projects with intricate dependencies
+# May increase analysis time but improve accuracy
+</code></pre>
+<p><strong>When to use</strong>:</p>
+<ul>
+<li>Complex dependency graphs</li>
+<li>Large codebases with deep nesting</li>
+<li>When single-pass results seem incomplete</li>
+</ul>
+<h3 id="attribution-output"><a class="header" href="#attribution-output">Attribution Output</a></h3>
+<p><strong>Flag</strong>: <code>--attribution</code></p>
+<p>Shows attribution information for detected issues.</p>
+<pre><code class="language-bash"># Enable attribution output
+debtmap --attribution
+
+# Combine with verbosity for details
+debtmap --attribution -v
+</code></pre>
+<p><strong>Troubleshooting</strong>:</p>
+<ul>
+<li>Requires git history provider for author information</li>
+<li>May slow down analysis</li>
+<li>Use <code>--disable-context git_history</code> if causing errors</li>
+</ul>
+<h3 id="aggregation-methods"><a class="header" href="#aggregation-methods">Aggregation Methods</a></h3>
+<p><strong>Flag</strong>: <code>--aggregation-method &lt;method&gt;</code></p>
+<p>Controls how results are aggregated across files.</p>
+<pre><code class="language-bash"># Available aggregation methods:
+debtmap --aggregation-method weighted_sum  # (default)
+debtmap --aggregation-method sum
+debtmap --aggregation-method logarithmic_sum
+debtmap --aggregation-method max_plus_average
+</code></pre>
+<p><strong>Common issues</strong>:</p>
+<ul>
+<li>Different methods produce different result structures</li>
+<li>Choose method based on your reporting needs</li>
+<li>Use consistent method for comparison over time</li>
+</ul>
+<h3 id="minimum-problematic-threshold"><a class="header" href="#minimum-problematic-threshold">Minimum Problematic Threshold</a></h3>
+<p><strong>Flag</strong>: <code>--min-problematic &lt;number&gt;</code></p>
+<p>Sets the minimum score for an item to be considered problematic.</p>
+<pre><code class="language-bash"># Default threshold
+debtmap --min-problematic 3
+
+# More strict (show more issues)
+debtmap --min-problematic 1
+
+# Less strict (show only serious issues)
+debtmap --min-problematic 5
+</code></pre>
+<p><strong>Relationship to other filters</strong>:</p>
+<ul>
+<li>Works alongside <code>--min-priority</code></li>
+<li>Filters at analysis level vs display level</li>
+<li>Lower values = more issues shown</li>
+</ul>
+<h3 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h3>
+<p><strong>Flag</strong>: <code>--no-god-object</code></p>
+<p>Disables god object (large class/module) detection.</p>
+<pre><code class="language-bash"># Disable god object detection
+debtmap --no-god-object
+
+# Useful if false positives on legitimately large modules
+# Or if your architecture uses centralized classes
+</code></pre>
+<p><strong>When to use</strong>:</p>
+<ul>
+<li>False positives on framework files</li>
+<li>Intentional large aggregator classes</li>
+<li>Reducing noise in results</li>
+</ul>
+<h3 id="detail-level-control"><a class="header" href="#detail-level-control">Detail Level Control</a></h3>
+<p><strong>Flag</strong>: <code>--detail-level &lt;level&gt;</code></p>
+<p>Controls the level of detail in analysis output.</p>
+<pre><code class="language-bash"># Available detail levels:
+debtmap --detail-level summary        # High-level overview only
+debtmap --detail-level standard       # (default) Balanced detail
+debtmap --detail-level comprehensive  # Detailed analysis
+debtmap --detail-level debug         # Full debug information
+</code></pre>
+<p><strong>When to use</strong>:</p>
+<ul>
+<li><code>summary</code>: Quick overview for large codebases</li>
+<li><code>standard</code>: Default, appropriate for most use cases</li>
+<li><code>comprehensive</code>: Deep dive into specific issues</li>
+<li><code>debug</code>: Troubleshooting analysis behavior</li>
+</ul>
+<h3 id="aggregation-control"><a class="header" href="#aggregation-control">Aggregation Control</a></h3>
+<p><strong>Flags</strong>: <code>--aggregate-only</code>, <code>--no-aggregation</code></p>
+<p>Control file-level score aggregation.</p>
+<pre><code class="language-bash"># Show only aggregated file-level scores
+debtmap --aggregate-only
+
+# Disable file-level aggregation entirely
+debtmap --no-aggregation
+
+# Default: show both individual items and file aggregates
+debtmap
+</code></pre>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li><code>--aggregate-only</code>: Focus on file-level technical debt</li>
+<li><code>--no-aggregation</code>: See individual functions/classes only</li>
+<li>Default: Full picture with both levels</li>
+</ul>
+<h3 id="combining-advanced-flags"><a class="header" href="#combining-advanced-flags">Combining Advanced Flags</a></h3>
+<pre><code class="language-bash"># Comprehensive analysis with all features
+debtmap --multi-pass --attribution --context -vv
+
+# Minimal filtering for exploration
+debtmap --min-problematic 1 --min-priority 0 --no-god-object
+
+# Performance-focused advanced analysis
+debtmap --multi-pass --jobs 8 --cache-location ~/.cache/debtmap
+
+# Summary view with aggregated scores
+debtmap --detail-level summary --aggregate-only
 </code></pre>
 <h2 id="error-messages-reference"><a class="header" href="#error-messages-reference">Error Messages Reference</a></h2>
 <p>Understanding common error messages and how to resolve them.</p>
@@ -994,6 +1117,142 @@ debtmap --filter "complexity,debt"
 # Combine filters
 debtmap --min-priority 3 --top 20 --filter complexity
 </code></pre>
+<h2 id="compare-command-issues"><a class="header" href="#compare-command-issues">Compare Command Issues</a></h2>
+<p>The <code>compare</code> command helps track changes in technical debt over time.</p>
+<h3 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h3>
+<p><strong>Note</strong>: The <code>compare</code> command defaults to JSON output format (unlike <code>analyze</code> which defaults to terminal). Use <code>--format terminal</code> or <code>--format markdown</code> if you need different output.</p>
+<pre><code class="language-bash"># Save baseline results
+debtmap --format json --output before.json
+
+# Make code changes...
+
+# Save new results
+debtmap --format json --output after.json
+
+# Compare results (outputs JSON by default)
+debtmap compare --before before.json --after after.json
+
+# Compare with terminal output
+debtmap compare --before before.json --after after.json --format terminal
+</code></pre>
+<h3 id="targeted-comparison"><a class="header" href="#targeted-comparison">Targeted Comparison</a></h3>
+<p>Use <code>--plan</code> and <code>--target-location</code> for focused debt analysis:</p>
+<pre><code class="language-bash"># Compare based on implementation plan
+debtmap compare --before before.json --after after.json --plan implementation-plan.json
+
+# Compare specific code location
+debtmap compare --before before.json --after after.json \
+  --target-location src/main.rs:calculate_score:42
+
+# Combine both for precise tracking
+debtmap compare --before before.json --after after.json \
+  --plan implementation-plan.json \
+  --target-location src/analyzers/complexity.rs:analyze_function:128
+</code></pre>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li><code>--plan</code>: Track debt changes for planned refactoring tasks</li>
+<li><code>--target-location</code>: Focus on specific function or code location</li>
+<li>Combine for granular technical debt tracking</li>
+</ul>
+<h3 id="incompatible-format-errors"><a class="header" href="#incompatible-format-errors">Incompatible Format Errors</a></h3>
+<p><strong>Problem</strong>: “Incompatible formats” error when comparing files</p>
+<p><strong>Causes</strong>:</p>
+<ul>
+<li>Mixing legacy and unified JSON formats</li>
+<li>Files from different debtmap versions</li>
+<li>Corrupted JSON files</li>
+</ul>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Ensure both files use same output format
+debtmap --format json --output-format unified --output before.json
+# ... make changes ...
+debtmap --format json --output-format unified --output after.json
+debtmap compare --before before.json --after after.json
+
+# Validate JSON files are well-formed
+jq . before.json &gt; /dev/null
+jq . after.json &gt; /dev/null
+</code></pre>
+<h3 id="comparing-across-branches"><a class="header" href="#comparing-across-branches">Comparing Across Branches</a></h3>
+<pre><code class="language-bash"># Save baseline on main branch
+git checkout main
+debtmap --format json --output main.json
+
+# Switch to feature branch
+git checkout feature-branch
+debtmap --format json --output feature.json
+
+# Compare branches
+debtmap compare --before main.json --after feature.json
+</code></pre>
+<h3 id="missing-files-error"><a class="header" href="#missing-files-error">Missing Files Error</a></h3>
+<p><strong>Problem</strong>: “File not found” when running compare</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Verify file paths are correct (use absolute paths if needed)</li>
+<li>Ensure JSON files weren’t moved or deleted</li>
+<li>Check current working directory with <code>pwd</code></li>
+</ul>
+<h3 id="format-mismatch-issues"><a class="header" href="#format-mismatch-issues">Format Mismatch Issues</a></h3>
+<p><strong>Problem</strong>: Compare shows unexpected differences or errors</p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Regenerate both files with same debtmap version
+debtmap --format json --output before.json
+# ... make changes ...
+debtmap --format json --output after.json
+
+# Use same output format for both
+debtmap --format json --output-format unified --output before.json
+debtmap --format json --output-format unified --output after.json
+</code></pre>
+<h2 id="validate-command-issues"><a class="header" href="#validate-command-issues">Validate Command Issues</a></h2>
+<p>The <code>validate</code> command checks if a codebase meets specified quality thresholds, useful for CI/CD pipelines.</p>
+<h3 id="basic-validation"><a class="header" href="#basic-validation">Basic Validation</a></h3>
+<pre><code class="language-bash"># Validate codebase passes default thresholds
+debtmap validate /path/to/project
+
+# Exit code 0 if passes, non-zero if validation fails
+</code></pre>
+<h3 id="debt-density-validation"><a class="header" href="#debt-density-validation">Debt Density Validation</a></h3>
+<p><strong>Flag</strong>: <code>--max-debt-density &lt;number&gt;</code></p>
+<p>Sets the maximum acceptable technical debt per 1000 lines of code.</p>
+<pre><code class="language-bash"># Set maximum acceptable debt density (per 1000 LOC)
+debtmap validate /path/to/project --max-debt-density 10.0
+
+# Stricter threshold for critical projects
+debtmap validate /path/to/project --max-debt-density 5.0
+
+# Lenient threshold for legacy code
+debtmap validate /path/to/project --max-debt-density 20.0
+</code></pre>
+<p><strong>Troubleshooting validation failures</strong>:</p>
+<pre><code class="language-bash"># See which files exceed threshold
+debtmap validate /path/to/project --max-debt-density 10.0 -v
+
+# Get detailed breakdown
+debtmap validate /path/to/project --max-debt-density 10.0 -vv
+
+# Analyze specific files that failed
+debtmap /path/to/problematic/file.rs -v
+</code></pre>
+<h3 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h3>
+<pre><code class="language-bash"># In CI pipeline (fails build if validation fails)
+debtmap validate . --max-debt-density 10.0 || exit 1
+
+# With verbose output for debugging
+debtmap validate . --max-debt-density 10.0 -v
+
+# Save validation report
+debtmap validate . --max-debt-density 10.0 --format json --output validation.json
+</code></pre>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li>Enforce quality gates in CI/CD pipelines</li>
+<li>Prevent accumulation of technical debt over time</li>
+<li>Track debt density trends across releases</li>
+<li>Set different thresholds for different parts of codebase</li>
+</ul>
 <h2 id="faq"><a class="header" href="#faq">FAQ</a></h2>
 <h3 id="general-questions"><a class="header" href="#general-questions">General Questions</a></h3>
 <p><strong>Q: Why is my analysis slow?</strong></p>
@@ -1124,6 +1383,38 @@ debtmap --format json --output before.json
 debtmap --format json --output after.json
 
 # Compare
+debtmap compare --before before.json --after after.json
+</code></pre>
+<p><strong>Q: Why does compare fail with ‘incompatible formats’?</strong></p>
+<p>A: The JSON files must use the same output format:</p>
+<pre><code class="language-bash"># Use unified format for both
+debtmap --format json --output-format unified --output before.json
+# ... make changes ...
+debtmap --format json --output-format unified --output after.json
+debtmap compare --before before.json --after after.json
+
+# Or use legacy format for both (but unified is recommended)
+debtmap --format json --output-format legacy --output before.json
+debtmap --format json --output-format legacy --output after.json
+</code></pre>
+<p><strong>Q: How do I compare results from different branches?</strong></p>
+<p>A: Generate JSON output on each branch and compare:</p>
+<pre><code class="language-bash"># On main branch
+git checkout main
+debtmap --format json --output main.json
+
+# On feature branch
+git checkout feature-branch
+debtmap --format json --output feature.json
+
+# Compare (from either branch)
+debtmap compare --before main.json --after feature.json
+</code></pre>
+<p><strong>Q: Can I compare legacy and unified JSON formats?</strong></p>
+<p>A: No, both files must use the same format. Regenerate with matching formats:</p>
+<pre><code class="language-bash"># Convert both to unified format
+debtmap --format json --output-format unified --output before.json
+debtmap --format json --output-format unified --output after.json
 debtmap compare --before before.json --after after.json
 </code></pre>
 <h3 id="performance-and-optimization"><a class="header" href="#performance-and-optimization">Performance and Optimization</a></h3>

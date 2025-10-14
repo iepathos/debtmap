@@ -181,8 +181,22 @@
                         <h1 id="examples"><a class="header" href="#examples">Examples</a></h1>
 <p>This chapter provides practical, real-world examples of using Debtmap across different project types and workflows. All examples use current CLI syntax verified against the source code.</p>
 <blockquote>
+<p><strong>Quick Start</strong>: New to Debtmap? Start with <a href="#basic-rust-analysis">Basic Rust Analysis</a> for the simplest introduction, then explore <a href="#coverage-integration-with-cargo-tarpaulin">Coverage Integration</a> for risk-based prioritization.</p>
+</blockquote>
+<blockquote>
 <p><strong>Quick Navigation</strong>: For detailed explanations of all CLI options, see the <a href="cli-reference.html">CLI Reference</a> chapter.</p>
 </blockquote>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>This chapter demonstrates:</p>
+<ul>
+<li><strong>Language-specific analysis</strong>: Rust, Python, JavaScript/TypeScript with their respective testing tools</li>
+<li><strong>CI/CD integration</strong>: GitHub Actions, GitLab CI, CircleCI with validation gates</li>
+<li><strong>Output formats</strong>: Terminal, JSON, and Markdown with interpretation guidance</li>
+<li><strong>Advanced features</strong>: Context-aware analysis, multi-pass processing, cache management</li>
+<li><strong>Configuration patterns</strong>: Tailored settings for different project types</li>
+<li><strong>Progress tracking</strong>: Using the <code>compare</code> command to validate refactoring improvements</li>
+</ul>
+<p>All examples are copy-paste ready and tested against the current Debtmap implementation.</p>
 <h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of Contents</a></h2>
 <ul>
 <li><a href="#analyzing-rust-projects">Analyzing Rust Projects</a></li>
@@ -229,6 +243,11 @@ debtmap analyze . --coverage-file target/coverage/lcov.info
 debtmap analyze . \
   --threshold-complexity 15 \
   --threshold-duplication 50
+
+# Use preset configurations for quick setup
+debtmap analyze . --threshold-preset strict    # Strict standards
+debtmap analyze . --threshold-preset balanced  # Default balanced
+debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 </code></pre>
 <h3 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h3>
 <p>Identify classes and modules with too many responsibilities:</p>
@@ -255,12 +274,22 @@ debtmap analyze . --filter Architecture
 # Focus on testing gaps
 debtmap analyze . --filter Testing
 
+# Filter by multiple categories
+debtmap analyze . --filter Architecture,Testing
+
 # Show only top 10 issues
 debtmap analyze . --top 10
 
 # Show only high-priority items
 debtmap analyze . --min-priority high
 </code></pre>
+<p><strong>Valid filter categories:</strong></p>
+<ul>
+<li><code>Architecture</code> - God objects, high complexity, structural issues</li>
+<li><code>Testing</code> - Test coverage gaps, untested critical code</li>
+<li><code>Duplication</code> - Code duplication and similar patterns</li>
+<li><code>Maintainability</code> - Long functions, deep nesting, readability issues</li>
+</ul>
 <h3 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h3>
 <pre><code class="language-bash"># JSON output for CI integration
 debtmap analyze . --format json --output report.json
@@ -413,6 +442,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -444,11 +474,15 @@ jobs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
 
     - name: Install cargo-tarpaulin
       run: |
         if ! command -v cargo-tarpaulin &amp;&gt; /dev/null; then
           cargo install cargo-tarpaulin
+        else
+          echo "cargo-tarpaulin already installed"
         fi
 
     - name: Build debtmap
@@ -460,18 +494,13 @@ jobs:
     - name: Run debtmap validation with coverage
       run: |
         if [ -f "target/coverage/lcov.info" ]; then
-          ./target/release/debtmap validate . \
-            --coverage-file target/coverage/lcov.info \
-            --format json \
-            --output debtmap-report.json
+          ./target/release/debtmap validate . --coverage-file target/coverage/lcov.info --format json --output debtmap-report.json
         else
-          echo "Warning: LCOV file not found, running without coverage"
-          ./target/release/debtmap validate . \
-            --format json \
-            --output debtmap-report.json
+          echo "Warning: LCOV file not found, running validation without coverage data"
+          ./target/release/debtmap validate . --format json --output debtmap-report.json
         fi
 
-    - name: Upload debtmap report
+    - name: Upload debtmap report and coverage
       if: always()
       uses: actions/upload-artifact@v4
       with:
@@ -596,6 +625,19 @@ debtmap compare \
 <p>Machine-readable format for CI/CD integration:</p>
 <pre><code class="language-bash">debtmap analyze . --format json --output report.json
 </code></pre>
+<p><strong>Using JSON output programmatically:</strong></p>
+<pre><code class="language-bash"># Extract total debt score
+debtmap analyze . --format json | jq '.total_debt_score'
+
+# Count critical items
+debtmap analyze . --format json | jq '[.items[] | select(.unified_score.final_score &gt;= 8)] | length'
+
+# Get top 5 functions by score
+debtmap analyze . --format json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5] | .[].location'
+
+# Extract all test gap items
+debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap")]'
+</code></pre>
 <p>Structure:</p>
 <pre><code class="language-json">{
   "items": [
@@ -635,11 +677,14 @@ debtmap compare \
 </code></pre>
 <p>Great for documentation or PR comments.</p>
 <h3 id="understanding-output-formats"><a class="header" href="#understanding-output-formats">Understanding Output Formats</a></h3>
-<pre><code class="language-bash"># Unified JSON format (default)
+<pre><code class="language-bash"># JSON output (default is legacy format)
 debtmap analyze . --format json
 
-# Legacy JSON format for backward compatibility
-debtmap analyze . --format json --json-format legacy
+# Unified JSON format (alternative to legacy)
+debtmap analyze . --format json --output-format unified
+
+# Legacy JSON format (default, for backward compatibility)
+debtmap analyze . --format json --output-format legacy
 
 # Output format options: terminal, json, markdown
 debtmap analyze . --format terminal
@@ -699,6 +744,9 @@ debtmap analyze . -vv
 
 # Level 3: Show all debug information
 debtmap analyze . -vvv
+
+# Long form also available
+debtmap analyze . --verbose
 
 # Show macro expansion details (Rust)
 debtmap analyze . --verbose-macro-warnings --show-macro-stats
@@ -839,7 +887,7 @@ debtmap compare --before before.json --after after.json
 debtmap compare \
   --before before.json \
   --after after.json \
-  --target src/main.rs:process_data:100
+  --target-location src/main.rs:process_data:100
 </code></pre>
 <h3 id="using-with-implementation-plans"><a class="header" href="#using-with-implementation-plans">Using with Implementation Plans</a></h3>
 <p>Extract target automatically from plan files:</p>
@@ -852,10 +900,16 @@ debtmap compare \
   --plan IMPLEMENTATION_PLAN.md
 </code></pre>
 <h3 id="output-formats-2"><a class="header" href="#output-formats-2">Output Formats</a></h3>
-<pre><code class="language-bash"># Terminal output (default)
+<pre><code class="language-bash"># JSON output (default)
 debtmap compare --before before.json --after after.json
 
-# JSON for CI integration
+# Terminal output (explicit)
+debtmap compare \
+  --before before.json \
+  --after after.json \
+  --format terminal
+
+# JSON for CI integration (explicit output file)
 debtmap compare \
   --before before.json \
   --after after.json \
@@ -926,7 +980,7 @@ debtmap compare \
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="output-formats.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="prodigy-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -940,7 +994,7 @@ debtmap compare \
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="output-formats.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="prodigy-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

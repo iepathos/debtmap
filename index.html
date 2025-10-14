@@ -189,7 +189,7 @@
 <li><strong>“What should I refactor to reduce cognitive burden?”</strong> - Identifies overly complex code that slows down development</li>
 <li><strong>“What should I test first to reduce the most risk?”</strong> - Pinpoints untested complex code that threatens stability</li>
 </ol>
-<p>Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It fully supports Rust, Python, JavaScript, and TypeScript.</p>
+<p>Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It supports Rust, Python, JavaScript, and TypeScript with full AST parsing and analysis capabilities. Rust includes additional advanced features like macro expansion and trait tracking.</p>
 <p><strong>What Makes Debtmap Different:</strong></p>
 <ul>
 <li><strong>Entropy-Based Complexity Analysis</strong>: Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%</li>
@@ -202,18 +202,19 @@
 <p>Debtmap helps you make data-driven decisions about where to focus your refactoring and testing efforts:</p>
 <ul>
 <li><strong>Identify Complexity</strong> - Find complex functions and modules that need refactoring, with concrete metrics showing which changes will have the most impact</li>
-<li><strong>Detect Technical Debt</strong> - Discover 20+ debt patterns including code smells, security vulnerabilities, resource management issues, and architectural problems</li>
+<li><strong>Detect Technical Debt</strong> - Discover 30+ debt patterns including code smells, security vulnerabilities, resource management issues, and architectural problems</li>
 <li><strong>Assess Risk</strong> - Prioritize improvements based on sophisticated risk scoring that combines complexity, test coverage, and dependency impact</li>
-<li><strong>Track Quality</strong> - Monitor code quality metrics over time with the <code>compare</code> command to verify that refactoring efforts achieved their goals</li>
+<li><strong>Track Quality</strong> - Monitor code quality metrics over time with the <code>compare</code> command (which can track improvements against implementation plan targets) to verify that refactoring efforts achieved their goals</li>
 <li><strong>Get Actionable Recommendations</strong> - Receive specific guidance like “refactoring this will reduce complexity by 60%” or “testing this will reduce risk by 5%”</li>
+<li><strong>Automated Debt Reduction</strong> - Integrates with Prodigy workflows for AI-driven automated refactoring with iterative validation and testing</li>
 </ul>
 <h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Multi-language support</strong> - Fully supports Rust, Python, JavaScript, and TypeScript</li>
+<li><strong>Multi-language support</strong> - Full support for Rust, Python, JavaScript, and TypeScript with AST parsing, complexity analysis, and debt detection</li>
 <li><strong>Entropy-based complexity analysis</strong> - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory</li>
 <li><strong>Token classification system</strong> - Advanced token categorization with weighted entropy for accurate complexity assessment</li>
-<li><strong>Comprehensive debt detection</strong> - Identifies 20+ technical debt patterns across security, organization, testing, and resource management</li>
+<li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types)</li>
 <li><strong>Security vulnerability detection</strong> - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns</li>
 <li><strong>Resource management analysis</strong> - Identifies inefficient allocations, nested loops, and blocking I/O patterns</li>
 <li><strong>Code organization analysis</strong> - Detects god objects, feature envy, primitive obsession, and magic values</li>
@@ -231,9 +232,10 @@
 <h3 id="performance--output"><a class="header" href="#performance--output">Performance &amp; Output</a></h3>
 <ul>
 <li><strong>Parallel processing</strong> - Built with Rust and Rayon for blazing-fast analysis of large codebases</li>
-<li><strong>Multiple output formats</strong> - JSON (legacy or unified structure), Markdown, and human-readable terminal formats</li>
+<li><strong>Multiple output formats</strong> - JSON, Markdown, and human-readable terminal formats</li>
 <li><strong>Configurable thresholds</strong> - Customize complexity and duplication thresholds to match your standards</li>
 <li><strong>Incremental analysis</strong> - Smart caching system for analyzing only changed files</li>
+<li><strong>Intelligent caching</strong> - Smart cache system with automatic pruning, configurable strategies (LRU, LFU, FIFO), and environment-based configuration for fast repeated analysis</li>
 <li><strong>Verbosity controls</strong> - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail</li>
 </ul>
 <h3 id="configuration--customization"><a class="header" href="#configuration--customization">Configuration &amp; Customization</a></h3>

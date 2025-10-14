@@ -265,18 +265,24 @@ debtmap analyze . -o analysis.txt
 </ul>
 <p><strong>Complexity Classification:</strong></p>
 <ul>
-<li><strong>LOW</strong> (≤5): Green - Simple, easy to maintain</li>
+<li><strong>LOW</strong> (0-5): Green - Simple, easy to maintain</li>
 <li><strong>MODERATE</strong> (6-10): Yellow - Consider refactoring</li>
-<li><strong>MEDIUM</strong> (11-15): Orange - Should refactor</li>
-<li><strong>HIGH</strong> (&gt;15): Red - Urgent refactoring needed</li>
+<li><strong>HIGH</strong> (11-15): Orange - Should refactor</li>
+<li><strong>SEVERE</strong> (&gt;15): Red - Urgent refactoring needed</li>
 </ul>
+<blockquote>
+<p><strong>Note:</strong> These levels match the <code>ComplexityLevel</code> enum in the implementation.</p>
+</blockquote>
 <p><strong>Debt Score Thresholds:</strong></p>
 <p>The default debt threshold is <strong>100</strong>. Scores are colored based on this threshold:</p>
 <ul>
-<li><strong>Green (≤50)</strong>: Healthy - Below half threshold</li>
-<li><strong>Yellow (51-100)</strong>: Attention needed - Between half and full threshold</li>
-<li><strong>Red (&gt;100)</strong>: Action required - Exceeds threshold</li>
+<li><strong>Green (≤50)</strong>: Healthy - Below half threshold (score ≤ threshold/2)</li>
+<li><strong>Yellow (51-100)</strong>: Attention needed - Between half and full threshold (threshold/2 &lt; score ≤ threshold)</li>
+<li><strong>Red (&gt;100)</strong>: Action required - Exceeds threshold (score &gt; threshold)</li>
 </ul>
+<blockquote>
+<p><strong>Note:</strong> Boundary values use strict inequalities: 50 is Green, 100 is Yellow (not Red), 101+ is Red.</p>
+</blockquote>
 <h3 id="refactoring-guidance"><a class="header" href="#refactoring-guidance">Refactoring Guidance</a></h3>
 <p>For complex functions (cyclomatic complexity &gt; 5), the terminal output provides actionable refactoring recommendations:</p>
 <pre><code>ACTION: Extract 3-5 pure functions using decompose-then-transform strategy
@@ -285,9 +291,9 @@ BENEFIT: Pure functions are easily testable and composable
 </code></pre>
 <p>Guidance levels:</p>
 <ul>
-<li><strong>Moderate</strong> (6-10): Extract 2-3 pure functions with direct transformation</li>
-<li><strong>High</strong> (11-15): Extract 3-5 pure functions with decomposition strategy</li>
-<li><strong>Severe</strong> (&gt;15): Extract 5+ functions into modules with functional core/imperative shell</li>
+<li><strong>Moderate</strong> (6-10): Extract 2-3 pure functions using direct functional transformation</li>
+<li><strong>High</strong> (11-15): Extract 3-5 pure functions using decompose-then-transform strategy</li>
+<li><strong>Severe</strong> (&gt;15): Extract 5+ pure functions into modules with functional core/imperative shell</li>
 </ul>
 <p>See the <a href="./analysis-guide.html">Analysis Guide</a> for metric explanations.</p>
 <h3 id="plain-terminal-mode"><a class="header" href="#plain-terminal-mode">Plain Terminal Mode</a></h3>
@@ -302,6 +308,9 @@ debtmap analyze . --plain
 <li>Uses ASCII box-drawing characters</li>
 <li>Machine-parseable structure</li>
 </ul>
+<blockquote>
+<p><strong>Note:</strong> Terminal output formatting (colors, symbols, etc.) can be customized internally via <code>FormattingConfig</code>. These customization options are currently not exposed through the CLI interface.</p>
+</blockquote>
 <h3 id="verbosity-levels"><a class="header" href="#verbosity-levels">Verbosity Levels</a></h3>
 <p>Control detail level with <code>-v</code> flags (can be repeated):</p>
 <pre><code class="language-bash"># Standard output
@@ -322,7 +331,38 @@ debtmap analyze . -vvv
 <li><code>-vv</code>: Show detailed calculations with formulas and intermediate values</li>
 <li><code>-vvv</code>: Show all debug information including entropy metrics, role detection, and cache hits</li>
 </ul>
+<blockquote>
+<p><strong>Note:</strong> Verbosity flags affect terminal output only. JSON and markdown formats include all data regardless of verbosity level.</p>
+</blockquote>
 <p>Each level includes all information from the previous levels, progressively adding more detail to help understand how scores are calculated.</p>
+<p><strong>Example Output Differences:</strong></p>
+<p>Standard output shows basic metrics:</p>
+<pre><code>Total debt score: 156 (threshold: 100)
+</code></pre>
+<p>Level 1 (<code>-v</code>) adds score breakdowns:</p>
+<pre><code>Total debt score: 156 (threshold: 100)
+  Complexity contribution: 85 (54%)
+  Coverage gaps: 45 (29%)
+  Dependency issues: 26 (17%)
+</code></pre>
+<p>Level 2 (<code>-vv</code>) adds detailed calculations:</p>
+<pre><code>Total debt score: 156 (threshold: 100)
+  Complexity contribution: 85 (54%)
+    Formula: sum(cyclomatic_weight * severity_multiplier)
+    High complexity functions: 5 × 12 = 60
+    Medium complexity: 8 × 3 = 24
+    Base penalty: 1
+  Coverage gaps: 45 (29%)
+    Uncovered complex functions: 3 × 15 = 45
+</code></pre>
+<p>Level 3 (<code>-vvv</code>) adds all internal details:</p>
+<pre><code>Total debt score: 156 (threshold: 100)
+  ... (all level 2 output) ...
+  Debug info:
+    Entropy metrics cached: 42/50 functions
+    Function role detection: BusinessLogic=12, Utility=8, TestHelper=5
+    Cache hit rate: 84%
+</code></pre>
 <h3 id="risk-analysis-output"><a class="header" href="#risk-analysis-output">Risk Analysis Output</a></h3>
 <p>When coverage data is provided via <code>--lcov</code>, terminal output includes a dedicated risk analysis section:</p>
 <pre><code>═══════════════════════════════════════════
@@ -356,10 +396,13 @@ Risk Distribution:
 </code></pre>
 <p><strong>Risk Level Classification:</strong></p>
 <ul>
-<li><strong>LOW</strong> (&lt;30): Green</li>
-<li><strong>MEDIUM</strong> (30-60): Yellow</li>
-<li><strong>HIGH</strong> (&gt;60): Red</li>
+<li><strong>LOW</strong> (&lt;30): Green - score &lt; 30.0</li>
+<li><strong>MEDIUM</strong> (30-59): Yellow - 30.0 ≤ score &lt; 60.0</li>
+<li><strong>HIGH</strong> (≥60): Red - score ≥ 60.0</li>
 </ul>
+<blockquote>
+<p><strong>Note:</strong> 60 is the start of HIGH risk level.</p>
+</blockquote>
 <h2 id="json-output"><a class="header" href="#json-output">JSON Output</a></h2>
 <p>JSON output provides complete analysis results in a machine-readable format, ideal for CI/CD pipelines, custom tooling, and programmatic analysis.</p>
 <h3 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h3>
@@ -369,9 +412,12 @@ debtmap analyze . --format json
 # Save to file
 debtmap analyze . --format json -o report.json
 
-# Pretty-printed by default
+# Pretty-printed by default for readability
 debtmap analyze . --format json | jq .
 </code></pre>
+<blockquote>
+<p><strong>Note:</strong> JSON output is automatically pretty-printed for readability.</p>
+</blockquote>
 <h3 id="json-schema-structure"><a class="header" href="#json-schema-structure">JSON Schema Structure</a></h3>
 <p>Debtmap outputs a structured JSON document with the following top-level fields:</p>
 <pre><code class="language-json">{
@@ -498,23 +544,71 @@ debtmap analyze . --format json | jq .
 <h3 id="field-descriptions"><a class="header" href="#field-descriptions">Field Descriptions</a></h3>
 <p><strong>FunctionMetrics Fields:</strong></p>
 <ul>
-<li><code>name</code>: Function name</li>
-<li><code>file</code>: Path to source file</li>
-<li><code>line</code>: Line number where function is defined</li>
-<li><code>cyclomatic</code>: Cyclomatic complexity score</li>
-<li><code>cognitive</code>: Cognitive complexity score</li>
-<li><code>nesting</code>: Maximum nesting depth</li>
-<li><code>length</code>: Lines of code in function</li>
-<li><code>is_test</code>: Whether this is a test function</li>
-<li><code>visibility</code>: Rust visibility modifier (pub, pub(crate), or null)</li>
-<li><code>is_trait_method</code>: Whether this implements a trait</li>
-<li><code>in_test_module</code>: Whether inside #[cfg(test)]</li>
-<li><code>entropy_score</code>: Optional entropy analysis results</li>
-<li><code>is_pure</code>: Whether function is pure (no side effects)</li>
-<li><code>purity_confidence</code>: Confidence level (0.0-1.0)</li>
-<li><code>detected_patterns</code>: List of detected code patterns</li>
-<li><code>upstream_callers</code>: Functions that call this one</li>
-<li><code>downstream_callees</code>: Functions this one calls</li>
+<li>
+<p><code>name</code>: Function name</p>
+</li>
+<li>
+<p><code>file</code>: Path to source file</p>
+</li>
+<li>
+<p><code>line</code>: Line number where function is defined</p>
+</li>
+<li>
+<p><code>cyclomatic</code>: Cyclomatic complexity score</p>
+</li>
+<li>
+<p><code>cognitive</code>: Cognitive complexity score</p>
+</li>
+<li>
+<p><code>nesting</code>: Maximum nesting depth</p>
+</li>
+<li>
+<p><code>length</code>: Lines of code in function</p>
+</li>
+<li>
+<p><code>is_test</code>: Whether this is a test function</p>
+</li>
+<li>
+<p><code>visibility</code>: Rust visibility modifier (pub, pub(crate), or null)</p>
+</li>
+<li>
+<p><code>is_trait_method</code>: Whether this implements a trait</p>
+</li>
+<li>
+<p><code>in_test_module</code>: Whether inside #[cfg(test)]</p>
+</li>
+<li>
+<p><code>entropy_score</code>: Optional entropy analysis with structure:</p>
+<pre><code class="language-json">{
+  "token_entropy": 0.65,        // Token distribution entropy (0-1): measures variety of tokens
+  "pattern_repetition": 0.30,   // Pattern repetition score (0-1): detects repeated code patterns
+  "branch_similarity": 0.45,    // Branch similarity metric (0-1): compares similarity between branches
+  "effective_complexity": 0.85  // Adjusted complexity multiplier: complexity adjusted for entropy
+}
+</code></pre>
+<p><strong>EntropyScore Fields:</strong></p>
+<ul>
+<li><code>token_entropy</code>: Measures the variety and distribution of tokens in the function (0-1, higher = more variety)</li>
+<li><code>pattern_repetition</code>: Detects repeated code patterns within the function (0-1, higher = more repetition)</li>
+<li><code>branch_similarity</code>: Measures similarity between different code branches (0-1, higher = more similar)</li>
+<li><code>effective_complexity</code>: The overall complexity multiplier adjusted for entropy effects</li>
+</ul>
+</li>
+<li>
+<p><code>is_pure</code>: Whether function is pure (no side effects)</p>
+</li>
+<li>
+<p><code>purity_confidence</code>: Confidence level (0.0-1.0)</p>
+</li>
+<li>
+<p><code>detected_patterns</code>: List of detected code patterns</p>
+</li>
+<li>
+<p><code>upstream_callers</code>: Functions that call this one</p>
+</li>
+<li>
+<p><code>downstream_callees</code>: Functions this one calls</p>
+</li>
 </ul>
 <p><strong>DebtItem Fields:</strong></p>
 <ul>
@@ -703,7 +797,9 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
 <li><strong>Strategic priorities</strong> - Long-term architectural improvements</li>
 <li><strong>Team guidance</strong> - Role-specific recommendations</li>
 </ul>
-<p>Enhanced markdown is generated when using specific analysis flags (see source code for configuration options).</p>
+<blockquote>
+<p><strong>Note:</strong> Enhanced markdown features are implemented in the codebase (<code>src/io/writers/enhanced_markdown/</code> module) but the specific flags or configuration options to enable them are not currently documented. Refer to the source code or use <code>--help</code> to discover available options.</p>
+</blockquote>
 <h3 id="rendering-to-htmlpdf"><a class="header" href="#rendering-to-htmlpdf">Rendering to HTML/PDF</a></h3>
 <p>Markdown reports can be converted to other formats:</p>
 <pre><code class="language-bash"># Generate markdown
@@ -979,6 +1075,9 @@ curl -X POST "$CUSTOM_WEBHOOK_URL" \
 </code></pre>
 <h2 id="output-filtering"><a class="header" href="#output-filtering">Output Filtering</a></h2>
 <p>Debtmap provides several flags to filter and limit output:</p>
+<blockquote>
+<p><strong>Note:</strong> Filtering options (<code>--top</code>, <code>--tail</code>, <code>--summary</code>, <code>--filter</code>) apply to all output formats (terminal, JSON, and markdown). The filtered data is applied at the analysis level before formatting, ensuring consistent results across all output types.</p>
+</blockquote>
 <h3 id="limiting-results"><a class="header" href="#limiting-results">Limiting Results</a></h3>
 <pre><code class="language-bash"># Show only top 10 priority items
 debtmap analyze . --top 10
@@ -1092,7 +1191,8 @@ debtmap analyze . --format markdown -o docs/DEBT.md
 </ul>
 <h3 id="exit-codes"><a class="header" href="#exit-codes">Exit Codes</a></h3>
 <blockquote>
-<p><strong>Note:</strong> Currently, debtmap returns exit code <code>0</code> on successful analysis regardless of threshold violations. Planned behavior includes:</p>
+<p><strong>IMPORTANT:</strong> Exit codes 1 and 2 are NOT YET IMPLEMENTED. Current behavior: Always returns <code>0</code> on successful analysis, regardless of threshold violations.</p>
+<p>Planned behavior includes:</p>
 <ul>
 <li><code>0</code>: Success, all checks passed</li>
 <li><code>1</code>: Analysis completed, but validation thresholds exceeded</li>
@@ -1126,7 +1226,7 @@ fi
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="examples.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="tiered-prioritization.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -1140,7 +1240,7 @@ fi
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="examples.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="tiered-prioritization.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

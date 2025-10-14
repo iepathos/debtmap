@@ -1,0 +1,979 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Prodigy Integration - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="prodigy-integration"><a class="header" href="#prodigy-integration">Prodigy Integration</a></h1>
+<p>Debtmap integrates with <a href="https://github.com/iepathos/prodigy">Prodigy</a> to provide fully automated technical debt reduction through AI-driven workflows. This chapter explains how to set up and use Prodigy workflows to automatically refactor code, add tests, and improve codebase quality.</p>
+<h2 id="what-is-prodigy"><a class="header" href="#what-is-prodigy">What is Prodigy?</a></h2>
+<p>Prodigy is an AI-powered workflow automation system that uses Claude to execute complex multi-step tasks. When integrated with Debtmap, it can:</p>
+<ul>
+<li><strong>Automatically refactor</strong> high-complexity functions identified by Debtmap</li>
+<li><strong>Add unit tests</strong> for untested code</li>
+<li><strong>Fix code duplication</strong> by extracting shared logic</li>
+<li><strong>Improve code organization</strong> by addressing architectural issues</li>
+<li><strong>Validate improvements</strong> with automated testing</li>
+</ul>
+<p>All changes are made in isolated git worktrees, validated with tests and linting, and only committed if all checks pass.</p>
+<h2 id="benefits"><a class="header" href="#benefits">Benefits</a></h2>
+<h3 id="automated-debt-reduction"><a class="header" href="#automated-debt-reduction">Automated Debt Reduction</a></h3>
+<p>Instead of manually addressing each technical debt item, Prodigy can:</p>
+<ol>
+<li>Analyze Debtmap’s output</li>
+<li>Select high-priority items</li>
+<li>Generate refactoring plans</li>
+<li>Execute refactorings automatically</li>
+<li>Validate with tests</li>
+<li>Commit clean changes</li>
+</ol>
+<h3 id="iterative-improvement"><a class="header" href="#iterative-improvement">Iterative Improvement</a></h3>
+<p>Prodigy supports <strong>iterative workflows</strong>:</p>
+<ul>
+<li>Run analysis → fix top items → re-analyze → fix more</li>
+<li>Configurable iteration count (default: 5 iterations)</li>
+<li>Each iteration focuses on highest-priority remaining items</li>
+</ul>
+<h3 id="safe-experimentation"><a class="header" href="#safe-experimentation">Safe Experimentation</a></h3>
+<p>All changes happen in <strong>isolated git worktrees</strong>:</p>
+<ul>
+<li>Original branch remains untouched</li>
+<li>Failed attempts don’t affect main codebase</li>
+<li>Easy to review before merging</li>
+<li>Automatic cleanup after workflow</li>
+</ul>
+<h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
+<h3 id="install-prodigy"><a class="header" href="#install-prodigy">Install Prodigy</a></h3>
+<pre><code class="language-bash"># Install Prodigy CLI
+cargo install prodigy
+
+# Verify installation
+prodigy --version
+</code></pre>
+<h3 id="configure-claude-api"><a class="header" href="#configure-claude-api">Configure Claude API</a></h3>
+<pre><code class="language-bash"># Set Claude API key
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+# Or in ~/.prodigy/config.toml:
+[api]
+anthropic_key = "your-api-key-here"
+</code></pre>
+<h3 id="ensure-debtmap-is-installed"><a class="header" href="#ensure-debtmap-is-installed">Ensure Debtmap is Installed</a></h3>
+<pre><code class="language-bash"># Install Debtmap
+cargo install debtmap
+
+# Verify installation
+debtmap --version
+</code></pre>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<h3 id="1-initialize-workflow"><a class="header" href="#1-initialize-workflow">1. Initialize Workflow</a></h3>
+<p>Create a workflow file <code>workflows/debtmap.yml</code>:</p>
+<pre><code class="language-yaml"># Sequential workflow. Fix top technical debt item
+
+# Phase 1: Generate coverage data
+- shell: "just coverage-lcov"
+
+# Phase 2: Analyze tech debt and capture baseline
+- shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
+
+# Phase 3: Create implementation plan (PLANNING PHASE)
+- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+  capture_output: true
+  validate:
+    commands:
+      - claude: "/prodigy-validate-debtmap-plan --before .prodigy/debtmap-before.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/plan-validation.json"
+    result_file: ".prodigy/plan-validation.json"
+    threshold: 75
+    on_incomplete:
+      commands:
+        - claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+      max_attempts: 3
+      fail_workflow: false
+
+# Phase 4: Execute the plan (IMPLEMENTATION PHASE)
+- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
+  commit_required: true
+  validate:
+    commands:
+      - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+      - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
+      - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+    result_file: ".prodigy/debtmap-validation.json"
+    threshold: 75
+    on_incomplete:
+      commands:
+        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+          commit_required: true
+        - shell: "just coverage-lcov"
+        - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+        - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
+      max_attempts: 5
+      fail_workflow: true
+
+# Phase 5: Run tests with automatic fixing
+- shell: "just test"
+  on_failure:
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+
+# Phase 6: Run linting and formatting
+- shell: "just fmt-check &amp;&amp; just lint"
+  on_failure:
+    claude: "/prodigy-lint ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+</code></pre>
+<h3 id="2-run-workflow"><a class="header" href="#2-run-workflow">2. Run Workflow</a></h3>
+<pre><code class="language-bash"># Run with worktree, auto-confirm, 5 iterations
+prodigy cook workflows/debtmap.yml -wyn 5
+
+# Run with custom iteration count
+prodigy cook workflows/debtmap.yml -wyn 10
+
+# Run single iteration for testing
+prodigy cook workflows/debtmap.yml -wyn 1
+</code></pre>
+<p><strong>Command Flags:</strong></p>
+<ul>
+<li><code>-w</code> - Create an isolated git worktree for changes</li>
+<li><code>-y</code> - Auto-confirm workflow steps (skip prompts)</li>
+<li><code>-n 5</code> - Run workflow for up to 5 iterations</li>
+</ul>
+<h3 id="3-review-results"><a class="header" href="#3-review-results">3. Review Results</a></h3>
+<p>Prodigy creates a detailed report:</p>
+<pre><code>📊 WORKFLOW SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Iterations: 5
+Items Fixed: 12
+Tests Added: 8
+Complexity Reduced: 145 → 78 (-46%)
+Coverage Improved: 45% → 72% (+27%)
+
+✅ All validations passed
+</code></pre>
+<h2 id="workflow-configuration"><a class="header" href="#workflow-configuration">Workflow Configuration</a></h2>
+<p>Prodigy workflows are defined as YAML lists of steps. Each step can be either a <code>shell</code> command or a <code>claude</code> slash command.</p>
+<h3 id="workflow-step-types"><a class="header" href="#workflow-step-types">Workflow Step Types</a></h3>
+<h4 id="shell-commands"><a class="header" href="#shell-commands">Shell Commands</a></h4>
+<p>Execute shell commands directly:</p>
+<pre><code class="language-yaml">- shell: "cargo test"
+</code></pre>
+<p>With error handling:</p>
+<pre><code class="language-yaml">- shell: "just test"
+  on_failure:
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+</code></pre>
+<h4 id="claude-commands"><a class="header" href="#claude-commands">Claude Commands</a></h4>
+<p>Execute Claude Code slash commands:</p>
+<pre><code class="language-yaml">- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+  capture_output: true
+  commit_required: true
+</code></pre>
+<h3 id="step-level-validation"><a class="header" href="#step-level-validation">Step-Level Validation</a></h3>
+<p>Steps can include validation that must pass:</p>
+<pre><code class="language-yaml">- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
+  commit_required: true
+  validate:
+    commands:
+      - shell: "cargo test"
+      - shell: "cargo clippy -- -D warnings"
+    result_file: ".prodigy/validation.json"
+    threshold: 75
+    on_incomplete:
+      commands:
+        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+          commit_required: true
+      max_attempts: 5
+      fail_workflow: true
+</code></pre>
+<p><strong>Validation Options:</strong></p>
+<ul>
+<li><code>commands</code>: List of commands to run for validation</li>
+<li><code>result_file</code>: JSON file containing validation results</li>
+<li><code>threshold</code>: Minimum score (0-100) required to pass</li>
+<li><code>on_incomplete</code>: Actions to take if validation score &lt; threshold</li>
+<li><code>max_attempts</code>: Maximum retry attempts</li>
+<li><code>fail_workflow</code>: Whether to fail entire workflow if validation never passes</li>
+</ul>
+<h3 id="error-handling"><a class="header" href="#error-handling">Error Handling</a></h3>
+<p>Use <code>on_failure</code> to handle command failures:</p>
+<pre><code class="language-yaml">- shell: "just fmt-check &amp;&amp; just lint"
+  on_failure:
+    claude: "/prodigy-lint ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+</code></pre>
+<p><strong>Error Handling Options:</strong></p>
+<ul>
+<li><code>claude</code>: Slash command to fix the failure</li>
+<li><code>max_attempts</code>: Maximum fix attempts</li>
+<li><code>fail_workflow</code>: If true, workflow fails after max_attempts; if false, continues to next step</li>
+</ul>
+<h3 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h3>
+<p>Generate and use coverage data in workflows:</p>
+<pre><code class="language-yaml"># Generate coverage
+- shell: "just coverage-lcov"
+
+# Use coverage in analysis
+- shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
+</code></pre>
+<h2 id="claude-slash-commands"><a class="header" href="#claude-slash-commands">Claude Slash Commands</a></h2>
+<p>Prodigy workflows use Claude Code slash commands to perform analysis, planning, and implementation. The key commands used in the debtmap workflow are:</p>
+<h3 id="planning-commands"><a class="header" href="#planning-commands">Planning Commands</a></h3>
+<h4 id="prodigy-debtmap-plan"><a class="header" href="#prodigy-debtmap-plan"><code>/prodigy-debtmap-plan</code></a></h4>
+<p>Creates an implementation plan for the top priority debt item.</p>
+<pre><code class="language-yaml">- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+  capture_output: true
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>--before</code>: Path to debtmap analysis JSON file</li>
+<li><code>--output</code>: Path to write implementation plan</li>
+</ul>
+<h4 id="prodigy-validate-debtmap-plan"><a class="header" href="#prodigy-validate-debtmap-plan"><code>/prodigy-validate-debtmap-plan</code></a></h4>
+<p>Validates that the implementation plan is complete and addresses the debt item.</p>
+<pre><code class="language-yaml">- claude: "/prodigy-validate-debtmap-plan --before .prodigy/debtmap-before.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/plan-validation.json"
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>--before</code>: Original debtmap analysis</li>
+<li><code>--plan</code>: Implementation plan to validate</li>
+<li><code>--output</code>: Validation results JSON (with score 0-100)</li>
+</ul>
+<h4 id="prodigy-revise-debtmap-plan"><a class="header" href="#prodigy-revise-debtmap-plan"><code>/prodigy-revise-debtmap-plan</code></a></h4>
+<p>Revises an incomplete plan based on validation gaps.</p>
+<pre><code class="language-yaml">- claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>--gaps</code>: List of missing items from validation</li>
+<li><code>--plan</code>: Plan file to update</li>
+</ul>
+<h3 id="implementation-commands"><a class="header" href="#implementation-commands">Implementation Commands</a></h3>
+<h4 id="prodigy-debtmap-implement"><a class="header" href="#prodigy-debtmap-implement"><code>/prodigy-debtmap-implement</code></a></h4>
+<p>Executes the implementation plan.</p>
+<pre><code class="language-yaml">- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
+  commit_required: true
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>--plan</code>: Path to implementation plan</li>
+</ul>
+<h4 id="prodigy-validate-debtmap-improvement"><a class="header" href="#prodigy-validate-debtmap-improvement"><code>/prodigy-validate-debtmap-improvement</code></a></h4>
+<p>Validates that the implementation successfully addressed the debt item.</p>
+<pre><code class="language-yaml">- claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>--comparison</code>: Debtmap comparison results (before vs after)</li>
+<li><code>--output</code>: Validation results JSON (with score 0-100)</li>
+</ul>
+<h4 id="prodigy-complete-debtmap-fix"><a class="header" href="#prodigy-complete-debtmap-fix"><code>/prodigy-complete-debtmap-fix</code></a></h4>
+<p>Completes a partial fix based on validation gaps.</p>
+<pre><code class="language-yaml">- claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+  commit_required: true
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>--gaps</code>: Validation gaps to address</li>
+<li><code>--plan</code>: Original implementation plan</li>
+</ul>
+<h3 id="testing-and-quality-commands"><a class="header" href="#testing-and-quality-commands">Testing and Quality Commands</a></h3>
+<h4 id="prodigy-debug-test-failure"><a class="header" href="#prodigy-debug-test-failure"><code>/prodigy-debug-test-failure</code></a></h4>
+<p>Automatically fixes failing tests.</p>
+<pre><code class="language-yaml">- shell: "just test"
+  on_failure:
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
+    max_attempts: 5
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>--output</code>: Test failure output from shell command</li>
+</ul>
+<h4 id="prodigy-lint"><a class="header" href="#prodigy-lint"><code>/prodigy-lint</code></a></h4>
+<p>Fixes linting and formatting issues.</p>
+<pre><code class="language-yaml">- shell: "just fmt-check &amp;&amp; just lint"
+  on_failure:
+    claude: "/prodigy-lint ${shell.output}"
+    max_attempts: 5
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li>Shell output with linting errors</li>
+</ul>
+<h2 id="target-selection"><a class="header" href="#target-selection">Target Selection</a></h2>
+<p>Target selection happens through the debtmap analysis and slash commands, not through workflow configuration:</p>
+<h3 id="how-targets-are-selected"><a class="header" href="#how-targets-are-selected">How Targets Are Selected</a></h3>
+<ol>
+<li><strong>Debtmap analyzes</strong> the codebase and scores all items by complexity, coverage, and risk</li>
+<li><strong>Planning command</strong> (<code>/prodigy-debtmap-plan</code>) selects the highest priority item</li>
+<li><strong>Implementation command</strong> (<code>/prodigy-debtmap-implement</code>) fixes that specific item</li>
+<li><strong>Next iteration</strong> re-analyzes and selects the next highest priority item</li>
+</ol>
+<h3 id="factors-in-prioritization"><a class="header" href="#factors-in-prioritization">Factors in Prioritization</a></h3>
+<ul>
+<li><strong>Complexity score</strong>: Functions with cyclomatic complexity &gt; 10</li>
+<li><strong>Coverage percentage</strong>: Lower coverage increases priority</li>
+<li><strong>Risk score</strong>: Complexity × (100 - coverage%)</li>
+<li><strong>Debt type</strong>: Complexity, TestGap, Duplication, GodObject, DeepNesting</li>
+</ul>
+<h3 id="customizing-target-selection"><a class="header" href="#customizing-target-selection">Customizing Target Selection</a></h3>
+<p>To focus on specific debt types or modules, modify the slash commands or create custom commands in <code>.claude/commands/</code></p>
+<h2 id="map-reduce-workflows"><a class="header" href="#map-reduce-workflows">Map-Reduce Workflows</a></h2>
+<p>Prodigy supports map-reduce workflows for processing multiple items in parallel. This is useful for large-scale refactoring tasks.</p>
+<h3 id="when-to-use-map-reduce"><a class="header" href="#when-to-use-map-reduce">When to Use Map-Reduce</a></h3>
+<ul>
+<li>Processing multiple independent debt items simultaneously</li>
+<li>Applying the same fix pattern across many files</li>
+<li>Large-scale codebase cleanup tasks</li>
+</ul>
+<h3 id="map-reduce-structure"><a class="header" href="#map-reduce-structure">Map-Reduce Structure</a></h3>
+<p>The exact syntax for map-reduce workflows in Prodigy may differ from sequential workflows. Consult the Prodigy documentation for current map-reduce syntax and examples.</p>
+<p><strong>Key Concepts:</strong></p>
+<ul>
+<li><strong>Map phase</strong>: Process items in parallel using multiple agents</li>
+<li><strong>Reduce phase</strong>: Aggregate results and ensure consistency</li>
+<li><strong>Isolation</strong>: Each map agent works in its own worktree</li>
+<li><strong>Validation</strong>: All changes must pass validation before merging</li>
+</ul>
+<h2 id="iteration-strategy"><a class="header" href="#iteration-strategy">Iteration Strategy</a></h2>
+<h3 id="how-iterations-work"><a class="header" href="#how-iterations-work">How Iterations Work</a></h3>
+<p>When you run <code>prodigy cook workflows/debtmap.yml -wyn 5</code>, the workflow executes up to 5 times:</p>
+<ol>
+<li>
+<p><strong>Iteration 1</strong>:</p>
+<ul>
+<li>Analyze codebase with debtmap</li>
+<li>Select highest priority item</li>
+<li>Create implementation plan</li>
+<li>Execute plan and validate</li>
+<li>Run tests and linting</li>
+</ul>
+</li>
+<li>
+<p><strong>Iteration 2</strong>:</p>
+<ul>
+<li>Re-analyze codebase (scores updated based on Iteration 1 changes)</li>
+<li>Select next highest priority item</li>
+<li>Repeat plan/implement/validate cycle</li>
+</ul>
+</li>
+<li>
+<p><strong>Continue</strong> until iteration limit reached or workflow completes without finding issues</p>
+</li>
+</ol>
+<h3 id="controlling-iterations"><a class="header" href="#controlling-iterations">Controlling Iterations</a></h3>
+<p>Iterations are controlled via the <code>-n</code> flag:</p>
+<pre><code class="language-bash"># Single iteration (testing)
+prodigy cook workflows/debtmap.yml -wyn 1
+
+# Standard run (5 iterations)
+prodigy cook workflows/debtmap.yml -wyn 5
+
+# Deep cleanup (10+ iterations)
+prodigy cook workflows/debtmap.yml -wyn 20
+</code></pre>
+<h3 id="what-happens-each-iteration"><a class="header" href="#what-happens-each-iteration">What Happens Each Iteration</a></h3>
+<p>Each iteration runs the <strong>entire workflow from start to finish</strong>:</p>
+<ol>
+<li>Generate coverage data</li>
+<li>Analyze technical debt</li>
+<li>Create implementation plan</li>
+<li>Execute plan</li>
+<li>Validate improvement</li>
+<li>Run tests (with auto-fixing)</li>
+<li>Run linting (with auto-fixing)</li>
+</ol>
+<p>The workflow continues to the next iteration automatically if all steps succeed.</p>
+<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
+<pre><code>Iteration 1:
+  - Fixed: parse_expression() (9.2 → 5.1)
+  - Fixed: calculate_score() (8.8 → 4.2)
+  - Fixed: apply_weights() (8.5 → 5.8)
+  ✓ Tests pass
+
+Iteration 2:
+  - Fixed: normalize_results() (7.5 → 3.9)
+  - Fixed: aggregate_data() (7.2 → 4.1)
+  ✓ Tests pass
+
+Iteration 3:
+  - No items above threshold (6.0)
+  ✓ Early stop
+
+Final Results:
+  Items fixed: 5
+  Average complexity: 15.2 → 8.6
+</code></pre>
+<h2 id="validation"><a class="header" href="#validation">Validation</a></h2>
+<p>Prodigy validates changes at the workflow step level, not as a standalone configuration.</p>
+<h3 id="step-level-validation-1"><a class="header" href="#step-level-validation-1">Step-Level Validation</a></h3>
+<p>Validation is attached to specific workflow steps:</p>
+<pre><code class="language-yaml">- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
+  commit_required: true
+  validate:
+    commands:
+      - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+      - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
+      - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+    result_file: ".prodigy/debtmap-validation.json"
+    threshold: 75
+    on_incomplete:
+      commands:
+        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+          commit_required: true
+        - shell: "just coverage-lcov"
+        - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+        - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
+      max_attempts: 5
+      fail_workflow: true
+</code></pre>
+<h3 id="validation-process"><a class="header" href="#validation-process">Validation Process</a></h3>
+<ol>
+<li><strong>Commands run</strong>: Execute validation commands (shell or claude)</li>
+<li><strong>Check result file</strong>: Read JSON file specified in <code>result_file</code></li>
+<li><strong>Compare to threshold</strong>: Score must be &gt;= threshold (0-100 scale)</li>
+<li><strong>On incomplete</strong>: If score &lt; threshold, run <code>on_incomplete</code> commands</li>
+<li><strong>Retry</strong>: Repeat up to <code>max_attempts</code> times</li>
+<li><strong>Fail or continue</strong>: If <code>fail_workflow: true</code>, stop workflow; otherwise continue</li>
+</ol>
+<h3 id="validation-result-format"><a class="header" href="#validation-result-format">Validation Result Format</a></h3>
+<p>The <code>result_file</code> JSON should contain:</p>
+<pre><code class="language-json">{
+  "score": 85,
+  "passed": true,
+  "gaps": [],
+  "details": "All debt improvement criteria met"
+}
+</code></pre>
+<h3 id="test-validation-with-auto-fix"><a class="header" href="#test-validation-with-auto-fix">Test Validation with Auto-Fix</a></h3>
+<p>Tests are validated with automatic fixing on failure:</p>
+<pre><code class="language-yaml">- shell: "just test"
+  on_failure:
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+</code></pre>
+<p>If tests fail, Prodigy automatically attempts to fix them up to 5 times before failing the workflow.</p>
+<h2 id="output-and-metrics"><a class="header" href="#output-and-metrics">Output and Metrics</a></h2>
+<h3 id="workflow-report"><a class="header" href="#workflow-report">Workflow Report</a></h3>
+<pre><code class="language-json">{
+  "workflow": "debtmap-debt-reduction",
+  "iterations": 5,
+  "items_processed": 12,
+  "items_fixed": 10,
+  "items_failed": 2,
+  "metrics": {
+    "complexity_before": 145,
+    "complexity_after": 78,
+    "complexity_reduction": -46.2,
+    "coverage_before": 45.3,
+    "coverage_after": 72.1,
+    "coverage_improvement": 26.8
+  },
+  "changes": [
+    {
+      "file": "src/parser.rs",
+      "function": "parse_expression",
+      "before_score": 9.2,
+      "after_score": 5.1,
+      "improvements": ["Reduced complexity", "Added tests"]
+    }
+  ]
+}
+</code></pre>
+<h3 id="commit-messages"><a class="header" href="#commit-messages">Commit Messages</a></h3>
+<p>Prodigy generates descriptive commit messages:</p>
+<pre><code>refactor(parser): reduce complexity in parse_expression
+
+- Extract nested conditionals to helper functions
+- Add unit tests for edge cases
+- Coverage: 0% → 85%
+- Complexity: 22 → 8
+
+Generated by Prodigy workflow: debtmap-debt-reduction
+Iteration: 1/5
+</code></pre>
+<h2 id="integration-with-cicd"><a class="header" href="#integration-with-cicd">Integration with CI/CD</a></h2>
+<h3 id="github-actions"><a class="header" href="#github-actions">GitHub Actions</a></h3>
+<pre><code class="language-yaml">name: Prodigy Debt Reduction
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
+
+jobs:
+  reduce-debt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install Prodigy
+        run: cargo install prodigy
+
+      - name: Install dependencies
+        run: |
+          cargo install debtmap
+          cargo install just
+
+      - name: Run Prodigy workflow
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: prodigy cook workflows/debtmap.yml -wyn 5
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "chore: automated debt reduction via Prodigy"
+          body: |
+            Automated technical debt reduction using Prodigy workflow.
+
+            This PR was generated by the weekly debt reduction workflow.
+            Review changes carefully before merging.
+          branch: prodigy-debt-reduction
+</code></pre>
+<h3 id="gitlab-ci"><a class="header" href="#gitlab-ci">GitLab CI</a></h3>
+<pre><code class="language-yaml">prodigy-debt-reduction:
+  stage: quality
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  script:
+    - cargo install prodigy
+    - cargo install debtmap
+    - cargo install just
+    - prodigy cook workflows/debtmap.yml -wyn 5
+  artifacts:
+    paths:
+      - .prodigy/debtmap-*.json
+      - .prodigy/comparison.json
+</code></pre>
+<h3 id="important-ci-considerations"><a class="header" href="#important-ci-considerations">Important CI Considerations</a></h3>
+<ul>
+<li><strong>API Keys</strong>: Store <code>ANTHROPIC_API_KEY</code> as a secret</li>
+<li><strong>Worktrees</strong>: The <code>-w</code> flag creates isolated worktrees automatically</li>
+<li><strong>Dependencies</strong>: Install <code>prodigy</code>, <code>debtmap</code>, and <code>just</code> (or your build tool)</li>
+<li><strong>Timeout</strong>: CI jobs may need extended timeout for multiple iterations</li>
+<li><strong>Review</strong>: Always create a PR for human review before merging automated changes</li>
+</ul>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="1-start-small"><a class="header" href="#1-start-small">1. Start Small</a></h3>
+<p>Begin with low iteration counts:</p>
+<pre><code class="language-bash"># First run: 1 iteration to test workflow
+prodigy cook workflows/debtmap.yml -wyn 1
+
+# Standard run: 3-5 iterations
+prodigy cook workflows/debtmap.yml -wyn 5
+</code></pre>
+<h3 id="2-focus-on-high-priority-items"><a class="header" href="#2-focus-on-high-priority-items">2. Focus on High-Priority Items</a></h3>
+<p>The debtmap analysis automatically prioritizes by:</p>
+<ul>
+<li>Complexity score (cyclomatic complexity)</li>
+<li>Coverage percentage (lower coverage = higher priority)</li>
+<li>Risk score (complexity × (100 - coverage%))</li>
+</ul>
+<p>To focus on specific areas, create custom slash commands in <code>.claude/commands/</code> that filter by:</p>
+<ul>
+<li>Module/file patterns</li>
+<li>Specific debt types (Complexity, TestGap, Duplication)</li>
+<li>Score thresholds</li>
+</ul>
+<h3 id="3-validate-thoroughly"><a class="header" href="#3-validate-thoroughly">3. Validate Thoroughly</a></h3>
+<p>Use comprehensive validation in your workflow:</p>
+<pre><code class="language-yaml">- shell: "just test"
+  on_failure:
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+
+- shell: "just fmt-check &amp;&amp; just lint"
+  on_failure:
+    claude: "/prodigy-lint ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+</code></pre>
+<h3 id="4-review-before-merging"><a class="header" href="#4-review-before-merging">4. Review Before Merging</a></h3>
+<p>Always review Prodigy’s changes:</p>
+<pre><code class="language-bash"># Find your worktree
+ls ~/.prodigy/worktrees/
+
+# Check changes
+cd ~/.prodigy/worktrees/session-xxx
+git diff main
+
+# Review commit history
+git log --oneline
+
+# Run full test suite
+cargo test --all-features
+</code></pre>
+<h3 id="5-monitor-progress"><a class="header" href="#5-monitor-progress">5. Monitor Progress</a></h3>
+<p>Track debt reduction over iterations:</p>
+<pre><code class="language-bash"># Compare before and after
+debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json
+
+# View detailed metrics
+cat .prodigy/comparison.json | jq
+</code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="workflow-fails-to-start"><a class="header" href="#workflow-fails-to-start">Workflow Fails to Start</a></h3>
+<p><strong>Issue</strong>: “Prodigy not found” or “API key missing”</p>
+<p><strong>Solution</strong>:</p>
+<pre><code class="language-bash"># Install Prodigy
+cargo install prodigy
+
+# Set API key
+export ANTHROPIC_API_KEY="your-key"
+
+# Verify installation
+prodigy --version
+</code></pre>
+<h3 id="validation-failures"><a class="header" href="#validation-failures">Validation Failures</a></h3>
+<p><strong>Issue</strong>: Validation score below threshold</p>
+<p><strong>Solution</strong>: Check validation results:</p>
+<pre><code class="language-bash"># View validation details
+cat .prodigy/debtmap-validation.json
+
+# Check what gaps remain
+cat .prodigy/debtmap-validation.json | jq '.gaps'
+
+# Review comparison results
+cat .prodigy/comparison.json
+</code></pre>
+<p>The workflow will automatically retry up to <code>max_attempts</code> times with <code>/prodigy-complete-debtmap-fix</code>.</p>
+<h3 id="test-failures"><a class="header" href="#test-failures">Test Failures</a></h3>
+<p><strong>Issue</strong>: Tests fail after implementation</p>
+<p><strong>Solution</strong>: The workflow includes automatic test fixing:</p>
+<pre><code class="language-yaml">- shell: "just test"
+  on_failure:
+    claude: "/prodigy-debug-test-failure --output ${shell.output}"
+    max_attempts: 5
+    fail_workflow: true
+</code></pre>
+<p>If tests still fail after 5 attempts, review manually:</p>
+<pre><code class="language-bash"># Check test output
+just test
+
+# Review recent changes
+git diff HEAD~1
+</code></pre>
+<h3 id="no-items-processed"><a class="header" href="#no-items-processed">No Items Processed</a></h3>
+<p><strong>Issue</strong>: Workflow completes but doesn’t find debt to fix</p>
+<p><strong>Possible Causes</strong>:</p>
+<ol>
+<li>Codebase has very low debt scores (below selection threshold)</li>
+<li>Coverage data not generated properly</li>
+<li>Debtmap analysis found no high-priority items</li>
+</ol>
+<p><strong>Solution</strong>:</p>
+<pre><code class="language-bash"># Check debtmap analysis results
+cat .prodigy/debtmap-before.json | jq '.items | sort_by(-.unified_score.final_score) | .[0:5]'
+
+# Verify coverage was generated
+ls -lh target/coverage/lcov.info
+
+# Run debtmap manually to see what's detected
+debtmap analyze . --lcov target/coverage/lcov.info
+</code></pre>
+<h3 id="workflow-hangs-or-times-out"><a class="header" href="#workflow-hangs-or-times-out">Workflow Hangs or Times Out</a></h3>
+<p><strong>Issue</strong>: Workflow takes too long or appears stuck</p>
+<p><strong>Possible Causes</strong>:</p>
+<ul>
+<li>Large codebase with many files</li>
+<li>Complex refactoring requiring extensive analysis</li>
+<li>Network issues with Claude API</li>
+</ul>
+<p><strong>Solution</strong>:</p>
+<ul>
+<li>Reduce iteration count for testing (<code>-n 1</code>)</li>
+<li>Check Claude API connectivity</li>
+<li>Monitor worktree for progress: <code>cd ~/.prodigy/worktrees/session-xxx &amp;&amp; git log</code></li>
+</ul>
+<h2 id="example-workflows"><a class="header" href="#example-workflows">Example Workflows</a></h2>
+<h3 id="full-repository-cleanup"><a class="header" href="#full-repository-cleanup">Full Repository Cleanup</a></h3>
+<p>For comprehensive debt reduction, use a higher iteration count:</p>
+<pre><code class="language-bash"># Run 10 iterations for deeper cleanup
+prodigy cook workflows/debtmap.yml -wyn 10
+
+# Run 20 iterations for major refactoring
+prodigy cook workflows/debtmap.yml -wyn 20
+</code></pre>
+<p>The workflow automatically:</p>
+<ol>
+<li>Selects highest priority items each iteration</li>
+<li>Addresses different debt types (Complexity, TestGap, Duplication)</li>
+<li>Validates all changes with tests and linting</li>
+<li>Commits only successful improvements</li>
+</ol>
+<h3 id="custom-workflow-for-specific-focus"><a class="header" href="#custom-workflow-for-specific-focus">Custom Workflow for Specific Focus</a></h3>
+<p>Create a custom workflow file for focused improvements:</p>
+<p><strong><code>workflows/add-tests.yml</code></strong> - Focus on test coverage:</p>
+<pre><code class="language-yaml"># Generate coverage
+- shell: "just coverage-lcov"
+
+# Analyze with focus on test gaps
+- shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
+
+# Create plan (slash command will prioritize TestGap items)
+- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+
+# ... rest of standard workflow steps
+</code></pre>
+<p>Run with:</p>
+<pre><code class="language-bash">prodigy cook workflows/add-tests.yml -wyn 5
+</code></pre>
+<h3 id="targeted-module-cleanup"><a class="header" href="#targeted-module-cleanup">Targeted Module Cleanup</a></h3>
+<p>Create a custom slash command to focus on specific modules:</p>
+<p><strong><code>.claude/commands/refactor-module.md</code></strong>:</p>
+<pre><code class="language-markdown"># /refactor-module
+
+Refactor the highest complexity item in the specified module.
+
+Arguments: --module &lt;module_name&gt;
+
+... implementation details ...
+</code></pre>
+<p>Then create a workflow using this command for targeted refactoring.</p>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="./cli-reference.html">Debtmap CLI Reference</a> - Debtmap command options</li>
+<li><a href="./configuration.html">Configuration</a> - Debtmap configuration</li>
+<li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - Understanding priority tiers</li>
+<li><a href="https://github.com/iepathos/prodigy">Prodigy Documentation</a> - Full Prodigy reference</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="scoring-strategies.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="examples.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="scoring-strategies.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="examples.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

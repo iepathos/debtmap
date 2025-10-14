@@ -1,0 +1,438 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Tiered Prioritization - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h1>
+<p>Debtmap uses a sophisticated tiered prioritization system to surface critical architectural issues above simple testing gaps. This chapter explains the tier strategy, how to interpret tier classifications, and how to customize tier thresholds for your project.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>The tiered prioritization system organizes technical debt into four distinct tiers based on impact, urgency, and architectural significance. This prevents “walls of similar-scored items” and ensures critical issues don’t get lost among minor problems.</p>
+<h2 id="the-four-tiers"><a class="header" href="#the-four-tiers">The Four Tiers</a></h2>
+<h3 id="tier-1-critical-architecture"><a class="header" href="#tier-1-critical-architecture">Tier 1: Critical Architecture</a></h3>
+<p><strong>Description</strong>: God Objects, God Modules, excessive complexity requiring immediate architectural attention</p>
+<p><strong>Priority</strong>: Must address before adding new features</p>
+<p><strong>Weight</strong>: 1.5x (highest priority multiplier)</p>
+<p><strong>Impact</strong>: High impact on maintainability and team velocity</p>
+<p><strong>Examples</strong>:</p>
+<ul>
+<li>Files with 15+ responsibilities</li>
+<li>Modules with 50+ methods</li>
+<li>God objects flagged by detection algorithms</li>
+<li>Circular dependencies affecting core modules</li>
+</ul>
+<p><strong>When to Address</strong>: Immediately, before sprint work begins. These issues compound over time and block progress.</p>
+<pre><code class="language-bash"># Focus on Tier 1 items
+debtmap analyze . --filter Architecture --min-priority high
+</code></pre>
+<h3 id="tier-2-complex-untested"><a class="header" href="#tier-2-complex-untested">Tier 2: Complex Untested</a></h3>
+<p><strong>Description</strong>: Untested code with high complexity or critical dependencies</p>
+<p><strong>Priority</strong>: Risk of bugs in critical paths</p>
+<p><strong>Weight</strong>: 1.0x (standard multiplier)</p>
+<p><strong>Action</strong>: Should be tested before refactoring to prevent regressions</p>
+<p><strong>Examples</strong>:</p>
+<ul>
+<li>Functions with cyclomatic complexity &gt; 15 and 0% coverage</li>
+<li>Business logic entry points without tests</li>
+<li>Complex error handling without validation</li>
+</ul>
+<p><strong>When to Address</strong>: Within current sprint. Add tests before making changes.</p>
+<pre><code class="language-bash"># See Tier 2 testing gaps
+debtmap analyze . --lcov coverage.lcov --filter Testing
+</code></pre>
+<h3 id="tier-3-testing-gaps"><a class="header" href="#tier-3-testing-gaps">Tier 3: Testing Gaps</a></h3>
+<p><strong>Description</strong>: Untested code with moderate complexity</p>
+<p><strong>Priority</strong>: Improve coverage to prevent future issues</p>
+<p><strong>Weight</strong>: 0.7x (reduced multiplier)</p>
+<p><strong>Action</strong>: Add tests opportunistically or during related changes</p>
+<p><strong>Examples</strong>:</p>
+<ul>
+<li>Functions with cyclomatic complexity 10-15 and low coverage</li>
+<li>Utility functions without edge case tests</li>
+<li>Moderate complexity with partial coverage</li>
+</ul>
+<p><strong>When to Address</strong>: Next sprint or when touching related code.</p>
+<h3 id="tier-4-maintenance"><a class="header" href="#tier-4-maintenance">Tier 4: Maintenance</a></h3>
+<p><strong>Description</strong>: Low-complexity issues and code quality improvements</p>
+<p><strong>Priority</strong>: Address opportunistically during other work</p>
+<p><strong>Weight</strong>: 0.3x (lowest multiplier)</p>
+<p><strong>Action</strong>: Fix when convenient, low urgency</p>
+<p><strong>Examples</strong>:</p>
+<ul>
+<li>Simple functions with minor code quality issues</li>
+<li>TODO markers in well-tested code</li>
+<li>Minor duplication in test code</li>
+</ul>
+<p><strong>When to Address</strong>: During cleanup sprints or when refactoring nearby code.</p>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<h3 id="default-tier-thresholds"><a class="header" href="#default-tier-thresholds">Default Tier Thresholds</a></h3>
+<pre><code class="language-toml">[tiers]
+# Tier 2 thresholds (Complex Untested)
+t2_complexity_threshold = 15         # Cyclomatic complexity cutoff
+t2_dependency_threshold = 10         # Dependency count cutoff
+
+# Tier 3 thresholds (Testing Gaps)
+t3_complexity_threshold = 10         # Lower complexity threshold
+
+# Display options
+show_t4_in_main_report = false      # Hide Tier 4 from main output
+
+# Tier weights
+[tiers.tier_weights]
+t1 = 1.5    # Critical architecture
+t2 = 1.0    # Complex untested
+t3 = 0.7    # Testing gaps
+t4 = 0.3    # Maintenance
+</code></pre>
+<h3 id="customizing-tier-thresholds"><a class="header" href="#customizing-tier-thresholds">Customizing Tier Thresholds</a></h3>
+<p>Adjust thresholds to match your team’s standards:</p>
+<pre><code class="language-toml"># Stricter thresholds for high-quality codebases
+[tiers]
+t2_complexity_threshold = 12
+t3_complexity_threshold = 8
+
+# More lenient for legacy codebases
+[tiers]
+t2_complexity_threshold = 20
+t3_complexity_threshold = 15
+</code></pre>
+<h3 id="tier-weight-customization"><a class="header" href="#tier-weight-customization">Tier Weight Customization</a></h3>
+<p>Adjust weights based on your priorities:</p>
+<pre><code class="language-toml"># Emphasize testing over architecture
+[tiers.tier_weights]
+t1 = 1.2    # Reduce architecture weight
+t2 = 1.3    # Increase testing weight
+t3 = 0.8
+t4 = 0.3
+
+# Focus on architecture first
+[tiers.tier_weights]
+t1 = 2.0    # Maximize architecture weight
+t2 = 1.0
+t3 = 0.5
+t4 = 0.2
+</code></pre>
+<h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
+<h3 id="sprint-planning"><a class="header" href="#sprint-planning">Sprint Planning</a></h3>
+<p>Use tiered prioritization to allocate work:</p>
+<pre><code class="language-bash"># See Tier 1 items for architectural planning
+debtmap analyze . --filter Architecture --top 5
+
+# See Tier 2/3 for testing sprint work
+debtmap analyze . --filter Testing --min-priority medium
+</code></pre>
+<h3 id="code-review-focus"><a class="header" href="#code-review-focus">Code Review Focus</a></h3>
+<p>Prioritize review attention based on tiers:</p>
+<ul>
+<li><strong>Tier 1</strong>: Architectural review required, senior dev attention</li>
+<li><strong>Tier 2</strong>: Test coverage validation critical</li>
+<li><strong>Tier 3</strong>: Standard review process</li>
+<li><strong>Tier 4</strong>: Quick review or automated checks</li>
+</ul>
+<h3 id="refactoring-strategy"><a class="header" href="#refactoring-strategy">Refactoring Strategy</a></h3>
+<pre><code class="language-bash"># Phase 1: Address Tier 1 architectural issues
+debtmap analyze . --filter Architecture
+
+# Phase 2: Add tests for Tier 2 complex code
+debtmap analyze . --lcov coverage.lcov --min-priority high
+
+# Phase 3: Improve Tier 3 coverage
+debtmap analyze . --lcov coverage.lcov --min-priority medium
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<ol>
+<li><strong>Always address Tier 1 before feature work</strong> - Architectural issues compound</li>
+<li><strong>Test Tier 2 items before refactoring</strong> - Avoid regressions</li>
+<li><strong>Batch Tier 3 items</strong> - Address multiple in one sprint</li>
+<li><strong>Defer Tier 4 items</strong> - Only fix during cleanup or when convenient</li>
+<li><strong>Track tier distribution over time</strong> - Aim to reduce Tier 1/2 counts</li>
+</ol>
+<h2 id="interpreting-tier-output"><a class="header" href="#interpreting-tier-output">Interpreting Tier Output</a></h2>
+<h3 id="terminal-output"><a class="header" href="#terminal-output">Terminal Output</a></h3>
+<pre><code>════════════════════════════════════════════
+    TIERED TECHNICAL DEBT REPORT
+════════════════════════════════════════════
+
+🔴 TIER 1: CRITICAL ARCHITECTURE (3 items)
+  1. src/services.rs - God Object (85% god score, 52 methods)
+  2. src/core/engine.rs - Circular dependency with parsers module
+  3. src/api/handlers.rs - God Module (15 responsibilities)
+
+🟠 TIER 2: COMPLEX UNTESTED (12 items)
+  1. src/processing/transform.rs:145 - Complexity 18, Coverage 0%
+  ...
+
+🟡 TIER 3: TESTING GAPS (45 items)
+  ...
+
+⚪ TIER 4: MAINTENANCE (120 items) [hidden]
+  Use --show-t4 to display maintenance items
+</code></pre>
+<h3 id="json-output"><a class="header" href="#json-output">JSON Output</a></h3>
+<pre><code class="language-json">{
+  "tier_distribution": {
+    "t1_count": 3,
+    "t2_count": 12,
+    "t3_count": 45,
+    "t4_count": 120
+  },
+  "items": [
+    {
+      "tier": "T1_CriticalArchitecture",
+      "priority_weight": 1.5,
+      "base_score": 8.5,
+      "final_score": 12.75
+    }
+  ]
+}
+</code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<p><strong>Issue</strong>: Too many Tier 1 items</p>
+<p><strong>Solution</strong>: Lower tier weights or increase thresholds temporarily:</p>
+<pre><code class="language-toml">[tiers.tier_weights]
+t1 = 1.2    # Reduce from 1.5
+</code></pre>
+<p><strong>Issue</strong>: Not enough items in Tier 1</p>
+<p><strong>Solution</strong>: Check if god object detection is enabled:</p>
+<pre><code class="language-toml">[god_object_detection]
+enabled = true
+</code></pre>
+<p><strong>Issue</strong>: All items in Tier 4</p>
+<p><strong>Solution</strong>: Lower minimum thresholds:</p>
+<pre><code class="language-toml">[thresholds]
+minimum_debt_score = 1.0
+minimum_cyclomatic_complexity = 2
+</code></pre>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="./scoring-strategies.html">Scoring Strategies</a> - Understanding file-level vs function-level scoring</li>
+<li><a href="./configuration.html">Configuration</a> - Complete configuration reference</li>
+<li><a href="./analysis-guide.html">Analysis Guide</a> - Detailed metric explanations</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="output-formats.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="scoring-strategies.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="output-formats.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="scoring-strategies.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

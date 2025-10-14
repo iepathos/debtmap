@@ -257,6 +257,7 @@ cargo tarpaulin --out lcov --output-dir target/coverage
 debtmap analyze . --lcov target/coverage/lcov.info
 
 # Analyze with custom thresholds
+# Note: threshold-duplication specifies minimum lines of duplicated code to detect
 debtmap analyze ./src --threshold-complexity 15 --threshold-duplication 50
 
 # Output as JSON (for CI/CD integration)
@@ -276,6 +277,12 @@ debtmap analyze . --format json --output before.json
 # ... make improvements ...
 debtmap analyze . --format json --output after.json
 debtmap compare --before before.json --after after.json
+
+# Advanced comparison: focus on specific function
+debtmap compare --before before.json --after after.json --target-location src/main.rs:main:10
+
+# Extract target from implementation plan
+debtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md
 </code></pre>
 <h3 id="advanced-options"><a class="header" href="#advanced-options">Advanced Options</a></h3>
 <p>Debtmap provides many powerful options to customize your analysis:</p>
@@ -299,10 +306,6 @@ debtmap analyze . --filter Architecture,Testing
 # Group results by debt category
 debtmap analyze . --group-by-category
 </code></pre>
-<p><strong>Security Focus:</strong></p>
-<pre><code class="language-bash"># Emphasize security-relevant patterns
-debtmap analyze . --security-enhanced
-</code></pre>
 <p><strong>Cache Management:</strong></p>
 <pre><code class="language-bash"># Skip cache for fresh analysis
 debtmap analyze . --no-cache
@@ -312,6 +315,12 @@ debtmap analyze . --clear-cache
 
 # View cache statistics
 debtmap analyze . --cache-stats
+
+# Specify custom cache location
+debtmap analyze . --cache-location /custom/path
+
+# Migrate cache from local to shared location
+debtmap analyze . --migrate-cache
 </code></pre>
 <p><strong>Performance Control:</strong></p>
 <pre><code class="language-bash"># Limit parallel jobs
@@ -326,7 +335,37 @@ debtmap analyze . --plain
 
 # Compact summary output
 debtmap analyze . --summary
+
+# Control aggregation behavior
+debtmap analyze . --aggregate-only          # Show only aggregated results
+debtmap analyze . --no-aggregation          # Skip aggregation entirely
+debtmap analyze . --aggregation-method sum  # Choose aggregation method
+
+# Adjust detail level in output
+debtmap analyze . --detail-level high       # More detailed output
 </code></pre>
+<p><strong>Expert Options:</strong></p>
+<p>These advanced options are available for power users and specialized use cases:</p>
+<pre><code class="language-bash"># Analysis behavior
+--semantic-off              # Disable semantic analysis
+--no-context-aware          # Disable context-aware analysis
+--multi-pass                # Enable multi-pass analysis for deeper insights
+--validate-loc              # Validate lines of code calculations
+
+# Rust-specific options
+--verbose-macro-warnings    # Show detailed macro expansion warnings
+--show-macro-stats          # Display macro usage statistics
+
+# Filtering and thresholds
+--threshold-preset &lt;name&gt;   # Use predefined threshold preset
+--min-problematic &lt;count&gt;   # Minimum problematic items to report
+--max-files &lt;count&gt;         # Limit analysis to N files
+--no-god-object             # Disable god object detection
+
+# Advanced reporting
+--attribution               # Include code attribution information
+</code></pre>
+<p>For detailed documentation of these options, run <code>debtmap analyze --help</code>.</p>
 <h2 id="first-analysis"><a class="header" href="#first-analysis">First Analysis</a></h2>
 <p>Let’s run your first analysis! Navigate to a project directory and run:</p>
 <pre><code class="language-bash">debtmap analyze .
@@ -343,7 +382,7 @@ debtmap analyze . --summary
 <p><strong>About Caching:</strong>
 Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:</p>
 <ul>
-<li><strong>Cache location</strong>: <code>XDG_CACHE_HOME/debtmap</code> on Linux, <code>~/Library/Caches/debtmap</code> on macOS</li>
+<li><strong>Cache location</strong>: <code>XDG_CACHE_HOME/debtmap</code> on Linux, <code>~/Library/Caches/debtmap</code> on macOS, <code>%LOCALAPPDATA%/debtmap</code> on Windows</li>
 <li><strong>What’s cached</strong>: Parsed ASTs and computed metrics for each file</li>
 <li><strong>Invalidation</strong>: Cache is automatically invalidated when files are modified</li>
 <li><strong>Management</strong>: Use <code>--clear-cache</code> to clear, <code>--no-cache</code> to skip, or <code>--cache-stats</code> to view statistics</li>
@@ -493,6 +532,12 @@ debtmap analyze . --format json --output report.json
 # For the new unified format (with consistent structure and type field):
 debtmap analyze . --format json --output-format unified --output report.json
 </code></pre>
+<p><strong>JSON Format Options:</strong></p>
+<ul>
+<li><strong>legacy</strong> (default): Uses <code>{File: {...}}</code> and <code>{Function: {...}}</code> wrappers for backward compatibility with existing tools</li>
+<li><strong>unified</strong>: New format (spec 108) with consistent structure and <code>type</code> field for all items</li>
+</ul>
+<p>Recommendation: Use <code>unified</code> for new integrations, <code>legacy</code> only for compatibility with existing tooling.</p>
 <p>Example Markdown output:</p>
 <pre><code class="language-bash">debtmap analyze . --format markdown --output report.md
 </code></pre>

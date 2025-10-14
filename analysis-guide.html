@@ -310,6 +310,7 @@ fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
 <p>When these conditions are met:</p>
 <pre><code>effective_complexity = entropy × pattern_factor × similarity_factor
 </code></pre>
+<p><strong>Dampening cap:</strong> The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores. This prevents over-correction of pattern-based code and maintains a baseline complexity floor for functions that still require understanding and maintenance.</p>
 <p><strong>Example:</strong></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -398,34 +399,124 @@ fn process(data: Data) -&gt; Result&lt;Output&gt; {
 <li>Difficult to reuse</li>
 </ul>
 <h2 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h2>
-<p>Debtmap detects 13 types of technical debt, each with a severity weight that affects scoring.</p>
-<h3 id="basic-markers-weight--1"><a class="header" href="#basic-markers-weight--1">Basic Markers (Weight = 1)</a></h3>
-<p><strong>Todo</strong>: TODO comments in production code</p>
+<p>Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.</p>
+<h3 id="debt-type-enum"><a class="header" href="#debt-type-enum">Debt Type Enum</a></h3>
+<p>The <code>DebtType</code> enum defines all specific debt patterns that Debtmap can detect:</p>
+<p><strong>Testing Debt:</strong></p>
+<ul>
+<li><code>TestingGap</code> - Functions with insufficient test coverage</li>
+<li><code>TestTodo</code> - TODO comments in test code</li>
+<li><code>TestComplexity</code> - Test functions exceeding complexity thresholds</li>
+<li><code>TestDuplication</code> - Duplicated code in test files</li>
+<li><code>TestComplexityHotspot</code> - Complex test logic that’s hard to maintain</li>
+<li><code>AssertionComplexity</code> - Complex test assertions</li>
+<li><code>FlakyTestPattern</code> - Non-deterministic test behavior</li>
+</ul>
+<p><strong>Architecture Debt:</strong></p>
+<ul>
+<li><code>ComplexityHotspot</code> - Functions exceeding complexity thresholds</li>
+<li><code>DeadCode</code> - Unreachable or unused code</li>
+<li><code>GodObject</code> - Classes with too many responsibilities</li>
+<li><code>GodModule</code> - Modules with too many responsibilities</li>
+<li><code>FeatureEnvy</code> - Using more data from other objects than own</li>
+<li><code>PrimitiveObsession</code> - Overusing basic types instead of domain objects</li>
+<li><code>MagicValues</code> - Unexplained literal values</li>
+</ul>
+<p><strong>Performance Debt:</strong></p>
+<ul>
+<li><code>AllocationInefficiency</code> - Inefficient memory allocations</li>
+<li><code>StringConcatenation</code> - Inefficient string building in loops</li>
+<li><code>NestedLoops</code> - Multiple nested iterations (O(n²) or worse)</li>
+<li><code>BlockingIO</code> - Blocking I/O in async contexts</li>
+<li><code>SuboptimalDataStructure</code> - Wrong data structure for access pattern</li>
+<li><code>AsyncMisuse</code> - Improper async/await usage</li>
+<li><code>ResourceLeak</code> - Resources not properly released</li>
+<li><code>CollectionInefficiency</code> - Inefficient collection operations</li>
+</ul>
+<p><strong>Code Quality Debt:</strong></p>
+<ul>
+<li><code>Risk</code> - High-risk code (complex + poorly tested)</li>
+<li><code>Duplication</code> - Duplicated code blocks</li>
+<li><code>ErrorSwallowing</code> - Errors caught but ignored</li>
+</ul>
+<h3 id="debt-categories"><a class="header" href="#debt-categories">Debt Categories</a></h3>
+<p>The <code>DebtCategory</code> enum groups debt types into strategic categories:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// TODO: Add error handling here
-fn process() { /* ... */ }
-<span class="boring">}</span></code></pre></pre>
-<p><strong>TestTodo</strong>: TODO comments in test code</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[test]
-fn test_feature() {
-    // TODO: Add edge case testing
-    assert_eq!(process(), expected);
+</span>pub enum DebtCategory {
+    Architecture,  // Structure, design, complexity
+    Testing,       // Coverage, test quality
+    Performance,   // Speed, memory, efficiency
+    CodeQuality,   // Maintainability, readability
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>When detected</strong>: Comment lines containing <code>TODO:</code> or <code>todo!</code> macro (Rust)
-<strong>Impact</strong>: Low - markers for future work, not immediate problems
-<strong>Action</strong>: Plan when to address or document why it’s deferred</p>
-<h3 id="fixable-issues-weight--2"><a class="header" href="#fixable-issues-weight--2">Fixable Issues (Weight = 2)</a></h3>
-<p><strong>Fixme</strong>: FIXME comments indicating known problems</p>
+<p><strong>Category Mapping:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Debt Type</th><th>Category</th><th>Strategic Focus</th></tr></thead><tbody>
+<tr><td>ComplexityHotspot, DeadCode, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues</td><td>Architecture</td><td>Structural improvements, design patterns</td></tr>
+<tr><td>TestingGap, TestTodo, TestComplexity, TestDuplication, TestComplexityHotspot, AssertionComplexity, FlakyTestPattern</td><td>Testing</td><td>Test coverage, test quality</td></tr>
+<tr><td>AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency</td><td>Performance</td><td>Runtime efficiency, resource usage</td></tr>
+<tr><td>Risk, Duplication, ErrorSwallowing</td><td>CodeQuality</td><td>Maintainability, reliability</td></tr>
+</tbody></table>
+</div>
+<h3 id="examples-by-category"><a class="header" href="#examples-by-category">Examples by Category</a></h3>
+<h4 id="architecture-debt"><a class="header" href="#architecture-debt">Architecture Debt</a></h4>
+<p><strong>ComplexityHotspot</strong>: Functions exceeding complexity thresholds</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// FIXME: This breaks with negative numbers
-fn calculate(value: i32) -&gt; i32 { /* ... */ }
+</span>// Cyclomatic: 22, Cognitive: 35
+fn process_transaction(tx: Transaction, account: &amp;mut Account) -&gt; Result&lt;Receipt&gt; {
+    if tx.amount &lt;= 0 {
+        return Err(Error::InvalidAmount);
+    }
+    // ... deeply nested logic with many branches
+    Ok(receipt)
+}
 <span class="boring">}</span></code></pre></pre>
-<p><strong>TestComplexity</strong>: Test functions exceeding complexity thresholds</p>
+<p><strong>When detected</strong>: Cyclomatic &gt; 10 OR Cognitive &gt; 15 (configurable)
+<strong>Action</strong>: Break into smaller functions, extract validation, simplify control flow</p>
+<p><strong>GodObject / GodModule</strong>: Too many responsibilities</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// God module: handles parsing, validation, storage, notifications
+mod user_service {
+    fn parse_user() { /* ... */ }
+    fn validate_user() { /* ... */ }
+    fn save_user() { /* ... */ }
+    fn send_email() { /* ... */ }
+    fn log_activity() { /* ... */ }
+    // ... 20+ more functions
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>When detected</strong>: Pattern analysis for responsibility clustering
+<strong>Action</strong>: Split into focused modules (parser, validator, repository, notifier)</p>
+<p><strong>MagicValues</strong>: Unexplained literals</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Magic numbers
+fn calculate_price(quantity: u32) -&gt; f64 {
+    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+}
+
+// Good: Named constants
+const UNIT_PRICE: f64 = 19.99;
+const SHIPPING_COST: f64 = 5.0;
+fn calculate_price(quantity: u32) -&gt; f64 {
+    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="testing-debt"><a class="header" href="#testing-debt">Testing Debt</a></h4>
+<p><strong>TestingGap</strong>: Functions with insufficient test coverage</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// 0% coverage - critical business logic untested
+fn calculate_tax(amount: f64, region: &amp;str) -&gt; f64 {
+    // Complex tax calculation logic
+    // No tests exist for this function!
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>When detected</strong>: Coverage data shows function has &lt; 80% line coverage
+<strong>Action</strong>: Add unit tests to cover all branches and edge cases</p>
+<p><strong>TestComplexity</strong>: Test functions too complex</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[test]
@@ -440,77 +531,76 @@ fn complex_test() {
     }
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>TestDuplication</strong>: Duplicated code in test files</p>
+<p><strong>When detected</strong>: Test functions with cyclomatic &gt; 10 or cognitive &gt; 15
+<strong>Action</strong>: Split into multiple focused tests, use test fixtures</p>
+<p><strong>FlakyTestPattern</strong>: Non-deterministic tests</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[test]
-fn test_a() {
-    let setup = create_test_data();  // Duplicated
-    let result = process(setup);
-    assert!(result.is_ok());
-}
-
-#[test]
-fn test_b() {
-    let setup = create_test_data();  // Same setup duplicated
-    let result = process_different(setup);
-    assert!(result.is_ok());
+fn flaky_test() {
+    let result = async_operation().await;  // Timing-dependent
+    thread::sleep(Duration::from_millis(100));  // Race condition!
+    assert_eq!(result.status, "complete");
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>When detected</strong>:</p>
-<ul>
-<li>Comments with <code>FIXME:</code> or <code>fixme!</code> macro</li>
-<li>Test functions with cyclomatic &gt; 10 or cognitive &gt; 15</li>
-<li>Similar code blocks &gt; 10 lines in test files</li>
-</ul>
-<p><strong>Impact</strong>: Medium - affects test quality and maintainability
-<strong>Action</strong>: Refactor tests to be simpler, extract common test utilities</p>
-<h3 id="code-quality-weight--3"><a class="header" href="#code-quality-weight--3">Code Quality (Weight = 3)</a></h3>
-<p><strong>CodeSmell</strong>: Anti-patterns and bad practices</p>
-<ul>
-<li>God objects (classes with too many responsibilities)</li>
-<li>Long parameter lists (&gt; 5 parameters)</li>
-<li>Feature envy (using more data from other objects than own)</li>
-<li>Primitive obsession (overusing basic types instead of domain objects)</li>
-<li>Magic numbers/strings (unexplained literal values)</li>
-</ul>
+<p><strong>When detected</strong>: Pattern analysis for timing dependencies, random values
+<strong>Action</strong>: Use mocks, deterministic test data, proper async test utilities</p>
+<h4 id="performance-debt"><a class="header" href="#performance-debt">Performance Debt</a></h4>
+<p><strong>AllocationInefficiency</strong>: Excessive allocations</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Code smell: Magic numbers
-fn calculate_price(quantity: u32) -&gt; f64 {
-    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+</span>// Bad: Allocates on every iteration
+fn process_items(items: &amp;[Item]) -&gt; Vec&lt;String&gt; {
+    let mut results = Vec::new();
+    for item in items {
+        results.push(item.name.clone());  // Unnecessary clone
+    }
+    results
 }
 
-// Better: Named constants
-const UNIT_PRICE: f64 = 19.99;
-const SHIPPING_COST: f64 = 5.0;
-
-fn calculate_price(quantity: u32) -&gt; f64 {
-    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+// Good: Pre-allocate, avoid clones
+fn process_items(items: &amp;[Item]) -&gt; Vec&lt;&amp;str&gt; {
+    items.iter().map(|item| item.name.as_str()).collect()
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>Dependency</strong>: Problematic dependencies</p>
-<ul>
-<li>Circular dependencies between modules</li>
-<li>High coupling (too many dependencies)</li>
-<li>Deprecated dependencies</li>
-</ul>
-<p><strong>CodeOrganization</strong>: Poor structure</p>
-<ul>
-<li>Files too large (&gt; 500 lines)</li>
-<li>Modules with unclear responsibilities</li>
-<li>Inconsistent naming patterns</li>
-</ul>
-<p><strong>TestQuality</strong>: Low-quality tests</p>
-<ul>
-<li>Tests with complex assertions</li>
-<li>Flaky test patterns (non-deterministic behavior)</li>
-<li>Tests that test implementation instead of behavior</li>
-</ul>
-<p><strong>When detected</strong>: Pattern analysis, heuristics for each smell type
-<strong>Impact</strong>: Medium-High - affects maintainability and evolution
-<strong>Action</strong>: Refactor to follow better patterns, extract responsibilities</p>
-<h3 id="serious-issues-weight--4"><a class="header" href="#serious-issues-weight--4">Serious Issues (Weight = 4)</a></h3>
+<p><strong>BlockingIO</strong>: Blocking operations in async contexts</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Blocks async runtime
+async fn load_data() -&gt; Result&lt;Data&gt; {
+    let file = std::fs::read_to_string("data.json")?;  // Blocking!
+    parse_json(&amp;file)
+}
+
+// Good: Async I/O
+async fn load_data() -&gt; Result&lt;Data&gt; {
+    let file = tokio::fs::read_to_string("data.json").await?;
+    parse_json(&amp;file)
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>NestedLoops</strong>: O(n²) or worse complexity</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: O(n²) nested loops
+fn find_duplicates(items: &amp;[Item]) -&gt; Vec&lt;(Item, Item)&gt; {
+    let mut dupes = vec![];
+    for i in 0..items.len() {
+        for j in i+1..items.len() {
+            if items[i] == items[j] {
+                dupes.push((items[i].clone(), items[j].clone()));
+            }
+        }
+    }
+    dupes
+}
+
+// Good: O(n) with HashSet
+fn find_duplicates(items: &amp;[Item]) -&gt; Vec&lt;Item&gt; {
+    let mut seen = HashSet::new();
+    items.iter().filter(|item| !seen.insert(item)).cloned().collect()
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="code-quality-debt"><a class="header" href="#code-quality-debt">Code Quality Debt</a></h4>
 <p><strong>Duplication</strong>: Duplicated code blocks</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -523,7 +613,7 @@ fn process_user(user: User) -&gt; Result&lt;()&gt; {
     Ok(())
 }
 
-// File B:
+// File B: Duplicated validation
 fn process_admin(admin: Admin) -&gt; Result&lt;()&gt; {
     validate_email(&amp;admin.email)?;  // Duplicated
     validate_age(admin.age)?;       // Duplicated
@@ -532,6 +622,8 @@ fn process_admin(admin: Admin) -&gt; Result&lt;()&gt; {
     Ok(())
 }
 <span class="boring">}</span></code></pre></pre>
+<p><strong>When detected</strong>: Similar code blocks &gt; 50 lines (configurable)
+<strong>Action</strong>: Extract shared code into reusable functions</p>
 <p><strong>ErrorSwallowing</strong>: Errors caught but ignored</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -550,80 +642,19 @@ match risky_operation() {
     }
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>ResourceManagement</strong>: Resource leaks or improper cleanup</p>
-<ul>
-<li>Files not closed</li>
-<li>Connections not released</li>
-<li>Memory leaks</li>
-<li>Inefficient allocations in hot paths</li>
-<li>Blocking I/O in async contexts</li>
-</ul>
+<p><strong>When detected</strong>: Empty catch blocks, ignored Results
+<strong>Action</strong>: Add proper error logging and propagation</p>
+<p><strong>Risk</strong>: High-risk code (complex + poorly tested)</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Bad: File might not be closed on error
-fn read_config() -&gt; Result&lt;Config&gt; {
-    let file = File::open("config.toml")?;
-    let config = parse_toml(file)?;  // If this fails, file not closed
-    Ok(config)
-}
-
-// Good: RAII ensures cleanup
-fn read_config() -&gt; Result&lt;Config&gt; {
-    let file = File::open("config.toml")?;
-    let config = parse_toml(file)?;
-    Ok(config)
-    // File automatically closed when dropped
+</span>// Cyclomatic: 18, Coverage: 20%, Risk Score: 47.6 (HIGH)
+fn process_payment(tx: Transaction) -&gt; Result&lt;Receipt&gt; {
+    // Complex payment logic with minimal testing
+    // High risk of bugs in production
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>When detected</strong>:</p>
-<ul>
-<li>Duplication: Similar code blocks &gt; 50 lines (configurable)</li>
-<li>Error swallowing: Empty catch blocks, ignored Results</li>
-<li>Resource management: Pattern analysis for leaks, async/await misuse</li>
-</ul>
-<p><strong>Impact</strong>: High - can cause bugs, performance issues, data loss
-<strong>Action</strong>: Extract shared code, add proper error handling, fix resource cleanup</p>
-<h3 id="high-severity-weight--5"><a class="header" href="#high-severity-weight--5">High Severity (Weight = 5)</a></h3>
-<p><strong>Complexity</strong>: Functions exceeding complexity thresholds</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Cyclomatic: 22, Cognitive: 35
-fn process_transaction(tx: Transaction, account: &amp;mut Account) -&gt; Result&lt;Receipt&gt; {
-    if tx.amount &lt;= 0 {
-        return Err(Error::InvalidAmount);
-    }
-
-    if account.balance &lt; tx.amount {
-        if account.overdraft_enabled {
-            if account.overdraft_limit &gt;= tx.amount - account.balance {
-                // Process with overdraft
-                match tx.type {
-                    TransactionType::Debit =&gt; { /* complex logic */ }
-                    TransactionType::Credit =&gt; { /* complex logic */ }
-                    TransactionType::Transfer =&gt; { /* complex logic */ }
-                }
-            } else {
-                return Err(Error::OverdraftLimitExceeded);
-            }
-        } else {
-            return Err(Error::InsufficientFunds);
-        }
-    } else {
-        // Regular processing
-        match tx.type {
-            TransactionType::Debit =&gt; { /* complex logic */ }
-            TransactionType::Credit =&gt; { /* complex logic */ }
-            TransactionType::Transfer =&gt; { /* complex logic */ }
-        }
-    }
-
-    // More complex validation and processing...
-    Ok(receipt)
-}
-<span class="boring">}</span></code></pre></pre>
-<p><strong>When detected</strong>: Cyclomatic &gt; 10 OR Cognitive &gt; 15 (configurable)
-<strong>Impact</strong>: Very High - hard to test, likely has bugs, difficult to modify
-<strong>Action</strong>: Break into smaller functions, extract validation, simplify control flow</p>
+<p><strong>When detected</strong>: Combines complexity metrics with coverage data
+<strong>Action</strong>: Either add comprehensive tests OR refactor to reduce complexity</p>
 <h3 id="debt-scoring-formula"><a class="header" href="#debt-scoring-formula">Debt Scoring Formula</a></h3>
 <p>Each debt item gets a score based on priority and type:</p>
 <pre><code>debt_score = priority_weight × type_weight
@@ -646,35 +677,194 @@ fn process_transaction(tx: Transaction, account: &amp;mut Account) -&gt; Result&
 <p>Lower is better. Track over time to measure improvement.</p>
 <h2 id="risk-scoring"><a class="header" href="#risk-scoring">Risk Scoring</a></h2>
 <p>Debtmap’s risk scoring identifies code that is both complex AND poorly tested - the true risk hotspots.</p>
+<h3 id="unified-scoring-system"><a class="header" href="#unified-scoring-system">Unified Scoring System</a></h3>
+<p>Debtmap uses a <strong>unified scoring system</strong> (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.</p>
+<h4 id="score-scale-and-priority-classifications"><a class="header" href="#score-scale-and-priority-classifications">Score Scale and Priority Classifications</a></h4>
+<p>Functions receive scores from 0 (minimal risk) to 10 (critical risk):</p>
+<div class="table-wrapper"><table><thead><tr><th>Score Range</th><th>Priority</th><th>Description</th><th>Action</th></tr></thead><tbody>
+<tr><td><strong>9.0-10.0</strong></td><td>Critical</td><td>Severe risk requiring immediate attention</td><td>Address immediately</td></tr>
+<tr><td><strong>7.0-8.9</strong></td><td>High</td><td>Significant risk, should be addressed soon</td><td>Plan for this sprint</td></tr>
+<tr><td><strong>5.0-6.9</strong></td><td>Medium</td><td>Moderate risk, plan for future work</td><td>Schedule for next sprint</td></tr>
+<tr><td><strong>3.0-4.9</strong></td><td>Low</td><td>Minor risk, lower priority</td><td>Monitor and address as time permits</td></tr>
+<tr><td><strong>0.0-2.9</strong></td><td>Minimal</td><td>Well-managed code</td><td>Continue monitoring</td></tr>
+</tbody></table>
+</div>
+<h4 id="scoring-formula"><a class="header" href="#scoring-formula">Scoring Formula</a></h4>
+<p>The unified score combines three weighted factors:</p>
+<pre><code>Base Score = (Complexity Factor × 0.40) + (Coverage Factor × 0.40) + (Dependency Factor × 0.20)
+
+Final Score = Base Score × Role Multiplier
+</code></pre>
+<p><strong>Factor Calculations:</strong></p>
+<p><strong>Complexity Factor</strong> (0-10 scale):</p>
+<pre><code>Complexity Factor = min(10, ((cyclomatic / 10) + (cognitive / 20)) × 5)
+</code></pre>
+<p>Normalized to 0-10 range based on cyclomatic and cognitive complexity.</p>
+<p><strong>Coverage Factor</strong> (0-10 scale):</p>
+<pre><code>Coverage Factor = 10 × (1 - coverage_percentage) × complexity_weight
+</code></pre>
+<p>Uncovered complex code scores higher than uncovered simple code. Coverage dampens the score - well-tested code gets lower scores.</p>
+<p><strong>Dependency Factor</strong> (0-10 scale):
+Based on call graph analysis:</p>
+<ul>
+<li>High upstream caller count (many functions depend on this): 8-10</li>
+<li>On critical paths from entry points: 7-9</li>
+<li>Moderate dependencies: 4-6</li>
+<li>Isolated utilities: 1-3</li>
+</ul>
+<h4 id="default-weights"><a class="header" href="#default-weights">Default Weights</a></h4>
+<p>The scoring formula uses configurable weights (default values shown):</p>
+<ul>
+<li><strong>Complexity: 40%</strong> - How difficult the code is to understand and test</li>
+<li><strong>Coverage: 40%</strong> - How well the code is tested</li>
+<li><strong>Dependency: 20%</strong> - How many other functions depend on this code</li>
+</ul>
+<p>These weights can be adjusted in <code>.debtmap.toml</code> to match your team’s priorities.</p>
+<h4 id="role-based-prioritization"><a class="header" href="#role-based-prioritization">Role-Based Prioritization</a></h4>
+<p>The unified score is multiplied by a <strong>role multiplier</strong> based on the function’s semantic classification:</p>
+<div class="table-wrapper"><table><thead><tr><th>Role</th><th>Multiplier</th><th>Description</th><th>Example</th></tr></thead><tbody>
+<tr><td><strong>Entry Points</strong></td><td>1.5×</td><td>main(), HTTP handlers, API endpoints</td><td>User-facing code where bugs have immediate impact</td></tr>
+<tr><td><strong>Business Logic</strong></td><td>1.2×</td><td>Core domain functions, algorithms</td><td>Critical functionality</td></tr>
+<tr><td><strong>Data Access</strong></td><td>1.0×</td><td>Database queries, file I/O</td><td>Baseline importance</td></tr>
+<tr><td><strong>Infrastructure</strong></td><td>0.8×</td><td>Logging, configuration, monitoring</td><td>Supporting code</td></tr>
+<tr><td><strong>Utilities</strong></td><td>0.5×</td><td>Helpers, formatters, converters</td><td>Lower impact</td></tr>
+<tr><td><strong>Test Code</strong></td><td>0.1×</td><td>Test functions, fixtures, mocks</td><td>Internal quality</td></tr>
+</tbody></table>
+</div>
+<p><strong>How role classification works:</strong></p>
+<p>Debtmap identifies function roles through pattern analysis:</p>
+<ul>
+<li><strong>Entry points</strong>: Functions named <code>main</code>, handlers with routing decorators, public API functions</li>
+<li><strong>Business logic</strong>: Core domain operations, calculation functions, decision-making code</li>
+<li><strong>Data access</strong>: Database queries, file operations, network calls</li>
+<li><strong>Infrastructure</strong>: Logging, config parsing, monitoring, error handling</li>
+<li><strong>Utilities</strong>: Helper functions, formatters, type converters, validators</li>
+<li><strong>Test code</strong>: Functions in test modules, test functions, fixtures</li>
+</ul>
+<p><strong>Example: Same complexity, different priorities</strong></p>
+<p>Consider a function with base score 8.0:</p>
+<pre><code>If classified as Entry Point:
+  Final Score = 8.0 × 1.5 = 12.0 (capped at 10.0) → CRITICAL priority
+
+If classified as Business Logic:
+  Final Score = 8.0 × 1.2 = 9.6 → CRITICAL priority
+
+If classified as Data Access:
+  Final Score = 8.0 × 1.0 = 8.0 → HIGH priority
+
+If classified as Utility:
+  Final Score = 8.0 × 0.5 = 4.0 → LOW priority
+</code></pre>
+<p>This ensures that complex code in critical paths gets higher priority than equally complex utility code.</p>
+<h4 id="coverage-propagation"><a class="header" href="#coverage-propagation">Coverage Propagation</a></h4>
+<p>Coverage impact flows through the call graph using <strong>transitive coverage</strong>:</p>
+<pre><code>Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)
+</code></pre>
+<p><strong>How it works:</strong></p>
+<p>Functions called by well-tested code inherit some coverage benefit, reducing their urgency. This helps identify which untested functions are on critical paths versus safely isolated utilities.</p>
+<p><strong>Example scenarios:</strong></p>
+<p><strong>Scenario 1: Untested function with well-tested callers</strong></p>
+<pre><code>Function A: 0% direct coverage
+  Called by:
+    - handle_request (95% coverage)
+    - process_payment (90% coverage)
+    - validate_order (88% coverage)
+
+Transitive coverage: ~40% (inherits coverage benefit from callers)
+Final priority: Lower than isolated 0% coverage function
+</code></pre>
+<p><strong>Scenario 2: Untested function on critical path</strong></p>
+<pre><code>Function B: 0% direct coverage
+  Called by:
+    - main (0% coverage)
+    - startup (10% coverage)
+
+Transitive coverage: ~5% (minimal coverage benefit)
+Final priority: Higher - on critical path with no safety net
+</code></pre>
+<p>Coverage propagation prevents false alarms about utility functions called only by well-tested code, while highlighting genuinely risky untested code on critical paths.</p>
+<h4 id="unified-score-example"><a class="header" href="#unified-score-example">Unified Score Example</a></h4>
+<pre><code>Function: process_payment
+  Location: src/payments.rs:145
+
+Metrics:
+  - Cyclomatic complexity: 18
+  - Cognitive complexity: 25
+  - Test coverage: 20%
+  - Upstream callers: 3 (high dependency)
+  - Role: Business Logic
+
+Calculation:
+  Complexity Factor = min(10, ((18/10) + (25/20)) × 5) = min(10, 8.75) = 8.75
+  Coverage Factor = 10 × (1 - 0.20) × 1.0 = 8.0
+  Dependency Factor = 7.5 (3 upstream callers, moderate impact)
+
+  Base Score = (8.75 × 0.40) + (8.0 × 0.40) + (7.5 × 0.20)
+             = 3.5 + 3.2 + 1.5
+             = 8.2
+
+  Final Score = 8.2 × 1.2 (Business Logic multiplier)
+              = 9.84 → CRITICAL priority
+</code></pre>
+<h3 id="legacy-risk-scoring-pre-02x"><a class="header" href="#legacy-risk-scoring-pre-02x">Legacy Risk Scoring (Pre-0.2.x)</a></h3>
+<p>Prior to the unified scoring system, Debtmap used a simpler additive risk formula. This is still available for compatibility but unified scoring is now the default and provides better prioritization.</p>
 <h3 id="risk-categories"><a class="header" href="#risk-categories">Risk Categories</a></h3>
-<p>Functions are classified into five risk categories:</p>
-<p><strong>Critical</strong> (score ≥ 50)</p>
+<p><strong>Note:</strong> The <code>RiskLevel</code> enum (Low, Medium, High, Critical) is used for <strong>legacy risk scoring compatibility</strong>. When using <strong>unified scoring</strong> (0-10 scale), refer to the priority classifications shown in the Unified Scoring System section above.</p>
+<h4 id="legacy-risklevel-enum"><a class="header" href="#legacy-risklevel-enum">Legacy RiskLevel Enum</a></h4>
+<p>For legacy risk scoring, Debtmap classifies functions into four risk levels:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum RiskLevel {
+    Low,       // Score &lt; 10
+    Medium,    // Score 10-24
+    High,      // Score 25-49
+    Critical,  // Score ≥ 50
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Critical</strong> (legacy score ≥ 50)</p>
 <ul>
 <li>High complexity (cyclomatic &gt; 15) AND low coverage (&lt; 30%)</li>
 <li>Untested code that’s likely to break and hard to fix</li>
 <li><strong>Action</strong>: Immediate attention required - add tests or refactor</li>
 </ul>
-<p><strong>High</strong> (score 25-49)</p>
+<p><strong>High</strong> (legacy score 25-49)</p>
 <ul>
 <li>High complexity (cyclomatic &gt; 10) AND moderate coverage (&lt; 60%)</li>
 <li>Risky code with incomplete testing</li>
 <li><strong>Action</strong>: Should be addressed soon</li>
 </ul>
-<p><strong>Medium</strong> (score 10-24)</p>
+<p><strong>Medium</strong> (legacy score 10-24)</p>
 <ul>
 <li>Moderate complexity (cyclomatic &gt; 5) AND low coverage (&lt; 50%)</li>
 <li>OR: High complexity with good coverage</li>
 <li><strong>Action</strong>: Plan for next sprint</li>
 </ul>
-<p><strong>Low</strong> (score 5-9)</p>
+<p><strong>Low</strong> (legacy score &lt; 10)</p>
 <ul>
 <li>Low complexity OR high coverage</li>
 <li>Well-managed code</li>
 <li><strong>Action</strong>: Monitor, low priority</li>
 </ul>
-<p><strong>Note</strong>: The risk categorization is based on the RiskLevel enum which includes Low, Medium, High, and Critical levels. Well-tested complex code will typically fall into the Low risk category due to coverage dampening.</p>
-<h3 id="risk-calculation"><a class="header" href="#risk-calculation">Risk Calculation</a></h3>
-<p>Risk score combines multiple factors:</p>
+<h4 id="unified-scoring-priority-levels"><a class="header" href="#unified-scoring-priority-levels">Unified Scoring Priority Levels</a></h4>
+<p>When using unified scoring (default), functions are classified using the 0-10 scale:</p>
+<ul>
+<li><strong>Critical</strong> (9.0-10.0): Immediate attention</li>
+<li><strong>High</strong> (7.0-8.9): Address this sprint</li>
+<li><strong>Medium</strong> (5.0-6.9): Plan for next sprint</li>
+<li><strong>Low</strong> (3.0-4.9): Monitor and address as time permits</li>
+<li><strong>Minimal</strong> (0.0-2.9): Well-managed code</li>
+</ul>
+<p><strong>Well-tested complex code</strong> is an <strong>outcome</strong> in both systems, not a separate category:</p>
+<ul>
+<li>Complex function (cyclomatic 18, cognitive 25) with 95% coverage</li>
+<li>Unified score: ~2.5 (Minimal priority due to coverage dampening)</li>
+<li>Legacy risk score: ~8 (Low risk)</li>
+<li>Falls into low-priority categories because good testing mitigates complexity</li>
+<li>This is the desired state for inherently complex business logic</li>
+</ul>
+<h3 id="legacy-risk-calculation"><a class="header" href="#legacy-risk-calculation">Legacy Risk Calculation</a></h3>
+<p><strong>Note:</strong> The legacy risk calculation is still supported for compatibility but has been superseded by the unified scoring system (see above). Unified scoring provides better prioritization through its multi-factor, weighted approach with role-based adjustments.</p>
+<p>The legacy risk score uses a simpler additive formula:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>risk_score = complexity_factor + coverage_factor + debt_factor
@@ -684,7 +874,7 @@ where:
   coverage_factor = (1 - coverage_percentage) × 50
   debt_factor = debt_score / 10  // If debt data available
 <span class="boring">}</span></code></pre></pre>
-<p><strong>Example:</strong></p>
+<p><strong>Example (legacy scoring):</strong></p>
 <pre><code>Function: process_payment
   - Cyclomatic complexity: 18
   - Cognitive complexity: 25
@@ -698,6 +888,19 @@ Calculation:
 
   risk_score = 6.1 + 40 + 1.5 = 47.6 (HIGH RISK)
 </code></pre>
+<p><strong>When to use legacy scoring:</strong></p>
+<ul>
+<li>Comparing with historical data from older Debtmap versions</li>
+<li>Teams with existing workflows built around the old scale</li>
+<li>Gradual migration to unified scoring</li>
+</ul>
+<p><strong>Why unified scoring is better:</strong></p>
+<ul>
+<li>Normalized 0-10 scale is more intuitive</li>
+<li>Weighted factors (40% complexity, 40% coverage, 20% dependency) provide better balance</li>
+<li>Role multipliers adjust priority based on function importance</li>
+<li>Coverage propagation reduces false positives for utility functions</li>
+</ul>
 <h3 id="test-effort-assessment"><a class="header" href="#test-effort-assessment">Test Effort Assessment</a></h3>
 <p>Debtmap estimates testing difficulty based on cognitive complexity:</p>
 <p><strong>Difficulty Levels:</strong></p>
@@ -722,7 +925,7 @@ Calculation:
     "high_count": 45,
     "medium_count": 123,
     "low_count": 456,
-    "well_tested_count": 234,
+    "minimal_count": 234,
     "total_functions": 870
   },
   "codebase_risk_score": 1247.5
@@ -730,10 +933,12 @@ Calculation:
 </code></pre>
 <p><strong>Interpreting distribution:</strong></p>
 <ul>
-<li><strong>Healthy codebase</strong>: Most functions in Low/WellTested</li>
-<li><strong>Needs attention</strong>: Many Critical/High risk functions</li>
+<li><strong>Healthy codebase</strong>: Most functions in Low/Minimal priority (unified scoring) or Low/WellTested (legacy)</li>
+<li><strong>Needs attention</strong>: Many Critical/High priority functions</li>
 <li><strong>Technical debt</strong>: High codebase risk score</li>
 </ul>
+<p><strong>Note on well-tested functions:</strong>
+In unified scoring, well-tested complex code simply scores low (0-2.9 Minimal or 3-4.9 Low) due to coverage dampening - it’s not a separate category. The <code>minimal_count</code> in the distribution represents functions with unified scores 0-2.9, which includes well-tested complex code.</p>
 <h3 id="testing-recommendations"><a class="header" href="#testing-recommendations">Testing Recommendations</a></h3>
 <p>When coverage data is provided, Debtmap generates prioritized testing recommendations with ROI analysis:</p>
 <pre><code class="language-json">{
@@ -787,7 +992,7 @@ Calculation:
         "nesting": 4,
         "length": 68,
         "is_test": false,
-        "visibility": "pub",
+        "visibility": "Public",
         "is_trait_method": false,
         "in_test_module": false,
         "entropy_score": {
@@ -838,6 +1043,7 @@ Calculation:
 <li><code>cognitive</code>: Understanding difficulty - guides refactoring priority</li>
 <li><code>nesting</code>: Indentation depth - signals need for extraction</li>
 <li><code>length</code>: Lines of code - signals SRP violations</li>
+<li><code>visibility</code>: Function visibility (<code>"Private"</code>, <code>"Crate"</code>, or <code>"Public"</code> from FunctionVisibility enum)</li>
 <li><code>is_pure</code>: No side effects - easier to test (Option type, may be None)</li>
 <li><code>purity_confidence</code>: How certain we are about purity 0.0-1.0 (Option type, may be None)</li>
 <li><code>is_trait_method</code>: Whether this function implements a trait method</li>
@@ -855,15 +1061,31 @@ Calculation:
 <li><code>effective_complexity &lt; 1.0</code>: Dampening applied</li>
 </ul>
 <h3 id="prioritizing-work"><a class="header" href="#prioritizing-work">Prioritizing Work</a></h3>
-<p>Debtmap provides multiple prioritization strategies:</p>
-<p><strong>1. By Unified Score (default)</strong></p>
+<p>Debtmap provides multiple prioritization strategies, with <strong>unified scoring (0-10 scale)</strong> as the recommended default for most workflows:</p>
+<p><strong>1. By Unified Score (default - recommended)</strong></p>
 <pre><code class="language-bash">debtmap analyze . --top 10
 </code></pre>
-<p>Shows top 10 items by combined complexity, coverage, and dependency factors.</p>
-<p><strong>2. By Risk Category</strong></p>
+<p>Shows top 10 items by <strong>combined complexity, coverage, and dependency factors</strong>, weighted and adjusted by function role.</p>
+<p><strong>Why use unified scoring:</strong></p>
+<ul>
+<li>Balances complexity (40%), coverage (40%), and dependency impact (20%)</li>
+<li>Adjusts for function importance (entry points prioritized over utilities)</li>
+<li>Normalized 0-10 scale is intuitive and consistent</li>
+<li>Reduces false positives through coverage propagation</li>
+<li>Best for <strong>sprint planning</strong> and <strong>function-level refactoring decisions</strong></li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Show top 20 critical items
+debtmap analyze . --min-priority 7.0 --top 20
+
+# Focus on high-impact functions (score &gt;= 7.0)
+debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;= 7.0)'
+</code></pre>
+<p><strong>2. By Risk Category (legacy compatibility)</strong></p>
 <pre><code class="language-bash">debtmap analyze . --min-priority high
 </code></pre>
-<p>Shows only HIGH and CRITICAL priority items.</p>
+<p>Shows only HIGH and CRITICAL priority items using legacy risk scoring.</p>
+<p><strong>Note:</strong> Legacy risk scoring uses additive formulas and unbounded scales. Prefer unified scoring for new workflows.</p>
 <p><strong>3. By Debt Type</strong></p>
 <pre><code class="language-bash">debtmap analyze . --filter Architecture,Testing
 </code></pre>
@@ -877,7 +1099,473 @@ Calculation:
 <p><strong>4. By ROI (with coverage)</strong></p>
 <pre><code class="language-bash">debtmap analyze . --lcov coverage.lcov --top 20
 </code></pre>
-<p>Prioritizes by return on investment for testing/refactoring.</p>
+<p>Prioritizes by return on investment for testing/refactoring. Combines unified scoring with test effort estimates to identify high-value work.</p>
+<p><strong>Choosing the right strategy:</strong></p>
+<ul>
+<li><strong>Sprint planning for developers</strong>: Use unified scoring (<code>--top N</code>)</li>
+<li><strong>Architectural review</strong>: Use tiered prioritization (<code>--summary</code>)</li>
+<li><strong>Category-focused work</strong>: Use debt type filtering (<code>--filter</code>)</li>
+<li><strong>Testing priorities</strong>: Use ROI analysis with coverage data (<code>--lcov</code>)</li>
+<li><strong>Historical comparisons</strong>: Use legacy risk scoring (for consistency with old reports)</li>
+</ul>
+<h3 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h3>
+<p><strong>Note:</strong> Tiered prioritization uses <strong>traditional debt scoring</strong> (additive, higher = worse) and is complementary to the unified scoring system (0-10 scale). Both systems can be used together:</p>
+<ul>
+<li><strong>Unified scoring</strong> (0-10 scale): Best for <strong>function-level prioritization</strong> and sprint planning</li>
+<li><strong>Tiered prioritization</strong> (debt tiers): Best for <strong>architectural focus</strong> and strategic debt planning</li>
+</ul>
+<p>Use <code>--summary</code> for tiered view focusing on architectural issues, or default output for function-level unified scores.</p>
+<p>Debtmap uses a tier-based system to map debt scores to actionable priority levels. Each tier includes effort estimates and strategic guidance for efficient debt remediation.</p>
+<h4 id="tier-levels"><a class="header" href="#tier-levels">Tier Levels</a></h4>
+<p>The <code>Tier</code> enum defines four priority levels based on score thresholds:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum Tier {
+    Critical,  // Score ≥ 90
+    High,      // Score 70-89.9
+    Moderate,  // Score 50-69.9
+    Low,       // Score &lt; 50
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Score-to-Tier Mapping:</strong></p>
+<ul>
+<li><strong>Critical</strong> (≥ 90): Immediate action required - blocks progress</li>
+<li><strong>High</strong> (70-89.9): Should be addressed this sprint</li>
+<li><strong>Moderate</strong> (50-69.9): Plan for next sprint</li>
+<li><strong>Low</strong> (&lt; 50): Background maintenance work</li>
+</ul>
+<h4 id="effort-estimates-per-tier"><a class="header" href="#effort-estimates-per-tier">Effort Estimates Per Tier</a></h4>
+<p>Each tier includes estimated effort based on typical remediation patterns:</p>
+<div class="table-wrapper"><table><thead><tr><th>Tier</th><th>Estimated Effort</th><th>Typical Work</th></tr></thead><tbody>
+<tr><td><strong>Critical</strong></td><td>1-2 days</td><td>Major refactoring, comprehensive testing, architectural changes</td></tr>
+<tr><td><strong>High</strong></td><td>2-4 hours</td><td>Extract functions, add test coverage, fix resource leaks</td></tr>
+<tr><td><strong>Moderate</strong></td><td>1-2 hours</td><td>Simplify logic, reduce duplication, improve error handling</td></tr>
+<tr><td><strong>Low</strong></td><td>30 minutes</td><td>Address TODOs, minor cleanup, documentation</td></tr>
+</tbody></table>
+</div>
+<p><strong>Effort calculation considers:</strong></p>
+<ul>
+<li>Complexity metrics (cyclomatic, cognitive)</li>
+<li>Test coverage gaps</li>
+<li>Number of dependencies (upstream/downstream)</li>
+<li>Debt category (Architecture debt takes longer than CodeQuality)</li>
+</ul>
+<h4 id="tiered-display-grouping"><a class="header" href="#tiered-display-grouping">Tiered Display Grouping</a></h4>
+<p><code>TieredDisplay</code> groups similar debt items for batch action recommendations:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct TieredDisplay {
+    pub tier: Tier,
+    pub items: Vec&lt;DebtItem&gt;,
+    pub total_score: f64,
+    pub estimated_total_effort_hours: f64,
+    pub batch_recommendations: Vec&lt;String&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Grouping strategy:</strong></p>
+<ul>
+<li>Groups items by tier and similarity pattern</li>
+<li>Prevents grouping of god objects (always show individually)</li>
+<li>Prevents grouping of Critical items (each needs individual attention)</li>
+<li>Suggests batch actions for similar Low/Moderate items</li>
+</ul>
+<p><strong>Example batch recommendations:</strong></p>
+<pre><code class="language-json">{
+  "tier": "Moderate",
+  "total_score": 245.8,
+  "estimated_total_effort_hours": 12.5,
+  "batch_recommendations": [
+    "Extract 5 validation functions from similar patterns",
+    "Add test coverage for 8 moderately complex functions (grouped by module)",
+    "Refactor 3 functions with similar nested loop patterns"
+  ]
+}
+</code></pre>
+<h4 id="using-tiered-prioritization"><a class="header" href="#using-tiered-prioritization">Using Tiered Prioritization</a></h4>
+<p><strong>1. Start with Critical tier:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority critical
+</code></pre>
+<p>Focus on items with score ≥ 90. These typically represent:</p>
+<ul>
+<li>Complex functions with 0% coverage</li>
+<li>God objects blocking feature development</li>
+<li>Critical resource leaks or security issues</li>
+</ul>
+<p><strong>2. Plan High tier work:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority high --format json &gt; sprint-plan.json
+</code></pre>
+<p>Schedule 2-4 hours per item for this sprint. Look for:</p>
+<ul>
+<li>Functions approaching complexity thresholds</li>
+<li>Moderate coverage gaps on important code paths</li>
+<li>Performance bottlenecks with clear solutions</li>
+</ul>
+<p><strong>3. Batch Moderate tier items:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority moderate
+</code></pre>
+<p>Review batch recommendations. Examples:</p>
+<ul>
+<li>“10 validation functions detected - extract common pattern”</li>
+<li>“5 similar test files with duplication - create shared fixtures”</li>
+<li>“8 functions with magic values - create constants module”</li>
+</ul>
+<p><strong>4. Schedule Low tier background work:</strong>
+Address during slack time or as warm-up tasks for new contributors.</p>
+<h4 id="strategic-guidance-by-tier"><a class="header" href="#strategic-guidance-by-tier">Strategic Guidance by Tier</a></h4>
+<p><strong>Critical Tier Strategy:</strong></p>
+<ul>
+<li><strong>Block new features</strong> until addressed</li>
+<li><strong>Pair programming</strong> recommended for complex items</li>
+<li><strong>Architectural review</strong> before major refactoring</li>
+<li><strong>Comprehensive testing</strong> after changes</li>
+</ul>
+<p><strong>High Tier Strategy:</strong></p>
+<ul>
+<li><strong>Sprint planning priority</strong></li>
+<li><strong>Impact analysis</strong> before changes</li>
+<li><strong>Code review</strong> from senior developers</li>
+<li><strong>Integration testing</strong> after changes</li>
+</ul>
+<p><strong>Moderate Tier Strategy:</strong></p>
+<ul>
+<li><strong>Batch similar items</strong> for efficiency</li>
+<li><strong>Extract patterns</strong> across multiple files</li>
+<li><strong>Incremental improvement</strong> over multiple PRs</li>
+<li><strong>Regression testing</strong> for affected areas</li>
+</ul>
+<p><strong>Low Tier Strategy:</strong></p>
+<ul>
+<li><strong>Good first issues</strong> for new contributors</li>
+<li><strong>Documentation improvements</strong></li>
+<li><strong>Code cleanup</strong> during refactoring nearby code</li>
+<li><strong>Technical debt gardening</strong> sessions</li>
+</ul>
+<h3 id="categorized-debt-analysis"><a class="header" href="#categorized-debt-analysis">Categorized Debt Analysis</a></h3>
+<p>Debtmap provides <code>CategorizedDebt</code> analysis that groups debt items by category and identifies cross-category dependencies. This helps teams understand strategic relationships between different types of technical debt.</p>
+<h4 id="categorysummary"><a class="header" href="#categorysummary">CategorySummary</a></h4>
+<p>Each category gets a summary with metrics for planning:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct CategorySummary {
+    pub category: DebtCategory,
+    pub total_score: f64,
+    pub item_count: usize,
+    pub estimated_effort_hours: f64,
+    pub average_severity: f64,
+    pub top_items: Vec&lt;DebtItem&gt;,  // Up to 5 highest priority
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Effort estimation formulas:</strong></p>
+<ul>
+<li><strong>Architecture debt</strong>: <code>complexity_score / 10 × 2</code> hours (structural changes take longer)</li>
+<li><strong>Testing debt</strong>: <code>complexity_score / 10 × 1.5</code> hours (writing tests)</li>
+<li><strong>Performance debt</strong>: <code>complexity_score / 10 × 1.8</code> hours (profiling + optimization)</li>
+<li><strong>CodeQuality debt</strong>: <code>complexity_score / 10 × 1.2</code> hours (refactoring)</li>
+</ul>
+<p><strong>Example category summary:</strong></p>
+<pre><code class="language-json">{
+  "category": "Architecture",
+  "total_score": 487.5,
+  "item_count": 15,
+  "estimated_effort_hours": 97.5,
+  "average_severity": 32.5,
+  "top_items": [
+    {
+      "debt_type": "GodObject",
+      "file": "src/services/user_service.rs",
+      "score": 95.0,
+      "estimated_effort_hours": 16.0
+    },
+    {
+      "debt_type": "ComplexityHotspot",
+      "file": "src/payments/processor.rs",
+      "score": 87.3,
+      "estimated_effort_hours": 14.0
+    }
+  ]
+}
+</code></pre>
+<h4 id="cross-category-dependencies"><a class="header" href="#cross-category-dependencies">Cross-Category Dependencies</a></h4>
+<p><code>CrossCategoryDependency</code> identifies blocking relationships between different debt categories:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct CrossCategoryDependency {
+    pub from_category: DebtCategory,
+    pub to_category: DebtCategory,
+    pub blocking_items: Vec&lt;(DebtItem, DebtItem)&gt;,
+    pub impact_level: ImpactLevel,  // Critical, High, Medium, Low
+    pub recommendation: String,
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Common dependency patterns:</strong></p>
+<p><strong>1. Architecture blocks Testing:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: God objects are too complex to test effectively</li>
+<li><strong>Example</strong>: <code>UserService</code> has 50+ functions, making comprehensive testing impractical</li>
+<li><strong>Impact</strong>: Critical - cannot improve test coverage without refactoring</li>
+<li><strong>Recommendation</strong>: “Split god object into 4-5 focused modules before adding tests”</li>
+</ul>
+<p><strong>2. Async issues require Architecture changes:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: Blocking I/O in async contexts requires architectural redesign</li>
+<li><strong>Example</strong>: Sync database calls in async handlers</li>
+<li><strong>Impact</strong>: High - performance problems require design changes</li>
+<li><strong>Recommendation</strong>: “Introduce async database layer before optimizing handlers”</li>
+</ul>
+<p><strong>3. Complexity affects Testability:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: High cyclomatic complexity makes thorough testing difficult</li>
+<li><strong>Example</strong>: Function with 22 branches needs 22+ test cases</li>
+<li><strong>Impact</strong>: High - testing effort grows exponentially with complexity</li>
+<li><strong>Recommendation</strong>: “Reduce complexity to &lt; 10 before writing comprehensive tests”</li>
+</ul>
+<p><strong>4. Performance requires Architecture:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: O(n²) nested loops need different data structures</li>
+<li><strong>Example</strong>: Linear search in loops should use HashMap</li>
+<li><strong>Impact</strong>: Medium - optimization requires structural changes</li>
+<li><strong>Recommendation</strong>: “Refactor data structure before micro-optimizations”</li>
+</ul>
+<p><strong>Example cross-category dependency:</strong></p>
+<pre><code class="language-json">{
+  "from_category": "Architecture",
+  "to_category": "Testing",
+  "impact_level": "Critical",
+  "blocking_items": [
+    {
+      "blocker": {
+        "debt_type": "GodObject",
+        "file": "src/services/user_service.rs",
+        "functions": 52,
+        "score": 95.0
+      },
+      "blocked": {
+        "debt_type": "TestingGap",
+        "file": "src/services/user_service.rs",
+        "coverage": 15,
+        "score": 78.0
+      }
+    }
+  ],
+  "recommendation": "Split UserService into focused modules (auth, profile, settings, notifications) before attempting to improve test coverage. Current structure makes comprehensive testing impractical.",
+  "estimated_unblock_effort_hours": 16.0
+}
+</code></pre>
+<h4 id="using-categorized-debt-analysis"><a class="header" href="#using-categorized-debt-analysis">Using Categorized Debt Analysis</a></h4>
+<p><strong>View all category summaries:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --format json | jq '.categorized_debt.summaries'
+</code></pre>
+<p><strong>Focus on specific category:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --filter Architecture --top 10
+</code></pre>
+<p><strong>Identify blocking relationships:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --format json | jq '.categorized_debt.cross_category_dependencies[] | select(.impact_level == "Critical")'
+</code></pre>
+<p><strong>Strategic planning workflow:</strong></p>
+<ol>
+<li>
+<p><strong>Review category summaries:</strong></p>
+<ul>
+<li>Identify which category has highest total score</li>
+<li>Check estimated effort hours per category</li>
+<li>Note average severity to gauge urgency</li>
+</ul>
+</li>
+<li>
+<p><strong>Check cross-category dependencies:</strong></p>
+<ul>
+<li>Find Critical and High impact blockers</li>
+<li>Prioritize blockers before blocked items</li>
+<li>Plan architectural changes before optimization</li>
+</ul>
+</li>
+<li>
+<p><strong>Plan remediation order:</strong></p>
+<pre><code>Example decision tree:
+- Architecture score &gt; 400? → Address god objects first
+- Testing gap with low complexity? → Quick wins, add tests
+- Performance issues + architecture debt? → Refactor structure first
+- High code quality debt but good architecture? → Incremental cleanup
+</code></pre>
+</li>
+<li>
+<p><strong>Use category-specific strategies:</strong></p>
+<ul>
+<li><strong>Architecture</strong>: Pair programming, design reviews, incremental refactoring</li>
+<li><strong>Testing</strong>: TDD for new code, characterization tests for legacy</li>
+<li><strong>Performance</strong>: Profiling first, optimize hot paths, avoid premature optimization</li>
+<li><strong>CodeQuality</strong>: Code review focus, linting rules, consistent patterns</li>
+</ul>
+</li>
+</ol>
+<h4 id="categorizeddebt-output-structure"><a class="header" href="#categorizeddebt-output-structure">CategorizedDebt Output Structure</a></h4>
+<pre><code class="language-json">{
+  "categorized_debt": {
+    "summaries": [
+      {
+        "category": "Architecture",
+        "total_score": 487.5,
+        "item_count": 15,
+        "estimated_effort_hours": 97.5,
+        "average_severity": 32.5,
+        "top_items": [...]
+      },
+      {
+        "category": "Testing",
+        "total_score": 356.2,
+        "item_count": 23,
+        "estimated_effort_hours": 53.4,
+        "average_severity": 15.5,
+        "top_items": [...]
+      },
+      {
+        "category": "Performance",
+        "total_score": 234.8,
+        "item_count": 12,
+        "estimated_effort_hours": 42.3,
+        "average_severity": 19.6,
+        "top_items": [...]
+      },
+      {
+        "category": "CodeQuality",
+        "total_score": 189.3,
+        "item_count": 31,
+        "estimated_effort_hours": 22.7,
+        "average_severity": 6.1,
+        "top_items": [...]
+      }
+    ],
+    "cross_category_dependencies": [
+      {
+        "from_category": "Architecture",
+        "to_category": "Testing",
+        "impact_level": "Critical",
+        "blocking_items": [...],
+        "recommendation": "..."
+      }
+    ]
+  }
+}
+</code></pre>
+<h3 id="debt-density-metric"><a class="header" href="#debt-density-metric">Debt Density Metric</a></h3>
+<p>Debt density normalizes technical debt scores across projects of different sizes, providing a per-1000-lines-of-code metric for fair comparison.</p>
+<h4 id="formula"><a class="header" href="#formula">Formula</a></h4>
+<pre><code>debt_density = (total_debt_score / total_lines_of_code) × 1000
+</code></pre>
+<p><strong>Example calculation:</strong></p>
+<pre><code>Project A:
+  - Total debt score: 1,250
+  - Total lines of code: 25,000
+  - Debt density: (1,250 / 25,000) × 1000 = 50
+
+Project B:
+  - Total debt score: 2,500
+  - Total lines of code: 50,000
+  - Debt density: (2,500 / 50,000) × 1000 = 50
+</code></pre>
+<p>Projects A and B have <strong>equal debt density</strong> (50) despite B having twice the absolute debt, because B is also twice as large. They have proportionally similar technical debt.</p>
+<h4 id="interpretation-guidelines"><a class="header" href="#interpretation-guidelines">Interpretation Guidelines</a></h4>
+<p>Use these thresholds to assess codebase health:</p>
+<div class="table-wrapper"><table><thead><tr><th>Debt Density</th><th>Assessment</th><th>Description</th></tr></thead><tbody>
+<tr><td><strong>0-50</strong></td><td>Clean</td><td>Well-maintained codebase, minimal debt</td></tr>
+<tr><td><strong>51-100</strong></td><td>Moderate</td><td>Typical technical debt, manageable</td></tr>
+<tr><td><strong>101-150</strong></td><td>High</td><td>Significant debt, prioritize remediation</td></tr>
+<tr><td><strong>150+</strong></td><td>Critical</td><td>Severe debt burden, may impede development</td></tr>
+</tbody></table>
+</div>
+<p><strong>Context matters:</strong></p>
+<ul>
+<li><strong>Early-stage projects</strong>: Often have higher density (rapid iteration)</li>
+<li><strong>Mature projects</strong>: Should trend toward lower density over time</li>
+<li><strong>Legacy systems</strong>: May have high density, track trend over time</li>
+<li><strong>Greenfield rewrites</strong>: Aim for density &lt; 50</li>
+</ul>
+<h4 id="using-debt-density"><a class="header" href="#using-debt-density">Using Debt Density</a></h4>
+<p><strong>1. Compare projects fairly:</strong></p>
+<pre><code class="language-bash"># Small microservice (5,000 LOC, debt = 250)
+# Debt density: 50
+
+# Large monolith (100,000 LOC, debt = 5,000)
+# Debt density: 50
+
+# Equal health despite size difference
+</code></pre>
+<p><strong>2. Track improvement over time:</strong></p>
+<pre><code>Sprint 1: 50,000 LOC, debt = 7,500, density = 150 (High)
+Sprint 5: 52,000 LOC, debt = 6,500, density = 125 (Improving)
+Sprint 10: 54,000 LOC, debt = 4,860, density = 90 (Moderate)
+</code></pre>
+<p><strong>3. Set team goals:</strong></p>
+<pre><code>Current density: 120
+Target density: &lt; 80 (by Q4)
+Reduction needed: 40 points
+
+Strategy:
+- Fix 2-3 Critical items per sprint
+- Prevent new debt (enforce thresholds)
+- Refactor before adding features in high-debt modules
+</code></pre>
+<p><strong>4. Benchmark across teams/projects:</strong></p>
+<pre><code class="language-json">{
+  "team_metrics": [
+    {
+      "project": "auth-service",
+      "debt_density": 45,
+      "assessment": "Clean",
+      "trend": "stable"
+    },
+    {
+      "project": "billing-service",
+      "debt_density": 95,
+      "assessment": "Moderate",
+      "trend": "improving"
+    },
+    {
+      "project": "legacy-api",
+      "debt_density": 165,
+      "assessment": "Critical",
+      "trend": "worsening"
+    }
+  ]
+}
+</code></pre>
+<h4 id="limitations"><a class="header" href="#limitations">Limitations</a></h4>
+<p><strong>Debt density doesn’t account for:</strong></p>
+<ul>
+<li><strong>Code importance</strong>: 100 LOC in payment logic ≠ 100 LOC in logging utils</li>
+<li><strong>Complexity distribution</strong>: One 1000-line god object vs. 1000 simple functions</li>
+<li><strong>Test coverage</strong>: 50% coverage on critical paths vs. low-priority features</li>
+<li><strong>Team familiarity</strong>: New codebase vs. well-understood legacy system</li>
+</ul>
+<p><strong>Best practices:</strong></p>
+<ul>
+<li>Use density as <strong>one metric among many</strong></li>
+<li>Combine with category analysis and tiered prioritization</li>
+<li>Focus on <strong>trend</strong> (improving/stable/worsening) over absolute number</li>
+<li>Consider <strong>debt per module</strong> for more granular insights</li>
+</ul>
+<h4 id="debt-density-in-cicd"><a class="header" href="#debt-density-in-cicd">Debt Density in CI/CD</a></h4>
+<p><strong>Track density over time:</strong></p>
+<pre><code class="language-bash"># Generate report with density
+debtmap analyze . --format json --output debt-report.json
+
+# Extract density for trending
+DENSITY=$(jq '.debt_density' debt-report.json)
+
+# Store in metrics database
+echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
+</code></pre>
+<p><strong>Set threshold gates:</strong></p>
+<pre><code class="language-yaml"># .github/workflows/debt-check.yml
+- name: Check debt density
+  run: |
+    DENSITY=$(debtmap analyze . --format json | jq '.debt_density')
+    if (( $(echo "$DENSITY &gt; 150" | bc -l) )); then
+      echo "❌ Debt density too high: $DENSITY (limit: 150)"
+      exit 1
+    fi
+    echo "✅ Debt density acceptable: $DENSITY"
+</code></pre>
 <h3 id="actionable-insights"><a class="header" href="#actionable-insights">Actionable Insights</a></h3>
 <p>Each recommendation includes:</p>
 <p><strong>ACTION</strong>: What to do</p>
@@ -939,12 +1627,26 @@ Calculation:
 <li>Trait implementation tracking</li>
 <li>Purity detection with confidence scoring</li>
 <li>Call graph analysis (upstream callers, downstream callees)</li>
-<li>Pattern-based adjustments for macros</li>
+<li>Semantic function classification (entry points, business logic, data access, infrastructure, utilities, test code)</li>
+<li>Enhanced call graph with transitive relationships</li>
+<li>Macro expansion support for accurate complexity analysis</li>
+<li>Pattern-based adjustments for macros and code generation</li>
 <li>Visibility tracking (pub, pub(crate), private)</li>
 <li>Test module detection (#[cfg(test)])</li>
 </ul>
 </li>
 </ul>
+<p><strong>Semantic Classification:</strong></p>
+<p>Debtmap automatically identifies function roles in Rust code to apply appropriate role multipliers in unified scoring:</p>
+<ul>
+<li><strong>Entry Points</strong>: Functions named <code>main</code>, <code>start</code>, or public functions in <code>bin/</code> modules</li>
+<li><strong>Business Logic</strong>: Core domain functions with complex logic, algorithms, business rules</li>
+<li><strong>Data Access</strong>: Functions performing database queries, file I/O, network operations</li>
+<li><strong>Infrastructure</strong>: Logging, configuration, monitoring, error handling utilities</li>
+<li><strong>Utilities</strong>: Helper functions, formatters, type converters, validation functions</li>
+<li><strong>Test Code</strong>: Functions in <code>#[cfg(test)]</code> modules, functions with <code>#[test]</code> attribute</li>
+</ul>
+<p>This classification feeds directly into the unified scoring system’s role multiplier (see Risk Scoring section).</p>
 <p><strong>Python</strong> (Partial Support)</p>
 <ul>
 <li><strong>Parser</strong>: rustpython-parser</li>
@@ -984,12 +1686,22 @@ Calculation:
 </ul>
 </li>
 </ul>
-<p><strong>Unknown</strong> (Unsupported)</p>
+<p><strong>Unsupported Languages:</strong></p>
+<p>Debtmap’s <code>Language</code> enum contains only the four supported languages: Rust, Python, JavaScript, and TypeScript. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.</p>
+<p><strong>File filtering behavior:</strong></p>
 <ul>
-<li>Files with unsupported extensions are classified as <code>Language::Unknown</code></li>
-<li>These files are skipped during analysis</li>
-<li>No metrics or debt patterns are extracted</li>
+<li>Discovery scans project for files matching supported extensions</li>
+<li>Unsupported files (<code>.cpp</code>, <code>.java</code>, <code>.go</code>, etc.) are skipped silently</li>
+<li>No analysis, metrics, or debt patterns are generated for filtered files</li>
+<li>Use <code>--languages</code> flag to explicitly control which languages to analyze</li>
 </ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Only analyze Rust files (skip Python/JS/TS)
+debtmap analyze . --languages rust
+
+# Analyze Rust and Python only
+debtmap analyze . --languages rust,python
+</code></pre>
 <h3 id="language-detection"><a class="header" href="#language-detection">Language Detection</a></h3>
 <p>Automatic detection by file extension:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -1071,8 +1783,9 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
 <li>Safe to parallelize</li>
 <li>Easier to reason about</li>
 </ul>
-<h3 id="call-graph-analysis"><a class="header" href="#call-graph-analysis">Call Graph Analysis</a></h3>
-<p>Debtmap builds a call graph showing function relationships:</p>
+<h3 id="data-flow-analysis"><a class="header" href="#data-flow-analysis">Data Flow Analysis</a></h3>
+<p>Debtmap builds a comprehensive <code>DataFlowGraph</code> that extends basic call graph analysis with variable dependencies, data transformations, I/O operations, and purity tracking.</p>
+<h4 id="call-graph-foundation"><a class="header" href="#call-graph-foundation">Call Graph Foundation</a></h4>
 <p><strong>Upstream callers</strong> - Who calls this function</p>
 <ul>
 <li>Indicates impact radius</li>
@@ -1099,12 +1812,234 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
   ]
 }
 </code></pre>
-<p><strong>Impact analysis:</strong></p>
+<h4 id="variable-dependency-tracking"><a class="header" href="#variable-dependency-tracking">Variable Dependency Tracking</a></h4>
+<p><code>DataFlowGraph</code> tracks which variables each function depends on:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DataFlowGraph {
+    // Maps function_id -&gt; set of variable names used
+    variable_dependencies: HashMap&lt;String, HashSet&lt;String&gt;&gt;,
+    // ...
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>What it tracks:</strong></p>
 <ul>
-<li><strong>Entry points</strong>: Functions with no upstream callers (main, handlers)</li>
-<li><strong>Critical paths</strong>: Functions with many upstream callers</li>
-<li><strong>Integration complexity</strong>: Functions with many downstream callees</li>
+<li>Local variables accessed in function body</li>
+<li>Function parameters</li>
+<li>Captured variables (closures)</li>
+<li>Mutable vs immutable references</li>
 </ul>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Identify functions coupled through shared state</li>
+<li>Detect potential side effect chains</li>
+<li>Guide refactoring to reduce coupling</li>
+</ul>
+<p><strong>Example output:</strong></p>
+<pre><code class="language-json">{
+  "function": "calculate_total",
+  "variable_dependencies": ["items", "tax_rate", "discount", "total"],
+  "parameter_count": 3,
+  "local_var_count": 1
+}
+</code></pre>
+<h4 id="data-transformation-patterns"><a class="header" href="#data-transformation-patterns">Data Transformation Patterns</a></h4>
+<p><code>DataFlowGraph</code> identifies common functional programming patterns:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum TransformationType {
+    Map,        // Transform each element
+    Filter,     // Select subset of elements
+    Reduce,     // Aggregate to single value
+    FlatMap,    // Transform and flatten
+    Unknown,    // Other transformations
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Pattern detection:</strong></p>
+<ul>
+<li>Recognizes iterator chains (<code>.map()</code>, <code>.filter()</code>, <code>.fold()</code>)</li>
+<li>Identifies functional vs imperative data flow</li>
+<li>Tracks input/output variable relationships</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Detected as: Filter → Map → Reduce pattern
+fn total_active_users(users: &amp;[User]) -&gt; f64 {
+    users.iter()
+        .filter(|u| u.active)      // Filter transformation
+        .map(|u| u.balance)        // Map transformation
+        .sum()                      // Reduce transformation
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Transformation metadata:</strong></p>
+<pre><code class="language-json">{
+  "function": "total_active_users",
+  "input_vars": ["users"],
+  "output_vars": ["sum_result"],
+  "transformation_type": "Reduce",
+  "is_functional_style": true,
+  "pipeline_length": 3
+}
+</code></pre>
+<h4 id="io-operation-detection"><a class="header" href="#io-operation-detection">I/O Operation Detection</a></h4>
+<p>Tracks functions performing I/O operations for purity and performance analysis:</p>
+<p><strong>I/O categories tracked:</strong></p>
+<ul>
+<li><strong>File I/O</strong>: <code>std::fs</code>, <code>File::open</code>, <code>read_to_string</code></li>
+<li><strong>Network I/O</strong>: HTTP requests, socket operations</li>
+<li><strong>Database I/O</strong>: SQL queries, ORM operations</li>
+<li><strong>System calls</strong>: Process spawning, environment access</li>
+<li><strong>Blocking operations</strong>: <code>thread::sleep</code>, synchronous I/O in async</li>
+</ul>
+<p><strong>Example detection:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Detected I/O operations: FileRead, FileWrite
+fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
+    let json = serde_json::to_string(config)?;  // No I/O
+    std::fs::write(path, json)?;                 // FileWrite detected
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>I/O metadata:</strong></p>
+<pre><code class="language-json">{
+  "function": "save_config",
+  "io_operations": ["FileWrite"],
+  "is_blocking": true,
+  "affects_purity": true,
+  "async_safe": false
+}
+</code></pre>
+<h4 id="purity-analysis-integration"><a class="header" href="#purity-analysis-integration">Purity Analysis Integration</a></h4>
+<p><code>DataFlowGraph</code> integrates with purity detection to provide comprehensive side effect analysis:</p>
+<p><strong>Side effect tracking:</strong></p>
+<ul>
+<li>I/O operations (file, network, console)</li>
+<li>Global state mutations</li>
+<li>Random number generation</li>
+<li>System time access</li>
+<li>Non-deterministic behavior</li>
+</ul>
+<p><strong>Purity confidence factors:</strong></p>
+<ul>
+<li><strong>1.0</strong>: Pure mathematical function, no side effects</li>
+<li><strong>0.8</strong>: Pure with deterministic data transformations</li>
+<li><strong>0.5</strong>: Mixed - some suspicious patterns</li>
+<li><strong>0.2</strong>: Likely impure - I/O detected</li>
+<li><strong>0.0</strong>: Definitely impure - multiple side effects</li>
+</ul>
+<p><strong>Example analysis:</strong></p>
+<pre><code class="language-json">{
+  "function": "calculate_discount",
+  "is_pure": true,
+  "purity_confidence": 0.95,
+  "side_effects": [],
+  "deterministic": true,
+  "safe_to_parallelize": true,
+  "safe_to_cache": true
+}
+</code></pre>
+<h4 id="modification-impact-analysis"><a class="header" href="#modification-impact-analysis">Modification Impact Analysis</a></h4>
+<p><code>DataFlowGraph</code> calculates the impact of modifying a function:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct ModificationImpact {
+    pub function_name: String,
+    pub affected_functions: Vec&lt;String&gt;,  // Upstream callers
+    pub dependency_count: usize,          // Downstream callees
+    pub has_side_effects: bool,
+    pub risk_level: RiskLevel,
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Risk level calculation:</strong></p>
+<ul>
+<li><strong>Critical</strong>: Many upstream callers + side effects + low test coverage</li>
+<li><strong>High</strong>: Many callers OR side effects with moderate coverage</li>
+<li><strong>Medium</strong>: Few callers with side effects OR many callers with good coverage</li>
+<li><strong>Low</strong>: Few callers, no side effects, or well-tested</li>
+</ul>
+<p><strong>Example impact analysis:</strong></p>
+<pre><code class="language-json">{
+  "function": "validate_payment_method",
+  "modification_impact": {
+    "affected_functions": [
+      "process_payment",
+      "refund_payment",
+      "update_payment_method",
+      "validate_subscription"
+    ],
+    "affected_count": 4,
+    "dependency_count": 8,
+    "has_side_effects": true,
+    "io_operations": ["DatabaseRead", "NetworkCall"],
+    "risk_level": "High",
+    "recommendation": "Comprehensive testing required - 4 functions depend on this, performs I/O"
+  }
+}
+</code></pre>
+<p><strong>Using modification impact:</strong></p>
+<pre><code class="language-bash"># Analyze impact before refactoring
+debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_payment_method") | .modification_impact'
+</code></pre>
+<p><strong>Impact analysis uses:</strong></p>
+<ul>
+<li><strong>Refactoring planning</strong>: Understand blast radius before changes</li>
+<li><strong>Test prioritization</strong>: Focus tests on high-impact functions</li>
+<li><strong>Code review</strong>: Flag high-risk changes for extra scrutiny</li>
+<li><strong>Dependency management</strong>: Identify tightly coupled components</li>
+</ul>
+<h4 id="dataflowgraph-methods"><a class="header" href="#dataflowgraph-methods">DataFlowGraph Methods</a></h4>
+<p>Key methods for data flow analysis:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Add function with its dependencies
+pub fn add_function(&amp;mut self, function_id: String, callees: Vec&lt;String&gt;)
+
+// Track variable dependencies
+pub fn add_variable_dependency(&amp;mut self, function_id: String, var_name: String)
+
+// Record I/O operations
+pub fn add_io_operation(&amp;mut self, function_id: String, io_type: IoType)
+
+// Calculate modification impact
+pub fn calculate_modification_impact(&amp;self, function_id: &amp;str) -&gt; ModificationImpact
+
+// Get all functions affected by a change
+pub fn get_affected_functions(&amp;self, function_id: &amp;str) -&gt; Vec&lt;String&gt;
+
+// Find functions with side effects
+pub fn find_functions_with_side_effects(&amp;self) -&gt; Vec&lt;String&gt;
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Integration in analysis pipeline:</strong></p>
+<ol>
+<li>Parser builds initial call graph</li>
+<li>DataFlowGraph extends with variable/I/O tracking</li>
+<li>Purity analyzer adds side effect information</li>
+<li>Modification impact calculated for each function</li>
+<li>Results used in prioritization and risk scoring</li>
+</ol>
+<p><strong>Connection to Unified Scoring:</strong></p>
+<p>The dependency analysis from DataFlowGraph directly feeds into the <strong>unified scoring system’s dependency factor</strong> (20% weight):</p>
+<ul>
+<li><strong>Dependency Factor Calculation</strong>: Functions with high upstream caller count or on critical paths from entry points receive higher dependency scores (8-10)</li>
+<li><strong>Isolated Utilities</strong>: Functions with few or no callers score lower (1-3) on dependency factor</li>
+<li><strong>Impact Prioritization</strong>: This helps prioritize functions where bugs have wider impact across the codebase</li>
+<li><strong>Modification Risk</strong>: The modification impact analysis uses dependency data to calculate blast radius when changes are made</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code>Function: validate_payment_method
+  Upstream callers: 4 (high impact)
+  → Dependency Factor: 8.0
+
+Function: format_currency_string
+  Upstream callers: 0 (utility)
+  → Dependency Factor: 1.5
+
+Both have same complexity, but validate_payment_method gets higher unified score
+due to its critical role in the call graph.
+</code></pre>
+<p>This integration ensures that the unified scoring system considers not just internal function complexity and test coverage, but also the function’s importance in the broader codebase architecture.</p>
 <h3 id="entropy-based-complexity"><a class="header" href="#entropy-based-complexity">Entropy-Based Complexity</a></h3>
 <p>Advanced pattern detection to reduce false positives.</p>
 <p><strong>Token Classification:</strong></p>
@@ -1141,6 +2076,93 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
     - Low token entropy indicates simple patterns (0.32)
     - Similar branch structures found (92% similarity)
     - Complexity reduced by 67% due to pattern-based code
+</code></pre>
+<h3 id="entropy-analysis-caching"><a class="header" href="#entropy-analysis-caching">Entropy Analysis Caching</a></h3>
+<p><code>EntropyAnalyzer</code> includes an LRU-style cache for performance optimization when analyzing large codebases or performing repeated analysis.</p>
+<h4 id="cache-structure"><a class="header" href="#cache-structure">Cache Structure</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct CacheEntry {
+    score: EntropyScore,
+    timestamp: Instant,
+    hit_count: usize,
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Cache configuration:</strong></p>
+<ul>
+<li><strong>Default size</strong>: 1000 entries</li>
+<li><strong>Eviction policy</strong>: LRU (Least Recently Used)</li>
+<li><strong>Memory per entry</strong>: ~128 bytes</li>
+<li><strong>Total memory overhead</strong>: ~128 KB for default size</li>
+</ul>
+<h4 id="cache-statistics"><a class="header" href="#cache-statistics">Cache Statistics</a></h4>
+<p>The analyzer tracks cache performance:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct CacheStats {
+    pub hits: usize,
+    pub misses: usize,
+    pub evictions: usize,
+    pub hit_rate: f64,
+    pub memory_bytes: usize,
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Example stats output:</strong></p>
+<pre><code class="language-json">{
+  "entropy_cache_stats": {
+    "hits": 3427,
+    "misses": 1573,
+    "evictions": 573,
+    "hit_rate": 0.685,
+    "memory_bytes": 128000
+  }
+}
+</code></pre>
+<p><strong>Hit rate interpretation:</strong></p>
+<ul>
+<li><strong>&gt; 0.7</strong>: Excellent - many repeated analyses, cache is effective</li>
+<li><strong>0.4-0.7</strong>: Good - moderate reuse, typical for incremental analysis</li>
+<li><strong>&lt; 0.4</strong>: Low - mostly unique functions, cache less helpful</li>
+</ul>
+<h4 id="performance-benefits"><a class="header" href="#performance-benefits">Performance Benefits</a></h4>
+<p><strong>Typical performance gains:</strong></p>
+<ul>
+<li><strong>Cold analysis</strong>: 100ms baseline (no cache benefit)</li>
+<li><strong>Incremental analysis</strong>: 30-40ms (~60-70% faster) for unchanged functions</li>
+<li><strong>Re-analysis</strong>: 15-20ms (~80-85% faster) for recently analyzed functions</li>
+</ul>
+<p><strong>Best for:</strong></p>
+<ul>
+<li><strong>Watch mode</strong>: Analyzing on file save (repeated analysis of same files)</li>
+<li><strong>CI/CD</strong>: Comparing feature branch to main (overlap in functions)</li>
+<li><strong>Large codebases</strong>: Many similar functions benefit from pattern caching</li>
+</ul>
+<p><strong>Memory estimation:</strong></p>
+<pre><code>Total cache memory = entry_count × 128 bytes
+
+Examples:
+- 1,000 entries: ~128 KB (default)
+- 5,000 entries: ~640 KB (large projects)
+- 10,000 entries: ~1.25 MB (very large)
+</code></pre>
+<h4 id="cache-management"><a class="header" href="#cache-management">Cache Management</a></h4>
+<p><strong>Automatic eviction:</strong></p>
+<ul>
+<li>When cache reaches size limit, oldest entries evicted</li>
+<li>Hit count influences retention (frequently accessed stay longer)</li>
+<li>Timestamp used for LRU ordering</li>
+</ul>
+<p><strong>Cache invalidation:</strong></p>
+<ul>
+<li>Function source changes invalidate entry</li>
+<li>Cache cleared between major analysis runs</li>
+<li>No manual invalidation needed</li>
+</ul>
+<p><strong>Configuration (if exposed in future):</strong></p>
+<pre><code class="language-toml">[entropy.cache]
+enabled = true
+size = 1000           # Number of entries
+ttl_seconds = 3600    # Optional: expire after 1 hour
 </code></pre>
 <h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
 <p>Debtmap adjusts analysis based on code context:</p>
@@ -1185,11 +2207,45 @@ fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
 <li>~200 bytes per function</li>
 <li>Thread-safe (Arc<CoverageIndex>)</li>
 </ul>
-<p><strong>Performance:</strong></p>
+<h4 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h4>
+<p><strong>Index Build Performance:</strong></p>
 <ul>
-<li>Index build: ~20-30ms for 5,000 functions</li>
-<li>Analysis overhead: ~2.5x baseline (target: ≤3x)</li>
-<li>Example: 53ms → 130ms for 100 files</li>
+<li>Index construction: O(n), approximately 20-30ms for 5,000 functions</li>
+<li>Memory usage: ~200 bytes per record (~2MB for 5,000 functions)</li>
+<li>Scales linearly with function count</li>
+</ul>
+<p><strong>Lookup Performance:</strong></p>
+<ul>
+<li>Exact match (function name): O(1) average, ~0.5μs per lookup</li>
+<li>Line-based fallback: O(log n), ~5-8μs per lookup</li>
+<li>Cache-friendly data structure for hot paths</li>
+</ul>
+<p><strong>Analysis Overhead:</strong></p>
+<ul>
+<li>Coverage integration overhead: ~2.5x baseline analysis time</li>
+<li>Target overhead: ≤3x (maintained through optimizations)</li>
+<li>Example timing: 53ms baseline → 130ms with coverage (2.45x overhead)</li>
+<li>Overhead includes index build + lookups + coverage propagation</li>
+</ul>
+<p><strong>Thread Safety:</strong></p>
+<ul>
+<li>Coverage index wrapped in <code>Arc&lt;CoverageIndex&gt;</code> for lock-free parallel access</li>
+<li>Multiple analyzer threads can query coverage simultaneously</li>
+<li>No contention on reads, suitable for parallel analysis pipelines</li>
+</ul>
+<p><strong>Memory Footprint:</strong></p>
+<pre><code>Total memory = (function_count × 200 bytes) + index overhead
+
+Examples:
+- 1,000 functions: ~200 KB
+- 5,000 functions: ~2 MB
+- 10,000 functions: ~4 MB
+</code></pre>
+<p><strong>Scalability:</strong></p>
+<ul>
+<li>Tested with codebases up to 10,000 functions</li>
+<li>Performance remains predictable and acceptable</li>
+<li>Memory usage stays bounded and reasonable</li>
 </ul>
 <p><strong>Generating coverage:</strong></p>
 <pre><code class="language-bash"># Rust
