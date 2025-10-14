@@ -263,19 +263,42 @@ mod tests {
     fn test_cache_strategy_from_env() {
         // Test DEBTMAP_CACHE_DIR with proper isolation
         {
-            let temp_dir = TempDir::new().unwrap();
             let mut guard = EnvGuard::new();
+            let temp_dir = TempDir::new().unwrap();
             guard.set("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
             let location = CacheLocation::resolve(None).unwrap();
-            assert!(matches!(location.strategy, CacheStrategy::Custom(_)));
+            if let CacheStrategy::Custom(ref path) = location.strategy {
+                assert!(path
+                    .to_string_lossy()
+                    .contains(temp_dir.path().to_str().unwrap()));
+            } else {
+                panic!("Expected Custom strategy when DEBTMAP_CACHE_DIR is set");
+            }
+            // Explicitly drop temp_dir before guard to ensure cleanup order
+            drop(temp_dir);
         } // Guard drops here, restoring original env
 
         // Test default (no env vars) = shared
+        // Explicitly verify the environment is clean before testing
         {
             let mut guard = EnvGuard::new();
             guard.remove("DEBTMAP_CACHE_DIR");
+
+            // Double-check the env var is actually removed
+            assert!(
+                std::env::var("DEBTMAP_CACHE_DIR").is_err(),
+                "DEBTMAP_CACHE_DIR should not be set in this test block"
+            );
+
             let location = CacheLocation::resolve(None).unwrap();
-            assert_eq!(location.strategy, CacheStrategy::Shared);
+
+            // When DEBTMAP_CACHE_DIR is not set, strategy must be Shared
+            assert_eq!(
+                location.strategy,
+                CacheStrategy::Shared,
+                "When DEBTMAP_CACHE_DIR is not set, strategy should be Shared. Got: {:?}",
+                location.strategy
+            );
         }
     }
 
