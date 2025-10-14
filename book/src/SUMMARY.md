@@ -10,6 +10,12 @@
 - [Configuration](configuration.md)
 - [Output Formats](output-formats.md)
 
+# Advanced Topics
+
+- [Tiered Prioritization](tiered-prioritization.md)
+- [Scoring Strategies](scoring-strategies.md)
+- [Prodigy Integration](prodigy-integration.md)
+
 # Reference
 
 - [Examples](examples.md)
