@@ -3,109 +3,110 @@
   "chapter_title": "Examples",
   "chapter_file": "book/src/examples.md",
   "drift_detected": true,
-  "severity": "critical",
-  "quality_assessment": "Chapter is completely empty - only contains TODO placeholders. All content needs to be written from scratch based on current CLI capabilities.",
+  "severity": "medium",
+  "quality_assessment": "Chapter has excellent comprehensive content but contains several CLI option name errors that will cause commands to fail. Flag names need updating to match actual implementation.",
   "issues": [
     {
-      "type": "missing_content",
-      "severity": "critical",
-      "section": "Analyzing Rust Projects",
-      "description": "Section is empty (only TODO marker)",
-      "should_add": "Provide complete examples of analyzing Rust projects including: basic analysis, coverage integration with cargo-tarpaulin, threshold configuration, god object detection, and multi-pass analysis",
-      "fix_suggestion": "Add comprehensive Rust examples covering:\n1. Basic analysis: debtmap analyze ./src\n2. With coverage: cargo tarpaulin --out lcov && debtmap analyze . --lcov target/coverage/lcov.info\n3. Custom thresholds: debtmap analyze . --threshold-complexity 15 --threshold-duplication 50\n4. Filtering: debtmap analyze . --languages rust --filter Architecture,Testing\n5. Output formats: debtmap analyze . --format json --output report.json\n6. CI integration example from .github/workflows/debtmap.yml",
-      "source_reference": "src/cli.rs:Commands::Analyze, .github/workflows/debtmap.yml, README.md:103-139"
-    },
-    {
-      "type": "missing_content",
-      "severity": "critical",
-      "section": "Python Analysis",
-      "description": "Section is empty (only TODO marker)",
-      "should_add": "Provide complete examples of analyzing Python projects including coverage integration with pytest",
-      "fix_suggestion": "Add Python-specific examples:\n1. Basic Python analysis: debtmap analyze . --languages python\n2. With pytest coverage: pytest --cov --cov-report=lcov && debtmap analyze . --lcov coverage.lcov\n3. Filtering Python files: debtmap analyze src --languages python --filter Testing\n4. Common patterns in Python codebases (god objects, code smells)\n5. Example .debtmap.toml configuration for Python projects",
-      "source_reference": "src/analyzers/python.rs, README.md:733 (LCOV integration)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "critical",
-      "section": "JavaScript/TypeScript",
-      "description": "Section is empty (only TODO marker)",
-      "should_add": "Provide complete examples of analyzing JavaScript/TypeScript projects including Jest coverage integration",
-      "fix_suggestion": "Add JS/TS-specific examples:\n1. Analyzing JS/TS projects: debtmap analyze . --languages javascript,typescript\n2. With Jest coverage: jest --coverage --coverageReporters=lcov && debtmap analyze . --lcov coverage/lcov.info\n3. Node.js project patterns: excluding node_modules, package patterns\n4. TypeScript-specific patterns and best practices\n5. Example configuration for monorepos",
-      "source_reference": "README.md:733 (Jest integration), src/cli.rs:53-54 (languages option)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "critical",
-      "section": "CI Integration",
-      "description": "Section is empty (only TODO marker)",
-      "should_add": "Provide complete CI/CD integration examples for GitHub Actions, GitLab CI, and other platforms",
-      "fix_suggestion": "Add comprehensive CI integration examples:\n1. Complete GitHub Actions workflow (based on .github/workflows/debtmap.yml)\n2. GitLab CI example with artifacts\n3. CircleCI integration\n4. Using debtmap validate for PR gates\n5. Artifact upload and retention strategies\n6. Setting thresholds and failing builds\n7. Integration with coverage generation (cargo-tarpaulin, pytest, jest)\n8. Example of comparing before/after with debtmap compare",
-      "source_reference": ".github/workflows/debtmap.yml (complete working example), src/cli.rs:217-282 (validate command), src/cli.rs:284-310 (compare command)"
-    },
-    {
-      "type": "missing_content",
+      "type": "incorrect_example",
       "severity": "high",
-      "section": "General Examples",
-      "description": "No overview or introduction to examples",
-      "should_add": "Add chapter introduction explaining what examples are provided and how to use them",
-      "fix_suggestion": "Add introductory section explaining:\n1. Purpose of examples chapter\n2. How to adapt examples to your project\n3. Overview of available examples\n4. Link to CLI reference for full options\n5. Common patterns across all languages",
-      "source_reference": "book/src/SUMMARY.md"
+      "section": "Output Formats - Understanding Output Formats",
+      "description": "Chapter uses '--json-format' flag but the actual CLI uses '--output-format'",
+      "current_content": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --json-format legacy\n\n# Output format options: terminal, json, markdown\ndebtmap analyze . --format terminal",
+      "should_be": "# Legacy JSON format for backward compatibility\ndebtmap analyze . --format json --output-format legacy\n\n# Unified JSON format (default)\ndebtmap analyze . --format json --output-format unified",
+      "fix_suggestion": "Replace '--json-format' with '--output-format' throughout chapter (appears in line 575). Note that the default is 'legacy' not 'unified'.",
+      "source_reference": "src/cli.rs:37 - #[arg(long = \"output-format\", value_enum, default_value = \"legacy\")]"
     },
     {
-      "type": "missing_content",
+      "type": "incorrect_example",
       "severity": "high",
-      "section": "Output Format Examples",
-      "description": "No examples showing different output formats and how to interpret them",
-      "should_add": "Show example output for terminal, JSON, and markdown formats with interpretation",
-      "fix_suggestion": "Add section showing:\n1. Terminal output example with color-coded priorities\n2. JSON output structure with field descriptions\n3. Markdown report example\n4. How to interpret scores and priorities\n5. Understanding unified vs legacy JSON formats (--output-format option)",
-      "source_reference": "src/cli.rs:34-38 (json_format option), src/cli.rs:313-326 (OutputFormat and JsonFormat enums), README.md:311-415 (example output)"
+      "section": "Compare Command - Target-Specific Comparison",
+      "description": "Chapter shows '--target' option but CLI uses '--target-location'",
+      "current_content": "# Target format: file:function:line\ndebtmap compare \\\n  --before before.json \\\n  --after after.json \\\n  --target src/main.rs:process_data:100",
+      "should_be": "# Target format: file:function:line\ndebtmap compare \\\n  --before before.json \\\n  --after after.json \\\n  --target-location src/main.rs:process_data:100",
+      "fix_suggestion": "Replace '--target' with '--target-location' in line 829",
+      "source_reference": "src/cli.rs:298-301 - target_location: Option<String>"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Compare Command - Output Formats (line 849)",
+      "description": "Chapter comment says terminal output is default, but CLI default for compare is json",
+      "current_content": "# Terminal output (default)\ndebtmap compare --before before.json --after after.json",
+      "should_be": "# JSON output (default)\ndebtmap compare --before before.json --after after.json\n\n# Terminal output (explicit)\ndebtmap compare --before before.json --after after.json --format terminal",
+      "fix_suggestion": "Update comment to indicate json is default, and show explicit --format terminal for terminal output",
+      "source_reference": "src/cli.rs:304 - format: OutputFormat with default_value = \"json\""
+    },
+    {
+      "type": "unclear_content",
+      "severity": "medium",
+      "section": "Filtering and Focusing",
+      "description": "Examples show filtering by category names (Architecture, Testing) but don't document what valid category names are",
+      "current_content": "# Focus on architecture issues (god objects, complexity)\ndebtmap analyze . --filter Architecture\n\n# Focus on testing gaps\ndebtmap analyze . --filter Testing\n\n# Show only top 10 issues\ndebtmap analyze . --top 10",
+      "should_be": "Should verify category names are correct and document the complete list of valid categories",
+      "fix_suggestion": "Add a note or list documenting valid category names that can be passed to --filter. Cross-reference with debt detection types in the codebase.",
+      "source_reference": "src/cli.rs:118-119 - filter_categories accepts Vec<String>, need to verify against debt::DebtType or similar"
     },
     {
       "type": "missing_content",
-      "severity": "medium",
-      "section": "Advanced Usage Examples",
-      "description": "No examples of advanced features like context providers, multi-pass analysis, or cache management",
-      "should_add": "Show examples of advanced debtmap features",
-      "fix_suggestion": "Add advanced examples:\n1. Context-aware analysis: --context --context-providers critical_path,dependency,git_history\n2. Multi-pass analysis: --multi-pass --attribution\n3. Cache management: --cache-stats, --clear-cache\n4. Aggregation methods: --aggregation-method logarithmic_sum\n5. Filtering and grouping: --group-by-category --min-priority high\n6. Verbosity levels: -v, -vv, -vvv for debugging\n7. Parallel processing: --jobs 8 --no-parallel",
-      "source_reference": "src/cli.rs:62-68 (context options), src/cli.rs:169-175 (multi-pass), src/cli.rs:157-167 (cache options), src/cli.rs:94-99 (verbosity)"
+      "severity": "low",
+      "section": "Advanced Usage - Verbosity Levels",
+      "description": "Chapter shows -v/-vv/-vvv but doesn't mention --verbose long form is also available",
+      "current_content": "# Level 1: Show main score factors\ndebtmap analyze . -v\n\n# Level 2: Show detailed calculations\ndebtmap analyze . -vv",
+      "should_be": "Examples are correct. Optional: note that --verbose is the long form",
+      "fix_suggestion": "Optional: Add note that -v is short for --verbose",
+      "source_reference": "src/cli.rs:94-99 - #[arg(short = 'v', long = \"verbose\")]"
     },
     {
       "type": "missing_content",
-      "severity": "medium",
-      "section": "Configuration Examples",
-      "description": "No examples showing .debtmap.toml configuration for different project types",
-      "should_add": "Provide example configurations for common project scenarios",
-      "fix_suggestion": "Add configuration examples:\n1. Basic configuration with thresholds\n2. Entropy-based complexity configuration\n3. Ignore patterns for different project types\n4. Scoring weight customization\n5. God object detection tuning\n6. External API configuration for libraries vs CLI tools",
-      "source_reference": "README.md:952-1024 (complete configuration reference)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Compare Command Examples",
-      "description": "No examples showing how to use the compare command for tracking improvements",
-      "should_add": "Show practical examples of using debtmap compare to validate refactoring",
-      "fix_suggestion": "Add compare command examples:\n1. Basic before/after comparison workflow\n2. Using --plan to extract target from implementation plan\n3. Using --target to focus on specific location\n4. Interpreting comparison results (Resolved, Improved, Regressed)\n5. CI integration for regression detection",
-      "source_reference": "src/cli.rs:284-310 (compare command), README.md:242-289 (compare documentation)"
+      "severity": "low",
+      "section": "Custom Thresholds",
+      "description": "Chapter doesn't mention --threshold-preset option for quick configuration",
+      "current_content": "# Set both complexity and duplication thresholds\ndebtmap analyze . \\\n  --threshold-complexity 15 \\\n  --threshold-duplication 50",
+      "should_be": "Could also show the preset option as an alternative",
+      "fix_suggestion": "Add example: debtmap analyze . --threshold-preset strict (options: strict, balanced, lenient)",
+      "source_reference": "src/cli.rs:125-127 - threshold_preset option with ThresholdPreset enum"
     }
   ],
   "positive_aspects": [
-    "Chapter structure follows logical organization (language-specific then CI integration)",
-    "Section headings clearly indicate what content should be added"
+    "Comprehensive coverage of all major use cases (Rust, Python, JS/TS analysis)",
+    "Excellent real-world CI integration examples for GitHub Actions, GitLab CI, and CircleCI",
+    "Very well-structured progression from basic to advanced usage",
+    "Good use of actual examples from Debtmap's own workflows (.github/workflows/debtmap.yml)",
+    "Clear explanations of what each option does and expected results",
+    "Helpful interpretation guidance for output formats with example JSON structure",
+    "Practical configuration examples (.debtmap.toml) for different project types",
+    "Comprehensive compare command section with workflow and interpretation",
+    "Examples are mostly syntactically valid (except for the flag name issues)",
+    "Excellent 'Tips and Best Practices' section",
+    "Good cross-references to other chapters",
+    "Coverage integration examples for all supported languages (tarpaulin, pytest, jest)",
+    "Monorepo analysis example",
+    "Cache management examples",
+    "Practical CI validation gates and regression detection examples"
   ],
   "improvement_suggestions": [
-    "Start with simplest examples first (basic analysis) then progress to advanced features",
-    "Include actual command output showing what users should expect to see",
-    "Cross-reference to CLI Reference chapter for detailed option explanations",
-    "Add troubleshooting section for common issues in examples",
-    "Include links to working GitHub Actions workflow as reference",
-    "Consider adding a 'Quick Start' section at the beginning",
-    "Show examples of .debtmap.toml configuration alongside CLI examples",
-    "Include examples of interpreting results and making decisions based on output"
+    "Add a quick reference table of valid category names for --filter option",
+    "Include more examples of combining multiple advanced options together",
+    "Add example showing how to read and use JSON output programmatically (jq examples)",
+    "Show examples of setting environment variables mentioned in cache section",
+    "Add section on interpreting exit codes in CI scripts",
+    "Include performance benchmarks or tips for very large codebases",
+    "Add example of using --max-files for limiting analysis scope",
+    "Consider adding animated terminal recordings or screenshots of actual output"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-09",
-    "feature_inventory": "N/A (features.json not available, analysis based on CLI source code and README)",
-    "topics_covered": [],
+    "analyzed_at": "2025-10-14",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Analyzing Rust projects",
+      "Python analysis",
+      "JavaScript/TypeScript",
+      "CI integration (GitHub Actions, GitLab CI, CircleCI)",
+      "Output formats (terminal, JSON, markdown)",
+      "Advanced usage (context providers, multi-pass, cache, filtering)",
+      "Configuration examples (.debtmap.toml)",
+      "Compare command workflow"
+    ],
     "validation_focus": "Ensure examples use current CLI syntax and options"
   }
 }
