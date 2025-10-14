@@ -301,6 +301,7 @@ debtmap --jobs 0
 debtmap --jobs 4
 
 # Disable parallel processing (debugging)
+# Note: --no-parallel is equivalent to --jobs 1 (single-threaded)
 debtmap --no-parallel
 ```
 
@@ -444,15 +445,12 @@ debtmap --migrate-cache
 ### Cache Strategies
 
 **Local cache** (`.debtmap/cache`):
-- ✅ Isolated per project
-- ✅ Automatically managed
-- ❌ Duplicates across projects
+- **Pros**: Isolated per project, automatically managed
+- **Cons**: Duplicates across projects
 
 **Shared cache** (`~/.cache/debtmap`):
-- ✅ Shared across projects
-- ✅ Saves disk space
-- ❌ Requires manual management
-- ❌ May mix unrelated projects
+- **Pros**: Shared across projects, saves disk space
+- **Cons**: Requires manual management, may mix unrelated projects
 
 ### Cache Consistency
 
@@ -608,6 +606,121 @@ debtmap --context -vvv
 
 # Check which providers are active
 debtmap --context -v | grep "context provider"
+```
+
+## Advanced Analysis Troubleshooting
+
+Advanced CLI flags for specialized analysis scenarios.
+
+### Multi-Pass Analysis
+
+**Flag**: `--multi-pass`
+
+Multi-pass analysis performs multiple iterations to refine results.
+
+```bash
+# Enable multi-pass analysis
+debtmap --multi-pass
+
+# Useful for complex projects with intricate dependencies
+# May increase analysis time but improve accuracy
+```
+
+**When to use**:
+- Complex dependency graphs
+- Large codebases with deep nesting
+- When single-pass results seem incomplete
+
+### Attribution Output
+
+**Flag**: `--attribution`
+
+Shows attribution information for detected issues.
+
+```bash
+# Enable attribution output
+debtmap --attribution
+
+# Combine with verbosity for details
+debtmap --attribution -v
+```
+
+**Troubleshooting**:
+- Requires git history provider for author information
+- May slow down analysis
+- Use `--disable-context git_history` if causing errors
+
+### Aggregation Methods
+
+**Flag**: `--aggregation-method <method>`
+
+Controls how results are aggregated across files.
+
+```bash
+# Default aggregation
+debtmap --aggregation-method default
+
+# Alternative methods (check --help for available options)
+debtmap --aggregation-method <method>
+```
+
+**Common issues**:
+- Different methods produce different result structures
+- Choose method based on your reporting needs
+- Use consistent method for comparison over time
+
+### Minimum Problematic Threshold
+
+**Flag**: `--min-problematic <number>`
+
+Sets the minimum score for an item to be considered problematic.
+
+```bash
+# Default threshold
+debtmap --min-problematic 3
+
+# More strict (show more issues)
+debtmap --min-problematic 1
+
+# Less strict (show only serious issues)
+debtmap --min-problematic 5
+```
+
+**Relationship to other filters**:
+- Works alongside `--min-priority`
+- Filters at analysis level vs display level
+- Lower values = more issues shown
+
+### God Object Detection
+
+**Flag**: `--no-god-object`
+
+Disables god object (large class/module) detection.
+
+```bash
+# Disable god object detection
+debtmap --no-god-object
+
+# Useful if false positives on legitimately large modules
+# Or if your architecture uses centralized classes
+```
+
+**When to use**:
+- False positives on framework files
+- Intentional large aggregator classes
+- Reducing noise in results
+
+### Combining Advanced Flags
+
+```bash
+# Comprehensive analysis with all features
+debtmap --multi-pass --attribution --context -vv
+
+# Minimal filtering for exploration
+debtmap --min-problematic 1 --min-priority 0 --no-god-object
+
+# Performance-focused advanced analysis
+debtmap --multi-pass --jobs 8 --cache-location ~/.cache/debtmap
 ```
 
 ## Error Messages Reference
@@ -1021,6 +1134,87 @@ debtmap --filter "complexity,debt"
 debtmap --min-priority 3 --top 20 --filter complexity
 ```
 
+## Compare Command Issues
+
+The `compare` command helps track changes in technical debt over time.
+
+### Basic Usage
+
+```bash
+# Save baseline results
+debtmap --format json --output before.json
+
+# Make code changes...
+
+# Save new results
+debtmap --format json --output after.json
+
+# Compare results
+debtmap compare --before before.json --after after.json
+```
+
+### Incompatible Format Errors
+
+**Problem**: "Incompatible formats" error when comparing files
+
+**Causes**:
+- Mixing legacy and unified JSON formats
+- Files from different debtmap versions
+- Corrupted JSON files
+
+**Solutions**:
+```bash
+# Ensure both files use same output format
+debtmap --format json --output-format unified --output before.json
+# ... make changes ...
+debtmap --format json --output-format unified --output after.json
+debtmap compare --before before.json --after after.json
+
+# Validate JSON files are well-formed
+jq . before.json > /dev/null
+jq . after.json > /dev/null
+```
+
+### Comparing Across Branches
+
+```bash
+# Save baseline on main branch
+git checkout main
+debtmap --format json --output main.json
+
+# Switch to feature branch
+git checkout feature-branch
+debtmap --format json --output feature.json
+
+# Compare branches
+debtmap compare --before main.json --after feature.json
+```
+
+### Missing Files Error
+
+**Problem**: "File not found" when running compare
+
+**Solutions**:
+- Verify file paths are correct (use absolute paths if needed)
+- Ensure JSON files weren't moved or deleted
+- Check current working directory with `pwd`
+
+### Format Mismatch Issues
+
+**Problem**: Compare shows unexpected differences or errors
+
+**Solutions**:
+```bash
+# Regenerate both files with same debtmap version
+debtmap --format json --output before.json
+# ... make changes ...
+debtmap --format json --output after.json
+
+# Use same output format for both
+debtmap --format json --output-format unified --output before.json
+debtmap --format json --output-format unified --output after.json
+```
+
 ## FAQ
 
 ### General Questions
@@ -1177,6 +1371,47 @@ debtmap --format json --output before.json
 debtmap --format json --output after.json
 
 # Compare
+debtmap compare --before before.json --after after.json
+```
+
+**Q: Why does compare fail with 'incompatible formats'?**
+
+A: The JSON files must use the same output format:
+```bash
+# Use unified format for both
+debtmap --format json --output-format unified --output before.json
+# ... make changes ...
+debtmap --format json --output-format unified --output after.json
+debtmap compare --before before.json --after after.json
+
+# Or use legacy format for both (but unified is recommended)
+debtmap --format json --output-format legacy --output before.json
+debtmap --format json --output-format legacy --output after.json
+```
+
+**Q: How do I compare results from different branches?**
+
+A: Generate JSON output on each branch and compare:
+```bash
+# On main branch
+git checkout main
+debtmap --format json --output main.json
+
+# On feature branch
+git checkout feature-branch
+debtmap --format json --output feature.json
+
+# Compare (from either branch)
+debtmap compare --before main.json --after feature.json
+```
+
+**Q: Can I compare legacy and unified JSON formats?**
+
+A: No, both files must use the same format. Regenerate with matching formats:
+```bash
+# Convert both to unified format
+debtmap --format json --output-format unified --output before.json
+debtmap --format json --output-format unified --output after.json
 debtmap compare --before before.json --after after.json
 ```
 
