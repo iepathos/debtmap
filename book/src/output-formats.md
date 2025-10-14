@@ -105,12 +105,16 @@ The terminal output uses colors and symbols for quick visual scanning:
 - **HIGH** (11-15): Orange - Should refactor
 - **SEVERE** (>15): Red - Urgent refactoring needed
 
+> **Note:** These levels match the `ComplexityLevel` enum in the implementation.
+
 **Debt Score Thresholds:**
 
 The default debt threshold is **100**. Scores are colored based on this threshold:
-- **Green (≤50)**: Healthy - Below half threshold
-- **Yellow (51-100)**: Attention needed - Between half and full threshold
-- **Red (>100)**: Action required - Exceeds threshold
+- **Green (≤50)**: Healthy - Below half threshold (score ≤ threshold/2)
+- **Yellow (51-100)**: Attention needed - Between half and full threshold (threshold/2 < score ≤ threshold)
+- **Red (>100)**: Action required - Exceeds threshold (score > threshold)
+
+> **Note:** Boundary values use strict inequalities: 50 is Green, 100 is Yellow (not Red), 101+ is Red.
 
 ### Refactoring Guidance
 
@@ -144,6 +148,8 @@ Plain mode:
 - Uses ASCII box-drawing characters
 - Machine-parseable structure
 
+> **Note:** Terminal output formatting (colors, symbols, etc.) can be customized internally via `FormattingConfig`. These customization options are currently not exposed through the CLI interface.
+
 ### Verbosity Levels
 
 Control detail level with `-v` flags (can be repeated):
@@ -166,6 +172,8 @@ debtmap analyze . -vvv
 - `-v`: Show main score factors (complexity, coverage, dependency breakdown)
 - `-vv`: Show detailed calculations with formulas and intermediate values
 - `-vvv`: Show all debug information including entropy metrics, role detection, and cache hits
+
+> **Note:** Verbosity flags affect terminal output only. JSON and markdown formats include all data regardless of verbosity level.
 
 Each level includes all information from the previous levels, progressively adding more detail to help understand how scores are calculated.
 
@@ -242,9 +250,11 @@ Risk Distribution:
 ```
 
 **Risk Level Classification:**
-- **LOW** (<30): Green
-- **MEDIUM** (30-59): Yellow
-- **HIGH** (≥60): Red
+- **LOW** (<30): Green - score < 30.0
+- **MEDIUM** (30-59): Yellow - 30.0 ≤ score < 60.0
+- **HIGH** (≥60): Red - score ≥ 60.0
+
+> **Note:** 60 is the start of HIGH risk level.
 
 ## JSON Output
 
@@ -259,9 +269,11 @@ debtmap analyze . --format json
 # Save to file
 debtmap analyze . --format json -o report.json
 
-# Pretty-printed by default
+# Pretty-printed by default for readability
 debtmap analyze . --format json | jq .
 ```
+
+> **Note:** JSON output is automatically pretty-printed for readability.
 
 ### JSON Schema Structure
 
@@ -411,12 +423,18 @@ Here's a complete annotated JSON output example:
 - `entropy_score`: Optional entropy analysis with structure:
   ```json
   {
-    "token_entropy": 0.65,        // Token distribution entropy (0-1)
-    "pattern_repetition": 0.30,   // Pattern repetition score (0-1)
-    "branch_similarity": 0.45,    // Branch similarity metric (0-1)
-    "effective_complexity": 0.85  // Adjusted complexity multiplier
+    "token_entropy": 0.65,        // Token distribution entropy (0-1): measures variety of tokens
+    "pattern_repetition": 0.30,   // Pattern repetition score (0-1): detects repeated code patterns
+    "branch_similarity": 0.45,    // Branch similarity metric (0-1): compares similarity between branches
+    "effective_complexity": 0.85  // Adjusted complexity multiplier: complexity adjusted for entropy
   }
   ```
+
+  **EntropyScore Fields:**
+  - `token_entropy`: Measures the variety and distribution of tokens in the function (0-1, higher = more variety)
+  - `pattern_repetition`: Detects repeated code patterns within the function (0-1, higher = more repetition)
+  - `branch_similarity`: Measures similarity between different code branches (0-1, higher = more similar)
+  - `effective_complexity`: The overall complexity multiplier adjusted for entropy effects
 - `is_pure`: Whether function is pure (no side effects)
 - `purity_confidence`: Confidence level (0.0-1.0)
 - `detected_patterns`: List of detected code patterns
@@ -627,7 +645,7 @@ Debtmap can generate enhanced markdown reports with additional visualizations an
 - **Strategic priorities** - Long-term architectural improvements
 - **Team guidance** - Role-specific recommendations
 
-Enhanced markdown is generated when using specific analysis flags (see source code for configuration options).
+> **Note:** Enhanced markdown features are implemented in the codebase (`src/io/writers/enhanced_markdown/` module) but the specific flags or configuration options to enable them are not currently documented. Refer to the source code or use `--help` to discover available options.
 
 ### Rendering to HTML/PDF
 
@@ -946,6 +964,8 @@ curl -X POST "$CUSTOM_WEBHOOK_URL" \
 
 Debtmap provides several flags to filter and limit output:
 
+> **Note:** Filtering options (`--top`, `--tail`, `--summary`, `--filter`) apply to all output formats (terminal, JSON, and markdown). The filtered data is applied at the analysis level before formatting, ensuring consistent results across all output types.
+
 ### Limiting Results
 
 ```bash
@@ -1073,7 +1093,9 @@ For very large codebases (>10,000 files), use `--top` or `--filter` to limit out
 
 ### Exit Codes
 
-> **Note:** Currently, debtmap returns exit code `0` on successful analysis regardless of threshold violations. Planned behavior includes:
+> **IMPORTANT:** Exit codes 1 and 2 are NOT YET IMPLEMENTED. Current behavior: Always returns `0` on successful analysis, regardless of threshold violations.
+>
+> Planned behavior includes:
 > - `0`: Success, all checks passed
 > - `1`: Analysis completed, but validation thresholds exceeded
 > - `2`: Error during analysis (invalid path, parsing error, etc.)
