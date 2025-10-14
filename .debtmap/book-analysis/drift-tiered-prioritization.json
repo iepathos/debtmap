@@ -1,0 +1,55 @@
+{
+  "chapter_id": "tiered-prioritization",
+  "chapter_title": "Tiered Prioritization",
+  "chapter_file": "book/src/tiered-prioritization.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter is mostly accurate but contains one critical factual error about the t2_dependency_threshold default value that will mislead users",
+  "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Default Tier Thresholds",
+      "description": "Chapter documents t2_dependency_threshold default as 5, but implementation shows default is 10",
+      "current_content": "t2_dependency_threshold = 5          # Dependency count cutoff",
+      "should_be": "t2_dependency_threshold = 10         # Dependency count cutoff",
+      "fix_suggestion": "Update line 98 to reflect the correct default value of 10. This affects when code is classified as Tier 2 Complex Untested based on dependency count.",
+      "source_reference": "src/priority/tiers.rs:92 (TierConfig::default)"
+    }
+  ],
+  "positive_aspects": [
+    "Tier weights (1.5, 1.0, 0.7, 0.3) are accurate",
+    "t2_complexity_threshold default (15) is correct",
+    "t3_complexity_threshold default (10) is correct",
+    "show_t4_in_main_report default (false) is correct",
+    "TOML configuration structure matches actual implementation",
+    "Tier descriptions and priorities accurately reflect the code",
+    "Examples are practical and demonstrate real-world usage",
+    "Good progression from basic concepts to advanced customization",
+    "Clear explanations of when to address each tier",
+    "Helpful use cases for sprint planning and code review",
+    "Terminal output example matches actual format",
+    "JSON output structure is accurate",
+    "Troubleshooting section addresses common issues"
+  ],
+  "improvement_suggestions": [
+    "Add example showing how god object detection triggers Tier 1 classification",
+    "Include example of how entry points can trigger Tier 2 even with moderate complexity",
+    "Add note about how tiers interact with other filtering options (--filter, --min-priority)",
+    "Consider adding a visual diagram showing the tier classification decision tree",
+    "Add example showing tier distribution trends over time for project health tracking"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-14",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Tier 1: Critical Architecture",
+      "Tier 2: Complex Untested",
+      "Tier 3: Testing Gaps",
+      "Tier 4: Maintenance",
+      "Tier weights and configuration",
+      "Customizing tier thresholds"
+    ],
+    "validation_focus": "Check that tier strategy, weights, and configuration options are documented with examples"
+  }
+}
