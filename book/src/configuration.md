@@ -81,15 +81,13 @@ Role multipliers adjust complexity scores based on a function's semantic role:
 
 ```toml
 [role_multipliers]
-pure_logic = 1.2        # Prioritize pure computation
-orchestrator = 0.8      # Reduce for delegation functions
-io_wrapper = 0.7        # Reduce for I/O wrappers
-entry_point = 0.9       # Slight reduction for main/CLI
-pattern_match = 0.6     # Reduce for pattern matching
-unknown = 1.0           # No adjustment
+pure_logic = 1.2        # Prioritize pure computation (default: 1.2)
+orchestrator = 0.8      # Reduce for delegation functions (default: 0.8)
+io_wrapper = 0.7        # Reduce for I/O wrappers (default: 0.7)
+entry_point = 0.9       # Slight reduction for main/CLI (default: 0.9)
+pattern_match = 0.6     # Reduce for pattern matching (default: 0.6)
+unknown = 1.0           # No adjustment (default: 1.0)
 ```
-
-**Default values:** pure_logic=1.2, orchestrator=0.8, io_wrapper=0.7, entry_point=0.9, pattern_match=0.6, unknown=1.0
 
 These multipliers help reduce false positives by recognizing that different function types have naturally different complexity levels.
 
@@ -218,7 +216,7 @@ patterns = [
     "**/*_test.rs",           # Test files (suffix)
     "**/fixtures/**",         # Test fixtures
     "**/mocks/**",            # Mock implementations
-    "**/ stubs/**",           # Stub implementations
+    "**/stubs/**",            # Stub implementations
     "**/examples/**",         # Example code
     "**/demo/**",             # Demo code
 ]
@@ -229,6 +227,8 @@ patterns = [
 - `**` - Matches any characters including `/` (recursive)
 - `?` - Matches a single character
 - `[abc]` - Matches any character in the set
+
+**Note:** Function-level filtering (e.g., ignoring specific function name patterns) is handled by role detection and context-aware analysis rather than explicit ignore patterns. See the Context-Aware Detection section for function-level filtering options.
 
 ## Display Configuration
 
@@ -251,10 +251,16 @@ Set the default output format:
 default_format = "terminal"    # Options: "terminal", "json", "markdown"
 ```
 
+**Supported formats:**
+- `"terminal"` - Human-readable colored output for the terminal (default)
+- `"json"` - Machine-readable JSON for integration with other tools
+- `"markdown"` - Markdown format for documentation and reports
+
 This can be overridden with the `--format` CLI flag:
 
 ```bash
-debtmap analyze --format json
+debtmap analyze --format json      # JSON output
+debtmap analyze --format markdown  # Markdown output
 ```
 
 ## Normalization Configuration
@@ -281,18 +287,18 @@ Entropy analysis helps identify repetitive code patterns (like large match state
 ```toml
 [entropy]
 enabled = true                      # Enable entropy analysis (default: true)
-weight = 1.0                        # Weight in complexity adjustment (0.0-1.0) (default: 1.0)
+weight = 1.0                        # Weight in complexity adjustment (default: 1.0)
 min_tokens = 20                     # Minimum tokens for analysis (default: 20)
-pattern_threshold = 0.7             # Pattern similarity threshold (0.0-1.0)
-entropy_threshold = 0.4             # Low entropy threshold (0.0-1.0)
-branch_threshold = 0.8              # Branch similarity threshold (0.0-1.0)
-use_classification = false          # Use smarter token classification
+pattern_threshold = 0.7             # Pattern similarity threshold (default: 0.7)
+entropy_threshold = 0.4             # Low entropy threshold (default: 0.4)
+branch_threshold = 0.8              # Branch similarity threshold (default: 0.8)
+use_classification = false          # Use smarter token classification (default: false)
 
 # Maximum reductions to prevent over-correction
-max_repetition_reduction = 0.20     # Max 20% reduction for repetition
-max_entropy_reduction = 0.15        # Max 15% reduction for low entropy
-max_branch_reduction = 0.25         # Max 25% reduction for similar branches
-max_combined_reduction = 0.30       # Max 30% total reduction (cap)
+max_repetition_reduction = 0.20     # Max 20% reduction for repetition (default: 0.20)
+max_entropy_reduction = 0.15        # Max 15% reduction for low entropy (default: 0.15)
+max_branch_reduction = 0.25         # Max 25% reduction for similar branches (default: 0.25)
+max_combined_reduction = 0.30       # Max 30% total reduction (default: 0.30)
 ```
 
 Entropy scoring reduces false positives from functions like parsers and state machines that have high cyclomatic complexity but are actually simple and maintainable.
