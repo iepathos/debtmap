@@ -255,10 +255,7 @@ debtmap --cache-stats
 ### Debugging Score Calculations
 
 ```bash
-# Show score breakdown (deprecated, use -v instead)
-debtmap --explain-score
-
-# Better: use verbosity levels
+# Use verbosity levels to see score breakdown
 debtmap -v    # Shows score factors
 
 # See how coverage affects scores
@@ -313,6 +310,8 @@ debtmap --no-parallel
 ### Caching Strategies
 
 Caching is **enabled by default** and provides the biggest performance improvement.
+
+**Note**: The `--cache` flag (to enable caching) is deprecated and hidden. Caching is now always enabled by default; use `--no-cache` to disable it.
 
 ```bash
 # Check cache effectiveness
@@ -657,11 +656,11 @@ debtmap --attribution -v
 Controls how results are aggregated across files.
 
 ```bash
-# Default aggregation
-debtmap --aggregation-method default
-
-# Alternative methods (check --help for available options)
-debtmap --aggregation-method <method>
+# Available aggregation methods:
+debtmap --aggregation-method weighted_sum  # (default)
+debtmap --aggregation-method sum
+debtmap --aggregation-method logarithmic_sum
+debtmap --aggregation-method max_plus_average
 ```
 
 **Common issues**:
@@ -710,6 +709,48 @@ debtmap --no-god-object
 - Intentional large aggregator classes
 - Reducing noise in results
 
+### Detail Level Control
+
+**Flag**: `--detail-level <level>`
+
+Controls the level of detail in analysis output.
+
+```bash
+# Available detail levels:
+debtmap --detail-level summary        # High-level overview only
+debtmap --detail-level standard       # (default) Balanced detail
+debtmap --detail-level comprehensive  # Detailed analysis
+debtmap --detail-level debug         # Full debug information
+```
+
+**When to use**:
+- `summary`: Quick overview for large codebases
+- `standard`: Default, appropriate for most use cases
+- `comprehensive`: Deep dive into specific issues
+- `debug`: Troubleshooting analysis behavior
+
+### Aggregation Control
+
+**Flags**: `--aggregate-only`, `--no-aggregation`
+
+Control file-level score aggregation.
+
+```bash
+# Show only aggregated file-level scores
+debtmap --aggregate-only
+
+# Disable file-level aggregation entirely
+debtmap --no-aggregation
+
+# Default: show both individual items and file aggregates
+debtmap
+```
+
+**Use cases**:
+- `--aggregate-only`: Focus on file-level technical debt
+- `--no-aggregation`: See individual functions/classes only
+- Default: Full picture with both levels
+
 ### Combining Advanced Flags
 
 ```bash
@@ -721,6 +762,9 @@ debtmap --min-problematic 1 --min-priority 0 --no-god-object
 
 # Performance-focused advanced analysis
 debtmap --multi-pass --jobs 8 --cache-location ~/.cache/debtmap
+
+# Summary view with aggregated scores
+debtmap --detail-level summary --aggregate-only
 ```
 
 ## Error Messages Reference
@@ -1140,6 +1184,8 @@ The `compare` command helps track changes in technical debt over time.
 
 ### Basic Usage
 
+**Note**: The `compare` command defaults to JSON output format (unlike `analyze` which defaults to terminal). Use `--format terminal` or `--format markdown` if you need different output.
+
 ```bash
 # Save baseline results
 debtmap --format json --output before.json
@@ -1149,9 +1195,35 @@ debtmap --format json --output before.json
 # Save new results
 debtmap --format json --output after.json
 
-# Compare results
+# Compare results (outputs JSON by default)
 debtmap compare --before before.json --after after.json
+
+# Compare with terminal output
+debtmap compare --before before.json --after after.json --format terminal
 ```
+
+### Targeted Comparison
+
+Use `--plan` and `--target-location` for focused debt analysis:
+
+```bash
+# Compare based on implementation plan
+debtmap compare --before before.json --after after.json --plan implementation-plan.json
+
+# Compare specific code location
+debtmap compare --before before.json --after after.json \
+  --target-location src/main.rs:calculate_score:42
+
+# Combine both for precise tracking
+debtmap compare --before before.json --after after.json \
+  --plan implementation-plan.json \
+  --target-location src/analyzers/complexity.rs:analyze_function:128
+```
+
+**Use cases**:
+- `--plan`: Track debt changes for planned refactoring tasks
+- `--target-location`: Focus on specific function or code location
+- Combine for granular technical debt tracking
 
 ### Incompatible Format Errors
 
@@ -1214,6 +1286,67 @@ debtmap --format json --output after.json
 debtmap --format json --output-format unified --output before.json
 debtmap --format json --output-format unified --output after.json
 ```
+
+## Validate Command Issues
+
+The `validate` command checks if a codebase meets specified quality thresholds, useful for CI/CD pipelines.
+
+### Basic Validation
+
+```bash
+# Validate codebase passes default thresholds
+debtmap validate /path/to/project
+
+# Exit code 0 if passes, non-zero if validation fails
+```
+
+### Debt Density Validation
+
+**Flag**: `--max-debt-density <number>`
+
+Sets the maximum acceptable technical debt per 1000 lines of code.
+
+```bash
+# Set maximum acceptable debt density (per 1000 LOC)
+debtmap validate /path/to/project --max-debt-density 10.0
+
+# Stricter threshold for critical projects
+debtmap validate /path/to/project --max-debt-density 5.0
+
+# Lenient threshold for legacy code
+debtmap validate /path/to/project --max-debt-density 20.0
+```
+
+**Troubleshooting validation failures**:
+```bash
+# See which files exceed threshold
+debtmap validate /path/to/project --max-debt-density 10.0 -v
+
+# Get detailed breakdown
+debtmap validate /path/to/project --max-debt-density 10.0 -vv
+
+# Analyze specific files that failed
+debtmap /path/to/problematic/file.rs -v
+```
+
+### CI/CD Integration
+
+```bash
+# In CI pipeline (fails build if validation fails)
+debtmap validate . --max-debt-density 10.0 || exit 1
+
+# With verbose output for debugging
+debtmap validate . --max-debt-density 10.0 -v
+
+# Save validation report
+debtmap validate . --max-debt-density 10.0 --format json --output validation.json
+```
+
+**Use cases**:
+- Enforce quality gates in CI/CD pipelines
+- Prevent accumulation of technical debt over time
+- Track debt density trends across releases
+- Set different thresholds for different parts of codebase
 
 ## FAQ
 
