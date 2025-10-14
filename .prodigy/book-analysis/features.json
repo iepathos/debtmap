@@ -1,0 +1,805 @@
+{
+  "project_info": {
+    "name": "Debtmap",
+    "version": "0.2.7",
+    "description": "Code complexity and technical debt analyzer written in Rust",
+    "analysis_date": "2025-01-13",
+    "purpose": "Identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction"
+  },
+  "cli_commands": {
+    "analyze": {
+      "description": "Comprehensive analysis with unified prioritization for testing and refactoring efforts",
+      "primary_options": {
+        "path": "Directory or file to analyze",
+        "format": "Output format (json, markdown, terminal)",
+        "output": "Output file path (defaults to stdout)",
+        "json_format": "JSON structure format (legacy or unified)"
+      },
+      "threshold_options": {
+        "threshold_complexity": "Cyclomatic complexity threshold (default: 10)",
+        "threshold_duplication": "Code duplication threshold in lines (default: 50)",
+        "threshold_preset": "Preset thresholds (strict, balanced, lenient)"
+      },
+      "language_options": {
+        "languages": "Comma-separated list of languages to analyze (rust, python, javascript, typescript)"
+      },
+      "coverage_options": {
+        "coverage_file": "LCOV coverage file for risk analysis (alias: --lcov)",
+        "enable_context": "Enable context-aware risk analysis",
+        "context_providers": "Context providers (critical_path, dependency, git_history)",
+        "disable_context": "Disable specific context providers"
+      },
+      "output_control": {
+        "top": "Show only top N priority items (alias: --head)",
+        "tail": "Show only bottom N priority items",
+        "summary": "Use summary format with tiered priority display",
+        "group_by_category": "Group output by debt category",
+        "min_priority": "Minimum priority to display (low, medium, high, critical)",
+        "filter_categories": "Filter by debt categories (comma-separated)"
+      },
+      "analysis_modes": {
+        "semantic_off": "Disable semantic analysis (fallback mode)",
+        "no_context_aware": "Disable context-aware false positive reduction (enabled by default)",
+        "multi_pass": "Enable multi-pass analysis with attribution",
+        "show_attribution": "Show complexity attribution details"
+      },
+      "performance_options": {
+        "no_parallel": "Disable parallel processing",
+        "jobs": "Number of threads for parallel processing (0 = all cores)",
+        "plain": "Plain output mode: ASCII-only, no colors, no emoji"
+      },
+      "cache_options": {
+        "use_cache": "Enable caching (deprecated, now default)",
+        "no_cache": "Disable caching for this run",
+        "clear_cache": "Clear cache before running",
+        "force_cache_rebuild": "Force cache rebuild",
+        "cache_stats": "Show cache statistics and location",
+        "migrate_cache": "Migrate cache from local to shared location",
+        "cache_location": "Cache location strategy (local, shared, or path)"
+      },
+      "verbosity_options": {
+        "verbosity": "Increase verbosity level (-v, -vv, -vvv)",
+        "verbose_macro_warnings": "Show verbose macro parsing warnings",
+        "show_macro_stats": "Show macro expansion statistics"
+      },
+      "god_object_options": {
+        "no_god_object": "Disable god object detection",
+        "aggregate_only": "Show only aggregated file-level scores",
+        "no_aggregation": "Disable file-level aggregation",
+        "aggregation_method": "File aggregation method (sum, weighted_sum, logarithmic_sum, max_plus_average)",
+        "min_problematic": "Minimum number of problematic functions for file aggregation"
+      },
+      "advanced_options": {
+        "detail_level": "Detail level for diagnostic reports (summary, standard, comprehensive, debug)",
+        "max_files": "Maximum number of files to analyze",
+        "validate_loc": "Validate LOC consistency across analysis modes"
+      }
+    },
+    "init": {
+      "description": "Initialize configuration file for the project",
+      "options": {
+        "force": "Force overwrite existing configuration file"
+      }
+    },
+    "validate": {
+      "description": "Validate code against configured thresholds and fail if metrics exceed limits",
+      "options": {
+        "path": "Path to analyze",
+        "config": "Configuration file to use (default: .debtmap.toml)",
+        "coverage_file": "LCOV coverage file for risk-based validation",
+        "format": "Output format for validation report",
+        "output": "Output file for validation results",
+        "max_debt_density": "Maximum debt density allowed (per 1000 LOC)"
+      },
+      "supports": "All analyze command options for coverage, context, filtering, and output control"
+    },
+    "compare": {
+      "description": "Compare two analysis results to track improvements and detect regressions",
+      "options": {
+        "before": "Path to baseline analysis (JSON format)",
+        "after": "Path to current analysis (JSON format)",
+        "plan": "Implementation plan file (extracts target from **Target:** markers)",
+        "target_location": "Target location to track (format: file:function:line)",
+        "format": "Output format (json, markdown, terminal)",
+        "output": "Output file (defaults to stdout)"
+      },
+      "use_cases": [
+        "Validate refactoring efforts achieved goals",
+        "Track complexity reduction over time",
+        "Detect new critical debt items (regressions)",
+        "Measure coverage improvements",
+        "Monitor project health trends"
+      ],
+      "comparison_results": {
+        "target_status": "Resolved, Improved, Unchanged, Regressed, or Not Found",
+        "overall_trend": "Improving, Stable, or Regressing",
+        "regressions": "New critical debt items introduced",
+        "metrics": "Complexity reduction, coverage improvement, score changes",
+        "project_health": "Before/after comparison with detailed breakdowns"
+      }
+    }
+  },
+  "core_analysis": {
+    "language_support": {
+      "rust": {
+        "status": "Full support",
+        "parser": "syn AST parser",
+        "capabilities": [
+          "Full AST parsing",
+          "Macro expansion support",
+          "Call graph extraction",
+          "Trait and implementation tracking",
+          "Type inference",
+          "Semantic classification"
+        ]
+      },
+      "python": {
+        "status": "Full support",
+        "parser": "rustpython-parser",
+        "capabilities": [
+          "AST parsing",
+          "Type inference",
+          "Error handling analysis",
+          "Purity detection"
+        ]
+      },
+      "javascript": {
+        "status": "Full support",
+        "parser": "tree-sitter",
+        "capabilities": [
+          "AST parsing",
+          "Module analysis",
+          "Complexity metrics"
+        ]
+      },
+      "typescript": {
+        "status": "Full support",
+        "parser": "tree-sitter",
+        "capabilities": [
+          "AST parsing",
+          "Type analysis",
+          "Module analysis",
+          "Complexity metrics"
+        ]
+      }
+    },
+    "complexity_metrics": {
+      "cyclomatic_complexity": {
+        "description": "Measures number of linearly independent paths through code",
+        "thresholds": {
+          "1-5": "Simple, easy to test",
+          "6-10": "Moderate complexity",
+          "11-20": "Complex, consider refactoring",
+          "20+": "Very complex, high risk"
+        }
+      },
+      "cognitive_complexity": {
+        "description": "Measures how difficult code is to understand",
+        "factors": [
+          "Nesting depth",
+          "Control flow interruptions",
+          "Structural complexity"
+        ]
+      },
+      "entropy_based_analysis": {
+        "description": "Uses information theory to distinguish genuinely complex code from pattern-based repetitive code",
+        "components": {
+          "shannon_entropy": "Measures variety and unpredictability of code patterns (0.0-1.0)",
+          "pattern_repetition": "Detects repetitive structures in AST (0.0-1.0)",
+          "branch_similarity": "Analyzes similarity between conditional branches (0.0-1.0)",
+          "effective_complexity": "Adjusts raw complexity scores based on entropy analysis",
+          "token_classification": "Categorizes tokens by type with weighted importance"
+        },
+        "benefits": "Reduces false positives by up to 70% for validation functions, dispatchers, and configuration parsers",
+        "configuration": {
+          "enabled": "Enable/disable entropy analysis",
+          "weight": "Weight in complexity adjustment (0.0-1.0)",
+          "use_classification": "Enable advanced token classification",
+          "pattern_threshold": "Threshold for pattern detection (0.0-1.0)"
+        }
+      },
+      "nesting_depth": {
+        "description": "Measures maximum indentation level",
+        "impact": "Higher nesting increases cognitive load"
+      },
+      "function_length": {
+        "description": "Number of lines in function",
+        "threshold": "Functions over 50 lines flagged"
+      }
+    },
+    "call_graph_analysis": {
+      "description": "Builds and analyzes function call relationships",
+      "capabilities": [
+        "Dependency tracking (upstream and downstream)",
+        "Entry point identification",
+        "Critical path detection",
+        "Transitive coverage propagation",
+        "Semantic function classification"
+      ],
+      "classifications": {
+        "entry_points": "main, handlers, API endpoints (multiplier: 1.5x)",
+        "business_logic": "Core domain functions (multiplier: 1.2x)",
+        "data_access": "Database, file I/O (multiplier: 1.0x)",
+        "infrastructure": "Logging, configuration (multiplier: 0.8x)",
+        "utilities": "Helpers, formatters (multiplier: 0.5x)",
+        "test_code": "Test functions, fixtures (multiplier: 0.1x)"
+      }
+    },
+    "semantic_analysis": {
+      "description": "Context-aware analysis that reduces false positives",
+      "features": [
+        "Function role detection",
+        "Pattern recognition",
+        "Purity detection",
+        "Test code identification",
+        "Entry point detection"
+      ],
+      "enabled_by_default": true
+    }
+  },
+  "debt_detection": {
+    "core_patterns": {
+      "long_methods": "Functions exceeding recommended line counts",
+      "deep_nesting": "Code with excessive indentation levels",
+      "large_files": "Files that have grown too large to maintain",
+      "circular_dependencies": "Modules that depend on each other",
+      "high_coupling": "Excessive dependencies between modules",
+      "markers": "TODO/FIXME/HACK comments requiring attention",
+      "duplication": "Similar code blocks that could be refactored",
+      "high_complexity": "Functions with excessive cyclomatic or cognitive complexity",
+      "error_swallowing": "Catch blocks that suppress errors without proper handling",
+      "dead_code": "Unused functions and modules that can be removed",
+      "testing_gaps": "Complex functions lacking adequate test coverage",
+      "risk_hotspots": "Functions combining high complexity with low coverage"
+    },
+    "security_patterns": {
+      "hardcoded_secrets": "API keys, passwords, tokens in source code",
+      "weak_cryptography": "Deprecated or insecure cryptographic algorithms",
+      "sql_injection": "Unsafe dynamic SQL query construction",
+      "unsafe_code": "Unnecessary or poorly justified unsafe operations",
+      "input_validation": "Missing validation for user inputs and external data"
+    },
+    "resource_management": {
+      "inefficient_allocations": "Unnecessary heap allocations and memory waste",
+      "string_concatenation": "Inefficient string building in loops",
+      "nested_loops": "O(n²) and higher complexity patterns",
+      "blocking_io": "Synchronous operations in async contexts",
+      "suboptimal_structures": "Using wrong collections for access patterns"
+    },
+    "code_organization": {
+      "god_objects": {
+        "description": "Classes/modules with too many responsibilities",
+        "detection_criteria": [
+          "Method count - Number of methods/functions in class/module",
+          "Field count - Number of fields/attributes",
+          "Responsibility count - Number of distinct responsibilities",
+          "Lines of code - Overall size of class/module"
+        ],
+        "thresholds": {
+          "max_methods": 20,
+          "max_fields": 15,
+          "max_responsibilities": 5
+        },
+        "scoring": "0-100% god object score",
+        "recommendations": "Split into smaller, focused modules"
+      },
+      "feature_envy": "Methods using more data from other classes than their own",
+      "primitive_obsession": "Overuse of basic types instead of domain objects",
+      "magic_values": "Unexplained literal values throughout code"
+    },
+    "testing_quality": {
+      "complex_assertions": "Tests that are hard to understand or maintain",
+      "flaky_patterns": "Non-deterministic test behaviors",
+      "excessive_complexity": "Tests with high cyclomatic complexity"
+    },
+    "error_handling": {
+      "async_errors": "Improper handling of asynchronous operations",
+      "error_context": "Missing context in error messages",
+      "error_propagation": "Improper error propagation patterns",
+      "panic_patterns": "Unsafe panic usage"
+    },
+    "suppression": {
+      "inline_comments": {
+        "formats": [
+          "debtmap:ignore - Suppress all debt types on current line",
+          "debtmap:ignore-next-line - Suppress all debt types on next line",
+          "debtmap:ignore-start / debtmap:ignore-end - Suppress block of code",
+          "debtmap:ignore[todo] - Suppress only TODO markers",
+          "debtmap:ignore[fixme] - Suppress only FIXME markers",
+          "debtmap:ignore[hack] - Suppress only HACK markers",
+          "debtmap:ignore[*] - Suppress all types (wildcard)"
+        ],
+        "supports_languages": ["rust", "python", "javascript", "typescript"]
+      },
+      "config_file": {
+        "description": "Ignore entire files or directories via .debtmap.toml",
+        "pattern_syntax": "Glob patterns (*, **, ?, [abc], [!abc])"
+      }
+    }
+  },
+  "risk_assessment": {
+    "coverage_integration": {
+      "description": "Correlates complexity metrics with test coverage to identify truly risky code",
+      "supported_formats": {
+        "lcov": "Standard coverage format supported by most tools",
+        "tools": [
+          "Rust: cargo tarpaulin --out lcov",
+          "JavaScript/TypeScript: jest --coverage --coverageReporters=lcov",
+          "Python: pytest --cov --cov-report=lcov",
+          "Go: go test -coverprofile + gocover-cobertura"
+        ]
+      },
+      "performance": {
+        "index_build_time": "O(n), ~20-30ms for 5000 functions",
+        "lookup_time": "O(1) for exact matches (~0.5μs), O(log n) for fallback (~5-8μs)",
+        "memory_usage": "~200 bytes per record (~2MB for 5000 functions)",
+        "analysis_overhead": "~2.5x baseline (target: ≤3x)",
+        "thread_safety": "Arc<CoverageIndex> for lock-free parallel access"
+      }
+    },
+    "risk_scoring": {
+      "description": "Functions scored based on complexity-coverage correlation",
+      "levels": {
+        "critical": "50+ - High complexity with low/no coverage",
+        "high": "25-49 - Medium-high complexity with poor coverage",
+        "medium": "10-24 - Moderate complexity or coverage gaps",
+        "low": "5-9 - Well-tested or simple functions"
+      }
+    },
+    "unified_scoring": {
+      "description": "Multi-factor scoring system (0-10 scale) for prioritizing technical debt",
+      "formula": "Base Score = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)",
+      "factors": {
+        "complexity_factor": {
+          "weight": "40%",
+          "calculation": "min(10, (cyclomatic / 10 + cognitive / 20) × 5)",
+          "description": "Combines cyclomatic and cognitive complexity"
+        },
+        "coverage_factor": {
+          "weight": "40%",
+          "calculation": "10 × (1 - coverage_percentage) × complexity_weight",
+          "special_cases": {
+            "test_functions": "0 (don't need coverage)",
+            "no_coverage_data": "10 (assume worst case)",
+            "transitive_coverage": "Considers coverage through call graph"
+          }
+        },
+        "dependency_factor": {
+          "weight": "20%",
+          "calculation": "Based on upstream/downstream dependencies, normalized to 0-10",
+          "ranges": {
+            "entry_points": "8-10 (critical path)",
+            "business_logic": "6-8 (core functionality)",
+            "data_access": "5-7 (important but stable)",
+            "utilities": "3-5 (lower priority)",
+            "test_helpers": "1-3 (lowest priority)"
+          }
+        }
+      },
+      "role_multiplier": {
+        "description": "Final Score = Base Score × Role Multiplier",
+        "multipliers": {
+          "entry_points": "1.5x",
+          "business_logic": "1.2x",
+          "data_access": "1.0x",
+          "infrastructure": "0.8x",
+          "utilities": "0.5x",
+          "test_code": "0.1x"
+        }
+      },
+      "coverage_propagation": {
+        "description": "Coverage impact flows through call graph",
+        "formula": "Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)",
+        "behavior": "Functions called by well-tested code have reduced urgency"
+      },
+      "priority_classification": {
+        "critical": "9.0-10.0 - Immediate action required",
+        "high": "7.0-8.9 - Should be addressed soon",
+        "medium": "5.0-6.9 - Plan for next sprint",
+        "low": "3.0-4.9 - Nice to have",
+        "minimal": "0.0-2.9 - Can be deferred"
+      }
+    },
+    "coverage_dampening": {
+      "description": "Coverage data dampens debt scores for well-tested code",
+      "formula": "Final Score = Base Score × (1.0 - coverage_percentage)",
+      "examples": {
+        "100_percent_coverage": "Multiplier = 0.0 → Near-zero debt score (well-tested, low priority)",
+        "50_percent_coverage": "Multiplier = 0.5 → Half the base score (moderate priority)",
+        "0_percent_coverage": "Multiplier = 1.0 → Full base score (untested, high priority)"
+      },
+      "invariant": "Total debt score with coverage ≤ total debt score without coverage",
+      "untested_surfacing": "Functions with 0% coverage and complexity ≥ 10 marked [UNTESTED]"
+    },
+    "testing_recommendations": {
+      "risk_based_prioritization": "Functions ranked by complexity-coverage correlation",
+      "test_effort_estimation": "Complexity-based test case recommendations",
+      "actionable_insights": "Concrete steps to reduce overall codebase risk"
+    },
+    "context_providers": {
+      "critical_path": "Identifies functions on critical execution paths",
+      "dependency": "Analyzes dependency relationships and impact",
+      "git_history": "Uses version control history to identify change frequency"
+    }
+  },
+  "output_formats": {
+    "terminal": {
+      "description": "Human-readable table format with colors and formatting",
+      "features": [
+        "Colored output for severity levels",
+        "Table-based layout",
+        "Summary statistics",
+        "Tiered priority display",
+        "God object indicators"
+      ]
+    },
+    "json": {
+      "description": "Machine-parseable structured output",
+      "formats": {
+        "legacy": "Current format with {File: {...}} and {Function: {...}} wrappers",
+        "unified": "New format with consistent structure and 'type' field (spec 108)"
+      },
+      "structure": {
+        "items": "Array of debt items with location, scores, and metrics",
+        "call_graph": "Call graph statistics",
+        "overall_coverage": "Project-wide coverage percentage",
+        "total_impact": "Aggregated impact metrics"
+      }
+    },
+    "markdown": {
+      "description": "Formatted markdown for reports and documentation",
+      "features": [
+        "Hierarchical structure",
+        "Code blocks for context",
+        "Links to source locations",
+        "Severity indicators"
+      ]
+    }
+  },
+  "configuration": {
+    "config_file": ".debtmap.toml",
+    "sections": {
+      "thresholds": {
+        "complexity": "Cyclomatic complexity threshold",
+        "duplication": "Code duplication threshold in lines",
+        "max_file_lines": "Maximum lines per file",
+        "max_function_lines": "Maximum lines per function",
+        "max_nesting_depth": "Maximum nesting depth",
+        "minimum_debt_score": "Minimum unified score to include (0.0-10.0)",
+        "minimum_cyclomatic_complexity": "Skip functions with cyclomatic <= this value",
+        "minimum_cognitive_complexity": "Skip functions with cognitive <= this value",
+        "minimum_risk_score": "Minimum risk score for Risk debt types"
+      },
+      "entropy": {
+        "enabled": "Enable entropy-based complexity analysis",
+        "weight": "Weight of entropy in complexity adjustment (0.0-1.0)",
+        "min_tokens": "Minimum tokens required for entropy calculation",
+        "pattern_threshold": "Pattern similarity threshold for detection",
+        "use_classification": "Enable advanced token classification",
+        "entropy_threshold": "Entropy level below which dampening is applied",
+        "branch_threshold": "Branch similarity above which dampening is applied",
+        "max_combined_reduction": "Maximum combined complexity reduction percentage"
+      },
+      "scoring": {
+        "coverage": "Weight for coverage factor (default: 0.40)",
+        "complexity": "Weight for complexity factor (default: 0.40)",
+        "dependency": "Weight for dependency criticality (default: 0.20)",
+        "customizable": "Weights must sum to 1.0"
+      },
+      "ignore": {
+        "patterns": "Array of glob patterns to ignore during analysis",
+        "examples": [
+          "tests/**/*",
+          "**/*.test.rs",
+          "**/fixtures/**",
+          "target/**",
+          "node_modules/**"
+        ]
+      },
+      "languages": {
+        "enabled": "Array of languages to analyze (rust, python, javascript, typescript)"
+      },
+      "external_api": {
+        "detect_external_api": "Control external API detection for dead code analysis",
+        "api_functions": "Explicitly mark functions as external APIs",
+        "api_files": "Mark files containing external APIs (glob patterns supported)"
+      },
+      "god_object": {
+        "enabled": "Enable god object detection",
+        "max_methods": "Maximum methods before flagging (default: 20)",
+        "max_fields": "Maximum fields before flagging (default: 15)",
+        "max_responsibilities": "Maximum responsibilities before flagging (default: 5)"
+      },
+      "tiers": {
+        "t2_complexity_threshold": "Complexity threshold for Tier 2 (complex untested)",
+        "t2_dependency_threshold": "Dependency threshold for Tier 2",
+        "t3_complexity_threshold": "Complexity threshold for Tier 3 (testing gaps)",
+        "show_t4_in_main_report": "Show Tier 4 items in main report (default: false)",
+        "tier_weights": "Tier weights for score adjustment (t1: 1.5, t2: 1.0, t3: 0.7, t4: 0.3)"
+      }
+    }
+  },
+  "tiered_prioritization": {
+    "description": "Surfaces critical architectural issues above simple testing gaps",
+    "tiers": {
+      "tier_1_critical_architecture": {
+        "description": "God Objects, God Modules, excessive complexity",
+        "priority": "Must address before adding new features",
+        "impact": "High impact on maintainability",
+        "weight": "1.5x",
+        "examples": [
+          "Files with 15+ responsibilities",
+          "Modules with 50+ methods"
+        ]
+      },
+      "tier_2_complex_untested": {
+        "description": "Untested code with high complexity or dependencies",
+        "priority": "Risk of bugs in critical paths",
+        "action": "Should be tested before refactoring",
+        "weight": "1.0x",
+        "examples": [
+          "Functions with cyclomatic complexity > 15 and 0% coverage"
+        ]
+      },
+      "tier_3_testing_gaps": {
+        "description": "Untested code with moderate complexity",
+        "priority": "Improve coverage to prevent future issues",
+        "weight": "0.7x",
+        "examples": [
+          "Functions with cyclomatic complexity 10-15 and low coverage"
+        ]
+      },
+      "tier_4_maintenance": {
+        "description": "Low-complexity issues",
+        "priority": "Address opportunistically",
+        "weight": "0.3x",
+        "examples": [
+          "Simple functions with minor code quality issues"
+        ]
+      }
+    }
+  },
+  "file_level_scoring": {
+    "description": "Aggregates and analyzes entire files for architectural refactoring",
+    "formula": "File Score = Size × Complexity × Coverage × Density × GodObject × FunctionScores",
+    "factors": {
+      "size_factor": "sqrt(total_lines / 100) - Larger files have higher impact",
+      "complexity_factor": "Combines average and total complexity across all functions",
+      "coverage_factor": "(1 - coverage_percent) × 2 + 1 - Lower coverage increases score",
+      "density_factor": "Penalizes files with >50 functions (possible god object)",
+      "god_object_multiplier": "2.0 + god_object_score when god object detected",
+      "function_scores": "Sum of all function scores divided by 10"
+    },
+    "use_cases": [
+      "Planning major refactoring initiatives",
+      "Identifying architectural issues (god objects, poor cohesion)",
+      "Breaking up monolithic modules",
+      "Evaluating overall codebase health"
+    ],
+    "aggregation_methods": {
+      "sum": "Simple sum of all function scores",
+      "weighted_sum": "Weighted by complexity and coverage (default)",
+      "logarithmic_sum": "Dampens impact of many small issues",
+      "max_plus_average": "Considers worst function plus average"
+    }
+  },
+  "function_level_scoring": {
+    "description": "Identifies specific functions needing attention",
+    "metrics": [
+      "Cyclomatic complexity",
+      "Cognitive complexity",
+      "Nesting depth",
+      "Direct coverage percentage",
+      "Call graph dependencies"
+    ],
+    "use_cases": [
+      "Identifying specific hot spots in code",
+      "Planning sprint work for individual developers",
+      "Writing unit tests for uncovered functions",
+      "Doing targeted performance optimization"
+    ]
+  },
+  "cache_management": {
+    "description": "Intelligent cache system for speeding up repeated analyses",
+    "location_priority": [
+      "$DEBTMAP_CACHE_DIR environment variable",
+      "$XDG_CACHE_HOME/debtmap (Linux/Unix)",
+      "~/Library/Caches/debtmap (macOS)",
+      "%APPDATA%/debtmap/cache (Windows)"
+    ],
+    "configuration": {
+      "DEBTMAP_CACHE_AUTO_PRUNE": "Enable/disable automatic cache pruning (default: true)",
+      "DEBTMAP_CACHE_MAX_SIZE": "Maximum cache size in bytes (default: 1GB)",
+      "DEBTMAP_CACHE_MAX_AGE_DAYS": "Maximum age for cache entries in days (default: 30)",
+      "DEBTMAP_CACHE_MAX_ENTRIES": "Maximum number of cache entries (default: 10000)",
+      "DEBTMAP_CACHE_PRUNE_PERCENTAGE": "Percentage of cache to remove when limits are hit (default: 0.25)",
+      "DEBTMAP_CACHE_STRATEGY": "Pruning strategy (lru, lfu, fifo, age_based; default: lru)"
+    },
+    "pruning_strategies": {
+      "lru": "Least Recently Used - Removes entries that haven't been accessed recently",
+      "lfu": "Least Frequently Used - Removes entries with lowest access count",
+      "fifo": "First In, First Out - Removes oldest entries based on creation time",
+      "age_based": "Only removes entries older than configured max age"
+    },
+    "features": [
+      "Automatic pruning when size or entry limits exceeded",
+      "Background processing to avoid blocking analysis",
+      "Orphan cleanup for deleted files",
+      "Smart eviction preserving frequently accessed entries"
+    ]
+  },
+  "parallel_processing": {
+    "description": "Built with Rust and Rayon for blazing-fast analysis",
+    "features": [
+      "CPU-bound operations parallelized with rayon::par_iter()",
+      "Lock-free concurrent access with DashMap",
+      "Thread-safe coverage index with Arc<CoverageIndex>",
+      "Configurable worker thread count"
+    ],
+    "performance": "10-100x faster than Java/Python-based competitors"
+  },
+  "best_practices": {
+    "analysis_workflow": [
+      "Start with default settings to understand codebase health",
+      "Use --lcov for coverage-based risk analysis",
+      "Focus on critical and high priority items first",
+      "Use --filter to focus on specific debt categories",
+      "Leverage --top N to avoid overwhelming output",
+      "Run with -vv for detailed score breakdowns when debugging priorities"
+    ],
+    "refactoring_strategy": [
+      "Address Tier 1 architectural issues before feature work",
+      "Test Tier 2 complex untested code before refactoring",
+      "Use compare command to validate improvements",
+      "Focus on high-score items for maximum impact",
+      "Consider file-level scores for module reorganization"
+    ],
+    "testing_strategy": [
+      "Prioritize untested functions with high complexity",
+      "Use coverage data to identify genuine risk hotspots",
+      "Test entry points with integration tests, not unit tests",
+      "Focus on business logic for unit test coverage",
+      "Use dependency analysis to understand impact"
+    ],
+    "configuration": [
+      "Start with balanced preset, adjust thresholds based on project needs",
+      "Enable entropy analysis to reduce false positives",
+      "Customize scoring weights based on project priorities",
+      "Use ignore patterns for test fixtures and generated code",
+      "Set minimum thresholds to filter trivial functions"
+    ],
+    "ci_integration": [
+      "Use validate command to enforce quality gates",
+      "Set appropriate thresholds for your project",
+      "Fail CI on new critical debt items",
+      "Track debt trends with compare command",
+      "Generate JSON reports for dashboards"
+    ]
+  },
+  "common_patterns": [
+    {
+      "name": "Basic Analysis",
+      "description": "Quick codebase health check",
+      "command": "debtmap analyze .",
+      "use_case": "Understanding overall technical debt"
+    },
+    {
+      "name": "Coverage-Based Risk Analysis",
+      "description": "Identify untested complex code",
+      "command": "debtmap analyze . --lcov target/coverage/lcov.info",
+      "use_case": "Prioritizing testing efforts"
+    },
+    {
+      "name": "Top Priority Items",
+      "description": "Focus on most critical issues",
+      "command": "debtmap analyze . --top 10 -vv",
+      "use_case": "Sprint planning and immediate fixes"
+    },
+    {
+      "name": "Architectural Review",
+      "description": "Find god objects and complexity hotspots",
+      "command": "debtmap analyze . --filter Architecture --group-by-category",
+      "use_case": "Major refactoring initiatives"
+    },
+    {
+      "name": "Validate Changes",
+      "description": "Compare before and after refactoring",
+      "command": "debtmap compare --before before.json --after after.json --target src/main.rs:process_data:100",
+      "use_case": "Validating refactoring effectiveness"
+    },
+    {
+      "name": "CI Quality Gate",
+      "description": "Enforce technical debt thresholds",
+      "command": "debtmap validate . --config .debtmap.toml --max-debt-density 50",
+      "use_case": "Continuous integration checks"
+    }
+  ],
+  "troubleshooting": {
+    "common_issues": [
+      {
+        "issue": "False positives for validation functions",
+        "solution": "Enable entropy analysis in .debtmap.toml to reduce false positives by up to 70%"
+      },
+      {
+        "issue": "Entry points dominating priority list",
+        "solution": "Entry points are weighted lower for coverage (0.6x) - this is expected. Use --filter to focus on specific categories."
+      },
+      {
+        "issue": "Cache taking too much disk space",
+        "solution": "Configure DEBTMAP_CACHE_MAX_SIZE or run 'debtmap analyze . --clear-cache' to clear cache"
+      },
+      {
+        "issue": "Analysis too slow",
+        "solution": "Ensure parallel processing is enabled (default), increase --jobs N for more threads, or use --max-files to limit scope"
+      },
+      {
+        "issue": "Coverage not correlating with functions",
+        "solution": "Ensure LCOV file contains line coverage data. Use -vv to see coverage lookup details."
+      },
+      {
+        "issue": "Too many low-priority items in output",
+        "solution": "Use --min-priority high, --top N, or set minimum_debt_score in .debtmap.toml"
+      }
+    ]
+  },
+  "integration_capabilities": {
+    "version_control": [
+      "Git history analysis for change frequency",
+      "Compare command for tracking improvements",
+      "Plan file integration for target tracking"
+    ],
+    "ci_cd": [
+      "Validate command for quality gates",
+      "JSON output for dashboard integration",
+      "Exit codes for CI failure conditions"
+    ],
+    "coverage_tools": [
+      "LCOV format (universal)",
+      "cargo-tarpaulin (Rust)",
+      "jest (JavaScript/TypeScript)",
+      "pytest (Python)",
+      "go test (Go with conversion)"
+    ]
+  },
+  "automation": {
+    "prodigy_workflows": {
+      "description": "Automated technical debt reduction through AI-driven workflows",
+      "workflow_file": "workflows/debtmap.yml",
+      "capabilities": [
+        "Isolated git worktree for safe experimentation",
+        "Iterative debt reduction (configurable iterations)",
+        "Automatic validation with tests and linting",
+        "Detailed metrics tracking",
+        "Map-reduce parallel agent processing"
+      ],
+      "command": "prodigy run workflows/debtmap.yml -yn 5",
+      "targets": [
+        "High complexity functions (cyclomatic > 10)",
+        "Untested complex code",
+        "Code duplication (>50 lines)",
+        "Deep nesting and long functions",
+        "Code style inconsistencies"
+      ]
+    }
+  },
+  "unique_capabilities": [
+    "Entropy-based complexity analysis distinguishes genuinely complex code from pattern-based repetitive code",
+    "Coverage-risk correlation identifies truly risky code (high complexity + low coverage)",
+    "Context-aware false positive reduction intelligently filters noise",
+    "Tiered prioritization prevents 'walls of similar-scored items'",
+    "Role-based coverage weighting accounts for entry points vs business logic",
+    "Transitive coverage propagation through call graph",
+    "God object detection with responsibility analysis",
+    "File-level and function-level scoring for different refactoring granularities",
+    "Quantified impact metrics (refactoring this will reduce complexity by 60%)",
+    "Actionable refactoring guidance with specific recommendations",
+    "Language-agnostic coverage integration via LCOV",
+    "10-100x faster than Java/Python competitors"
+  ],
+  "version_info": {
+    "analyzed_version": "0.2.7",
+    "analysis_date": "2025-01-13",
+    "rust_edition": "2021",
+    "license": "MIT"
+  }
+}
