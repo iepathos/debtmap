@@ -8,14 +8,14 @@ mode: mapreduce
 # Environment variables for parameterization
 env:
   # Project configuration
-  PROJECT_NAME: "Debtmap"
+  PROJECT_NAME: "Prodigy"
   PROJECT_CONFIG: ".prodigy/book-config.json"
   FEATURES_PATH: ".prodigy/book-analysis/features.json"
 
   # Book-specific settings
   BOOK_DIR: "book"
   ANALYSIS_DIR: ".prodigy/book-analysis"
-  CHAPTERS_FILE: "workflows/data/debtmap-chapters.json"
+  CHAPTERS_FILE: "workflows/data/prodigy-chapters.json"
 
   # Workflow settings
   MAX_PARALLEL: "3"
@@ -24,8 +24,13 @@ env:
 setup:
   - shell: "mkdir -p $ANALYSIS_DIR"
 
-  # Analyze codebase for workflow features, command types, and configuration
+  # Step 1: Analyze codebase for workflow features, command types, and configuration
   - claude: "/prodigy-analyze-features-for-book --project $PROJECT_NAME --config $PROJECT_CONFIG"
+    commit_required: true
+
+  # Step 2: Detect documentation gaps and create missing chapters
+  # Note: May not commit if no gaps found, which is a successful outcome
+  - claude: "/prodigy-detect-documentation-gaps --project $PROJECT_NAME --config $PROJECT_CONFIG --features $FEATURES_PATH --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR"
 
 # Map phase: Analyze and fix each book chapter for drift
 map:
@@ -46,11 +51,16 @@ map:
 # Reduce phase: Validate and handle any merge conflicts
 reduce:
   # Rebuild the book to ensure all chapters compile together
-  - shell: "cd $BOOK_DIR && mdbook build"
+  - shell: "cd book && mdbook build"
     on_failure:
       # Only needed if there are build errors (broken links, etc)
       claude: "/prodigy-fix-book-build-errors --project $PROJECT_NAME"
       commit_required: true
+
+  # Clean up temporary analysis files
+  - shell: "rm -rf ${ANALYSIS_DIR}"
+  - shell: "git add -A && git commit -m 'chore: remove temporary book analysis files for ${PROJECT_NAME}' || true"
+ 
 
 # Error handling
 error_policy:
@@ -62,13 +72,6 @@ error_policy:
 # Custom merge workflow - cleanup and validation before merging
 merge:
   commands:
-    # Step 1: Clean up temporary analysis files
-    - shell: "rm -rf ${ANALYSIS_DIR}"
-    - shell: "git add -A && git commit -m 'chore: remove temporary book analysis files for ${PROJECT_NAME}' || true"
-
-    # Step 2: Validate book builds successfully
-    - shell: "cd ${BOOK_DIR} && mdbook build"
-
     # Step 3: Fetch latest changes and merge master into worktree
     - shell: "git fetch origin"
     - claude: "/prodigy-merge-master --project ${PROJECT_NAME}"
