@@ -100,7 +100,7 @@ debtmap validate <PATH> [OPTIONS]
 **Description:**
 Similar to `analyze` but enforces thresholds defined in configuration file. Returns non-zero exit code if thresholds are exceeded, making it suitable for CI/CD integration.
 
-The `validate` command supports a focused subset of `analyze` options, primarily for output control, coverage integration, context-aware analysis, and display filtering. Analysis thresholds (complexity, duplication, presets) are typically configured via the `--config` file rather than command-line flags.
+The `validate` command supports a focused subset of `analyze` options, primarily for output control, coverage integration, context-aware analysis, and display filtering. The validate command does not support `--threshold-complexity`, `--threshold-duplication`, or `--threshold-preset` flags (these are analyze-only). Instead, configure thresholds in the `.debtmap.toml` config file. Performance options like `--jobs`, `--cache-*`, and `--languages` are also not available in validate.
 
 **Exit Codes:**
 - `0` - Success (no errors, all thresholds passed)
@@ -123,7 +123,7 @@ debtmap compare --before <FILE> --after <FILE> [OPTIONS]
 - `--plan <FILE>` - Path to implementation plan (to extract target location)
 - `--target-location <LOCATION>` - Target location in format `file:function:line`
 
-**Note:** `--plan` and `--target-location` are mutually exclusive options; use one or the other to specify the target location.
+**Note:** `--plan` and `--target-location` are mutually exclusive options. Using both together will cause a CLI error. Use one or the other to specify the target location.
 
 **Output Options:**
 - `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: json)
