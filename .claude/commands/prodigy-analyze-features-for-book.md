@@ -55,6 +55,8 @@ Instead of hardcoding "Prodigy workflow" or "Prodigy features":
 
 ### Phase 3: Create Feature Inventory
 
+**IMPORTANT: You MUST create a JSON file using the Write tool. This is NOT optional.**
+
 **Determine Output Path:**
 Based on the project configuration:
 - Extract `book_dir` from config (defaults to "book")
@@ -62,7 +64,8 @@ Based on the project configuration:
 - For Prodigy: `.prodigy/book-analysis/features.json`
 - For Debtmap: `.debtmap/book-analysis/features.json`
 
-Create a JSON file at the determined path with this structure:
+**Action Required:**
+Use the Write tool to create a JSON file at the determined path with this structure:
 
 ```json
 {
@@ -247,3 +250,20 @@ The features.json file should:
 5. Include troubleshooting guidance (if `custom_analysis.include_troubleshooting` is true)
 6. Be user-focused, not developer-focused
 7. Be project-agnostic (work for any codebase with proper configuration)
+
+### Phase 7: Commit the Changes
+
+**CRITICAL: This step requires a commit to be created.**
+
+After creating the features.json file:
+1. Add the file to git: `git add .{project_lowercase}/book-analysis/features.json`
+2. Create a commit with a descriptive message:
+   ```
+   chore: analyze {project_name} features for book documentation
+
+   Generated comprehensive feature inventory covering:
+   - [List key areas analyzed]
+
+   This analysis will be used to detect documentation drift.
+   ```
+3. Verify the commit was created successfully with `git log -1`
