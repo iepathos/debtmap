@@ -326,6 +326,17 @@ pub fn calculate_unified_priority_with_debt(
                 &composition_metrics,
             );
 
+            // Log adjustment details for observability (spec 110)
+            log::debug!(
+                "Orchestration adjustment applied to {}:{} - Original: {:.2}, Adjusted: {:.2}, Reduction: {:.1}%, Reason: {}",
+                func.file.display(),
+                func.name,
+                adjustment.original_score,
+                adjustment.adjusted_score,
+                adjustment.reduction_percent,
+                adjustment.adjustment_reason
+            );
+
             (
                 adjustment.adjusted_score,
                 Some(normalized_score),

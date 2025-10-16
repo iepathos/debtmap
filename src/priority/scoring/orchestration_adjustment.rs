@@ -68,6 +68,18 @@ impl ReductionPercent {
 /// This configuration allows tuning of the adjustment algorithm to match
 /// project-specific needs while maintaining sensible defaults.
 ///
+/// # Design Note: Quality-Based vs Confidence-Based Scoring
+///
+/// This implementation uses a **quality-based** model rather than a confidence-based model.
+/// While the original spec 110 proposed confidence-based reductions (high ≥0.7: 30%,
+/// medium 0.5-0.7: 20%, low <0.5: 10%), the semantic classifier (spec 117) provides
+/// binary classifications without confidence scores. The quality-based approach is more
+/// appropriate because it:
+/// - Provides granular adjustments based on measurable composition metrics
+/// - Uses delegation ratio, callee count, and local complexity as quality indicators
+/// - Produces a continuous quality score (0.0-1.0) rather than discrete confidence levels
+/// - Better captures orchestration patterns (high delegation + low complexity = better)
+///
 /// # Example
 ///
 /// ```toml
@@ -279,6 +291,14 @@ pub fn extract_composition_metrics(
 /// - **Orchestrator**: Receives graduated reduction based on composition quality
 /// - **Other roles**: No adjustment (PureLogic, IOWrapper, EntryPoint, PatternMatch already have multipliers from spec 117)
 ///
+/// Note: The original spec 110 mentioned adjustments for "Worker" and "EntryPoint" roles,
+/// but these are handled by spec 117's role multipliers applied earlier in the pipeline:
+/// - PureLogic (similar to "pure workers"): 1.2× multiplier (increases priority)
+/// - EntryPoint: 0.9× multiplier (slight reduction)
+/// - Orchestrator: 0.8× multiplier + additional orchestration adjustment
+/// This separation of concerns is intentional: spec 117 provides role-based multipliers,
+/// while spec 110 focuses solely on reducing orchestrator false positives.
+///
 /// # Example
 ///
 /// ```text
@@ -417,7 +437,9 @@ fn adjust_orchestrator_score(
 /// Poor: 2 callees, 10% delegation, complexity 8
 /// → callee_quality(0.1) + delegation_quality(0.0) + complexity_quality(0.0) = 0.1 → clamped to min (0.5)
 /// ```
-fn calculate_composition_quality(
+///
+/// Made public for benchmarking and testing purposes.
+pub fn calculate_composition_quality(
     config: &OrchestrationAdjustmentConfig,
     metrics: &CompositionMetrics,
 ) -> f64 {
@@ -651,8 +673,8 @@ mod tests {
         };
         let quality = calculate_composition_quality(&config, &poor);
         assert!(
-            quality >= config.min_composition_quality && quality < 0.5,
-            "Poor quality should be between min and 0.5, got {}",
+            quality >= config.min_composition_quality && quality <= 0.5,
+            "Poor quality should be between min and 0.5 (inclusive), got {}",
             quality
         );
     }
@@ -742,7 +764,21 @@ mod tests {
 
             let adjustment = adjust_score(&config, base_score, &role, &metrics);
 
-            prop_assert!(adjustment.adjusted_score <= adjustment.original_score);
+            // Adjusted score should never exceed original UNLESS the minimum floor
+            // (callee_count × min_inherent_complexity_factor) is higher than base score.
+            // This is intentional: a function with many callees has inherent complexity
+            // that shouldn't be reduced below a minimum threshold.
+            let min_floor = callee_count as f64 * config.min_inherent_complexity_factor;
+            let expected_max = base_score.max(min_floor);
+
+            prop_assert!(
+                adjustment.adjusted_score <= expected_max,
+                "Adjusted score {} exceeds max(base_score, min_floor) = max({}, {}) = {}",
+                adjustment.adjusted_score,
+                base_score,
+                min_floor,
+                expected_max
+            );
         }
 
         #[test]
