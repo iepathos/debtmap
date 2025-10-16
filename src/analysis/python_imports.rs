@@ -262,11 +262,19 @@ impl EnhancedImportResolver {
                 let name = f.name.as_str().to_string();
                 symbols.functions.insert(name.clone(), false);
                 symbols.implicit_exports.insert(name);
+                // Check for dynamic imports in function body
+                for body_stmt in &f.body {
+                    self.detect_dynamic_imports(body_stmt, path);
+                }
             }
             ast::Stmt::AsyncFunctionDef(f) => {
                 let name = f.name.as_str().to_string();
                 symbols.functions.insert(name.clone(), true);
                 symbols.implicit_exports.insert(name);
+                // Check for dynamic imports in function body
+                for body_stmt in &f.body {
+                    self.detect_dynamic_imports(body_stmt, path);
+                }
             }
             ast::Stmt::ClassDef(c) => {
                 let name = c.name.as_str().to_string();
@@ -275,8 +283,16 @@ impl EnhancedImportResolver {
                 for item in &c.body {
                     if let ast::Stmt::FunctionDef(method) = item {
                         methods.push(method.name.as_str().to_string());
+                        // Check for dynamic imports in method body
+                        for body_stmt in &method.body {
+                            self.detect_dynamic_imports(body_stmt, path);
+                        }
                     } else if let ast::Stmt::AsyncFunctionDef(method) = item {
                         methods.push(method.name.as_str().to_string());
+                        // Check for dynamic imports in method body
+                        for body_stmt in &method.body {
+                            self.detect_dynamic_imports(body_stmt, path);
+                        }
                     }
                 }
 
@@ -307,6 +323,8 @@ impl EnhancedImportResolver {
                         }
                     }
                 }
+                // Check for dynamic imports in assignment expressions
+                self.detect_dynamic_imports_in_expr(&assign.value, path);
             }
             ast::Stmt::ImportFrom(import_from) => {
                 // Track re-exports
@@ -323,8 +341,189 @@ impl EnhancedImportResolver {
                     }
                 }
             }
+            ast::Stmt::Expr(expr) => {
+                // Check for dynamic imports in expressions
+                self.detect_dynamic_imports_in_expr(&expr.value, path);
+            }
             _ => {}
         }
+    }
+
+    /// Detect dynamic import calls: __import__() and importlib.import_module()
+    fn detect_dynamic_imports(&mut self, stmt: &ast::Stmt, path: &Path) {
+        match stmt {
+            ast::Stmt::Expr(expr) => {
+                self.detect_dynamic_imports_in_expr(&expr.value, path);
+            }
+            ast::Stmt::Assign(assign) => {
+                self.detect_dynamic_imports_in_expr(&assign.value, path);
+            }
+            ast::Stmt::AugAssign(aug) => {
+                self.detect_dynamic_imports_in_expr(&aug.value, path);
+            }
+            ast::Stmt::Return(ret) => {
+                if let Some(value) = &ret.value {
+                    self.detect_dynamic_imports_in_expr(value, path);
+                }
+            }
+            ast::Stmt::If(if_stmt) => {
+                self.detect_dynamic_imports_in_expr(&if_stmt.test, path);
+                for body_stmt in &if_stmt.body {
+                    self.detect_dynamic_imports(body_stmt, path);
+                }
+                for orelse_stmt in &if_stmt.orelse {
+                    self.detect_dynamic_imports(orelse_stmt, path);
+                }
+            }
+            ast::Stmt::While(while_stmt) => {
+                self.detect_dynamic_imports_in_expr(&while_stmt.test, path);
+                for body_stmt in &while_stmt.body {
+                    self.detect_dynamic_imports(body_stmt, path);
+                }
+            }
+            ast::Stmt::For(for_stmt) => {
+                self.detect_dynamic_imports_in_expr(&for_stmt.iter, path);
+                for body_stmt in &for_stmt.body {
+                    self.detect_dynamic_imports(body_stmt, path);
+                }
+            }
+            ast::Stmt::With(with_stmt) => {
+                for item in &with_stmt.items {
+                    self.detect_dynamic_imports_in_expr(&item.context_expr, path);
+                }
+                for body_stmt in &with_stmt.body {
+                    self.detect_dynamic_imports(body_stmt, path);
+                }
+            }
+            ast::Stmt::Try(try_stmt) => {
+                for body_stmt in &try_stmt.body {
+                    self.detect_dynamic_imports(body_stmt, path);
+                }
+                for handler in &try_stmt.handlers {
+                    let ast::ExceptHandler::ExceptHandler(h) = handler;
+                    for handler_stmt in &h.body {
+                        self.detect_dynamic_imports(handler_stmt, path);
+                    }
+                }
+                for orelse_stmt in &try_stmt.orelse {
+                    self.detect_dynamic_imports(orelse_stmt, path);
+                }
+                for finalbody_stmt in &try_stmt.finalbody {
+                    self.detect_dynamic_imports(finalbody_stmt, path);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Detect dynamic imports in expressions
+    fn detect_dynamic_imports_in_expr(&mut self, expr: &ast::Expr, path: &Path) {
+        match expr {
+            ast::Expr::Call(call) => {
+                // Check for __import__() call
+                if let ast::Expr::Name(name) = call.func.as_ref() {
+                    if name.id.as_str() == "__import__" {
+                        // Extract module name from first argument if it's a string literal
+                        if let Some(first_arg) = call.args.first() {
+                            if let Some(module_name) = self.extract_string_literal(first_arg) {
+                                self.add_dynamic_import(path, &module_name);
+                            }
+                        }
+                    }
+                }
+                // Check for importlib.import_module() call
+                else if let ast::Expr::Attribute(attr) = call.func.as_ref() {
+                    if attr.attr.as_str() == "import_module" {
+                        if let ast::Expr::Name(name) = attr.value.as_ref() {
+                            if name.id.as_str() == "importlib" {
+                                // Extract module name from first argument if it's a string literal
+                                if let Some(first_arg) = call.args.first() {
+                                    if let Some(module_name) = self.extract_string_literal(first_arg) {
+                                        self.add_dynamic_import(path, &module_name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Recursively check call arguments
+                for arg in &call.args {
+                    self.detect_dynamic_imports_in_expr(arg, path);
+                }
+            }
+            ast::Expr::BinOp(binop) => {
+                self.detect_dynamic_imports_in_expr(&binop.left, path);
+                self.detect_dynamic_imports_in_expr(&binop.right, path);
+            }
+            ast::Expr::UnaryOp(unaryop) => {
+                self.detect_dynamic_imports_in_expr(&unaryop.operand, path);
+            }
+            ast::Expr::Lambda(lambda) => {
+                self.detect_dynamic_imports_in_expr(&lambda.body, path);
+            }
+            ast::Expr::IfExp(ifexp) => {
+                self.detect_dynamic_imports_in_expr(&ifexp.test, path);
+                self.detect_dynamic_imports_in_expr(&ifexp.body, path);
+                self.detect_dynamic_imports_in_expr(&ifexp.orelse, path);
+            }
+            ast::Expr::ListComp(comp) => {
+                self.detect_dynamic_imports_in_expr(&comp.elt, path);
+                for generator in &comp.generators {
+                    self.detect_dynamic_imports_in_expr(&generator.iter, path);
+                }
+            }
+            ast::Expr::DictComp(comp) => {
+                self.detect_dynamic_imports_in_expr(&comp.key, path);
+                self.detect_dynamic_imports_in_expr(&comp.value, path);
+                for generator in &comp.generators {
+                    self.detect_dynamic_imports_in_expr(&generator.iter, path);
+                }
+            }
+            ast::Expr::List(list) => {
+                for elt in &list.elts {
+                    self.detect_dynamic_imports_in_expr(elt, path);
+                }
+            }
+            ast::Expr::Tuple(tuple) => {
+                for elt in &tuple.elts {
+                    self.detect_dynamic_imports_in_expr(elt, path);
+                }
+            }
+            ast::Expr::Dict(dict) => {
+                for key in &dict.keys {
+                    if let Some(k) = key {
+                        self.detect_dynamic_imports_in_expr(k, path);
+                    }
+                }
+                for value in &dict.values {
+                    self.detect_dynamic_imports_in_expr(value, path);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Extract string literal from expression
+    fn extract_string_literal(&self, expr: &ast::Expr) -> Option<String> {
+        if let ast::Expr::Constant(constant) = expr {
+            if let ast::Constant::Str(s) = &constant.value {
+                return Some(s.to_string());
+            }
+        }
+        None
+    }
+
+    /// Add a dynamic import edge to the graph
+    fn add_dynamic_import(&mut self, from_path: &Path, module_name: &str) {
+        let target_path = self.resolve_absolute_import(from_path, module_name);
+
+        self.import_graph.add_edge(ImportEdge {
+            from_module: from_path.to_path_buf(),
+            to_module: target_path,
+            import_type: ImportType::Dynamic,
+            imported_names: vec![module_name.to_string()],
+            aliases: HashMap::new(),
+        });
     }
 
     /// Process import statements and build graph
@@ -714,5 +913,90 @@ def helper():
         let symbol = resolved.unwrap();
         assert_eq!(symbol.name, "helper");
         assert!(symbol.is_function);
+    }
+
+    #[test]
+    fn test_dynamic_import_builtin() {
+        let source = r#"
+def load_module(name):
+    return __import__(name)
+
+# Direct call at module level
+module = __import__("os")
+"#;
+        let module = parse_python(source);
+        let mut resolver = EnhancedImportResolver::new();
+        resolver.analyze_imports(&module, Path::new("test.py"));
+
+        let edges = &resolver.import_graph.edges[&PathBuf::from("test.py")];
+        let dynamic_imports: Vec<_> = edges
+            .iter()
+            .filter(|e| e.import_type == ImportType::Dynamic)
+            .collect();
+
+        // Should detect the __import__() call with string literal "os"
+        // The call with variable "name" cannot be statically analyzed
+        assert_eq!(dynamic_imports.len(), 1);
+        assert!(dynamic_imports
+            .iter()
+            .any(|e| e.imported_names.contains(&"os".to_string())));
+    }
+
+    #[test]
+    fn test_dynamic_import_importlib() {
+        let source = r#"
+import importlib
+
+def load_module(name):
+    return importlib.import_module(name)
+
+# Direct call at module level
+plugin = importlib.import_module("plugins.core")
+"#;
+        let module = parse_python(source);
+        let mut resolver = EnhancedImportResolver::new();
+        resolver.analyze_imports(&module, Path::new("test.py"));
+
+        let edges = &resolver.import_graph.edges[&PathBuf::from("test.py")];
+        let dynamic_imports: Vec<_> = edges
+            .iter()
+            .filter(|e| e.import_type == ImportType::Dynamic)
+            .collect();
+
+        // Should detect the importlib.import_module() call with string literal
+        // The call with variable "name" cannot be statically analyzed
+        assert_eq!(dynamic_imports.len(), 1);
+        assert!(dynamic_imports
+            .iter()
+            .any(|e| e.imported_names.contains(&"plugins.core".to_string())));
+    }
+
+    #[test]
+    fn test_dynamic_import_in_conditionals() {
+        let source = r#"
+def conditional_import(use_new):
+    if use_new:
+        return __import__("new_impl")
+    else:
+        return __import__("old_impl")
+"#;
+        let module = parse_python(source);
+        let mut resolver = EnhancedImportResolver::new();
+        resolver.analyze_imports(&module, Path::new("test.py"));
+
+        let edges = &resolver.import_graph.edges[&PathBuf::from("test.py")];
+        let dynamic_imports: Vec<_> = edges
+            .iter()
+            .filter(|e| e.import_type == ImportType::Dynamic)
+            .collect();
+
+        // Should detect both dynamic imports in if/else branches
+        assert_eq!(dynamic_imports.len(), 2);
+        assert!(dynamic_imports
+            .iter()
+            .any(|e| e.imported_names.contains(&"new_impl".to_string())));
+        assert!(dynamic_imports
+            .iter()
+            .any(|e| e.imported_names.contains(&"old_impl".to_string())));
     }
 }
