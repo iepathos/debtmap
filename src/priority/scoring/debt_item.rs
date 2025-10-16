@@ -57,9 +57,7 @@ use super::recommendation_helpers::generate_full_coverage_recommendation;
 use crate::priority::FunctionVisibility;
 
 // Re-export validation functions for backward compatibility
-pub(super) use super::validation::{
-    check_complexity_hotspot, check_dead_code, check_testing_gap,
-};
+pub(super) use super::validation::{check_complexity_hotspot, check_dead_code, check_testing_gap};
 
 // Re-export formatting and helper functions for backward compatibility
 pub use super::formatting::determine_visibility;
