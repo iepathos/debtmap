@@ -123,7 +123,7 @@ impl CallbackTracker {
                             registration_point: pending.registration_point.clone(),
                         });
                     }
-                },
+                }
                 None => unresolved.push(pending.callback_expr.clone()),
             }
         }
@@ -417,7 +417,10 @@ mod tests {
 
         assert_eq!(result.resolved_callbacks.len(), 1);
         assert_eq!(
-            result.resolved_callbacks[0].callback_ref.target_function.name,
+            result.resolved_callbacks[0]
+                .callback_ref
+                .target_function
+                .name,
             "MyClass.on_click"
         );
         assert!(result.resolved_callbacks[0].callback_ref.confidence > 0.8);
@@ -455,7 +458,13 @@ mod tests {
         let result = tracker.resolve_callbacks(&known_functions);
 
         assert_eq!(result.resolved_callbacks.len(), 1);
-        assert_eq!(result.resolved_callbacks[0].callback_ref.target_function.name, "outer.inner");
+        assert_eq!(
+            result.resolved_callbacks[0]
+                .callback_ref
+                .target_function
+                .name,
+            "outer.inner"
+        );
     }
 
     #[test]

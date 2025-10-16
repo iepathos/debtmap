@@ -63,8 +63,8 @@ class Handler:
     let mut total_detected = 0;
 
     for test in test_cases {
-        let module = rp::parse(test.code, rp::Mode::Module, "test.py")
-            .expect("Failed to parse test code");
+        let module =
+            rp::parse(test.code, rp::Mode::Module, "test.py").expect("Failed to parse test code");
         let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), test.code);
         let call_graph = extractor.extract(&module);
 
@@ -74,7 +74,7 @@ class Handler:
             let caller_id = call_graph
                 .get_all_functions()
                 .find(|f| f.name == *caller_name)
-                .expect(&format!("Caller {} not found", caller_name));
+                .unwrap_or_else(|| panic!("Caller {} not found", caller_name));
 
             // Check if callee is in the call graph
             let callees = call_graph.get_callees(caller_id);
@@ -161,8 +161,8 @@ def index():
     let mut total_detected = 0;
 
     for test in test_cases {
-        let module = rp::parse(test.code, rp::Mode::Module, "test.py")
-            .expect("Failed to parse test code");
+        let module =
+            rp::parse(test.code, rp::Mode::Module, "test.py").expect("Failed to parse test code");
         let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), test.code);
         let call_graph = extractor.extract(&module);
 
@@ -181,10 +181,7 @@ def index():
         total_expected += test.expected_callbacks.len();
         total_detected += detected;
 
-        println!(
-            "Test '{}': {} entry points detected",
-            test.name, detected
-        );
+        println!("Test '{}': {} entry points detected", test.name, detected);
     }
 
     let overall_accuracy = if total_expected > 0 {
@@ -231,8 +228,8 @@ async def create_item(item: dict):
     let mut total_detected = 0;
 
     for test in test_cases {
-        let module = rp::parse(test.code, rp::Mode::Module, "test.py")
-            .expect("Failed to parse test code");
+        let module =
+            rp::parse(test.code, rp::Mode::Module, "test.py").expect("Failed to parse test code");
         let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), test.code);
         let call_graph = extractor.extract(&module);
 
@@ -251,10 +248,7 @@ async def create_item(item: dict):
         total_expected += test.expected_callbacks.len();
         total_detected += detected;
 
-        println!(
-            "Test '{}': {} entry points detected",
-            test.name, detected
-        );
+        println!("Test '{}': {} entry points detected", test.name, detected);
     }
 
     let overall_accuracy = if total_expected > 0 {
@@ -342,8 +336,8 @@ class App:
     let mut total_detected = 0;
 
     for test in test_cases {
-        let module = rp::parse(test.code, rp::Mode::Module, "test.py")
-            .expect("Failed to parse test code");
+        let module =
+            rp::parse(test.code, rp::Mode::Module, "test.py").expect("Failed to parse test code");
         let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), test.code);
         let call_graph = extractor.extract(&module);
 
@@ -402,37 +396,48 @@ fn test_combined_callback_accuracy() {
     // This test runs all patterns together to get an overall accuracy score
     let all_test_cases = vec![
         // wxPython patterns
-        ("wxPython Bind", r#"
+        (
+            "wxPython Bind",
+            r#"
 class MyFrame:
     def on_click(self, event):
         pass
 
     def setup(self):
         self.button.Bind(wx.EVT_BUTTON, self.on_click)
-"#, vec![("MyFrame.setup", "MyFrame.on_click")]),
-
+"#,
+            vec![("MyFrame.setup", "MyFrame.on_click")],
+        ),
         // PyQt patterns
-        ("PyQt connect", r#"
+        (
+            "PyQt connect",
+            r#"
 class Window:
     def on_button_clicked(self):
         pass
 
     def setup_ui(self):
         self.button.clicked.connect(self.on_button_clicked)
-"#, vec![("Window.setup_ui", "Window.on_button_clicked")]),
-
+"#,
+            vec![("Window.setup_ui", "Window.on_button_clicked")],
+        ),
         // Tkinter patterns
-        ("Tkinter bind", r#"
+        (
+            "Tkinter bind",
+            r#"
 class App:
     def on_key_press(self, event):
         pass
 
     def setup(self):
         self.root.bind("<KeyPress>", self.on_key_press)
-"#, vec![("App.setup", "App.on_key_press")]),
-
+"#,
+            vec![("App.setup", "App.on_key_press")],
+        ),
         // Functools patterns
-        ("Functools partial", r#"
+        (
+            "Functools partial",
+            r#"
 import functools
 
 class TaskScheduler:
@@ -442,15 +447,17 @@ class TaskScheduler:
     def schedule(self, task_id):
         callback = functools.partial(self.process_task, priority=10)
         self.executor.submit(callback, task_id)
-"#, vec![("TaskScheduler.schedule", "TaskScheduler.process_task")]),
+"#,
+            vec![("TaskScheduler.schedule", "TaskScheduler.process_task")],
+        ),
     ];
 
     let mut total_expected = 0;
     let mut total_detected = 0;
 
     for (name, code, expected_callbacks) in all_test_cases {
-        let module = rp::parse(code, rp::Mode::Module, "test.py")
-            .expect("Failed to parse test code");
+        let module =
+            rp::parse(code, rp::Mode::Module, "test.py").expect("Failed to parse test code");
         let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), code);
         let call_graph = extractor.extract(&module);
 
@@ -482,15 +489,21 @@ class TaskScheduler:
     }
 
     let overall_accuracy = calculate_accuracy(total_detected, total_expected);
-    println!(
-        "\n=== COMBINED CALLBACK ACCURACY REPORT ===");
+    println!("\n=== COMBINED CALLBACK ACCURACY REPORT ===");
     println!(
         "Total callbacks detected: {}/{}",
         total_detected, total_expected
     );
     println!("Overall Accuracy: {:.1}%", overall_accuracy);
     println!("Target Accuracy: 90.0%");
-    println!("Status: {}", if overall_accuracy >= 90.0 { "PASS" } else { "FAIL" });
+    println!(
+        "Status: {}",
+        if overall_accuracy >= 90.0 {
+            "PASS"
+        } else {
+            "FAIL"
+        }
+    );
     println!("=========================================\n");
 
     // Assert 90% accuracy threshold for spec compliance
