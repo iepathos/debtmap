@@ -372,6 +372,54 @@ impl CallbackTracker {
     pub fn get_decorator_targets(&self) -> &HashMap<String, Vec<String>> {
         &self.decorator_targets
     }
+
+    /// Check if a function is registered as a callback target
+    /// This checks both pending callbacks and decorator targets
+    pub fn is_callback_target(&self, function_name: &str) -> bool {
+        // Check if function is in decorator targets
+        for targets in self.decorator_targets.values() {
+            if targets.iter().any(|t| t == function_name) {
+                return true;
+            }
+        }
+
+        // Check if function is referenced in pending callbacks
+        for pending in &self.pending_callbacks {
+            // Check direct references
+            if pending.callback_expr == function_name {
+                return true;
+            }
+
+            // Check method references (self.method -> Class.method)
+            if let Some(method_name) = pending.callback_expr.strip_prefix("self.") {
+                if let Some(class_name) = &pending.context.current_class {
+                    let full_name = format!("{}.{}", class_name, method_name);
+                    if full_name == function_name {
+                        return true;
+                    }
+                }
+            }
+
+            // Check if target_hint matches
+            if let Some(hint) = &pending.target_hint {
+                if hint == function_name {
+                    return true;
+                }
+            }
+        }
+
+        // Check if function is in callback storage
+        for callbacks in self.callback_storage.values() {
+            if callbacks
+                .iter()
+                .any(|cb| cb.target_function.name == function_name)
+            {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 impl Default for CallbackTracker {
