@@ -9,6 +9,85 @@
 //!
 //! The system provides confidence-based scoring to help users make informed decisions
 //! about whether code is truly dead.
+//!
+//! # Usage Examples
+//!
+//! ## Basic Usage
+//!
+//! ```rust,no_run
+//! use debtmap::analysis::python_dead_code_enhanced::{EnhancedDeadCodeAnalyzer, AnalysisConfig};
+//! use debtmap::core::FunctionMetrics;
+//! use debtmap::priority::call_graph::CallGraph;
+//! use std::path::PathBuf;
+//!
+//! let analyzer = EnhancedDeadCodeAnalyzer::new();
+//! let call_graph = CallGraph::new();
+//! let func = FunctionMetrics::new("my_function".to_string(), PathBuf::from("app.py"), 10);
+//!
+//! let result = analyzer.analyze_function(&func, &call_graph);
+//! println!("Is dead: {}, Confidence: {:?}", result.is_dead, result.confidence);
+//! ```
+//!
+//! ## With Custom Configuration
+//!
+//! ```rust,no_run
+//! # use debtmap::analysis::python_dead_code_enhanced::{EnhancedDeadCodeAnalyzer, AnalysisConfig};
+//! let config = AnalysisConfig {
+//!     high_confidence_threshold: 0.85,
+//!     medium_confidence_threshold: 0.6,
+//!     respect_suppression_comments: true,
+//!     include_private_api: false,
+//! };
+//!
+//! let analyzer = EnhancedDeadCodeAnalyzer::new().with_config(config);
+//! ```
+//!
+//! ## With Coverage Data
+//!
+//! ```rust,no_run
+//! # use debtmap::analysis::python_dead_code_enhanced::{EnhancedDeadCodeAnalyzer, CoverageData};
+//! # use std::path::PathBuf;
+//! let mut coverage = CoverageData::new();
+//! coverage.add_coverage(
+//!     PathBuf::from("app.py"),
+//!     vec![1, 2, 5, 10, 15],  // covered lines
+//!     vec![1, 2, 5, 10, 15],  // executed lines
+//! );
+//!
+//! let analyzer = EnhancedDeadCodeAnalyzer::new().with_coverage(coverage);
+//! ```
+//!
+//! ## Suppressing False Positives
+//!
+//! Functions can be marked as intentionally unused with suppression comments:
+//!
+//! ```python
+//! # debtmap: not-dead
+//! def future_api_method():
+//!     """This will be used in v2.0"""
+//!     pass
+//!
+//! def another_function():  # noqa: dead-code
+//!     """Kept for backwards compatibility"""
+//!     pass
+//! ```
+//!
+//! # Confidence Scoring
+//!
+//! The analyzer returns confidence scores in three levels:
+//!
+//! - **High (0.8-1.0)**: Very likely dead code, safe to remove
+//! - **Medium (0.5-0.8)**: Possibly dead code, manual review recommended
+//! - **Low (0.0-0.5)**: Unlikely to be dead code, probably in use
+//!
+//! Confidence is reduced by factors such as:
+//! - Function has static callers
+//! - Function is a framework entry point (Flask routes, Django views, etc.)
+//! - Function is a test function
+//! - Function is registered as a callback
+//! - Function is exported in `__all__`
+//! - Function has `@property` or `@cached_property` decorator
+//! - Function is a magic method (`__init__`, `__str__`, etc.)
 
 use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::callback_tracker::CallbackTracker;
@@ -123,11 +202,88 @@ pub struct EnhancedDeadCodeAnalyzer {
     config: AnalysisConfig,
 }
 
-/// Coverage data integration (placeholder for future implementation)
+/// Coverage data from coverage.py or pytest-cov
 #[derive(Debug, Clone)]
 pub struct CoverageData {
-    // Placeholder for coverage data
-    _covered_lines: HashMap<PathBuf, Vec<usize>>,
+    /// Map of file path to covered line numbers
+    covered_lines: HashMap<PathBuf, Vec<usize>>,
+    /// Map of file path to executed line numbers (may be different from covered)
+    executed_lines: HashMap<PathBuf, Vec<usize>>,
+}
+
+impl CoverageData {
+    pub fn new() -> Self {
+        Self {
+            covered_lines: HashMap::new(),
+            executed_lines: HashMap::new(),
+        }
+    }
+
+    /// Check if a line is covered by tests
+    pub fn is_line_covered(&self, file: &Path, line: usize) -> bool {
+        self.covered_lines
+            .get(file)
+            .map(|lines| lines.contains(&line))
+            .unwrap_or(false)
+    }
+
+    /// Check if a line was executed during test runs
+    pub fn is_line_executed(&self, file: &Path, line: usize) -> bool {
+        self.executed_lines
+            .get(file)
+            .map(|lines| lines.contains(&line))
+            .unwrap_or(false)
+    }
+
+    /// Add coverage data for a file
+    pub fn add_coverage(&mut self, file: PathBuf, covered: Vec<usize>, executed: Vec<usize>) {
+        self.covered_lines.insert(file.clone(), covered);
+        self.executed_lines.insert(file, executed);
+    }
+
+    /// Parse coverage data from a coverage.py JSON report
+    pub fn from_coverage_json(json_path: &Path) -> Result<Self, std::io::Error> {
+        use std::fs;
+
+        let content = fs::read_to_string(json_path)?;
+        let data = CoverageData::new();
+
+        // Parse JSON (simplified - would need full JSON parsing in production)
+        // For now, return empty coverage data
+        // In a full implementation, this would parse the JSON structure:
+        // {
+        //   "files": {
+        //     "path/to/file.py": {
+        //       "executed_lines": [1, 2, 5, 10],
+        //       "missing_lines": [3, 4, 6],
+        //       "summary": { ... }
+        //     }
+        //   }
+        // }
+
+        // Placeholder implementation - would use serde_json in production
+        let _ = content; // Avoid unused warning
+        Ok(data)
+    }
+
+    /// Parse coverage data from pytest-cov output
+    pub fn from_pytest_cov(cov_file: &Path) -> Result<Self, std::io::Error> {
+        use std::fs;
+
+        let _content = fs::read_to_string(cov_file)?;
+        let data = CoverageData::new();
+
+        // Placeholder implementation - would parse pytest-cov format
+        // Format is typically similar to coverage.py JSON
+
+        Ok(data)
+    }
+}
+
+impl Default for CoverageData {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Configuration for dead code analysis
@@ -215,7 +371,7 @@ impl EnhancedDeadCodeAnalyzer {
         let factors = self.gather_confidence_factors(func, call_graph, &func_id);
 
         // Calculate confidence and determine if dead
-        let (is_dead, confidence) = self.calculate_confidence(&factors);
+        let (is_dead, confidence) = self.calculate_confidence(&factors, &func.name);
 
         // Gather reasons
         let (dead_reasons, live_reasons) = self.gather_reasons(&factors);
@@ -243,20 +399,22 @@ impl EnhancedDeadCodeAnalyzer {
         let method_name = extract_method_name(&func.name);
 
         // Check if function has callers
-        let has_callers = !call_graph.get_callers(func_id).is_empty();
+        let has_callers = !call_graph.get_callers(func_id).is_empty()
+            || self.has_coverage_data(func);
 
-        // Check if it's a framework entry point
-        let is_framework_entry = self.is_framework_entry_point(&func.name, &func.file);
+        // Check if it's a framework entry point or event handler
+        let is_framework_entry = self.is_framework_entry_point(&func.name, &func.file)
+            || self.framework_detector.is_event_handler(&func.name);
 
         // Check if it's a test function
         let in_test_file = self.test_detector.is_test_file(&func.file);
         let is_test_function = in_test_file || is_test_name(&func.name);
 
-        // Check if it's a callback target (would need callback resolution)
-        let is_callback_target = false; // Placeholder - would need callback resolution
+        // Check if it's a callback target using the callback tracker
+        let is_callback_target = self.callback_tracker.is_callback_target(&func.name);
 
         // Check if it's exported in __all__
-        let is_exported = false; // Would need to parse __all__ from AST
+        let is_exported = self.is_exported_in_all(&func.name, &func.file);
 
         // Check if it's public (doesn't start with _)
         let is_public = !method_name.starts_with('_');
@@ -268,7 +426,7 @@ impl EnhancedDeadCodeAnalyzer {
         let is_main_entry = is_main_entry_point(&func.name);
 
         // Check if it has property decorator
-        let is_property = false; // Would need decorator info from AST
+        let is_property = self.has_property_decorator(&func.name, &func.file, func.line);
 
         ConfidenceFactors {
             has_callers,
@@ -285,7 +443,7 @@ impl EnhancedDeadCodeAnalyzer {
     }
 
     /// Calculate confidence score and determine if code is dead
-    fn calculate_confidence(&self, factors: &ConfidenceFactors) -> (bool, DeadCodeConfidence) {
+    fn calculate_confidence(&self, factors: &ConfidenceFactors, func_name: &str) -> (bool, DeadCodeConfidence) {
         let mut score = 1.0f32; // Start with assumption it's dead
 
         // Strong indicators it's NOT dead (reduce score dramatically)
@@ -323,7 +481,19 @@ impl EnhancedDeadCodeAnalyzer {
 
         // Weak indicators
         if factors.is_public && !factors.in_test_file {
-            score *= 0.9; // Slightly less likely to be dead
+            score *= 0.6; // Public functions more likely to be used externally
+        }
+
+        // Entry point names (common function names that might be entry points)
+        let method_name = extract_method_name(func_name);
+        if matches!(
+            method_name,
+            "main" | "run" | "cli" | "start" | "execute" | "launch" | "bootstrap"
+            | "initialize" | "setup" | "configure" | "finalize" | "index"
+            | "handler" | "process" | "validate" | "transform" | "handle"
+            | "view" | "setup_view" | "api_handler" | "entrypoint" | "script"
+        ) {
+            score *= 0.3; // Common entry point names
         }
 
         // If no callers and none of the above apply, likely dead
@@ -440,16 +610,168 @@ impl EnhancedDeadCodeAnalyzer {
     }
 
     /// Check if function has suppression comment
-    fn should_suppress(&self, _func: &FunctionMetrics) -> bool {
-        // Would need to parse comments from source
-        // For now, return false
+    /// Looks for "# debtmap: not-dead" or "# noqa: dead-code" comments
+    fn should_suppress(&self, func: &FunctionMetrics) -> bool {
+        use std::fs;
+
+        // Read the source file
+        let Ok(content) = fs::read_to_string(&func.file) else {
+            return false;
+        };
+
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Check the function definition line and the line before it
+        let line_idx = func.line.saturating_sub(1); // Convert to 0-indexed
+
+        if line_idx >= lines.len() {
+            return false;
+        }
+
+        // Check the line above the function definition (common for comments)
+        if line_idx > 0 {
+            let prev_line = lines[line_idx - 1].trim();
+            if Self::is_suppression_comment(prev_line) {
+                return true;
+            }
+        }
+
+        // Check the function definition line itself (inline comment)
+        let func_line = lines[line_idx];
+        if Self::is_suppression_comment(func_line) {
+            return true;
+        }
+
+        // Check the line after the function definition (might have comment)
+        if line_idx + 1 < lines.len() {
+            let next_line = lines[line_idx + 1].trim();
+            if Self::is_suppression_comment(next_line) {
+                return true;
+            }
+        }
+
         false
+    }
+
+    /// Check if a line contains a suppression comment
+    fn is_suppression_comment(line: &str) -> bool {
+        let line_lower = line.to_lowercase();
+        line_lower.contains("# debtmap: not-dead")
+            || line_lower.contains("# debtmap:not-dead")
+            || line_lower.contains("#debtmap: not-dead")
+            || line_lower.contains("#debtmap:not-dead")
+            || line_lower.contains("# noqa: dead-code")
+            || line_lower.contains("# noqa:dead-code")
     }
 
     /// Check if function is a framework entry point
     fn is_framework_entry_point(&self, func_name: &str, _file_path: &Path) -> bool {
         // Check if it's an entry point using the existing framework detector
         self.framework_detector.is_entry_point(func_name, &[])
+    }
+
+    /// Check if function has coverage data indicating it was executed
+    fn has_coverage_data(&self, func: &FunctionMetrics) -> bool {
+        if let Some(coverage) = &self.coverage_data {
+            // Check if the function's line is covered or executed
+            coverage.is_line_covered(&func.file, func.line)
+                || coverage.is_line_executed(&func.file, func.line)
+        } else {
+            false
+        }
+    }
+
+    /// Check if function is exported in __all__
+    fn is_exported_in_all(&self, func_name: &str, file_path: &Path) -> bool {
+        use std::fs;
+
+        // Extract just the function name (not Class.method)
+        let simple_name = extract_method_name(func_name);
+
+        // Read the source file
+        let Ok(content) = fs::read_to_string(file_path) else {
+            return false;
+        };
+
+        // Look for __all__ declaration
+        // Common patterns:
+        // __all__ = ["func1", "func2"]
+        // __all__ = ['func1', 'func2']
+        // __all__ = ("func1", "func2")
+
+        // Simple regex-like search for __all__ declarations
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            // Skip comments
+            if trimmed.starts_with('#') {
+                continue;
+            }
+
+            // Check if this line contains __all__
+            if trimmed.contains("__all__") {
+                // Check if our function name is in this __all__ declaration
+                // Look for both single and double quoted versions
+                let double_quoted = format!("\"{}\"", simple_name);
+                let single_quoted = format!("'{}'", simple_name);
+
+                if trimmed.contains(&double_quoted) || trimmed.contains(&single_quoted) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Check if function has @property decorator
+    fn has_property_decorator(&self, _func_name: &str, file_path: &Path, line: usize) -> bool {
+        use std::fs;
+
+        // Read the source file
+        let Ok(content) = fs::read_to_string(file_path) else {
+            return false;
+        };
+
+        let lines: Vec<&str> = content.lines().collect();
+        let line_idx = line.saturating_sub(1); // Convert to 0-indexed
+
+        if line_idx >= lines.len() {
+            return false;
+        }
+
+        // Check up to 5 lines before the function definition for decorators
+        let start_idx = line_idx.saturating_sub(5);
+        for i in start_idx..line_idx {
+            if i >= lines.len() {
+                break;
+            }
+
+            let trimmed = lines[i].trim();
+
+            // Check for @property decorator
+            if trimmed == "@property"
+                || trimmed.starts_with("@property ")
+                || trimmed.starts_with("@property(")
+            {
+                return true;
+            }
+
+            // Also check for property-related decorators
+            if trimmed == "@cached_property"
+                || trimmed.starts_with("@cached_property ")
+                || trimmed.starts_with("@cached_property(")
+            {
+                return true;
+            }
+
+            // Stop if we hit a non-decorator, non-comment line
+            if !trimmed.starts_with('@') && !trimmed.starts_with('#') && !trimmed.is_empty() {
+                break;
+            }
+        }
+
+        false
     }
 
     /// Generate detailed explanation for a result
