@@ -15,6 +15,7 @@ pub mod purity_detector;
 pub mod python;
 pub mod python_asyncio_patterns;
 pub mod python_detectors;
+pub mod python_exception_flow;
 pub mod python_purity;
 pub mod rust;
 pub mod rust_call_graph;
