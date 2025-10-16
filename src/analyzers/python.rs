@@ -395,6 +395,18 @@ fn extract_functions_from_stmts(
     source: &str,
     entropy_calculator: &mut UniversalEntropyCalculator,
 ) {
+    use crate::testing::python::test_detector::{PythonTestDetector, TestContext};
+
+    let test_detector = PythonTestDetector::new();
+    let is_test_file = test_detector.is_test_file(path);
+    let is_test_class = class_context
+        .map(|c| c.starts_with("Test") || c.ends_with("Test") || c.ends_with("Tests"))
+        .unwrap_or(false);
+
+    let mut test_context = TestContext::new().with_test_file(is_test_file);
+    if let Some(class_name) = class_context {
+        test_context = test_context.with_class(class_name.to_string(), is_test_class);
+    }
     for (idx, stmt) in stmts.iter().enumerate() {
         match stmt {
             ast::Stmt::FunctionDef(func_def) => {
@@ -431,6 +443,9 @@ fn extract_functions_from_stmts(
                     None
                 };
 
+                // Detect if this is a test function using comprehensive patterns
+                let test_result = test_detector.detect_test(func_def, &test_context);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -439,10 +454,10 @@ fn extract_functions_from_stmts(
                     cognitive: adjusted_cognitive,
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
-                    is_test: func_def.name.starts_with("test_"),
+                    is_test: test_result.is_test,
                     visibility: None, // Python doesn't have explicit visibility modifiers
                     is_trait_method: false, // Python doesn't have traits like Rust
-                    in_test_module: false, // Python test detection works differently
+                    in_test_module: is_test_file,
                     entropy_score,
                     is_pure: Some(purity_analysis.is_pure),
                     purity_confidence: Some(purity_analysis.confidence),
@@ -497,6 +512,9 @@ fn extract_functions_from_stmts(
                     None
                 };
 
+                // Detect if this is an async test function using comprehensive patterns
+                let test_result = test_detector.detect_async_test(func_def, &test_context);
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -505,10 +523,10 @@ fn extract_functions_from_stmts(
                     cognitive: adjusted_cognitive,
                     nesting: calculate_nesting_python(&func_def.body),
                     length: func_def.body.len(),
-                    is_test: func_def.name.starts_with("test_"),
+                    is_test: test_result.is_test,
                     visibility: None, // Python doesn't have explicit visibility modifiers
                     is_trait_method: false, // Python doesn't have traits like Rust
-                    in_test_module: false, // Python test detection works differently
+                    in_test_module: is_test_file,
                     entropy_score,
                     is_pure: Some(purity_analysis.is_pure),
                     purity_confidence: Some(purity_analysis.confidence),

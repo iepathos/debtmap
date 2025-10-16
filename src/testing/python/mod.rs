@@ -108,6 +108,7 @@ pub mod complexity_analyzer;
 pub mod config;
 pub mod flaky_patterns;
 pub mod framework_detector;
+pub mod test_detector;
 
 #[cfg(test)]
 mod analyzer_test;
