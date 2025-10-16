@@ -252,10 +252,25 @@ fn collect_all_rust_debt_items(
         analyze_resource_patterns(file, path),
         analyze_organization_patterns(file, path),
         testing::analyze_testing_patterns(file, path),
+        analyze_rust_test_quality(file, path),
     ]
     .into_iter()
     .flatten()
     .collect()
+}
+
+/// Analyze Rust test quality
+fn analyze_rust_test_quality(file: &syn::File, path: &Path) -> Vec<DebtItem> {
+    use crate::testing::rust::analyzer::RustTestQualityAnalyzer;
+    use crate::testing::rust::convert_rust_test_issue_to_debt_item;
+
+    let mut analyzer = RustTestQualityAnalyzer::new();
+    let issues = analyzer.analyze_file(file, path);
+
+    issues
+        .into_iter()
+        .map(|issue| convert_rust_test_issue_to_debt_item(issue, path))
+        .collect()
 }
 
 fn extract_rust_module_smell_items(
