@@ -2,11 +2,16 @@
 
 pub mod calculation;
 pub mod classification;
+pub mod computation;
+pub mod construction;
 pub mod debt_item;
+pub mod formatting;
 pub mod recommendation;
 pub mod recommendation_extended;
+pub mod recommendation_helpers;
 pub mod rust_recommendations;
 pub mod test_calculation;
+pub mod validation;
 
 // Re-export commonly used items
 pub use calculation::{
