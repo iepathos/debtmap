@@ -290,7 +290,8 @@ fn bench_circular_import_detection(c: &mut Criterion) {
                         .collect();
 
                     resolver.build_import_graph(&parsed_modules);
-                    black_box(resolver.circular_imports())
+                    let cycles = resolver.circular_imports().to_vec();
+                    black_box(cycles)
                 })
             },
         );
