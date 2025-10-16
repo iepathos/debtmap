@@ -93,6 +93,17 @@ fn is_pattern_matching_function(func: &FunctionMetrics, func_id: &FunctionId) ->
     false
 }
 
+/// Calculate delegation ratio for a function
+///
+/// Returns the ratio of function calls to total statements (approximated by function length).
+/// A higher ratio indicates more coordination/delegation behavior.
+fn calculate_delegation_ratio(func: &FunctionMetrics, meaningful_callees: &[&FunctionId]) -> f64 {
+    if func.length == 0 {
+        return 0.0;
+    }
+    meaningful_callees.len() as f64 / func.length as f64
+}
+
 // Pure function to check if a function is an orchestrator
 fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &CallGraph) -> bool {
     // First check if there are meaningful callees to orchestrate
@@ -144,13 +155,18 @@ fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &Ca
         return false;
     }
 
-    // Name-based orchestration with low complexity
-    let name_suggests_orchestration =
-        is_orchestrator_by_name(&func_id.name) && func.cyclomatic <= 3;
+    // Calculate delegation ratio to better identify orchestrators
+    let delegation_ratio = calculate_delegation_ratio(func, &meaningful_callees);
 
-    // Low complexity delegation pattern
-    let is_simple_delegation = func.cyclomatic <= 2
-        && func.cognitive <= 3
+    // Name-based orchestration with lenient complexity threshold
+    let name_suggests_orchestration =
+        is_orchestrator_by_name(&func_id.name) && func.cyclomatic <= 5;
+
+    // Lenient complexity delegation pattern with delegation ratio check
+    // Orchestrators can have complexity up to 5 (allowing for error handling)
+    // and should have at least 20% of their code as function calls
+    let is_simple_delegation = func.cyclomatic <= 5
+        && delegation_ratio >= 0.2
         && delegates_to_tested_functions(func_id, call_graph, 0.8);
 
     name_suggests_orchestration || is_simple_delegation
@@ -654,6 +670,104 @@ mod tests {
             role,
             FunctionRole::Orchestrator,
             "Function coordinating multiple steps should be Orchestrator"
+        );
+    }
+
+    #[test]
+    fn test_orchestrator_with_error_handling_complexity_5() {
+        let mut graph = CallGraph::new();
+
+        // Function with complexity 5 from Result handling (spec 117)
+        let func = create_test_metrics("coordinate_tasks", 5, 3, 20);
+        let func_id = FunctionId {
+            file: PathBuf::from("tasks.rs"),
+            name: "coordinate_tasks".to_string(),
+            line: 10,
+        };
+
+        graph.add_function(func_id.clone(), false, false, 5, 20);
+
+        // Add 4 meaningful callees (20% of 20 lines = 4 calls for delegation ratio)
+        for i in 0..4 {
+            let callee_id = FunctionId {
+                file: PathBuf::from("worker.rs"),
+                name: format!("worker_task_{}", i),
+                line: i * 20,
+            };
+            graph.add_function(callee_id.clone(), false, false, 8, 40);
+            graph.add_call(FunctionCall {
+                caller: func_id.clone(),
+                callee: callee_id,
+                call_type: CallType::Direct,
+            });
+        }
+
+        // Should be classified as orchestrator despite higher complexity
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::Orchestrator,
+            "Function with complexity 5 and good delegation ratio should be Orchestrator"
+        );
+    }
+
+    #[test]
+    fn test_delegation_ratio_calculation() {
+        let func = create_test_metrics("orchestrator", 4, 2, 20);
+
+        // Create test callees - 4 calls in 20 lines = 20% ratio
+        let callees_vec: Vec<FunctionId> = (0..4)
+            .map(|i| FunctionId {
+                file: PathBuf::from("test.rs"),
+                name: format!("callee_{}", i),
+                line: i * 10,
+            })
+            .collect();
+
+        let callees: Vec<&FunctionId> = callees_vec.iter().collect();
+
+        let ratio = calculate_delegation_ratio(&func, &callees);
+        assert!(
+            (ratio - 0.2).abs() < 0.01,
+            "Expected delegation ratio of 0.2, got {}",
+            ratio
+        );
+    }
+
+    #[test]
+    fn test_high_complexity_not_orchestrator() {
+        let mut graph = CallGraph::new();
+
+        // Function with complexity > 5 should not be orchestrator
+        let func = create_test_metrics("complex_logic", 8, 10, 30);
+        let func_id = FunctionId {
+            file: PathBuf::from("logic.rs"),
+            name: "complex_logic".to_string(),
+            line: 10,
+        };
+
+        graph.add_function(func_id.clone(), false, false, 8, 30);
+
+        // Even with callees, complexity > 5 means not orchestrator
+        for i in 0..3 {
+            let callee_id = FunctionId {
+                file: PathBuf::from("worker.rs"),
+                name: format!("worker_{}", i),
+                line: i * 20,
+            };
+            graph.add_function(callee_id.clone(), false, false, 5, 20);
+            graph.add_call(FunctionCall {
+                caller: func_id.clone(),
+                callee: callee_id,
+                call_type: CallType::Direct,
+            });
+        }
+
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::PureLogic,
+            "Function with complexity > 5 should be PureLogic, not Orchestrator"
         );
     }
 }

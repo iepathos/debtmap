@@ -231,6 +231,57 @@ pub struct RoleCoverageWeights {
     pub unknown: f64,
 }
 
+/// Orchestrator detection configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrchestratorDetectionConfig {
+    /// Maximum cyclomatic complexity for orchestrators (default: 5)
+    /// Allows for error handling patterns (Result chains)
+    #[serde(default = "default_orchestrator_max_cyclomatic")]
+    pub max_cyclomatic: u32,
+
+    /// Minimum delegation ratio (default: 0.2)
+    /// Percentage of statements that are function calls
+    #[serde(default = "default_orchestrator_min_delegation_ratio")]
+    pub min_delegation_ratio: f64,
+
+    /// Minimum meaningful callees (default: 2)
+    /// Must coordinate at least 2 non-stdlib functions
+    #[serde(default = "default_orchestrator_min_meaningful_callees")]
+    pub min_meaningful_callees: usize,
+
+    /// Cognitive complexity weight (default: 0.7)
+    /// Weight given to cognitive vs cyclomatic complexity for orchestrators
+    #[serde(default = "default_orchestrator_cognitive_weight")]
+    pub cognitive_weight: f64,
+}
+
+impl Default for OrchestratorDetectionConfig {
+    fn default() -> Self {
+        Self {
+            max_cyclomatic: default_orchestrator_max_cyclomatic(),
+            min_delegation_ratio: default_orchestrator_min_delegation_ratio(),
+            min_meaningful_callees: default_orchestrator_min_meaningful_callees(),
+            cognitive_weight: default_orchestrator_cognitive_weight(),
+        }
+    }
+}
+
+fn default_orchestrator_max_cyclomatic() -> u32 {
+    5 // Allow complexity up to 5 for error handling
+}
+
+fn default_orchestrator_min_delegation_ratio() -> f64 {
+    0.2 // 20% of statements should be function calls
+}
+
+fn default_orchestrator_min_meaningful_callees() -> usize {
+    2 // Must coordinate at least 2 functions
+}
+
+fn default_orchestrator_cognitive_weight() -> f64 {
+    0.7 // 70% weight for cognitive complexity in orchestrators
+}
+
 impl Default for RoleCoverageWeights {
     fn default() -> Self {
         Self {
@@ -629,6 +680,10 @@ pub struct DebtmapConfig {
     /// Role-based coverage weight multipliers
     #[serde(default)]
     pub role_coverage_weights: Option<RoleCoverageWeights>,
+
+    /// Orchestrator detection configuration
+    #[serde(default)]
+    pub orchestrator_detection: Option<OrchestratorDetectionConfig>,
 }
 
 impl DebtmapConfig {
@@ -1276,6 +1331,14 @@ pub fn get_error_handling_config() -> ErrorHandlingConfig {
 pub fn get_role_coverage_weights() -> RoleCoverageWeights {
     get_config()
         .role_coverage_weights
+        .clone()
+        .unwrap_or_default()
+}
+
+/// Get orchestrator detection configuration
+pub fn get_orchestrator_detection_config() -> OrchestratorDetectionConfig {
+    get_config()
+        .orchestrator_detection
         .clone()
         .unwrap_or_default()
 }
