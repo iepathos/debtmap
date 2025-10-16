@@ -26,6 +26,11 @@ pub struct UnifiedScore {
     pub dependency_factor: f64, // 0-10, configurable weight (default 20%)
     pub role_multiplier: f64,   // 0.1-1.5x based on function role
     pub final_score: f64,       // Computed composite score
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pre_adjustment_score: Option<f64>, // Score before orchestration adjustment (spec 110)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adjustment_applied:
+        Option<crate::priority::scoring::orchestration_adjustment::ScoreAdjustment>, // Orchestration adjustment details (spec 110)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +125,8 @@ pub fn calculate_unified_score_with_patterns(
         dependency_factor: base_score.dependency_factor,
         role_multiplier: base_score.role_multiplier,
         final_score: base_score.final_score * god_object_multiplier,
+        pre_adjustment_score: base_score.pre_adjustment_score,
+        adjustment_applied: base_score.adjustment_applied,
     }
 }
 
@@ -177,6 +184,8 @@ pub fn calculate_unified_priority_with_debt(
             dependency_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         };
     }
 
@@ -299,12 +308,55 @@ pub fn calculate_unified_priority_with_debt(
     // Normalize to 0-10 scale with better distribution
     let normalized_score = normalize_final_score(final_score);
 
+    // Apply orchestration score adjustment (spec 110) if this is an orchestrator
+    let (final_normalized_score, pre_adjustment, adjustment) = if is_orchestrator_candidate {
+        let config = crate::config::get_orchestration_adjustment_config();
+        if config.enabled {
+            // Extract composition metrics from call graph
+            let composition_metrics =
+                crate::priority::scoring::orchestration_adjustment::extract_composition_metrics(
+                    &func_id, func, call_graph,
+                );
+
+            // Apply the adjustment
+            let adjustment = crate::priority::scoring::orchestration_adjustment::adjust_score(
+                &config,
+                normalized_score,
+                &role,
+                &composition_metrics,
+            );
+
+            // Log adjustment details for observability (spec 110)
+            log::debug!(
+                "Orchestration adjustment applied to {}:{} - Original: {:.2}, Adjusted: {:.2}, Reduction: {:.1}%, Reason: {}",
+                func.file.display(),
+                func.name,
+                adjustment.original_score,
+                adjustment.adjusted_score,
+                adjustment.reduction_percent,
+                adjustment.adjustment_reason
+            );
+
+            (
+                adjustment.adjusted_score,
+                Some(normalized_score),
+                Some(adjustment),
+            )
+        } else {
+            (normalized_score, None, None)
+        }
+    } else {
+        (normalized_score, None, None)
+    };
+
     UnifiedScore {
         complexity_factor,
         coverage_factor: (1.0 - coverage_pct) * 10.0, // Convert gap to 0-10 for display
         dependency_factor: upstream_count as f64,
         role_multiplier,
-        final_score: normalized_score,
+        final_score: final_normalized_score,
+        pre_adjustment_score: pre_adjustment,
+        adjustment_applied: adjustment,
     }
 }
 /// Normalize complexity metrics with cognitive complexity weighting for orchestrators

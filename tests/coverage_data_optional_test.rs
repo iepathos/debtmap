@@ -29,6 +29,8 @@ fn create_untested_item() -> UnifiedDebtItem {
             dependency_factor: 4.0,
             role_multiplier: 1.0,
             final_score: 85.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

@@ -6,6 +6,7 @@ pub mod computation;
 pub mod construction;
 pub mod debt_item;
 pub mod formatting;
+pub mod orchestration_adjustment;
 pub mod recommendation;
 pub mod recommendation_extended;
 pub mod recommendation_helpers;
@@ -34,6 +35,11 @@ pub use recommendation::{
 
 pub use test_calculation::{
     calculate_tests_needed, validate_recommendation_consistency, ComplexityTier, TestRecommendation,
+};
+
+pub use orchestration_adjustment::{
+    adjust_score, extract_composition_metrics, CompositionMetrics, OrchestrationAdjustmentConfig,
+    ReductionPercent, ScoreAdjustment,
 };
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

@@ -1894,6 +1894,8 @@ mod tests {
                 dependency_factor: 3.0,
                 role_multiplier: 1.0,
                 final_score: score,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {

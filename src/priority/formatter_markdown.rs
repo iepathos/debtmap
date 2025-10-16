@@ -1221,6 +1221,8 @@ mod tests {
             dependency_factor: 4.0,
             role_multiplier: 1.2,
             final_score: 8.5,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         };
 
         let result = format_score_breakdown_with_coverage(&score, None);
@@ -1249,6 +1251,8 @@ mod tests {
             dependency_factor: 6.0, // Above threshold
             role_multiplier: 1.0,
             final_score: 7.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         };
 
         let debt_type = DebtType::Risk {
@@ -1273,6 +1277,8 @@ mod tests {
             dependency_factor: 2.0,
             role_multiplier: 1.0,
             final_score: 2.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         };
 
         let debt_type = DebtType::Risk {
@@ -1342,6 +1348,8 @@ mod tests {
                 dependency_factor: 6.0,
                 role_multiplier: 1.2,
                 final_score: 8.5,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
@@ -1874,6 +1882,8 @@ mod tests {
                 dependency_factor: 10.0,
                 role_multiplier: 1.0,
                 final_score: 95.0,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
             },
             function_role: FunctionRole::Unknown,
             recommendation: ActionableRecommendation {
@@ -1920,6 +1930,8 @@ mod tests {
                 dependency_factor: 6.0,
                 role_multiplier: 1.0,
                 final_score: 75.0,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
@@ -1967,6 +1979,8 @@ mod tests {
                 dependency_factor: 4.0,
                 role_multiplier: 1.0,
                 final_score: 55.0,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
@@ -2015,6 +2029,8 @@ mod tests {
                 dependency_factor: 2.0,
                 role_multiplier: 1.0,
                 final_score: 25.0,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
             },
             function_role: FunctionRole::Unknown,
             recommendation: ActionableRecommendation {
