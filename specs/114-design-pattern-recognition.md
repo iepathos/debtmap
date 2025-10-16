@@ -1,14 +1,14 @@
 ---
-number: 111
+number: 114
 title: Design Pattern Recognition
 category: foundation
 priority: high
 status: draft
-dependencies: [109]
+dependencies: [112]
 created: 2025-10-16
 ---
 
-# Specification 111: Design Pattern Recognition
+# Specification 114: Design Pattern Recognition
 
 **Category**: foundation
 **Priority**: high
@@ -925,6 +925,6 @@ For existing users:
 
 ## Related Specifications
 
-- Spec 109: Cross-File Dependency Analysis (provides call graph and symbol resolution)
-- Spec 110: Public API Detection (complementary false positive reduction)
-- Spec 113: Confidence Scoring (uses pattern detection for confidence)
+- Spec 112: Cross-File Dependency Analysis (provides call graph and symbol resolution)
+- Spec 116: Public API Detection (complementary false positive reduction)
+- Spec 116: Confidence Scoring (uses pattern detection for confidence)

@@ -1,5 +1,5 @@
 ---
-number: 112
+number: 115
 title: Static Analysis Integration
 category: foundation
 priority: medium
@@ -8,7 +8,7 @@ dependencies: []
 created: 2025-10-16
 ---
 
-# Specification 112: Static Analysis Integration
+# Specification 115: Static Analysis Integration
 
 **Category**: foundation
 **Priority**: medium
@@ -823,5 +823,5 @@ For existing users:
 
 ## Related Specifications
 
-- Spec 109: Cross-File Dependency Analysis (complementary analysis)
-- Spec 113: Confidence Scoring System (uses static analysis for confidence)
+- Spec 112: Cross-File Dependency Analysis (complementary analysis)
+- Spec 116: Confidence Scoring System (uses static analysis for confidence)

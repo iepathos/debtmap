@@ -1,5 +1,5 @@
 ---
-number: 109
+number: 112
 title: Cross-File Dependency Analysis
 category: foundation
 priority: critical
@@ -8,7 +8,7 @@ dependencies: []
 created: 2025-10-16
 ---
 
-# Specification 109: Cross-File Dependency Analysis
+# Specification 112: Cross-File Dependency Analysis
 
 **Category**: foundation
 **Priority**: critical

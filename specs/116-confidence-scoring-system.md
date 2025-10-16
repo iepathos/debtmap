@@ -1,19 +1,19 @@
 ---
-number: 113
+number: 116
 title: Confidence Scoring System
 category: foundation
 priority: high
 status: draft
-dependencies: [109, 110, 111, 112]
+dependencies: [112, 113, 114, 115]
 created: 2025-10-16
 ---
 
-# Specification 113: Confidence Scoring System
+# Specification 116: Confidence Scoring System
 
 **Category**: foundation
 **Priority**: high
 **Status**: draft
-**Dependencies**: Specs 109, 110, 111, 112
+**Dependencies**: Specs 112, 113, 114, 115
 
 ## Context
 
@@ -670,10 +670,10 @@ Commands::Analyze {
 ## Dependencies
 
 - **Prerequisites**:
-  - Spec 109: Cross-File Dependency Analysis
-  - Spec 110: Public API Detection Heuristics
-  - Spec 111: Design Pattern Recognition
-  - Spec 112: Static Analysis Integration
+  - Spec 115: Cross-File Dependency Analysis
+  - Spec 113: Public API Detection Heuristics
+  - Spec 114: Design Pattern Recognition
+  - Spec 115: Static Analysis Integration
 - **Affected Components**:
   - `src/confidence/` - New module
   - `src/debt/` - Add confidence to findings
