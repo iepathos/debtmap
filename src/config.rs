@@ -684,6 +684,11 @@ pub struct DebtmapConfig {
     /// Orchestrator detection configuration
     #[serde(default)]
     pub orchestrator_detection: Option<OrchestratorDetectionConfig>,
+
+    /// Orchestration score adjustment configuration (spec 110)
+    #[serde(default)]
+    pub orchestration_adjustment:
+        Option<crate::priority::scoring::orchestration_adjustment::OrchestrationAdjustmentConfig>,
 }
 
 impl DebtmapConfig {
@@ -1339,6 +1344,15 @@ pub fn get_role_coverage_weights() -> RoleCoverageWeights {
 pub fn get_orchestrator_detection_config() -> OrchestratorDetectionConfig {
     get_config()
         .orchestrator_detection
+        .clone()
+        .unwrap_or_default()
+}
+
+/// Get orchestration adjustment configuration (spec 110)
+pub fn get_orchestration_adjustment_config(
+) -> crate::priority::scoring::orchestration_adjustment::OrchestrationAdjustmentConfig {
+    get_config()
+        .orchestration_adjustment
         .clone()
         .unwrap_or_default()
 }

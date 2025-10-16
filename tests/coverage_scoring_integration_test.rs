@@ -50,6 +50,8 @@ fn create_debt_item(
             dependency_factor,
             role_multiplier: 1.0,
             final_score,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {
@@ -138,6 +140,8 @@ fn test_coverage_scoring_invariant_total_analysis() {
                 dependency_factor,
                 role_multiplier: 1.0,
                 final_score: base_score,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: debtmap::priority::ActionableRecommendation {

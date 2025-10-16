@@ -1314,6 +1314,8 @@ mod tests {
             dependency_factor: 2.0,
             role_multiplier: 1.2,
             final_score: 8.5,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         };
 
         let coverage = TransitiveCoverage {
