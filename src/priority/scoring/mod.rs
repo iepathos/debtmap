@@ -9,6 +9,7 @@ pub mod recommendation;
 pub mod recommendation_extended;
 pub mod rust_recommendations;
 pub mod test_calculation;
+pub mod validation;
 
 // Re-export commonly used items
 pub use calculation::{
