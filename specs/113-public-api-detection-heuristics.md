@@ -1,14 +1,14 @@
 ---
-number: 110
+number: 113
 title: Public API Detection Heuristics
 category: foundation
 priority: high
 status: draft
-dependencies: [109]
+dependencies: [112]
 created: 2025-10-16
 ---
 
-# Specification 110: Public API Detection Heuristics
+# Specification 113: Public API Detection Heuristics
 
 **Category**: foundation
 **Priority**: high
@@ -884,5 +884,5 @@ For existing users:
 
 ## Related Specifications
 
-- Spec 109: Cross-File Dependency Analysis (provides usage data)
+- Spec 112: Cross-File Dependency Analysis (provides usage data)
 - Spec 113: Confidence Scoring System (uses public API scores)
