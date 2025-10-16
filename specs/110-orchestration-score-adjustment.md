@@ -310,41 +310,43 @@ pub fn adjust_score(
 /// Adjust score for orchestrator functions (pure function)
 ///
 /// Applies graduated reductions based on:
-/// - Confidence level (how sure we are this is an orchestrator)
-/// - Composition quality (purity, depth, delegation ratio)
-/// - Minimum complexity floor (coordinates × factor)
+/// - Base reduction for being an orchestrator (20%)
+/// - Composition quality bonus (up to 10% more)
+/// - Minimum complexity floor (callee_count × factor)
 fn adjust_orchestrator_score(
     config: &OrchestrationAdjustmentConfig,
     base_score: f64,
-    complexity: u32,
-    coordinates: usize,
-    confidence: f64,
-    metrics: &RoleMetrics,
+    metrics: &CompositionMetrics,
 ) -> ScoreAdjustment {
-    // Handle zero-coordination edge case
-    if coordinates == 0 {
+    // Handle zero-callee edge case
+    if metrics.callee_count == 0 {
         return ScoreAdjustment {
             original_score: base_score,
             adjusted_score: base_score,
             reduction_percent: 0.0,
-            adjustment_reason: "Orchestrator with zero coordination (no adjustment)".to_string(),
-            confidence,
+            adjustment_reason: "Orchestrator with zero callees (no adjustment)".to_string(),
+            quality_score: 0.0,
         };
     }
 
-    // Determine base reduction percentage based on confidence
-    let base_reduction = calculate_base_reduction(config, confidence);
+    // Base reduction for all orchestrators
+    let base_reduction = config.base_orchestrator_reduction;
 
-    // Apply composition quality multiplier
-    let quality_multiplier = calculate_composition_quality(config, metrics);
-    let final_reduction = base_reduction * quality_multiplier;
+    // Calculate composition quality score
+    let quality_score = calculate_composition_quality(config, metrics);
+
+    // Apply quality bonus (scaled by quality score)
+    let quality_bonus = config.max_quality_bonus * quality_score;
+
+    // Total reduction (capped at max)
+    let total_reduction = (base_reduction + quality_bonus).min(config.max_total_reduction);
 
     // Calculate adjusted score
-    let reduction_factor = 1.0 - final_reduction;
+    let reduction_factor = 1.0 - total_reduction;
     let adjusted = base_score * reduction_factor;
 
     // Apply minimum complexity floor (never reduce below inherent coordination complexity)
-    let min_complexity = coordinates as f64 * config.min_inherent_complexity_factor;
+    let min_complexity = metrics.callee_count as f64 * config.min_inherent_complexity_factor;
     let final_score = adjusted.max(min_complexity);
 
     let actual_reduction = (base_score - final_score) / base_score;
@@ -354,109 +356,65 @@ fn adjust_orchestrator_score(
         adjusted_score: final_score,
         reduction_percent: actual_reduction * 100.0,
         adjustment_reason: format!(
-            "Orchestrator (confidence: {:.1}%, coordinates: {}, quality: {:.2})",
-            confidence * 100.0,
-            coordinates,
-            quality_multiplier
+            "Orchestrator (callees: {}, delegation: {:.1}%, quality: {:.2})",
+            metrics.callee_count,
+            metrics.delegation_ratio * 100.0,
+            quality_score
         ),
-        confidence,
+        quality_score,
     }
 }
 
-/// Calculate base reduction percentage based on confidence (pure function)
-///
-/// Returns a graduated reduction percentage:
-/// - ≥0.7: High confidence reduction
-/// - 0.5-0.7: Graduated between low and medium
-/// - <0.5: Graduated below low
-fn calculate_base_reduction(config: &OrchestrationAdjustmentConfig, confidence: f64) -> f64 {
-    if confidence >= 0.7 {
-        config.high_confidence_reduction
-    } else if confidence >= 0.5 {
-        // Graduated between low and medium
-        let t = (confidence - 0.5) / 0.2; // 0.0 at 0.5, 1.0 at 0.7
-        config.low_confidence_reduction
-            + t * (config.medium_confidence_reduction - config.low_confidence_reduction)
-    } else {
-        // Graduated below 0.5
-        let t = confidence / 0.5; // 0.0 at 0.0, 1.0 at 0.5
-        t * config.low_confidence_reduction
-    }
-}
-
-/// Calculate composition quality multiplier (pure function)
+/// Calculate composition quality score (pure function)
 ///
 /// Returns a quality score between config.min_composition_quality and 1.0.
-/// Higher quality (more pure calls, shallower depth, higher delegation) increases
-/// the effectiveness of the base reduction.
+/// Higher quality (more callees, higher delegation, lower complexity) increases
+/// the quality bonus applied to the base reduction.
 ///
 /// Quality factors:
-/// - Pure function ratio: max +0.3
-/// - Call depth: max +0.3
-/// - Delegation ratio: max +0.4
-fn calculate_composition_quality(config: &OrchestrationAdjustmentConfig, metrics: &RoleMetrics) -> f64 {
-    // Pure function calls increase quality (max +0.3)
-    let pure_ratio = if metrics.callee_count > 0 {
-        metrics.pure_callee_count as f64 / metrics.callee_count as f64
+/// - Callee count: max +0.4 (more delegation is better)
+/// - Delegation ratio: max +0.4 (higher ratio is better)
+/// - Low local complexity: max +0.2 (simpler coordination is better)
+fn calculate_composition_quality(
+    config: &OrchestrationAdjustmentConfig,
+    metrics: &CompositionMetrics,
+) -> f64 {
+    // More callees = better orchestration (max +0.4)
+    // Scale from 0.0 at 2 callees to 0.4 at 6+ callees
+    let callee_quality = match metrics.callee_count {
+        0..=1 => 0.0,
+        2 => 0.1,
+        3 => 0.2,
+        4 => 0.3,
+        5 => 0.35,
+        _ => 0.4, // 6+ callees
+    };
+
+    // High delegation ratio = better orchestration (max +0.4)
+    // Scale from 0.0 at ratio=0.2 to 0.4 at ratio=0.5+
+    let delegation_quality = if metrics.delegation_ratio >= 0.5 {
+        0.4
+    } else if metrics.delegation_ratio >= 0.2 {
+        (metrics.delegation_ratio - 0.2) / 0.3 * 0.4
     } else {
         0.0
     };
-    let pure_quality = pure_ratio * 0.3;
 
-    // Shallow call depth increases quality (max +0.3)
-    let depth_quality = match metrics.avg_call_depth {
-        0..=1 => 0.3,
-        2 => 0.2,
-        3 => 0.1,
+    // Low local complexity = cleaner orchestration (max +0.2)
+    // Lower is better for orchestrators
+    let complexity_quality = match metrics.local_complexity {
+        0..=2 => 0.2,
+        3 => 0.15,
+        4 => 0.1,
+        5 => 0.05,
         _ => 0.0,
     };
 
-    // High delegation ratio increases quality (max +0.4)
-    // Scale from 0.0 at delegation_ratio=0.5 to 0.4 at delegation_ratio=1.0
-    let delegation_quality = (metrics.delegation_ratio - 0.5).max(0.0) * 0.8;
-
     // Combine quality factors
-    let quality = pure_quality + depth_quality + delegation_quality;
+    let quality = callee_quality + delegation_quality + complexity_quality;
 
     // Clamp to [min_composition_quality, 1.0]
     quality.min(1.0).max(config.min_composition_quality)
-}
-
-/// Adjust score for worker functions (pure function)
-fn adjust_worker_score(config: &OrchestrationAdjustmentConfig, base_score: f64, is_pure: bool) -> ScoreAdjustment {
-    if is_pure {
-        let reduction_factor = 1.0 - config.pure_worker_reduction;
-        let adjusted = base_score * reduction_factor;
-
-        ScoreAdjustment {
-            original_score: base_score,
-            adjusted_score: adjusted,
-            reduction_percent: config.pure_worker_reduction * 100.0,
-            adjustment_reason: "Pure worker function".to_string(),
-            confidence: 1.0,
-        }
-    } else {
-        // No adjustment for impure workers
-        ScoreAdjustment::no_adjustment(base_score)
-    }
-}
-
-/// Adjust score for entry point functions (pure function)
-fn adjust_entry_point_score(config: &OrchestrationAdjustmentConfig, base_score: f64, depth: u32) -> ScoreAdjustment {
-    if depth >= 3 {
-        let reduction_factor = 1.0 - config.entry_point_reduction;
-        let adjusted = base_score * reduction_factor;
-
-        ScoreAdjustment {
-            original_score: base_score,
-            adjusted_score: adjusted,
-            reduction_percent: config.entry_point_reduction * 100.0,
-            adjustment_reason: format!("Entry point with depth {}", depth),
-            confidence: 0.8,
-        }
-    } else {
-        ScoreAdjustment::no_adjustment(base_score)
-    }
 }
 ```
 
@@ -465,17 +423,21 @@ fn adjust_entry_point_score(config: &OrchestrationAdjustmentConfig, base_score: 
 ```rust
 // src/priority/scoring/computation.rs
 
-use crate::priority::scoring::orchestration_adjustment::{adjust_score, ScoreAdjustment};
+use crate::priority::scoring::orchestration_adjustment::{
+    adjust_score, extract_composition_metrics, ScoreAdjustment
+};
 
 /// Calculate final score with all adjustments applied
 ///
 /// # Score Calculation Pipeline
 /// 1. Base complexity score (cyclomatic, cognitive, etc.)
-/// 2. Entropy dampening (reduces noise in scattered complexity)
-/// 3. Orchestration adjustment (reduces orchestrator false positives)
+/// 2. Role multiplier (from spec 117 - applied via get_role_multiplier)
+/// 3. Entropy dampening (reduces noise in scattered complexity)
+/// 4. Orchestration adjustment (reduces orchestrator false positives) ← NEW
 ///
 /// Each step is a pure transformation of the score from the previous step.
 pub fn calculate_final_score_with_adjustments(
+    func_id: &FunctionId,
     function: &FunctionMetrics,
     call_graph: &CallGraph,
     config: &ScoringConfig,
@@ -483,25 +445,29 @@ pub fn calculate_final_score_with_adjustments(
     // Step 1: Calculate base score (existing logic)
     let base_score = calculate_base_complexity_score(function);
 
-    // Step 2: Apply entropy dampening (existing)
+    // Step 2: Apply role multiplier (spec 117 - existing)
+    let role = classify_function_role(function, func_id, call_graph);
+    let role_multiplier = get_role_multiplier(role);
+    let after_role = base_score * role_multiplier;
+
+    // Step 3: Apply entropy dampening (existing)
     let after_entropy = function.entropy_score
         .as_ref()
-        .map(|entropy| apply_entropy_dampening(base_score as u32, entropy) as f64)
-        .unwrap_or(base_score);
+        .map(|entropy| apply_entropy_dampening(after_role as u32, entropy) as f64)
+        .unwrap_or(after_role);
 
-    // Step 3: Apply orchestration adjustment (new)
-    let adjustment = match (&function.function_role, &function.role_metrics) {
-        (Some(role), Some(metrics)) => {
-            let adj = adjust_score(
-                &config.orchestration_adjustment,
-                after_entropy,
-                function.cyclomatic,
-                role,
-                metrics,
-            );
-            (adj.adjusted_score, Some(adj))
-        }
-        _ => (after_entropy, None),
+    // Step 4: Apply orchestration adjustment (new - only for orchestrators)
+    let adjustment = if matches!(role, FunctionRole::Orchestrator) {
+        let metrics = extract_composition_metrics(func_id, function, call_graph);
+        let adj = adjust_score(
+            &config.orchestration_adjustment,
+            after_entropy,
+            &role,
+            &metrics,
+        );
+        (adj.adjusted_score, Some(adj))
+    } else {
+        (after_entropy, None)
     };
 
     adjustment
@@ -512,27 +478,32 @@ pub fn calculate_final_score_with_adjustments(
 /// This demonstrates how the scoring pipeline can be expressed as
 /// a composition of pure functions.
 pub fn calculate_score_functional(
+    func_id: &FunctionId,
     function: &FunctionMetrics,
+    call_graph: &CallGraph,
     config: &ScoringConfig,
 ) -> (f64, Option<ScoreAdjustment>) {
     // Compose the scoring pipeline
-    let score_pipeline = |base: f64| -> (f64, Option<ScoreAdjustment>) {
-        let with_entropy = function.entropy_score
-            .as_ref()
-            .map(|e| apply_entropy_dampening(base as u32, e) as f64)
-            .unwrap_or(base);
-
-        match (&function.function_role, &function.role_metrics) {
-            (Some(role), Some(metrics)) => {
-                let adj = adjust_score(&config.orchestration_adjustment, with_entropy, function.cyclomatic, role, metrics);
-                (adj.adjusted_score, Some(adj))
-            }
-            _ => (with_entropy, None),
-        }
-    };
-
     let base = calculate_base_complexity_score(function);
-    score_pipeline(base)
+
+    // Role classification and multiplier
+    let role = classify_function_role(function, func_id, call_graph);
+    let with_role = base * get_role_multiplier(role);
+
+    // Entropy dampening
+    let with_entropy = function.entropy_score
+        .as_ref()
+        .map(|e| apply_entropy_dampening(with_role as u32, e) as f64)
+        .unwrap_or(with_role);
+
+    // Orchestration adjustment (only for orchestrators)
+    if matches!(role, FunctionRole::Orchestrator) {
+        let metrics = extract_composition_metrics(func_id, function, call_graph);
+        let adj = adjust_score(&config.orchestration_adjustment, with_entropy, &role, &metrics);
+        (adj.adjusted_score, Some(adj))
+    } else {
+        (with_entropy, None)
+    }
 }
 ```
 
@@ -576,12 +547,13 @@ if verbose_mode {
 ## Dependencies
 
 - **Prerequisites**:
-  - Spec 109 (Call Graph Role Classification) - Must be implemented first
+  - Spec 117 (Semantic Function Classification) - Already implemented
+  - Call graph analysis - Existing functionality
 - **Affected Components**:
-  - `src/priority/scoring/computation.rs` - Score calculation
-  - `src/priority/scoring/debt_item.rs` - Debt item creation
-  - `src/priority/unified_scorer.rs` - Unified scoring
-  - `src/config.rs` - Add adjustment configuration
+  - `src/priority/scoring/` - Create new `orchestration_adjustment.rs` module
+  - `src/priority/scoring/computation.rs` - Integrate adjustment into scoring pipeline
+  - `src/priority/unified_scorer.rs` - Update to use adjusted scores
+  - `src/config.rs` - Add `OrchestrationAdjustmentConfig` structure
 - **External Dependencies**: None
 
 ## Testing Strategy
@@ -599,62 +571,58 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_high_confidence_orchestrator_max_reduction() {
+    fn test_high_quality_orchestrator_max_reduction() {
         let config = OrchestrationAdjustmentConfig::default();
+        let role = FunctionRole::Orchestrator;
 
-        let role = FunctionRole::Orchestrator {
-            coordinates: 8,
-            confidence: 0.9,
-        };
-
-        let metrics = RoleMetrics {
-            delegation_ratio: 0.85,
-            pure_callee_count: 7,
-            callee_count: 8,
-            avg_call_depth: 1,
+        // Excellent quality: 6 callees, 50% delegation, complexity 2
+        let metrics = CompositionMetrics {
+            callee_count: 6,
+            delegation_ratio: 0.5,
             local_complexity: 2,
-            caller_count: 3,
         };
 
-        let adjustment = adjust_score(&config, 100.0, 17, &role, &metrics);
+        let adjustment = adjust_score(&config, 100.0, &role, &metrics);
 
-        // High confidence (0.9) + excellent quality should give ~30% reduction
+        // Base 20% + quality bonus (up to 10%) = ~30% reduction
         assert!(adjustment.reduction_percent >= 25.0 && adjustment.reduction_percent <= 30.0);
         assert!(adjustment.adjusted_score >= 70.0 && adjustment.adjusted_score <= 75.0);
+        assert!(adjustment.quality_score >= 0.8); // High quality
     }
 
     #[test]
     fn test_minimum_complexity_floor() {
         let config = OrchestrationAdjustmentConfig::default();
+        let role = FunctionRole::Orchestrator;
 
-        let role = FunctionRole::Orchestrator {
-            coordinates: 10,
-            confidence: 0.95,
+        // High quality metrics but low base score
+        let metrics = CompositionMetrics {
+            callee_count: 10,
+            delegation_ratio: 0.6,
+            local_complexity: 2,
         };
 
-        let metrics = create_high_quality_metrics(10);
-
-        // Even with high reduction, should not go below coordinates × 2
-        let adjustment = adjust_score(&config, 30.0, 15, &role, &metrics);
+        // Even with high reduction, should not go below callee_count × 2
+        let adjustment = adjust_score(&config, 30.0, &role, &metrics);
         assert!(adjustment.adjusted_score >= 20.0); // 10 × 2 = 20
     }
 
     #[test]
-    fn test_zero_coordination_edge_case() {
+    fn test_zero_callee_edge_case() {
         let config = OrchestrationAdjustmentConfig::default();
+        let role = FunctionRole::Orchestrator;
 
-        let role = FunctionRole::Orchestrator {
-            coordinates: 0,
-            confidence: 0.9,
+        let metrics = CompositionMetrics {
+            callee_count: 0,
+            delegation_ratio: 0.0,
+            local_complexity: 5,
         };
 
-        let metrics = RoleMetrics::default();
-
-        // Should not adjust if coordinates = 0
-        let adjustment = adjust_score(&config, 100.0, 10, &role, &metrics);
+        // Should not adjust if callee_count = 0
+        let adjustment = adjust_score(&config, 100.0, &role, &metrics);
         assert_eq!(adjustment.reduction_percent, 0.0);
         assert_eq!(adjustment.adjusted_score, 100.0);
-        assert!(adjustment.adjustment_reason.contains("zero coordination"));
+        assert!(adjustment.adjustment_reason.contains("zero callees"));
     }
 
     // ========================================================================
@@ -665,43 +633,34 @@ mod tests {
     fn test_composition_quality_calculation() {
         let config = OrchestrationAdjustmentConfig::default();
 
-        // Excellent quality: all pure, shallow depth, high delegation
-        let excellent = RoleMetrics {
-            delegation_ratio: 0.9,
-            pure_callee_count: 10,
-            callee_count: 10,
-            avg_call_depth: 1,
+        // Excellent quality: 6+ callees, high delegation (0.5+), low complexity (≤2)
+        let excellent = CompositionMetrics {
+            callee_count: 8,
+            delegation_ratio: 0.6,
             local_complexity: 2,
-            caller_count: 2,
         };
         let quality = calculate_composition_quality(&config, &excellent);
         assert!(quality >= 0.9, "Excellent quality should be >= 0.9, got {}", quality);
 
-        // Good quality: mostly pure, shallow depth, decent delegation
-        let good = RoleMetrics {
-            delegation_ratio: 0.75,
-            pure_callee_count: 7,
-            callee_count: 10,
-            avg_call_depth: 2,
+        // Good quality: 4 callees, decent delegation (0.3), medium complexity (3)
+        let good = CompositionMetrics {
+            callee_count: 4,
+            delegation_ratio: 0.3,
             local_complexity: 3,
-            caller_count: 2,
         };
         let quality = calculate_composition_quality(&config, &good);
-        assert!(quality >= 0.6 && quality < 0.9, "Good quality should be 0.6-0.9, got {}", quality);
+        assert!(quality >= 0.5 && quality < 0.9, "Good quality should be 0.5-0.9, got {}", quality);
 
-        // Poor quality: few pure, deep, low delegation
-        let poor = RoleMetrics {
-            delegation_ratio: 0.6,
-            pure_callee_count: 2,
-            callee_count: 10,
-            avg_call_depth: 5,
+        // Poor quality: 2 callees, low delegation (0.1), high complexity (8)
+        let poor = CompositionMetrics {
+            callee_count: 2,
+            delegation_ratio: 0.1,
             local_complexity: 8,
-            caller_count: 2,
         };
         let quality = calculate_composition_quality(&config, &poor);
         assert!(
-            quality >= config.min_composition_quality && quality < 0.7,
-            "Poor quality should be between min and 0.7, got {}",
+            quality >= config.min_composition_quality && quality < 0.5,
+            "Poor quality should be between min and 0.5, got {}",
             quality
         );
     }
@@ -712,13 +671,10 @@ mod tests {
         config.min_composition_quality = 0.6;
 
         // Worst possible metrics
-        let worst = RoleMetrics {
+        let worst = CompositionMetrics {
+            callee_count: 0,
             delegation_ratio: 0.0,
-            pure_callee_count: 0,
-            callee_count: 10,
-            avg_call_depth: 10,
             local_complexity: 20,
-            caller_count: 1,
         };
 
         let quality = calculate_composition_quality(&config, &worst);
@@ -726,52 +682,35 @@ mod tests {
     }
 
     // ========================================================================
-    // Confidence Reduction Tests
+    // Non-Orchestrator Role Tests
     // ========================================================================
 
     #[test]
-    fn test_graduated_confidence_reductions() {
+    fn test_non_orchestrator_roles_no_adjustment() {
         let config = OrchestrationAdjustmentConfig::default();
+        let metrics = CompositionMetrics {
+            callee_count: 5,
+            delegation_ratio: 0.3,
+            local_complexity: 3,
+        };
 
-        // High confidence: 0.8
-        let high = calculate_base_reduction(&config, 0.8);
-        assert_eq!(high, 0.30, "Confidence >= 0.7 should use high reduction");
+        // PureLogic should not receive adjustment
+        let pure_logic = FunctionRole::PureLogic;
+        let adj = adjust_score(&config, 100.0, &pure_logic, &metrics);
+        assert_eq!(adj.reduction_percent, 0.0);
+        assert_eq!(adj.adjusted_score, 100.0);
 
-        // Medium confidence: 0.6
-        let medium = calculate_base_reduction(&config, 0.6);
-        assert!(
-            medium > 0.10 && medium < 0.30,
-            "Confidence 0.5-0.7 should graduate between low and medium, got {}",
-            medium
-        );
+        // IOWrapper should not receive adjustment (already has multiplier from spec 117)
+        let io_wrapper = FunctionRole::IOWrapper;
+        let adj = adjust_score(&config, 100.0, &io_wrapper, &metrics);
+        assert_eq!(adj.reduction_percent, 0.0);
+        assert_eq!(adj.adjusted_score, 100.0);
 
-        // Low confidence: 0.4
-        let low = calculate_base_reduction(&config, 0.4);
-        assert!(low < 0.10, "Confidence < 0.5 should be < low reduction, got {}", low);
-
-        // Edge cases
-        let at_boundary = calculate_base_reduction(&config, 0.5);
-        assert_eq!(at_boundary, config.low_confidence_reduction);
-
-        let zero_confidence = calculate_base_reduction(&config, 0.0);
-        assert_eq!(zero_confidence, 0.0, "Zero confidence should give zero reduction");
-    }
-
-    // ========================================================================
-    // Worker Function Tests
-    // ========================================================================
-
-    #[test]
-    fn test_pure_worker_reduction() {
-        let config = OrchestrationAdjustmentConfig::default();
-
-        let pure_adjustment = adjust_worker_score(&config, 100.0, true);
-        assert_eq!(pure_adjustment.reduction_percent, 10.0);
-        assert_eq!(pure_adjustment.adjusted_score, 90.0);
-
-        let impure_adjustment = adjust_worker_score(&config, 100.0, false);
-        assert_eq!(impure_adjustment.reduction_percent, 0.0);
-        assert_eq!(impure_adjustment.adjusted_score, 100.0);
+        // EntryPoint should not receive adjustment
+        let entry_point = FunctionRole::EntryPoint;
+        let adj = adjust_score(&config, 100.0, &entry_point, &metrics);
+        assert_eq!(adj.reduction_percent, 0.0);
+        assert_eq!(adj.adjusted_score, 100.0);
     }
 
     // ========================================================================
@@ -787,20 +726,21 @@ mod tests {
     #[test]
     fn test_config_validation_invalid_reduction_range() {
         let mut config = OrchestrationAdjustmentConfig::default();
-        config.high_confidence_reduction = 1.5;
+        config.base_orchestrator_reduction = 1.5;
         assert!(config.validate().is_err());
 
-        config.high_confidence_reduction = -0.1;
+        config.base_orchestrator_reduction = -0.1;
         assert!(config.validate().is_err());
     }
 
     #[test]
-    fn test_config_validation_reduction_ordering() {
+    fn test_config_validation_base_plus_bonus_exceeds_max() {
         let mut config = OrchestrationAdjustmentConfig::default();
-        config.high_confidence_reduction = 0.1;
-        config.medium_confidence_reduction = 0.2;
-        config.low_confidence_reduction = 0.3;
-        assert!(config.validate().is_err(), "High must be >= medium >= low");
+        config.base_orchestrator_reduction = 0.25;
+        config.max_quality_bonus = 0.15;
+        config.max_total_reduction = 0.30;
+        // 0.25 + 0.15 = 0.40 > 0.30 (max)
+        assert!(config.validate().is_err(), "base + bonus must be <= max");
     }
 
     #[test]
@@ -818,13 +758,14 @@ mod tests {
         let mut config = OrchestrationAdjustmentConfig::default();
         config.enabled = false;
 
-        let role = FunctionRole::Orchestrator {
-            coordinates: 8,
-            confidence: 0.9,
+        let role = FunctionRole::Orchestrator;
+        let metrics = CompositionMetrics {
+            callee_count: 8,
+            delegation_ratio: 0.5,
+            local_complexity: 2,
         };
-        let metrics = create_high_quality_metrics(8);
 
-        let adjustment = adjust_score(&config, 100.0, 17, &role, &metrics);
+        let adjustment = adjust_score(&config, 100.0, &role, &metrics);
         assert_eq!(adjustment.reduction_percent, 0.0);
         assert_eq!(adjustment.adjusted_score, 100.0);
     }
@@ -837,14 +778,19 @@ mod tests {
         #[test]
         fn prop_adjusted_score_never_exceeds_original(
             base_score in 1.0f64..1000.0,
-            coordinates in 1usize..50,
-            confidence in 0.0f64..1.0
+            callee_count in 1usize..50,
+            delegation_ratio in 0.0f64..1.0,
+            complexity in 0u32..20
         ) {
             let config = OrchestrationAdjustmentConfig::default();
-            let role = FunctionRole::Orchestrator { coordinates, confidence };
-            let metrics = create_high_quality_metrics(coordinates);
+            let role = FunctionRole::Orchestrator;
+            let metrics = CompositionMetrics {
+                callee_count,
+                delegation_ratio,
+                local_complexity: complexity,
+            };
 
-            let adjustment = adjust_score(&config, base_score, 10, &role, &metrics);
+            let adjustment = adjust_score(&config, base_score, &role, &metrics);
 
             prop_assert!(adjustment.adjusted_score <= adjustment.original_score);
         }
@@ -852,15 +798,19 @@ mod tests {
         #[test]
         fn prop_adjusted_score_respects_minimum_floor(
             base_score in 10.0f64..1000.0,
-            coordinates in 1usize..50,
-            confidence in 0.7f64..1.0  // High confidence
+            callee_count in 1usize..50
         ) {
             let config = OrchestrationAdjustmentConfig::default();
-            let role = FunctionRole::Orchestrator { coordinates, confidence };
-            let metrics = create_high_quality_metrics(coordinates);
+            let role = FunctionRole::Orchestrator;
+            // Use high-quality metrics to maximize reduction
+            let metrics = CompositionMetrics {
+                callee_count,
+                delegation_ratio: 0.8,
+                local_complexity: 2,
+            };
 
-            let adjustment = adjust_score(&config, base_score, 10, &role, &metrics);
-            let min_floor = coordinates as f64 * config.min_inherent_complexity_factor;
+            let adjustment = adjust_score(&config, base_score, &role, &metrics);
+            let min_floor = callee_count as f64 * config.min_inherent_complexity_factor;
 
             prop_assert!(
                 adjustment.adjusted_score >= min_floor,
@@ -872,19 +822,15 @@ mod tests {
 
         #[test]
         fn prop_composition_quality_bounded(
+            callee_count in 0usize..20,
             delegation_ratio in 0.0f64..1.0,
-            pure_count in 0usize..20,
-            total_count in 1usize..20,
-            depth in 0u32..10
+            complexity in 0u32..20
         ) {
             let config = OrchestrationAdjustmentConfig::default();
-            let metrics = RoleMetrics {
+            let metrics = CompositionMetrics {
+                callee_count,
                 delegation_ratio,
-                pure_callee_count: pure_count.min(total_count),
-                callee_count: total_count,
-                avg_call_depth: depth,
-                local_complexity: 5,
-                caller_count: 2,
+                local_complexity: complexity,
             };
 
             let quality = calculate_composition_quality(&config, &metrics);
@@ -897,21 +843,6 @@ mod tests {
             );
         }
     }
-
-    // ========================================================================
-    // Helper Functions
-    // ========================================================================
-
-    fn create_high_quality_metrics(coordinates: usize) -> RoleMetrics {
-        RoleMetrics {
-            delegation_ratio: 0.9,
-            pure_callee_count: coordinates,
-            callee_count: coordinates,
-            avg_call_depth: 1,
-            local_complexity: 2,
-            caller_count: 3,
-        }
-    }
 }
 ```
 
@@ -920,13 +851,13 @@ mod tests {
 1. **Real codebase validation**:
    ```rust
    #[test]
-   fn test_shared_cache_orchestrator_adjustment() {
-       // Analyze src/cache/shared_cache.rs
-       let analysis = analyze_file("src/cache/shared_cache.rs");
+   fn test_real_orchestrator_adjustment() {
+       // Analyze a file with known orchestrators
+       let analysis = analyze_file("src/priority/unified_scorer.rs");
 
        // Find orchestrator functions
        let orchestrators: Vec<_> = analysis.items.iter()
-           .filter(|item| matches!(item.function_role, FunctionRole::Orchestrator { .. }))
+           .filter(|item| matches!(item.function_role, Some(FunctionRole::Orchestrator)))
            .collect();
 
        // Verify adjustments applied
@@ -935,6 +866,7 @@ mod tests {
            let adj = item.score_adjustment.as_ref().unwrap();
            assert!(adj.reduction_percent > 0.0);
            assert!(adj.adjusted_score < adj.original_score);
+           assert!(adj.quality_score >= 0.0 && adj.quality_score <= 1.0);
        }
    }
    ```
@@ -944,17 +876,23 @@ mod tests {
    #[test]
    fn test_false_positive_reduction_metrics() {
        // Analyze with and without adjustments
-       let without = analyze_with_config(config_no_adjustment());
-       let with = analyze_with_config(config_with_adjustment());
+       let mut config_off = ScoringConfig::default();
+       config_off.orchestration_adjustment.enabled = false;
+
+       let mut config_on = ScoringConfig::default();
+       config_on.orchestration_adjustment.enabled = true;
+
+       let without = analyze_with_config(config_off);
+       let with = analyze_with_config(config_on);
 
        // Count high-priority orchestrators
        let false_positives_before = count_high_priority_orchestrators(&without);
        let false_positives_after = count_high_priority_orchestrators(&with);
 
-       // Verify 40-60% reduction
+       // Verify 30-50% reduction (updated target)
        let reduction = (false_positives_before - false_positives_after) as f64
            / false_positives_before as f64;
-       assert!(reduction >= 0.4 && reduction <= 0.6);
+       assert!(reduction >= 0.3 && reduction <= 0.5);
    }
    ```
 
@@ -963,16 +901,21 @@ mod tests {
    #[bench]
    fn bench_adjustment_overhead(b: &mut Bencher) {
        let functions = load_test_functions(1000);
-       let adjuster = OrchestrationAdjuster::new(Default::default());
+       let config = OrchestrationAdjustmentConfig::default();
+       let call_graph = build_test_call_graph(&functions);
 
        b.iter(|| {
            for func in &functions {
-               let _ = adjuster.adjust_score(
-                   black_box(100.0),
-                   black_box(func.cyclomatic),
-                   black_box(&func.role),
-                   black_box(&func.metrics),
-               );
+               if matches!(func.role, FunctionRole::Orchestrator) {
+                   let func_id = func.get_id();
+                   let metrics = extract_composition_metrics(&func_id, &func, &call_graph);
+                   let _ = adjust_score(
+                       black_box(&config),
+                       black_box(100.0),
+                       black_box(&func.role),
+                       black_box(&metrics),
+                   );
+               }
            }
        });
    }
@@ -987,37 +930,41 @@ Add comprehensive rustdoc comments explaining:
 - Adjustment algorithm and formulas (with examples)
 - Configuration options and their effects (with validation rules)
 - Composition quality calculation (factor weights and rationale)
-- Minimum complexity floor rationale (why coordinates × factor)
+- Minimum complexity floor rationale (why callee_count × factor)
 - Score calculation pipeline (order of transformations)
-- Newtype wrappers for type safety (`Confidence`, `ReductionPercent`)
+- Newtype wrapper for type safety (`ReductionPercent`)
 - Edge cases and how they're handled
+- Integration with spec 117's role multipliers
 
 ### User Documentation
 
 ```markdown
 ## Orchestration Score Adjustments
 
-Debtmap automatically reduces complexity scores for legitimate orchestrator functions:
+Debtmap automatically reduces complexity scores for legitimate orchestrator functions identified by spec 117's semantic classification:
 
 ### How It Works
 
-1. **Role Detection**: Functions classified as orchestrators (spec 109)
-2. **Confidence Scoring**: Multi-factor confidence calculation
-3. **Adjustment Calculation**: Graduated reductions based on confidence and quality
-4. **Floor Protection**: Never reduce below minimum inherent complexity
+1. **Role Detection**: Functions classified as orchestrators (spec 117)
+2. **Base Reduction**: All orchestrators receive 20% base reduction
+3. **Quality Bonus**: Up to 10% additional reduction based on composition quality
+4. **Floor Protection**: Never reduce below minimum inherent complexity (callee_count × 2)
 
-### Adjustment Levels
+### Adjustment Formula
 
-- **High Confidence (≥70%)**: Up to 30% score reduction
-- **Medium Confidence (50-70%)**: Up to 20% score reduction
-- **Low Confidence (<50%)**: Up to 10% score reduction
+```
+Base reduction: 20%
+Quality bonus: 0-10% (based on composition quality)
+Total reduction: min(base + bonus, 30%)
+Final score: max(score × (1 - reduction), callees × 2)
+```
 
 ### Quality Factors
 
-Composition quality influences adjustment amount:
-- Pure function calls (more is better)
-- Call depth (shallower is better)
-- Delegation ratio (higher is better)
+Composition quality (0.0-1.0) influences the bonus reduction:
+- **Callee count**: More delegated functions (max +0.4)
+- **Delegation ratio**: Higher ratio of callees to function length (max +0.4)
+- **Low local complexity**: Simpler coordination logic (max +0.2)
 
 ### Configuration
 
@@ -1026,13 +973,11 @@ Customize in `.debtmap.toml`:
 ```toml
 [orchestration_adjustment]
 enabled = true
-high_confidence_reduction = 0.30  # 30% (must be >= medium)
-medium_confidence_reduction = 0.20  # 20% (must be >= low)
-low_confidence_reduction = 0.10  # 10%
-pure_worker_reduction = 0.10  # 10%
-entry_point_reduction = 0.15  # 15%
-min_inherent_complexity_factor = 2.0  # Floor = coordinates × this
-min_composition_quality = 0.5  # Minimum quality multiplier
+base_orchestrator_reduction = 0.20      # 20% base reduction
+max_quality_bonus = 0.10                 # Up to 10% more
+max_total_reduction = 0.30               # 30% cap
+min_inherent_complexity_factor = 2.0     # Floor = callees × this
+min_composition_quality = 0.5            # Minimum quality score
 ```
 
 ### Viewing Adjustments
@@ -1046,7 +991,7 @@ debtmap analyze src -v
 Output:
 ```
 📊 create_unified_analysis_with_exclusions - 17.0 → 12.5 (26.5% reduction)
-   Reason: Orchestrator (confidence: 85.0%, coordinates: 6, quality: 0.92)
+   Reason: Orchestrator (callees: 6, delegation: 30.0%, quality: 0.92)
 ```
 ```
 
@@ -1063,24 +1008,27 @@ This implementation follows functional programming principles:
 5. **Testability**: Pure functions are trivially testable and deterministic
 6. **Pipeline Architecture**: Score calculation flows through pure transformations:
    ```
-   base_score → entropy_dampening → orchestration_adjustment → final_score
+   base_score → role_multiplier (spec 117) → entropy_dampening → orchestration_adjustment → final_score
    ```
 
 ### Formula Derivation
 
 The adjustment formula balances several competing concerns:
 
-1. **Confidence**: Higher confidence → higher reduction
-2. **Quality**: Better composition → higher reduction
-3. **Floor**: Minimum complexity based on coordination count
+1. **Base Reduction**: Flat 20% for all identified orchestrators (from spec 117)
+2. **Quality Bonus**: 0-10% additional based on composition quality
+3. **Floor**: Minimum complexity based on callee count
 4. **Conservatism**: Cap at 30% to avoid over-reduction
 
 ```rust
-reduction = base_reduction(confidence) × composition_quality(metrics)
-adjusted = max(base_score × (1 - reduction), coordinates × min_inherent_complexity_factor)
+base_reduction = 0.20
+quality_score = calculate_composition_quality(metrics)  // 0.0-1.0
+quality_bonus = max_quality_bonus * quality_score      // 0.0-0.10
+total_reduction = min(base_reduction + quality_bonus, max_total_reduction)
+adjusted = max(base_score × (1 - total_reduction), callee_count × min_inherent_complexity_factor)
 ```
 
-Key insight: The formula is **multiplicative** (confidence × quality), not additive, which naturally handles edge cases where either factor is low.
+Key insight: The formula is **additive** (base + quality bonus), which is simpler than the spec 109 multiplicative approach and easier to reason about.
 
 ### Tuning Process
 
@@ -1092,13 +1040,14 @@ Key insight: The formula is **multiplicative** (confidence × quality), not addi
 
 ### Edge Cases
 
-1. **Zero Coordination**: Functions with 0 coordinates receive no adjustment (explicit check)
+1. **Zero Callees**: Functions with 0 callees receive no adjustment (explicit check)
 2. **Extreme Delegators** (100% delegation): Still apply floor to prevent unrealistic low scores
-3. **Recursive Orchestrators**: Call depth calculation prevents infinite recursion
-4. **Mixed Patterns**: Confidence scoring and quality metrics handle ambiguous cases
-5. **Configuration Extremes**: Validate config values at load time (using `validate()` method)
+3. **Non-Orchestrator Roles**: Only `FunctionRole::Orchestrator` receives adjustments (all other roles return early)
+4. **Configuration Extremes**: Validate config values at load time (using `validate()` method)
+5. **Base + Bonus Exceeds Max**: Validation ensures `base_reduction + max_quality_bonus ≤ max_total_reduction`
 6. **Disabled Configuration**: Early return with no adjustment when `enabled = false`
 7. **Quality Below Minimum**: Composition quality clamped to `min_composition_quality`
+8. **Integration with Spec 117 Multipliers**: Orchestration adjustment is applied **after** the 0.8 role multiplier from spec 117
 
 ### Benefits of Functional Approach
 
@@ -1136,9 +1085,10 @@ if config.orchestration_adjustment.ab_test_mode {
 
 ## Success Metrics
 
-- **False Positive Reduction**: 40-60% fewer orchestrators in top 10 debt items
-- **Precision**: ≥90% of adjusted items are true orchestrators
-- **Recall**: ≥80% of orchestrators receive adjustments
+- **False Positive Reduction**: 30-50% fewer orchestrators in top 10 debt items (updated target - more conservative than spec 109 approach)
+- **Precision**: ≥85% of adjusted items are true orchestrators
+- **Recall**: ≥75% of orchestrators receive adjustments
 - **Performance**: < 5% overhead on analysis time
 - **No Regressions**: Zero increase in false negatives (missing real debt)
 - **Determinism**: Same input always produces same output (testable with property tests)
+- **Integration**: Seamless integration with spec 117's existing role multipliers
