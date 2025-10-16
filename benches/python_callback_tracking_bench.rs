@@ -3,9 +3,9 @@
 //! Measures the overhead of callback tracking to verify < 10% impact requirement
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::hint::black_box;
 use debtmap::analysis::python_call_graph::TwoPassExtractor;
 use rustpython_parser as rp;
+use std::hint::black_box;
 use std::path::PathBuf;
 
 /// Generate a large Python codebase with various callback patterns
