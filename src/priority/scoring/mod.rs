@@ -8,6 +8,7 @@ pub mod debt_item;
 pub mod formatting;
 pub mod recommendation;
 pub mod recommendation_extended;
+pub mod recommendation_helpers;
 pub mod rust_recommendations;
 pub mod test_calculation;
 pub mod validation;

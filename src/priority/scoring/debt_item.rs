@@ -1,10 +1,8 @@
 // Functions for creating UnifiedDebtItem instances
 
-use crate::analysis::PythonDeadCodeDetector;
 use crate::core::FunctionMetrics;
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
-    external_api_detector::is_likely_external_api,
     scoring::recommendation_extended::{
         generate_assertion_complexity_recommendation, generate_async_misuse_recommendation,
         generate_collection_inefficiency_recommendation,
@@ -14,14 +12,13 @@ use crate::priority::{
         generate_infrastructure_recommendation_with_coverage, generate_magic_values_recommendation,
         generate_nested_loops_recommendation, generate_primitive_obsession_recommendation,
         generate_resource_leak_recommendation, generate_resource_management_recommendation,
-        generate_string_concat_recommendation, generate_usage_hints,
+        generate_string_concat_recommendation,
     },
     scoring::rust_recommendations::generate_rust_refactoring_recommendation,
     semantic_classifier::classify_function_role,
     ActionableRecommendation, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
     TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
 };
-use std::collections::HashSet;
 
 // Re-export construction functions for backward compatibility
 pub use super::construction::{
@@ -58,6 +55,21 @@ pub(super) use super::formatting::{
     generate_combined_testing_refactoring_steps, generate_dead_code_steps,
     generate_testing_gap_steps, get_role_display_name, is_excluded_from_dead_code_analysis,
     is_rust_file,
+};
+
+// Import functions from recommendation_helpers module
+use super::recommendation_helpers::{
+    build_actionable_recommendation, extract_coverage_percent, extract_cyclomatic_complexity,
+    generate_complex_function_recommendation, generate_dead_code_action,
+    generate_dead_code_recommendation, generate_error_swallowing_recommendation,
+    generate_full_coverage_recommendation, generate_simple_function_recommendation,
+    generate_test_debt_recommendation, generate_testing_gap_recommendation,
+};
+
+// Import and re-export classification functions for backward compatibility
+pub use super::classification::{
+    classify_debt_type_with_exclusions, classify_risk_based_debt, classify_simple_function_risk,
+    classify_test_debt, is_complexity_hotspot, is_dead_code, is_dead_code_with_exclusions,
 };
 
 // Helper functions
@@ -180,99 +192,46 @@ fn identify_risk_factors(
     factors
 }
 
-pub fn is_dead_code(
+/// Enhanced version of debt type classification (legacy - kept for compatibility)
+pub fn classify_debt_type_enhanced(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     func_id: &FunctionId,
-    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
-) -> bool {
-    // FIRST: Check if function has incoming calls in the call graph
-    // This includes event handlers bound via Bind() and other framework patterns
-    let callers = call_graph.get_callers(func_id);
-    if !callers.is_empty() {
-        return false;
-    }
-
-    // Check if function is definitely used through function pointers
-    if let Some(fp_used) = function_pointer_used_functions {
-        if fp_used.contains(func_id) {
-            return false;
-        }
-    }
-
-    // For Python files, use the PythonDeadCodeDetector for additional pattern-based detection
-    // This handles magic methods, framework patterns, etc. that might not show up in call graph
-    let language = crate::core::Language::from_path(&func.file);
-    if language == crate::core::Language::Python {
-        let detector = PythonDeadCodeDetector::new();
-        // Use the enhanced detection that considers both call graph and implicit calls
-        if let Some((is_dead, _confidence)) =
-            detector.is_dead_code_with_confidence(func, call_graph, func_id)
-        {
-            return is_dead;
-        }
-    }
-
-    // LAST: Check hardcoded exclusions (includes test functions, main, etc.)
-    // This is now a fallback for functions with no callers but might be implicitly called
-    if is_excluded_from_dead_code_analysis(func) {
-        return false;
-    }
-
-    // No callers found and not excluded by patterns
-    true
-}
-
-/// Enhanced dead code detection that uses framework pattern exclusions
-pub fn is_dead_code_with_exclusions(
-    func: &FunctionMetrics,
-    call_graph: &CallGraph,
-    func_id: &FunctionId,
-    framework_exclusions: &std::collections::HashSet<FunctionId>,
-    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
-) -> bool {
-    // Check if dead code detection is enabled for this file's language
-    let language = crate::core::Language::from_path(&func.file);
-    let language_features = crate::config::get_language_features(&language);
-
-    if !language_features.detect_dead_code {
-        // Dead code detection disabled for this language
-        return false;
-    }
-
-    // First check if this function is excluded by framework patterns
-    if framework_exclusions.contains(func_id) {
-        return false;
-    }
-
-    // Use the enhanced dead code detection with function pointer information
-    is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
-}
-
-/// Enhanced version of debt type classification with framework pattern exclusions
-pub fn classify_debt_type_with_exclusions(
-    func: &FunctionMetrics,
-    call_graph: &CallGraph,
-    func_id: &FunctionId,
-    framework_exclusions: &HashSet<FunctionId>,
-    function_pointer_used_functions: Option<&HashSet<FunctionId>>,
-    coverage: Option<&TransitiveCoverage>,
 ) -> DebtType {
-    // Create classification context
-    let context = ClassificationContext {
-        func,
-        call_graph,
-        func_id,
-        framework_exclusions,
-        function_pointer_used_functions,
-        coverage,
-    };
+    // Test functions are special debt cases
+    if func.is_test {
+        return classify_test_debt(func);
+    }
 
-    // Use functional pipeline for classification
-    classify_debt_with_context(&context)
+    let role = classify_function_role(func, func_id, call_graph);
+
+    // Check for complexity hotspots
+    if let Some(debt) = is_complexity_hotspot(func, &role) {
+        return debt;
+    }
+
+    // Check for dead code
+    if is_dead_code(func, call_graph, func_id, None) {
+        // Import generate_usage_hints from recommendation_extended
+        use crate::priority::scoring::recommendation_extended::generate_usage_hints;
+        return DebtType::DeadCode {
+            visibility: determine_visibility(func),
+            cyclomatic: func.cyclomatic,
+            cognitive: func.cognitive,
+            usage_hints: generate_usage_hints(func, call_graph, func_id),
+        };
+    }
+
+    // Check for simple functions that aren't debt
+    if let Some(debt) = classify_simple_function_risk(func, &role) {
+        return debt;
+    }
+
+    // Default to risk-based classification
+    classify_risk_based_debt(func, &role)
 }
 
-/// Pure function to classify debt using context
+/// Pure function to classify debt using context (helper for context-based classification)
 fn classify_debt_with_context(context: &ClassificationContext) -> DebtType {
     if context.func.is_test {
         return classify_test_debt(context.func);
@@ -308,361 +267,6 @@ fn classify_remaining_enhanced_debt(context: &ClassificationContext) -> DebtType
     DebtType::Risk {
         risk_score: 0.0,
         factors: vec!["Well-designed simple function - not technical debt".to_string()],
-    }
-}
-
-/// Classify test function debt type based on complexity
-fn classify_test_debt(func: &FunctionMetrics) -> DebtType {
-    match () {
-        _ if func.cyclomatic > 15 || func.cognitive > 20 => DebtType::TestComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-            threshold: 15,
-        },
-        _ => DebtType::TestingGap {
-            coverage: 0.0, // Test functions don't have coverage themselves
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        },
-    }
-}
-
-/// Check if function is a complexity hotspot based on role and metrics
-fn is_complexity_hotspot(func: &FunctionMetrics, role: &FunctionRole) -> Option<DebtType> {
-    // Direct complexity check
-    if func.cyclomatic > 10 || func.cognitive > 15 {
-        return Some(DebtType::ComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        });
-    }
-
-    // Orchestrator-specific complexity check
-    if *role == FunctionRole::Orchestrator && func.cyclomatic > 5 {
-        return Some(DebtType::ComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        });
-    }
-
-    None
-}
-
-/// Classify simple function risk based on role and metrics
-fn classify_simple_function_risk(func: &FunctionMetrics, role: &FunctionRole) -> Option<DebtType> {
-    // Check if it's a very simple function
-    if func.cyclomatic <= 3 && func.cognitive <= 5 {
-        match role {
-            FunctionRole::IOWrapper | FunctionRole::EntryPoint | FunctionRole::PatternMatch => {
-                return Some(DebtType::Risk {
-                    risk_score: 0.0,
-                    factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
-                });
-            }
-            FunctionRole::PureLogic if func.length <= 10 => {
-                return Some(DebtType::Risk {
-                    risk_score: 0.0,
-                    factors: vec!["Trivial pure function - not technical debt".to_string()],
-                });
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-/// Classify risk-based debt for moderate complexity functions
-fn classify_risk_based_debt(func: &FunctionMetrics, role: &FunctionRole) -> DebtType {
-    if func.cyclomatic > 5 || func.cognitive > 8 || func.length > 50 {
-        DebtType::Risk {
-            risk_score: calculate_risk_score(func),
-            factors: identify_risk_factors(func, &None),
-        }
-    } else {
-        match role {
-            FunctionRole::PureLogic => DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Simple pure function - minimal risk".to_string()],
-            },
-            _ => DebtType::Risk {
-                risk_score: 0.1,
-                factors: vec!["Simple function with low complexity".to_string()],
-            },
-        }
-    }
-}
-
-/// Enhanced version of debt type classification (legacy - kept for compatibility)
-pub fn classify_debt_type_enhanced(
-    func: &FunctionMetrics,
-    call_graph: &CallGraph,
-    func_id: &FunctionId,
-) -> DebtType {
-    // Test functions are special debt cases
-    if func.is_test {
-        return classify_test_debt(func);
-    }
-
-    let role = classify_function_role(func, func_id, call_graph);
-
-    // Check for complexity hotspots
-    if let Some(debt) = is_complexity_hotspot(func, &role) {
-        return debt;
-    }
-
-    // Check for dead code
-    if is_dead_code(func, call_graph, func_id, None) {
-        return DebtType::DeadCode {
-            visibility: determine_visibility(func),
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-            usage_hints: generate_usage_hints(func, call_graph, func_id),
-        };
-    }
-
-    // Check for simple functions that aren't debt
-    if let Some(debt) = classify_simple_function_risk(func, &role) {
-        return debt;
-    }
-
-    // Default to risk-based classification
-    classify_risk_based_debt(func, &role)
-}
-
-/// Generate action and rationale for dead code
-fn generate_dead_code_action(
-    func: &FunctionMetrics,
-    visibility: &FunctionVisibility,
-    func_name: &str,
-    cyclomatic: &u32,
-    cognitive: &u32,
-) -> (String, String) {
-    let complexity_str = format_complexity_display(cyclomatic, cognitive);
-
-    match visibility {
-        FunctionVisibility::Private => (
-            "Remove unused private function".to_string(),
-            format!("Private function '{func_name}' has no callers and can be safely removed (complexity: {complexity_str})"),
-        ),
-        FunctionVisibility::Crate => (
-            "Remove or document unused crate function".to_string(),
-            format!("Crate-public function '{func_name}' has no internal callers (complexity: {complexity_str})"),
-        ),
-        FunctionVisibility::Public => {
-            let (is_likely_api, _) = is_likely_external_api(func, visibility);
-            if is_likely_api {
-                (
-                    "Verify external usage before removal or deprecation".to_string(),
-                    format!("Public function '{func_name}' appears to be external API - verify usage before action (complexity: {complexity_str})"),
-                )
-            } else {
-                (
-                    "Remove unused public function (no API indicators)".to_string(),
-                    format!("Public function '{func_name}' has no callers and no external API indicators (complexity: {complexity_str})"),
-                )
-            }
-        }
-    }
-}
-
-/// Generate recommendation when function is fully covered
-fn generate_full_coverage_recommendation(role: FunctionRole) -> (String, String, Vec<String>) {
-    let role_display = get_role_display_name(role);
-    (
-        "Maintain test coverage".to_string(),
-        format!("{} function is currently 100% covered", role_display),
-        vec![
-            "Keep tests up to date with code changes".to_string(),
-            "Consider property-based testing for edge cases".to_string(),
-            "Monitor coverage in CI/CD pipeline".to_string(),
-        ],
-    )
-}
-
-/// Generate recommendation for complex functions with testing gaps
-fn generate_complex_function_recommendation(
-    cyclomatic: u32,
-    cognitive: u32,
-    coverage_pct: f64,
-    coverage_gap: i32,
-    role_str: &str,
-    func: &FunctionMetrics,
-    transitive_coverage: &Option<TransitiveCoverage>,
-) -> (String, String, Vec<String>) {
-    let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
-    let needed_test_cases = calculate_needed_test_cases(cyclomatic, coverage_pct);
-    let coverage_pct_int = (coverage_pct * 100.0) as i32;
-
-    let complexity_explanation = format!(
-        "Cyclomatic complexity of {} requires at least {} test cases for full path coverage. After extracting {} functions, each will need only 3-5 tests",
-        cyclomatic, cyclomatic, functions_to_extract
-    );
-
-    let mut steps =
-        generate_combined_testing_refactoring_steps(cyclomatic, cognitive, coverage_pct_int);
-    add_uncovered_lines_to_steps(&mut steps, func, transitive_coverage);
-
-    (
-        format!("Add {} tests for {}% coverage gap, then refactor complexity {} into {} functions",
-               needed_test_cases, coverage_gap, cyclomatic, functions_to_extract),
-        format!("Complex {role_str} with {coverage_gap}% gap. {}. Testing before refactoring ensures no regressions",
-               complexity_explanation),
-        steps,
-    )
-}
-
-/// Generate recommendation for simple functions with testing gaps
-fn generate_simple_function_recommendation(
-    cyclomatic: u32,
-    coverage_pct: f64,
-    coverage_gap: i32,
-    role: FunctionRole,
-    func: &FunctionMetrics,
-    transitive_coverage: &Option<TransitiveCoverage>,
-) -> (String, String, Vec<String>) {
-    let role_display = get_role_display_name(role);
-    let test_cases_needed = calculate_simple_test_cases(cyclomatic, coverage_pct);
-    let coverage_pct_int = (coverage_pct * 100.0) as i32;
-
-    let coverage_explanation = if coverage_pct_int == 0 {
-        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} test cases to cover all {} execution paths",
-               test_cases_needed, cyclomatic.max(2))
-    } else {
-        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} more test cases",
-               test_cases_needed)
-    };
-
-    let mut steps = generate_testing_gap_steps(false);
-    add_uncovered_lines_to_steps(&mut steps, func, transitive_coverage);
-
-    (
-        format!(
-            "Add {} tests for {}% coverage gap",
-            test_cases_needed, coverage_gap
-        ),
-        coverage_explanation,
-        steps,
-    )
-}
-
-fn generate_testing_gap_recommendation(
-    coverage_pct: f64,
-    cyclomatic: u32,
-    cognitive: u32,
-    role: FunctionRole,
-    func: &FunctionMetrics,
-    transitive_coverage: &Option<TransitiveCoverage>,
-) -> (String, String, Vec<String>) {
-    let coverage_gap = 100 - (coverage_pct * 100.0) as i32;
-
-    // If function is fully covered, no testing gap exists
-    if coverage_gap == 0 {
-        return generate_full_coverage_recommendation(role);
-    }
-
-    let is_complex = cyclomatic > 10 || cognitive > 15;
-
-    if is_complex {
-        let role_str = format_role_description(role);
-        generate_complex_function_recommendation(
-            cyclomatic,
-            cognitive,
-            coverage_pct,
-            coverage_gap,
-            role_str,
-            func,
-            transitive_coverage,
-        )
-    } else {
-        generate_simple_function_recommendation(
-            cyclomatic,
-            coverage_pct,
-            coverage_gap,
-            role,
-            func,
-            transitive_coverage,
-        )
-    }
-}
-
-/// Generate recommendation for dead code debt type
-fn generate_dead_code_recommendation(
-    func: &FunctionMetrics,
-    visibility: &FunctionVisibility,
-    usage_hints: &[String],
-    cyclomatic: u32,
-    cognitive: u32,
-) -> (String, String, Vec<String>) {
-    let (action, rationale) =
-        generate_dead_code_action(func, visibility, &func.name, &cyclomatic, &cognitive);
-    let mut steps = generate_dead_code_steps(visibility);
-
-    // Add usage hints to the steps
-    for hint in usage_hints {
-        steps.push(format!("Note: {hint}"));
-    }
-
-    (action, rationale, steps)
-}
-
-/// Generate recommendation for error swallowing debt
-fn generate_error_swallowing_recommendation(
-    pattern: &str,
-    context: &Option<String>,
-) -> (String, String, Vec<String>) {
-    let primary_action = format!("Fix error swallowing: {}", pattern);
-
-    let rationale = match context {
-        Some(ctx) => format!("Error being silently ignored using '{}' pattern. Context: {}", pattern, ctx),
-        None => format!("Error being silently ignored using '{}' pattern. This can hide critical failures in production", pattern),
-    };
-
-    let steps = vec![
-        "Replace error swallowing with proper error handling".to_string(),
-        "Log errors at minimum, even if they can't be handled".to_string(),
-        "Consider propagating errors to caller with ?".to_string(),
-        "Add context to errors using .context() or .with_context()".to_string(),
-        "Test error paths explicitly".to_string(),
-    ];
-
-    (primary_action, rationale, steps)
-}
-
-/// Generate recommendation for test-specific debt types
-fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
-    match debt_type {
-        DebtType::TestComplexityHotspot {
-            cyclomatic,
-            cognitive,
-            threshold
-        } => (
-            format!("Simplify test - complexity {} exceeds test threshold {}", cyclomatic.max(cognitive), threshold),
-            format!("Test has high complexity (cyclo={cyclomatic}, cognitive={cognitive}) - consider splitting into smaller tests"),
-            vec![
-                "Break complex test into multiple smaller tests".to_string(),
-                "Extract test setup into helper functions".to_string(),
-                "Use parameterized tests for similar test cases".to_string(),
-            ],
-        ),
-        DebtType::TestTodo { priority: _, reason } => (
-            "Complete test TODO".to_string(),
-            format!("Test contains TODO: {}", reason.as_ref().unwrap_or(&"No reason specified".to_string())),
-            vec![
-                "Address the TODO comment".to_string(),
-                "Implement missing test logic".to_string(),
-                "Remove TODO once completed".to_string(),
-            ],
-        ),
-        DebtType::TestDuplication { instances, total_lines, similarity: _ } => (
-            format!("Remove test duplication - {instances} similar test blocks"),
-            format!("{instances} duplicated test blocks found across {total_lines} lines"),
-            vec![
-                "Extract common test logic into helper functions".to_string(),
-                "Create parameterized tests for similar test cases".to_string(),
-                "Use test fixtures for shared setup".to_string(),
-            ],
-        ),
-        _ => unreachable!("Not a test debt type"),
     }
 }
 
@@ -769,11 +373,6 @@ impl FunctionInfo {
     }
 }
 
-// Pure function to extract coverage percentage
-fn extract_coverage_percent(coverage: &Option<TransitiveCoverage>) -> f64 {
-    coverage.as_ref().map(|c| c.direct).unwrap_or(0.0)
-}
-
 // Pure function to generate context-aware recommendations
 fn generate_context_aware_recommendation(
     context: RecommendationContext,
@@ -849,14 +448,6 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
     }
 }
 
-// Pure function to extract cyclomatic complexity from debt type
-fn extract_cyclomatic_complexity(debt_type: &DebtType) -> u32 {
-    match debt_type {
-        DebtType::ComplexityHotspot { cyclomatic, .. } => *cyclomatic,
-        _ => 0,
-    }
-}
-
 // Function to generate standard recommendation from context
 fn generate_standard_recommendation_from_context(
     context: RecommendationContext,
@@ -894,20 +485,6 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    }
-}
-
-// Pure function to build final actionable recommendation
-fn build_actionable_recommendation(
-    primary_action: String,
-    rationale: String,
-    steps: Vec<String>,
-) -> ActionableRecommendation {
-    ActionableRecommendation {
-        primary_action,
-        rationale,
-        implementation_steps: steps,
-        related_items: vec![],
     }
 }
 
