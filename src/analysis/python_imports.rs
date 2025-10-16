@@ -438,7 +438,9 @@ impl EnhancedImportResolver {
                             if name.id.as_str() == "importlib" {
                                 // Extract module name from first argument if it's a string literal
                                 if let Some(first_arg) = call.args.first() {
-                                    if let Some(module_name) = self.extract_string_literal(first_arg) {
+                                    if let Some(module_name) =
+                                        self.extract_string_literal(first_arg)
+                                    {
                                         self.add_dynamic_import(path, &module_name);
                                     }
                                 }
@@ -490,10 +492,8 @@ impl EnhancedImportResolver {
                 }
             }
             ast::Expr::Dict(dict) => {
-                for key in &dict.keys {
-                    if let Some(k) = key {
-                        self.detect_dynamic_imports_in_expr(k, path);
-                    }
+                for k in dict.keys.iter().flatten() {
+                    self.detect_dynamic_imports_in_expr(k, path);
                 }
                 for value in &dict.values {
                     self.detect_dynamic_imports_in_expr(value, path);
