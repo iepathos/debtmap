@@ -586,6 +586,36 @@ pub struct TwoPassExtractor {
     source_lines: Vec<String>,
     /// Optional cross-module context for resolving imports
     cross_module_context: Option<CrossModuleContext>,
+    /// Callback tracker for deferred callback resolution
+    callback_tracker: crate::analysis::python_call_graph::CallbackTracker,
+}
+
+/// Helper function to extract callback expression as a string
+fn extract_callback_expr_impl(expr: &ast::Expr) -> String {
+    match expr {
+        ast::Expr::Name(name) => name.id.to_string(),
+        ast::Expr::Attribute(attr) => {
+            if let ast::Expr::Name(obj) = &*attr.value {
+                format!("{}.{}", obj.id, attr.attr)
+            } else {
+                attr.attr.to_string()
+            }
+        }
+        ast::Expr::Call(call) => {
+            // For functools.partial(func, ...) extract func
+            if let ast::Expr::Attribute(attr) = &*call.func {
+                if attr.attr.as_str() == "partial" {
+                    if let Some(first_arg) = call.args.first() {
+                        let func_name = extract_callback_expr_impl(first_arg);
+                        return format!("partial({})", func_name);
+                    }
+                }
+            }
+            "<lambda>".to_string()
+        }
+        ast::Expr::Lambda(_) => "<lambda>".to_string(),
+        _ => "<unknown>".to_string(),
+    }
 }
 
 impl TwoPassExtractor {
@@ -625,6 +655,7 @@ impl TwoPassExtractor {
             current_class: None,
             source_lines: Vec::new(),
             cross_module_context: None,
+            callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
         }
     }
 
@@ -641,6 +672,7 @@ impl TwoPassExtractor {
             current_class: None,
             source_lines,
             cross_module_context: None,
+            callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
         }
     }
 
@@ -657,6 +689,7 @@ impl TwoPassExtractor {
             current_class: None,
             source_lines,
             cross_module_context: Some(context),
+            callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
         }
     }
 
@@ -801,9 +834,15 @@ impl TwoPassExtractor {
 
     /// Analyze function in phase one
     fn analyze_function_phase_one(&mut self, func_def: &ast::StmtFunctionDef) {
-        let func_name = if let Some(class_name) = &self.current_class {
+        // Build function name considering both class and parent function context
+        let func_name = if let Some(parent_func) = &self.current_function {
+            // This is a nested function
+            format!("{}.{}", parent_func.name, func_def.name)
+        } else if let Some(class_name) = &self.current_class {
+            // This is a method
             format!("{}.{}", class_name, func_def.name)
         } else {
+            // Top-level function
             func_def.name.to_string()
         };
 
@@ -881,10 +920,15 @@ impl TwoPassExtractor {
 
     /// Analyze async function in phase one
     fn analyze_async_function_phase_one(&mut self, func_def: &ast::StmtAsyncFunctionDef) {
-        // Similar to regular function
-        let func_name = if let Some(class_name) = &self.current_class {
+        // Build function name considering both class and parent function context
+        let func_name = if let Some(parent_func) = &self.current_function {
+            // This is a nested async function
+            format!("{}.{}", parent_func.name, func_def.name)
+        } else if let Some(class_name) = &self.current_class {
+            // This is an async method
             format!("{}.{}", class_name, func_def.name)
         } else {
+            // Top-level async function
             func_def.name.to_string()
         };
 
@@ -951,6 +995,14 @@ impl TwoPassExtractor {
     /// Analyze statement within a function
     fn analyze_stmt_in_function(&mut self, stmt: &ast::Stmt) {
         match stmt {
+            ast::Stmt::FunctionDef(nested_func) => {
+                // Handle nested function definitions
+                self.analyze_function_phase_one(nested_func);
+            }
+            ast::Stmt::AsyncFunctionDef(nested_func) => {
+                // Handle nested async function definitions
+                self.analyze_async_function_phase_one(nested_func);
+            }
             ast::Stmt::Expr(expr_stmt) => {
                 self.analyze_expr_for_calls(&expr_stmt.value);
             }
@@ -1007,6 +1059,9 @@ impl TwoPassExtractor {
 
                     // Check for event binding patterns (e.g., Bind(event, self.method))
                     self.check_for_event_bindings(call);
+
+                    // Check for callback patterns (wx.CallAfter, functools.partial, etc.)
+                    self.check_for_callback_patterns(call);
                 }
 
                 // Recursively analyze arguments
@@ -1134,6 +1189,7 @@ impl TwoPassExtractor {
 
     /// Phase 2: Resolve calls using type information
     fn phase_two(&mut self) {
+        // First, resolve regular function calls
         for unresolved in &self.phase_one_calls {
             if let Some(callee) = self.resolve_call(unresolved) {
                 self.call_graph.add_call(FunctionCall {
@@ -1143,6 +1199,80 @@ impl TwoPassExtractor {
                 });
             }
         }
+
+        // Then, resolve callbacks using the callback tracker
+        let resolution = self
+            .callback_tracker
+            .resolve_callbacks(&self.function_name_map);
+        self.callback_tracker
+            .add_to_call_graph(&resolution, &mut self.call_graph);
+    }
+
+    /// Check for callback patterns where functions are passed as arguments
+    fn check_for_callback_patterns(&mut self, call: &ast::ExprCall) {
+        use crate::analysis::python_call_graph::callback_patterns::{
+            extract_call_target, find_callback_position, get_callback_argument,
+            get_callback_patterns,
+        };
+        use crate::analysis::python_call_graph::callback_tracker::{
+            CallbackContext, CallbackType, Location, PendingCallback,
+        };
+
+        // Extract the function name and module being called
+        let Some((func_name, module_name)) = extract_call_target(call) else {
+            return;
+        };
+
+        // Get callback patterns
+        let patterns = get_callback_patterns();
+
+        // Check if this is a callback-accepting function
+        if let Some(callback_position) =
+            find_callback_position(&patterns, &func_name, module_name.as_deref())
+        {
+            if let Some(callback_arg) = get_callback_argument(call, callback_position) {
+                // Extract callback expression string for tracking
+                let callback_expr = self.extract_callback_expr(callback_arg);
+
+                // Determine callback type based on the pattern and callback expression
+                let callback_type = if func_name == "partial" {
+                    CallbackType::Partial
+                } else if callback_expr.starts_with("self.") || callback_expr.starts_with("cls.") {
+                    // For method references like self.method
+                    CallbackType::SignalConnection
+                } else {
+                    // For direct function names (including nested functions)
+                    CallbackType::DirectAssignment
+                };
+
+                // Create callback context
+                let context = CallbackContext {
+                    current_class: self.current_class.clone(),
+                    current_function: self.current_function.as_ref().map(|f| f.name.clone()),
+                    scope_variables: std::collections::HashMap::new(),
+                };
+
+                // Create pending callback for deferred resolution
+                let pending = PendingCallback {
+                    callback_expr,
+                    registration_point: Location {
+                        file: self.type_tracker.file_path.clone(),
+                        line: 0, // Will be filled in during resolution
+                        caller_function: self.current_function.as_ref().map(|f| f.name.clone()),
+                    },
+                    registration_type: callback_type,
+                    context,
+                    target_hint: None,
+                };
+
+                self.callback_tracker.track_callback(pending);
+            }
+        }
+    }
+
+    /// Extract callback expression as a string for tracking
+    fn extract_callback_expr(&self, expr: &ast::Expr) -> String {
+        extract_callback_expr_impl(expr)
     }
 
     /// Check for event binding patterns like obj.Bind(event, self.method)
