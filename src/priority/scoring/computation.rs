@@ -307,8 +307,29 @@ mod tests {
 
     #[test]
     fn test_calculate_risk_factor() {
-        assert_eq!(calculate_risk_factor(&DebtType::TestingGap { coverage: 0.5, cyclomatic: 10, cognitive: 8 }), 0.42);
-        assert_eq!(calculate_risk_factor(&DebtType::ComplexityHotspot { cyclomatic: 20, cognitive: 15 }), 0.35);
-        assert_eq!(calculate_risk_factor(&DebtType::DeadCode { cyclomatic: 5, cognitive: 3, visibility: crate::priority::FunctionVisibility::Private, usage_hints: vec![] }), 0.3);
+        assert_eq!(
+            calculate_risk_factor(&DebtType::TestingGap {
+                coverage: 0.5,
+                cyclomatic: 10,
+                cognitive: 8
+            }),
+            0.42
+        );
+        assert_eq!(
+            calculate_risk_factor(&DebtType::ComplexityHotspot {
+                cyclomatic: 20,
+                cognitive: 15
+            }),
+            0.35
+        );
+        assert_eq!(
+            calculate_risk_factor(&DebtType::DeadCode {
+                cyclomatic: 5,
+                cognitive: 3,
+                visibility: crate::priority::FunctionVisibility::Private,
+                usage_hints: vec![]
+            }),
+            0.3
+        );
     }
 }
