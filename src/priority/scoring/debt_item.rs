@@ -45,6 +45,13 @@ use super::computation::{
     is_function_complex,
 };
 
+// Re-export validation functions for backward compatibility
+pub(super) use super::validation::{
+    check_complexity_hotspot, check_dead_code, check_enhanced_complexity_hotspot,
+    check_enhanced_dead_code, check_enhanced_testing_gap, check_testing_gap,
+    ClassificationContext,
+};
+
 // Helper functions
 
 pub(super) fn determine_debt_type(
@@ -71,50 +78,6 @@ pub(super) fn determine_debt_type(
     classify_remaining_debt(func, coverage, &role)
 }
 
-/// Pure function to check for testing gaps
-fn check_testing_gap(
-    func: &FunctionMetrics,
-    coverage: &Option<TransitiveCoverage>,
-) -> Option<DebtType> {
-    coverage
-        .as_ref()
-        .filter(|cov| cov.direct < 0.2 && !func.is_test)
-        .map(|cov| DebtType::TestingGap {
-            coverage: cov.direct,
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        })
-}
-
-/// Pure function to check for complexity hotspots
-fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
-    if func.cyclomatic > 10 || func.cognitive > 15 {
-        Some(DebtType::ComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        })
-    } else {
-        None
-    }
-}
-
-/// Pure function to check for dead code
-fn check_dead_code(
-    func: &FunctionMetrics,
-    call_graph: &CallGraph,
-    func_id: &FunctionId,
-) -> Option<DebtType> {
-    if is_dead_code(func, call_graph, func_id, None) {
-        Some(DebtType::DeadCode {
-            visibility: determine_visibility(func),
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-            usage_hints: generate_usage_hints(func, call_graph, func_id),
-        })
-    } else {
-        None
-    }
-}
 
 /// Pure function to classify remaining debt based on role and complexity
 fn classify_remaining_debt(
@@ -279,15 +242,6 @@ pub fn is_dead_code_with_exclusions(
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
 
-// Pure function to check if function has testing gap
-fn has_testing_gap(coverage: f64, is_test: bool) -> bool {
-    coverage < 0.2 && !is_test
-}
-
-// Pure function to check if function is complexity hotspot based on metrics only
-fn is_complexity_hotspot_by_metrics(cyclomatic: u32, cognitive: u32) -> bool {
-    cyclomatic > 5 || cognitive > 8
-}
 
 /// Enhanced version of debt type classification with framework pattern exclusions
 pub fn classify_debt_type_with_exclusions(
@@ -335,65 +289,6 @@ fn classify_debt_with_context(context: &ClassificationContext) -> DebtType {
     classify_remaining_enhanced_debt(context)
 }
 
-/// Context structure for debt classification
-struct ClassificationContext<'a> {
-    func: &'a FunctionMetrics,
-    call_graph: &'a CallGraph,
-    func_id: &'a FunctionId,
-    framework_exclusions: &'a HashSet<FunctionId>,
-    function_pointer_used_functions: Option<&'a HashSet<FunctionId>>,
-    coverage: Option<&'a TransitiveCoverage>,
-}
-
-/// Pure function to check for enhanced testing gaps
-fn check_enhanced_testing_gap(context: &ClassificationContext) -> Option<DebtType> {
-    context.coverage.and_then(|cov| {
-        let has_gap = has_testing_gap(cov.direct, context.func.is_test)
-            || (cov.direct < 0.8 && context.func.cyclomatic > 5 && !cov.uncovered_lines.is_empty());
-
-        if has_gap {
-            Some(DebtType::TestingGap {
-                coverage: cov.direct,
-                cyclomatic: context.func.cyclomatic,
-                cognitive: context.func.cognitive,
-            })
-        } else {
-            None
-        }
-    })
-}
-
-/// Pure function to check for enhanced complexity hotspots
-fn check_enhanced_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
-    if is_complexity_hotspot_by_metrics(func.cyclomatic, func.cognitive) {
-        Some(DebtType::ComplexityHotspot {
-            cyclomatic: func.cyclomatic,
-            cognitive: func.cognitive,
-        })
-    } else {
-        None
-    }
-}
-
-/// Pure function to check for enhanced dead code
-fn check_enhanced_dead_code(context: &ClassificationContext) -> Option<DebtType> {
-    if is_dead_code_with_exclusions(
-        context.func,
-        context.call_graph,
-        context.func_id,
-        context.framework_exclusions,
-        context.function_pointer_used_functions,
-    ) {
-        Some(DebtType::DeadCode {
-            visibility: determine_visibility(context.func),
-            cyclomatic: context.func.cyclomatic,
-            cognitive: context.func.cognitive,
-            usage_hints: generate_usage_hints(context.func, context.call_graph, context.func_id),
-        })
-    } else {
-        None
-    }
-}
 
 /// Pure function to classify remaining enhanced debt
 fn classify_remaining_enhanced_debt(context: &ClassificationContext) -> DebtType {
@@ -1520,36 +1415,6 @@ mod tests {
         assert_eq!(calculate_needed_test_cases(25, 0.0), 10);
     }
 
-    #[test]
-    fn test_has_testing_gap() {
-        // Coverage below 20% and not a test = testing gap
-        assert!(has_testing_gap(0.1, false));
-        assert!(has_testing_gap(0.19, false));
-
-        // Coverage at or above 20% = no testing gap
-        assert!(!has_testing_gap(0.2, false));
-        assert!(!has_testing_gap(0.5, false));
-
-        // Test functions never have testing gaps
-        assert!(!has_testing_gap(0.0, true));
-        assert!(!has_testing_gap(0.1, true));
-    }
-
-    #[test]
-    fn test_is_complexity_hotspot_by_metrics() {
-        // High cyclomatic complexity
-        assert!(is_complexity_hotspot_by_metrics(6, 3));
-        assert!(is_complexity_hotspot_by_metrics(10, 5));
-
-        // High cognitive complexity
-        assert!(is_complexity_hotspot_by_metrics(3, 9));
-        assert!(is_complexity_hotspot_by_metrics(4, 15));
-
-        // Both low = not a hotspot
-        assert!(!is_complexity_hotspot_by_metrics(5, 8));
-        assert!(!is_complexity_hotspot_by_metrics(3, 5));
-        assert!(!is_complexity_hotspot_by_metrics(0, 0));
-    }
 
     #[test]
     fn test_classify_test_debt() {
@@ -1588,68 +1453,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_check_enhanced_complexity_hotspot() {
-        let complex_func = FunctionMetrics {
-            name: "complex_func".to_string(),
-            file: std::path::PathBuf::from("src/complex.rs"),
-            line: 1,
-            length: 50,
-            cyclomatic: 10,
-            cognitive: 12,
-            nesting: 3,
-            visibility: Some("pub".to_string()),
-            is_test: false,
-            is_trait_method: false,
-            in_test_module: false,
-            entropy_score: None,
-            is_pure: Some(false),
-            purity_confidence: Some(0.5),
-            detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
-        };
-
-        let debt = check_enhanced_complexity_hotspot(&complex_func);
-        assert!(debt.is_some());
-
-        match debt.unwrap() {
-            DebtType::ComplexityHotspot {
-                cyclomatic,
-                cognitive,
-            } => {
-                assert_eq!(cyclomatic, 10);
-                assert_eq!(cognitive, 12);
-            }
-            _ => panic!("Expected ComplexityHotspot debt type"),
-        }
-    }
-
-    #[test]
-    fn test_check_enhanced_complexity_hotspot_simple() {
-        let simple_func = FunctionMetrics {
-            name: "simple_func".to_string(),
-            file: std::path::PathBuf::from("src/simple.rs"),
-            line: 1,
-            length: 10,
-            cyclomatic: 2,
-            cognitive: 3,
-            nesting: 1,
-            visibility: Some("pub".to_string()),
-            is_test: false,
-            is_trait_method: false,
-            in_test_module: false,
-            entropy_score: None,
-            is_pure: Some(true),
-            purity_confidence: Some(0.9),
-            detected_patterns: None,
-            upstream_callers: None,
-            downstream_callees: None,
-        };
-
-        let debt = check_enhanced_complexity_hotspot(&simple_func);
-        assert!(debt.is_none());
-    }
 
     #[test]
     fn test_calculate_needed_test_cases_partial_coverage() {
