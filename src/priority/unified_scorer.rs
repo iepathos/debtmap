@@ -180,13 +180,20 @@ pub fn calculate_unified_priority_with_debt(
         };
     }
 
+    // Detect if this is an orchestrator candidate for complexity weighting
+    // Orchestrators typically have low cognitive complexity relative to cyclomatic
+    let is_orchestrator_candidate = role == FunctionRole::Orchestrator;
+
     // Calculate complexity factor (normalized to 0-10)
     // Apply purity bonus first (pure functions are easier to understand and test)
     let purity_adjusted_cyclomatic = (func.cyclomatic as f64 * purity_bonus) as u32;
     let purity_adjusted_cognitive = (func.cognitive as f64 * purity_bonus) as u32;
 
-    let raw_complexity =
-        normalize_complexity(purity_adjusted_cyclomatic, purity_adjusted_cognitive);
+    let raw_complexity = normalize_complexity(
+        purity_adjusted_cyclomatic,
+        purity_adjusted_cognitive,
+        is_orchestrator_candidate,
+    );
 
     // Get actual coverage percentage
     let coverage_pct = if func.is_test {
@@ -300,9 +307,23 @@ pub fn calculate_unified_priority_with_debt(
         final_score: normalized_score,
     }
 }
-fn normalize_complexity(cyclomatic: u32, cognitive: u32) -> f64 {
-    // Normalize complexity to 0-10 scale
-    let combined = (cyclomatic + cognitive) as f64 / 2.0;
+/// Normalize complexity metrics with cognitive complexity weighting for orchestrators
+///
+/// For orchestrators (coordination functions), cognitive complexity receives higher weight (70%)
+/// because sequential delegation has lower mental overhead than nested algorithmic logic,
+/// even with similar cyclomatic complexity from error handling.
+///
+/// For non-orchestrators, both metrics are weighted equally (50%/50%).
+fn normalize_complexity(cyclomatic: u32, cognitive: u32, is_orchestrator: bool) -> f64 {
+    // Apply cognitive complexity weighting based on function role
+    let combined = if is_orchestrator {
+        // Weight cognitive more heavily for orchestrators (70%)
+        // Sequential calls = low cognitive, high cyclomatic from error handling
+        (cyclomatic as f64 * 0.3) + (cognitive as f64 * 0.7)
+    } else {
+        // Equal weight for pure logic (50%/50%)
+        (cyclomatic + cognitive) as f64 / 2.0
+    };
 
     // Use logarithmic scale for better distribution
     // Complexity of 1-5 = low (0-3), 6-10 = medium (3-6), 11+ = high (6-10)
