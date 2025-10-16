@@ -3,6 +3,7 @@
 //! Provides type inference and tracking for Python code to improve call graph accuracy.
 //! Uses two-pass resolution for better method resolution and reduced false positives.
 
+use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
@@ -97,6 +98,8 @@ pub struct PythonTypeTracker {
     imports: HashMap<String, String>, // alias -> module_name
     /// Imported symbols from modules
     from_imports: HashMap<String, (String, Option<String>)>, // name -> (module, alias)
+    /// Framework pattern registry for entry point detection
+    pub framework_registry: FrameworkPatternRegistry,
 }
 
 impl PythonTypeTracker {
@@ -109,6 +112,7 @@ impl PythonTypeTracker {
             file_path,
             imports: HashMap::new(),
             from_imports: HashMap::new(),
+            framework_registry: FrameworkPatternRegistry::new(),
         }
     }
 
@@ -490,6 +494,40 @@ impl PythonTypeTracker {
         None
     }
 
+    /// Get all import strings for framework detection
+    pub fn get_all_imports(&self) -> Vec<String> {
+        let mut imports = Vec::new();
+
+        // Add module imports
+        for (alias, module) in &self.imports {
+            if alias == module {
+                imports.push(format!("import {}", module));
+            } else {
+                imports.push(format!("import {} as {}", module, alias));
+            }
+        }
+
+        // Add from imports
+        for (alias, (module, original_name)) in &self.from_imports {
+            if let Some(name) = original_name {
+                if alias == name {
+                    imports.push(format!("from {} import {}", module, name));
+                } else {
+                    imports.push(format!("from {} import {} as {}", module, name, alias));
+                }
+            }
+        }
+
+        imports
+    }
+
+    /// Detect frameworks from collected imports
+    pub fn detect_frameworks_from_imports(&mut self) {
+        let imports = self.get_all_imports();
+        self.framework_registry
+            .auto_detect_frameworks(&self.file_path, &imports);
+    }
+
     fn resolve_method_in_hierarchy(
         &self,
         class_name: &str,
@@ -551,54 +589,29 @@ pub struct TwoPassExtractor {
 }
 
 impl TwoPassExtractor {
-    /// Check if a function name is a framework entry point
-    fn is_framework_entry_point(func_name: &str) -> bool {
-        // Extract the method name if it's a class method (e.g., "ClassName.methodName")
+    /// Check if a function name is a framework entry point using the framework registry
+    fn is_framework_entry_point(&self, func_name: &str, decorators: &[&str]) -> bool {
+        // Convert decorator strings
+        let decorator_strings: Vec<String> = decorators.iter().map(|s| s.to_string()).collect();
+
+        // Check using framework registry
+        if self
+            .type_tracker
+            .framework_registry
+            .is_entry_point(func_name, &decorator_strings)
+        {
+            return true;
+        }
+
+        // Fallback: check common patterns
         let method_name = if let Some(pos) = func_name.rfind('.') {
             &func_name[pos + 1..]
         } else {
             func_name
         };
 
-        // Common framework entry points
-        let framework_methods = [
-            // wxPython
-            "OnInit",
-            "OnExit",
-            "OnClose",
-            "OnDestroy",
-            "OnPaint",
-            "OnSize",
-            // unittest
-            "setUp",
-            "tearDown",
-            "setUpClass",
-            "tearDownClass",
-            "setUpModule",
-            "tearDownModule",
-            // pytest
-            "setup_method",
-            "teardown_method",
-            "setup_class",
-            "teardown_class",
-            // Django
-            "handle",
-            "ready",
-            "save",
-            "delete",
-            "clean",
-            // FastAPI/Flask
-            "get",
-            "post",
-            "put",
-            "delete",
-            "patch",
-            // Main entry points
-            "main",
-            "__main__",
-        ];
-
-        framework_methods.contains(&method_name) || method_name.starts_with("test_")
+        // Main entry points
+        method_name == "main" || method_name == "__main__" || method_name.starts_with("test_")
     }
 
     pub fn new(file_path: PathBuf) -> Self {
@@ -697,6 +710,9 @@ impl TwoPassExtractor {
                     _ => {}
                 }
             }
+
+            // Detect frameworks from imports
+            self.type_tracker.detect_frameworks_from_imports();
 
             // Second pass: Analyze functions and collect calls
             for stmt in &module.body {
@@ -800,8 +816,19 @@ impl TwoPassExtractor {
             line,
         };
 
+        // Extract decorator names
+        let decorators: Vec<&str> = func_def
+            .decorator_list
+            .iter()
+            .filter_map(|dec| match dec {
+                ast::Expr::Name(name) => Some(name.id.as_str()),
+                ast::Expr::Attribute(attr) => Some(attr.attr.as_str()),
+                _ => None,
+            })
+            .collect();
+
         // Check for framework methods and test functions
-        let is_entry_point = Self::is_framework_entry_point(&func_name);
+        let is_entry_point = self.is_framework_entry_point(&func_name, &decorators);
         let is_test = func_name.starts_with("test_") || func_name.contains("::test_");
 
         // Register function with appropriate metrics
@@ -870,8 +897,19 @@ impl TwoPassExtractor {
             line,
         };
 
+        // Extract decorator names
+        let decorators: Vec<&str> = func_def
+            .decorator_list
+            .iter()
+            .filter_map(|dec| match dec {
+                ast::Expr::Name(name) => Some(name.id.as_str()),
+                ast::Expr::Attribute(attr) => Some(attr.attr.as_str()),
+                _ => None,
+            })
+            .collect();
+
         // Check for framework methods and test functions
-        let is_entry_point = Self::is_framework_entry_point(&func_name);
+        let is_entry_point = self.is_framework_entry_point(&func_name, &decorators);
         let is_test = func_name.starts_with("test_") || func_name.contains("::test_");
 
         self.call_graph.add_function(
