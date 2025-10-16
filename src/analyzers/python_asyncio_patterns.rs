@@ -12,7 +12,9 @@ use crate::core::{DebtItem, DebtType, Priority};
 /// Main detector for asyncio patterns
 #[derive(Debug)]
 pub struct AsyncioPatternDetector {
+    #[allow(dead_code)]
     task_registry: HashMap<String, TaskInfo>,
+    #[allow(dead_code)]
     resource_registry: HashMap<String, AsyncResourceInfo>,
     blocking_operations: HashSet<&'static str>,
     file_path: PathBuf,
@@ -22,6 +24,7 @@ pub struct AsyncioPatternDetector {
 
 /// Information about a tracked task
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TaskInfo {
     creation_line: usize,
     is_awaited: bool,
@@ -32,6 +35,7 @@ struct TaskInfo {
 
 /// Type of async task
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 enum TaskType {
     CreateTask,
     Gather,
@@ -42,6 +46,7 @@ enum TaskType {
 
 /// Information about an async resource
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct AsyncResourceInfo {
     resource_type: AsyncResourceType,
     creation_line: usize,
@@ -52,6 +57,7 @@ struct AsyncResourceInfo {
 
 /// Type of async resource
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 enum AsyncResourceType {
     ClientSession,
     StreamWriter,
@@ -64,6 +70,7 @@ enum AsyncResourceType {
 
 /// Lifecycle state of a resource
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 enum ResourceLifecycle {
     Created,
     InUse,
@@ -299,9 +306,9 @@ impl AsyncioPatternDetector {
         call: &ast::ExprCall,
     ) -> Vec<AsyncErrorPattern> {
         let has_return_exceptions = call.keywords.iter().any(|kw| {
-            kw.arg
-                .as_ref()
-                .map_or(false, |arg| <ast::Identifier as AsRef<str>>::as_ref(arg) == "return_exceptions")
+            kw.arg.as_ref().is_some_and(|arg| {
+                <ast::Identifier as AsRef<str>>::as_ref(arg) == "return_exceptions"
+            })
         });
 
         if !has_return_exceptions {
