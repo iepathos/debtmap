@@ -5,6 +5,7 @@ pub mod classification;
 pub mod computation;
 pub mod construction;
 pub mod debt_item;
+pub mod formatting;
 pub mod recommendation;
 pub mod recommendation_extended;
 pub mod rust_recommendations;
