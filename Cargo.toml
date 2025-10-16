@@ -138,3 +138,7 @@ harness = false
 [[bench]]
 name = "unified_output_format_bench"
 harness = false
+
+[[bench]]
+name = "python_import_resolution_bench"
+harness = false

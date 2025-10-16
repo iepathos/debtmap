@@ -659,6 +659,19 @@ impl EnhancedImportResolver {
     }
 
     /// Resolve absolute import
+    ///
+    /// # Limitations
+    ///
+    /// This implementation handles standard Python packages (with `__init__.py`) and modules.
+    /// PEP 420 namespace packages (packages without `__init__.py` that span multiple directories)
+    /// are not explicitly supported. Namespace packages are less common in practice, and full
+    /// support would require checking multiple directories in sys.path to aggregate namespace
+    /// package portions, which adds significant complexity for minimal benefit in most codebases.
+    ///
+    /// For regular packages and modules, this resolver correctly:
+    /// - Resolves module files (e.g., `module.py`)
+    /// - Resolves package directories (e.g., `package/__init__.py`)
+    /// - Handles dotted module paths (e.g., `package.submodule.module`)
     fn resolve_absolute_import(&self, from_path: &Path, module_name: &str) -> PathBuf {
         if module_name.is_empty() {
             return from_path.to_path_buf();
@@ -677,6 +690,8 @@ impl EnhancedImportResolver {
         if file_path.exists() {
             file_path
         } else {
+            // Note: If no __init__.py exists, this could be a namespace package (PEP 420),
+            // but we treat it as a regular package directory for simplicity
             path.push("__init__.py");
             path
         }
