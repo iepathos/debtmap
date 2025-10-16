@@ -115,18 +115,15 @@ fn bench_import_analysis(c: &mut Criterion) {
     for (size_name, num_imports) in &[("small", 10), ("medium", 50), ("large", 200)] {
         let code = generate_module_with_imports(*num_imports / 2, *num_imports / 4, 5, 10);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size_name),
-            size_name,
-            |b, _| {
-                b.iter(|| {
-                    let module = rp::parse(&code, rp::Mode::Module, "test.py")
-                        .expect("Failed to parse");
-                    let mut resolver = EnhancedImportResolver::new();
-                    black_box(resolver.analyze_imports(&module, Path::new("test.py")))
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(size_name), size_name, |b, _| {
+            b.iter(|| {
+                let module =
+                    rp::parse(&code, rp::Mode::Module, "test.py").expect("Failed to parse");
+                let mut resolver = EnhancedImportResolver::new();
+                resolver.analyze_imports(&module, Path::new("test.py"));
+                black_box(())
+            })
+        });
     }
 
     group.finish();
@@ -139,30 +136,26 @@ fn bench_dynamic_import_detection(c: &mut Criterion) {
     for (size_name, num_dynamic) in &[("few", 5), ("many", 20), ("extensive", 50)] {
         let code = generate_module_with_dynamic_imports(*num_dynamic);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size_name),
-            size_name,
-            |b, _| {
-                b.iter(|| {
-                    let module = rp::parse(&code, rp::Mode::Module, "test.py")
-                        .expect("Failed to parse");
-                    let mut resolver = EnhancedImportResolver::new();
-                    resolver.analyze_imports(&module, Path::new("test.py"));
+        group.bench_with_input(BenchmarkId::from_parameter(size_name), size_name, |b, _| {
+            b.iter(|| {
+                let module =
+                    rp::parse(&code, rp::Mode::Module, "test.py").expect("Failed to parse");
+                let mut resolver = EnhancedImportResolver::new();
+                resolver.analyze_imports(&module, Path::new("test.py"));
 
-                    // Count dynamic imports
-                    let edges = resolver.import_graph().edges.get(Path::new("test.py"));
-                    let dynamic_count = edges
-                        .map(|e| {
-                            e.iter()
-                                .filter(|edge| edge.import_type == ImportType::Dynamic)
-                                .count()
-                        })
-                        .unwrap_or(0);
+                // Count dynamic imports
+                let edges = resolver.import_graph().edges.get(Path::new("test.py"));
+                let dynamic_count = edges
+                    .map(|e| {
+                        e.iter()
+                            .filter(|edge| edge.import_type == ImportType::Dynamic)
+                            .count()
+                    })
+                    .unwrap_or(0);
 
-                    black_box(dynamic_count)
-                })
-            },
-        );
+                black_box(dynamic_count)
+            })
+        });
     }
 
     group.finish();
@@ -175,25 +168,22 @@ fn bench_graph_building(c: &mut Criterion) {
     for (size_name, num_modules) in &[("small", 10), ("medium", 50), ("large", 100)] {
         let modules_data = generate_module_graph(*num_modules);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size_name),
-            size_name,
-            |b, _| {
-                b.iter(|| {
-                    let mut resolver = EnhancedImportResolver::new();
-                    let parsed_modules: Vec<_> = modules_data
-                        .iter()
-                        .map(|(code, path)| {
-                            let module = rp::parse(code, rp::Mode::Module, "test.py")
-                                .expect("Failed to parse");
-                            (module, path.clone())
-                        })
-                        .collect();
+        group.bench_with_input(BenchmarkId::from_parameter(size_name), size_name, |b, _| {
+            b.iter(|| {
+                let mut resolver = EnhancedImportResolver::new();
+                let parsed_modules: Vec<_> = modules_data
+                    .iter()
+                    .map(|(code, path)| {
+                        let module =
+                            rp::parse(code, rp::Mode::Module, "test.py").expect("Failed to parse");
+                        (module, path.clone())
+                    })
+                    .collect();
 
-                    black_box(resolver.build_import_graph(&parsed_modules))
-                })
-            },
-        );
+                resolver.build_import_graph(&parsed_modules);
+                black_box(())
+            })
+        });
     }
 
     group.finish();
@@ -269,32 +259,31 @@ fn bench_circular_import_detection(c: &mut Criterion) {
 
         for i in 0..*chain_length {
             let next = (i + 1) % chain_length;
-            let code = format!("from module_{} import func_{}\n\ndef func_{}():\n    pass\n", next, next, i);
+            let code = format!(
+                "from module_{} import func_{}\n\ndef func_{}():\n    pass\n",
+                next, next, i
+            );
             let path = PathBuf::from(format!("test_project/module_{}.py", i));
             modules.push((code, path));
         }
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size_name),
-            size_name,
-            |b, _| {
-                b.iter(|| {
-                    let mut resolver = EnhancedImportResolver::new();
-                    let parsed_modules: Vec<_> = modules
-                        .iter()
-                        .map(|(code, path)| {
-                            let module = rp::parse(code, rp::Mode::Module, "test.py")
-                                .expect("Failed to parse");
-                            (module, path.clone())
-                        })
-                        .collect();
+        group.bench_with_input(BenchmarkId::from_parameter(size_name), size_name, |b, _| {
+            b.iter(|| {
+                let mut resolver = EnhancedImportResolver::new();
+                let parsed_modules: Vec<_> = modules
+                    .iter()
+                    .map(|(code, path)| {
+                        let module =
+                            rp::parse(code, rp::Mode::Module, "test.py").expect("Failed to parse");
+                        (module, path.clone())
+                    })
+                    .collect();
 
-                    resolver.build_import_graph(&parsed_modules);
-                    let cycles = resolver.circular_imports().to_vec();
-                    black_box(cycles)
-                })
-            },
-        );
+                resolver.build_import_graph(&parsed_modules);
+                let cycles = resolver.circular_imports().to_vec();
+                black_box(cycles)
+            })
+        });
     }
 
     group.finish();
