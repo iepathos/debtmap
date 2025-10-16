@@ -158,4 +158,44 @@ Some content without location marker.
             "/abs/path/main.rs:func:42"
         );
     }
+
+    #[test]
+    fn test_parse_file_level_debt_location() {
+        // Test parsing file-level debt with :file:0 format
+        let line = "**Location**: ./src/priority/scoring/debt_item.rs:file:0";
+        let result = PlanParser::parse_location_line(line);
+        assert_eq!(
+            result,
+            Some("src/priority/scoring/debt_item.rs:file:0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_file_level_debt_with_comment() {
+        // Test parsing file-level debt with trailing comment (should be rejected)
+        let line = "**Location**: ./src/priority/scoring/debt_item.rs:file:1 (File-level debt)";
+        let result = PlanParser::parse_location_line(line);
+        // This should be None because of the trailing text
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_file_level_location_from_plan() {
+        let content = r#"
+# Implementation Plan: Refactor God Object
+
+## Problem Summary
+
+**Location**: ./src/priority/scoring/debt_item.rs:file:0
+**Priority Score**: 85.78
+**Debt Type**: God Object
+"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(content.as_bytes()).unwrap();
+
+        let location = PlanParser::extract_target_location(temp_file.path()).unwrap();
+
+        assert_eq!(location, "src/priority/scoring/debt_item.rs:file:0");
+    }
 }
