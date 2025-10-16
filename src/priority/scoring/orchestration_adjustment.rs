@@ -296,6 +296,7 @@ pub fn extract_composition_metrics(
 /// - PureLogic (similar to "pure workers"): 1.2× multiplier (increases priority)
 /// - EntryPoint: 0.9× multiplier (slight reduction)
 /// - Orchestrator: 0.8× multiplier + additional orchestration adjustment
+///
 /// This separation of concerns is intentional: spec 117 provides role-based multipliers,
 /// while spec 110 focuses solely on reducing orchestrator false positives.
 ///
@@ -655,7 +656,7 @@ mod tests {
         };
         let quality = calculate_composition_quality(&config, &good);
         assert!(
-            quality >= 0.5 && quality < 0.9,
+            (0.5..0.9).contains(&quality),
             "Good quality should be 0.5-0.9, got {}",
             quality
         );

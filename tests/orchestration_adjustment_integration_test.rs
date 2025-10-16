@@ -203,7 +203,12 @@ fn test_disabled_adjustment() {
 // Test Helpers
 // ============================================================================
 
-fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) -> debtmap::core::FunctionMetrics {
+fn create_test_func(
+    name: &str,
+    cyclomatic: u32,
+    cognitive: u32,
+    length: usize,
+) -> debtmap::core::FunctionMetrics {
     debtmap::core::FunctionMetrics {
         file: PathBuf::from("test.rs"),
         name: name.to_string(),
