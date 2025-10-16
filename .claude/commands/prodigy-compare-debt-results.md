@@ -8,9 +8,9 @@ args:
   - name: after
     required: true
     description: Path to the updated debtmap.json file after fixes
-  - name: map-results
+  - name: map-results-file
     required: false
-    description: JSON results from the map phase
+    description: Path to JSON file containing results from the map phase
   - name: successful
     required: false
     description: Number of successfully fixed items
@@ -29,44 +29,45 @@ Analyze the difference between before and after debtmap results to quantify tech
 
 ## Usage
 ```
-/prodigy-compare-debt-results --before <original-debtmap.json> --after <new-debtmap.json> --map-results '<results>' --successful <count> --failed <count>
+/prodigy-compare-debt-results --before <original-debtmap.json> --after <new-debtmap.json> --map-results-file <map-results.json> --successful <count> --failed <count>
 ```
 
 ## Parameters
 - `--before`: Path to the original debtmap.json file
 - `--after`: Path to the updated debtmap.json file after fixes
-- `--map-results`: JSON results from the map phase (optional)
+- `--map-results-file`: Path to JSON file containing results from the map phase (optional)
 - `--successful`: Number of successfully fixed items
 - `--failed`: Number of items that failed to fix
 
 ## Process
 
-**CRITICAL**: Use the `debtmap compare` command for efficient comparison. This reduces processing overhead from 40MB JSON files to <10KB output (99.975% reduction).
+1. **Load and Parse JSON Files**
+   - Read the before and after debtmap.json files
+   - If `--map-results-file` is provided, read and parse the map results JSON file
+   - Parse the JSON structures
 
-1. **Run Debtmap Compare Command**
-   ```bash
-   cargo run --release -- compare \
-     --before <before-path> \
-     --after <after-path> \
-     --output comparison-result.json \
-     --format json
-   ```
+2. **Calculate Overall Metrics**
+   - Compare total debt scores
+   - Count total items before/after
+   - Calculate percentage improvements
 
-   This command:
-   - Efficiently compares large debtmap analyses
-   - Identifies resolved, improved, worsened, and new items
-   - Calculates project health metrics
-   - Generates summary statistics
+3. **Analyze Item-Level Changes**
+   - Match items by location (file, function, line)
+   - Identify:
+     - Items completely resolved (no longer in after)
+     - Items with reduced scores
+     - Items with increased scores (regression)
+     - New items introduced
 
-2. **Parse Comparison Results**
-   - Read the comparison-result.json output
-   - Extract key metrics from structured output:
-     - `project_health`: Overall project metrics before/after
-     - `improvements`: Items that were resolved or improved
-     - `regressions`: Items that worsened or new items added
-     - `summary`: High-level statistics and status
+4. **Category Analysis**
+   - Group improvements by debt type:
+     - Complexity debt
+     - Duplication debt
+     - Coverage debt
+     - Dependency debt
+   - Show which categories improved most
 
-3. **Generate Summary Report**
+5. **Generate Summary Report**
    Format a concise summary for the commit message:
    ```
    Technical Debt Improvements:
@@ -125,50 +126,40 @@ Generate a concise, markdown-formatted summary suitable for inclusion in a git c
 - If JSON structure is unexpected, provide details
 - Handle cases where items may have moved (line number changes)
 
-## Example Implementation Using Debtmap Compare
+## Example Implementation Steps
 
-**IMPORTANT**: Use the `debtmap compare` command instead of manual jq processing. This is more efficient and accurate.
+```python
+# Pseudo-code structure
+before_data = load_json(before_path)
+after_data = load_json(after_path)
 
-```bash
-# Step 1: Run debtmap compare
-cargo run --release -- compare \
-  --before "$BEFORE_PATH" \
-  --after "$AFTER_PATH" \
-  --output comparison-result.json \
-  --format json
+# Create lookup maps
+before_items = {(item.file, item.function): item for item in before_data.items}
+after_items = {(item.file, item.function): item for item in after_data.items}
 
-# Step 2: Extract summary information from comparison result
-RESOLVED_COUNT=$(jq -r '.summary.resolved_count' comparison-result.json)
-IMPROVED_COUNT=$(jq -r '.summary.total_improvements' comparison-result.json)
-WORSENED_COUNT=$(jq -r '.summary.total_regressions' comparison-result.json)
-STATUS=$(jq -r '.summary.status' comparison-result.json)
+# Calculate improvements
+resolved = before_items.keys() - after_items.keys()
+improved = []
+regressed = []
+new_items = after_items.keys() - before_items.keys()
 
-# Step 3: Extract project health metrics
-BEFORE_ITEMS=$(jq -r '.project_health.total_items_before' comparison-result.json)
-AFTER_ITEMS=$(jq -r '.project_health.total_items_after' comparison-result.json)
-BEFORE_HIGH=$(jq -r '.project_health.high_priority_before' comparison-result.json)
-AFTER_HIGH=$(jq -r '.project_health.high_priority_after' comparison-result.json)
+for key in before_items.keys() & after_items.keys():
+    before_score = before_items[key].unified_score.final_score
+    after_score = after_items[key].unified_score.final_score
+    if after_score < before_score:
+        improved.append((key, before_score, after_score))
+    elif after_score > before_score:
+        regressed.append((key, before_score, after_score))
 
-# Step 4: Format the commit message
-cat <<EOF
-fix: eliminate technical debt items via MapReduce
+# Generate summary statistics
+total_before = sum(item.unified_score.final_score for item in before_data.items)
+total_after = sum(item.unified_score.final_score for item in after_data.items)
+improvement_pct = ((total_before - total_after) / total_before) * 100
 
-Processed debt items in parallel:
-- Successfully fixed: ${SUCCESSFUL} items
-- Failed to fix: ${FAILED} items
-- Total items processed: ${TOTAL}
-
-Technical Debt Improvements:
-- Total items: ${BEFORE_ITEMS} → ${AFTER_ITEMS}
-- High priority items: ${BEFORE_HIGH} → ${AFTER_HIGH}
-- Items resolved: ${RESOLVED_COUNT}
-- Items improved: ${IMPROVED_COUNT}
-- Status: ${STATUS}
-EOF
-
-# Step 5: Create the git commit
-git add -A
-git commit -m "$(cat comparison-result.json | jq -r '.summary.commit_message // "fix: eliminate technical debt items"')"
+# Format output
+print(f"- Total debt score: {total_before} → {total_after} (-{improvement_pct:.0f}%)")
+print(f"- Items resolved: {len(resolved)} of {successful + failed} targeted")
+# ... continue formatting
 ```
 
 ## Integration Notes

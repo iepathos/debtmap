@@ -1,59 +1,101 @@
 # Complete Debtmap Fix Command
 
-Completes a partial technical debt fix by addressing validation gaps and remaining debt items.
+**PRIMARY OBJECTIVE: Complete the original implementation plan items** - NOT to fix new problems or refactor existing code.
+
+This command is called when validation shows incomplete progress. Your job is to **finish what was started**, not start new improvements.
 
 Arguments: $ARGUMENTS
 
 ## Usage
 
 ```
-/prodigy-complete-debtmap-fix [--gaps <validation-gaps-json>]
+/prodigy-complete-debtmap-fix --plan <plan-file> --validation <validation-file> --attempt <number>
 ```
 
 Examples:
-- `/prodigy-complete-debtmap-fix --gaps ${validation.gaps}` with specific gaps from validation
+- `/prodigy-complete-debtmap-fix --plan .prodigy/IMPLEMENTATION_PLAN.md --validation .prodigy/debtmap-validation.json --attempt 2`
 
 ## What This Command Does
 
-1. **Receives Validation Gaps**
-   - Gets list of remaining debt items from debtmap validation
-   - Parses gap details including locations, severity, and specific metrics
-   - Prioritizes fixes by impact and feasibility
+**CRITICAL UNDERSTANDING**: You are in a recovery situation. A previous implementation attempt was partially successful but didn't reach the 75% completion threshold. Your job is to:
 
-2. **Completes Technical Debt Resolution**
-   - Addresses each gap systematically using functional programming principles
-   - Focuses on high-priority debt items first
-   - Implements targeted fixes based on validation feedback
+1. **Complete Remaining Plan Items** (PRIMARY GOAL)
+   - Read the IMPLEMENTATION_PLAN.md to see the original plan
+   - Check validation to see what's been completed
+   - Focus ONLY on completing the remaining planned items
+   - DO NOT start new refactoring or improvements
 
-3. **Verifies Completion**
-   - Re-checks implementation after fixes
-   - Ensures gaps are addressed without introducing new debt
+2. **Avoid Making Things Worse** (CRITICAL)
+   - If completion percentage is DECREASING across attempts → STOP REFACTORING
+   - Regressions indicate you're solving the wrong problem
+   - Return to the original plan and execute it as written
+
+3. **Verify Completion**
+   - Re-checks implementation after completing plan items
+   - Ensures original objectives are met
    - Outputs completion status
 
 ## Execution Process
 
-### Step 1: Parse Input
+### Step 1: Parse Input and Understand Context
 
 The command will:
-- Extract validation gaps from $ARGUMENTS (`--gaps` parameter)
-- If no gaps provided, analyze current debtmap state to identify remaining issues
-- Parse gaps JSON to understand what specific improvements are needed
-- Prioritize gaps by severity and impact
+- Extract `--plan` parameter: Path to IMPLEMENTATION_PLAN.md
+- Extract `--validation` parameter: Path to validation JSON with completion status
+- Extract `--attempt` parameter: Current attempt number (1-5)
+- Read both files to understand:
+  - What was the original plan?
+  - What's been completed so far?
+  - What remains to be done?
+  - Are we progressing or regressing?
 
-### Step 2: Analyze Technical Debt Gaps
+**CRITICAL CHECK**: If this is attempt 2+ and completion percentage decreased:
+```
+Example:
+  Attempt 1: 72.3% complete
+  Attempt 2: 51.2% complete  ← REGRESSION!
 
-Prioritize gaps by:
-- **Critical severity (score >= 8)**: Fix immediately
-- **High severity (score 6-8)**: Address next
-- **Medium severity (score 4-6)**: Fix if feasible
-- **Low severity (score < 4)**: Optional improvements
+Action: STOP trying new approaches. Return to original plan and complete it exactly as written.
+```
 
-Gap types to handle:
-- **Unresolved critical complexity**: Functions with high cyclomatic complexity
-- **Missing test coverage**: Functions with inadequate test coverage
-- **Deep nesting**: Functions with excessive nesting depth
-- **Function length**: Overly long functions
-- **New technical debt**: Regression issues introduced during initial fix
+### Step 2: Identify Remaining Work vs Regressions
+
+**Read the validation JSON** to distinguish:
+
+1. **Remaining Plan Items** (PRIMARY FOCUS)
+   ```json
+   "remaining_plan_items": [
+     "Extract output capture logic",
+     "Extract validation processing",
+     "Final cleanup and documentation"
+   ]
+   ```
+   → **ACTION**: Complete these items from the original plan
+
+2. **Completed Items** (DON'T UNDO)
+   ```json
+   "completed_items": [
+     "Extracted step initialization logic",
+     "Extracted command execution logic"
+   ]
+   ```
+   → **ACTION**: Preserve these improvements, don't refactor them
+
+3. **Regressions** (SECONDARY - only if blocking tests)
+   ```json
+   "regressions_to_fix": [
+     {
+       "location": "src/executor.rs:new_helper:123",
+       "issue": "New complex function introduced"
+     }
+   ]
+   ```
+   → **ACTION**: Only fix if they cause test failures. Otherwise ignore them.
+
+**Decision Framework**:
+- Focus 90% effort on completing remaining plan items
+- Focus 10% effort on regressions that block tests
+- Focus 0% effort on "improvements" not in original plan
 
 ### Step 3: Apply Functional Programming Fixes
 
@@ -198,31 +240,58 @@ fn process_data(input: &Data) -> Result<Output> {
 - Use function composition for complex workflows
 - Keep main function as orchestration only
 
-### Step 4: Incremental Improvement Strategy
+### Step 3: Complete Remaining Plan Items
 
-For each gap:
+**CRITICAL**: **NEVER DELETE IMPLEMENTATION_PLAN.md** - The workflow requires this file for validation. Even if you complete all plan items, the workflow still needs this file. Do not remove it.
 
-1. **Identify the core issue** causing the debt
-2. **Apply minimal functional refactoring** that addresses the specific gap
-3. **Preserve existing improvements** - don't undo previous fixes
-4. **Verify metric improvement** using functional programming principles
-5. **Ensure no regression** in other areas
+**Read IMPLEMENTATION_PLAN.md** and identify incomplete items:
 
-### Step 5: Handle Multiple Attempts
+Example plan structure:
+```markdown
+## Stage 1: Extract Step Initialization
+Status: ✅ Complete
 
-This command may be called multiple times (max_attempts: 3 in workflow):
+## Stage 2: Extract Command Execution
+Status: ✅ Complete
 
-**Attempt 1**: Address critical gaps using conservative functional patterns
-- Focus on highest impact debt items
-- Apply safe refactoring with pure function extraction
+## Stage 3: Extract Output Capture
+Status: ❌ Not Started
 
-**Attempt 2**: Apply more aggressive functional programming patterns
-- Use advanced patterns like function composition
-- Consider more comprehensive restructuring
+## Stage 4: Extract Validation Processing
+Status: ❌ Not Started
 
-**Attempt 3**: Make pragmatic improvements for threshold
-- Focus on achieving minimum viable improvement
-- Document remaining technical debt for future work
+## Stage 5: Final Cleanup
+Status: ❌ Not Started
+```
+
+**For each incomplete stage**:
+1. Follow the approach described in the plan
+2. Implement it as specified
+3. Don't try to improve the approach
+4. Mark stage as complete when done
+
+### Step 4: Handle Multiple Attempts (Regression Prevention)
+
+**Attempt 1**: Complete next 2-3 plan items
+- Focus on plan items, not validation gaps
+- Use conservative implementation
+- Commit each completed item
+
+**Attempt 2+**: Check for regression first
+```python
+if current_completion < previous_completion:
+    # REGRESSION DETECTED
+    # Stop trying new things
+    # Review what got undone
+    # Complete original plan items only
+else:
+    # Continue completing plan items
+```
+
+**NEVER**:
+- Start new refactoring not in plan
+- "Improve" existing completed work
+- Chase validation gaps by adding abstractions
 
 ### Step 6: Verify No Regression
 
@@ -239,31 +308,31 @@ just fmt-check && just lint
 just build-release
 ```
 
-### Step 7: Commit Functional Improvements
+### Step 5: Commit Plan Item Completions
 
-Create a clear commit documenting the functional programming improvements:
+Create a clear commit documenting completion of plan items (NOT gap fixes):
 
 ```bash
 git add -A
-git commit -m "fix: complete technical debt resolution with functional patterns
+git commit -m "fix: complete implementation plan items [stage numbers]
 
-- Applied functional programming principles to address validation gaps:
-  * Extracted N pure functions from complex imperative code
-  * Replaced nested conditionals with pattern matching
-  * Used function composition for data transformation pipelines
-  * Separated I/O operations from business logic
-  * Added comprehensive test coverage for pure functions
+Completed remaining implementation plan items:
+- [Stage 3]: Extract output capture logic
+- [Stage 4]: Extract validation processing
 
-- Specific improvements:
-  * Reduced cyclomatic complexity in [function] from X to Y
-  * Added test coverage for critical error paths
-  * Eliminated deep nesting through early returns
-  * Extracted helper functions using immutable data flow
+Plan progress: [N]/[Total] stages complete
+Validation: [completion]% (threshold: 75%)
 
-- Gaps addressed: [list specific gaps resolved]
-- Functions improved: [list of functions with their files]
+Following original implementation plan approach.
+No new refactoring or abstractions introduced.
 "
 ```
+
+**Commit Message Focus**:
+- What plan stages were completed
+- NOT what gaps were fixed
+- NOT what improvements were made
+- Keep it about completing the original work
 
 ## Functional Programming Strategies by Gap Type
 
@@ -372,12 +441,13 @@ The command succeeds when:
 
 ## Important Notes
 
-1. **Always apply functional programming principles** when fixing technical debt
-2. **Preserve existing functionality** during refactoring
-3. **Focus on pure functions** - easier to test and reason about
-4. **Use immutable data structures** where possible
-5. **Separate I/O from business logic** - core principle for maintainable code
-6. **Create composable functions** - build complex behavior from simple parts
-7. **Output valid JSON** for workflow parsing
-8. **MUST create git commit** - Prodigy requires this to verify fixes were made
-9. **Document functional patterns used** in commit messages
+1. **NEVER DELETE IMPLEMENTATION_PLAN.md** - The workflow requires this file throughout execution
+2. **Always apply functional programming principles** when fixing technical debt
+3. **Preserve existing functionality** during refactoring
+4. **Focus on pure functions** - easier to test and reason about
+5. **Use immutable data structures** where possible
+6. **Separate I/O from business logic** - core principle for maintainable code
+7. **Create composable functions** - build complex behavior from simple parts
+8. **Output valid JSON** for workflow parsing
+9. **MUST create git commit** - Prodigy requires this to verify fixes were made
+10. **Document functional patterns used** in commit messages

@@ -16,6 +16,8 @@ Follow the implementation plan created by `/prodigy-debtmap-plan` to fix **ONLY 
 
 ## Process
 
+**CRITICAL**: **NEVER DELETE IMPLEMENTATION_PLAN.md** - The workflow requires this file for validation even after all phases are complete. Do not remove it under any circumstances.
+
 ### Step 1: Load the Plan
 
 Read the implementation plan:
@@ -251,9 +253,10 @@ Where `<type>` is one of:
 
 ## Important Notes
 
+- **NEVER DELETE IMPLEMENTATION_PLAN.md**: The workflow needs this file for validation
 - **Do not skip phases**: Each phase builds on the previous one
 - **Do not combine phases**: Keep commits focused on one phase
-- **Do not modify the plan**: Follow it as designed
+- **Do not modify the plan**: Follow it as designed (but never delete it)
 - **Do commit frequently**: After each phase
 - **Do test thoroughly**: Before each commit
 
