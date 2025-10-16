@@ -58,8 +58,7 @@ use crate::priority::FunctionVisibility;
 
 // Re-export validation functions for backward compatibility
 pub(super) use super::validation::{
-    check_complexity_hotspot, check_dead_code, check_enhanced_complexity_hotspot,
-    check_enhanced_dead_code, check_enhanced_testing_gap, check_testing_gap, ClassificationContext,
+    check_complexity_hotspot, check_dead_code, check_testing_gap,
 };
 
 // Re-export formatting and helper functions for backward compatibility
@@ -236,45 +235,6 @@ pub fn classify_debt_type_enhanced(
 
     // Default to risk-based classification
     classify_risk_based_debt(func, &role)
-}
-
-/// Pure function to classify debt using context (helper for context-based classification)
-fn classify_debt_with_context(context: &ClassificationContext) -> DebtType {
-    if context.func.is_test {
-        return classify_test_debt(context.func);
-    }
-
-    // Check each debt type in priority order
-    if let Some(debt) = check_enhanced_testing_gap(context) {
-        return debt;
-    }
-
-    if let Some(debt) = check_enhanced_complexity_hotspot(context.func) {
-        return debt;
-    }
-
-    if let Some(debt) = check_enhanced_dead_code(context) {
-        return debt;
-    }
-
-    // Classify remaining based on function characteristics
-    classify_remaining_enhanced_debt(context)
-}
-
-/// Pure function to classify remaining enhanced debt
-fn classify_remaining_enhanced_debt(context: &ClassificationContext) -> DebtType {
-    let role = classify_function_role(context.func, context.func_id, context.call_graph);
-
-    if context.func.cyclomatic <= 3 && context.func.cognitive <= 5 {
-        if let Some(debt) = classify_simple_function_risk(context.func, &role) {
-            return debt;
-        }
-    }
-
-    DebtType::Risk {
-        risk_score: 0.0,
-        factors: vec!["Well-designed simple function - not technical debt".to_string()],
-    }
 }
 
 pub(super) fn generate_recommendation(
