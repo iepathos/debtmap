@@ -3,7 +3,6 @@
 use crate::core::FunctionMetrics;
 use crate::priority::{
     ActionableRecommendation, DebtType, FunctionRole, FunctionVisibility, TransitiveCoverage,
-    UnifiedScore,
 };
 
 // Re-use functions from other modules
@@ -15,7 +14,6 @@ use super::formatting::{
     generate_combined_testing_refactoring_steps, generate_dead_code_steps,
     generate_testing_gap_steps, get_role_display_name,
 };
-use super::recommendation_extended::generate_usage_hints;
 use crate::priority::external_api_detector::is_likely_external_api;
 
 /// Generate action and rationale for dead code
@@ -55,7 +53,9 @@ pub(super) fn generate_dead_code_action(
 }
 
 /// Generate recommendation when function is fully covered
-pub(super) fn generate_full_coverage_recommendation(role: FunctionRole) -> (String, String, Vec<String>) {
+pub(super) fn generate_full_coverage_recommendation(
+    role: FunctionRole,
+) -> (String, String, Vec<String>) {
     let role_display = get_role_display_name(role);
     (
         "Maintain test coverage".to_string(),
@@ -219,7 +219,9 @@ pub(super) fn generate_error_swallowing_recommendation(
 }
 
 /// Generate recommendation for test-specific debt types
-pub(super) fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, Vec<String>) {
+pub(super) fn generate_test_debt_recommendation(
+    debt_type: &DebtType,
+) -> (String, String, Vec<String>) {
     match debt_type {
         DebtType::TestComplexityHotspot {
             cyclomatic,
