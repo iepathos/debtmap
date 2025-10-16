@@ -684,7 +684,7 @@ struct ExceptionInfo {
 
 /// Type of exception
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum ExceptionType {
+pub enum ExceptionType {
     Builtin(BuiltinException),
     Custom(String),
     Variable(String),
@@ -744,7 +744,7 @@ impl ExceptionType {
 
 /// Built-in Python exceptions
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum BuiltinException {
+pub enum BuiltinException {
     BaseException,
     Exception,
     ValueError,
@@ -1156,8 +1156,17 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
 
     // Known NumPy section headers
     const NUMPY_SECTIONS: &[&str] = &[
-        "Parameters", "Returns", "Yields", "Raises", "Warns", "See Also", "Notes", "References",
-        "Examples", "Attributes", "Methods",
+        "Parameters",
+        "Returns",
+        "Yields",
+        "Raises",
+        "Warns",
+        "See Also",
+        "Notes",
+        "References",
+        "Examples",
+        "Attributes",
+        "Methods",
     ];
 
     for line in docstring.lines() {
