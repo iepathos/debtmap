@@ -134,11 +134,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
-    fn create_test_function(
-        cyclomatic: u32,
-        cognitive: u32,
-        is_test: bool,
-    ) -> FunctionMetrics {
+    fn create_test_function(cyclomatic: u32, cognitive: u32, is_test: bool) -> FunctionMetrics {
         FunctionMetrics {
             name: "test_func".to_string(),
             file: PathBuf::from("test.rs"),

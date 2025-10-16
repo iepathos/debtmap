@@ -48,18 +48,17 @@ use super::computation::{
 // Re-export validation functions for backward compatibility
 pub(super) use super::validation::{
     check_complexity_hotspot, check_dead_code, check_enhanced_complexity_hotspot,
-    check_enhanced_dead_code, check_enhanced_testing_gap, check_testing_gap,
-    ClassificationContext,
+    check_enhanced_dead_code, check_enhanced_testing_gap, check_testing_gap, ClassificationContext,
 };
 
 // Re-export formatting and helper functions for backward compatibility
+pub use super::formatting::determine_visibility;
 pub(super) use super::formatting::{
     add_uncovered_lines_to_steps, format_complexity_display, format_role_description,
     generate_combined_testing_refactoring_steps, generate_dead_code_steps,
     generate_testing_gap_steps, get_role_display_name, is_excluded_from_dead_code_analysis,
     is_rust_file,
 };
-pub use super::formatting::determine_visibility;
 
 // Helper functions
 
@@ -86,7 +85,6 @@ pub(super) fn determine_debt_type(
     let role = classify_function_role(func, func_id, call_graph);
     classify_remaining_debt(func, coverage, &role)
 }
-
 
 /// Pure function to classify remaining debt based on role and complexity
 fn classify_remaining_debt(
@@ -251,7 +249,6 @@ pub fn is_dead_code_with_exclusions(
     is_dead_code(func, call_graph, func_id, function_pointer_used_functions)
 }
 
-
 /// Enhanced version of debt type classification with framework pattern exclusions
 pub fn classify_debt_type_with_exclusions(
     func: &FunctionMetrics,
@@ -297,7 +294,6 @@ fn classify_debt_with_context(context: &ClassificationContext) -> DebtType {
     // Classify remaining based on function characteristics
     classify_remaining_enhanced_debt(context)
 }
-
 
 /// Pure function to classify remaining enhanced debt
 fn classify_remaining_enhanced_debt(context: &ClassificationContext) -> DebtType {
@@ -433,7 +429,6 @@ pub fn classify_debt_type_enhanced(
     classify_risk_based_debt(func, &role)
 }
 
-
 /// Generate action and rationale for dead code
 fn generate_dead_code_action(
     func: &FunctionMetrics,
@@ -469,7 +464,6 @@ fn generate_dead_code_action(
         }
     }
 }
-
 
 /// Generate recommendation when function is fully covered
 fn generate_full_coverage_recommendation(role: FunctionRole) -> (String, String, Vec<String>) {
@@ -672,7 +666,6 @@ fn generate_test_debt_recommendation(debt_type: &DebtType) -> (String, String, V
     }
 }
 
-
 pub(super) fn generate_recommendation(
     func: &FunctionMetrics,
     debt_type: &DebtType,
@@ -775,7 +768,6 @@ impl FunctionInfo {
         }
     }
 }
-
 
 // Pure function to extract coverage percentage
 fn extract_coverage_percent(coverage: &Option<TransitiveCoverage>) -> f64 {
@@ -1052,7 +1044,6 @@ fn generate_standard_recommendation(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1103,7 +1094,6 @@ mod tests {
         assert_eq!(calculate_needed_test_cases(25, 0.0), 10);
     }
 
-
     #[test]
     fn test_classify_test_debt() {
         let test_func = FunctionMetrics {
@@ -1140,7 +1130,6 @@ mod tests {
             _ => panic!("Expected TestingGap debt type for test function"),
         }
     }
-
 
     #[test]
     fn test_calculate_needed_test_cases_partial_coverage() {

@@ -256,7 +256,10 @@ pub(super) fn generate_combined_testing_refactoring_steps(
 }
 
 /// Analyze uncovered lines to provide specific testing recommendations
-pub(super) fn analyze_uncovered_lines(func: &FunctionMetrics, uncovered_lines: &[usize]) -> Vec<String> {
+pub(super) fn analyze_uncovered_lines(
+    func: &FunctionMetrics,
+    uncovered_lines: &[usize],
+) -> Vec<String> {
     let mut recommendations = Vec::new();
 
     if uncovered_lines.is_empty() {
@@ -432,7 +435,10 @@ mod tests {
             ..pub_func.clone()
         };
 
-        assert_eq!(determine_visibility(&priv_func), FunctionVisibility::Private);
+        assert_eq!(
+            determine_visibility(&priv_func),
+            FunctionVisibility::Private
+        );
     }
 
     #[test]
