@@ -6,8 +6,9 @@
 // exception flows similar to Rust's Result propagation analysis.
 
 use crate::core::{DebtItem, DebtType, Priority};
+use crate::priority::call_graph::{CallGraph, FunctionId};
 use rustpython_parser::ast;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 /// Tracks exception flows through Python code
@@ -18,6 +19,8 @@ pub struct ExceptionFlowAnalyzer {
     exception_flows: HashMap<String, ExceptionFlow>,
     /// Current file path
     current_file: PathBuf,
+    /// Function line numbers
+    function_lines: HashMap<String, usize>,
 }
 
 impl ExceptionFlowAnalyzer {
@@ -26,6 +29,7 @@ impl ExceptionFlowAnalyzer {
             custom_exceptions: HashMap::new(),
             exception_flows: HashMap::new(),
             current_file: file_path,
+            function_lines: HashMap::new(),
         }
     }
 
@@ -115,11 +119,17 @@ impl ExceptionFlowAnalyzer {
         match stmt {
             ast::Stmt::FunctionDef(func_def) => {
                 let func_name = func_def.name.to_string();
+                // Track line number
+                self.function_lines
+                    .insert(func_name.clone(), func_def.range.start().to_u32() as usize);
                 let flow = self.analyze_function(func_def);
                 self.exception_flows.insert(func_name, flow);
             }
             ast::Stmt::AsyncFunctionDef(func_def) => {
                 let func_name = format!("async {}", func_def.name);
+                // Track line number
+                self.function_lines
+                    .insert(func_name.clone(), func_def.range.start().to_u32() as usize);
                 let flow = self.analyze_async_function(func_def);
                 self.exception_flows.insert(func_name, flow);
             }
@@ -550,6 +560,72 @@ impl ExceptionFlowAnalyzer {
         patterns
     }
 
+    /// Build exception propagation graph integrated with call graph
+    pub fn build_exception_graph(&self, call_graph: &CallGraph) -> ExceptionGraph {
+        let mut graph = ExceptionGraph::new();
+
+        // For each function with exception flows
+        for (func_name, flow) in &self.exception_flows {
+            let func_id = FunctionId {
+                name: func_name.clone(),
+                file: self.current_file.clone(),
+                line: 1, // Will be improved with line tracking
+            };
+
+            // Track exceptions that propagate to callers
+            let propagating_exceptions: Vec<ExceptionType> = flow
+                .raised_exceptions
+                .iter()
+                .filter(|exc_info| {
+                    // Exception propagates if not caught in this function
+                    !flow.caught_exceptions.iter().any(|caught| {
+                        caught.exception_types.iter().any(|caught_type| {
+                            exc_info.exception_type == *caught_type
+                                || exc_info.exception_type.is_subclass_of(&caught_type.name())
+                        })
+                    })
+                })
+                .map(|exc_info| exc_info.exception_type.clone())
+                .collect();
+
+            // Record exceptions for this function
+            graph.function_exceptions.insert(
+                func_id.clone(),
+                FunctionExceptions {
+                    raised: flow
+                        .raised_exceptions
+                        .iter()
+                        .map(|e| e.exception_type.clone())
+                        .collect(),
+                    caught: flow
+                        .caught_exceptions
+                        .iter()
+                        .flat_map(|c| c.exception_types.clone())
+                        .collect(),
+                    propagates: propagating_exceptions,
+                    documented: flow
+                        .documented_exceptions
+                        .iter()
+                        .map(|d| d.exception_type.clone())
+                        .collect(),
+                },
+            );
+
+            // Propagate exceptions through callers
+            for caller_id in call_graph.get_callers(&func_id) {
+                for exc_type in &graph.function_exceptions[&func_id].propagates {
+                    graph
+                        .propagation_edges
+                        .entry(caller_id.clone())
+                        .or_default()
+                        .insert((func_id.clone(), exc_type.clone()));
+                }
+            }
+        }
+
+        graph
+    }
+
     /// Convert patterns to debt items
     pub fn patterns_to_debt_items(&self, patterns: Vec<ExceptionFlowPattern>) -> Vec<DebtItem> {
         patterns
@@ -563,6 +639,13 @@ impl ExceptionFlowAnalyzer {
 
                 let message = format!("{}: {}", pattern.explanation, pattern.suggestion);
 
+                // Get actual line number from function_lines, default to 1 if not found
+                let line = self
+                    .function_lines
+                    .get(&pattern.function_name)
+                    .copied()
+                    .unwrap_or(1);
+
                 DebtItem {
                     id: format!(
                         "exc-flow-{}-{}-{}",
@@ -573,7 +656,7 @@ impl ExceptionFlowAnalyzer {
                     debt_type: DebtType::ErrorSwallowing,
                     priority,
                     file: self.current_file.clone(),
-                    line: 1, // TODO: Track actual line numbers
+                    line,
                     column: None,
                     message,
                     context: Some(format!(
@@ -600,7 +683,7 @@ struct ExceptionInfo {
 }
 
 /// Type of exception
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum ExceptionType {
     Builtin(BuiltinException),
     Custom(String),
@@ -638,14 +721,29 @@ impl ExceptionType {
         )
     }
 
-    fn is_subclass_of(&self, _parent: &str) -> bool {
-        // TODO: Implement proper hierarchy checking
+    fn is_subclass_of(&self, parent: &str) -> bool {
+        let child_name = self.name();
+
+        // Exact match
+        if child_name == parent {
+            return true;
+        }
+
+        // Recursively check built-in hierarchy
+        let mut current = child_name.clone();
+        while let Some(parent_type) = find_parent_exception(&current) {
+            if parent_type == parent {
+                return true;
+            }
+            current = parent_type;
+        }
+
         false
     }
 }
 
 /// Built-in Python exceptions
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum BuiltinException {
     BaseException,
     Exception,
@@ -749,6 +847,62 @@ const BUILTIN_EXCEPTIONS: &[&str] = &[
     "KeyboardInterrupt",
     "SystemExit",
 ];
+
+/// Built-in exception hierarchy: child -> parent
+const BUILTIN_EXCEPTION_HIERARCHY: &[(&str, &str)] = &[
+    // BaseException is the root
+    ("Exception", "BaseException"),
+    ("SystemExit", "BaseException"),
+    ("KeyboardInterrupt", "BaseException"),
+    ("GeneratorExit", "BaseException"),
+    // Exception hierarchy
+    ("StopIteration", "Exception"),
+    ("ArithmeticError", "Exception"),
+    ("AssertionError", "Exception"),
+    ("AttributeError", "Exception"),
+    ("BufferError", "Exception"),
+    ("EOFError", "Exception"),
+    ("ImportError", "Exception"),
+    ("LookupError", "Exception"),
+    ("MemoryError", "Exception"),
+    ("NameError", "Exception"),
+    ("OSError", "Exception"),
+    ("ReferenceError", "Exception"),
+    ("RuntimeError", "Exception"),
+    ("SyntaxError", "Exception"),
+    ("SystemError", "Exception"),
+    ("TypeError", "Exception"),
+    ("ValueError", "Exception"),
+    ("Warning", "Exception"),
+    // ArithmeticError subclasses
+    ("FloatingPointError", "ArithmeticError"),
+    ("OverflowError", "ArithmeticError"),
+    ("ZeroDivisionError", "ArithmeticError"),
+    // ImportError subclasses
+    ("ModuleNotFoundError", "ImportError"),
+    // LookupError subclasses
+    ("IndexError", "LookupError"),
+    ("KeyError", "LookupError"),
+    // OSError subclasses (and IOError alias)
+    ("IOError", "OSError"),
+    ("FileNotFoundError", "OSError"),
+    ("FileExistsError", "OSError"),
+    ("PermissionError", "OSError"),
+    ("TimeoutError", "OSError"),
+    // NameError subclasses
+    ("UnboundLocalError", "NameError"),
+    // RuntimeError subclasses
+    ("NotImplementedError", "RuntimeError"),
+    ("RecursionError", "RuntimeError"),
+];
+
+/// Find the parent exception type for a given exception name
+fn find_parent_exception(exception_name: &str) -> Option<String> {
+    BUILTIN_EXCEPTION_HIERARCHY
+        .iter()
+        .find(|(child, _)| *child == exception_name)
+        .map(|(_, parent)| parent.to_string())
+}
 
 /// Exception flow for a function
 #[derive(Debug)]
@@ -879,6 +1033,45 @@ enum Severity {
     Low,
 }
 
+/// Exception propagation graph
+#[derive(Debug)]
+pub struct ExceptionGraph {
+    /// Exception information for each function
+    pub function_exceptions: HashMap<FunctionId, FunctionExceptions>,
+    /// Propagation edges: caller -> (callee, exception_type)
+    pub propagation_edges: HashMap<FunctionId, HashSet<(FunctionId, ExceptionType)>>,
+}
+
+impl ExceptionGraph {
+    fn new() -> Self {
+        Self {
+            function_exceptions: HashMap::new(),
+            propagation_edges: HashMap::new(),
+        }
+    }
+
+    /// Get all exceptions that may propagate to a function through its callees
+    pub fn get_propagating_exceptions(&self, func_id: &FunctionId) -> Vec<ExceptionType> {
+        self.propagation_edges
+            .get(func_id)
+            .map(|edges| edges.iter().map(|(_, exc)| exc.clone()).collect())
+            .unwrap_or_default()
+    }
+}
+
+/// Exception information for a function
+#[derive(Debug, Clone)]
+pub struct FunctionExceptions {
+    /// Exceptions raised directly in this function
+    pub raised: Vec<ExceptionType>,
+    /// Exceptions caught in this function
+    pub caught: Vec<ExceptionType>,
+    /// Exceptions that propagate to callers (raised but not caught)
+    pub propagates: Vec<ExceptionType>,
+    /// Exceptions documented in docstring
+    pub documented: Vec<String>,
+}
+
 /// Extract docstring from a statement list
 fn extract_docstring(body: &[ast::Stmt]) -> Option<String> {
     body.first().and_then(|stmt| {
@@ -961,8 +1154,15 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
     let mut current_exception: Option<String> = None;
     let mut current_description = String::new();
 
+    // Known NumPy section headers
+    const NUMPY_SECTIONS: &[&str] = &[
+        "Parameters", "Returns", "Yields", "Raises", "Warns", "See Also", "Notes", "References",
+        "Examples", "Attributes", "Methods",
+    ];
+
     for line in docstring.lines() {
         let trimmed = line.trim();
+        let indent_count = line.len() - line.trim_start().len();
 
         if trimmed == "Raises" {
             in_raises = true;
@@ -975,20 +1175,55 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
         }
 
         if in_raises && in_separator {
-            // Stop at next section (next line that has dashes or is a new section header)
-            if trimmed.starts_with("---") || trimmed.starts_with("--") {
-                break;
-            }
-
-            // Stop at known section headers (non-indented non-empty lines)
-            let indent_count = line.len() - line.trim_start().len();
+            // Check if we've hit a new section header
+            // NumPy sections are typically preceded by a blank line and followed by dashes
             if !trimmed.is_empty() && indent_count == 0 {
-                // This is a new section header (not indented)
+                // Check if this looks like a section header
+                if NUMPY_SECTIONS.contains(&trimmed) {
+                    // Save current exception before stopping
+                    if let Some(exc) = current_exception.take() {
+                        exceptions.push(DocumentedException {
+                            exception_type: exc,
+                            description: current_description.trim().to_string(),
+                        });
+                    }
+                    break;
+                }
+            }
+
+            // Stop at dashes that indicate a new section
+            if trimmed.starts_with("---") || trimmed.starts_with("--") {
+                // Save current exception before stopping
+                if let Some(exc) = current_exception.take() {
+                    exceptions.push(DocumentedException {
+                        exception_type: exc,
+                        description: current_description.trim().to_string(),
+                    });
+                }
                 break;
             }
 
-            // Exception type lines have minimal indentation (8 spaces or less)
-            if !trimmed.is_empty() && indent_count <= 8 {
+            // Track empty lines
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            // Exception type lines have minimal indentation (4-8 spaces)
+            // and come after an empty line or the separator
+            // BUT we need to exclude section headers (like "Returns")
+            if indent_count > 0 && indent_count <= 8 {
+                // Check if this is actually a section header
+                if NUMPY_SECTIONS.contains(&trimmed) {
+                    // This is a section header, stop parsing
+                    if let Some(exc) = current_exception.take() {
+                        exceptions.push(DocumentedException {
+                            exception_type: exc,
+                            description: current_description.trim().to_string(),
+                        });
+                    }
+                    break;
+                }
+
                 // Save previous exception
                 if let Some(exc) = current_exception.take() {
                     exceptions.push(DocumentedException {
@@ -998,7 +1233,7 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
                     current_description.clear();
                 }
                 current_exception = Some(trimmed.to_string());
-            } else if !trimmed.is_empty() && indent_count > 8 {
+            } else if indent_count > 8 {
                 // Description line (more indented)
                 if !current_description.is_empty() {
                     current_description.push(' ');
@@ -1181,7 +1416,6 @@ def undocumented():
     }
 
     #[test]
-    #[ignore] // TODO: Fix NumPy docstring parser to handle section transitions properly
     fn test_parse_numpy_raises() {
         let docstring = r#"
         Do something.
