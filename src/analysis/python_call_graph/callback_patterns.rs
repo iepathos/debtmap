@@ -108,6 +108,44 @@ fn create_generic_patterns() -> Vec<CallbackPattern> {
     ]
 }
 
+/// Pure function to create functools callback patterns
+fn create_functools_patterns() -> Vec<CallbackPattern> {
+    vec![CallbackPattern {
+        function_name: "partial".to_string(),
+        module_name: Some("functools".to_string()),
+        argument_position: 0,
+    }]
+}
+
+/// Pure function to create web framework callback patterns
+fn create_web_framework_patterns() -> Vec<CallbackPattern> {
+    vec![
+        // Flask/FastAPI route decorators - these are handled differently
+        // but we list them for completeness
+        CallbackPattern {
+            function_name: "route".to_string(),
+            module_name: None,
+            argument_position: 0,
+        },
+        CallbackPattern {
+            function_name: "get".to_string(),
+            module_name: None,
+            argument_position: 0,
+        },
+        CallbackPattern {
+            function_name: "post".to_string(),
+            module_name: None,
+            argument_position: 0,
+        },
+        // Click command decorators
+        CallbackPattern {
+            function_name: "command".to_string(),
+            module_name: None,
+            argument_position: 0,
+        },
+    ]
+}
+
 /// Get callback patterns for a given function name
 pub fn get_callback_patterns() -> Vec<CallbackPattern> {
     [
@@ -116,6 +154,8 @@ pub fn get_callback_patterns() -> Vec<CallbackPattern> {
         create_threading_patterns(),
         create_multiprocessing_patterns(),
         create_generic_patterns(),
+        create_functools_patterns(),
+        create_web_framework_patterns(),
     ]
     .into_iter()
     .flatten()
@@ -177,4 +217,55 @@ pub fn get_callback_argument(
     } else {
         None
     }
+}
+
+/// Pure function to check if an expression is a lambda
+#[allow(dead_code)]
+pub fn is_lambda_expr(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::Lambda(_))
+}
+
+/// Pure function to check if an expression is a partial call
+#[allow(dead_code)]
+pub fn is_partial_call(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::Call(call_expr) => {
+            if let Some((func_name, module_name)) = extract_call_target(call_expr) {
+                func_name == "partial" && module_name.as_deref() == Some("functools")
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Pure function to extract function name from simple name expression
+#[allow(dead_code)]
+pub fn extract_function_name(expr: &ast::Expr) -> Option<String> {
+    match expr {
+        ast::Expr::Name(name) => Some(name.id.to_string()),
+        ast::Expr::Attribute(attr) => {
+            // For self.method or cls.method
+            if let ast::Expr::Name(obj) = &*attr.value {
+                Some(format!("{}.{}", obj.id, attr.attr))
+            } else {
+                Some(attr.attr.to_string())
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Pure function to check if an expression is a method reference (self.method, cls.method)
+#[allow(dead_code)]
+pub fn is_method_reference(expr: &ast::Expr) -> Option<(String, String)> {
+    if let ast::Expr::Attribute(attr) = expr {
+        if let ast::Expr::Name(obj) = &*attr.value {
+            if obj.id.as_str() == "self" || obj.id.as_str() == "cls" {
+                return Some((obj.id.to_string(), attr.attr.to_string()));
+            }
+        }
+    }
+    None
 }

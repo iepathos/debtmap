@@ -260,6 +260,30 @@ impl<'a> CallAnalyzer<'a> {
                 self.analyze_expr_for_calls(&ifexp.body, file_path, call_graph)?;
                 self.analyze_expr_for_calls(&ifexp.orelse, file_path, call_graph)?;
             }
+            ast::Expr::Dict(dict_expr) => {
+                // Analyze dictionary values that might be callbacks
+                for value in &dict_expr.values {
+                    self.analyze_expr_for_calls(value, file_path, call_graph)?;
+                }
+            }
+            ast::Expr::List(list_expr) => {
+                // Analyze list elements that might be callbacks
+                for elem in &list_expr.elts {
+                    self.analyze_expr_for_calls(elem, file_path, call_graph)?;
+                }
+            }
+            ast::Expr::Tuple(tuple_expr) => {
+                // Analyze tuple elements that might be callbacks
+                for elem in &tuple_expr.elts {
+                    self.analyze_expr_for_calls(elem, file_path, call_graph)?;
+                }
+            }
+            ast::Expr::Set(set_expr) => {
+                // Analyze set elements that might be callbacks
+                for elem in &set_expr.elts {
+                    self.analyze_expr_for_calls(elem, file_path, call_graph)?;
+                }
+            }
             _ => {}
         }
         Ok(())
