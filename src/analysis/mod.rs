@@ -18,6 +18,7 @@ pub mod function_visitor;
 pub mod multi_pass;
 pub mod python_call_graph;
 pub mod python_dead_code;
+pub mod python_dead_code_enhanced;
 pub mod python_imports;
 pub mod python_type_tracker;
 
@@ -29,6 +30,10 @@ pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,
 };
 pub use python_dead_code::{FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence};
+pub use python_dead_code_enhanced::{
+    DeadCodeConfidence, DeadCodeReason, DeadCodeResult, EnhancedDeadCodeAnalyzer, LiveCodeReason,
+    RemovalSuggestion,
+};
 pub use python_imports::{
     EnhancedImportResolver, ExportedSymbol as ImportExportedSymbol, ImportGraph, ImportType,
     ModuleSymbols, ResolvedSymbol,
