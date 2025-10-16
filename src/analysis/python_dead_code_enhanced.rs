@@ -399,8 +399,8 @@ impl EnhancedDeadCodeAnalyzer {
         let method_name = extract_method_name(&func.name);
 
         // Check if function has callers
-        let has_callers = !call_graph.get_callers(func_id).is_empty()
-            || self.has_coverage_data(func);
+        let has_callers =
+            !call_graph.get_callers(func_id).is_empty() || self.has_coverage_data(func);
 
         // Check if it's a framework entry point or event handler
         let is_framework_entry = self.is_framework_entry_point(&func.name, &func.file)
@@ -443,7 +443,11 @@ impl EnhancedDeadCodeAnalyzer {
     }
 
     /// Calculate confidence score and determine if code is dead
-    fn calculate_confidence(&self, factors: &ConfidenceFactors, func_name: &str) -> (bool, DeadCodeConfidence) {
+    fn calculate_confidence(
+        &self,
+        factors: &ConfidenceFactors,
+        func_name: &str,
+    ) -> (bool, DeadCodeConfidence) {
         let mut score = 1.0f32; // Start with assumption it's dead
 
         // Strong indicators it's NOT dead (reduce score dramatically)
@@ -488,10 +492,28 @@ impl EnhancedDeadCodeAnalyzer {
         let method_name = extract_method_name(func_name);
         if matches!(
             method_name,
-            "main" | "run" | "cli" | "start" | "execute" | "launch" | "bootstrap"
-            | "initialize" | "setup" | "configure" | "finalize" | "index"
-            | "handler" | "process" | "validate" | "transform" | "handle"
-            | "view" | "setup_view" | "api_handler" | "entrypoint" | "script"
+            "main"
+                | "run"
+                | "cli"
+                | "start"
+                | "execute"
+                | "launch"
+                | "bootstrap"
+                | "initialize"
+                | "setup"
+                | "configure"
+                | "finalize"
+                | "index"
+                | "handler"
+                | "process"
+                | "validate"
+                | "transform"
+                | "handle"
+                | "view"
+                | "setup_view"
+                | "api_handler"
+                | "entrypoint"
+                | "script"
         ) {
             score *= 0.3; // Common entry point names
         }
