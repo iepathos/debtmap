@@ -18,6 +18,8 @@ Update the implementation plan to address validation gaps identified by `/prodig
 
 ## Process
 
+**CRITICAL**: This command revises the plan file but **NEVER DELETES IT**. The workflow requires IMPLEMENTATION_PLAN.md throughout execution.
+
 ### Step 1: Load Current Plan and Gaps
 
 ```bash

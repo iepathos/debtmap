@@ -7,11 +7,12 @@ Arguments: $ARGUMENTS
 ## Usage
 
 ```
-/prodigy-validate-debtmap-improvement --comparison <comparison-json-file> [--output <filepath>]
+/prodigy-validate-debtmap-improvement --comparison <comparison-json-file> [--previous-validation <filepath>] [--output <filepath>]
 ```
 
 Examples:
 - `/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json`
+- `/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --previous-validation .prodigy/debtmap-validation.json --output .prodigy/debtmap-validation.json`
 
 ## What This Command Does
 
@@ -32,15 +33,21 @@ Examples:
 
 ## Execution Process
 
-### Step 1: Parse Arguments and Load Comparison
+### Step 1: Parse Arguments and Load Data
 
 The command will:
 - Parse $ARGUMENTS to extract:
-  - `--comparison` parameter with path to comparison JSON (from `debtmap compare`)
-  - `--output` parameter with filepath (required when called from workflow)
-- If missing parameters, fail with error message
-- If no `--output` parameter, default to `.prodigy/debtmap-validation.json`
+  - `--comparison` parameter: Path to comparison JSON (from `debtmap compare`)
+  - `--previous-validation` parameter: Path to previous validation result (optional)
+  - `--output` parameter: Filepath to write results (defaults to `.prodigy/debtmap-validation.json`)
 - Load comparison JSON and validate it contains comparison output
+- If `--previous-validation` provided, load it to track progress:
+  ```json
+  {
+    "completion_percentage": 72.3,
+    "attempt_number": 1
+  }
+  ```
 
 ### Step 2: Analyze Target Item Improvement
 
@@ -116,7 +123,7 @@ Extract:
 - **Overall debt improvement**: `project_health.improvement_percent`
 - **Items resolved vs new**: Compare `items_resolved` vs `items_new`
 
-### Step 5: Calculate Improvement Score
+### Step 5: Calculate Improvement Score and Track Progress
 
 Calculate improvement percentage using the formula:
 
@@ -133,34 +140,81 @@ improvement_score = (
 )
 ```
 
-Where:
-- `target_component` = 0-100 based on target item score reduction
-- `no_regression_component` = 100 if no regressions, 80 for 1 regression, 60 for 2, etc.
-- `project_health_component` = scaled overall debt improvement (5% improvement = 50 points)
+**Track attempt progress** if previous validation provided:
+```python
+previous_completion = previous_validation.get("completion_percentage")
+current_completion = improvement_score
+attempt_number = previous_validation.get("attempt_number", 0) + 1
 
-### Step 6: Identify Improvement Gaps
+if previous_completion:
+    change = current_completion - previous_completion
+    direction = "regression" if change < -5 else "progress" if change > 5 else "stable"
 
-If improvement score < threshold (75%), identify specific gaps from the comparison:
+    if direction == "regression":
+        recommendation = "CRITICAL: Stop refactoring. Return to original plan and complete remaining items."
+    elif direction == "stable":
+        recommendation = "Progress stalled. Focus on completing specific plan items rather than refactoring."
+    else:
+        recommendation = "Continue completing remaining plan items."
+```
 
-1. **Insufficient Target Improvement**:
-   - Target item status is "unchanged" or "slightly_improved"
-   - Score reduction < 50%
-   - Complexity still above threshold
+### Step 6: Identify Remaining Work vs Regressions
 
-2. **Regression Issues**:
-   - New critical debt items introduced (from `regressions` array)
-   - Overall project debt increased instead of decreased
-   - New complex functions created during refactoring
+**CRITICAL**: Distinguish between "work to complete" and "problems to fix".
 
-3. **Incomplete Implementation**:
-   - Target item improved but not enough (e.g., 40% vs 75% goal)
-   - Some tests added but coverage still insufficient
-   - Function shortened but still too complex
+If improvement score < threshold (75%), analyze the comparison to extract:
 
-4. **Project Health Degradation**:
-   - More new items than resolved items
-   - Overall debt score increased
-   - Average complexity increased
+#### A. Remaining Plan Items (Primary Focus)
+
+Read the plan file and cross-reference with comparison to identify:
+```json
+"remaining_plan_items": [
+  "Stage 3: Extract output capture logic - Not started",
+  "Stage 4: Extract validation processing - Not started",
+  "Stage 5: Final cleanup and documentation - Not started"
+]
+```
+
+**How to extract**:
+- Parse IMPLEMENTATION_PLAN.md to find stages/items
+- Check which stages are marked complete vs incomplete
+- List incomplete stages in this section
+
+#### B. Completed Items (Preserve These)
+
+From the comparison, identify what HAS improved:
+```json
+"completed_items": [
+  "Target item complexity reduced by 40%",
+  "Extracted step initialization logic",
+  "Added test coverage for error paths"
+]
+```
+
+**How to extract**:
+- Look at `target_item.improvement.status`
+- Check `improvements` array in comparison
+- List specific achievements
+
+#### C. Regressions to Fix (Secondary - Only if Blocking)
+
+From comparison `regressions` array:
+```json
+"regressions_to_fix": [
+  {
+    "location": "src/executor.rs:new_helper:123",
+    "score": 65.3,
+    "issue": "New complex helper function introduced",
+    "blocks_tests": false,
+    "action": "Only fix if causes test failures, otherwise ignore"
+  }
+]
+```
+
+**How to determine**:
+- Regressions that cause test failures → Must fix
+- Regressions that don't block tests → Ignore for now
+- Focus on completing plan items instead
 
 ### Step 7: Write Validation Results
 
@@ -181,38 +235,54 @@ The JSON format is:
 
 ```json
 {
-  "completion_percentage": 82.0,
+  "completion_percentage": 72.3,
   "status": "incomplete",
-  "improvements": [
-    "Target item score reduced by 66.7% (81.9 → 15.2)",
-    "Reduced cognitive complexity by 19 (22 → 3)",
-    "Overall project debt reduced by 5.2%"
+  "attempt_number": 1,
+
+  "completed_items": [
+    "Target item complexity reduced by 40%",
+    "Extracted step initialization logic",
+    "Extracted command execution logic",
+    "Added test coverage for error paths"
   ],
-  "remaining_issues": [
-    "1 new critical debt item introduced during refactoring"
+
+  "remaining_plan_items": [
+    "Stage 3: Extract output capture logic - Not started",
+    "Stage 4: Extract validation processing - Not started",
+    "Stage 5: Final cleanup and documentation - Not started"
   ],
-  "gaps": {
-    "regression_introduced": {
-      "description": "New complex helper function introduced during refactoring",
-      "location": "src/analyzers/rust_analyzer.rs:process_helper:589",
-      "severity": "high",
-      "suggested_fix": "Simplify process_helper using pure functional patterns",
-      "current_score": 65.3
+
+  "regressions_to_fix": [
+    {
+      "location": "src/executor.rs:new_helper:123",
+      "score": 65.3,
+      "issue": "New complex helper function introduced",
+      "blocks_tests": false,
+      "priority": "low"
     }
+  ],
+
+  "trend_analysis": {
+    "direction": "progress",
+    "previous_completion": null,
+    "change": null,
+    "recommendation": "Continue completing remaining plan items"
   },
+
   "target_summary": {
     "location": "src/analyzers/rust_analyzer.rs:build_call_graph:523",
     "score_before": 81.9,
-    "score_after": 15.2,
-    "improvement_percent": 81.4,
-    "status": "significantly_improved"
+    "score_after": 49.0,
+    "improvement_percent": 40.2,
+    "status": "moderately_improved"
   },
+
   "project_summary": {
     "total_debt_before": 1247.3,
-    "total_debt_after": 1182.6,
-    "improvement_percent": 5.2,
-    "items_resolved": 12,
-    "items_new": 4
+    "total_debt_after": 1210.5,
+    "improvement_percent": 3.0,
+    "items_resolved": 8,
+    "items_new": 2
   }
 }
 ```

@@ -50,22 +50,53 @@ The command will:
   - Check git history for recently deleted spec files
   - Reconstruct requirements from commit messages and diffs
 
-### Step 2: Analyze Recent Changes
+### Step 2: Analyze ALL Implementation Commits
+
+**CRITICAL**: When running in a Prodigy worktree, you MUST analyze ALL commits in the current session, including recovery commits from previous validation attempts.
 
 Review implementation by:
-- Getting list of files changed in recent commits
-- Reading modified files to understand implementation
-- Checking test coverage for new code
-- Verifying coding standards compliance
+- **Determine commit range**: Get ALL commits in worktree using `git log HEAD --not master --oneline` (or appropriate base branch)
+- **This ensures you include**:
+  - Initial implementation commits
+  - Recovery commits from `on_incomplete` attempts
+  - Any other commits in the worktree session
+- **Analyze files changed**: For EACH commit in range, check what files were modified
+- **Read current state**: Read the current working tree state of modified files (not historical versions)
+- **Check test coverage**: Verify tests were added for new code
+- **Verify coding standards**: Ensure standards compliance
 
-### Step 3: Validate Against Requirements
+**Example for spec 118 scenario**:
+```bash
+# Get all worktree commits (returns 2 commits):
+# e696c9c fix: complete spec 118 implementation gaps  <- MUST analyze this!
+# 2e8b1e4 feat: implement spec 118 - generalize book documentation commands
+
+# Analyze files from BOTH commits to see complete implementation
+```
+
+**Why this matters**: If the first implementation was incomplete (85%), and a recovery commit fixed the gaps (making it 100%), you MUST include the recovery commit in your analysis or you'll incorrectly report the same gaps again.
+
+### Step 3: Validate Against Requirements (Using Current Working Tree State)
+
+**IMPORTANT**: Validate against the CURRENT state of files in the working tree, not historical versions. This ensures you catch fixes made in recovery commits.
 
 For each spec requirement:
-- **Code Requirements**: Check if required files/functions exist
-- **Test Requirements**: Verify tests were added
-- **Documentation**: Ensure docs were updated
-- **Architecture**: Confirm design patterns followed
-- **Success Criteria**: Validate each criterion is met
+- **Code Requirements**: Check if required files/functions exist in the CURRENT working tree
+- **Test Requirements**: Verify tests were added (check current test files)
+- **Documentation**: Ensure docs were updated (read current doc files)
+- **Architecture**: Confirm design patterns followed (check current code structure)
+- **Success Criteria**: Validate each criterion is met (based on current state)
+
+**Validation Process**:
+1. List ALL files that were modified across ALL commits in worktree
+2. Read the CURRENT content of those files (not historical versions)
+3. Check each spec requirement against current file content
+4. Mark requirement as "implemented" ONLY if current files satisfy it
+5. Mark as "missing" if current files don't satisfy it
+
+**Example**: If spec requires "Create docs/book-documentation-workflow.md":
+- ✓ CORRECT: Read current working tree, find the file exists → mark as implemented
+- ✗ WRONG: Only check first commit, miss that recovery commit created it → mark as missing
 
 ### Step 4: Generate Validation Report
 
@@ -245,3 +276,46 @@ This command is designed to work with Prodigy workflows:
 7. **Gap details** help subsequent commands fix issues
 8. **Keep JSON compact** - Prodigy will parse it programmatically
 9. **Do NOT output JSON to stdout** - only progress messages should go to stdout
+
+## Troubleshooting Validation Issues
+
+### Issue: Validation reports same gaps after recovery commit fixed them
+
+**Symptoms**:
+- First validation shows 85% complete with gaps
+- Recovery commit fixes all gaps
+- Second validation still shows 85% with same gaps
+
+**Root Cause**: Not analyzing ALL commits in worktree, missing recovery commits
+
+**Fix**:
+1. Run `git log HEAD --not master --oneline` to see ALL worktree commits
+2. Analyze files from EVERY commit in the output
+3. Read CURRENT working tree state of files, not historical versions
+4. Validate against current state
+
+**Example**:
+```bash
+# Shows 2 commits in worktree
+git log HEAD --not master --oneline
+# e696c9c fix: complete spec 118 implementation gaps  <- Don't miss this!
+# 2e8b1e4 feat: implement spec 118
+
+# Check if docs/book-documentation-workflow.md exists NOW
+ls -la docs/book-documentation-workflow.md  # File exists!
+
+# Therefore: Mark "Create docs/book-documentation-workflow.md" as implemented
+```
+
+### Issue: Validation marks items as missing that actually exist
+
+**Root Cause**: Reading old commit state instead of current working tree
+
+**Fix**: Always use current file state, not git history:
+```bash
+# ✓ CORRECT: Read current file
+cat docs/book-documentation-workflow.md
+
+# ✗ WRONG: Read file from specific commit
+git show 2e8b1e4:docs/book-documentation-workflow.md  # May not exist in this commit!
+```

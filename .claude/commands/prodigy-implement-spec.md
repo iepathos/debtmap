@@ -99,7 +99,7 @@ Update .prodigy files (skip for temporary iteration specs):
 
 Final steps:
 - Run `cargo fmt` and `cargo clippy`
-- Run `cargo nextest run` if tests exist
+- Run `cargo test` if tests exist
 - **Delete spec file**: Remove the implemented spec file after successful implementation (both permanent and temporary specs)
 - **Report modified files** (for automation tracking):
   - List all files that were created, modified, or deleted
@@ -138,7 +138,7 @@ Final steps:
 
 **Automation Detection**: The command detects automation mode when:
 - Environment variable `PRODIGY_AUTOMATION=true` is set
-- Called from within an PRODIGY workflow context
+- Called from within a Prodigy workflow context
 
 **Git-Native Automation Flow**:
 1. Read spec file and implement all required changes

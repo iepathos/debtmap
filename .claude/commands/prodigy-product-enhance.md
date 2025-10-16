@@ -234,7 +234,7 @@ FOCUS: $PRODIGY_FOCUS (optional - focus directive from prodigy CLI, e.g., "onboa
 
 **Automation Detection**: The command detects automation mode when:
 - Environment variable `PRODIGY_AUTOMATION=true` is set
-- Called from within an PRODIGY workflow context
+- Called from within a Prodigy workflow context
 
 **Git-Native Automation Flow**:
 1. Analyze product from user perspective

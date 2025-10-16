@@ -115,7 +115,7 @@ Create a file at `$ARG_output` with this structure:
 
 ## Problem Summary
 
-**Location**: <location from debtmap - must be in format: ./file.rs:function:line>
+**Location**: <location from debtmap - must be in format: ./file:function:line (WITH ./ prefix, use : separators)>
 **Priority Score**: <unified_score from debtmap>
 **Debt Type**: <debt_type from debtmap>
 **Current Metrics**:
@@ -232,6 +232,8 @@ Before writing the plan, ensure:
    - Include test coverage targets
 
 ### Step 6: Write the Plan
+
+**CRITICAL**: This file will be used throughout the workflow. Do NOT delete it after creation or at any point during the workflow execution.
 
 Write the complete implementation plan to `$ARG_output`:
 
