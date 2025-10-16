@@ -23,6 +23,8 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             dependency_factor: 3.0,
             role_multiplier: 1.0,
             final_score: 6.5,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
         },
         function_role: FunctionRole::PureLogic,
         recommendation: debtmap::priority::ActionableRecommendation {

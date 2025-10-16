@@ -211,6 +211,8 @@ mod tests {
                 coverage_factor: 0.6,
                 dependency_factor: 0.5,
                 role_multiplier: 1.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
@@ -254,6 +256,8 @@ mod tests {
             coverage_factor: 0.65,
             dependency_factor: 0.45,
             role_multiplier: 1.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None
         };
 
         let result = format_score_factors(&score);
@@ -339,6 +343,8 @@ mod tests {
             coverage_factor: 0.654321,
             dependency_factor: 0.456789,
             role_multiplier: 1.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None
         };
 
         let result = format_score_factors(&score);

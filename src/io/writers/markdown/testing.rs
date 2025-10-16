@@ -87,6 +87,8 @@ mod tests {
                 coverage_factor: 0.6,
                 dependency_factor: 0.5,
                 role_multiplier: 1.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None
             },
             debt_type: DebtType::TestingGap {
                 coverage,
@@ -136,6 +138,8 @@ mod tests {
                 coverage_factor: 0.6,
                 dependency_factor: 0.5,
                 role_multiplier: 1.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None
             },
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,

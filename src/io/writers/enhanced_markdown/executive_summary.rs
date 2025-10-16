@@ -728,6 +728,8 @@ mod tests {
             },
             unified_score: UnifiedScore {
                 final_score: 5.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
                 coverage_factor: 1.0,
                 complexity_factor: 1.0,
                 dependency_factor: 1.0,

@@ -1528,6 +1528,8 @@ mod tests {
                 dependency_factor: 2.0,
                 role_multiplier: 1.0,
                 final_score: 10.0,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
             },
             function_role: crate::priority::FunctionRole::Unknown,
             recommendation: crate::priority::ActionableRecommendation {
