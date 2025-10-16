@@ -4,7 +4,7 @@ title: Orchestration Pattern Score Adjustment
 category: optimization
 priority: high
 status: draft
-dependencies: [109]
+dependencies: [117]
 created: 2025-10-16
 ---
 
@@ -13,13 +13,13 @@ created: 2025-10-16
 **Category**: optimization
 **Priority**: high
 **Status**: draft
-**Dependencies**: [109 - Call Graph Role Classification]
+**Dependencies**: [117 - Semantic Function Classification]
 
 ## Context
 
-Building on spec 109's role classification system, this specification implements score adjustments that reduce false positives for legitimate orchestrator functions while preserving full scoring for complex business logic.
+Building on spec 117's semantic role classification system, this specification implements score adjustments that reduce false positives for legitimate orchestrator functions while preserving full scoring for complex business logic.
 
-**Current problem**: Even after identifying orchestrators (spec 109), they receive the same debt scores as tangled business logic, leading to:
+**Current problem**: Even after identifying orchestrators (spec 117), they receive the same debt scores as tangled business logic, leading to:
 - Orchestrator functions appearing as top debt priorities
 - Discouraging functional composition patterns
 - False alarms that reduce trust in debtmap recommendations
@@ -28,39 +28,35 @@ Building on spec 109's role classification system, this specification implements
 
 ## Objective
 
-Implement graduated score adjustments for orchestrator functions based on confidence level and composition quality, reducing false positive debt scores by 40-60% while maintaining accurate scores for genuine technical debt.
+Implement score adjustments for orchestrator functions based on composition quality metrics calculated from the call graph, reducing false positive debt scores by 30-50% while maintaining accurate scores for genuine technical debt.
 
 ## Requirements
 
 ### Functional Requirements
 
 1. **Score Adjustment Algorithm**:
-   - Calculate adjusted complexity based on role and confidence
-   - Apply graduated reductions (not fixed percentages)
+   - Calculate adjusted complexity based on role and composition quality
+   - Apply graduated reductions based on delegation ratio
    - Cap maximum reduction at 30% to prevent over-optimization
    - Never reduce below delegation count × 2 (minimum inherent complexity)
 
 2. **Orchestrator Scoring Rules**:
-   - High confidence (≥0.7): Up to 30% reduction
-   - Medium confidence (0.5-0.7): Up to 20% reduction
-   - Low confidence (<0.5): Up to 10% reduction
-   - Reduction scales with composition quality (pure calls, shallow depth)
+   - Base reduction: 20% for identified orchestrators (from spec 117)
+   - Additional reduction based on composition quality (up to 10% more)
+   - Reduction scales with: delegation ratio, callee count, and low local complexity
+   - Maximum total reduction: 30%
 
-3. **Worker Function Preservation**:
-   - Full scoring applied to workers (no reduction)
-   - Pure workers get 10% reduction (encourage pure functions)
-   - Impure workers with high complexity remain high priority
+3. **Role-Based Preservation**:
+   - PureLogic: No adjustment (full scoring)
+   - IOWrapper: No adjustment (already has multiplier from spec 117)
+   - EntryPoint: No adjustment (already has multiplier from spec 117)
+   - PatternMatch: No adjustment (already has multiplier from spec 117)
 
-4. **Entry Point Handling**:
-   - Shallow entry points (<3 depth): No adjustment
-   - Deep entry points (≥3 depth): 15% reduction
-   - Recognize that entry points naturally coordinate
-
-5. **Composition Quality Scoring**:
-   - More pure function calls → higher reduction
-   - Shallower call depth → higher reduction
+4. **Composition Quality Scoring** (calculated from CallGraph):
+   - More callees → higher reduction
    - Higher delegation ratio → higher reduction
-   - Composite score determines final adjustment
+   - Lower local complexity → higher reduction
+   - Composite quality score (0.0-1.0) multiplies base reduction
 
 ### Non-Functional Requirements
 
@@ -74,30 +70,28 @@ Implement graduated score adjustments for orchestrator functions based on confid
 
 ### Functional Requirements
 - [ ] `adjust_score()` pure function reduces scores for orchestrators
-- [ ] High-confidence orchestrators (≥0.7) receive up to 30% reduction
-- [ ] Medium-confidence orchestrators (0.5-0.7) receive up to 20% reduction
-- [ ] Low-confidence orchestrators (<0.5) receive up to 10% reduction
-- [ ] Reduction never goes below delegation_count × min_inherent_complexity_factor
-- [ ] Zero-coordination orchestrators receive no adjustment
-- [ ] Worker functions receive no orchestration adjustment
-- [ ] Pure workers receive 10% reduction
-- [ ] Deep entry points (≥3 depth) receive 15% reduction
-- [ ] Composition quality factors (pure calls, depth, delegation) influence adjustment
+- [ ] Orchestrators receive base 20% reduction
+- [ ] Additional up to 10% reduction based on composition quality
+- [ ] Maximum total reduction: 30%
+- [ ] Reduction never goes below callee_count × min_inherent_complexity_factor
+- [ ] Zero-callee orchestrators receive no adjustment
+- [ ] PureLogic functions receive no adjustment (full scoring)
+- [ ] Composition quality factors (callee count, delegation ratio, complexity) influence adjustment
 - [ ] Composition quality respects configurable minimum threshold
 
 ### Data & Configuration
 - [ ] Original and adjusted scores stored in `UnifiedDebtItem`
 - [ ] Configuration validation prevents invalid threshold values
-- [ ] Configuration validation enforces reduction ordering (high ≥ medium ≥ low)
+- [ ] Configuration validation enforces base + quality ≤ max reduction
 - [ ] Disabled configuration bypasses all adjustments
-- [ ] Configuration allows tuning all reduction percentages and thresholds
+- [ ] Configuration allows tuning reduction percentages and quality thresholds
 
 ### Testing & Validation
 - [ ] Unit tests verify adjustments for all role types
-- [ ] Unit tests verify all edge cases (zero coordination, disabled config, etc.)
+- [ ] Unit tests verify all edge cases (zero callees, disabled config, etc.)
 - [ ] Property-based tests verify score invariants (never exceeds original, respects floor)
 - [ ] Property-based tests verify quality bounds
-- [ ] Integration tests with real codebases show 40-60% false positive reduction
+- [ ] Integration tests with real codebases show 30-50% false positive reduction
 - [ ] Performance benchmarks demonstrate < 5% overhead
 - [ ] Tests verify determinism (same input → same output)
 
@@ -112,10 +106,10 @@ Implement graduated score adjustments for orchestrator functions based on confid
 
 **Phase 1: Core Adjustment Logic** (Week 1)
 1. Create `src/priority/scoring/orchestration_adjustment.rs`
-2. Define newtype wrappers (`Confidence`, `ReductionPercent`) for type safety
+2. Define newtype wrapper (`ReductionPercent`) for type safety
 3. Implement pure function for score adjustment calculation
-4. Add pure function for composition quality scoring
-5. Add pure function for base reduction calculation
+4. Add pure function for composition quality scoring from CallGraph metrics
+5. Add helper to extract metrics from CallGraph (callee count, delegation ratio)
 6. Create adjustment configuration structure with validation
 7. Write unit tests for all pure functions
 8. Write property-based tests for invariants
@@ -137,27 +131,10 @@ Implement graduated score adjustments for orchestrator functions based on confid
 ```rust
 // src/priority/scoring/orchestration_adjustment.rs
 
-use crate::priority::call_graph::roles::{FunctionRole, RoleMetrics};
+use crate::priority::semantic_classifier::FunctionRole;
+use crate::priority::call_graph::{CallGraph, FunctionId};
+use crate::core::FunctionMetrics;
 use anyhow::{ensure, Result};
-
-/// Confidence score bounded between 0.0 and 1.0
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Confidence(f64);
-
-impl Confidence {
-    pub fn new(value: f64) -> Result<Self> {
-        ensure!(
-            (0.0..=1.0).contains(&value),
-            "Confidence must be between 0.0 and 1.0, got {}",
-            value
-        );
-        Ok(Self(value))
-    }
-
-    pub fn value(&self) -> f64 {
-        self.0
-    }
-}
 
 /// Reduction percentage bounded between 0.0 and 1.0
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -186,24 +163,20 @@ impl ReductionPercent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestrationAdjustmentConfig {
     pub enabled: bool,
-    pub high_confidence_reduction: f64,    // Default: 0.30 (30%)
-    pub medium_confidence_reduction: f64,  // Default: 0.20 (20%)
-    pub low_confidence_reduction: f64,     // Default: 0.10 (10%)
-    pub pure_worker_reduction: f64,        // Default: 0.10 (10%)
-    pub entry_point_reduction: f64,        // Default: 0.15 (15%)
+    pub base_orchestrator_reduction: f64,    // Default: 0.20 (20%)
+    pub max_quality_bonus: f64,              // Default: 0.10 (10% additional)
+    pub max_total_reduction: f64,            // Default: 0.30 (30% cap)
     pub min_inherent_complexity_factor: f64, // Default: 2.0
-    pub min_composition_quality: f64,      // Default: 0.5 (minimum quality multiplier)
+    pub min_composition_quality: f64,        // Default: 0.5 (minimum quality multiplier)
 }
 
 impl Default for OrchestrationAdjustmentConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            high_confidence_reduction: 0.30,
-            medium_confidence_reduction: 0.20,
-            low_confidence_reduction: 0.10,
-            pure_worker_reduction: 0.10,
-            entry_point_reduction: 0.15,
+            base_orchestrator_reduction: 0.20,
+            max_quality_bonus: 0.10,
+            max_total_reduction: 0.30,
             min_inherent_complexity_factor: 2.0,
             min_composition_quality: 0.5,
         }
@@ -214,32 +187,20 @@ impl OrchestrationAdjustmentConfig {
     /// Validate configuration values
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            (0.0..=1.0).contains(&self.high_confidence_reduction),
-            "high_confidence_reduction must be between 0.0 and 1.0"
+            (0.0..=1.0).contains(&self.base_orchestrator_reduction),
+            "base_orchestrator_reduction must be between 0.0 and 1.0"
         );
         ensure!(
-            (0.0..=1.0).contains(&self.medium_confidence_reduction),
-            "medium_confidence_reduction must be between 0.0 and 1.0"
+            (0.0..=1.0).contains(&self.max_quality_bonus),
+            "max_quality_bonus must be between 0.0 and 1.0"
         );
         ensure!(
-            (0.0..=1.0).contains(&self.low_confidence_reduction),
-            "low_confidence_reduction must be between 0.0 and 1.0"
+            (0.0..=1.0).contains(&self.max_total_reduction),
+            "max_total_reduction must be between 0.0 and 1.0"
         );
         ensure!(
-            self.high_confidence_reduction >= self.medium_confidence_reduction,
-            "high_confidence_reduction must be >= medium_confidence_reduction"
-        );
-        ensure!(
-            self.medium_confidence_reduction >= self.low_confidence_reduction,
-            "medium_confidence_reduction must be >= low_confidence_reduction"
-        );
-        ensure!(
-            (0.0..=1.0).contains(&self.pure_worker_reduction),
-            "pure_worker_reduction must be between 0.0 and 1.0"
-        );
-        ensure!(
-            (0.0..=1.0).contains(&self.entry_point_reduction),
-            "entry_point_reduction must be between 0.0 and 1.0"
+            self.base_orchestrator_reduction + self.max_quality_bonus <= self.max_total_reduction,
+            "base_orchestrator_reduction + max_quality_bonus must be <= max_total_reduction"
         );
         ensure!(
             self.min_inherent_complexity_factor > 0.0,
@@ -260,7 +221,7 @@ pub struct ScoreAdjustment {
     pub adjusted_score: f64,
     pub reduction_percent: f64,
     pub adjustment_reason: String,
-    pub confidence: f64,
+    pub quality_score: f64,  // Composition quality (0.0-1.0)
 }
 
 impl ScoreAdjustment {
@@ -270,7 +231,7 @@ impl ScoreAdjustment {
             adjusted_score: score,
             reduction_percent: 0.0,
             adjustment_reason: "No adjustment applied".to_string(),
-            confidence: 1.0,
+            quality_score: 0.0,
         }
     }
 }
@@ -278,6 +239,40 @@ impl ScoreAdjustment {
 // ============================================================================
 // Pure Functions for Score Adjustment (Functional Programming Approach)
 // ============================================================================
+
+/// Composition metrics extracted from call graph
+#[derive(Debug, Clone)]
+pub struct CompositionMetrics {
+    pub callee_count: usize,
+    pub delegation_ratio: f64,
+    pub local_complexity: u32,
+}
+
+/// Extract composition metrics from call graph (pure function)
+pub fn extract_composition_metrics(
+    func_id: &FunctionId,
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+) -> CompositionMetrics {
+    let callees = call_graph.get_callees(func_id);
+    let callee_count = callees.len();
+
+    // Delegation ratio: callees / function length
+    let delegation_ratio = if func.length > 0 {
+        callee_count as f64 / func.length as f64
+    } else {
+        0.0
+    };
+
+    // Local complexity is the cyclomatic complexity
+    let local_complexity = func.cyclomatic;
+
+    CompositionMetrics {
+        callee_count,
+        delegation_ratio,
+        local_complexity,
+    }
+}
 
 /// Apply orchestration-aware score adjustment (pure function)
 ///
@@ -293,25 +288,20 @@ impl ScoreAdjustment {
 pub fn adjust_score(
     config: &OrchestrationAdjustmentConfig,
     base_score: f64,
-    complexity: u32,
     role: &FunctionRole,
-    metrics: &RoleMetrics,
+    metrics: &CompositionMetrics,
 ) -> ScoreAdjustment {
     if !config.enabled {
         return ScoreAdjustment::no_adjustment(base_score);
     }
 
     match role {
-        FunctionRole::Orchestrator { coordinates, confidence } => {
-            adjust_orchestrator_score(config, base_score, complexity, *coordinates, *confidence, metrics)
+        FunctionRole::Orchestrator => {
+            adjust_orchestrator_score(config, base_score, metrics)
         },
-        FunctionRole::Worker { is_pure, .. } => {
-            adjust_worker_score(config, base_score, *is_pure)
-        },
-        FunctionRole::EntryPoint { downstream_depth } => {
-            adjust_entry_point_score(config, base_score, *downstream_depth)
-        },
-        FunctionRole::Utility => {
+        _ => {
+            // Other roles (PureLogic, IOWrapper, EntryPoint, PatternMatch, Unknown)
+            // already have multipliers applied via spec 117
             ScoreAdjustment::no_adjustment(base_score)
         },
     }
