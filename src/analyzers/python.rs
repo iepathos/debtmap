@@ -1,5 +1,6 @@
 use crate::analyzers::python_asyncio_patterns::AsyncioPatternDetector;
 use crate::analyzers::python_detectors::SimplifiedPythonDetector;
+use crate::analyzers::python_exception_flow::ExceptionFlowAnalyzer;
 use crate::analyzers::python_purity::PythonPurityDetector;
 use crate::analyzers::Analyzer;
 use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
@@ -106,6 +107,13 @@ impl Analyzer for PythonAnalyzer {
                 let mut asyncio_detector = AsyncioPatternDetector::new(python_ast.path.clone());
                 let asyncio_debt_items = asyncio_detector.analyze_module(&python_ast.module);
                 metrics.debt_items.extend(asyncio_debt_items);
+
+                // Add exception flow analysis
+                let mut exc_flow_analyzer = ExceptionFlowAnalyzer::new(python_ast.path.clone());
+                let exception_patterns = exc_flow_analyzer.analyze_module(&python_ast.module);
+                let exception_debt_items =
+                    exc_flow_analyzer.patterns_to_debt_items(exception_patterns);
+                metrics.debt_items.extend(exception_debt_items);
 
                 metrics
             }
