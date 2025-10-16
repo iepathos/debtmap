@@ -590,6 +590,34 @@ pub struct TwoPassExtractor {
     callback_tracker: crate::analysis::python_call_graph::CallbackTracker,
 }
 
+/// Helper function to extract callback expression as a string
+fn extract_callback_expr_impl(expr: &ast::Expr) -> String {
+    match expr {
+        ast::Expr::Name(name) => name.id.to_string(),
+        ast::Expr::Attribute(attr) => {
+            if let ast::Expr::Name(obj) = &*attr.value {
+                format!("{}.{}", obj.id, attr.attr)
+            } else {
+                attr.attr.to_string()
+            }
+        }
+        ast::Expr::Call(call) => {
+            // For functools.partial(func, ...) extract func
+            if let ast::Expr::Attribute(attr) = &*call.func {
+                if attr.attr.as_str() == "partial" {
+                    if let Some(first_arg) = call.args.first() {
+                        let func_name = extract_callback_expr_impl(first_arg);
+                        return format!("partial({})", func_name);
+                    }
+                }
+            }
+            "<lambda>".to_string()
+        }
+        ast::Expr::Lambda(_) => "<lambda>".to_string(),
+        _ => "<unknown>".to_string(),
+    }
+}
+
 impl TwoPassExtractor {
     /// Check if a function name is a framework entry point using the framework registry
     fn is_framework_entry_point(&self, func_name: &str, decorators: &[&str]) -> bool {
@@ -1173,8 +1201,11 @@ impl TwoPassExtractor {
         }
 
         // Then, resolve callbacks using the callback tracker
-        let resolution = self.callback_tracker.resolve_callbacks(&self.function_name_map);
-        self.callback_tracker.add_to_call_graph(&resolution, &mut self.call_graph);
+        let resolution = self
+            .callback_tracker
+            .resolve_callbacks(&self.function_name_map);
+        self.callback_tracker
+            .add_to_call_graph(&resolution, &mut self.call_graph);
     }
 
     /// Check for callback patterns where functions are passed as arguments
@@ -1241,30 +1272,7 @@ impl TwoPassExtractor {
 
     /// Extract callback expression as a string for tracking
     fn extract_callback_expr(&self, expr: &ast::Expr) -> String {
-        match expr {
-            ast::Expr::Name(name) => name.id.to_string(),
-            ast::Expr::Attribute(attr) => {
-                if let ast::Expr::Name(obj) = &*attr.value {
-                    format!("{}.{}", obj.id, attr.attr)
-                } else {
-                    attr.attr.to_string()
-                }
-            }
-            ast::Expr::Call(call) => {
-                // For functools.partial(func, ...) extract func
-                if let ast::Expr::Attribute(attr) = &*call.func {
-                    if attr.attr.as_str() == "partial" {
-                        if let Some(first_arg) = call.args.first() {
-                            let func_name = self.extract_callback_expr(first_arg);
-                            return format!("partial({})", func_name);
-                        }
-                    }
-                }
-                "<lambda>".to_string()
-            }
-            ast::Expr::Lambda(_) => "<lambda>".to_string(),
-            _ => "<unknown>".to_string(),
-        }
+        extract_callback_expr_impl(expr)
     }
 
     /// Check for event binding patterns like obj.Bind(event, self.method)

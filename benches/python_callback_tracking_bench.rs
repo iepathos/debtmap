@@ -2,7 +2,8 @@
 //!
 //! Measures the overhead of callback tracking to verify < 10% impact requirement
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 use debtmap::analysis::python_call_graph::TwoPassExtractor;
 use rustpython_parser as rp;
 use std::path::PathBuf;
@@ -28,7 +29,7 @@ fn generate_large_codebase(num_classes: usize, methods_per_class: usize) -> Stri
                 "        self.method_{}()\n",
                 (method_idx + 1) % methods_per_class
             ));
-            code.push_str("\n");
+            code.push('\n');
         }
 
         // Add event handlers
@@ -55,10 +56,9 @@ fn bench_with_callback_tracking(c: &mut Criterion) {
 
     c.bench_function("callback_tracking_enabled", |b| {
         b.iter(|| {
-            let module = rp::parse(&code, rp::Mode::Module, "test.py")
-                .expect("Failed to parse code");
-            let mut extractor =
-                TwoPassExtractor::new_with_source(PathBuf::from("test.py"), &code);
+            let module =
+                rp::parse(&code, rp::Mode::Module, "test.py").expect("Failed to parse code");
+            let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), &code);
             black_box(extractor.extract(&module))
         })
     });
@@ -78,10 +78,9 @@ fn bench_baseline_no_callbacks(c: &mut Criterion) {
 
     c.bench_function("baseline_no_callbacks", |b| {
         b.iter(|| {
-            let module = rp::parse(&code, rp::Mode::Module, "test.py")
-                .expect("Failed to parse code");
-            let mut extractor =
-                TwoPassExtractor::new_with_source(PathBuf::from("test.py"), &code);
+            let module =
+                rp::parse(&code, rp::Mode::Module, "test.py").expect("Failed to parse code");
+            let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), &code);
             black_box(extractor.extract(&module))
         })
     });
@@ -89,19 +88,15 @@ fn bench_baseline_no_callbacks(c: &mut Criterion) {
 
 /// Benchmark with varying codebase sizes
 fn bench_scalability(c: &mut Criterion) {
-    let sizes = vec![
-        ("small", 5, 3),
-        ("medium", 20, 8),
-        ("large", 50, 15),
-    ];
+    let sizes = vec![("small", 5, 3), ("medium", 20, 8), ("large", 50, 15)];
 
     for (name, num_classes, methods_per_class) in sizes {
         let code = generate_large_codebase(num_classes, methods_per_class);
 
         c.bench_function(&format!("callback_tracking_{}", name), |b| {
             b.iter(|| {
-                let module = rp::parse(&code, rp::Mode::Module, "test.py")
-                    .expect("Failed to parse code");
+                let module =
+                    rp::parse(&code, rp::Mode::Module, "test.py").expect("Failed to parse code");
                 let mut extractor =
                     TwoPassExtractor::new_with_source(PathBuf::from("test.py"), &code);
                 black_box(extractor.extract(&module))
@@ -116,10 +111,9 @@ fn bench_callback_resolution(c: &mut Criterion) {
 
     c.bench_function("callback_resolution_phase", |b| {
         b.iter(|| {
-            let module = rp::parse(&code, rp::Mode::Module, "test.py")
-                .expect("Failed to parse code");
-            let mut extractor =
-                TwoPassExtractor::new_with_source(PathBuf::from("test.py"), &code);
+            let module =
+                rp::parse(&code, rp::Mode::Module, "test.py").expect("Failed to parse code");
+            let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), &code);
 
             // Extract call graph which includes both passes
             let call_graph = extractor.extract(&module);
@@ -204,10 +198,9 @@ class Application:
 
     c.bench_function("realistic_callback_patterns", |b| {
         b.iter(|| {
-            let module = rp::parse(code, rp::Mode::Module, "test.py")
-                .expect("Failed to parse code");
-            let mut extractor =
-                TwoPassExtractor::new_with_source(PathBuf::from("test.py"), code);
+            let module =
+                rp::parse(code, rp::Mode::Module, "test.py").expect("Failed to parse code");
+            let mut extractor = TwoPassExtractor::new_with_source(PathBuf::from("test.py"), code);
             black_box(extractor.extract(&module))
         })
     });
