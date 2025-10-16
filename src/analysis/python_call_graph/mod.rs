@@ -13,8 +13,8 @@
 
 mod analyze;
 mod call_analysis;
-mod callback_patterns;
-mod callback_tracker;
+pub mod callback_patterns;
+pub mod callback_tracker;
 pub mod cross_module;
 mod event_tracking;
 mod function_detection;
@@ -41,6 +41,12 @@ pub use analyze::{analyze_python_project, build_cross_module_context};
 // Re-export callback tracker for advanced callback analysis
 pub use callback_tracker::{
     CallbackContext, CallbackTracker, CallbackType, Location, PendingCallback,
+};
+
+// Re-export callback pattern recognition functions
+pub use callback_patterns::{
+    extract_call_target, find_callback_position as find_callback_arg_position,
+    get_callback_argument,
 };
 
 /// Python-specific call graph analyzer
