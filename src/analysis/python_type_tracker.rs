@@ -586,6 +586,8 @@ pub struct TwoPassExtractor {
     source_lines: Vec<String>,
     /// Optional cross-module context for resolving imports
     cross_module_context: Option<CrossModuleContext>,
+    /// Callback tracker for deferred callback resolution
+    callback_tracker: crate::analysis::python_call_graph::CallbackTracker,
 }
 
 impl TwoPassExtractor {
@@ -625,6 +627,7 @@ impl TwoPassExtractor {
             current_class: None,
             source_lines: Vec::new(),
             cross_module_context: None,
+            callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
         }
     }
 
@@ -641,6 +644,7 @@ impl TwoPassExtractor {
             current_class: None,
             source_lines,
             cross_module_context: None,
+            callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
         }
     }
 
@@ -657,6 +661,7 @@ impl TwoPassExtractor {
             current_class: None,
             source_lines,
             cross_module_context: Some(context),
+            callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
         }
     }
 
@@ -1134,6 +1139,7 @@ impl TwoPassExtractor {
 
     /// Phase 2: Resolve calls using type information
     fn phase_two(&mut self) {
+        // First, resolve regular function calls
         for unresolved in &self.phase_one_calls {
             if let Some(callee) = self.resolve_call(unresolved) {
                 self.call_graph.add_call(FunctionCall {
@@ -1143,6 +1149,10 @@ impl TwoPassExtractor {
                 });
             }
         }
+
+        // Then, resolve callbacks using the callback tracker
+        let resolution = self.callback_tracker.resolve_callbacks(&self.function_name_map);
+        self.callback_tracker.add_to_call_graph(&resolution, &mut self.call_graph);
     }
 
     /// Check for event binding patterns like obj.Bind(event, self.method)
