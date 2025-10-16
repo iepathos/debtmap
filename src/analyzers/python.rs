@@ -1,3 +1,4 @@
+use crate::analyzers::python_asyncio_patterns::AsyncioPatternDetector;
 use crate::analyzers::python_detectors::SimplifiedPythonDetector;
 use crate::analyzers::python_purity::PythonPurityDetector;
 use crate::analyzers::Analyzer;
@@ -100,6 +101,11 @@ impl Analyzer for PythonAnalyzer {
 
                 // Add pattern complexity to overall complexity metrics
                 metrics.complexity.cognitive_complexity += pattern_complexity as u32;
+
+                // Add asyncio pattern detection
+                let mut asyncio_detector = AsyncioPatternDetector::new(python_ast.path.clone());
+                let asyncio_debt_items = asyncio_detector.analyze_module(&python_ast.module);
+                metrics.debt_items.extend(asyncio_debt_items);
 
                 metrics
             }
