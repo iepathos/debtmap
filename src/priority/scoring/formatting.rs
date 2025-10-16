@@ -1,7 +1,6 @@
 // Formatting and helper utility functions for debt item processing
 
-use crate::analysis::PythonDeadCodeDetector;
-use crate::core::{FunctionMetrics, Language};
+use crate::core::FunctionMetrics;
 use crate::priority::{FunctionRole, FunctionVisibility};
 
 /// Helper to format complexity metrics for display
@@ -51,119 +50,6 @@ pub fn determine_visibility(func: &FunctionMetrics) -> FunctionVisibility {
         Some(vis) if vis.starts_with("pub(") => FunctionVisibility::Crate, // pub(super), pub(in ...), etc.
         _ => FunctionVisibility::Private,
     }
-}
-
-/// Check if function should be excluded from dead code analysis
-pub(super) fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
-    // Check language-specific exclusions
-    let language = Language::from_path(&func.file);
-
-    if language == Language::Python {
-        // Use Python-specific dead code detector
-        let detector = PythonDeadCodeDetector::new();
-        if detector.is_implicitly_called(func) {
-            return true;
-        }
-    }
-
-    // Entry points
-    if func.name == "main" || func.name.starts_with("_start") {
-        return true;
-    }
-
-    // Test functions
-    if func.is_test
-        || func.name.starts_with("test_")
-        || func.file.to_string_lossy().contains("/tests/")
-        || func.in_test_module
-    // Helper functions in test modules
-    {
-        return true;
-    }
-
-    // Closures are part of their parent function - not independent dead code
-    if func.name.contains("<closure@") {
-        return true;
-    }
-
-    // Exported functions (likely FFI or API) - check for common patterns
-    if func.name.contains("extern") || func.name.starts_with("__") {
-        return true;
-    }
-
-    // Common framework patterns (for non-Python languages)
-    if language != Language::Python && is_framework_callback(func) {
-        return true;
-    }
-
-    // Trait method implementations - these are called through trait objects
-    // Use the new is_trait_method field for accurate detection
-    if func.is_trait_method {
-        return true;
-    }
-
-    // Also check for common trait method patterns as fallback (for Rust)
-    if language != Language::Python && is_likely_trait_method(func) {
-        return true;
-    }
-
-    false
-}
-
-/// Check if function is likely a trait method implementation
-pub(super) fn is_likely_trait_method(func: &FunctionMetrics) -> bool {
-    // Check if this is likely a trait method implementation based on:
-    // 1. Public visibility + specific method names that are commonly trait methods
-    // 2. Methods that are part of common trait implementations
-
-    if func.visibility == Some("pub".to_string()) {
-        // Common trait methods that should not be flagged as dead code
-        let method_name = if let Some(pos) = func.name.rfind("::") {
-            &func.name[pos + 2..]
-        } else {
-            &func.name
-        };
-
-        matches!(
-            method_name,
-            // Common trait methods from std library traits
-            "write_results" | "write_risk_insights" |  // OutputWriter trait
-            "fmt" | "clone" | "default" | "from" | "into" |
-            "as_ref" | "as_mut" | "deref" | "deref_mut" |
-            "drop" | "eq" | "ne" | "cmp" | "partial_cmp" |
-            "hash" | "serialize" | "deserialize" |
-            "try_from" | "try_into" | "to_string" |
-            // Iterator trait methods
-            "next" | "size_hint" | "count" | "last" | "nth" |
-            // Async trait methods
-            "poll" | "poll_next" | "poll_ready" | "poll_flush" |
-            // Common custom trait methods
-            "execute" | "run" | "process" | "handle" |
-            "render" | "draw" | "update" | "tick" |
-            "validate" | "is_valid" | "check" |
-            "encode" | "decode" | "parse" | "format"
-        )
-    } else {
-        false
-    }
-}
-
-/// Check if function is a framework callback
-pub(super) fn is_framework_callback(func: &FunctionMetrics) -> bool {
-    // Common web framework handlers
-    func.name.contains("handler") ||
-    func.name.contains("route") ||
-    func.name.contains("view") ||
-    func.name.contains("controller") ||
-    // Common async patterns
-    func.name.starts_with("on_") ||
-    func.name.starts_with("handle_") ||
-    // Common trait implementations
-    func.name == "new" ||
-    func.name == "default" ||
-    func.name == "fmt" ||
-    func.name == "drop" ||
-    func.name == "clone"
 }
 
 /// Generate steps for dead code based on visibility
