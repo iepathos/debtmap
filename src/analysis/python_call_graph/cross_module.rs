@@ -1,11 +1,13 @@
 use super::import_tracker::{ExportedSymbol, ImportTracker, ImportedSymbol};
 use super::namespace::{build_module_namespace, ImportUsage, ModuleNamespace};
+use crate::analysis::python_imports::EnhancedImportResolver;
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct CrossModuleContext {
     pub symbols: HashMap<String, FunctionId>,
     pub dependencies: HashMap<PathBuf, Vec<PathBuf>>,
@@ -17,12 +19,44 @@ pub struct CrossModuleContext {
     /// Import usage tracking
     pub import_usage: HashMap<PathBuf, Vec<ImportUsage>>,
     /// Resolution cache for performance
-    pub resolution_cache: HashMap<(PathBuf, String), Option<FunctionId>>,
+    pub resolution_cache: RwLock<HashMap<(PathBuf, String), Option<FunctionId>>>,
+    /// Enhanced import resolver for advanced import resolution
+    pub enhanced_resolver: RwLock<Option<EnhancedImportResolver>>,
+}
+
+impl Clone for CrossModuleContext {
+    fn clone(&self) -> Self {
+        Self {
+            symbols: self.symbols.clone(),
+            dependencies: self.dependencies.clone(),
+            imports: self.imports.clone(),
+            exports: self.exports.clone(),
+            module_trackers: self.module_trackers.clone(),
+            namespaces: self.namespaces.clone(),
+            import_usage: self.import_usage.clone(),
+            resolution_cache: RwLock::new(self.resolution_cache.read().unwrap().clone()),
+            enhanced_resolver: RwLock::new(self.enhanced_resolver.read().unwrap().clone()),
+        }
+    }
 }
 
 impl CrossModuleContext {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            resolution_cache: RwLock::new(HashMap::new()),
+            enhanced_resolver: RwLock::new(None),
+            ..Default::default()
+        }
+    }
+
+    /// Enable enhanced import resolution
+    pub fn enable_enhanced_resolution(&self) {
+        *self.enhanced_resolver.write().unwrap() = Some(EnhancedImportResolver::new());
+    }
+
+    /// Check if enhanced resolution is enabled
+    pub fn has_enhanced_resolution(&self) -> bool {
+        self.enhanced_resolver.read().unwrap().is_some()
     }
 
     pub fn add_module(
@@ -92,17 +126,51 @@ impl CrossModuleContext {
     pub fn resolve_function(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
         // Check resolution cache first
         let cache_key = (module_path.to_path_buf(), name.to_string());
-        if self.resolution_cache.contains_key(&cache_key) {
-            return self.resolution_cache[&cache_key].clone();
+        {
+            let cache = self.resolution_cache.read().unwrap();
+            if let Some(cached) = cache.get(&cache_key) {
+                return cached.clone();
+            }
         }
 
-        // Try namespace-based resolution first
+        // Try enhanced resolver first if available
+        {
+            let mut resolver = self.enhanced_resolver.write().unwrap();
+            if let Some(ref mut resolver) = *resolver {
+                if let Some(resolved) = resolver.resolve_symbol(module_path, name) {
+                    // Look up the FunctionId from the resolved symbol
+                    let func_id = self
+                        .symbols
+                        .get(&format!(
+                            "{}:{}",
+                            resolved.module_path.display(),
+                            resolved.name
+                        ))
+                        .or_else(|| self.symbols.get(&resolved.name))
+                        .cloned();
+
+                    if func_id.is_some() {
+                        self.resolution_cache
+                            .write()
+                            .unwrap()
+                            .insert(cache_key, func_id.clone());
+                        return func_id;
+                    }
+                }
+            }
+        }
+
+        // Try namespace-based resolution
         if let Some(namespace) = self.namespaces.get(module_path) {
             if let Some((source_module, original_name)) = namespace.resolve_import(name) {
                 // Resolve through the source module
                 if let Some(func_id) =
                     self.resolve_function_in_module(&source_module, &original_name)
                 {
+                    self.resolution_cache
+                        .write()
+                        .unwrap()
+                        .insert(cache_key, Some(func_id.clone()));
                     return Some(func_id);
                 }
             }
@@ -110,6 +178,10 @@ impl CrossModuleContext {
             // Check wildcard imports
             for wildcard_module in &namespace.wildcard_imports {
                 if let Some(func_id) = self.resolve_function_in_module(wildcard_module, name) {
+                    self.resolution_cache
+                        .write()
+                        .unwrap()
+                        .insert(cache_key, Some(func_id.clone()));
                     return Some(func_id);
                 }
             }
@@ -120,6 +192,10 @@ impl CrossModuleContext {
             if let Some(resolved) = tracker.resolve_name(name) {
                 // Try direct resolution first
                 if let Some(func_id) = self.symbols.get(&resolved) {
+                    self.resolution_cache
+                        .write()
+                        .unwrap()
+                        .insert(cache_key, Some(func_id.clone()));
                     return Some(func_id.clone());
                 }
 
@@ -127,6 +203,10 @@ impl CrossModuleContext {
                 if let Some(dot_pos) = resolved.rfind('.') {
                     let func_name = &resolved[dot_pos + 1..];
                     if let Some(func_id) = self.symbols.get(func_name) {
+                        self.resolution_cache
+                            .write()
+                            .unwrap()
+                            .insert(cache_key, Some(func_id.clone()));
                         return Some(func_id.clone());
                     }
                 }
@@ -140,6 +220,10 @@ impl CrossModuleContext {
                                 .get(&export.qualified_name)
                                 .or_else(|| self.symbols.get(&export.name))
                             {
+                                self.resolution_cache
+                                    .write()
+                                    .unwrap()
+                                    .insert(cache_key, Some(func_id.clone()));
                                 return Some(func_id.clone());
                             }
                         }
@@ -149,7 +233,8 @@ impl CrossModuleContext {
         }
 
         // Try direct lookup
-        self.symbols
+        let result = self
+            .symbols
             .get(name)
             .or_else(|| {
                 let qualified = format!(
@@ -162,7 +247,13 @@ impl CrossModuleContext {
                 );
                 self.symbols.get(&qualified)
             })
-            .cloned()
+            .cloned();
+
+        self.resolution_cache
+            .write()
+            .unwrap()
+            .insert(cache_key, result.clone());
+        result
     }
 
     /// Resolve a function within a specific module
@@ -321,8 +412,8 @@ impl CrossModuleAnalyzer {
         // Create source lines for line number extraction
         let source_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
-        if let ast::Mod::Module(module) = &module {
-            for stmt in &module.body {
+        if let ast::Mod::Module(module_ast) = &module {
+            for stmt in &module_ast.body {
                 match stmt {
                     ast::Stmt::Import(import) => {
                         tracker.track_import(import);
@@ -339,6 +430,14 @@ impl CrossModuleAnalyzer {
 
         // Build module namespace
         let namespace = build_module_namespace(&module, path);
+
+        // Analyze with enhanced resolver if enabled
+        {
+            let mut resolver = self.context.enhanced_resolver.write().unwrap();
+            if let Some(ref mut resolver) = *resolver {
+                resolver.analyze_imports(&module, path);
+            }
+        }
 
         // Register exported functions in the global symbol table
         for export in &exports {
