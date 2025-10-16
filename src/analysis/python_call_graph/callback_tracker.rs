@@ -54,10 +54,17 @@ pub struct CallbackRef {
     pub confidence: f32,
 }
 
+/// Resolved callback with its registration information
+#[derive(Debug, Clone)]
+pub struct ResolvedCallback {
+    pub callback_ref: CallbackRef,
+    pub registration_point: Location,
+}
+
 /// Resolution result for a callback
 #[derive(Debug)]
 pub struct ResolutionResult {
-    pub callback_refs: Vec<CallbackRef>,
+    pub resolved_callbacks: Vec<ResolvedCallback>,
     pub unresolved: Vec<String>, // Expressions that couldn't be resolved
 }
 
@@ -103,18 +110,26 @@ impl CallbackTracker {
         &self,
         known_functions: &HashMap<String, FunctionId>,
     ) -> ResolutionResult {
-        let mut callback_refs = Vec::new();
+        let mut resolved_callbacks = Vec::new();
         let mut unresolved = Vec::new();
 
         for pending in &self.pending_callbacks {
             match self.resolve_single_callback(pending, known_functions) {
-                Some(refs) => callback_refs.extend(refs),
+                Some(refs) => {
+                    // Pair each callback_ref with its registration point
+                    for callback_ref in refs {
+                        resolved_callbacks.push(ResolvedCallback {
+                            callback_ref,
+                            registration_point: pending.registration_point.clone(),
+                        });
+                    }
+                },
                 None => unresolved.push(pending.callback_expr.clone()),
             }
         }
 
         ResolutionResult {
-            callback_refs,
+            resolved_callbacks,
             unresolved,
         }
     }
@@ -211,6 +226,19 @@ impl CallbackTracker {
         known_functions: &HashMap<String, FunctionId>,
         confidence: f32,
     ) -> Option<Vec<CallbackRef>> {
+        // Check if it's a self.method or cls.method reference
+        if let Some(method_name) = pending.callback_expr.strip_prefix("self.") {
+            if let Some(class_name) = &pending.context.current_class {
+                let full_name = format!("{}.{}", class_name, method_name);
+                if let Some(func_id) = known_functions.get(&full_name) {
+                    return Some(vec![CallbackRef {
+                        target_function: func_id.clone(),
+                        confidence,
+                    }]);
+                }
+            }
+        }
+
         // Try as-is first
         if let Some(func_id) = known_functions.get(&pending.callback_expr) {
             return Some(vec![CallbackRef {
@@ -251,20 +279,10 @@ impl CallbackTracker {
         known_functions: &HashMap<String, FunctionId>,
         confidence: f32,
     ) -> Option<Vec<CallbackRef>> {
-        // For functools.partial(func, ...), extract the func part
-        // Format: "partial(func_name, ...)"
-        let func_name = pending
-            .callback_expr
-            .strip_prefix("partial(")?
-            .split(',')
-            .next()?
-            .trim();
-
+        // For functools.partial, the callback_expr is already the function being partially applied
+        // No need to extract - just resolve it directly
         self.resolve_direct_assignment(
-            &PendingCallback {
-                callback_expr: func_name.to_string(),
-                ..pending.clone()
-            },
+            pending,
             known_functions,
             confidence * 0.85, // Lower confidence for partial
         )
@@ -317,33 +335,30 @@ impl CallbackTracker {
 
     /// Add resolved callbacks to the call graph
     pub fn add_to_call_graph(&self, resolution: &ResolutionResult, call_graph: &mut CallGraph) {
-        for callback_ref in &resolution.callback_refs {
-            // For each callback ref, we need the caller information
-            // This is stored in the pending callback's registration_point
-
-            // Find the corresponding pending callback
-            // Note: This is a simplified version - in practice, you'd want to
-            // maintain the association between resolved refs and their pending callbacks
-            for pending in &self.pending_callbacks {
-                if let Some(caller_func) = &pending.registration_point.caller_function {
-                    let caller_id = FunctionId {
+        for resolved in &resolution.resolved_callbacks {
+            if let Some(caller_func) = &resolved.registration_point.caller_function {
+                // Look up the caller in the call graph to get the correct line number
+                let caller_id = call_graph
+                    .get_all_functions()
+                    .find(|f| f.name == *caller_func)
+                    .cloned()
+                    .unwrap_or_else(|| FunctionId {
                         name: caller_func.clone(),
-                        file: pending.registration_point.file.clone(),
-                        line: pending.registration_point.line,
-                    };
+                        file: resolved.registration_point.file.clone(),
+                        line: resolved.registration_point.line,
+                    });
 
-                    let call = FunctionCall {
-                        caller: caller_id,
-                        callee: callback_ref.target_function.clone(),
-                        call_type: if callback_ref.confidence > 0.8 {
-                            CallType::Direct
-                        } else {
-                            CallType::Callback
-                        },
-                    };
+                let call = FunctionCall {
+                    caller: caller_id,
+                    callee: resolved.callback_ref.target_function.clone(),
+                    call_type: if resolved.callback_ref.confidence > 0.8 {
+                        CallType::Direct
+                    } else {
+                        CallType::Callback
+                    },
+                };
 
-                    call_graph.add_call(call);
-                }
+                call_graph.add_call(call);
             }
         }
     }
@@ -400,12 +415,12 @@ mod tests {
         tracker.track_callback(pending);
         let result = tracker.resolve_callbacks(&known_functions);
 
-        assert_eq!(result.callback_refs.len(), 1);
+        assert_eq!(result.resolved_callbacks.len(), 1);
         assert_eq!(
-            result.callback_refs[0].target_function.name,
+            result.resolved_callbacks[0].callback_ref.target_function.name,
             "MyClass.on_click"
         );
-        assert!(result.callback_refs[0].confidence > 0.8);
+        assert!(result.resolved_callbacks[0].callback_ref.confidence > 0.8);
     }
 
     #[test]
@@ -439,8 +454,8 @@ mod tests {
         tracker.track_callback(pending);
         let result = tracker.resolve_callbacks(&known_functions);
 
-        assert_eq!(result.callback_refs.len(), 1);
-        assert_eq!(result.callback_refs[0].target_function.name, "outer.inner");
+        assert_eq!(result.resolved_callbacks.len(), 1);
+        assert_eq!(result.resolved_callbacks[0].callback_ref.target_function.name, "outer.inner");
     }
 
     #[test]
