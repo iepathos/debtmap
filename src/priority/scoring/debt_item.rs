@@ -16,8 +16,8 @@ use crate::priority::{
     },
     scoring::rust_recommendations::generate_rust_refactoring_recommendation,
     semantic_classifier::classify_function_role,
-    ActionableRecommendation, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
-    TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
+    ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, Location, TransitiveCoverage,
+    UnifiedDebtItem, UnifiedScore,
 };
 
 // Re-export construction functions for backward compatibility
@@ -31,16 +31,30 @@ pub use super::construction::{
 
 // Re-export computation functions for backward compatibility
 pub(super) use super::computation::{
-    calculate_entropy_details, calculate_expected_impact, calculate_functions_to_extract,
-    calculate_needed_test_cases, calculate_risk_score, calculate_simple_test_cases,
+    calculate_entropy_details, calculate_expected_impact, calculate_risk_score,
 };
 
 // Import computation functions for tests
 #[cfg(test)]
 use super::computation::{
-    calculate_coverage_improvement, calculate_lines_reduction, calculate_risk_factor,
+    calculate_coverage_improvement, calculate_functions_to_extract, calculate_lines_reduction,
+    calculate_needed_test_cases, calculate_risk_factor, calculate_simple_test_cases,
     is_function_complex,
 };
+
+// Import formatting functions for tests
+#[cfg(test)]
+use super::formatting::{
+    format_complexity_display, format_role_description, get_role_display_name,
+};
+
+// Import recommendation helper functions for tests
+#[cfg(test)]
+use super::recommendation_helpers::generate_full_coverage_recommendation;
+
+// Import types for tests
+#[cfg(test)]
+use crate::priority::FunctionVisibility;
 
 // Re-export validation functions for backward compatibility
 pub(super) use super::validation::{
@@ -50,19 +64,12 @@ pub(super) use super::validation::{
 
 // Re-export formatting and helper functions for backward compatibility
 pub use super::formatting::determine_visibility;
-pub(super) use super::formatting::{
-    add_uncovered_lines_to_steps, format_complexity_display, format_role_description,
-    generate_combined_testing_refactoring_steps, generate_dead_code_steps,
-    generate_testing_gap_steps, get_role_display_name, is_excluded_from_dead_code_analysis,
-    is_rust_file,
-};
+pub(super) use super::formatting::is_rust_file;
 
 // Import functions from recommendation_helpers module
 use super::recommendation_helpers::{
     build_actionable_recommendation, extract_coverage_percent, extract_cyclomatic_complexity,
-    generate_complex_function_recommendation, generate_dead_code_action,
     generate_dead_code_recommendation, generate_error_swallowing_recommendation,
-    generate_full_coverage_recommendation, generate_simple_function_recommendation,
     generate_test_debt_recommendation, generate_testing_gap_recommendation,
 };
 
