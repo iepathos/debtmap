@@ -2,6 +2,7 @@
 
 pub mod calculation;
 pub mod classification;
+pub mod construction;
 pub mod debt_item;
 pub mod recommendation;
 pub mod recommendation_extended;
