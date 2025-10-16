@@ -3,10 +3,7 @@
 /// These tests validate that the analyzer meets the <10% false positive rate
 /// requirement (Spec 107) by testing against real-world Python patterns that
 /// are commonly incorrectly flagged as dead code.
-
-use debtmap::analysis::python_dead_code_enhanced::{
-    DeadCodeConfidence, EnhancedDeadCodeAnalyzer,
-};
+use debtmap::analysis::python_dead_code_enhanced::EnhancedDeadCodeAnalyzer;
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use std::path::PathBuf;
@@ -15,25 +12,20 @@ use std::path::PathBuf;
 struct ValidationResult {
     function_name: String,
     expected_live: bool,
-    actual_dead: bool,
+    _actual_dead: bool,
     confidence: f32,
     is_false_positive: bool,
 }
 
 impl ValidationResult {
-    fn new(
-        function_name: String,
-        expected_live: bool,
-        actual_dead: bool,
-        confidence: f32,
-    ) -> Self {
+    fn new(function_name: String, expected_live: bool, actual_dead: bool, confidence: f32) -> Self {
         // False positive: Expected to be live but marked as dead with high confidence
         let is_false_positive = expected_live && actual_dead && confidence >= 0.8;
 
         Self {
             function_name,
             expected_live,
-            actual_dead,
+            _actual_dead: actual_dead,
             confidence,
             is_false_positive,
         }
@@ -63,20 +55,16 @@ fn test_framework_patterns_false_positive_rate() {
         ("index", "app.py", true),
         ("api_users", "api.py", true),
         ("handle_error", "app.py", true),
-
         // Django views
         ("user_list", "views.py", true),
         ("save", "models.py", true),
         ("clean", "forms.py", true),
-
         // Click commands
         ("cli", "cli.py", true),
         ("run", "main.py", true),
-
         // Event handlers
         ("on_click", "gui.py", true),
         ("on_paint", "panel.py", true),
-
         // Actually dead code (for comparison)
         ("_old_implementation", "legacy.py", false),
         ("_unused_helper", "utils.py", false),
@@ -85,11 +73,7 @@ fn test_framework_patterns_false_positive_rate() {
     let mut results = Vec::new();
 
     for (func_name, file_name, expected_live) in test_cases {
-        let func = FunctionMetrics::new(
-            func_name.to_string(),
-            PathBuf::from(file_name),
-            10,
-        );
+        let func = FunctionMetrics::new(func_name.to_string(), PathBuf::from(file_name), 10);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -103,7 +87,10 @@ fn test_framework_patterns_false_positive_rate() {
 
     let fp_rate = calculate_false_positive_rate(&results);
 
-    println!("Framework patterns false positive rate: {:.1}%", fp_rate * 100.0);
+    println!(
+        "Framework patterns false positive rate: {:.1}%",
+        fp_rate * 100.0
+    );
 
     // Report any false positives
     for result in &results {
@@ -149,11 +136,7 @@ fn test_magic_methods_false_positive_rate() {
     let mut results = Vec::new();
 
     for method_name in magic_methods {
-        let func = FunctionMetrics::new(
-            method_name.to_string(),
-            PathBuf::from("model.py"),
-            10,
-        );
+        let func = FunctionMetrics::new(method_name.to_string(), PathBuf::from("model.py"), 10);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -171,7 +154,8 @@ fn test_magic_methods_false_positive_rate() {
 
     // Magic methods should have 0% false positive rate
     assert_eq!(
-        fp_rate, 0.0,
+        fp_rate,
+        0.0,
         "Magic methods should NEVER be false positives, but got {:.1}%",
         fp_rate * 100.0
     );
@@ -188,7 +172,8 @@ fn test_callback_patterns_false_positive_rate() {
         CallbackContext, CallbackType, Location, PendingCallback,
     };
 
-    let mut tracker = debtmap::analysis::python_call_graph::callback_tracker::CallbackTracker::new();
+    let mut tracker =
+        debtmap::analysis::python_call_graph::callback_tracker::CallbackTracker::new();
 
     // Register some callbacks
     tracker.track_decorator("app.route".to_string(), "index".to_string());
@@ -224,11 +209,7 @@ fn test_callback_patterns_false_positive_rate() {
     let mut results = Vec::new();
 
     for (func_name, file_name, expected_live) in test_cases {
-        let func = FunctionMetrics::new(
-            func_name.to_string(),
-            PathBuf::from(file_name),
-            10,
-        );
+        let func = FunctionMetrics::new(func_name.to_string(), PathBuf::from(file_name), 10);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -242,7 +223,10 @@ fn test_callback_patterns_false_positive_rate() {
 
     let fp_rate = calculate_false_positive_rate(&results);
 
-    println!("Callback patterns false positive rate: {:.1}%", fp_rate * 100.0);
+    println!(
+        "Callback patterns false positive rate: {:.1}%",
+        fp_rate * 100.0
+    );
 
     assert!(
         fp_rate < 0.10,
@@ -287,12 +271,23 @@ fn test_comprehensive_validation_suite() {
         ("process_data", "app.py", 20, true, "Has caller (main)"),
         ("index", "routes.py", 30, true, "Framework route"),
         ("on_click", "ui.py", 40, true, "Event handler"),
-
         // DEAD CODE - Should be flagged as dead
-        ("_old_helper", "utils.py", 50, false, "Unused private function"),
+        (
+            "_old_helper",
+            "utils.py",
+            50,
+            false,
+            "Unused private function",
+        ),
         ("_legacy_impl", "legacy.py", 60, false, "Old implementation"),
         ("_unused_calc", "math.py", 70, false, "Unused calculation"),
-        ("deprecated_func", "old_api.py", 80, false, "Unused public (edge case)"),
+        (
+            "deprecated_func",
+            "old_api.py",
+            80,
+            false,
+            "Unused public (edge case)",
+        ),
     ];
 
     let mut results = Vec::new();
@@ -301,11 +296,7 @@ fn test_comprehensive_validation_suite() {
     let mut false_negatives = 0;
 
     for (func_name, file_name, line, expected_live, description) in test_cases {
-        let func = FunctionMetrics::new(
-            func_name.to_string(),
-            PathBuf::from(file_name),
-            line,
-        );
+        let func = FunctionMetrics::new(func_name.to_string(), PathBuf::from(file_name), line);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -322,7 +313,9 @@ fn test_comprehensive_validation_suite() {
                 false_positives += 1;
                 println!(
                     "FALSE POSITIVE: {} - {} (confidence: {:.2})",
-                    func_name, description, result.confidence.score()
+                    func_name,
+                    description,
+                    result.confidence.score()
                 );
             }
         } else {
@@ -331,7 +324,9 @@ fn test_comprehensive_validation_suite() {
                 false_negatives += 1;
                 println!(
                     "FALSE NEGATIVE: {} - {} (confidence: {:.2})",
-                    func_name, description, result.confidence.score()
+                    func_name,
+                    description,
+                    result.confidence.score()
                 );
             }
         }
@@ -384,11 +379,7 @@ fn test_test_file_detection() {
     let mut results = Vec::new();
 
     for (func_name, file_name) in test_functions {
-        let func = FunctionMetrics::new(
-            func_name.to_string(),
-            PathBuf::from(file_name),
-            10,
-        );
+        let func = FunctionMetrics::new(func_name.to_string(), PathBuf::from(file_name), 10);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -402,7 +393,10 @@ fn test_test_file_detection() {
 
     let fp_rate = calculate_false_positive_rate(&results);
 
-    println!("Test file functions false positive rate: {:.1}%", fp_rate * 100.0);
+    println!(
+        "Test file functions false positive rate: {:.1}%",
+        fp_rate * 100.0
+    );
 
     // Test files should have very low false positive rate
     assert!(
@@ -427,11 +421,7 @@ fn test_public_api_detection() {
     let mut results = Vec::new();
 
     for (func_name, file_name, expected_live) in api_functions {
-        let func = FunctionMetrics::new(
-            func_name.to_string(),
-            PathBuf::from(file_name),
-            10,
-        );
+        let func = FunctionMetrics::new(func_name.to_string(), PathBuf::from(file_name), 10);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -486,11 +476,7 @@ fn test_property_decorators() {
     let mut results = Vec::new();
 
     for (func_name, file_name, expected_live) in property_like {
-        let func = FunctionMetrics::new(
-            func_name.to_string(),
-            PathBuf::from(file_name),
-            10,
-        );
+        let func = FunctionMetrics::new(func_name.to_string(), PathBuf::from(file_name), 10);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -504,7 +490,10 @@ fn test_property_decorators() {
 
     let fp_rate = calculate_false_positive_rate(&results);
 
-    println!("Property-like functions false positive rate: {:.1}%", fp_rate * 100.0);
+    println!(
+        "Property-like functions false positive rate: {:.1}%",
+        fp_rate * 100.0
+    );
 
     // Should be conservative with property-like functions
     assert!(
@@ -556,7 +545,6 @@ fn test_spec_107_requirement() {
         ("execute", "executor.py", 1, true),
         ("launch", "launcher.py", 1, true),
         ("bootstrap", "bootstrap.py", 1, true),
-
         // Magic methods (10)
         ("C.__init__", "m.py", 5, true),
         ("C.__str__", "m.py", 10, true),
@@ -568,7 +556,6 @@ fn test_spec_107_requirement() {
         ("C.__enter__", "m.py", 40, true),
         ("C.__exit__", "m.py", 45, true),
         ("C.__call__", "m.py", 50, true),
-
         // Framework patterns (10)
         ("index", "routes.py", 10, true),
         ("api_handler", "api.py", 20, true),
@@ -580,21 +567,18 @@ fn test_spec_107_requirement() {
         ("configure", "config.py", 80, true),
         ("initialize", "init.py", 90, true),
         ("finalize", "cleanup.py", 100, true),
-
         // Test functions (5)
         ("test_func", "test_a.py", 10, true),
         ("test_case", "test_b.py", 20, true),
         ("TestC.test_m", "test_c.py", 30, true),
         ("TestD.setUp", "test_d.py", 40, true),
         ("fixture", "test_fixtures.py", 50, true),
-
         // Called functions (5)
         ("utility", "utils.py", 10, true),
         ("helper", "helpers.py", 20, true),
         ("process", "processor.py", 30, true),
         ("validate", "validator.py", 40, true),
         ("transform", "transformer.py", 50, true),
-
         // Dead code (10)
         ("_old1", "old.py", 10, false),
         ("_old2", "old.py", 20, false),
@@ -616,18 +600,18 @@ fn test_spec_107_requirement() {
             live_count += 1;
         }
 
-        let func = FunctionMetrics::new(
-            name.to_string(),
-            PathBuf::from(file),
-            line,
-        );
+        let func = FunctionMetrics::new(name.to_string(), PathBuf::from(file), line);
 
         let result = analyzer.analyze_function(&func, &call_graph);
 
         // False positive: expected live but marked dead with high confidence
         if expected_live && result.is_dead && result.confidence.score() >= 0.8 {
             false_positives += 1;
-            println!("FALSE POSITIVE: {} (confidence: {:.2})", name, result.confidence.score());
+            println!(
+                "FALSE POSITIVE: {} (confidence: {:.2})",
+                name,
+                result.confidence.score()
+            );
         }
     }
 

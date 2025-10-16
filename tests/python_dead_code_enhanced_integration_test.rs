@@ -3,7 +3,6 @@
 /// These tests verify the full workflow of the enhanced dead code analyzer
 /// with real Python code patterns, including framework detection, callback
 /// tracking, and confidence scoring.
-
 use debtmap::analysis::python_dead_code_enhanced::{
     AnalysisConfig, DeadCodeConfidence, EnhancedDeadCodeAnalyzer,
 };
@@ -18,11 +17,7 @@ fn test_event_handler_pattern_not_dead() {
     let call_graph = CallGraph::new();
 
     // Test on_click pattern which matches event handler heuristics
-    let func = FunctionMetrics::new(
-        "on_click".to_string(),
-        PathBuf::from("gui.py"),
-        10,
-    );
+    let func = FunctionMetrics::new("on_click".to_string(), PathBuf::from("gui.py"), 10);
 
     let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -40,20 +35,14 @@ fn test_magic_method_not_dead() {
     let call_graph = CallGraph::new();
 
     // Test __init__
-    let init_func = FunctionMetrics::new(
-        "MyClass.__init__".to_string(),
-        PathBuf::from("model.py"),
-        5,
-    );
+    let init_func =
+        FunctionMetrics::new("MyClass.__init__".to_string(), PathBuf::from("model.py"), 5);
     let result = analyzer.analyze_function(&init_func, &call_graph);
     assert!(!result.is_dead, "__init__ should be LIVE");
 
     // Test __str__
-    let str_func = FunctionMetrics::new(
-        "MyClass.__str__".to_string(),
-        PathBuf::from("model.py"),
-        15,
-    );
+    let str_func =
+        FunctionMetrics::new("MyClass.__str__".to_string(), PathBuf::from("model.py"), 15);
     let result = analyzer.analyze_function(&str_func, &call_graph);
     assert!(!result.is_dead, "__str__ should be LIVE");
 
@@ -91,11 +80,7 @@ fn test_function_with_callers_not_dead() {
         call_type: CallType::Direct,
     });
 
-    let func = FunctionMetrics::new(
-        "helper_function".to_string(),
-        PathBuf::from("utils.py"),
-        10,
-    );
+    let func = FunctionMetrics::new("helper_function".to_string(), PathBuf::from("utils.py"), 10);
 
     let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -111,15 +96,14 @@ fn test_private_function_no_callers_is_dead() {
     let analyzer = EnhancedDeadCodeAnalyzer::new();
     let call_graph = CallGraph::new();
 
-    let func = FunctionMetrics::new(
-        "_unused_helper".to_string(),
-        PathBuf::from("utils.py"),
-        42,
-    );
+    let func = FunctionMetrics::new("_unused_helper".to_string(), PathBuf::from("utils.py"), 42);
 
     let result = analyzer.analyze_function(&func, &call_graph);
 
-    assert!(result.is_dead, "Private function with no callers should be DEAD");
+    assert!(
+        result.is_dead,
+        "Private function with no callers should be DEAD"
+    );
     assert!(
         matches!(result.confidence, DeadCodeConfidence::High(_)),
         "Should have high confidence: {:?}",
@@ -133,11 +117,7 @@ fn test_public_function_no_callers_medium_confidence() {
     let analyzer = EnhancedDeadCodeAnalyzer::new();
     let call_graph = CallGraph::new();
 
-    let func = FunctionMetrics::new(
-        "unused_api_method".to_string(),
-        PathBuf::from("api.py"),
-        20,
-    );
+    let func = FunctionMetrics::new("unused_api_method".to_string(), PathBuf::from("api.py"), 20);
 
     let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -192,20 +172,12 @@ fn test_main_entry_point_not_dead() {
     let call_graph = CallGraph::new();
 
     // Test main function
-    let main_func = FunctionMetrics::new(
-        "main".to_string(),
-        PathBuf::from("cli.py"),
-        100,
-    );
+    let main_func = FunctionMetrics::new("main".to_string(), PathBuf::from("cli.py"), 100);
     let result = analyzer.analyze_function(&main_func, &call_graph);
     assert!(!result.is_dead, "main() should be LIVE");
 
     // Test module.main pattern
-    let module_main = FunctionMetrics::new(
-        "app.main".to_string(),
-        PathBuf::from("app.py"),
-        150,
-    );
+    let module_main = FunctionMetrics::new("app.main".to_string(), PathBuf::from("app.py"), 150);
     let result = analyzer.analyze_function(&module_main, &call_graph);
     assert!(!result.is_dead, "app.main should be LIVE");
 }
@@ -222,11 +194,7 @@ fn test_custom_config_thresholds() {
     let analyzer = EnhancedDeadCodeAnalyzer::new().with_config(config);
     let call_graph = CallGraph::new();
 
-    let func = FunctionMetrics::new(
-        "_unused".to_string(),
-        PathBuf::from("app.py"),
-        10,
-    );
+    let func = FunctionMetrics::new("_unused".to_string(), PathBuf::from("app.py"), 10);
 
     let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -240,17 +208,16 @@ fn test_explanation_generation() {
     let analyzer = EnhancedDeadCodeAnalyzer::new();
     let call_graph = CallGraph::new();
 
-    let func = FunctionMetrics::new(
-        "_helper".to_string(),
-        PathBuf::from("utils.py"),
-        50,
-    );
+    let func = FunctionMetrics::new("_helper".to_string(), PathBuf::from("utils.py"), 50);
 
     let result = analyzer.analyze_function(&func, &call_graph);
     let explanation = analyzer.generate_explanation(&result);
 
     // Verify explanation contains key information
-    assert!(explanation.contains("_helper"), "Should mention function name");
+    assert!(
+        explanation.contains("_helper"),
+        "Should mention function name"
+    );
     assert!(
         explanation.contains("DEAD") || explanation.contains("LIVE"),
         "Should include result"
@@ -299,31 +266,22 @@ fn test_complex_call_chain() {
     });
 
     // Check main
-    let main_func = FunctionMetrics::new(
-        "main".to_string(),
-        PathBuf::from("app.py"),
-        10,
-    );
+    let main_func = FunctionMetrics::new("main".to_string(), PathBuf::from("app.py"), 10);
     let result = analyzer.analyze_function(&main_func, &call_graph);
     assert!(!result.is_dead, "main should be LIVE (entry point)");
 
     // Check helper1
-    let helper1_func = FunctionMetrics::new(
-        "helper1".to_string(),
-        PathBuf::from("app.py"),
-        20,
-    );
+    let helper1_func = FunctionMetrics::new("helper1".to_string(), PathBuf::from("app.py"), 20);
     let result = analyzer.analyze_function(&helper1_func, &call_graph);
     assert!(!result.is_dead, "helper1 should be LIVE (called by main)");
 
     // Check helper2
-    let helper2_func = FunctionMetrics::new(
-        "helper2".to_string(),
-        PathBuf::from("app.py"),
-        30,
-    );
+    let helper2_func = FunctionMetrics::new("helper2".to_string(), PathBuf::from("app.py"), 30);
     let result = analyzer.analyze_function(&helper2_func, &call_graph);
-    assert!(!result.is_dead, "helper2 should be LIVE (called by helper1)");
+    assert!(
+        !result.is_dead,
+        "helper2 should be LIVE (called by helper1)"
+    );
 }
 
 #[test]
@@ -365,14 +323,14 @@ fn test_mixed_confidence_batch() {
     ];
 
     let mut high_conf_count = 0;
-    let mut medium_conf_count = 0;
+    let mut _medium_conf_count = 0;
     let mut low_conf_count = 0;
 
     for func in functions {
         let result = analyzer.analyze_function(&func, &call_graph);
         match result.confidence {
             DeadCodeConfidence::High(_) => high_conf_count += 1,
-            DeadCodeConfidence::Medium(_) => medium_conf_count += 1,
+            DeadCodeConfidence::Medium(_) => _medium_conf_count += 1,
             DeadCodeConfidence::Low(_) => low_conf_count += 1,
         }
     }
@@ -395,11 +353,7 @@ fn test_reasons_tracking() {
     let analyzer = EnhancedDeadCodeAnalyzer::new();
     let call_graph = CallGraph::new();
 
-    let func = FunctionMetrics::new(
-        "_unused_private".to_string(),
-        PathBuf::from("app.py"),
-        100,
-    );
+    let func = FunctionMetrics::new("_unused_private".to_string(), PathBuf::from("app.py"), 100);
 
     let result = analyzer.analyze_function(&func, &call_graph);
 
@@ -408,7 +362,10 @@ fn test_reasons_tracking() {
 
     // Private function should note it's not public
     assert!(
-        result.dead_reasons.iter().any(|r| format!("{:?}", r).contains("Private")),
+        result
+            .dead_reasons
+            .iter()
+            .any(|r| format!("{:?}", r).contains("Private")),
         "Should note function is private"
     );
 }
@@ -419,23 +376,20 @@ fn test_removal_suggestion_accuracy() {
     let call_graph = CallGraph::new();
 
     // High confidence dead code
-    let dead_func = FunctionMetrics::new(
-        "_clearly_unused".to_string(),
-        PathBuf::from("old.py"),
-        10,
-    );
+    let dead_func =
+        FunctionMetrics::new("_clearly_unused".to_string(), PathBuf::from("old.py"), 10);
     let result = analyzer.analyze_function(&dead_func, &call_graph);
     assert!(result.suggestion.can_remove, "Should suggest removal");
     assert!(result.suggestion.safe_to_remove, "Should be safe to remove");
 
     // Magic method (should not suggest removal)
-    let magic_func = FunctionMetrics::new(
-        "Cls.__init__".to_string(),
-        PathBuf::from("model.py"),
-        20,
-    );
+    let magic_func =
+        FunctionMetrics::new("Cls.__init__".to_string(), PathBuf::from("model.py"), 20);
     let result = analyzer.analyze_function(&magic_func, &call_graph);
-    assert!(!result.suggestion.can_remove, "Should not suggest removing magic method");
+    assert!(
+        !result.suggestion.can_remove,
+        "Should not suggest removing magic method"
+    );
 }
 
 #[cfg(test)]
@@ -526,11 +480,7 @@ def _internal_helper():
         let call_graph = CallGraph::new();
 
         // Test exported function
-        let exported_func = FunctionMetrics::new(
-            "public_api".to_string(),
-            file_path.clone(),
-            4,
-        );
+        let exported_func = FunctionMetrics::new("public_api".to_string(), file_path.clone(), 4);
         let result = analyzer.analyze_function(&exported_func, &call_graph);
         assert!(
             !result.is_dead || result.confidence.score() < 0.5,
@@ -538,13 +488,12 @@ def _internal_helper():
         );
 
         // Test non-exported function
-        let internal_func = FunctionMetrics::new(
-            "_internal_helper".to_string(),
-            file_path,
-            10,
-        );
+        let internal_func = FunctionMetrics::new("_internal_helper".to_string(), file_path, 10);
         let result = analyzer.analyze_function(&internal_func, &call_graph);
         // Internal helper with no callers should be dead
-        assert!(result.is_dead, "Non-exported private function should be dead");
+        assert!(
+            result.is_dead,
+            "Non-exported private function should be dead"
+        );
     }
 }
