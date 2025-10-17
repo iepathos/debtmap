@@ -507,6 +507,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         no_god_object,
         max_files,
         validate_loc,
+        no_public_api_detection,
+        public_api_threshold,
     } = command
     {
         // Apply side effects first
@@ -562,6 +564,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             no_god_object,
             max_files,
             validate_loc,
+            no_public_api_detection,
+            public_api_threshold,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -744,6 +748,8 @@ fn build_analyze_config(
     no_god_object: bool,
     max_files: Option<usize>,
     validate_loc: bool,
+    no_public_api_detection: bool,
+    public_api_threshold: f32,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -789,6 +795,8 @@ fn build_analyze_config(
         no_god_object,
         max_files,
         validate_loc,
+        no_public_api_detection,
+        public_api_threshold,
     }
 }
 

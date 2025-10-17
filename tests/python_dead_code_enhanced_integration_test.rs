@@ -189,6 +189,8 @@ fn test_custom_config_thresholds() {
         medium_confidence_threshold: 0.6,
         respect_suppression_comments: true,
         include_private_api: true,
+        enable_public_api_detection: true,
+        public_api_config: None,
     };
 
     let analyzer = EnhancedDeadCodeAnalyzer::new().with_config(config);
