@@ -108,6 +108,8 @@ pub fn combine_file_metrics(metrics: Vec<FileMetrics>) -> FileMetrics {
             debt_items: Vec::new(),
             dependencies: Vec::new(),
             duplications: Vec::new(),
+            module_scope: None,
+            classes: None,
         },
         |mut acc, m| {
             acc.complexity
@@ -257,6 +259,8 @@ mod tests {
             debt_items: Vec::new(),
             dependencies: Vec::new(),
             duplications: Vec::new(),
+            module_scope: None,
+            classes: None,
         }
     }
 

@@ -225,6 +225,8 @@ impl JavaScriptAnalyzer {
             debt_items,
             dependencies,
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         }
     }
 }
@@ -260,6 +262,8 @@ impl Analyzer for JavaScriptAnalyzer {
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
+                module_scope: None,
+                classes: None,
             },
         }
     }

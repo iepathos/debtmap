@@ -253,6 +253,8 @@ fn test_pattern_matching_for_different_languages() {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        module_scope: None,
+        classes: None,
     };
 
     // Test that analyzer handles different languages

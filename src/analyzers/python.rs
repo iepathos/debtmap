@@ -124,6 +124,8 @@ impl Analyzer for PythonAnalyzer {
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
+                module_scope: None,
+                classes: None,
             },
         }
     }
@@ -280,6 +282,8 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
         debt_items,
         dependencies,
         duplications: vec![],
+        module_scope: None,
+        classes: None,
     }
 }
 

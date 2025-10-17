@@ -13,6 +13,7 @@ pub mod implementations;
 pub mod javascript;
 pub mod purity_detector;
 pub mod python;
+pub mod python_ast_extraction;
 pub mod python_asyncio_patterns;
 pub mod python_detectors;
 pub mod python_exception_flow;
@@ -137,6 +138,8 @@ impl Analyzer for NullAnalyzer {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         }
     }
 
@@ -166,6 +169,8 @@ mod tests {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         };
         let result = apply_filters(metrics.clone());
         assert_eq!(result.path, metrics.path);
@@ -238,6 +243,8 @@ mod tests {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         })];
 
         let analyzer = compose_analyzers(parsers, transformers, calculators);
