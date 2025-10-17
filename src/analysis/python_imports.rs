@@ -30,6 +30,43 @@ pub enum ImportType {
     Dynamic,
 }
 
+/// Confidence level for symbol resolution
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ResolutionConfidence {
+    /// Direct import with clear path resolution
+    High,
+    /// Relative import or heuristic-based resolution
+    Medium,
+    /// Wildcard import or complex dynamic patterns
+    Low,
+    /// Cannot resolve statically (dynamic imports, runtime modifications)
+    Unknown,
+}
+
+impl ResolutionConfidence {
+    /// Convert confidence to string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::High => "high",
+            Self::Medium => "medium",
+            Self::Low => "low",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    /// Classify import confidence based on import type
+    pub fn from_import_type(import_type: &ImportType) -> Self {
+        match import_type {
+            ImportType::Direct => Self::High,
+            ImportType::From => Self::High,
+            ImportType::Relative { level: 0..=1 } => Self::Medium,
+            ImportType::Relative { level: 2.. } => Self::Low,
+            ImportType::Star => Self::Low,
+            ImportType::Dynamic => Self::Unknown,
+        }
+    }
+}
+
 /// Symbol exported by a module
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportedSymbol {
@@ -211,6 +248,7 @@ pub struct ResolvedSymbol {
     pub original_name: String,
     pub is_function: bool,
     pub is_class: bool,
+    pub confidence: ResolutionConfidence,
 }
 
 /// Enhanced import resolver
@@ -737,6 +775,7 @@ impl EnhancedImportResolver {
                     original_name: name.to_string(),
                     is_function,
                     is_class,
+                    confidence: ResolutionConfidence::High, // Local definition - highest confidence
                 });
             }
 
@@ -784,6 +823,7 @@ impl EnhancedImportResolver {
                 original_name: name.to_string(),
                 is_function,
                 is_class,
+                confidence: ResolutionConfidence::Low, // Star import - low confidence
             })
         } else {
             None
@@ -809,6 +849,7 @@ impl EnhancedImportResolver {
                     original_name: name,
                     is_function,
                     is_class,
+                    confidence: ResolutionConfidence::Low, // Star import - low confidence
                 }
             })
             .collect()
