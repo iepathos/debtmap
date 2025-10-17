@@ -4,8 +4,9 @@ title: Design Pattern Recognition
 category: foundation
 priority: high
 status: draft
-dependencies: [112]
+dependencies: []
 created: 2025-10-16
+updated: 2025-10-16
 ---
 
 # Specification 114: Design Pattern Recognition
@@ -13,7 +14,7 @@ created: 2025-10-16
 **Category**: foundation
 **Priority**: high
 **Status**: draft
-**Dependencies**: Spec 109 (Cross-File Dependency Analysis)
+**Dependencies**: None (leverages existing cross-file analysis infrastructure)
 
 ## Context
 
@@ -151,29 +152,108 @@ Implement design pattern recognition to detect when functions/methods are invoke
 
 ## Technical Details
 
+### Parser Requirements
+
+To enable pattern recognition, the following language analyzers must extract additional AST information:
+
+#### Python Analyzer Enhancements
+
+**Required Extractions** (using `rustpython_parser`):
+1. **Class Decorators**: Extract decorators from class definitions
+   - `@dataclass`, `@abstractmethod`, custom decorators
+   - Store as `Vec<String>` on class metadata
+2. **Base Classes**: Track inheritance relationships
+   - Extract from `ClassDef.bases` AST node
+   - Store qualified names (e.g., `abc.ABC`, `Protocol`)
+3. **Method Decorators**: Extract decorators from method definitions
+   - `@abstractmethod`, `@property`, `@staticmethod`, `@classmethod`
+   - Framework decorators (`@app.route`, `@handler`)
+4. **Module-Level Assignments**: Track top-level variable assignments
+   - Pattern: `instance = ClassName(args)`
+   - Distinguish class instantiation from other assignments
+   - Store in `ModuleScopeAnalysis` struct
+5. **Callback Registrations**: Identify callback registration patterns
+   - AST patterns: `obj.method_name =  func`, `.on()`, `.subscribe()`, `.register()`
+   - Extract receiver, method, and callback function
+
+**AST Nodes to Analyze**:
+```rust
+use rustpython_parser::ast;
+
+// Class definitions with decorators and bases
+ast::Stmt::ClassDef(class_def) => {
+    decorators: class_def.decorator_list,
+    base_classes: class_def.bases,
+    // ...
+}
+
+// Function/method decorators
+ast::Stmt::FunctionDef(func_def) => {
+    decorators: func_def.decorator_list,
+    // Check if @abstractmethod is present
+}
+
+// Module-level assignments
+ast::Stmt::Assign(assign) if is_module_scope => {
+    targets: assign.targets,
+    value: assign.value,  // Check for ClassInstantiation pattern
+}
+
+// Method calls for callbacks
+ast::Expr::Call(call) => {
+    func: call.func,  // Check for .on(), .subscribe(), etc.
+    args: call.args,
+}
+```
+
+#### Rust Analyzer Enhancements
+
+**Already Implemented** via `TraitRegistry`:
+- ✅ Trait definitions and implementations
+- ✅ Trait method calls (polymorphic invocations)
+- ✅ Visitor pattern detection (syn::visit::Visit)
+- ✅ Cross-module trait resolution
+
+**Additional Requirements**:
+- Track `Arc<Mutex<T>>` patterns for singleton detection
+- Identify builder patterns (type-state builders)
+- Detect framework-specific patterns (Actix handlers, etc.)
+
+#### JavaScript/TypeScript Analyzer Enhancements
+
+**Required Extractions**:
+1. **Prototype Chain**: Track `prototype` assignments and `extends` clauses
+2. **Class Decorators**: Extract TypeScript decorators (`@Component`, `@Injectable`)
+3. **Callback Patterns**: Identify `.on()`, `.addEventListener()`, `.subscribe()`
+4. **Factory Functions**: Detect functions returning different class instances
+
 ### Implementation Approach
 
-**Phase 1: Observer Pattern**
-1. Detect abstract base classes with `@abstractmethod`
-2. Find concrete implementations inheriting from ABC
-3. Track observer registration patterns
-4. Detect polymorphic observer invocations
+**Phase 1: Parser Enhancements** (1 week)
+1. Extract decorators from Python classes and functions
+2. Track class inheritance relationships (base classes)
+3. Identify abstract methods via `@abstractmethod` decorator
+4. Extract module-level assignments with type information
+5. Track callback registration patterns (`.on()`, `.subscribe()`)
 
-**Phase 2: Singleton Pattern**
-1. Detect module-level class instantiation
-2. Track singleton instance exports
-3. Integrate with cross-file analysis (Spec 109)
+**Phase 2: Local Pattern Detection** (1 week)
+1. Observer pattern (AST-based detection, single-file initially)
+2. Factory pattern (name heuristics + AST analysis)
+3. Callback pattern (decorator-based)
+4. No cross-file dependencies yet - conservative local detection
 
-**Phase 3: Additional Patterns**
-1. Implement factory pattern detection
-2. Add strategy pattern recognition
-3. Implement callback pattern detection
-4. Add template method pattern
+**Phase 3: Cross-File Integration** (1 week)
+1. Integrate with existing `CrossModuleContext` for Python
+2. Integrate with existing `TraitRegistry` for Rust
+3. Singleton pattern with cross-file usage tracking
+4. Polymorphic invocation detection using call graph
 
-**Phase 4: Integration and Configuration**
-1. Integrate pattern detectors into dead code analysis
-2. Add configuration for custom patterns
-3. Implement pattern reasoning in output
+**Phase 4: Advanced Patterns & Configuration** (1 week)
+1. Strategy pattern detection
+2. Template method pattern detection
+3. Dependency injection detection
+4. Custom pattern configuration support
+5. Pattern reasoning in output
 
 ### Architecture Changes
 
@@ -288,21 +368,106 @@ impl ObserverPatternRecognizer {
     }
 
     fn has_polymorphic_invocation(&self, function: &FunctionDef, context: &ProjectContext) -> bool {
-        // Look for patterns like: `for obs in observers: obs.method_name()`
+        // Look for AST patterns: `for obs in observers: obs.method_name()`
         for (file, analysis) in &context.file_analyses {
-            if self.find_observer_loops(file, &function.name, analysis) {
+            if self.find_observer_loops_ast(file, &function.name, analysis) {
                 return true;
             }
         }
         false
     }
 
-    fn find_observer_loops(&self, file: &Path, method_name: &str, analysis: &FileAnalysis) -> bool {
-        // Parse for patterns:
-        // - for x in observers: x.method_name()
-        // - [obs.method_name() for obs in self.observers]
-        // - self.observers.forEach(obs => obs.method_name())
-        analysis.contains_pattern(&format!("for .+ in .+observers:.+\\.{}\\(", method_name))
+    /// AST-based detection of observer invocation loops
+    /// Detects patterns like:
+    /// - for observer in self.observers: observer.on_message_added()
+    /// - [obs.method() for obs in self.observers]
+    /// - map(lambda obs: obs.method(), self.observers)
+    fn find_observer_loops_ast(&self, file: &Path, method_name: &str, analysis: &FileAnalysis) -> bool {
+        use rustpython_parser::ast;
+
+        // Traverse AST to find for loops
+        for stmt in &analysis.ast.body {
+            if let ast::Stmt::For(for_loop) = stmt {
+                // Check if iterating over collection named *observers* or *callbacks*
+                if self.is_observer_collection(&for_loop.iter) {
+                    // Check if loop body calls method_name on loop variable
+                    if self.loop_calls_method(&for_loop.body, &for_loop.target, method_name) {
+                        return true;
+                    }
+                }
+            }
+
+            // Check list comprehensions: [obs.method() for obs in observers]
+            if let Some(comprehension) = self.extract_list_comprehension(stmt) {
+                if self.is_observer_collection(&comprehension.iter) {
+                    if self.comprehension_calls_method(&comprehension, method_name) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if an expression represents an observer/callback collection
+    fn is_observer_collection(&self, expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::Attribute(attr) => {
+                // self.observers, self.callbacks, etc.
+                matches!(attr.attr.as_str(),
+                    "observers" | "callbacks" | "listeners" | "handlers" | "subscribers")
+            }
+            ast::Expr::Name(name) => {
+                // Local variable named observers, callbacks, etc.
+                matches!(name.id.as_str(),
+                    "observers" | "callbacks" | "listeners" | "handlers" | "subscribers")
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if loop body calls method_name on loop variable
+    fn loop_calls_method(&self, body: &[ast::Stmt], target: &ast::Expr, method_name: &str) -> bool {
+        for stmt in body {
+            if let ast::Stmt::Expr(expr_stmt) = stmt {
+                if let ast::Expr::Call(call) = &expr_stmt.value {
+                    if let ast::Expr::Attribute(attr) = &*call.func {
+                        // Check if calling target.method_name()
+                        if attr.attr == method_name {
+                            if self.expressions_match(&attr.value, target) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if two AST expressions refer to the same variable
+    fn expressions_match(&self, expr1: &ast::Expr, expr2: &ast::Expr) -> bool {
+        match (expr1, expr2) {
+            (ast::Expr::Name(n1), ast::Expr::Name(n2)) => n1.id == n2.id,
+            _ => false,  // Conservative: assume no match for complex expressions
+        }
+    }
+
+    /// Extract list comprehension from expression statement
+    fn extract_list_comprehension(&self, stmt: &ast::Stmt) -> Option<&ast::Comprehension> {
+        if let ast::Stmt::Expr(expr_stmt) = stmt {
+            if let ast::Expr::ListComp(list_comp) = &expr_stmt.value {
+                return list_comp.generators.first();
+            }
+        }
+        None
+    }
+
+    /// Check if comprehension calls method_name
+    fn comprehension_calls_method(&self, comp: &ast::Comprehension, method_name: &str) -> bool {
+        // This would need deeper AST analysis to check the element expression
+        // For now, conservative approach: assume it might
+        false // TODO: Implement full comprehension analysis
     }
 }
 
@@ -522,35 +687,347 @@ impl DeadCodeDetector {
 }
 ```
 
+### Integration with Existing Infrastructure
+
+#### Python Cross-File Analysis (`src/analysis/python_call_graph/cross_module.rs`)
+
+**Already Implemented**:
+```rust
+pub struct CrossModuleContext {
+    pub symbols: HashMap<String, FunctionId>,  // Symbol resolution
+    pub dependencies: HashMap<PathBuf, Vec<PathBuf>>,  // File dependencies
+    pub imports: HashMap<PathBuf, Vec<ImportedSymbol>>,  // Import tracking
+    pub exports: HashMap<PathBuf, Vec<ExportedSymbol>>,  // Export tracking
+    pub namespaces: HashMap<PathBuf, ModuleNamespace>,  // Namespace resolution
+}
+
+impl CrossModuleContext {
+    pub fn resolve_function(&self, module_path: &Path, name: &str) -> Option<FunctionId>;
+    pub fn resolve_method(&self, class_name: &str, method_name: &str) -> Option<FunctionId>;
+}
+```
+
+**Pattern Detection Integration**:
+- Use `CrossModuleContext` for singleton instance tracking
+- Resolve cross-file observer implementations via `namespaces`
+- Track factory instantiation across modules via `dependencies`
+
+#### Rust Trait Analysis (`src/analysis/call_graph/trait_registry.rs`)
+
+**Already Implemented**:
+```rust
+pub struct TraitRegistry {
+    trait_definitions: HashMap<String, Vector<TraitMethod>>,
+    trait_implementations: HashMap<String, Vector<TraitImplementation>>,
+    unresolved_calls: Vector<TraitMethodCall>,
+}
+
+impl TraitRegistry {
+    pub fn find_implementations(&self, trait_name: &str) -> Option<Vector<TraitMethodImplementation>>;
+    pub fn resolve_trait_call(&self, call: &TraitMethodCall) -> Vector<FunctionId>;
+    pub fn has_trait_implementations(&self, func_id: &FunctionId) -> bool;
+}
+```
+
+**Pattern Detection Integration**:
+- Rust observer pattern == Trait implementations
+- Use `TraitRegistry` to detect polymorphic trait method calls
+- Leverage existing `visit_trait_methods` for visitor pattern detection
+
+#### Integration API
+
+```rust
+// Pattern detector uses existing infrastructure
+impl PatternDetector {
+    pub fn new_with_context(
+        config: PatternConfig,
+        cross_module_context: Arc<CrossModuleContext>,  // Python
+        trait_registry: Arc<TraitRegistry>,              // Rust
+    ) -> Self {
+        Self {
+            detectors: vec![
+                Box::new(ObserverPatternRecognizer::new(config.observer, cross_module_context.clone())),
+                Box::new(SingletonPatternRecognizer::new(cross_module_context.clone())),
+                // ... other recognizers
+            ],
+            config,
+        }
+    }
+}
+```
+
+### Default Pattern Configurations
+
+```rust
+impl Default for ObserverConfig {
+    fn default() -> Self {
+        Self {
+            interface_markers: vec![
+                "ABC".to_string(),
+                "Protocol".to_string(),
+                "Interface".to_string(),
+            ],
+            registration_methods: vec![
+                "add_observer".to_string(),
+                "register".to_string(),
+                "subscribe".to_string(),
+                "add_listener".to_string(),
+                "on".to_string(),
+            ],
+            common_method_prefixes: vec![
+                "on_".to_string(),
+                "handle_".to_string(),
+                "notify_".to_string(),
+                "process_".to_string(),
+            ],
+        }
+    }
+}
+
+impl Default for SingletonConfig {
+    fn default() -> Self {
+        Self {
+            detect_module_level: true,
+            detect_new_override: true,
+            detect_decorator: true,
+            singleton_decorators: vec![
+                "singleton".to_string(),
+                "dataclass".to_string(),  // Often used as singletons
+            ],
+        }
+    }
+}
+
+impl Default for FactoryConfig {
+    fn default() -> Self {
+        Self {
+            detect_functions: true,
+            detect_registries: true,
+            name_patterns: vec![
+                "create_".to_string(),
+                "make_".to_string(),
+                "build_".to_string(),
+                "_factory".to_string(),
+                "get_".to_string(),  // Getter factories
+            ],
+        }
+    }
+}
+
+impl Default for PatternConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            observer: ObserverConfig::default(),
+            singleton: SingletonConfig::default(),
+            factory: FactoryConfig::default(),
+            strategy: StrategyConfig::default(),
+            callback: CallbackConfig::default(),
+            template_method: TemplateMethodConfig::default(),
+            custom_rules: vec![],
+        }
+    }
+}
+```
+
+### Performance Optimization Strategies
+
+#### 1. Lazy Pattern Checking
+
+```rust
+impl DeadCodeDetector {
+    fn should_check_patterns(&self, function: &FunctionDef, context: &ProjectContext) -> bool {
+        // Only check patterns if function has NO direct callers
+        !context.call_graph.has_direct_callers(&function.id)
+    }
+
+    pub fn detect_with_pattern_analysis(&self, function: &FunctionDef, context: &ProjectContext) -> Option<DeadCodeFinding> {
+        // Fast path: If has direct callers, skip pattern detection
+        if !self.should_check_patterns(function, context) {
+            return None;
+        }
+
+        // Expensive pattern detection only for suspicious functions
+        if let Some(pattern) = self.pattern_detector.is_function_used_by_pattern(function, context) {
+            return None;  // Used via pattern
+        }
+
+        self.detect_without_patterns(function, context)
+    }
+}
+```
+
+#### 2. Pattern Index Caching
+
+```rust
+pub struct PatternDetector {
+    detectors: Vec<Box<dyn PatternRecognizer>>,
+    config: PatternConfig,
+    // Cached pattern indices
+    observer_interfaces: RwLock<HashMap<String, Vec<String>>>,  // class -> methods
+    singleton_instances: RwLock<HashMap<String, FunctionId>>,   // instance -> class
+    factory_registries: RwLock<HashMap<String, HashMap<String, String>>>,  // registry -> type -> class
+}
+
+impl PatternDetector {
+    pub fn build_indices(&mut self, context: &ProjectContext) {
+        // Build all indices upfront (parallel)
+        rayon::scope(|s| {
+            s.spawn(|_| self.build_observer_index(context));
+            s.spawn(|_| self.build_singleton_index(context));
+            s.spawn(|_| self.build_factory_index(context));
+        });
+    }
+}
+```
+
+#### 3. Parallel Pattern Detection
+
+```rust
+impl PatternDetector {
+    pub fn detect_all_patterns(&self, context: &ProjectContext) -> Vec<PatternInstance> {
+        // Run all pattern recognizers in parallel
+        self.detectors
+            .par_iter()
+            .flat_map(|detector| detector.detect(context))
+            .collect()
+    }
+}
+```
+
+#### 4. Memoization of Pattern Queries
+
+```rust
+pub struct PatternDetector {
+    // ... fields ...
+    pattern_cache: Arc<RwLock<HashMap<FunctionId, Option<PatternInstance>>>>,
+}
+
+impl PatternDetector {
+    pub fn is_function_used_by_pattern(
+        &self,
+        function: &FunctionDef,
+        context: &ProjectContext,
+    ) -> Option<PatternInstance> {
+        // Check cache first
+        {
+            let cache = self.pattern_cache.read().unwrap();
+            if let Some(cached) = cache.get(&function.id) {
+                return cached.clone();
+            }
+        }
+
+        // Compute and cache
+        let result = self.compute_pattern_usage(function, context);
+        self.pattern_cache.write().unwrap().insert(function.id.clone(), result.clone());
+        result
+    }
+}
+```
+
+### False Negative Mitigation
+
+To prevent missing actual pattern usage (false negatives), implement conservative defaults:
+
+#### 1. Conservative Observer Detection
+
+```rust
+impl ObserverPatternRecognizer {
+    fn is_used_by_pattern(&self, function: &FunctionDef, context: &ProjectContext) -> bool {
+        // Conservative: If method name suggests observer pattern, assume used
+        if self.has_observer_method_name(&function.name) {
+            // Require EITHER:
+            // - ABC inheritance OR
+            // - Observable method name ("on_", "handle_") AND any loop over collections
+            return self.is_likely_observer_method(function, context);
+        }
+
+        // Normal stricter check
+        self.has_abc_inheritance(function, context) && self.has_polymorphic_invocation(function, context)
+    }
+
+    fn has_observer_method_name(&self, name: &str) -> bool {
+        self.config.common_method_prefixes.iter().any(|prefix| name.starts_with(prefix))
+    }
+}
+```
+
+#### 2. User Annotations
+
+```rust
+// Support user annotations to override pattern detection
+// @debtmap:used-via-pattern observer
+// @debtmap:singleton-instance
+```
+
+#### 3. Warning Mode
+
+```rust
+pub struct PatternDetector {
+    config: PatternConfig,
+    warnings: Arc<RwLock<Vec<PatternWarning>>>,  // Uncertain patterns
+}
+
+pub struct PatternWarning {
+    pub function_id: FunctionId,
+    pub possible_pattern: PatternType,
+    pub confidence: f32,  // 0.0 - 1.0
+    pub reason: String,
+}
+
+impl PatternDetector {
+    pub fn detect_with_warnings(&self, function: &FunctionDef, context: &ProjectContext) -> (Option<PatternInstance>, Vec<PatternWarning>) {
+        let mut warnings = vec![];
+
+        // Check for partial pattern matches
+        if self.looks_like_observer_but_unclear(function, context) {
+            warnings.push(PatternWarning {
+                function_id: function.id.clone(),
+                possible_pattern: PatternType::Observer,
+                confidence: 0.6,
+                reason: "Method name suggests observer pattern, but no ABC inheritance found".to_string(),
+            });
+        }
+
+        (self.is_function_used_by_pattern(function, context), warnings)
+    }
+}
+```
+
 ### Integration Points
 
-1. **Symbol Resolver** (Spec 109)
-   - Track class inheritance relationships
-   - Provide base class lookup
-   - Identify abstract methods
+1. **CrossModuleContext (Python)**
+   - Symbol resolution for cross-file observer implementations
+   - Singleton instance tracking via imports/exports
+   - Factory instantiation across modules
 
-2. **Cross-File Call Graph** (Spec 109)
-   - Query polymorphic invocations
-   - Track singleton instance usage
-   - Identify factory-created objects
+2. **TraitRegistry (Rust)**
+   - Trait-based observer pattern detection
+   - Polymorphic method call resolution
+   - Visitor pattern support
 
 3. **Dead Code Detector**
    - Query pattern detector before marking as dead
    - Include pattern usage in findings
+   - Show warnings for uncertain patterns
 
 4. **Output Formatters**
    - Show pattern detection reasoning
    - Explain why function is used via pattern
+   - Display confidence scores for uncertain patterns
 
 ## Dependencies
 
-- **Prerequisites**:
-  - Spec 109 (Cross-File Dependency Analysis) - Provides call graph and symbol resolution
+- **Prerequisites**: None (uses existing cross-file infrastructure)
+- **Existing Infrastructure**:
+  - `src/analysis/python_call_graph/cross_module.rs` - Python cross-file analysis
+  - `src/analysis/call_graph/cross_module.rs` - Rust cross-module tracking
+  - `src/analysis/call_graph/trait_registry.rs` - Rust trait analysis
 - **Affected Components**:
-  - `src/analysis/patterns/` - New module for pattern recognition
+  - `src/analysis/patterns/` - **New module** for pattern recognition
   - `src/debt/dead_code.rs` - Integrate pattern detection
-  - `src/analyzers/python/` - Extract class inheritance and decorators
-- **External Dependencies**: None
+  - `src/analyzers/python.rs` - Extract decorators, base classes, module-level assignments
+- **External Dependencies**: None (uses existing `rustpython_parser`)
 
 ## Testing Strategy
 
