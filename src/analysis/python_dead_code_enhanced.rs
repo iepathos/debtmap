@@ -93,6 +93,7 @@ use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::callback_tracker::CallbackTracker;
 use crate::analysis::python_call_graph::import_tracker::ImportTracker;
 use crate::core::FunctionMetrics;
+use crate::debt::public_api_detector::{PublicApiConfig, PublicApiDetector};
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::testing::python::test_detector::PythonTestDetector;
 use std::collections::HashMap;
@@ -200,6 +201,7 @@ pub struct EnhancedDeadCodeAnalyzer {
     import_trackers: HashMap<PathBuf, ImportTracker>,
     coverage_data: Option<CoverageData>,
     config: AnalysisConfig,
+    public_api_detector: Option<PublicApiDetector>,
 }
 
 /// Coverage data from coverage.py or pytest-cov
@@ -293,6 +295,10 @@ pub struct AnalysisConfig {
     pub medium_confidence_threshold: f32,
     pub respect_suppression_comments: bool,
     pub include_private_api: bool,
+    /// Enable advanced public API detection heuristics (Spec 113)
+    pub enable_public_api_detection: bool,
+    /// Configuration for public API detector
+    pub public_api_config: Option<PublicApiConfig>,
 }
 
 impl Default for AnalysisConfig {
@@ -302,23 +308,43 @@ impl Default for AnalysisConfig {
             medium_confidence_threshold: 0.5,
             respect_suppression_comments: true,
             include_private_api: true,
+            enable_public_api_detection: true,
+            public_api_config: None,
         }
     }
 }
 
 impl EnhancedDeadCodeAnalyzer {
     pub fn new() -> Self {
+        let config = AnalysisConfig::default();
+        let public_api_detector = if config.enable_public_api_detection {
+            Some(PublicApiDetector::new(
+                config.public_api_config.clone().unwrap_or_default(),
+            ))
+        } else {
+            None
+        };
+
         Self {
             framework_detector: FrameworkPatternRegistry::new(),
             test_detector: PythonTestDetector::new(),
             callback_tracker: CallbackTracker::new(),
             import_trackers: HashMap::new(),
             coverage_data: None,
-            config: AnalysisConfig::default(),
+            config,
+            public_api_detector,
         }
     }
 
     pub fn with_config(mut self, config: AnalysisConfig) -> Self {
+        // Initialize public API detector if enabled
+        self.public_api_detector = if config.enable_public_api_detection {
+            Some(PublicApiDetector::new(
+                config.public_api_config.clone().unwrap_or_default(),
+            ))
+        } else {
+            None
+        };
         self.config = config;
         self
     }
