@@ -39,7 +39,10 @@ fn test_pattern_extraction_observer_pattern() {
         observer.base_classes.contains(&"ABC".to_string()),
         "Observer should inherit from ABC"
     );
-    assert!(observer.is_abstract, "Observer should be marked as abstract");
+    assert!(
+        observer.is_abstract,
+        "Observer should be marked as abstract"
+    );
     assert!(
         observer.methods.iter().any(|m| m.is_abstract),
         "Observer should have abstract methods"
@@ -57,7 +60,9 @@ fn test_pattern_extraction_observer_pattern() {
         "ConcreteObserver should have @dataclass decorator"
     );
     assert!(
-        concrete_observer.base_classes.contains(&"Observer".to_string()),
+        concrete_observer
+            .base_classes
+            .contains(&"Observer".to_string()),
         "ConcreteObserver should inherit from Observer"
     );
 
@@ -192,5 +197,8 @@ fn test_abstract_method_detection() {
         on_event.decorators.contains(&"abstractmethod".to_string()),
         "on_event should have @abstractmethod decorator"
     );
-    assert!(on_event.is_abstract, "on_event should be marked as abstract");
+    assert!(
+        on_event.is_abstract,
+        "on_event should be marked as abstract"
+    );
 }
