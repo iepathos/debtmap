@@ -27,6 +27,39 @@ impl FactoryPatternRecognizer {
             || name_lower.starts_with("get_")
             || name_lower.starts_with("new_")
     }
+
+    /// Detect factory registries from module scope analysis
+    ///
+    /// Looks for module-level assignments that might be factory registries,
+    /// such as dictionaries mapping type names to classes.
+    ///
+    /// NOTE: Full AST traversal for detecting dictionary-based registries
+    /// is not yet implemented. This is a heuristic-based approach that looks
+    /// for naming patterns like 'registry', 'factories', 'builders', etc.
+    fn detect_factory_registries(&self, file_metrics: &FileMetrics) -> Vec<Implementation> {
+        let module_scope = match &file_metrics.module_scope {
+            Some(scope) => scope,
+            None => return vec![],
+        };
+
+        module_scope
+            .assignments
+            .iter()
+            .filter(|assignment| {
+                let name_lower = assignment.name.to_lowercase();
+                name_lower.contains("registry")
+                    || name_lower.contains("factories")
+                    || name_lower.contains("builders")
+                    || name_lower.contains("creators")
+            })
+            .map(|assignment| Implementation {
+                file: file_metrics.path.clone(),
+                class_name: None,
+                function_name: assignment.name.clone(),
+                line: assignment.line,
+            })
+            .collect()
+    }
 }
 
 impl Default for FactoryPatternRecognizer {
@@ -41,7 +74,10 @@ impl PatternRecognizer for FactoryPatternRecognizer {
     }
 
     fn detect(&self, file_metrics: &FileMetrics) -> Vec<PatternInstance> {
-        file_metrics
+        let mut patterns = Vec::new();
+
+        // Detect factory functions
+        let factory_functions: Vec<PatternInstance> = file_metrics
             .complexity
             .functions
             .iter()
@@ -59,7 +95,27 @@ impl PatternRecognizer for FactoryPatternRecognizer {
                 usage_sites: vec![],
                 reasoning: format!("Factory function {} (name-based detection)", function.name),
             })
-            .collect()
+            .collect();
+
+        patterns.extend(factory_functions);
+
+        // Detect factory registries
+        let registries = self.detect_factory_registries(file_metrics);
+        if !registries.is_empty() {
+            patterns.push(PatternInstance {
+                pattern_type: PatternType::Factory,
+                confidence: 0.8,
+                base_class: None,
+                implementations: registries.clone(),
+                usage_sites: vec![],
+                reasoning: format!(
+                    "Factory registry pattern with {} registry definition(s)",
+                    registries.len()
+                ),
+            });
+        }
+
+        patterns
     }
 
     fn is_function_used_by_pattern(

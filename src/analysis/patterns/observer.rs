@@ -50,6 +50,25 @@ impl ObserverPatternRecognizer {
             })
             .collect()
     }
+
+    /// Detect observer invocation loops by checking method implementations
+    ///
+    /// This checks for patterns where collections named 'observers', 'callbacks',
+    /// 'listeners', etc. are likely iterated over to call observer methods.
+    ///
+    /// NOTE: Full AST traversal for loop detection is not yet implemented.
+    /// This is a heuristic-based approach that looks for methods with names
+    /// like 'notify', 'notify_all', 'trigger', etc. that likely contain
+    /// observer invocation loops.
+    fn has_observer_invocation_patterns(&self, class: &ClassDef) -> bool {
+        // Check for common notification method names
+        let notification_methods = ["notify", "notify_all", "trigger", "fire", "emit", "broadcast"];
+
+        class.methods.iter().any(|method| {
+            let method_lower = method.name.to_lowercase();
+            notification_methods.iter().any(|pattern| method_lower.contains(pattern))
+        })
+    }
 }
 
 impl Default for ObserverPatternRecognizer {
@@ -78,17 +97,35 @@ impl PatternRecognizer for ObserverPatternRecognizer {
                 if implementations.is_empty() {
                     None
                 } else {
-                    Some(PatternInstance {
-                        pattern_type: PatternType::Observer,
-                        confidence: 0.9,
-                        base_class: Some(interface.name.clone()),
-                        implementations: implementations.clone(),
-                        usage_sites: vec![],
-                        reasoning: format!(
+                    // Check if any implementation class has observer invocation patterns
+                    let has_invocation = classes.iter().any(|class| {
+                        class.base_classes.contains(&interface.name)
+                            || self.has_observer_invocation_patterns(class)
+                    });
+
+                    let confidence = if has_invocation { 0.95 } else { 0.85 };
+
+                    let reasoning = if has_invocation {
+                        format!(
+                            "Observer interface {} with {} concrete implementation(s) and invocation pattern detected",
+                            interface.name,
+                            implementations.len()
+                        )
+                    } else {
+                        format!(
                             "Observer interface {} with {} concrete implementation(s)",
                             interface.name,
                             implementations.len()
-                        ),
+                        )
+                    };
+
+                    Some(PatternInstance {
+                        pattern_type: PatternType::Observer,
+                        confidence,
+                        base_class: Some(interface.name.clone()),
+                        implementations: implementations.clone(),
+                        usage_sites: vec![],
+                        reasoning,
                     })
                 }
             })

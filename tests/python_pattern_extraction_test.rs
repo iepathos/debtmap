@@ -1,3 +1,4 @@
+use debtmap::analysis::patterns::{PatternDetector, PatternType};
 use debtmap::analyzers::{python::PythonAnalyzer, Analyzer};
 use debtmap::core::Language;
 use std::fs;
@@ -201,4 +202,153 @@ fn test_abstract_method_detection() {
         on_event.is_abstract,
         "on_event should be marked as abstract"
     );
+}
+
+#[test]
+fn test_pattern_detector_detects_observer_pattern() {
+    // Load and parse the observer.py fixture
+    let fixture_path = PathBuf::from("tests/fixtures/pattern_extraction/observer.py");
+    let content = fs::read_to_string(&fixture_path).expect("Failed to read fixture");
+
+    let analyzer = PythonAnalyzer::new();
+    let ast = analyzer
+        .parse(&content, fixture_path.clone())
+        .expect("Failed to parse Python code");
+    let metrics = analyzer.analyze(&ast);
+
+    // Create pattern detector and detect patterns
+    let detector = PatternDetector::new();
+    let patterns = detector.detect_all_patterns(&metrics);
+
+    // Assert that at least one Observer pattern was detected
+    let observer_patterns: Vec<_> = patterns
+        .iter()
+        .filter(|p| p.pattern_type == PatternType::Observer)
+        .collect();
+
+    assert!(
+        !observer_patterns.is_empty(),
+        "Should detect Observer pattern in observer.py"
+    );
+
+    // Verify confidence score is reasonable
+    let observer_pattern = observer_patterns.first().unwrap();
+    assert!(
+        observer_pattern.confidence >= 0.7,
+        "Observer pattern confidence should be at least 0.7, got {}",
+        observer_pattern.confidence
+    );
+
+    // Verify the pattern has a base class
+    assert!(
+        observer_pattern.base_class.is_some(),
+        "Observer pattern should identify base class"
+    );
+    let base_class = observer_pattern.base_class.as_ref().unwrap();
+    assert!(
+        base_class == "Observer" || base_class == "Subject",
+        "Base class should be Observer or Subject, got {}",
+        base_class
+    );
+
+    // Verify implementations were found
+    assert!(
+        !observer_pattern.implementations.is_empty(),
+        "Should find implementations of Observer pattern"
+    );
+}
+
+#[test]
+fn test_pattern_detector_detects_factory_pattern() {
+    // Load and parse the observer.py fixture (it contains a factory function)
+    let fixture_path = PathBuf::from("tests/fixtures/pattern_extraction/observer.py");
+    let content = fs::read_to_string(&fixture_path).expect("Failed to read fixture");
+
+    let analyzer = PythonAnalyzer::new();
+    let ast = analyzer
+        .parse(&content, fixture_path.clone())
+        .expect("Failed to parse Python code");
+    let metrics = analyzer.analyze(&ast);
+
+    // Create pattern detector and detect patterns
+    let detector = PatternDetector::new();
+    let patterns = detector.detect_all_patterns(&metrics);
+
+    // Assert that at least one Factory pattern was detected
+    let factory_patterns: Vec<_> = patterns
+        .iter()
+        .filter(|p| p.pattern_type == PatternType::Factory)
+        .collect();
+
+    assert!(
+        !factory_patterns.is_empty(),
+        "Should detect Factory pattern (create_observer function)"
+    );
+
+    // Verify confidence score
+    let factory_pattern = factory_patterns.first().unwrap();
+    assert!(
+        factory_pattern.confidence > 0.0,
+        "Factory pattern confidence should be positive"
+    );
+
+    // Verify implementations
+    assert!(
+        !factory_pattern.implementations.is_empty(),
+        "Should find factory function implementations"
+    );
+
+    // Check that the create_observer function is identified
+    let has_create_observer = factory_pattern
+        .implementations
+        .iter()
+        .any(|impl_| impl_.function_name.contains("create_observer"));
+    assert!(
+        has_create_observer,
+        "Should identify create_observer as factory function"
+    );
+}
+
+#[test]
+fn test_pattern_detector_all_patterns() {
+    // Integration test that checks all pattern detection works together
+    let fixture_path = PathBuf::from("tests/fixtures/pattern_extraction/observer.py");
+    let content = fs::read_to_string(&fixture_path).expect("Failed to read fixture");
+
+    let analyzer = PythonAnalyzer::new();
+    let ast = analyzer
+        .parse(&content, fixture_path.clone())
+        .expect("Failed to parse Python code");
+    let metrics = analyzer.analyze(&ast);
+
+    // Create pattern detector
+    let detector = PatternDetector::new();
+    let patterns = detector.detect_all_patterns(&metrics);
+
+    // Assert that multiple patterns are detected
+    assert!(
+        patterns.len() >= 2,
+        "Should detect at least 2 patterns (Observer and Factory)"
+    );
+
+    // Count pattern types
+    let observer_count = patterns
+        .iter()
+        .filter(|p| p.pattern_type == PatternType::Observer)
+        .count();
+    let factory_count = patterns
+        .iter()
+        .filter(|p| p.pattern_type == PatternType::Factory)
+        .count();
+
+    assert!(observer_count > 0, "Should detect Observer patterns");
+    assert!(factory_count > 0, "Should detect Factory patterns");
+
+    // Verify all patterns have reasoning
+    for pattern in &patterns {
+        assert!(
+            !pattern.reasoning.is_empty(),
+            "All patterns should have reasoning explanation"
+        );
+    }
 }
