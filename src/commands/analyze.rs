@@ -58,6 +58,8 @@ pub struct AnalyzeConfig {
     pub no_god_object: bool,
     pub max_files: Option<usize>,
     pub validate_loc: bool,
+    pub no_public_api_detection: bool,
+    pub public_api_threshold: f32,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {

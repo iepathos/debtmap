@@ -205,6 +205,14 @@ pub enum Commands {
         /// Validate LOC consistency across analysis modes (with/without coverage)
         #[arg(long = "validate-loc")]
         validate_loc: bool,
+
+        /// Disable public API detection heuristics for dead code analysis
+        #[arg(long = "no-public-api-detection")]
+        no_public_api_detection: bool,
+
+        /// Public API confidence threshold (0.0-1.0) - functions above this are considered public APIs
+        #[arg(long = "public-api-threshold", default_value = "0.7")]
+        public_api_threshold: f32,
     },
 
     /// Initialize configuration file
