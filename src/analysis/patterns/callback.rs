@@ -75,11 +75,10 @@ impl PatternRecognizer for CallbackPatternRecognizer {
             .filter(|function| self.has_callback_decorator(function, file_metrics))
             .map(|function| {
                 // Check if detected via decorator or naming convention
-                let has_decorator = file_metrics.classes.as_ref().map_or(false, |classes| {
+                let has_decorator = file_metrics.classes.as_ref().is_some_and(|classes| {
                     classes.iter().any(|class| {
                         class.methods.iter().any(|method| {
-                            (method.name == function.name
-                                || function.name.ends_with(&method.name))
+                            (method.name == function.name || function.name.ends_with(&method.name))
                                 && !method.decorators.is_empty()
                         })
                     })
@@ -96,10 +95,7 @@ impl PatternRecognizer for CallbackPatternRecognizer {
                 } else {
                     (
                         0.6,
-                        format!(
-                            "Callback handler {} (name-based detection)",
-                            function.name
-                        ),
+                        format!("Callback handler {} (name-based detection)", function.name),
                     )
                 };
 
@@ -127,7 +123,7 @@ impl PatternRecognizer for CallbackPatternRecognizer {
     ) -> Option<PatternInstance> {
         if self.has_callback_decorator(function, file_metrics) {
             // Check if detected via decorator or naming convention
-            let has_decorator = file_metrics.classes.as_ref().map_or(false, |classes| {
+            let has_decorator = file_metrics.classes.as_ref().is_some_and(|classes| {
                 classes.iter().any(|class| {
                     class.methods.iter().any(|method| {
                         (method.name == function.name || function.name.ends_with(&method.name))

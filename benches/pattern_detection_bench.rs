@@ -23,7 +23,9 @@ fn generate_pattern_rich_code(num_classes: usize) -> String {
         code.push_str("    def on_event(self, event: str) -> None:\n");
         code.push_str("        pass\n\n");
 
-        code.push_str(&format!("@dataclass\nclass ConcreteObserver{i}(Observer{i}):\n"));
+        code.push_str(&format!(
+            "@dataclass\nclass ConcreteObserver{i}(Observer{i}):\n"
+        ));
         code.push_str("    name: str\n\n");
         code.push_str("    def on_event(self, event: str) -> None:\n");
         code.push_str("        print(f'{self.name} received {event}')\n\n");
