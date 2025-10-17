@@ -62,11 +62,20 @@ impl ObserverPatternRecognizer {
     /// observer invocation loops.
     fn has_observer_invocation_patterns(&self, class: &ClassDef) -> bool {
         // Check for common notification method names
-        let notification_methods = ["notify", "notify_all", "trigger", "fire", "emit", "broadcast"];
+        let notification_methods = [
+            "notify",
+            "notify_all",
+            "trigger",
+            "fire",
+            "emit",
+            "broadcast",
+        ];
 
         class.methods.iter().any(|method| {
             let method_lower = method.name.to_lowercase();
-            notification_methods.iter().any(|pattern| method_lower.contains(pattern))
+            notification_methods
+                .iter()
+                .any(|pattern| method_lower.contains(pattern))
         })
     }
 }
