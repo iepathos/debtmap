@@ -282,6 +282,10 @@ pub struct FileMetrics {
     pub debt_items: Vec<DebtItem>,
     pub dependencies: Vec<Dependency>,
     pub duplications: Vec<DuplicationBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub module_scope: Option<ast::ModuleScopeAnalysis>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub classes: Option<Vec<ast::ClassDef>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

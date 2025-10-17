@@ -84,6 +84,8 @@ where
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         })
     }
 
@@ -140,6 +142,8 @@ where
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         })
     }
 

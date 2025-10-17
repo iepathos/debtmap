@@ -618,6 +618,8 @@ fn create_minimal_file_metrics(func: &FunctionMetrics) -> crate::core::FileMetri
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        module_scope: None,
+        classes: None,
     }
 }
 

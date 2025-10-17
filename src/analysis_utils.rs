@@ -305,6 +305,8 @@ mod tests {
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
+                module_scope: None,
+                classes: None,
             },
             FileMetrics {
                 path: PathBuf::from("file2.rs"),
@@ -356,6 +358,8 @@ mod tests {
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
+                module_scope: None,
+                classes: None,
             },
         ];
 
@@ -393,6 +397,8 @@ mod tests {
                 },
             ],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         }];
 
         let report = create_dependency_report(&file_metrics);

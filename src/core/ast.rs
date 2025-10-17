@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
@@ -7,6 +8,84 @@ pub enum Ast {
     JavaScript(JavaScriptAst),
     TypeScript(TypeScriptAst),
     Unknown,
+}
+
+// Pattern recognition data structures
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassDef {
+    pub name: String,
+    pub base_classes: Vec<String>,
+    pub methods: Vec<MethodDef>,
+    pub is_abstract: bool,
+    pub decorators: Vec<String>,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MethodDef {
+    pub name: String,
+    pub is_abstract: bool,
+    pub decorators: Vec<String>,
+    pub overrides_base: bool,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleScopeAnalysis {
+    pub assignments: Vec<Assignment>,
+    pub singleton_instances: Vec<SingletonInstance>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Assignment {
+    pub name: String,
+    pub value: Expression,
+    pub scope: Scope,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Scope {
+    Module,
+    Class,
+    Function,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Expression {
+    ClassInstantiation {
+        class_name: String,
+        args: Vec<String>,
+    },
+    FunctionCall {
+        function_name: String,
+        args: Vec<String>,
+    },
+    ClassReference {
+        class_name: String,
+    },
+    Literal {
+        value: String,
+    },
+    Other,
+}
+
+impl Expression {
+    pub fn is_class_instantiation(&self) -> bool {
+        matches!(self, Expression::ClassInstantiation { .. })
+    }
+
+    pub fn is_class_reference(&self) -> bool {
+        matches!(self, Expression::ClassReference { .. })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SingletonInstance {
+    pub variable_name: String,
+    pub class_name: String,
+    pub line: usize,
 }
 
 #[derive(Clone, Debug)]

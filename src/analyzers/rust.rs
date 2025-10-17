@@ -86,6 +86,8 @@ impl Analyzer for RustAnalyzer {
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
+                module_scope: None,
+                classes: None,
             },
         }
     }
@@ -201,6 +203,8 @@ fn build_file_metrics(
         debt_items,
         dependencies,
         duplications: vec![],
+        module_scope: None,
+        classes: None,
     }
 }
 
