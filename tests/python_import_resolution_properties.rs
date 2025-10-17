@@ -7,9 +7,7 @@
 //! - Import graphs have no self-loops
 //! - Cycle detection is consistent
 
-use debtmap::analysis::python_imports::{
-    EnhancedImportResolver, ImportType, ResolutionConfidence,
-};
+use debtmap::analysis::python_imports::{EnhancedImportResolver, ImportType, ResolutionConfidence};
 use proptest::prelude::*;
 use std::collections::HashSet;
 use std::fs;
@@ -17,10 +15,10 @@ use tempfile::TempDir;
 
 /// Python keywords to avoid
 const PYTHON_KEYWORDS: &[&str] = &[
-    "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del",
-    "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in",
-    "is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while",
-    "with", "yield", "None", "True", "False",
+    "and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif",
+    "else", "except", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda",
+    "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield", "None",
+    "True", "False",
 ];
 
 /// Generate valid Python identifier (avoiding keywords)
