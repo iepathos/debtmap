@@ -13,7 +13,7 @@ created: 2025-10-16
 **Category**: foundation
 **Priority**: high
 **Status**: draft
-**Dependencies**: Spec 109 (Cross-File Dependency Analysis)
+**Dependencies**: Spec 112 (Cross-File Dependency Analysis)
 
 ## Context
 
@@ -117,20 +117,25 @@ Implement heuristics to detect public API functions and exclude them from dead c
    - Custom patterns for project-specific APIs
 
 4. **Language Support**
-   - Python (primary)
-   - Rust (underscore convention, public/pub keyword)
-   - JavaScript/TypeScript (export keyword)
+   - Python (primary): underscore convention, `__all__`, docstrings, type hints
+   - Rust: `pub` keyword (definitive), `pub(crate)`, trait implementations, underscore convention
+   - JavaScript/TypeScript: `export` keyword
 
 ## Acceptance Criteria
 
 - [ ] Functions without underscore prefix marked as "potentially public"
+- [ ] Functions WITH underscore prefix marked as private (0.0) regardless of other signals
 - [ ] Functions with comprehensive docstrings (> 50 chars) marked as public API
 - [ ] Functions with full type hints + docstring marked as high-confidence public API
-- [ ] Symmetric function pairs detected (load/save, get/set)
+- [ ] Symmetric function pairs detected using word boundaries (load/save, get/set)
+- [ ] Symmetric pair matching handles edge cases (e.g., "resave" ≠ "reload")
 - [ ] If one function in pair is used, both marked as public
 - [ ] `__all__` exports identified as definite public API
 - [ ] Abstract method implementations excluded from dead code
 - [ ] Decorator-annotated functions handled appropriately
+- [ ] **Rust-specific**: Functions with `pub` keyword marked as public API (1.0)
+- [ ] **Rust-specific**: Functions with `pub(crate)` marked appropriately (0.5)
+- [ ] **Rust-specific**: Trait implementations never flagged as dead code
 - [ ] `create_bots_from_list()` example no longer flagged as dead code
 - [ ] `save_chat_history()` example no longer flagged (paired with `load_chat_history()`)
 - [ ] False positive rate < 5% on promptconstruct-frontend
@@ -224,6 +229,7 @@ pub struct DocstringHeuristic;
 pub struct TypeAnnotationHeuristic;
 pub struct SymmetricPairHeuristic;
 pub struct ModuleExportHeuristic;
+pub struct RustVisibilityHeuristic;  // Rust-specific pub keyword detection
 pub struct DecoratorHeuristic;
 pub struct AbstractMethodHeuristic;
 
@@ -260,6 +266,12 @@ impl DeadCodeDetector {
 
 ```rust
 // Naming Convention Heuristic
+//
+// IMPORTANT: This heuristic acts as a strong negative signal override.
+// Functions with leading underscore (`_private`) are marked as private (0.0)
+// regardless of other heuristic scores (docstrings, type hints, etc.).
+// This prevents false negatives where well-documented internal functions
+// are incorrectly classified as public APIs.
 impl ApiHeuristic for NamingConventionHeuristic {
     fn evaluate(&self, function: &FunctionDef, context: &FileContext) -> f32 {
         let name = &function.name;
@@ -269,7 +281,8 @@ impl ApiHeuristic for NamingConventionHeuristic {
             return 0.5;
         }
 
-        // Leading underscore → internal
+        // Leading underscore → internal (STRONG NEGATIVE SIGNAL - overrides other heuristics)
+        // Even if function has comprehensive docs and type hints, underscore means private
         if name.starts_with('_') {
             return 0.0;
         }
@@ -289,7 +302,7 @@ impl ApiHeuristic for NamingConventionHeuristic {
 
     fn explain(&self, function: &FunctionDef) -> String {
         if function.name.starts_with('_') {
-            "Function has leading underscore (private convention)".to_string()
+            "Function has leading underscore (private convention - strong negative signal)".to_string()
         } else {
             "Function has no underscore prefix (public convention)".to_string()
         }
@@ -388,13 +401,25 @@ impl ApiHeuristic for SymmetricPairHeuristic {
         let func_name = &function.name;
 
         for (first, second) in pairs {
-            // Check if this function matches either side of pair
-            if func_name.contains(first) || func_name.contains(second) {
-                // Find the symmetric pair
-                let pair_name = if func_name.contains(first) {
-                    func_name.replace(first, second)
+            // Match as whole word components (e.g., "save_data" or "data_save" but not "resave")
+            // Split on underscores and check if any component matches
+            let components: Vec<&str> = func_name.split('_').collect();
+
+            let has_first = components.iter().any(|&c| c == first);
+            let has_second = components.iter().any(|&c| c == second);
+
+            if has_first || has_second {
+                // Construct the symmetric pair name by replacing the matched component
+                let pair_name = if has_first {
+                    components.iter()
+                        .map(|&c| if c == first { second } else { c })
+                        .collect::<Vec<_>>()
+                        .join("_")
                 } else {
-                    func_name.replace(second, first)
+                    components.iter()
+                        .map(|&c| if c == second { first } else { c })
+                        .collect::<Vec<_>>()
+                        .join("_")
                 };
 
                 // Check if pair exists in module
@@ -434,6 +459,50 @@ impl ApiHeuristic for ModuleExportHeuristic {
         0.0
     }
 }
+
+// Rust Visibility Heuristic
+//
+// Rust has explicit visibility keywords that provide definitive signals.
+// This heuristic should be weighted higher than naming conventions for Rust code.
+impl ApiHeuristic for RustVisibilityHeuristic {
+    fn evaluate(&self, function: &FunctionDef, context: &FileContext) -> f32 {
+        // Only applicable to Rust code
+        if context.language() != Language::Rust {
+            return 0.0; // Not applicable
+        }
+
+        // Check for explicit `pub` visibility keyword
+        if function.has_visibility_keyword("pub") {
+            // Check visibility scope for more nuanced scoring
+            if function.has_visibility_keyword("pub(crate)") {
+                return 0.5; // Crate-public, but not external API
+            } else if function.has_visibility_keyword("pub(super)") {
+                return 0.3; // Module-public only
+            } else {
+                return 1.0; // Fully public API
+            }
+        }
+
+        // Check if this is a trait implementation
+        // Trait methods are never dead code (required by trait contract)
+        if function.is_trait_implementation() {
+            return 1.0; // Definite not dead code
+        }
+
+        // No `pub` keyword → private by default in Rust
+        0.0
+    }
+
+    fn explain(&self, function: &FunctionDef) -> String {
+        if function.has_visibility_keyword("pub") {
+            "Function has explicit `pub` visibility keyword (Rust public API)".to_string()
+        } else if function.is_trait_implementation() {
+            "Function implements trait method (required by trait contract)".to_string()
+        } else {
+            "Function has no `pub` keyword (Rust private by default)".to_string()
+        }
+    }
+}
 ```
 
 ### Data Structures
@@ -442,6 +511,7 @@ impl ApiHeuristic for ModuleExportHeuristic {
 #[derive(Debug, Clone)]
 pub struct FileContext {
     pub file_path: PathBuf,
+    pub language: Language,  // Language of the source file
     pub module_all: Option<Vec<String>>,
     pub functions: HashMap<String, FunctionDef>,
     pub classes: HashMap<String, ClassDef>,
@@ -450,6 +520,7 @@ pub struct FileContext {
 }
 
 impl FileContext {
+    pub fn language(&self) -> Language;
     pub fn is_module_level(&self, function: &FunctionDef) -> bool;
     pub fn is_class_method(&self, function: &FunctionDef) -> bool;
     pub fn is_in_module_all(&self, name: &str) -> bool;
@@ -468,6 +539,23 @@ pub struct FunctionDef {
     pub is_method: bool,
     pub class_name: Option<String>,
     pub line: usize,
+    // Rust-specific fields
+    pub visibility: Option<String>,  // "pub", "pub(crate)", "pub(super)", etc.
+    pub is_trait_impl: bool,         // True if implementing a trait method
+}
+
+impl FunctionDef {
+    /// Check if function has a specific visibility keyword (Rust)
+    pub fn has_visibility_keyword(&self, keyword: &str) -> bool {
+        self.visibility.as_ref()
+            .map(|v| v.contains(keyword))
+            .unwrap_or(false)
+    }
+
+    /// Check if function implements a trait method (Rust)
+    pub fn is_trait_implementation(&self) -> bool {
+        self.is_trait_impl
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -526,7 +614,7 @@ Commands::Analyze {
 ## Dependencies
 
 - **Prerequisites**:
-  - Spec 109 (Cross-File Dependency Analysis) - Provides usage data
+  - Spec 112 (Cross-File Dependency Analysis) - Provides usage data
 - **Affected Components**:
   - `src/debt/dead_code.rs` - Add public API check
   - `src/analyzers/python/` - Extract docstrings and annotations
@@ -675,6 +763,86 @@ mod tests {
         assert!(score.is_public, "Function should be detected as public API");
         assert!(score.confidence >= 0.6, "Confidence should exceed threshold");
     }
+
+    #[test]
+    fn test_rust_pub_keyword_detection() {
+        let function = FunctionDef {
+            name: "analyze_code".to_string(),
+            visibility: Some("pub".to_string()),
+            is_trait_impl: false,
+            ..Default::default()
+        };
+
+        let context = FileContext::rust_context();
+        let heuristic = RustVisibilityHeuristic;
+        let score = heuristic.evaluate(&function, &context);
+
+        assert_eq!(score, 1.0, "pub function should score 1.0");
+    }
+
+    #[test]
+    fn test_rust_pub_crate_detection() {
+        let function = FunctionDef {
+            name: "internal_helper".to_string(),
+            visibility: Some("pub(crate)".to_string()),
+            is_trait_impl: false,
+            ..Default::default()
+        };
+
+        let context = FileContext::rust_context();
+        let heuristic = RustVisibilityHeuristic;
+        let score = heuristic.evaluate(&function, &context);
+
+        assert_eq!(score, 0.5, "pub(crate) function should score 0.5");
+    }
+
+    #[test]
+    fn test_rust_trait_implementation() {
+        let function = FunctionDef {
+            name: "clone".to_string(),
+            visibility: None,
+            is_trait_impl: true,
+            ..Default::default()
+        };
+
+        let context = FileContext::rust_context();
+        let heuristic = RustVisibilityHeuristic;
+        let score = heuristic.evaluate(&function, &context);
+
+        assert_eq!(score, 1.0, "Trait implementation should score 1.0 (never dead code)");
+    }
+
+    #[test]
+    fn test_underscore_prefix_override() {
+        // Well-documented function with underscore prefix should still be private
+        let function = FunctionDef {
+            name: "_internal_complex_algorithm".to_string(),
+            docstring: Some(r#"
+                Performs complex internal processing.
+
+                Args:
+                    data: List of integers to process
+
+                Returns:
+                    Dictionary containing processed results
+            "#.to_string()),
+            parameters: vec![
+                Parameter {
+                    name: "data".to_string(),
+                    type_annotation: Some("List[int]".to_string()),
+                    default_value: None,
+                },
+            ],
+            return_type: Some("Dict[str, Any]".to_string()),
+            ..Default::default()
+        };
+
+        let context = FileContext::module_level();
+        let naming_heuristic = NamingConventionHeuristic;
+        let naming_score = naming_heuristic.evaluate(&function, &context);
+
+        assert_eq!(naming_score, 0.0, "Underscore prefix should score 0.0 regardless of docs");
+    }
 }
 ```
 
@@ -731,6 +899,54 @@ def _private_function():
 ```
 
 Expected: `public_function` NOT flagged, `_private_function` flagged.
+
+**Test Case 5: Rust Public Functions**
+```rust
+// tests/fixtures/public_api/analyzer.rs
+pub fn analyze_complexity(code: &str) -> u32 {
+    // Public API function
+}
+
+pub(crate) fn internal_helper(data: &[u8]) -> Vec<u8> {
+    // Crate-internal function
+}
+
+fn private_implementation() {
+    // Private function
+}
+
+impl Clone for MyStruct {
+    fn clone(&self) -> Self {
+        // Trait implementation - never dead code
+    }
+}
+```
+
+Expected:
+- `analyze_complexity` NOT flagged (public API with `pub`)
+- `internal_helper` NOT flagged (crate-public with `pub(crate)`)
+- `private_implementation` flagged as dead code if unused
+- `Clone::clone` NOT flagged (trait implementation)
+
+**Test Case 6: Underscore Override**
+```python
+# tests/fixtures/public_api/helpers.py
+def _well_documented_internal(data: List[int]) -> Dict[str, Any]:
+    """
+    Performs complex internal processing of numerical data.
+
+    This is a sophisticated algorithm used internally.
+
+    Args:
+        data: List of integers to process
+
+    Returns:
+        Dictionary containing processed results
+    """
+    pass
+```
+
+Expected: Flagged as dead code despite comprehensive documentation (underscore prefix overrides).
 
 ## Documentation Requirements
 
@@ -823,6 +1039,23 @@ Output shows public API reasoning:
 Update ARCHITECTURE.md with public API detection pipeline.
 
 ## Implementation Notes
+
+### Critical Design Decisions
+
+**1. Underscore Prefix as Override Signal**
+The naming convention heuristic returns 0.0 for functions with leading underscores, effectively vetoing public API classification even if other signals (docstrings, type hints) suggest otherwise. This prevents false negatives where well-documented internal functions are mistaken for public APIs.
+
+**2. Word Boundary Matching for Symmetric Pairs**
+Symmetric pair detection uses component-based matching (splitting on underscores) rather than substring replacement. This prevents false matches like:
+- ✗ Bad: `resave` → `reloadve` (substring replacement)
+- ✓ Good: `resave` has no match (component-based)
+- ✓ Good: `save_data` → `load_data` (correct match)
+
+**3. Rust Visibility as Definitive Signal**
+For Rust code, the `pub` keyword provides a definitive signal (1.0 score) that overrides heuristic guessing. Trait implementations are also marked as definitive not-dead-code since they're required by trait contracts.
+
+**4. Language-Aware Heuristics**
+Heuristics check the file's language and skip evaluation when not applicable. This allows language-specific heuristics (like `RustVisibilityHeuristic`) to coexist with generic ones without interference.
 
 ### Heuristic Tuning
 
