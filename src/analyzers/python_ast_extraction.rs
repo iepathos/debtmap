@@ -3,15 +3,11 @@ use crate::core::ast::{
 };
 use rustpython_parser::ast;
 
-pub struct PythonAstExtractor {
-    current_scope: Scope,
-}
+pub struct PythonAstExtractor;
 
 impl PythonAstExtractor {
     pub fn new() -> Self {
-        Self {
-            current_scope: Scope::Module,
-        }
+        Self
     }
 
     /// Extract class decorators from ClassDef AST node
@@ -28,7 +24,7 @@ impl PythonAstExtractor {
         class_def
             .bases
             .iter()
-            .filter_map(|base| self.expr_to_name(base))
+            .filter_map(Self::expr_to_name)
             .collect()
     }
 
@@ -54,7 +50,7 @@ impl PythonAstExtractor {
             for stmt in &mod_body.body {
                 if let ast::Stmt::Assign(assign) = stmt {
                     for target in &assign.targets {
-                        if let Some(name) = self.expr_to_name(target) {
+                        if let Some(name) = Self::expr_to_name(target) {
                             let value = self.classify_expression(&assign.value);
                             assignments.push(Assignment {
                                 name,
@@ -75,7 +71,7 @@ impl PythonAstExtractor {
     fn classify_expression(&self, expr: &ast::Expr) -> Expression {
         match expr {
             ast::Expr::Call(call) => {
-                if let Some(name) = self.expr_to_name(&call.func) {
+                if let Some(name) = Self::expr_to_name(&call.func) {
                     // Check if it's a class instantiation (capitalized name)
                     if name
                         .chars()
@@ -85,20 +81,12 @@ impl PythonAstExtractor {
                     {
                         Expression::ClassInstantiation {
                             class_name: name,
-                            args: call
-                                .args
-                                .iter()
-                                .filter_map(|arg| self.expr_to_name(arg))
-                                .collect(),
+                            args: call.args.iter().filter_map(Self::expr_to_name).collect(),
                         }
                     } else {
                         Expression::FunctionCall {
                             function_name: name,
-                            args: call
-                                .args
-                                .iter()
-                                .filter_map(|arg| self.expr_to_name(arg))
-                                .collect(),
+                            args: call.args.iter().filter_map(Self::expr_to_name).collect(),
                         }
                     }
                 } else {
@@ -118,23 +106,23 @@ impl PythonAstExtractor {
             ast::Expr::Name(name) => Some(name.id.to_string()),
             ast::Expr::Attribute(attr) => {
                 // Handle chained attributes like @abc.abstractmethod
-                let base = self.expr_to_name(&attr.value)?;
+                let base = Self::expr_to_name(&attr.value)?;
                 Some(format!("{}.{}", base, attr.attr))
             }
             ast::Expr::Call(call) => {
                 // Handle decorators with arguments like @dataclass(frozen=True)
-                self.expr_to_name(&call.func)
+                Self::expr_to_name(&call.func)
             }
             _ => None,
         }
     }
 
     /// Convert expression to name string
-    fn expr_to_name(&self, expr: &ast::Expr) -> Option<String> {
+    fn expr_to_name(expr: &ast::Expr) -> Option<String> {
         match expr {
             ast::Expr::Name(name) => Some(name.id.to_string()),
             ast::Expr::Attribute(attr) => {
-                let base = self.expr_to_name(&attr.value)?;
+                let base = Self::expr_to_name(&attr.value)?;
                 Some(format!("{}.{}", base, attr.attr))
             }
             _ => None,
