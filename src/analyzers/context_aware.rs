@@ -394,6 +394,8 @@ mod tests {
             debt_items: vec![create_test_debt_item()],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         }
     }
 }

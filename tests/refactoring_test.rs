@@ -32,6 +32,8 @@ fn create_test_file() -> FileMetrics {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        module_scope: None,
+        classes: None,
     }
 }
 

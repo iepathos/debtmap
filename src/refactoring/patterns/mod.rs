@@ -578,6 +578,8 @@ mod tests {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         }
     }
 

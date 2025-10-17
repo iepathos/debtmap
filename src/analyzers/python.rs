@@ -1,3 +1,4 @@
+use crate::analyzers::python_ast_extraction::PythonAstExtractor;
 use crate::analyzers::python_asyncio_patterns::AsyncioPatternDetector;
 use crate::analyzers::python_detectors::SimplifiedPythonDetector;
 use crate::analyzers::python_exception_flow::ExceptionFlowAnalyzer;
@@ -124,6 +125,8 @@ impl Analyzer for PythonAnalyzer {
                 debt_items: vec![],
                 dependencies: vec![],
                 duplications: vec![],
+                module_scope: None,
+                classes: None,
             },
         }
     }
@@ -269,6 +272,11 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
         (cyc + f.cyclomatic, cog + f.cognitive)
     });
 
+    // Extract AST pattern information using PythonAstExtractor
+    let ast_extractor = PythonAstExtractor::new();
+    let module_scope = Some(ast_extractor.extract_module_scope(&ast.module));
+    let classes = Some(ast_extractor.extract_classes(&ast.module));
+
     FileMetrics {
         path: ast.path.clone(),
         language: Language::Python,
@@ -280,6 +288,8 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
         debt_items,
         dependencies,
         duplications: vec![],
+        module_scope,
+        classes,
     }
 }
 

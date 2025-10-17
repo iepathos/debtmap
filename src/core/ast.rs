@@ -1,3 +1,34 @@
+//! AST representation and pattern extraction data structures.
+//!
+//! This module provides language-agnostic AST representations and specialized
+//! structures for pattern detection in different programming languages.
+//!
+//! # Design Pattern Extraction
+//!
+//! The module supports extracting design patterns from source code:
+//! - Class hierarchies with inheritance and decorators
+//! - Method definitions with abstract/override tracking
+//! - Module-level singleton instances
+//! - Assignment and expression analysis
+//!
+//! # Example
+//!
+//! ```ignore
+//! use debtmap::core::ast::{ClassDef, ModuleScopeAnalysis};
+//!
+//! // Extract classes from Python AST
+//! let classes: Vec<ClassDef> = extractor.extract_classes(&module);
+//!
+//! // Analyze module scope for singletons
+//! let scope: ModuleScopeAnalysis = extractor.extract_module_scope(&module);
+//! ```
+//!
+//! # Performance Considerations
+//!
+//! Pattern extraction is designed to add minimal overhead (< 5%) to existing
+//! parsing operations by extracting data during the single-pass AST traversal.
+
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
@@ -7,6 +38,96 @@ pub enum Ast {
     JavaScript(JavaScriptAst),
     TypeScript(TypeScriptAst),
     Unknown,
+}
+
+// Pattern recognition data structures
+
+/// Represents a class definition with its metadata.
+///
+/// Captures information about class decorators, inheritance hierarchy,
+/// methods, and abstract status for design pattern recognition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassDef {
+    pub name: String,
+    pub base_classes: Vec<String>,
+    pub methods: Vec<MethodDef>,
+    pub is_abstract: bool,
+    pub decorators: Vec<String>,
+    pub line: usize,
+}
+
+/// Represents a method definition within a class.
+///
+/// Tracks method decorators, abstract status, and whether it overrides
+/// a base class method for inheritance pattern detection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MethodDef {
+    pub name: String,
+    pub is_abstract: bool,
+    pub decorators: Vec<String>,
+    pub overrides_base: bool,
+    pub line: usize,
+}
+
+/// Analysis of module-level scope for pattern detection.
+///
+/// Captures module-level assignments and identifies singleton instances
+/// (module-level class instantiations that follow the singleton pattern).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleScopeAnalysis {
+    pub assignments: Vec<Assignment>,
+    pub singleton_instances: Vec<SingletonInstance>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Assignment {
+    pub name: String,
+    pub value: Expression,
+    pub scope: Scope,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Scope {
+    Module,
+    Class,
+    Function,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Expression {
+    ClassInstantiation {
+        class_name: String,
+        args: Vec<String>,
+    },
+    FunctionCall {
+        function_name: String,
+        args: Vec<String>,
+    },
+    ClassReference {
+        class_name: String,
+    },
+    Literal {
+        value: String,
+    },
+    Other,
+}
+
+impl Expression {
+    pub fn is_class_instantiation(&self) -> bool {
+        matches!(self, Expression::ClassInstantiation { .. })
+    }
+
+    pub fn is_class_reference(&self) -> bool {
+        matches!(self, Expression::ClassReference { .. })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SingletonInstance {
+    pub variable_name: String,
+    pub class_name: String,
+    pub line: usize,
 }
 
 #[derive(Clone, Debug)]

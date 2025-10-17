@@ -149,6 +149,8 @@ fn test_analysis_cache_uses_shared_backend() {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         })
     };
 
@@ -168,6 +170,8 @@ fn test_analysis_cache_uses_shared_backend() {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+            module_scope: None,
+            classes: None,
         })
     };
     let _result2 = cache.get_or_compute(&test_file, compute2).unwrap();

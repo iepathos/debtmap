@@ -273,6 +273,8 @@ mod tests {
             ],
             dependencies: Vec::new(),
             duplications: Vec::new(),
+            module_scope: None,
+            classes: None,
         }
     }
 
