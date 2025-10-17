@@ -1,3 +1,33 @@
+//! AST representation and pattern extraction data structures.
+//!
+//! This module provides language-agnostic AST representations and specialized
+//! structures for pattern detection in different programming languages.
+//!
+//! # Design Pattern Extraction
+//!
+//! The module supports extracting design patterns from source code:
+//! - Class hierarchies with inheritance and decorators
+//! - Method definitions with abstract/override tracking
+//! - Module-level singleton instances
+//! - Assignment and expression analysis
+//!
+//! # Example
+//!
+//! ```ignore
+//! use debtmap::core::ast::{ClassDef, ModuleScopeAnalysis};
+//!
+//! // Extract classes from Python AST
+//! let classes: Vec<ClassDef> = extractor.extract_classes(&module);
+//!
+//! // Analyze module scope for singletons
+//! let scope: ModuleScopeAnalysis = extractor.extract_module_scope(&module);
+//! ```
+//!
+//! # Performance Considerations
+//!
+//! Pattern extraction is designed to add minimal overhead (< 5%) to existing
+//! parsing operations by extracting data during the single-pass AST traversal.
+
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -12,6 +42,10 @@ pub enum Ast {
 
 // Pattern recognition data structures
 
+/// Represents a class definition with its metadata.
+///
+/// Captures information about class decorators, inheritance hierarchy,
+/// methods, and abstract status for design pattern recognition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassDef {
     pub name: String,
@@ -22,6 +56,10 @@ pub struct ClassDef {
     pub line: usize,
 }
 
+/// Represents a method definition within a class.
+///
+/// Tracks method decorators, abstract status, and whether it overrides
+/// a base class method for inheritance pattern detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MethodDef {
     pub name: String,
@@ -31,6 +69,10 @@ pub struct MethodDef {
     pub line: usize,
 }
 
+/// Analysis of module-level scope for pattern detection.
+///
+/// Captures module-level assignments and identifies singleton instances
+/// (module-level class instantiations that follow the singleton pattern).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleScopeAnalysis {
     pub assignments: Vec<Assignment>,
