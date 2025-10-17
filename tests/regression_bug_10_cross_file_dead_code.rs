@@ -293,7 +293,8 @@ fn test_relative_import_resolution() {
     fs::create_dir(&package_dir).unwrap();
 
     let helper_module = "def utility_function():\n    pass\n";
-    let main_module = "from .helper import utility_function\n\ndef main():\n    utility_function()\n";
+    let main_module =
+        "from .helper import utility_function\n\ndef main():\n    utility_function()\n";
 
     fs::write(package_dir.join("helper.py"), helper_module).unwrap();
     fs::write(package_dir.join("main.py"), main_module).unwrap();
@@ -315,7 +316,9 @@ fn test_relative_import_resolution() {
     )
     .unwrap();
 
-    use debtmap::analysis::python_imports::{EnhancedImportResolver, ResolutionConfidence, ImportType};
+    use debtmap::analysis::python_imports::{
+        EnhancedImportResolver, ImportType, ResolutionConfidence,
+    };
     let mut resolver = EnhancedImportResolver::new();
 
     resolver.analyze_imports(&helper_ast, &helper_path);
@@ -335,9 +338,9 @@ fn test_relative_import_resolution() {
     // Verify that import graph contains the relative import
     let import_graph = resolver.import_graph();
     let edges = import_graph.edges.get(&main_path).unwrap();
-    let relative_import = edges.iter().find(|e| {
-        matches!(e.import_type, ImportType::Relative { level: 1 })
-    });
+    let relative_import = edges
+        .iter()
+        .find(|e| matches!(e.import_type, ImportType::Relative { level: 1 }));
     assert!(
         relative_import.is_some(),
         "Import graph should contain relative import edge"
