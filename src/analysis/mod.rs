@@ -6,6 +6,7 @@
 //! - Python type tracking and inference for improved method resolution
 //! - Python-aware dead code detection with magic methods and framework patterns
 //! - Framework pattern detection
+//! - Design pattern recognition (Observer, Factory, Callback)
 //! - Cross-module dependency tracking
 //! - Multi-pass complexity analysis with attribution
 //! - Diagnostic reporting and insights generation
@@ -16,6 +17,7 @@ pub mod diagnostics;
 pub mod framework_patterns;
 pub mod function_visitor;
 pub mod multi_pass;
+pub mod patterns;
 pub mod python_call_graph;
 pub mod python_dead_code;
 pub mod python_dead_code_enhanced;
@@ -28,6 +30,11 @@ pub use call_graph::{
 };
 pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,
+};
+pub use patterns::{
+    callback::CallbackPatternRecognizer, factory::FactoryPatternRecognizer,
+    observer::ObserverPatternRecognizer, Implementation, PatternDetector, PatternInstance,
+    PatternRecognizer, PatternType, UsageSite,
 };
 pub use python_dead_code::{FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence};
 pub use python_dead_code_enhanced::{
