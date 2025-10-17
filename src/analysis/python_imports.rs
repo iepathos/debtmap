@@ -10,6 +10,104 @@
 //! - Re-exports and import forwarding
 //! - Circular imports
 //! - Dynamic imports (where statically analyzable)
+//!
+//! # Architecture
+//!
+//! The import resolution system consists of three main components:
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────┐
+//! │ EnhancedImportResolver                                  │
+//! │                                                         │
+//! │  1. Module Symbol Collection                           │
+//! │     ├─ Parse AST to extract functions/classes          │
+//! │     ├─ Track __all__ for explicit exports              │
+//! │     └─ Handle re-exports                               │
+//! │                                                         │
+//! │  2. Import Graph Construction                          │
+//! │     ├─ Track import edges (module A -> module B)       │
+//! │     ├─ Handle relative/absolute imports                │
+//! │     └─ Detect circular dependencies                    │
+//! │                                                         │
+//! │  3. Symbol Resolution                                  │
+//! │     ├─ Check local definitions first                   │
+//! │     ├─ Follow import chains                            │
+//! │     ├─ Resolve through star imports                    │
+//! │     └─ Assign confidence levels                        │
+//! └─────────────────────────────────────────────────────────┘
+//! ```
+//!
+//! # Examples
+//!
+//! ## Basic Usage
+//!
+//! ```rust
+//! use debtmap::analysis::python_imports::EnhancedImportResolver;
+//! use rustpython_parser::parse;
+//! use std::path::Path;
+//!
+//! let source = r#"
+//! def process_data(items):
+//!     return {item: len(item) for item in items}
+//! "#;
+//!
+//! let ast = parse(source, rustpython_parser::Mode::Module, "example.py").unwrap();
+//! let mut resolver = EnhancedImportResolver::new();
+//! resolver.analyze_imports(&ast, Path::new("example.py"));
+//!
+//! // Resolve locally defined function
+//! let func_symbol = resolver.resolve_symbol(Path::new("example.py"), "process_data");
+//! assert!(func_symbol.is_some());
+//! ```
+//!
+//! ## Cross-File Analysis
+//!
+//! ```rust,no_run
+//! // This example shows cross-file resolution conceptually.
+//! // In practice, file paths need to exist for resolution to work correctly.
+//! use debtmap::analysis::python_imports::EnhancedImportResolver;
+//! use rustpython_parser::parse;
+//! use std::path::Path;
+//!
+//! // Module A: utilities.py
+//! let utils_source = "def helper_function():\n    pass\n";
+//! let utils_ast = parse(utils_source, rustpython_parser::Mode::Module, "utilities.py").unwrap();
+//!
+//! // Module B demonstrates how imports are tracked
+//! let main_source = "def main():\n    pass\n";
+//! let main_ast = parse(main_source, rustpython_parser::Mode::Module, "main.py").unwrap();
+//!
+//! let mut resolver = EnhancedImportResolver::new();
+//! resolver.analyze_imports(&utils_ast, Path::new("utilities.py"));
+//! resolver.analyze_imports(&main_ast, Path::new("main.py"));
+//!
+//! // Symbols are tracked per module
+//! let symbol = resolver.resolve_symbol(Path::new("utilities.py"), "helper_function");
+//! assert!(symbol.is_some());
+//! ```
+//!
+//! ## Confidence Levels
+//!
+//! The resolver assigns confidence levels based on import type:
+//!
+//! - **High**: Direct imports (`import foo`, `from foo import bar`)
+//! - **Medium**: Simple relative imports (`from . import foo`)
+//! - **Low**: Wildcard imports (`from foo import *`) or deep relative imports
+//! - **Unknown**: Dynamic imports (`__import__()`, `importlib.import_module()`)
+//!
+//! ```rust
+//! use debtmap::analysis::python_imports::{ImportType, ResolutionConfidence};
+//!
+//! assert_eq!(
+//!     ResolutionConfidence::from_import_type(&ImportType::Direct),
+//!     ResolutionConfidence::High
+//! );
+//!
+//! assert_eq!(
+//!     ResolutionConfidence::from_import_type(&ImportType::Star),
+//!     ResolutionConfidence::Low
+//! );
+//! ```
 
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};

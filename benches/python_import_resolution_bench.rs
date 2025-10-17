@@ -345,6 +345,44 @@ def main():
     });
 }
 
+/// Benchmark large-scale analysis (spec requirement: <2s for 1000 files)
+fn bench_large_scale_performance(c: &mut Criterion) {
+    let mut group = c.benchmark_group("large_scale_performance");
+    group.sample_size(10); // Reduce sample size for large benchmarks
+    group.measurement_time(std::time::Duration::from_secs(30));
+
+    // Test with 1000 files as per spec requirement
+    let num_files = 1000;
+    let modules_data = generate_module_graph(num_files);
+
+    group.bench_function("1000_files", |b| {
+        b.iter(|| {
+            let mut resolver = EnhancedImportResolver::new();
+            let parsed_modules: Vec<_> = modules_data
+                .iter()
+                .map(|(code, path)| {
+                    let module = rp::parse(code, rp::Mode::Module, path.to_str().unwrap())
+                        .expect("Failed to parse");
+                    (module, path.clone())
+                })
+                .collect();
+
+            resolver.build_import_graph(&parsed_modules);
+
+            // Perform some symbol resolution to test complete workflow
+            for i in 0..10 {
+                let symbol_name = format!("func_{}", i);
+                let module_path = format!("test_project/module_{}.py", i);
+                black_box(resolver.resolve_symbol(Path::new(&module_path), &symbol_name));
+            }
+
+            black_box(())
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     import_resolution_benches,
     bench_import_analysis,
@@ -353,7 +391,8 @@ criterion_group!(
     bench_symbol_resolution_with_cache,
     bench_symbol_resolution_no_cache,
     bench_circular_import_detection,
-    bench_realistic_patterns
+    bench_realistic_patterns,
+    bench_large_scale_performance
 );
 
 criterion_main!(import_resolution_benches);
