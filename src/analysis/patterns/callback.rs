@@ -16,10 +16,36 @@ impl CallbackPatternRecognizer {
     }
 
     /// Check if a function has decorators that indicate it's a callback
-    pub(crate) fn has_callback_decorator(&self, function: &FunctionMetrics) -> bool {
-        // In the current implementation, FunctionMetrics doesn't have a decorators field
-        // We would need to enhance the parser to extract decorators
-        // For now, we use naming conventions as a heuristic
+    pub(crate) fn has_callback_decorator(
+        &self,
+        function: &FunctionMetrics,
+        file_metrics: &FileMetrics,
+    ) -> bool {
+        // Check method decorators from AST classes if available
+        if let Some(classes) = &file_metrics.classes {
+            for class in classes {
+                for method in &class.methods {
+                    // Match method by name and approximate line number
+                    if method.name == function.name || function.name.ends_with(&method.name) {
+                        // Check for callback-style decorators
+                        for decorator in &method.decorators {
+                            let dec_lower = decorator.to_lowercase();
+                            if dec_lower.contains("route")
+                                || dec_lower.contains("handler")
+                                || dec_lower.contains("callback")
+                                || dec_lower.contains("listener")
+                                || dec_lower.contains("event")
+                                || dec_lower.contains("on_")
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback to naming conventions as a heuristic
         let name_lower = function.name.to_lowercase();
 
         name_lower.starts_with("on_")
@@ -46,19 +72,50 @@ impl PatternRecognizer for CallbackPatternRecognizer {
             .complexity
             .functions
             .iter()
-            .filter(|function| self.has_callback_decorator(function))
-            .map(|function| PatternInstance {
-                pattern_type: PatternType::Callback,
-                confidence: 0.75,
-                base_class: None,
-                implementations: vec![Implementation {
-                    file: file_metrics.path.clone(),
-                    class_name: None,
-                    function_name: function.name.clone(),
-                    line: function.line,
-                }],
-                usage_sites: vec![],
-                reasoning: format!("Callback handler {} (name-based detection)", function.name),
+            .filter(|function| self.has_callback_decorator(function, file_metrics))
+            .map(|function| {
+                // Check if detected via decorator or naming convention
+                let has_decorator = file_metrics.classes.as_ref().map_or(false, |classes| {
+                    classes.iter().any(|class| {
+                        class.methods.iter().any(|method| {
+                            (method.name == function.name
+                                || function.name.ends_with(&method.name))
+                                && !method.decorators.is_empty()
+                        })
+                    })
+                });
+
+                let (confidence, reasoning) = if has_decorator {
+                    (
+                        0.9,
+                        format!(
+                            "Callback handler {} (decorator-based detection)",
+                            function.name
+                        ),
+                    )
+                } else {
+                    (
+                        0.6,
+                        format!(
+                            "Callback handler {} (name-based detection)",
+                            function.name
+                        ),
+                    )
+                };
+
+                PatternInstance {
+                    pattern_type: PatternType::Callback,
+                    confidence,
+                    base_class: None,
+                    implementations: vec![Implementation {
+                        file: file_metrics.path.clone(),
+                        class_name: None,
+                        function_name: function.name.clone(),
+                        line: function.line,
+                    }],
+                    usage_sites: vec![],
+                    reasoning,
+                }
             })
             .collect()
     }
@@ -66,12 +123,24 @@ impl PatternRecognizer for CallbackPatternRecognizer {
     fn is_function_used_by_pattern(
         &self,
         function: &FunctionMetrics,
-        _file_metrics: &FileMetrics,
+        file_metrics: &FileMetrics,
     ) -> Option<PatternInstance> {
-        if self.has_callback_decorator(function) {
+        if self.has_callback_decorator(function, file_metrics) {
+            // Check if detected via decorator or naming convention
+            let has_decorator = file_metrics.classes.as_ref().map_or(false, |classes| {
+                classes.iter().any(|class| {
+                    class.methods.iter().any(|method| {
+                        (method.name == function.name || function.name.ends_with(&method.name))
+                            && !method.decorators.is_empty()
+                    })
+                })
+            });
+
+            let confidence = if has_decorator { 0.9 } else { 0.6 };
+
             Some(PatternInstance {
                 pattern_type: PatternType::Callback,
-                confidence: 0.75,
+                confidence,
                 base_class: None,
                 implementations: vec![Implementation {
                     file: function.file.clone(),
@@ -136,43 +205,49 @@ mod tests {
     #[test]
     fn test_has_callback_decorator_on_prefix() {
         let function = create_test_function("on_click", 10);
+        let file_metrics = create_test_file_metrics_with_functions(vec![]);
         let recognizer = CallbackPatternRecognizer::new();
-        assert!(recognizer.has_callback_decorator(&function));
+        assert!(recognizer.has_callback_decorator(&function, &file_metrics));
     }
 
     #[test]
     fn test_has_callback_decorator_handle_prefix() {
         let function = create_test_function("handle_request", 10);
+        let file_metrics = create_test_file_metrics_with_functions(vec![]);
         let recognizer = CallbackPatternRecognizer::new();
-        assert!(recognizer.has_callback_decorator(&function));
+        assert!(recognizer.has_callback_decorator(&function, &file_metrics));
     }
 
     #[test]
     fn test_has_callback_decorator_callback_prefix() {
         let function = create_test_function("callback_success", 10);
+        let file_metrics = create_test_file_metrics_with_functions(vec![]);
         let recognizer = CallbackPatternRecognizer::new();
-        assert!(recognizer.has_callback_decorator(&function));
+        assert!(recognizer.has_callback_decorator(&function, &file_metrics));
     }
 
     #[test]
     fn test_has_callback_decorator_handler_suffix() {
         let function = create_test_function("request_handler", 10);
+        let file_metrics = create_test_file_metrics_with_functions(vec![]);
         let recognizer = CallbackPatternRecognizer::new();
-        assert!(recognizer.has_callback_decorator(&function));
+        assert!(recognizer.has_callback_decorator(&function, &file_metrics));
     }
 
     #[test]
     fn test_has_callback_decorator_listener() {
         let function = create_test_function("event_listener", 10);
+        let file_metrics = create_test_file_metrics_with_functions(vec![]);
         let recognizer = CallbackPatternRecognizer::new();
-        assert!(recognizer.has_callback_decorator(&function));
+        assert!(recognizer.has_callback_decorator(&function, &file_metrics));
     }
 
     #[test]
     fn test_not_callback() {
         let function = create_test_function("process_data", 10);
+        let file_metrics = create_test_file_metrics_with_functions(vec![]);
         let recognizer = CallbackPatternRecognizer::new();
-        assert!(!recognizer.has_callback_decorator(&function));
+        assert!(!recognizer.has_callback_decorator(&function, &file_metrics));
     }
 
     #[test]
@@ -204,7 +279,7 @@ mod tests {
         let patterns = recognizer.detect(&file_metrics);
 
         assert_eq!(patterns.len(), 1);
-        assert_eq!(patterns[0].confidence, 0.75);
+        assert_eq!(patterns[0].confidence, 0.6); // Name-based detection
         assert_eq!(patterns[0].pattern_type, PatternType::Callback);
     }
 
@@ -225,7 +300,7 @@ mod tests {
         assert!(result.is_some());
         let pattern = result.unwrap();
         assert_eq!(pattern.pattern_type, PatternType::Callback);
-        assert_eq!(pattern.confidence, 0.75);
+        assert_eq!(pattern.confidence, 0.6); // Name-based detection
     }
 
     #[test]
