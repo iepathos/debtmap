@@ -503,38 +503,52 @@ mod tests {
 
     #[test]
     fn test_config_validation_invalid_base_reduction() {
-        let mut config = OrchestrationAdjustmentConfig::default();
-        config.base_orchestrator_reduction = 1.5;
+        let config = OrchestrationAdjustmentConfig {
+            base_orchestrator_reduction: 1.5,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
 
-        config.base_orchestrator_reduction = -0.1;
+        let config = OrchestrationAdjustmentConfig {
+            base_orchestrator_reduction: -0.1,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 
     #[test]
     fn test_config_validation_base_plus_bonus_exceeds_max() {
-        let mut config = OrchestrationAdjustmentConfig::default();
-        config.base_orchestrator_reduction = 0.25;
-        config.max_quality_bonus = 0.15;
-        config.max_total_reduction = 0.30;
+        let config = OrchestrationAdjustmentConfig {
+            base_orchestrator_reduction: 0.25,
+            max_quality_bonus: 0.15,
+            max_total_reduction: 0.30,
+            ..Default::default()
+        };
         // 0.25 + 0.15 = 0.40 > 0.30 (max)
         assert!(config.validate().is_err(), "base + bonus must be <= max");
     }
 
     #[test]
     fn test_config_validation_min_complexity_factor() {
-        let mut config = OrchestrationAdjustmentConfig::default();
-        config.min_inherent_complexity_factor = 0.0;
+        let config = OrchestrationAdjustmentConfig {
+            min_inherent_complexity_factor: 0.0,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
 
-        config.min_inherent_complexity_factor = -1.0;
+        let config = OrchestrationAdjustmentConfig {
+            min_inherent_complexity_factor: -1.0,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 
     #[test]
     fn test_disabled_config() {
-        let mut config = OrchestrationAdjustmentConfig::default();
-        config.enabled = false;
+        let config = OrchestrationAdjustmentConfig {
+            enabled: false,
+            ..Default::default()
+        };
 
         let role = FunctionRole::Orchestrator;
         let metrics = CompositionMetrics {
@@ -682,8 +696,10 @@ mod tests {
 
     #[test]
     fn test_composition_quality_respects_config_minimum() {
-        let mut config = OrchestrationAdjustmentConfig::default();
-        config.min_composition_quality = 0.6;
+        let config = OrchestrationAdjustmentConfig {
+            min_composition_quality: 0.6,
+            ..Default::default()
+        };
 
         // Worst possible metrics
         let worst = CompositionMetrics {

@@ -3,13 +3,14 @@
 //! Validates that the orchestration adjustment has minimal performance overhead
 //! (target: < 5% of total scoring time)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use debtmap::priority::scoring::orchestration_adjustment::{
     adjust_score, extract_composition_metrics, OrchestrationAdjustmentConfig,
 };
 use debtmap::priority::semantic_classifier::FunctionRole;
+use std::hint::black_box;
 use std::path::PathBuf;
 
 fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) -> FunctionMetrics {
@@ -106,8 +107,10 @@ fn bench_adjust_score(c: &mut Criterion) {
 }
 
 fn bench_adjust_score_disabled(c: &mut Criterion) {
-    let mut config = OrchestrationAdjustmentConfig::default();
-    config.enabled = false;
+    let config = OrchestrationAdjustmentConfig {
+        enabled: false,
+        ..Default::default()
+    };
 
     let (graph, func_id, func) = create_call_graph_with_callees(10);
     let metrics = extract_composition_metrics(&func_id, &func, &graph);

@@ -162,6 +162,16 @@ proptest! {
         let temp_dir = TempDir::new().unwrap();
         let base_path = temp_dir.path();
 
+        // Ensure public_names and private_names are disjoint sets
+        let public_set: HashSet<_> = public_names.iter().collect();
+        let private_names: Vec<_> = private_names
+            .into_iter()
+            .filter(|name| !public_set.contains(name))
+            .collect();
+
+        // Skip if there are no private names after filtering
+        prop_assume!(!private_names.is_empty());
+
         // Create a module with __all__ definition
         let mut module_source = String::new();
         for name in &public_names {
