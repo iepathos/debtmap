@@ -41,7 +41,7 @@ fn test_orchestrator_receives_reduction() {
     }
 
     // Create orchestrator function metrics
-    let mut func = create_test_func("coordinate_tasks", 2, 3, 15);
+    let func = create_test_func("coordinate_tasks", 2, 3, 15);
 
     // Classify role
     let role = classify_function_role(&func, &orchestrator, &call_graph);
@@ -52,7 +52,7 @@ fn test_orchestrator_receives_reduction() {
     );
 
     // Calculate unified score
-    let score = calculate_unified_priority(&mut func, &call_graph, None, None);
+    let score = calculate_unified_priority(&func, &call_graph, None, None);
 
     // Verify adjustment was applied
     assert!(
@@ -80,7 +80,7 @@ fn test_orchestrator_receives_reduction() {
 fn test_non_orchestrator_no_adjustment() {
     let call_graph = CallGraph::new();
 
-    let mut func = create_test_func("calculate_risk", 8, 12, 30);
+    let func = create_test_func("calculate_risk", 8, 12, 30);
     let func_id = FunctionId {
         file: func.file.clone(),
         name: func.name.clone(),
@@ -96,7 +96,7 @@ fn test_non_orchestrator_no_adjustment() {
     );
 
     // Calculate unified score
-    let score = calculate_unified_priority(&mut func, &call_graph, None, None);
+    let score = calculate_unified_priority(&func, &call_graph, None, None);
 
     // Verify no adjustment was applied
     assert!(
@@ -179,8 +179,10 @@ fn test_minimum_complexity_floor() {
 /// Test that adjustment can be disabled
 #[test]
 fn test_disabled_adjustment() {
-    let mut config = OrchestrationAdjustmentConfig::default();
-    config.enabled = false;
+    let config = OrchestrationAdjustmentConfig {
+        enabled: false,
+        ..Default::default()
+    };
 
     let metrics = extract_composition_metrics(
         &FunctionId {
