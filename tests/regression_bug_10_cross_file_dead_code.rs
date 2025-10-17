@@ -235,3 +235,189 @@ fn test_circular_import_detection() {
         "Circular import should involve module_a or module_b"
     );
 }
+
+#[test]
+fn test_aliased_import_resolution() {
+    let temp_dir = TempDir::new().unwrap();
+    let base_path = temp_dir.path();
+
+    // Create module with aliased import
+    let module_a = "def helper_function():\n    pass\n";
+    let module_b = "from module_a import helper_function as hf\n\ndef use_helper():\n    hf()\n";
+
+    fs::write(base_path.join("module_a.py"), module_a).unwrap();
+    fs::write(base_path.join("module_b.py"), module_b).unwrap();
+
+    let module_a_path = base_path.join("module_a.py");
+    let module_b_path = base_path.join("module_b.py");
+
+    let ast_a = rustpython_parser::parse(
+        module_a,
+        rustpython_parser::Mode::Module,
+        module_a_path.to_str().unwrap(),
+    )
+    .unwrap();
+
+    let ast_b = rustpython_parser::parse(
+        module_b,
+        rustpython_parser::Mode::Module,
+        module_b_path.to_str().unwrap(),
+    )
+    .unwrap();
+
+    use debtmap::analysis::python_imports::EnhancedImportResolver;
+    let mut resolver = EnhancedImportResolver::new();
+
+    resolver.analyze_imports(&ast_a, &module_a_path);
+    resolver.analyze_imports(&ast_b, &module_b_path);
+
+    // Verify that aliased import is resolved correctly
+    let resolved = resolver.resolve_symbol(&module_b_path, "hf");
+    assert!(
+        resolved.is_some(),
+        "Should resolve aliased import 'hf' -> 'helper_function'"
+    );
+
+    let symbol = resolved.unwrap();
+    assert_eq!(symbol.original_name, "helper_function");
+    assert_eq!(symbol.module_path, module_a_path);
+}
+
+#[test]
+fn test_relative_import_resolution() {
+    let temp_dir = TempDir::new().unwrap();
+    let base_path = temp_dir.path();
+
+    // Create package structure with relative imports
+    let package_dir = base_path.join("mypackage");
+    fs::create_dir(&package_dir).unwrap();
+
+    let helper_module = "def utility_function():\n    pass\n";
+    let main_module = "from .helper import utility_function\n\ndef main():\n    utility_function()\n";
+
+    fs::write(package_dir.join("helper.py"), helper_module).unwrap();
+    fs::write(package_dir.join("main.py"), main_module).unwrap();
+
+    let helper_path = package_dir.join("helper.py");
+    let main_path = package_dir.join("main.py");
+
+    let helper_ast = rustpython_parser::parse(
+        helper_module,
+        rustpython_parser::Mode::Module,
+        helper_path.to_str().unwrap(),
+    )
+    .unwrap();
+
+    let main_ast = rustpython_parser::parse(
+        main_module,
+        rustpython_parser::Mode::Module,
+        main_path.to_str().unwrap(),
+    )
+    .unwrap();
+
+    use debtmap::analysis::python_imports::{EnhancedImportResolver, ResolutionConfidence, ImportType};
+    let mut resolver = EnhancedImportResolver::new();
+
+    resolver.analyze_imports(&helper_ast, &helper_path);
+    resolver.analyze_imports(&main_ast, &main_path);
+
+    // Verify relative import resolution
+    let resolved = resolver.resolve_symbol(&main_path, "utility_function");
+    assert!(
+        resolved.is_some(),
+        "Should resolve relative import 'from .helper import utility_function'"
+    );
+
+    let symbol = resolved.unwrap();
+    assert_eq!(symbol.name, "utility_function");
+    assert_eq!(symbol.module_path, helper_path);
+
+    // Verify that import graph contains the relative import
+    let import_graph = resolver.import_graph();
+    let edges = import_graph.edges.get(&main_path).unwrap();
+    let relative_import = edges.iter().find(|e| {
+        matches!(e.import_type, ImportType::Relative { level: 1 })
+    });
+    assert!(
+        relative_import.is_some(),
+        "Import graph should contain relative import edge"
+    );
+
+    // Relative imports should result in Medium confidence when classified
+    assert_eq!(
+        ResolutionConfidence::from_import_type(&ImportType::Relative { level: 1 }),
+        ResolutionConfidence::Medium,
+        "Relative imports should have Medium confidence"
+    );
+}
+
+#[test]
+fn test_wildcard_import_low_confidence() {
+    let temp_dir = TempDir::new().unwrap();
+    let base_path = temp_dir.path();
+
+    // Create module with wildcard import
+    let utils_module = r#"
+def func_a():
+    pass
+
+def func_b():
+    pass
+
+def _private_func():
+    pass
+
+__all__ = ['func_a', 'func_b']
+"#;
+    let main_module = "from utils import *\n\ndef use_functions():\n    func_a()\n    func_b()\n";
+
+    fs::write(base_path.join("utils.py"), utils_module).unwrap();
+    fs::write(base_path.join("main.py"), main_module).unwrap();
+
+    let utils_path = base_path.join("utils.py");
+    let main_path = base_path.join("main.py");
+
+    let utils_ast = rustpython_parser::parse(
+        utils_module,
+        rustpython_parser::Mode::Module,
+        utils_path.to_str().unwrap(),
+    )
+    .unwrap();
+
+    let main_ast = rustpython_parser::parse(
+        main_module,
+        rustpython_parser::Mode::Module,
+        main_path.to_str().unwrap(),
+    )
+    .unwrap();
+
+    use debtmap::analysis::python_imports::{EnhancedImportResolver, ResolutionConfidence};
+    let mut resolver = EnhancedImportResolver::new();
+
+    resolver.analyze_imports(&utils_ast, &utils_path);
+    resolver.analyze_imports(&main_ast, &main_path);
+
+    // Verify wildcard import resolution for func_a
+    let resolved_a = resolver.resolve_symbol(&main_path, "func_a");
+    assert!(
+        resolved_a.is_some(),
+        "Should resolve 'func_a' from wildcard import"
+    );
+
+    let symbol_a = resolved_a.unwrap();
+    assert_eq!(symbol_a.name, "func_a");
+    assert_eq!(symbol_a.module_path, utils_path);
+    // Wildcard imports should have Low confidence
+    assert_eq!(
+        symbol_a.confidence,
+        ResolutionConfidence::Low,
+        "Wildcard imports should have Low confidence"
+    );
+
+    // Verify that _private_func is not resolved (not in __all__)
+    let resolved_private = resolver.resolve_symbol(&main_path, "_private_func");
+    assert!(
+        resolved_private.is_none(),
+        "Should not resolve private functions from wildcard import"
+    );
+}
