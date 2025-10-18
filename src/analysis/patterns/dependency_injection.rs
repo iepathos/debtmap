@@ -227,10 +227,7 @@ impl PatternRecognizer for DependencyInjectionRecognizer {
                         line: function.line,
                     }],
                     usage_sites: Vec::new(),
-                    reasoning: format!(
-                        "Method {} uses dependency injection",
-                        function.name
-                    ),
+                    reasoning: format!("Method {} uses dependency injection", function.name),
                 });
             }
         }

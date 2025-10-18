@@ -88,10 +88,7 @@ fn test_pattern_detector_finds_multiple_patterns() {
     assert!(!patterns.is_empty(), "Expected to find patterns");
 
     // Check that we found different pattern types
-    let pattern_types: Vec<PatternType> = patterns
-        .iter()
-        .map(|p| p.pattern_type.clone())
-        .collect();
+    let pattern_types: Vec<PatternType> = patterns.iter().map(|p| p.pattern_type.clone()).collect();
 
     // Should find at least factory and dependency injection
     // (Observer may or may not be detected depending on implementation details)
@@ -218,29 +215,29 @@ fn test_custom_pattern_rules_validation() {
     let mut config = PatternConfig::default();
 
     // Add valid custom rule
-    config.custom_rules.push(
-        debtmap::analysis::patterns::config::CustomPatternRule {
+    config
+        .custom_rules
+        .push(debtmap::analysis::patterns::config::CustomPatternRule {
             name: "test_pattern".to_string(),
             method_pattern: Some("^test_.*".to_string()),
             class_pattern: None,
             decorator_pattern: None,
             confidence: 0.8,
-        },
-    );
+        });
 
     // Validation should pass
     assert!(config.validate().is_ok());
 
     // Add invalid custom rule (confidence > 1.0)
-    config.custom_rules.push(
-        debtmap::analysis::patterns::config::CustomPatternRule {
+    config
+        .custom_rules
+        .push(debtmap::analysis::patterns::config::CustomPatternRule {
             name: "invalid_pattern".to_string(),
             method_pattern: None,
             class_pattern: None,
             decorator_pattern: None,
             confidence: 1.5,
-        },
-    );
+        });
 
     // Validation should fail
     assert!(config.validate().is_err());
