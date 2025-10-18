@@ -67,47 +67,70 @@ pub fn analyze_static_errors(
 
     let builtins = python_builtins();
     let imported_modules = extract_imported_modules(&mod_module.body);
-    let mut errors = Vec::new();
-
-    for stmt in &mod_module.body {
-        if let ast::Stmt::FunctionDef(func) = stmt {
-            errors.extend(analyze_function(
-                func,
-                import_resolver,
-                builtins,
-                &imported_modules,
-            ));
-        }
-    }
+    let errors = analyze_all_functions(&mod_module.body, import_resolver, builtins, &imported_modules);
 
     StaticAnalysisResult { errors }
 }
 
+/// Analyze all function definitions in module
+fn analyze_all_functions(
+    stmts: &[ast::Stmt],
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    stmts
+        .iter()
+        .filter_map(|stmt| {
+            if let ast::Stmt::FunctionDef(func) = stmt {
+                Some(analyze_function(func, resolver, builtins, imported_modules))
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .collect()
+}
+
 /// Extract all imported module names from statements
 fn extract_imported_modules(stmts: &[ast::Stmt]) -> HashSet<String> {
-    let mut modules = HashSet::new();
+    stmts
+        .iter()
+        .flat_map(extract_modules_from_stmt)
+        .collect()
+}
 
-    for stmt in stmts {
-        match stmt {
-            ast::Stmt::Import(import) => {
-                for alias in &import.names {
-                    let module_name = alias.name.as_str();
-                    modules.insert(module_name.to_string());
-                    if let Some(alias_name) = &alias.asname {
-                        modules.insert(alias_name.as_str().to_string());
-                    }
-                }
-            }
-            ast::Stmt::ImportFrom(import_from) => {
-                if let Some(module) = &import_from.module {
-                    modules.insert(module.as_str().to_string());
-                }
-            }
-            _ => {}
-        }
+/// Extract module names from single import statement
+fn extract_modules_from_stmt(stmt: &ast::Stmt) -> Vec<String> {
+    match stmt {
+        ast::Stmt::Import(import) => extract_from_import(import),
+        ast::Stmt::ImportFrom(import_from) => extract_from_import_from(import_from),
+        _ => Vec::new(),
     }
+}
 
-    modules
+/// Extract module names from import statement
+fn extract_from_import(import: &ast::StmtImport) -> Vec<String> {
+    import
+        .names
+        .iter()
+        .flat_map(|alias| {
+            let mut names = vec![alias.name.as_str().to_string()];
+            if let Some(alias_name) = &alias.asname {
+                names.push(alias_name.as_str().to_string());
+            }
+            names
+        })
+        .collect()
+}
+
+/// Extract module name from import-from statement
+fn extract_from_import_from(import_from: &ast::StmtImportFrom) -> Vec<String> {
+    import_from
+        .module
+        .as_ref()
+        .map(|m| vec![m.as_str().to_string()])
+        .unwrap_or_default()
 }
 
 /// Analyze single function for errors
@@ -131,32 +154,35 @@ fn analyze_function(
 /// Extract all locally defined symbols from function
 fn extract_local_symbols(func: &ast::StmtFunctionDef) -> LocalSymbols {
     let mut symbols = LocalSymbols::new();
+    add_implicit_params(&mut symbols);
+    extract_function_parameters(&func.args, &mut symbols);
+    collect_definitions(&func.body, &mut symbols);
+    symbols
+}
 
-    // Add parameters - always add "self" for methods since it's implicit
+/// Add implicit parameters (self, cls)
+fn add_implicit_params(symbols: &mut LocalSymbols) {
     symbols.insert("self".to_string());
     symbols.insert("cls".to_string());
+}
 
-    // Extract parameter names from function args
-    for arg in &func.args.args {
+/// Extract parameter names from function arguments
+fn extract_function_parameters(args: &ast::Arguments, symbols: &mut LocalSymbols) {
+    for arg in &args.args {
         symbols.insert(arg.def.arg.to_string());
     }
 
-    if let Some(vararg) = &func.args.vararg {
+    if let Some(vararg) = &args.vararg {
         symbols.insert(vararg.arg.to_string());
     }
 
-    for kwarg in &func.args.kwonlyargs {
+    for kwarg in &args.kwonlyargs {
         symbols.insert(kwarg.def.arg.to_string());
     }
 
-    if let Some(kwarg) = &func.args.kwarg {
+    if let Some(kwarg) = &args.kwarg {
         symbols.insert(kwarg.arg.to_string());
     }
-
-    // Add local assignments, loop vars, etc.
-    collect_definitions(&func.body, &mut symbols);
-
-    symbols
 }
 
 /// Collect variable definitions from statements
@@ -239,20 +265,12 @@ fn find_undefined_names(
     builtins: &HashSet<String>,
     imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
-    let mut errors = Vec::new();
-
-    for stmt in stmts {
-        errors.extend(check_stmt_for_undefined(
-            stmt,
-            func_name,
-            symbols,
-            resolver,
-            builtins,
-            imported_modules,
-        ));
-    }
-
-    errors
+    stmts
+        .iter()
+        .flat_map(|stmt| {
+            check_stmt_for_undefined(stmt, func_name, symbols, resolver, builtins, imported_modules)
+        })
+        .collect()
 }
 
 /// Check single statement for undefined references
@@ -264,95 +282,114 @@ fn check_stmt_for_undefined(
     builtins: &HashSet<String>,
     imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
-    let mut errors = Vec::new();
+    let mut errors = check_stmt_expressions(stmt, func_name, symbols, resolver, builtins, imported_modules);
+    errors.extend(check_nested_blocks(stmt, func_name, symbols, resolver, builtins, imported_modules));
+    errors
+}
 
-    // Check expressions in statement
-    for expr in extract_expressions(stmt) {
-        errors.extend(check_expr_for_undefined(
-            expr,
-            func_name,
-            symbols,
-            resolver,
-            builtins,
-            imported_modules,
-        ));
-    }
+/// Check expressions within a statement
+fn check_stmt_expressions(
+    stmt: &ast::Stmt,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    extract_expressions(stmt)
+        .iter()
+        .flat_map(|expr| {
+            check_expr_for_undefined(expr, func_name, symbols, resolver, builtins, imported_modules)
+        })
+        .collect()
+}
 
-    // Recursively check nested blocks
+/// Check nested blocks in statement
+fn check_nested_blocks(
+    stmt: &ast::Stmt,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
     match stmt {
-        ast::Stmt::If(if_stmt) => {
-            errors.extend(find_undefined_names(
-                &if_stmt.body,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-            errors.extend(find_undefined_names(
-                &if_stmt.orelse,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-        }
-        ast::Stmt::While(while_stmt) => {
-            errors.extend(find_undefined_names(
-                &while_stmt.body,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-        }
-        ast::Stmt::For(for_stmt) => {
-            errors.extend(find_undefined_names(
-                &for_stmt.body,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-        }
-        ast::Stmt::Try(try_stmt) => {
-            errors.extend(find_undefined_names(
-                &try_stmt.body,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-            for handler in &try_stmt.handlers {
-                let ast::ExceptHandler::ExceptHandler(h) = handler;
-                errors.extend(find_undefined_names(
-                    &h.body,
-                    func_name,
-                    symbols,
-                    resolver,
-                    builtins,
-                    imported_modules,
-                ));
-            }
-        }
-        ast::Stmt::With(with_stmt) => {
-            errors.extend(find_undefined_names(
-                &with_stmt.body,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-        }
-        _ => {}
+        ast::Stmt::If(if_stmt) => check_if_stmt(if_stmt, func_name, symbols, resolver, builtins, imported_modules),
+        ast::Stmt::While(while_stmt) => check_while_stmt(while_stmt, func_name, symbols, resolver, builtins, imported_modules),
+        ast::Stmt::For(for_stmt) => check_for_stmt(for_stmt, func_name, symbols, resolver, builtins, imported_modules),
+        ast::Stmt::Try(try_stmt) => check_try_stmt(try_stmt, func_name, symbols, resolver, builtins, imported_modules),
+        ast::Stmt::With(with_stmt) => check_with_stmt(with_stmt, func_name, symbols, resolver, builtins, imported_modules),
+        _ => Vec::new(),
+    }
+}
+
+/// Check if statement blocks
+fn check_if_stmt(
+    if_stmt: &ast::StmtIf,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    let mut errors = find_undefined_names(&if_stmt.body, func_name, symbols, resolver, builtins, imported_modules);
+    errors.extend(find_undefined_names(&if_stmt.orelse, func_name, symbols, resolver, builtins, imported_modules));
+    errors
+}
+
+/// Check while statement block
+fn check_while_stmt(
+    while_stmt: &ast::StmtWhile,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    find_undefined_names(&while_stmt.body, func_name, symbols, resolver, builtins, imported_modules)
+}
+
+/// Check for statement block
+fn check_for_stmt(
+    for_stmt: &ast::StmtFor,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    find_undefined_names(&for_stmt.body, func_name, symbols, resolver, builtins, imported_modules)
+}
+
+/// Check try statement blocks
+fn check_try_stmt(
+    try_stmt: &ast::StmtTry,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    let mut errors = find_undefined_names(&try_stmt.body, func_name, symbols, resolver, builtins, imported_modules);
+
+    for handler in &try_stmt.handlers {
+        let ast::ExceptHandler::ExceptHandler(h) = handler;
+        errors.extend(find_undefined_names(&h.body, func_name, symbols, resolver, builtins, imported_modules));
     }
 
     errors
+}
+
+/// Check with statement block
+fn check_with_stmt(
+    with_stmt: &ast::StmtWith,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    find_undefined_names(&with_stmt.body, func_name, symbols, resolver, builtins, imported_modules)
 }
 
 /// Check expression for undefined references
@@ -364,116 +401,185 @@ fn check_expr_for_undefined(
     builtins: &HashSet<String>,
     imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
-    let mut errors = Vec::new();
-
     match expr {
         ast::Expr::Name(name) if matches!(name.ctx, ast::ExprContext::Load) => {
-            errors.extend(check_name_reference(name, func_name, symbols, builtins));
+            check_name_reference(name, func_name, symbols, builtins)
         }
         ast::Expr::Attribute(attr) => {
-            errors.extend(check_attribute_access(
-                attr,
-                resolver,
-                imported_modules,
-                symbols,
-            ));
-            // Only recursively check the base if it's not a simple Name
-            // (Name nodes are already handled by check_attribute_access for module references)
-            if !matches!(&*attr.value, ast::Expr::Name(_)) {
-                errors.extend(check_expr_for_undefined(
-                    &attr.value,
-                    func_name,
-                    symbols,
-                    resolver,
-                    builtins,
-                    imported_modules,
-                ));
-            }
+            check_attribute_expr(attr, func_name, symbols, resolver, builtins, imported_modules)
         }
         ast::Expr::Call(call) => {
-            errors.extend(check_expr_for_undefined(
-                &call.func,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-            for arg in &call.args {
-                errors.extend(check_expr_for_undefined(
-                    arg,
-                    func_name,
-                    symbols,
-                    resolver,
-                    builtins,
-                    imported_modules,
-                ));
-            }
+            check_call_expr(call, func_name, symbols, resolver, builtins, imported_modules)
         }
         ast::Expr::BinOp(binop) => {
-            errors.extend(check_expr_for_undefined(
-                &binop.left,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-            errors.extend(check_expr_for_undefined(
-                &binop.right,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
+            check_binop_expr(binop, func_name, symbols, resolver, builtins, imported_modules)
         }
         ast::Expr::Compare(compare) => {
-            errors.extend(check_expr_for_undefined(
-                &compare.left,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
-            for comparator in &compare.comparators {
-                errors.extend(check_expr_for_undefined(
-                    comparator,
-                    func_name,
-                    symbols,
-                    resolver,
-                    builtins,
-                    imported_modules,
-                ));
-            }
+            check_compare_expr(compare, func_name, symbols, resolver, builtins, imported_modules)
         }
         ast::Expr::List(list) => {
-            for elt in &list.elts {
-                errors.extend(check_expr_for_undefined(
-                    elt,
-                    func_name,
-                    symbols,
-                    resolver,
-                    builtins,
-                    imported_modules,
-                ));
-            }
+            check_list_expr(list, func_name, symbols, resolver, builtins, imported_modules)
         }
         ast::Expr::Subscript(subscript) => {
-            errors.extend(check_expr_for_undefined(
-                &subscript.value,
-                func_name,
-                symbols,
-                resolver,
-                builtins,
-                imported_modules,
-            ));
+            check_subscript_expr(subscript, func_name, symbols, resolver, builtins, imported_modules)
         }
-        _ => {}
+        _ => Vec::new(),
+    }
+}
+
+/// Check attribute expression
+fn check_attribute_expr(
+    attr: &ast::ExprAttribute,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    let mut errors = check_attribute_access(attr, resolver, imported_modules, symbols);
+
+    if !matches!(&*attr.value, ast::Expr::Name(_)) {
+        errors.extend(check_expr_for_undefined(
+            &attr.value,
+            func_name,
+            symbols,
+            resolver,
+            builtins,
+            imported_modules,
+        ));
     }
 
     errors
+}
+
+/// Check call expression
+fn check_call_expr(
+    call: &ast::ExprCall,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    let mut errors = check_expr_for_undefined(
+        &call.func,
+        func_name,
+        symbols,
+        resolver,
+        builtins,
+        imported_modules,
+    );
+
+    for arg in &call.args {
+        errors.extend(check_expr_for_undefined(
+            arg,
+            func_name,
+            symbols,
+            resolver,
+            builtins,
+            imported_modules,
+        ));
+    }
+
+    errors
+}
+
+/// Check binary operation expression
+fn check_binop_expr(
+    binop: &ast::ExprBinOp,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    let mut errors = check_expr_for_undefined(
+        &binop.left,
+        func_name,
+        symbols,
+        resolver,
+        builtins,
+        imported_modules,
+    );
+
+    errors.extend(check_expr_for_undefined(
+        &binop.right,
+        func_name,
+        symbols,
+        resolver,
+        builtins,
+        imported_modules,
+    ));
+
+    errors
+}
+
+/// Check comparison expression
+fn check_compare_expr(
+    compare: &ast::ExprCompare,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    let mut errors = check_expr_for_undefined(
+        &compare.left,
+        func_name,
+        symbols,
+        resolver,
+        builtins,
+        imported_modules,
+    );
+
+    for comparator in &compare.comparators {
+        errors.extend(check_expr_for_undefined(
+            comparator,
+            func_name,
+            symbols,
+            resolver,
+            builtins,
+            imported_modules,
+        ));
+    }
+
+    errors
+}
+
+/// Check list expression
+fn check_list_expr(
+    list: &ast::ExprList,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    list.elts
+        .iter()
+        .flat_map(|elt| {
+            check_expr_for_undefined(elt, func_name, symbols, resolver, builtins, imported_modules)
+        })
+        .collect()
+}
+
+/// Check subscript expression
+fn check_subscript_expr(
+    subscript: &ast::ExprSubscript,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    check_expr_for_undefined(
+        &subscript.value,
+        func_name,
+        symbols,
+        resolver,
+        builtins,
+        imported_modules,
+    )
 }
 
 /// Check if name reference is defined
@@ -485,20 +591,26 @@ fn check_name_reference(
 ) -> Vec<StaticError> {
     let name_str = name.id.to_string();
 
-    if is_false_positive(&name_str) {
+    if is_name_defined(&name_str, symbols, builtins) {
         return Vec::new();
     }
 
-    if symbols.contains(&name_str) || builtins.contains(&name_str) {
-        return Vec::new();
-    }
+    vec![create_undefined_var_error(&name_str, func_name)]
+}
 
-    vec![StaticError::UndefinedVariable {
-        name: name_str,
-        line: 0, // Line info will be added when converting to DebtItem
+/// Check if name is defined in symbols or builtins
+fn is_name_defined(name: &str, symbols: &LocalSymbols, builtins: &HashSet<String>) -> bool {
+    is_false_positive(name) || symbols.contains(name) || builtins.contains(name)
+}
+
+/// Create undefined variable error
+fn create_undefined_var_error(name: &str, func_name: &str) -> StaticError {
+    StaticError::UndefinedVariable {
+        name: name.to_string(),
+        line: 0,
         column: 0,
         function: func_name.to_string(),
-    }]
+    }
 }
 
 /// Check attribute access for missing imports
@@ -509,30 +621,44 @@ fn check_attribute_access(
     symbols: &LocalSymbols,
 ) -> Vec<StaticError> {
     if let ast::Expr::Name(base) = &*attr.value {
-        let module_name = base.id.to_string();
+        return check_module_attribute_access(base, attr, imported_modules, symbols);
+    }
+    Vec::new()
+}
 
-        // Skip common false positives (self, cls)
-        if is_false_positive(&module_name) {
-            return Vec::new();
-        }
+/// Check if module attribute access has proper import
+fn check_module_attribute_access(
+    base: &ast::ExprName,
+    attr: &ast::ExprAttribute,
+    imported_modules: &HashSet<String>,
+    symbols: &LocalSymbols,
+) -> Vec<StaticError> {
+    let module_name = base.id.to_string();
 
-        // Skip if it's a local variable
-        if symbols.contains(&module_name) {
-            return Vec::new();
-        }
+    if should_skip_module_check(&module_name, symbols) {
+        return Vec::new();
+    }
 
-        // Check if module is imported
-        if !imported_modules.contains(&module_name) {
-            let usage = format!("{}.{}", module_name, attr.attr.as_str());
-            return vec![StaticError::MissingImport {
-                module: module_name,
-                line: 0, // Line info will be added when converting to DebtItem
-                usage,
-            }];
-        }
+    if !imported_modules.contains(&module_name) {
+        return vec![create_missing_import_error(&module_name, attr)];
     }
 
     Vec::new()
+}
+
+/// Check if module check should be skipped
+fn should_skip_module_check(module_name: &str, symbols: &LocalSymbols) -> bool {
+    is_false_positive(module_name) || symbols.contains(module_name)
+}
+
+/// Create missing import error
+fn create_missing_import_error(module_name: &str, attr: &ast::ExprAttribute) -> StaticError {
+    let usage = format!("{}.{}", module_name, attr.attr.as_str());
+    StaticError::MissingImport {
+        module: module_name.to_string(),
+        line: 0,
+        usage,
+    }
 }
 
 /// Check if name should be filtered as false positive
