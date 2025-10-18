@@ -8,7 +8,7 @@
 //! common programming errors that would fail at runtime.
 
 use crate::analysis::python_imports::EnhancedImportResolver;
-use crate::core::types::{DebtCategory, DebtItem, Severity, SourceLocation};
+use crate::core::{DebtItem, DebtType, Priority};
 use lazy_static::lazy_static;
 use rustpython_parser::ast;
 use std::collections::HashSet;
@@ -187,16 +187,19 @@ fn extract_function_parameters(args: &ast::Arguments, symbols: &mut LocalSymbols
 
 /// Collect variable definitions from statements
 fn collect_definitions(stmts: &[ast::Stmt], symbols: &mut LocalSymbols) {
-    for stmt in stmts {
-        match stmt {
-            ast::Stmt::Assign(assign) => collect_from_assign(assign, symbols),
-            ast::Stmt::For(for_stmt) => collect_from_for(for_stmt, symbols),
-            ast::Stmt::With(with) => collect_from_with(with, symbols),
-            ast::Stmt::Try(try_stmt) => collect_from_try(try_stmt, symbols),
-            ast::Stmt::If(if_stmt) => collect_from_if(if_stmt, symbols),
-            ast::Stmt::While(while_stmt) => collect_from_while(while_stmt, symbols),
-            _ => {}
-        }
+    stmts.iter().for_each(|stmt| collect_from_stmt(stmt, symbols));
+}
+
+/// Collect definitions from a single statement
+fn collect_from_stmt(stmt: &ast::Stmt, symbols: &mut LocalSymbols) {
+    match stmt {
+        ast::Stmt::Assign(assign) => collect_from_assign(assign, symbols),
+        ast::Stmt::For(for_stmt) => collect_from_for(for_stmt, symbols),
+        ast::Stmt::With(with) => collect_from_with(with, symbols),
+        ast::Stmt::Try(try_stmt) => collect_from_try(try_stmt, symbols),
+        ast::Stmt::If(if_stmt) => collect_from_if(if_stmt, symbols),
+        ast::Stmt::While(while_stmt) => collect_from_while(while_stmt, symbols),
+        _ => {}
     }
 }
 
@@ -233,15 +236,16 @@ fn collect_from_with(with: &ast::StmtWith, symbols: &mut LocalSymbols) {
 /// Extract exception variables
 fn collect_from_try(try_stmt: &ast::StmtTry, symbols: &mut LocalSymbols) {
     collect_definitions(&try_stmt.body, symbols);
-    for handler in &try_stmt.handlers {
-        let ast::ExceptHandler::ExceptHandler(h) = handler;
-        if let Some(name) = &h.name {
-            symbols.insert(name.to_string());
-        }
-        collect_definitions(&h.body, symbols);
-    }
+    try_stmt.handlers.iter().for_each(|h| collect_from_except_handler(h, symbols));
     collect_definitions(&try_stmt.orelse, symbols);
     collect_definitions(&try_stmt.finalbody, symbols);
+}
+
+/// Collect definitions from exception handler
+fn collect_from_except_handler(handler: &ast::ExceptHandler, symbols: &mut LocalSymbols) {
+    let ast::ExceptHandler::ExceptHandler(h) = handler;
+    h.name.as_ref().map(|name| symbols.insert(name.to_string()));
+    collect_definitions(&h.body, symbols);
 }
 
 /// Extract variables from if statement branches
@@ -437,19 +441,29 @@ fn check_attribute_expr(
     imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
     let mut errors = check_attribute_access(attr, resolver, imported_modules, symbols);
-
-    if !matches!(&*attr.value, ast::Expr::Name(_)) {
-        errors.extend(check_expr_for_undefined(
-            &attr.value,
-            func_name,
-            symbols,
-            resolver,
-            builtins,
-            imported_modules,
-        ));
-    }
-
+    errors.extend(check_non_name_attribute_value(attr, func_name, symbols, resolver, builtins, imported_modules));
     errors
+}
+
+/// Check attribute value if it's not a simple name reference
+fn check_non_name_attribute_value(
+    attr: &ast::ExprAttribute,
+    func_name: &str,
+    symbols: &LocalSymbols,
+    resolver: &EnhancedImportResolver,
+    builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
+) -> Vec<StaticError> {
+    if should_check_attribute_value(&attr.value) {
+        check_expr_for_undefined(&attr.value, func_name, symbols, resolver, builtins, imported_modules)
+    } else {
+        Vec::new()
+    }
+}
+
+/// Determine if attribute value needs undefined check
+fn should_check_attribute_value(value: &ast::Expr) -> bool {
+    !matches!(value, ast::Expr::Name(_))
 }
 
 /// Check call expression
@@ -720,14 +734,13 @@ fn create_undefined_var_debt_item(
 ) -> DebtItem {
     DebtItem {
         id: format!("undefined-{}-{}", name, line),
-        category: DebtCategory::CodeSmell,
-        severity: Severity::Critical,
-        location: SourceLocation::new(file.to_path_buf(), line, column),
-        description: format!("Undefined variable '{}' in function '{}'", name, function),
-        impact: 0.9,
-        effort: 0.3,
-        priority: 0.9,
-        suggestions: vec![format!("Define '{}' before use or import it", name)],
+        debt_type: DebtType::CodeSmell,
+        priority: Priority::High,
+        file: file.to_path_buf(),
+        line,
+        column: Some(column),
+        message: format!("Undefined variable '{}' in function '{}'", name, function),
+        context: Some(format!("Define '{}' before use or import it", name)),
     }
 }
 
@@ -740,14 +753,13 @@ fn create_missing_import_debt_item(
 ) -> DebtItem {
     DebtItem {
         id: format!("missing-import-{}-{}", module, line),
-        category: DebtCategory::CodeSmell,
-        severity: Severity::Critical,
-        location: SourceLocation::new(file.to_path_buf(), line, 0),
-        description: format!("Missing import: {}", module),
-        impact: 0.9,
-        effort: 0.2,
-        priority: 0.9,
-        suggestions: vec![format!("Add 'import {}' (used as: {})", module, usage)],
+        debt_type: DebtType::CodeSmell,
+        priority: Priority::High,
+        file: file.to_path_buf(),
+        line,
+        column: Some(0),
+        message: format!("Missing import: {}", module),
+        context: Some(format!("Add 'import {}' (used as: {})", module, usage)),
     }
 }
 
