@@ -116,6 +116,19 @@ impl Analyzer for PythonAnalyzer {
                     exc_flow_analyzer.patterns_to_debt_items(exception_patterns);
                 metrics.debt_items.extend(exception_debt_items);
 
+                // Add static error detection (undefined variables, missing imports)
+                use crate::analysis::python_imports::EnhancedImportResolver;
+                use crate::analysis::python_static_errors::{
+                    analyze_static_errors, errors_to_debt_items,
+                };
+
+                let import_resolver = EnhancedImportResolver::new();
+                let static_analysis_result =
+                    analyze_static_errors(&python_ast.module, &import_resolver);
+                let static_error_debt_items =
+                    errors_to_debt_items(&static_analysis_result, &python_ast.path);
+                metrics.debt_items.extend(static_error_debt_items);
+
                 metrics
             }
             _ => FileMetrics {
