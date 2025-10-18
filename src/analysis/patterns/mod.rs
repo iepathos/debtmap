@@ -4,10 +4,13 @@
 //! common design patterns in code, such as Observer, Factory, and Callback patterns.
 
 pub mod callback;
+pub mod config;
 pub mod factory;
 pub mod observer;
 pub mod rust_traits;
 pub mod singleton;
+pub mod strategy;
+pub mod template_method;
 
 use crate::analysis::call_graph::TraitRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
@@ -23,6 +26,9 @@ pub enum PatternType {
     Factory,
     Callback,
     Singleton,
+    Strategy,
+    TemplateMethod,
+    DependencyInjection,
 }
 
 /// A detected instance of a design pattern
@@ -79,6 +85,8 @@ impl PatternDetector {
                 Box::new(factory::FactoryPatternRecognizer::new()),
                 Box::new(callback::CallbackPatternRecognizer::new()),
                 Box::new(singleton::SingletonPatternRecognizer::new()),
+                Box::new(strategy::StrategyPatternRecognizer::new()),
+                Box::new(template_method::TemplateMethodPatternRecognizer::new()),
             ],
             cross_module_context: None,
             trait_registry: None,
@@ -297,7 +305,7 @@ mod tests {
     #[test]
     fn test_pattern_detector_creation() {
         let detector = PatternDetector::new();
-        assert_eq!(detector.recognizers.len(), 4);
+        assert_eq!(detector.recognizers.len(), 6);
     }
 
     #[test]
@@ -351,7 +359,7 @@ mod tests {
     #[test]
     fn test_pattern_detector_with_singleton() {
         let detector = PatternDetector::new();
-        assert_eq!(detector.recognizers.len(), 4);
+        assert_eq!(detector.recognizers.len(), 6);
     }
 
     #[test]

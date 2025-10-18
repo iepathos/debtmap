@@ -1,4 +1,5 @@
 pub mod output;
+pub mod pattern_output;
 pub mod walker;
 pub mod writers;
 
