@@ -5,6 +5,7 @@
 
 pub mod callback;
 pub mod config;
+pub mod dependency_injection;
 pub mod factory;
 pub mod observer;
 pub mod rust_traits;
@@ -87,6 +88,7 @@ impl PatternDetector {
                 Box::new(singleton::SingletonPatternRecognizer::new()),
                 Box::new(strategy::StrategyPatternRecognizer::new()),
                 Box::new(template_method::TemplateMethodPatternRecognizer::new()),
+                Box::new(dependency_injection::DependencyInjectionRecognizer::new()),
             ],
             cross_module_context: None,
             trait_registry: None,
@@ -305,7 +307,7 @@ mod tests {
     #[test]
     fn test_pattern_detector_creation() {
         let detector = PatternDetector::new();
-        assert_eq!(detector.recognizers.len(), 6);
+        assert_eq!(detector.recognizers.len(), 7);
     }
 
     #[test]
@@ -359,7 +361,7 @@ mod tests {
     #[test]
     fn test_pattern_detector_with_singleton() {
         let detector = PatternDetector::new();
-        assert_eq!(detector.recognizers.len(), 6);
+        assert_eq!(detector.recognizers.len(), 7);
     }
 
     #[test]
