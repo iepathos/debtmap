@@ -509,6 +509,10 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         validate_loc,
         no_public_api_detection,
         public_api_threshold,
+        no_pattern_detection: _,
+        patterns: _,
+        pattern_threshold: _,
+        show_pattern_warnings: _,
     } = command
     {
         // Apply side effects first

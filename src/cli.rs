@@ -21,6 +21,7 @@ pub struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Commands {
     /// Analyze code for complexity and technical debt
     Analyze {
@@ -213,6 +214,22 @@ pub enum Commands {
         /// Public API confidence threshold (0.0-1.0) - functions above this are considered public APIs
         #[arg(long = "public-api-threshold", default_value = "0.7")]
         public_api_threshold: f32,
+
+        /// Disable pattern recognition
+        #[arg(long = "no-pattern-detection")]
+        no_pattern_detection: bool,
+
+        /// Enable specific patterns only (comma-separated: observer,singleton,factory,strategy,callback,template_method)
+        #[arg(long = "patterns", value_delimiter = ',')]
+        patterns: Option<Vec<String>>,
+
+        /// Pattern confidence threshold (0.0 - 1.0)
+        #[arg(long = "pattern-threshold", default_value = "0.7")]
+        pattern_threshold: f32,
+
+        /// Show pattern warnings for uncertain detections
+        #[arg(long = "show-pattern-warnings")]
+        show_pattern_warnings: bool,
     },
 
     /// Initialize configuration file
