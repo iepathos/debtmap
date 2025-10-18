@@ -22,6 +22,7 @@ pub mod python_call_graph;
 pub mod python_dead_code;
 pub mod python_dead_code_enhanced;
 pub mod python_imports;
+pub mod python_static_errors;
 pub mod python_type_tracker;
 
 pub use call_graph::{
@@ -44,6 +45,9 @@ pub use python_dead_code_enhanced::{
 pub use python_imports::{
     EnhancedImportResolver, ExportedSymbol as ImportExportedSymbol, ImportGraph, ImportType,
     ModuleSymbols, ResolvedSymbol,
+};
+pub use python_static_errors::{
+    analyze_static_errors, errors_to_debt_items, LocalSymbols, StaticAnalysisResult, StaticError,
 };
 pub use python_type_tracker::{
     ClassInfo, FunctionSignature, PythonType, PythonTypeTracker, TwoPassExtractor,
