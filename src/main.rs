@@ -509,6 +509,10 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         validate_loc,
         no_public_api_detection,
         public_api_threshold,
+        no_pattern_detection,
+        patterns,
+        pattern_threshold,
+        show_pattern_warnings,
     } = command
     {
         // Apply side effects first
@@ -566,6 +570,10 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             validate_loc,
             no_public_api_detection,
             public_api_threshold,
+            no_pattern_detection,
+            patterns,
+            pattern_threshold,
+            show_pattern_warnings,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -750,6 +758,10 @@ fn build_analyze_config(
     validate_loc: bool,
     no_public_api_detection: bool,
     public_api_threshold: f32,
+    no_pattern_detection: bool,
+    patterns: Option<Vec<String>>,
+    pattern_threshold: f32,
+    show_pattern_warnings: bool,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -797,6 +809,10 @@ fn build_analyze_config(
         validate_loc,
         no_public_api_detection,
         public_api_threshold,
+        no_pattern_detection,
+        patterns,
+        pattern_threshold,
+        show_pattern_warnings,
     }
 }
 

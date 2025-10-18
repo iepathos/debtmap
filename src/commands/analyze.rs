@@ -60,6 +60,10 @@ pub struct AnalyzeConfig {
     pub validate_loc: bool,
     pub no_public_api_detection: bool,
     pub public_api_threshold: f32,
+    pub no_pattern_detection: bool,
+    pub patterns: Option<Vec<String>>,
+    pub pattern_threshold: f32,
+    pub show_pattern_warnings: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
