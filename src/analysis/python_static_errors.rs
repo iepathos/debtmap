@@ -9,6 +9,7 @@
 
 use crate::analysis::python_imports::EnhancedImportResolver;
 use crate::core::types::{DebtCategory, DebtItem, Severity, SourceLocation};
+use lazy_static::lazy_static;
 use rustpython_parser::ast;
 use std::collections::HashSet;
 use std::path::Path;
@@ -65,15 +66,48 @@ pub fn analyze_static_errors(
     };
 
     let builtins = python_builtins();
+    let imported_modules = extract_imported_modules(&mod_module.body);
     let mut errors = Vec::new();
 
     for stmt in &mod_module.body {
         if let ast::Stmt::FunctionDef(func) = stmt {
-            errors.extend(analyze_function(func, import_resolver, &builtins));
+            errors.extend(analyze_function(
+                func,
+                import_resolver,
+                builtins,
+                &imported_modules,
+            ));
         }
     }
 
     StaticAnalysisResult { errors }
+}
+
+/// Extract all imported module names from statements
+fn extract_imported_modules(stmts: &[ast::Stmt]) -> HashSet<String> {
+    let mut modules = HashSet::new();
+
+    for stmt in stmts {
+        match stmt {
+            ast::Stmt::Import(import) => {
+                for alias in &import.names {
+                    let module_name = alias.name.as_str();
+                    modules.insert(module_name.to_string());
+                    if let Some(alias_name) = &alias.asname {
+                        modules.insert(alias_name.as_str().to_string());
+                    }
+                }
+            }
+            ast::Stmt::ImportFrom(import_from) => {
+                if let Some(module) = &import_from.module {
+                    modules.insert(module.as_str().to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    modules
 }
 
 /// Analyze single function for errors
@@ -81,9 +115,17 @@ fn analyze_function(
     func: &ast::StmtFunctionDef,
     resolver: &EnhancedImportResolver,
     builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
     let symbols = extract_local_symbols(func);
-    find_undefined_names(&func.body, func.name.as_str(), &symbols, resolver, builtins)
+    find_undefined_names(
+        &func.body,
+        func.name.as_str(),
+        &symbols,
+        resolver,
+        builtins,
+        imported_modules,
+    )
 }
 
 /// Extract all locally defined symbols from function
@@ -195,12 +237,18 @@ fn find_undefined_names(
     symbols: &LocalSymbols,
     resolver: &EnhancedImportResolver,
     builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
     let mut errors = Vec::new();
 
     for stmt in stmts {
         errors.extend(check_stmt_for_undefined(
-            stmt, func_name, symbols, resolver, builtins,
+            stmt,
+            func_name,
+            symbols,
+            resolver,
+            builtins,
+            imported_modules,
         ));
     }
 
@@ -214,13 +262,19 @@ fn check_stmt_for_undefined(
     symbols: &LocalSymbols,
     resolver: &EnhancedImportResolver,
     builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
     let mut errors = Vec::new();
 
     // Check expressions in statement
     for expr in extract_expressions(stmt) {
         errors.extend(check_expr_for_undefined(
-            expr, func_name, symbols, resolver, builtins,
+            expr,
+            func_name,
+            symbols,
+            resolver,
+            builtins,
+            imported_modules,
         ));
     }
 
@@ -233,6 +287,7 @@ fn check_stmt_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
             errors.extend(find_undefined_names(
                 &if_stmt.orelse,
@@ -240,6 +295,7 @@ fn check_stmt_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
         }
         ast::Stmt::While(while_stmt) => {
@@ -249,6 +305,7 @@ fn check_stmt_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
         }
         ast::Stmt::For(for_stmt) => {
@@ -258,6 +315,7 @@ fn check_stmt_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
         }
         ast::Stmt::Try(try_stmt) => {
@@ -267,11 +325,17 @@ fn check_stmt_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
             for handler in &try_stmt.handlers {
                 let ast::ExceptHandler::ExceptHandler(h) = handler;
                 errors.extend(find_undefined_names(
-                    &h.body, func_name, symbols, resolver, builtins,
+                    &h.body,
+                    func_name,
+                    symbols,
+                    resolver,
+                    builtins,
+                    imported_modules,
                 ));
             }
         }
@@ -282,6 +346,7 @@ fn check_stmt_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
         }
         _ => {}
@@ -297,6 +362,7 @@ fn check_expr_for_undefined(
     symbols: &LocalSymbols,
     resolver: &EnhancedImportResolver,
     builtins: &HashSet<String>,
+    imported_modules: &HashSet<String>,
 ) -> Vec<StaticError> {
     let mut errors = Vec::new();
 
@@ -305,23 +371,42 @@ fn check_expr_for_undefined(
             errors.extend(check_name_reference(name, func_name, symbols, builtins));
         }
         ast::Expr::Attribute(attr) => {
-            errors.extend(check_attribute_access(attr, resolver));
-            // Recursively check the base expression
+            errors.extend(check_attribute_access(
+                attr,
+                resolver,
+                imported_modules,
+                symbols,
+            ));
+            // Only recursively check the base if it's not a simple Name
+            // (Name nodes are already handled by check_attribute_access for module references)
+            if !matches!(&*attr.value, ast::Expr::Name(_)) {
+                errors.extend(check_expr_for_undefined(
+                    &attr.value,
+                    func_name,
+                    symbols,
+                    resolver,
+                    builtins,
+                    imported_modules,
+                ));
+            }
+        }
+        ast::Expr::Call(call) => {
             errors.extend(check_expr_for_undefined(
-                &attr.value,
+                &call.func,
                 func_name,
                 symbols,
                 resolver,
                 builtins,
-            ));
-        }
-        ast::Expr::Call(call) => {
-            errors.extend(check_expr_for_undefined(
-                &call.func, func_name, symbols, resolver, builtins,
+                imported_modules,
             ));
             for arg in &call.args {
                 errors.extend(check_expr_for_undefined(
-                    arg, func_name, symbols, resolver, builtins,
+                    arg,
+                    func_name,
+                    symbols,
+                    resolver,
+                    builtins,
+                    imported_modules,
                 ));
             }
         }
@@ -332,6 +417,7 @@ fn check_expr_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
             errors.extend(check_expr_for_undefined(
                 &binop.right,
@@ -339,6 +425,7 @@ fn check_expr_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
         }
         ast::Expr::Compare(compare) => {
@@ -348,17 +435,28 @@ fn check_expr_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
             for comparator in &compare.comparators {
                 errors.extend(check_expr_for_undefined(
-                    comparator, func_name, symbols, resolver, builtins,
+                    comparator,
+                    func_name,
+                    symbols,
+                    resolver,
+                    builtins,
+                    imported_modules,
                 ));
             }
         }
         ast::Expr::List(list) => {
             for elt in &list.elts {
                 errors.extend(check_expr_for_undefined(
-                    elt, func_name, symbols, resolver, builtins,
+                    elt,
+                    func_name,
+                    symbols,
+                    resolver,
+                    builtins,
+                    imported_modules,
                 ));
             }
         }
@@ -369,6 +467,7 @@ fn check_expr_for_undefined(
                 symbols,
                 resolver,
                 builtins,
+                imported_modules,
             ));
         }
         _ => {}
@@ -406,18 +505,31 @@ fn check_name_reference(
 fn check_attribute_access(
     attr: &ast::ExprAttribute,
     _resolver: &EnhancedImportResolver,
+    imported_modules: &HashSet<String>,
+    symbols: &LocalSymbols,
 ) -> Vec<StaticError> {
     if let ast::Expr::Name(base) = &*attr.value {
         let module_name = base.id.to_string();
 
-        // Skip common false positives
+        // Skip common false positives (self, cls)
         if is_false_positive(&module_name) {
             return Vec::new();
         }
 
-        // For now, we skip module import checking since it requires
-        // checking against the module-level imports, not function-level
-        // This will be enhanced in a future iteration
+        // Skip if it's a local variable
+        if symbols.contains(&module_name) {
+            return Vec::new();
+        }
+
+        // Check if module is imported
+        if !imported_modules.contains(&module_name) {
+            let usage = format!("{}.{}", module_name, attr.attr.as_str());
+            return vec![StaticError::MissingImport {
+                module: module_name,
+                line: 0, // Line info will be added when converting to DebtItem
+                usage,
+            }];
+        }
     }
 
     Vec::new()
@@ -428,97 +540,35 @@ fn is_false_positive(name: &str) -> bool {
     matches!(name, "self" | "cls")
 }
 
+lazy_static! {
+    /// Python 3.8+ builtins
+    static ref PYTHON_BUILTINS: HashSet<String> = {
+        vec![
+            // Functions
+            "abs", "all", "any", "ascii", "bin", "bool", "breakpoint", "bytearray", "bytes",
+            "callable", "chr", "classmethod", "compile", "complex", "delattr", "dict", "dir",
+            "divmod", "enumerate", "eval", "exec", "filter", "float", "format", "frozenset",
+            "getattr", "globals", "hasattr", "hash", "help", "hex", "id", "input", "int",
+            "isinstance", "issubclass", "iter", "len", "list", "locals", "map", "max",
+            "memoryview", "min", "next", "object", "oct", "open", "ord", "pow", "print",
+            "property", "range", "repr", "reversed", "round", "set", "setattr", "slice",
+            "sorted", "staticmethod", "str", "sum", "super", "tuple", "type", "vars", "zip",
+            "__import__",
+            // Constants
+            "True", "False", "None", "NotImplemented", "Ellipsis",
+            // Common exceptions
+            "Exception", "ValueError", "TypeError", "KeyError", "AttributeError",
+            "ImportError", "IndexError",
+        ]
+        .iter()
+        .map(|&s| s.to_string())
+        .collect()
+    };
+}
+
 /// Get Python 3.8+ builtins
-fn python_builtins() -> HashSet<String> {
-    [
-        // Functions
-        "abs",
-        "all",
-        "any",
-        "ascii",
-        "bin",
-        "bool",
-        "breakpoint",
-        "bytearray",
-        "bytes",
-        "callable",
-        "chr",
-        "classmethod",
-        "compile",
-        "complex",
-        "delattr",
-        "dict",
-        "dir",
-        "divmod",
-        "enumerate",
-        "eval",
-        "exec",
-        "filter",
-        "float",
-        "format",
-        "frozenset",
-        "getattr",
-        "globals",
-        "hasattr",
-        "hash",
-        "help",
-        "hex",
-        "id",
-        "input",
-        "int",
-        "isinstance",
-        "issubclass",
-        "iter",
-        "len",
-        "list",
-        "locals",
-        "map",
-        "max",
-        "memoryview",
-        "min",
-        "next",
-        "object",
-        "oct",
-        "open",
-        "ord",
-        "pow",
-        "print",
-        "property",
-        "range",
-        "repr",
-        "reversed",
-        "round",
-        "set",
-        "setattr",
-        "slice",
-        "sorted",
-        "staticmethod",
-        "str",
-        "sum",
-        "super",
-        "tuple",
-        "type",
-        "vars",
-        "zip",
-        "__import__",
-        // Constants
-        "True",
-        "False",
-        "None",
-        "NotImplemented",
-        "Ellipsis",
-        // Common exceptions
-        "Exception",
-        "ValueError",
-        "TypeError",
-        "KeyError",
-        "AttributeError",
-        "ImportError",
-        "IndexError",
-    ]
-    .iter()
-    .map(|&s| s.to_string())
-    .collect()
+fn python_builtins() -> &'static HashSet<String> {
+    &PYTHON_BUILTINS
 }
 
 /// Helper: Extract expressions from statement
@@ -534,6 +584,47 @@ fn extract_expressions(stmt: &ast::Stmt) -> Vec<&ast::Expr> {
     }
 }
 
+/// Create debt item for undefined variable error
+fn create_undefined_var_debt_item(
+    name: &str,
+    line: usize,
+    column: usize,
+    function: &str,
+    file: &Path,
+) -> DebtItem {
+    DebtItem {
+        id: format!("undefined-{}-{}", name, line),
+        category: DebtCategory::CodeSmell,
+        severity: Severity::Critical,
+        location: SourceLocation::new(file.to_path_buf(), line, column),
+        description: format!("Undefined variable '{}' in function '{}'", name, function),
+        impact: 0.9,
+        effort: 0.3,
+        priority: 0.9,
+        suggestions: vec![format!("Define '{}' before use or import it", name)],
+    }
+}
+
+/// Create debt item for missing import error
+fn create_missing_import_debt_item(
+    module: &str,
+    line: usize,
+    usage: &str,
+    file: &Path,
+) -> DebtItem {
+    DebtItem {
+        id: format!("missing-import-{}-{}", module, line),
+        category: DebtCategory::CodeSmell,
+        severity: Severity::Critical,
+        location: SourceLocation::new(file.to_path_buf(), line, 0),
+        description: format!("Missing import: {}", module),
+        impact: 0.9,
+        effort: 0.2,
+        priority: 0.9,
+        suggestions: vec![format!("Add 'import {}' (used as: {})", module, usage)],
+    }
+}
+
 /// Convert StaticError to DebtItem
 pub fn to_debt_item(error: &StaticError, file: &Path) -> DebtItem {
     match error {
@@ -542,32 +633,12 @@ pub fn to_debt_item(error: &StaticError, file: &Path) -> DebtItem {
             line,
             column,
             function,
-        } => DebtItem {
-            id: format!("undefined-{}-{}", name, line),
-            category: DebtCategory::CodeSmell,
-            severity: Severity::Critical,
-            location: SourceLocation::new(file.to_path_buf(), *line, *column),
-            description: format!("Undefined variable '{}' in function '{}'", name, function),
-            impact: 0.9,
-            effort: 0.3,
-            priority: 0.9,
-            suggestions: vec![format!("Define '{}' before use or import it", name)],
-        },
+        } => create_undefined_var_debt_item(name, *line, *column, function, file),
         StaticError::MissingImport {
             module,
             line,
             usage,
-        } => DebtItem {
-            id: format!("missing-import-{}-{}", module, line),
-            category: DebtCategory::CodeSmell,
-            severity: Severity::Critical,
-            location: SourceLocation::new(file.to_path_buf(), *line, 0),
-            description: format!("Missing import: {}", module),
-            impact: 0.9,
-            effort: 0.2,
-            priority: 0.9,
-            suggestions: vec![format!("Add 'import {}' (used as: {})", module, usage)],
-        },
+        } => create_missing_import_debt_item(module, *line, usage, file),
     }
 }
 
@@ -703,5 +774,22 @@ def process():
         let result = analyze_static_errors(&ast, &resolver);
 
         assert_eq!(result.errors.len(), 0);
+    }
+
+    #[test]
+    fn test_issue_9_missing_import() {
+        let code = r#"
+def test(param):
+    wx.CallAfter(param)
+"#;
+        let ast = parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let resolver = EnhancedImportResolver::new();
+        let result = analyze_static_errors(&ast, &resolver);
+
+        assert_eq!(result.errors.len(), 1);
+        assert!(matches!(
+            result.errors[0],
+            StaticError::MissingImport { ref module, .. } if module == "wx"
+        ));
     }
 }
