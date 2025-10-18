@@ -61,6 +61,7 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 - **Resource management analysis** - Identifies inefficient allocations, nested loops, and blocking I/O patterns
 - **Code organization analysis** - Detects god objects, feature envy, primitive obsession, and magic values
 - **God object detection** - Identifies classes/modules with too many responsibilities using method count, field count, and responsibility analysis
+- **Design pattern detection** - Automatically identifies common design patterns (Observer, Factory, Singleton, Strategy, Template Method, Dependency Injection) with configurable confidence thresholds and custom rules
 - **Testing quality assessment** - Analyzes test complexity, flaky patterns, and assertion quality
 - **Context-aware analysis** - Reduces false positives through intelligent context detection (enabled by default)
 - **Enhanced scoring system** - Advanced scoring differentiation for better prioritization
@@ -182,6 +183,109 @@ To disable god object detection for a specific run:
 ```bash
 debtmap analyze . --no-god-object
 ```
+
+## Pattern Detection
+
+Debtmap automatically detects common design patterns in your codebase to help you understand architectural decisions and identify opportunities for improvement. Pattern detection supports:
+
+### Supported Patterns
+
+- **Observer** - Event handling and notification patterns
+- **Factory** - Object creation patterns
+- **Callback** - Asynchronous and event-driven patterns
+- **Singleton** - Single instance management patterns
+- **Strategy** - Behavioral abstraction patterns
+- **Template Method** - Algorithm skeleton patterns
+- **Dependency Injection** - Dependency management patterns
+
+### CLI Options
+
+Control pattern detection behavior with command-line flags:
+
+```bash
+# Disable pattern detection
+debtmap analyze . --no-pattern-detection
+
+# Use specific patterns only
+debtmap analyze . --patterns observer,factory,singleton
+
+# Set confidence threshold (0.0 - 1.0, default: 0.7)
+debtmap analyze . --pattern-threshold 0.85
+
+# Show pattern detection warnings
+debtmap analyze . --show-pattern-warnings
+```
+
+### Configuration
+
+Configure pattern detection in `.debtmap.toml`:
+
+```toml
+# Pattern detection configuration
+[patterns]
+enabled = true
+confidence_threshold = 0.7
+
+# Observer pattern settings
+[patterns.observer]
+interface_markers = ["ABC", "Protocol", "EventHandler"]
+registration_methods = ["add_observer", "register", "subscribe"]
+method_prefixes = ["on_", "handle_", "notify_"]
+
+# Factory pattern settings
+[patterns.factory]
+detect_functions = true
+detect_registries = true
+name_patterns = ["create_", "make_", "build_", "_factory"]
+
+# Singleton pattern settings
+[patterns.singleton]
+detect_module_level = true
+detect_new_override = true
+detect_decorator = true
+
+# Strategy pattern settings
+[patterns.strategy]
+enabled = true
+
+# Template method pattern settings
+[patterns.template_method]
+enabled = true
+
+# Callback pattern settings
+[patterns.callback]
+decorator_patterns = ["route", "handler", "app."]
+
+# Custom pattern rules
+[[patterns.custom_rules]]
+name = "event_handler"
+method_pattern = "^handle_.*_event$"
+confidence = 0.85
+
+[[patterns.custom_rules]]
+name = "command_pattern"
+class_pattern = ".*Command$"
+decorator_pattern = "command"
+confidence = 0.9
+```
+
+### Custom Pattern Rules
+
+Define your own pattern detection rules:
+
+- **`name`** - Descriptive name for the pattern
+- **`method_pattern`** - Regex for matching method names
+- **`class_pattern`** - Regex for matching class names
+- **`decorator_pattern`** - Regex for matching decorators
+- **`confidence`** - Confidence score (0.0 - 1.0)
+
+Each pattern detection includes:
+- **Pattern type** - Which design pattern was detected
+- **Confidence score** - How certain the detection is (0.0 - 1.0)
+- **Implementations** - Specific classes/methods implementing the pattern
+- **Reasoning** - Why the pattern was identified
+
+Higher confidence thresholds reduce false positives but may miss some patterns. Lower thresholds catch more patterns but may include false positives.
 
 ## Commands
 
