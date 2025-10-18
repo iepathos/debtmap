@@ -25,7 +25,7 @@ impl AssertionDetector {
     pub fn analyze_assertions(&mut self, func: &ItemFn) -> Vec<Assertion> {
         self.assertions.clear();
 
-        // Check for #[should_panic]
+        // Check for `#[should_panic]`
         if self.has_should_panic_attribute(func) {
             self.assertions.push(Assertion {
                 assertion_type: RustAssertionType::ShouldPanic,
@@ -57,7 +57,7 @@ impl AssertionDetector {
         self.assertions.is_empty()
     }
 
-    /// Check for #[should_panic] attribute
+    /// Check for `\[should_panic\]` attribute
     fn has_should_panic_attribute(&self, func: &ItemFn) -> bool {
         func.attrs.iter().any(|attr| {
             attr.path().is_ident("should_panic")

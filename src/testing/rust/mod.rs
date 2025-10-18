@@ -18,7 +18,7 @@
 //! - Counts assertions per test (`assert!`, `assert_eq!`, `assert_ne!`)
 //! - Detects tests with no assertions
 //! - Identifies Result-based tests
-//! - Tracks `#[should_panic]` usage
+//! - Tracks `\[should_panic\]` usage
 //!
 //! ### Complexity Scoring
 //! - Conditional statements: +2 per if/match
@@ -35,7 +35,7 @@
 //! - **Hash ordering**: HashMap iteration
 //!
 //! ### Framework Detection
-//! - Standard `#[test]` attribute
+//! - Standard `\[test\]` attribute
 //! - Criterion benchmarks
 //! - Proptest property tests
 //! - Rstest parameterized tests
@@ -53,7 +53,7 @@ use std::path::Path;
 /// Rust test framework types
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RustTestFramework {
-    /// Standard library #[test]
+    /// Standard library `\[test\]` attribute
     Std,
     /// Criterion benchmarks
     Criterion,
@@ -86,7 +86,7 @@ pub enum RustAssertionType {
     AssertNe,
     /// matches!(value, pattern)
     Matches,
-    /// #[should_panic]
+    /// `\[should_panic\]` attribute
     ShouldPanic,
     /// Ok(()) return from test
     ResultOk,
