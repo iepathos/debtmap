@@ -1,9 +1,11 @@
 use super::{
-    calculate_god_object_score, determine_confidence, group_methods_by_responsibility,
-    GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds, MaintainabilityImpact,
-    OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
+    aggregate_weighted_complexity, calculate_avg_complexity, calculate_god_object_score,
+    calculate_god_object_score_weighted, determine_confidence, group_methods_by_responsibility,
+    FunctionComplexityInfo, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
+    MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
+use crate::complexity::cyclomatic::calculate_cyclomatic;
 use std::collections::HashMap;
 use std::path::Path;
 use syn::{self, visit::Visit};
@@ -106,13 +108,29 @@ impl GodObjectDetector {
         let responsibility_groups = group_methods_by_responsibility(&all_methods);
         let responsibility_count = responsibility_groups.len();
 
-        let god_object_score = calculate_god_object_score(
-            total_methods,
-            total_fields,
-            responsibility_count,
-            lines_of_code,
-            &thresholds,
-        );
+        // Calculate complexity-weighted metrics
+        let weighted_method_count = aggregate_weighted_complexity(&visitor.function_complexity);
+        let avg_complexity = calculate_avg_complexity(&visitor.function_complexity);
+
+        // Use weighted scoring if we have complexity data, otherwise fall back to raw count
+        let god_object_score = if !visitor.function_complexity.is_empty() {
+            calculate_god_object_score_weighted(
+                weighted_method_count,
+                total_fields,
+                responsibility_count,
+                lines_of_code,
+                avg_complexity,
+                &thresholds,
+            )
+        } else {
+            calculate_god_object_score(
+                total_methods,
+                total_fields,
+                responsibility_count,
+                lines_of_code,
+                &thresholds,
+            )
+        };
 
         let confidence = determine_confidence(
             total_methods,
@@ -123,7 +141,9 @@ impl GodObjectDetector {
             &thresholds,
         );
 
-        let is_god_object = confidence != GodObjectConfidence::NotGodObject;
+        // With complexity weighting, use the god_object_score to determine if it's a god object
+        // rather than just the confidence level (which still uses raw counts)
+        let is_god_object = god_object_score >= 70.0;
 
         let recommended_splits = if is_god_object {
             let file_name = path
@@ -421,6 +441,7 @@ struct Responsibility {
 struct TypeVisitor {
     types: HashMap<String, TypeAnalysis>,
     standalone_functions: Vec<String>,
+    function_complexity: Vec<FunctionComplexityInfo>,
     location_extractor: Option<UnifiedLocationExtractor>,
 }
 
@@ -429,7 +450,38 @@ impl TypeVisitor {
         Self {
             types: HashMap::new(),
             standalone_functions: Vec::new(),
+            function_complexity: Vec::new(),
             location_extractor,
+        }
+    }
+
+    /// Extract complexity from a function
+    fn extract_function_complexity(&self, item_fn: &syn::ItemFn) -> FunctionComplexityInfo {
+        let name = item_fn.sig.ident.to_string();
+
+        // Check if this is a test function
+        let is_test = item_fn.attrs.iter().any(|attr| {
+            attr.path().is_ident("test")
+                || attr.path().is_ident("cfg")
+                    && attr
+                        .meta
+                        .require_list()
+                        .ok()
+                        .map(|list| {
+                            list.tokens.to_string().contains("test")
+                                || list.tokens.to_string().contains("cfg(test)")
+                        })
+                        .unwrap_or(false)
+        });
+
+        // Calculate cyclomatic complexity from the function body
+        let cyclomatic_complexity = calculate_cyclomatic(&item_fn.block);
+
+        FunctionComplexityInfo {
+            name,
+            cyclomatic_complexity,
+            cognitive_complexity: cyclomatic_complexity, // Using cyclomatic as proxy for now
+            is_test,
         }
     }
 }
@@ -454,6 +506,45 @@ impl TypeVisitor {
         }
 
         (methods, count)
+    }
+
+    /// Extract complexity information from impl methods
+    fn extract_impl_complexity(&self, items: &[syn::ImplItem]) -> Vec<FunctionComplexityInfo> {
+        items
+            .iter()
+            .filter_map(|item| {
+                if let syn::ImplItem::Fn(method) = item {
+                    let name = method.sig.ident.to_string();
+
+                    // Check if this is a test function
+                    let is_test = method.attrs.iter().any(|attr| {
+                        attr.path().is_ident("test")
+                            || attr.path().is_ident("cfg")
+                                && attr
+                                    .meta
+                                    .require_list()
+                                    .ok()
+                                    .map(|list| {
+                                        list.tokens.to_string().contains("test")
+                                            || list.tokens.to_string().contains("cfg(test)")
+                                    })
+                                    .unwrap_or(false)
+                    });
+
+                    // Calculate cyclomatic complexity from the function body
+                    let cyclomatic_complexity = calculate_cyclomatic(&method.block);
+
+                    Some(FunctionComplexityInfo {
+                        name,
+                        cyclomatic_complexity,
+                        cognitive_complexity: cyclomatic_complexity,
+                        is_test,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn update_type_info(&mut self, type_name: &str, node: &syn::ItemImpl) {
@@ -512,12 +603,20 @@ impl<'ast> Visit<'ast> for TypeVisitor {
     fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
         if let Some(type_name) = Self::extract_type_name(&node.self_ty) {
             self.update_type_info(&type_name, node);
+
+            // Extract complexity information for impl methods
+            let complexity_info = self.extract_impl_complexity(&node.items);
+            self.function_complexity.extend(complexity_info);
         }
     }
 
     fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
         // Track standalone functions
         self.standalone_functions.push(node.sig.ident.to_string());
+
+        // Extract complexity information
+        let complexity_info = self.extract_function_complexity(node);
+        self.function_complexity.push(complexity_info);
     }
 }
 

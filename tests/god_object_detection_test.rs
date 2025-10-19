@@ -4,7 +4,8 @@ use debtmap::organization::{
 };
 use std::path::Path;
 
-/// Test that a file with many standalone functions is detected as a god object
+/// Test that a file with many simple/empty standalone functions is NOT flagged as a god object
+/// (complexity-weighted scoring rewards simple functions)
 #[test]
 fn test_detects_file_with_many_standalone_functions() {
     let code = r#"
@@ -44,22 +45,20 @@ fn test_detects_file_with_many_standalone_functions() {
     let detector = GodObjectDetector::with_source_content(code);
     let analysis = detector.analyze_comprehensive(Path::new("test.rs"), &file);
 
-    assert!(
-        analysis.is_god_object,
-        "File with 30 functions should be detected as god object"
-    );
     assert_eq!(
         analysis.method_count, 30,
         "Should count all 30 standalone functions"
     );
+    // With complexity weighting, 30 simple functions (complexity 1 each) should have
+    // a low weighted count (~5.77) which is well below the threshold of 20
     assert!(
-        analysis.god_object_score >= 100.0,
-        "God object score should be at least 100"
+        !analysis.is_god_object,
+        "File with 30 simple functions should NOT be flagged as god object with complexity weighting"
     );
-    assert_ne!(
-        analysis.confidence,
-        GodObjectConfidence::NotGodObject,
-        "Should have confidence in detection"
+    assert!(
+        analysis.god_object_score < 100.0,
+        "God object score should be less than 100 for simple functions, got {}",
+        analysis.god_object_score
     );
 }
 
@@ -129,6 +128,7 @@ fn test_minimum_score_enforcement() {
 }
 
 /// Test that mixed files with structs and standalone functions are properly analyzed
+/// with complexity weighting
 #[test]
 fn test_mixed_struct_and_functions() {
     let code = r#"
@@ -136,7 +136,7 @@ fn test_mixed_struct_and_functions() {
             field1: i32,
             field2: String,
         }
-        
+
         impl MyStruct {
             fn method1(&self) {}
             fn method2(&self) {}
@@ -144,7 +144,7 @@ fn test_mixed_struct_and_functions() {
             fn method4(&self) {}
             fn method5(&self) {}
         }
-        
+
         fn standalone1() {}
         fn standalone2() {}
         fn standalone3() {}
@@ -171,18 +171,21 @@ fn test_mixed_struct_and_functions() {
     let detector = GodObjectDetector::with_source_content(code);
     let analysis = detector.analyze_comprehensive(Path::new("mixed.rs"), &file);
 
-    assert!(
-        analysis.is_god_object,
-        "File with 25 total methods should be detected as god object"
-    );
     assert_eq!(
         analysis.method_count, 25,
         "Should count 5 impl methods + 20 standalone functions"
     );
     assert_eq!(analysis.field_count, 2, "Should count 2 struct fields");
+    // With complexity weighting, 25 simple functions (complexity 1 each) should have
+    // a low weighted count (~4.8) which is well below the threshold of 20
     assert!(
-        analysis.god_object_score >= 100.0,
-        "God object score should be at least 100"
+        !analysis.is_god_object,
+        "File with 25 simple functions should NOT be flagged as god object with complexity weighting"
+    );
+    assert!(
+        analysis.god_object_score < 100.0,
+        "God object score should be less than 100 for simple functions, got {}",
+        analysis.god_object_score
     );
 }
 
