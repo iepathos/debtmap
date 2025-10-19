@@ -1,8 +1,8 @@
 use super::{
     aggregate_weighted_complexity, calculate_avg_complexity, calculate_god_object_score,
     calculate_god_object_score_weighted, determine_confidence, group_methods_by_responsibility,
-    FunctionComplexityInfo, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
-    MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
+    FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds, MaintainabilityImpact,
+    OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
