@@ -477,6 +477,83 @@ Debtmap distinguishes between genuinely complex code and pattern-based repetitiv
 
 This prevents false positives from large but simple pattern-matching code.
 
+## God Object Detection
+
+### Complexity-Weighted Scoring
+
+**Design Problem**: Traditional god object detection relies on raw method counts, which creates false positives for well-refactored code. A file with 100 simple helper functions (complexity 1-3) should not rank higher than a file with 10 highly complex functions (complexity 17+).
+
+**Solution**: DebtMap uses complexity-weighted god object scoring that assigns each function a weight based on its cyclomatic complexity, ensuring that complex functions contribute more to the god object score than simple ones.
+
+#### Weighting Formula
+
+Each function contributes to the god object score based on this formula:
+
+```
+weight = (max(1, complexity) / 3)^1.5
+```
+
+**Examples**:
+- Complexity 1 (simple getter): weight ≈ 0.19
+- Complexity 3 (baseline): weight = 1.0
+- Complexity 9 (moderate): weight ≈ 5.2
+- Complexity 17 (needs refactoring): weight ≈ 13.5
+- Complexity 33 (critical): weight ≈ 36.5
+
+**Key Properties**:
+- **Non-linear scaling**: Higher complexity functions are weighted disproportionately more
+- **Baseline normalization**: Complexity 3 is normalized to weight 1.0 (typical simple function)
+- **Power law**: The 1.5 exponent ensures exponential growth for high complexity
+
+#### God Object Score Calculation
+
+The complexity-weighted god object score combines multiple factors:
+
+```rust
+weighted_method_count = sum(calculate_complexity_weight(fn.complexity) for fn in functions)
+complexity_penalty = if avg_complexity > 10.0 { 1.5 } else if avg_complexity < 3.0 { 0.7 } else { 1.0 }
+
+god_object_score = (
+    (weighted_method_count / thresholds.weighted_methods_high) * 40.0 +
+    (fields / thresholds.max_fields) * 20.0 +
+    (responsibilities / thresholds.max_responsibilities) * 15.0 +
+    (lines_of_code / 500) * 25.0
+) * complexity_penalty
+```
+
+**Threshold**: A file is considered a god object if `god_object_score >= 70.0`
+
+**Benefits**:
+- Files with many simple functions score lower than files with fewer complex functions
+- Reduces false positives on utility modules with many small helpers
+- Focuses refactoring efforts on truly problematic large, complex modules
+- Aligns with actual maintainability concerns (complexity matters more than count)
+
+#### Comparison: Raw vs Weighted
+
+**Example**: Comparing two files
+
+| File | Method Count | Avg Complexity | Raw Approach | Weighted Approach |
+|------|--------------|----------------|--------------|-------------------|
+| shared_cache.rs | 100 | 1.5 | God object (100 methods) | Normal (weighted: 19.0) |
+| legacy_parser.rs | 10 | 17.0 | Borderline (10 methods) | God object (weighted: 135.0) |
+
+The weighted approach correctly identifies `legacy_parser.rs` as the real problem despite having fewer methods.
+
+#### Implementation Details
+
+**Location**: `src/organization/complexity_weighting.rs`
+
+**Key Functions**:
+- `calculate_complexity_weight(complexity: u32) -> f64`: Pure function to calculate weight for a single function
+- `aggregate_weighted_complexity(functions: &[FunctionComplexityInfo]) -> f64`: Sum weights across all non-test functions
+- `calculate_avg_complexity(functions: &[FunctionComplexityInfo]) -> f64`: Calculate average complexity for penalty calculation
+- `calculate_complexity_penalty(avg_complexity: f64) -> f64`: Apply bonus/penalty based on average complexity
+
+**Integration**: The god object detector in `src/organization/god_object_detector.rs` automatically uses complexity-weighted scoring when cyclomatic complexity data is available, falling back to raw count scoring otherwise.
+
+**Testing**: Comprehensive unit tests validate the weighting formula and ensure that files with many simple functions score significantly lower than files with fewer complex functions.
+
 ## Dependencies
 
 ### Core Dependencies
