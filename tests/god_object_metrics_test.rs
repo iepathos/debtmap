@@ -6,33 +6,24 @@ use std::path::{Path, PathBuf};
 fn test_metrics_tracking_integration() {
     let mut metrics = GodObjectMetrics::new();
 
-    // Create a file with many functions (god object)
+    // Create a file with many COMPLEX functions (god object)
+    // With complexity weighting, we need actual complexity to trigger detection
     let god_object_code = r#"
-        fn function1() {}
-        fn function2() {}
-        fn function3() {}
-        fn function4() {}
-        fn function5() {}
-        fn function6() {}
-        fn function7() {}
-        fn function8() {}
-        fn function9() {}
-        fn function10() {}
-        fn function11() {}
-        fn function12() {}
-        fn function13() {}
-        fn function14() {}
-        fn function15() {}
-        fn function16() {}
-        fn function17() {}
-        fn function18() {}
-        fn function19() {}
-        fn function20() {}
-        fn function21() {}
-        fn function22() {}
-        fn function23() {}
-        fn function24() {}
-        fn function25() {}
+        fn function1(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function2(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function3(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function4(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function5(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function6(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function7(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function8(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function9(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function10(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function11(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function12(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function13(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function14(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function15(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
     "#;
 
     let file = syn::parse_file(god_object_code).expect("Failed to parse");
@@ -87,9 +78,9 @@ fn test_metrics_tracking_integration() {
 fn test_multi_file_metrics_tracking() {
     let mut metrics = GodObjectMetrics::new();
 
-    // File 1: God object
-    let code1 = (0..30)
-        .map(|i| format!("fn func_{}() {{}}", i))
+    // File 1: God object with complex functions
+    let code1 = (0..15)
+        .map(|i| format!("fn func_{}(x: i32) -> i32 {{ if x > 0 {{ if x > 10 {{ x * 2 }} else {{ x }} }} else {{ 0 }} }}", i))
         .collect::<Vec<_>>()
         .join("\n");
     let file1 = syn::parse_file(&code1).expect("Failed to parse");
@@ -127,7 +118,7 @@ fn test_multi_file_metrics_tracking() {
         .find(|h| h.file_path == PathBuf::from("file1.rs"))
         .unwrap();
     assert!(file1_history.current_is_god_object);
-    assert_eq!(file1_history.max_methods, 30);
+    assert_eq!(file1_history.max_methods, 15);
 
     let file2_history = metrics
         .summary
@@ -156,9 +147,9 @@ fn test_new_god_object_detection() {
 
     metrics.record_snapshot(PathBuf::from("growing.rs"), small_analysis);
 
-    // File grows into a god object
-    let large_code = (0..30)
-        .map(|i| format!("fn func_{}() {{}}", i))
+    // File grows into a god object with complex functions
+    let large_code = (0..15)
+        .map(|i| format!("fn func_{}(x: i32) -> i32 {{ if x > 0 {{ if x > 10 {{ x * 2 }} else {{ x }} }} else {{ 0 }} }}", i))
         .collect::<Vec<_>>()
         .join("\n");
     let large_file = syn::parse_file(&large_code).expect("Failed to parse");

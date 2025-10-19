@@ -126,6 +126,75 @@ pub fn calculate_god_object_score(
     }
 }
 
+/// Calculate complexity-weighted god object score.
+///
+/// Unlike raw method counting, this function weights each method by its
+/// cyclomatic complexity, ensuring that 100 simple functions (complexity 1-3)
+/// score better than 10 complex functions (complexity 17+).
+///
+/// # Arguments
+///
+/// * `weighted_method_count` - Sum of complexity weights for all functions
+/// * `field_count` - Number of fields in the type
+/// * `responsibility_count` - Number of distinct responsibilities
+/// * `lines_of_code` - Total lines of code
+/// * `avg_complexity` - Average cyclomatic complexity across functions
+/// * `thresholds` - God object thresholds for the language
+///
+/// # Returns
+///
+/// God object score (0-100+). Scores >70 indicate definite god objects.
+pub fn calculate_god_object_score_weighted(
+    weighted_method_count: f64,
+    field_count: usize,
+    responsibility_count: usize,
+    lines_of_code: usize,
+    avg_complexity: f64,
+    thresholds: &GodObjectThresholds,
+) -> f64 {
+    // Use weighted count instead of raw count
+    let method_factor = (weighted_method_count / thresholds.max_methods as f64).min(3.0);
+    let field_factor = (field_count as f64 / thresholds.max_fields as f64).min(3.0);
+    let responsibility_factor = (responsibility_count as f64 / 3.0).min(3.0);
+    let size_factor = (lines_of_code as f64 / thresholds.max_lines as f64).min(3.0);
+
+    // Add complexity bonus/penalty
+    let complexity_factor = if avg_complexity < 3.0 {
+        0.7 // Reward simple functions
+    } else if avg_complexity > 10.0 {
+        1.5 // Penalize complex functions
+    } else {
+        1.0
+    };
+
+    // Calculate violation count for minimum score determination
+    let mut violation_count = 0;
+    if weighted_method_count > thresholds.max_methods as f64 {
+        violation_count += 1;
+    }
+    if field_count > thresholds.max_fields {
+        violation_count += 1;
+    }
+    if responsibility_count > thresholds.max_traits {
+        violation_count += 1;
+    }
+    if lines_of_code > thresholds.max_lines {
+        violation_count += 1;
+    }
+
+    // Exponential scaling for severe violations
+    let base_score = method_factor * field_factor * responsibility_factor * size_factor;
+
+    // Apply complexity factor and ensure minimum score for violations
+    if violation_count > 0 {
+        let min_score = 100.0;
+        let severity_multiplier = violation_count as f64;
+        (base_score * 50.0 * complexity_factor * severity_multiplier).max(min_score)
+    } else {
+        base_score * 10.0 * complexity_factor
+    }
+}
+
 pub fn determine_confidence(
     method_count: usize,
     field_count: usize,
