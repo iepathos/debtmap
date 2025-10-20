@@ -250,6 +250,7 @@ mod tests {
                 GodObjectConfidence::NotGodObject
             },
             responsibilities: Vec::new(),
+            purity_distribution: None,
         }
     }
 

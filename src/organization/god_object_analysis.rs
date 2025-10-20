@@ -13,6 +13,19 @@ pub struct GodObjectAnalysis {
     pub recommended_splits: Vec<ModuleSplit>,
     pub confidence: GodObjectConfidence,
     pub responsibilities: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purity_distribution: Option<PurityDistribution>,
+}
+
+/// Distribution of functions by purity level
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PurityDistribution {
+    pub pure_count: usize,
+    pub probably_pure_count: usize,
+    pub impure_count: usize,
+    pub pure_weight_contribution: f64,
+    pub probably_pure_weight_contribution: f64,
+    pub impure_weight_contribution: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -4,11 +4,12 @@ use syn;
 pub mod complexity_weighting;
 pub mod god_object_analysis;
 pub mod god_object_metrics;
+pub mod purity_analyzer;
 
 pub use god_object_analysis::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
     group_methods_by_responsibility, recommend_module_splits, GodObjectAnalysis,
-    GodObjectConfidence, GodObjectThresholds, ModuleSplit,
+    GodObjectConfidence, GodObjectThresholds, ModuleSplit, PurityDistribution,
 };
 
 pub use god_object_metrics::{
@@ -21,6 +22,8 @@ pub use complexity_weighting::{
     calculate_complexity_weight, ComplexityWeight, ComplexityWeightedAnalysis,
     FunctionComplexityInfo,
 };
+
+pub use purity_analyzer::{PurityAnalyzer, PurityIndicators, PurityLevel};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrganizationAntiPattern {
