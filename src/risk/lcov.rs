@@ -730,4 +730,257 @@ end_of_record
         assert_eq!(data.get_overall_coverage(), 0.0);
         assert_eq!(data.functions.len(), 0);
     }
+
+    // Tests for find_functions_by_path
+    mod find_functions_by_path_tests {
+        use super::*;
+
+        fn create_test_function_coverage(name: &str) -> Vec<FunctionCoverage> {
+            vec![FunctionCoverage {
+                name: name.to_string(),
+                start_line: 10,
+                execution_count: 5,
+                coverage_percentage: 60.0,
+                uncovered_lines: vec![12, 13],
+            }]
+        }
+
+        #[test]
+        fn test_strategy_1_suffix_matching_sequential() {
+            // Test Strategy 1: query_path.ends_with(lcov_path)
+            // Sequential path (<=20 items)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("src/main.rs"),
+                create_test_function_coverage("main"),
+            );
+
+            let query = PathBuf::from("/home/user/project/src/main.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "main");
+        }
+
+        #[test]
+        fn test_strategy_2_reverse_suffix_matching_sequential() {
+            // Test Strategy 2: lcov_path.ends_with(normalized_query)
+            // Sequential path (<=20 items)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("/home/user/project/src/lib.rs"),
+                create_test_function_coverage("lib_func"),
+            );
+
+            let query = PathBuf::from("./src/lib.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "lib_func");
+        }
+
+        #[test]
+        fn test_strategy_3_normalized_equality_sequential() {
+            // Test Strategy 3: normalize_path(lcov_path) == normalize_path(query_path)
+            // Sequential path (<=20 items)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("./src/utils.rs"),
+                create_test_function_coverage("util_func"),
+            );
+
+            let query = PathBuf::from("src/utils.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "util_func");
+        }
+
+        #[test]
+        fn test_strategy_1_suffix_matching_parallel() {
+            // Test Strategy 1 with >20 items (parallel path)
+            let mut functions = HashMap::new();
+
+            // Add 21 items to trigger parallel path
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            // Add our target
+            functions.insert(
+                PathBuf::from("src/target.rs"),
+                create_test_function_coverage("target_func"),
+            );
+
+            let query = PathBuf::from("/home/user/project/src/target.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "target_func");
+        }
+
+        #[test]
+        fn test_strategy_2_reverse_suffix_matching_parallel() {
+            // Test Strategy 2 with >20 items (parallel path)
+            let mut functions = HashMap::new();
+
+            // Add 21 items to trigger parallel path
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            // Add our target with absolute path
+            functions.insert(
+                PathBuf::from("/home/user/project/src/target.rs"),
+                create_test_function_coverage("target_func"),
+            );
+
+            // Query with relative path
+            let query = PathBuf::from("./src/target.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "target_func");
+        }
+
+        #[test]
+        fn test_strategy_3_normalized_equality_parallel() {
+            // Test Strategy 3 with >20 items (parallel path)
+            let mut functions = HashMap::new();
+
+            // Add 21 items to trigger parallel path
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            // Add our target with ./ prefix
+            functions.insert(
+                PathBuf::from("./src/target.rs"),
+                create_test_function_coverage("target_func"),
+            );
+
+            // Query without ./ prefix
+            let query = PathBuf::from("src/target.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "target_func");
+        }
+
+        #[test]
+        fn test_no_match_found() {
+            // Test when no strategy matches
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("src/main.rs"),
+                create_test_function_coverage("main"),
+            );
+
+            let query = PathBuf::from("src/different.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_empty_map() {
+            // Test with empty function map
+            let functions = HashMap::new();
+            let query = PathBuf::from("src/main.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_single_item_map() {
+            // Test edge case with exactly 1 item (sequential path)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("src/single.rs"),
+                create_test_function_coverage("single_func"),
+            );
+
+            let query = PathBuf::from("./src/single.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "single_func");
+        }
+
+        #[test]
+        fn test_exactly_20_items() {
+            // Test boundary case with exactly 20 items (should use sequential)
+            let mut functions = HashMap::new();
+
+            for i in 0..20 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            let query = PathBuf::from("./src/file_10.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "func_10");
+        }
+
+        #[test]
+        fn test_exactly_21_items() {
+            // Test boundary case with exactly 21 items (should use parallel)
+            let mut functions = HashMap::new();
+
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            let query = PathBuf::from("./src/file_10.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "func_10");
+        }
+
+        #[test]
+        fn test_normalize_path_idempotency() {
+            // Test that normalize_path is idempotent
+            let path1 = PathBuf::from("./src/main.rs");
+            let normalized1 = normalize_path(&path1);
+            let normalized2 = normalize_path(&normalized1);
+
+            assert_eq!(normalized1, normalized2);
+        }
+
+        #[test]
+        fn test_normalize_path_removes_leading_dot_slash() {
+            // Test that normalize_path removes leading ./
+            let path = PathBuf::from("./src/main.rs");
+            let normalized = normalize_path(&path);
+
+            assert_eq!(normalized, PathBuf::from("src/main.rs"));
+        }
+
+        #[test]
+        fn test_normalize_path_no_leading_dot_slash() {
+            // Test that normalize_path doesn't affect paths without leading ./
+            let path = PathBuf::from("src/main.rs");
+            let normalized = normalize_path(&path);
+
+            assert_eq!(normalized, PathBuf::from("src/main.rs"));
+        }
+    }
 }
