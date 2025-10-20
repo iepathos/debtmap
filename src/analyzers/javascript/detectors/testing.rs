@@ -405,6 +405,14 @@ fn parse_test_name(node: Node, source: &str) -> String {
         .to_string()
 }
 
+fn create_async_test_issue(body_node: Node, test_name: String) -> TestingAntiPattern {
+    TestingAntiPattern::AsyncTestIssue {
+        location: SourceLocation::from_node(body_node),
+        test_name,
+        issue_type: "async operations without await or done callback".to_string(),
+    }
+}
+
 fn detect_async_test_issues(
     root: Node,
     source: &str,
@@ -428,12 +436,7 @@ fn detect_async_test_issues(
 
                         // Check if test contains async operations without proper handling
                         if contains_async_operations(body_text) {
-                            issues.push(TestingAntiPattern::AsyncTestIssue {
-                                location: SourceLocation::from_node(*body),
-                                test_name,
-                                issue_type: "async operations without await or done callback"
-                                    .to_string(),
-                            });
+                            issues.push(create_async_test_issue(*body, test_name));
                         }
                     }
                 }
@@ -1008,6 +1011,40 @@ mod tests {
                     name, "example test",
                     "Should parse test name with backticks"
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_async_test_issue() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('async test', () => { fetch('/api'); });";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(body_node) = extract_test_body(&match_) {
+                let issue = create_async_test_issue(*body_node, "async test".to_string());
+
+                if let TestingAntiPattern::AsyncTestIssue {
+                    test_name,
+                    issue_type,
+                    ..
+                } = issue
+                {
+                    assert_eq!(test_name, "async test");
+                    assert_eq!(
+                        issue_type,
+                        "async operations without await or done callback"
+                    );
+                } else {
+                    panic!("Expected AsyncTestIssue");
+                }
             }
         }
     }
